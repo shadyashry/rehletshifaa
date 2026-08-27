@@ -1,67 +1,283 @@
 {
-  "nav": { "home": "Home", "cardiology": "Cardiology", "consultants": "Consultants", "how": "How It Works", "send": "Send My Case", "language": "العربية" },
+  "nav": {
+    "home": "Home",
+    "cardiology": "Cardiology",
+    "consultants": "Consultants",
+    "how": "How It Works",
+    "send": "Send My Case",
+    "language": "العربية",
+    "languageAria": "Switch language to Arabic"
+  },
   "common": {
-    "brand": "RehletShifaa", "tagline": "Your Journey to Better Care", "send": "Send My Case", "whatsapp": "Talk to a Patient Coordinator", "explore": "Explore Cardiology", "profile": "View Consultant Profile",
+    "brand": "RehletShifaa",
+    "tagline": "Your Journey to Better Care",
+    "send": "Send My Case",
+    "whatsapp": "Talk to a Patient Coordinator",
+    "explore": "Explore Cardiology",
+    "profile": "View Consultant Profile",
     "emergency": "RehletShifaa is not an emergency medical service. If you are experiencing severe chest pain, severe shortness of breath, loss of consciousness, or another medical emergency, seek immediate emergency medical care in your current location.",
+    "emergencyLabel": "Emergency",
     "medicalNotice": "RehletShifaa coordinates access to medical review and care. Information provided through the platform does not replace emergency care or a complete clinical assessment. Final medical decisions are made by the treating consultant following appropriate evaluation.",
-    "privacy": "Privacy Policy", "terms": "Terms of Use", "disclaimer": "Medical Disclaimer", "menu": "Open menu"
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "disclaimer": "Medical Disclaimer",
+    "menu": "Open menu",
+    "menuClose": "Close menu",
+    "skip": "Skip to main content",
+    "brandArabic": "رحلة شفاء"
   },
   "home": {
     "eyebrow": "International cardiac care coordination",
     "title": "Your Journey to Better Heart Care",
     "intro": "Send your medical reports and let RehletShifaa help direct your case to the appropriate cardiac consultant before you travel to Egypt.",
     "reassurance": "Not sure which cardiac specialty you need? You don't have to be.",
-    "areasEyebrow": "Cardiac care areas", "areasTitle": "Specialist pathways, guided by your case",
-    "areas": [
-      { "title": "Coronary Arteries & Cardiac Catheterization", "body": "For patients requiring evaluation for coronary angiography, PCI, stents or complex coronary intervention." },
-      { "title": "Heart Valves & Structural Heart", "body": "Advanced assessment and catheter-based valve interventions including TAVI/TAVR and selected mitral and tricuspid interventions." },
-      { "title": "Heart Rhythm & Cardiac Devices", "body": "Assessment for Pacemaker, ICD, CRT-P and CRT-D when medically appropriate." }
+    "assurances": [
+      "Reviewed by a cardiac consultant before you decide to travel",
+      "Reports uploaded through private, short-lived links",
+      "One coordinator, in Arabic or English, from first contact to follow-up"
     ],
-    "howEyebrow": "A clear process", "howTitle": "How your journey works",
-    "steps": ["Send Your Case", "Your Coordinator Organizes It", "Consultant Review", "Understand Your Next Step", "We Coordinate Your Journey"],
-    "coordinatorTitle": "One Person Supporting Your Journey", "coordinatorBody": "Your Patient Coordinator stays connected with you from your first contact through treatment coordination and follow-up.",
-    "beforeTitle": "Understand Your Care Path Before You Travel", "beforeBody": "Where medically possible, RehletShifaa helps you understand the proposed next steps and expected arrangements before deciding to travel.",
-    "finalTitle": "Start With Your Medical Case", "finalBody": "You don't need to know the name of the specialty or procedure. Send what you have. We'll help with the next step."
+    "heroCardTitle": "After you send your case",
+    "heroCardNote": "The platform does not diagnose. Every clinical recommendation comes from the treating consultant.",
+    "areasEyebrow": "Cardiac care areas",
+    "areasTitle": "Specialist pathways, guided by your case",
+    "areas": [
+      {
+        "title": "Coronary Arteries & Cardiac Catheterization",
+        "body": "For patients requiring evaluation for coronary angiography, PCI, stents or complex coronary intervention."
+      },
+      {
+        "title": "Heart Valves & Structural Heart",
+        "body": "Advanced assessment and catheter-based valve interventions including TAVI/TAVR and selected mitral and tricuspid interventions."
+      },
+      {
+        "title": "Heart Rhythm & Cardiac Devices",
+        "body": "Assessment for Pacemaker, ICD, CRT-P and CRT-D when medically appropriate."
+      }
+    ],
+    "howEyebrow": "A clear process",
+    "howTitle": "How your journey works",
+    "howIntro": "Five steps, each with a named person responsible for it.",
+    "steps": [
+      "Send Your Case",
+      "Your Coordinator Organizes It",
+      "Consultant Review",
+      "Understand Your Next Step",
+      "We Coordinate Your Journey"
+    ],
+    "pathsEyebrow": "Two ways in",
+    "pathsTitle": "For patients and for referring doctors",
+    "patientTitle": "For patients",
+    "patientBody": "You do not need to know the name of the specialty or the procedure. Send the reports you already have.",
+    "patientItems": [
+      "Send reports in Arabic or English — your coordinator identifies what is missing.",
+      "A cardiac consultant reviews your case and sets out the next step.",
+      "Understand the proposed pathway before you decide to travel."
+    ],
+    "doctorTitle": "For referring doctors",
+    "doctorBody": "Refer a patient for a consultant cardiac opinion while your own relationship with them stays intact.",
+    "doctorItems": [
+      "Share a case with your patient's documented consent.",
+      "Your patient is reviewed by a named cardiac consultant, not by software.",
+      "Receive discharge documentation and the follow-up outcome with the patient's consent."
+    ],
+    "coordinatorTitle": "One Person Supporting Your Journey",
+    "coordinatorBody": "Your Patient Coordinator stays connected with you from your first contact through treatment coordination and follow-up.",
+    "beforeTitle": "Understand Your Care Path Before You Travel",
+    "beforeBody": "Where medically possible, RehletShifaa helps you understand the proposed next steps and expected arrangements before deciding to travel.",
+    "trustEyebrow": "Privacy and clinical governance",
+    "trustTitle": "How your information is handled",
+    "trustIntro": "Coordinating a cardiac case means handling sensitive medical information. These are the rules the platform is built on.",
+    "trust": [
+      {
+        "title": "The consultant decides",
+        "body": "RehletShifaa coordinates your case. Diagnosis, procedure selection and clinical suitability remain decisions of the treating consultant after appropriate evaluation."
+      },
+      {
+        "title": "Private document handling",
+        "body": "Reports are uploaded straight to private storage through short-lived links. Files are not published, indexed, or listed anywhere public."
+      },
+      {
+        "title": "Consent before review",
+        "body": "Your case is submitted only after you give explicit consent for your information to be processed for the purpose of coordinating your care."
+      },
+      {
+        "title": "Emergency comes first",
+        "body": "If your situation appears urgent, you will be advised to seek emergency care where you are rather than wait to travel."
+      }
+    ],
+    "finalTitle": "Start With Your Medical Case",
+    "finalBody": "You don't need to know the name of the specialty or procedure. Send what you have. We'll help with the next step.",
+    "finalNote": "Sending your case does not commit you to treatment or travel."
+  },
+  "footer": {
+    "description": "Consultant-led coordination of international cardiac care in Egypt, in Arabic and English.",
+    "explore": "Explore",
+    "legal": "Legal",
+    "contact": "Get in touch",
+    "rights": "All rights reserved."
   },
   "cardiology": {
-    "eyebrow": "Consultant-led cardiac pathways", "title": "Advanced Cardiac Care, Guided by Your Case", "intro": "You don't need to choose a cardiac specialty yourself. Send your medical information and RehletShifaa will help direct your case to the appropriate consultant.",
+    "eyebrow": "Consultant-led cardiac pathways",
+    "title": "Advanced Cardiac Care, Guided by Your Case",
+    "intro": "You don't need to choose a cardiac specialty yourself. Send your medical information and RehletShifaa will help direct your case to the appropriate consultant.",
     "coronaryTitle": "Coronary Arteries & Interventional Cardiology",
-    "coronaryItems": ["Coronary Angiography", "Cardiac Catheterization", "PCI / Coronary Angioplasty", "Coronary Stents", "Multiple Stent Procedures", "Complex PCI", "Evaluation for alternative treatment when PCI is not appropriate"],
-    "coronaryExamples": ["Coronary artery narrowing or blockage was diagnosed", "Coronary angiography was already performed", "A doctor recommended a stent", "Multiple blockages were identified", "Coronary disease was described as complex", "Another opinion is required before intervention"],
-    "structuralTitle": "Structural Heart & Valve Interventions", "structuralItems": ["TAVI / TAVR", "Percutaneous Mitral Commissurotomy", "Mitral TEER", "Tricuspid TEER", "Transcatheter Tricuspid Valve Replacement", "Bicaval Valve Implantation"],
+    "coronaryItems": [
+      "Coronary Angiography",
+      "Cardiac Catheterization",
+      "PCI / Coronary Angioplasty",
+      "Coronary Stents",
+      "Multiple Stent Procedures",
+      "Complex PCI",
+      "Evaluation for alternative treatment when PCI is not appropriate"
+    ],
+    "coronaryExamples": [
+      "Coronary artery narrowing or blockage was diagnosed",
+      "Coronary angiography was already performed",
+      "A doctor recommended a stent",
+      "Multiple blockages were identified",
+      "Coronary disease was described as complex",
+      "Another opinion is required before intervention"
+    ],
+    "structuralTitle": "Structural Heart & Valve Interventions",
+    "structuralItems": [
+      "TAVI / TAVR",
+      "Percutaneous Mitral Commissurotomy",
+      "Mitral TEER",
+      "Tricuspid TEER",
+      "Transcatheter Tricuspid Valve Replacement",
+      "Bicaval Valve Implantation"
+    ],
     "suitability": "Suitability for any procedure is determined only after consultant review.",
-    "rhythmTitle": "Heart Rhythm & Cardiac Devices", "rhythmItems": ["Pacemaker", "ICD", "CRT-P", "CRT-D"], "rhythmExamples": ["A doctor recommended a pacemaker", "An ICD was recommended", "CRT was suggested", "A second opinion is needed before device implantation"],
-    "examples": "Patients may contact RehletShifaa if", "finalTitle": "Not Sure Where Your Condition Fits?", "finalBody": "That's completely fine. You do not need to select a specialty. Send your reports and we'll help direct your case to the appropriate consultant."
+    "rhythmTitle": "Heart Rhythm & Cardiac Devices",
+    "rhythmItems": [
+      "Pacemaker",
+      "ICD",
+      "CRT-P",
+      "CRT-D"
+    ],
+    "rhythmExamples": [
+      "A doctor recommended a pacemaker",
+      "An ICD was recommended",
+      "CRT was suggested",
+      "A second opinion is needed before device implantation"
+    ],
+    "examples": "Patients may contact RehletShifaa if",
+    "finalTitle": "Not Sure Where Your Condition Fits?",
+    "finalBody": "That's completely fine. You do not need to select a specialty. Send your reports and we'll help direct your case to the appropriate consultant."
   },
   "consultants": {
-    "eyebrow": "Appropriate expertise for each case", "title": "Experienced Cardiac Consultants", "intro": "Your case is directed to the consultant whose area of expertise is most appropriate for the medical information provided.",
+    "eyebrow": "Appropriate expertise for each case",
+    "title": "Experienced Cardiac Consultants",
+    "intro": "Your case is directed to the consultant whose area of expertise is most appropriate for the medical information provided.",
     "notice": "Development profiles — names and credentials below are clearly marked placeholders and must be replaced with verified consultant data before publication.",
-    "labels": { "expertise": "Area of expertise", "position": "Current position", "experience": "Experience", "procedures": "Key procedures", "qualifications": "Qualifications", "memberships": "Memberships" },
+    "labels": {
+      "expertise": "Area of expertise",
+      "position": "Current position",
+      "experience": "Experience",
+      "procedures": "Key procedures",
+      "qualifications": "Qualifications",
+      "memberships": "Memberships"
+    },
     "people": [
-      { "name": "Consultant profile A", "title": "Placeholder academic title", "expertise": "Interventional cardiology", "position": "To be verified", "experience": "To be verified", "procedures": "Coronary angiography, PCI", "qualifications": "To be verified", "memberships": "To be verified" },
-      { "name": "Consultant profile B", "title": "Placeholder academic title", "expertise": "Structural heart & valve intervention", "position": "To be verified", "experience": "To be verified", "procedures": "TAVI/TAVR, selected valve interventions", "qualifications": "To be verified", "memberships": "To be verified" },
-      { "name": "Consultant profile C", "title": "Placeholder academic title", "expertise": "Electrophysiology & cardiac devices", "position": "To be verified", "experience": "To be verified", "procedures": "Pacemaker, ICD, CRT", "qualifications": "To be verified", "memberships": "To be verified" }
+      {
+        "name": "Consultant profile A",
+        "title": "Placeholder academic title",
+        "expertise": "Interventional cardiology",
+        "position": "To be verified",
+        "experience": "To be verified",
+        "procedures": "Coronary angiography, PCI",
+        "qualifications": "To be verified",
+        "memberships": "To be verified"
+      },
+      {
+        "name": "Consultant profile B",
+        "title": "Placeholder academic title",
+        "expertise": "Structural heart & valve intervention",
+        "position": "To be verified",
+        "experience": "To be verified",
+        "procedures": "TAVI/TAVR, selected valve interventions",
+        "qualifications": "To be verified",
+        "memberships": "To be verified"
+      },
+      {
+        "name": "Consultant profile C",
+        "title": "Placeholder academic title",
+        "expertise": "Electrophysiology & cardiac devices",
+        "position": "To be verified",
+        "experience": "To be verified",
+        "procedures": "Pacemaker, ICD, CRT",
+        "qualifications": "To be verified",
+        "memberships": "To be verified"
+      }
     ],
-    "finalTitle": "You Don't Need to Choose a Consultant", "finalBody": "Not sure which consultant is right for your condition? Send your case and RehletShifaa will help direct it to the appropriate consultant."
+    "finalTitle": "You Don't Need to Choose a Consultant",
+    "finalBody": "Not sure which consultant is right for your condition? Send your case and RehletShifaa will help direct it to the appropriate consultant."
   },
   "how": {
-    "eyebrow": "From reports to follow-up", "title": "Your Care Journey, Clearly Coordinated", "intro": "From your first medical reports to treatment coordination, RehletShifaa helps make the process simpler.",
+    "eyebrow": "From reports to follow-up",
+    "title": "Your Care Journey, Clearly Coordinated",
+    "intro": "From your first medical reports to treatment coordination, RehletShifaa helps make the process simpler.",
     "steps": [
-      { "title": "Send Your Case", "body": "Send the medical reports and investigations already available." },
-      { "title": "Patient Coordinator", "body": "Your dedicated coordinator organizes your information and helps identify missing documents." },
-      { "title": "Consultant Review", "body": "Your case is directed to the appropriate cardiac consultant." },
-      { "title": "Understand Your Care Path", "body": "Recommendations may include further investigation, medical treatment, catheterization, coronary or valve intervention, cardiac devices, surgical evaluation, or another appropriate pathway." },
-      { "title": "Treatment Coordination", "body": "If you decide to proceed in Egypt, RehletShifaa coordinates the required next steps." },
-      { "title": "Treatment & Follow-Up", "body": "Coordination continues through treatment and follow-up according to consultant recommendations." }
+      {
+        "title": "Send Your Case",
+        "body": "Send the medical reports and investigations already available."
+      },
+      {
+        "title": "Patient Coordinator",
+        "body": "Your dedicated coordinator organizes your information and helps identify missing documents."
+      },
+      {
+        "title": "Consultant Review",
+        "body": "Your case is directed to the appropriate cardiac consultant."
+      },
+      {
+        "title": "Understand Your Care Path",
+        "body": "Recommendations may include further investigation, medical treatment, catheterization, coronary or valve intervention, cardiac devices, surgical evaluation, or another appropriate pathway."
+      },
+      {
+        "title": "Treatment Coordination",
+        "body": "If you decide to proceed in Egypt, RehletShifaa coordinates the required next steps."
+      },
+      {
+        "title": "Treatment & Follow-Up",
+        "body": "Coordination continues through treatment and follow-up according to consultant recommendations."
+      }
     ]
   },
   "form": {
-    "eyebrow": "A secure first step", "title": "Send Your Medical Case", "intro": "You don't need to know which cardiac specialty you need. Send what you already have and we'll help guide the next step.",
-    "name": "Full Name", "country": "Country", "phone": "WhatsApp Number", "description": "Tell Us Briefly About Your Condition", "optional": "optional", "files": "Upload Medical Reports / Images", "uploadHelp": "Don't have all your reports? That's okay. Send what you have and your Patient Coordinator will help with the rest.",
-    "consent": "I consent to RehletShifaa processing the information I submit for the purpose of coordinating my medical case.", "send": "Send My Case", "sending": "Sending securely…", "choose": "Choose files", "selected": "files selected",
-    "successTitle": "Your Case Has Been Received", "successBody": "Thank you. A Patient Coordinator will help organize your case and guide you through the next steps.", "caseNumber": "Case Number", "continue": "Continue on WhatsApp",
-    "errors": { "required": "This field is required.", "name": "Please enter your full name.", "phone": "Please enter a valid WhatsApp number.", "consent": "Consent is required to coordinate your case.", "file": "Use PDF, JPG, JPEG or PNG files up to 15 MB each.", "server": "We couldn't send your case right now. Please try again or contact us on WhatsApp." }
+    "eyebrow": "A secure first step",
+    "title": "Send Your Medical Case",
+    "intro": "You don't need to know which cardiac specialty you need. Send what you already have and we'll help guide the next step.",
+    "name": "Full Name",
+    "country": "Country",
+    "phone": "WhatsApp Number",
+    "description": "Tell Us Briefly About Your Condition",
+    "optional": "optional",
+    "files": "Upload Medical Reports / Images",
+    "uploadHelp": "Don't have all your reports? That's okay. Send what you have and your Patient Coordinator will help with the rest.",
+    "consent": "I consent to RehletShifaa processing the information I submit for the purpose of coordinating my medical case.",
+    "send": "Send My Case",
+    "sending": "Sending securely…",
+    "choose": "Choose files",
+    "selected": "files selected",
+    "successTitle": "Your Case Has Been Received",
+    "successBody": "Thank you. A Patient Coordinator will help organize your case and guide you through the next steps.",
+    "caseNumber": "Case Number",
+    "continue": "Continue on WhatsApp",
+    "errors": {
+      "required": "This field is required.",
+      "name": "Please enter your full name.",
+      "phone": "Please enter a valid WhatsApp number.",
+      "consent": "Consent is required to coordinate your case.",
+      "file": "Use PDF, JPG, JPEG or PNG files up to 15 MB each.",
+      "server": "We couldn't send your case right now. Please try again or contact us on WhatsApp."
+    }
   },
-  "legal": { "review": "Placeholder policy — legal review is required before production.", "privacyTitle": "Privacy Policy", "termsTitle": "Terms of Use", "disclaimerTitle": "Medical Disclaimer", "body": "This page outlines the intended policy structure only. It must be reviewed and approved by qualified legal and privacy advisers before RehletShifaa processes real patient information." }
+  "legal": {
+    "review": "Placeholder policy — legal review is required before production.",
+    "privacyTitle": "Privacy Policy",
+    "termsTitle": "Terms of Use",
+    "disclaimerTitle": "Medical Disclaimer",
+    "body": "This page outlines the intended policy structure only. It must be reviewed and approved by qualified legal and privacy advisers before RehletShifaa processes real patient information."
+  }
 }
-

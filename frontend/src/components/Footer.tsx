@@ -1,20 +1,82 @@
 import Link from "next/link";
-import type { Locale } from "@/lib/i18n";
+import { MessageCircle } from "lucide-react";
+
 import type { Dictionary } from "@/lib/dictionary";
+import type { Locale } from "@/lib/i18n";
+import { legalNav, localeHref, primaryNav, whatsappHref, WHATSAPP_INTRO } from "@/lib/links";
+import { Logo } from "./Logo";
+import { TrackedLink } from "./TrackedLink";
 
 export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
-  const links = [["", d.nav.home], ["cardiology", d.nav.cardiology], ["consultants", d.nav.consultants], ["how-it-works", d.nav.how], ["send-my-case", d.nav.send]];
-  return <footer className="bg-[#08263b] text-white">
-    <div className="container-site grid gap-10 py-14 md:grid-cols-[.8fr_1.2fr]">
-      <div><p className="font-brand text-2xl font-extrabold">{d.common.brand}</p><p className="mt-2 text-[#b8d1dc]">{d.common.tagline}</p></div>
-      <div>
-        <nav className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-[#d8e7ed]" aria-label="Footer navigation">
-          {links.map(([path, label]) => <Link key={path} href={`/${locale}${path ? `/${path}` : ""}`}>{label}</Link>)}
-          <Link href={`/${locale}/privacy`}>{d.common.privacy}</Link><Link href={`/${locale}/terms`}>{d.common.terms}</Link><Link href={`/${locale}/medical-disclaimer`}>{d.common.disclaimer}</Link>
-        </nav>
-        <p className="mt-8 max-w-3xl text-xs leading-6 text-[#9fbac6]">{d.common.medicalNotice}</p>
+  const explore = [
+    ...primaryNav(locale, d).slice(1),
+    { href: localeHref(locale, "send-my-case"), label: d.nav.send },
+  ];
+  const legal = legalNav(locale, d);
+  const year = new Date().getFullYear();
+
+  return (
+    <footer className="border-t-2 border-brand-600 bg-mist text-ink-500">
+      <div className="container-site grid gap-10 py-14 sm:grid-cols-2 md:py-16 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] lg:gap-8">
+        <div className="max-w-sm sm:col-span-2 lg:col-span-1">
+          <Logo label={d.common.brand} arabicLabel={d.common.brandArabic} size={36} />
+          <p className="mt-4 text-sm leading-6 text-ink-500">{d.footer.description}</p>
+        </div>
+
+        <FooterColumn title={d.footer.explore}>
+          {explore.map((item) => (
+            <li key={item.href}>
+              <Link href={item.href} className="footer-link">
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </FooterColumn>
+
+        <FooterColumn title={d.footer.legal}>
+          {legal.map((item) => (
+            <li key={item.href}>
+              <Link href={item.href} className="footer-link">
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </FooterColumn>
+
+        <FooterColumn title={d.footer.contact}>
+          <li>
+            <TrackedLink
+              event="whatsapp_clicked"
+              target="_blank"
+              href={whatsappHref(WHATSAPP_INTRO)}
+              className="footer-link inline-flex items-center gap-2"
+            >
+              <MessageCircle size={16} aria-hidden="true" />
+              {d.common.whatsapp}
+            </TrackedLink>
+          </li>
+        </FooterColumn>
       </div>
-    </div>
-  </footer>;
+
+      <div className="border-t border-line">
+        <div className="container-site flex flex-col gap-5 py-8 md:flex-row md:items-start md:justify-between">
+          <p className="max-w-3xl text-xs leading-6 text-ink-500">{d.common.medicalNotice}</p>
+          <p className="shrink-0 text-xs text-ink-500">
+            © {year} {d.common.brand}. {d.footer.rights}
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
 }
 
+function FooterColumn({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h2 className="text-[0.78rem] font-semibold uppercase tracking-[0.12em] text-accent-700 rtl:tracking-normal rtl:normal-case rtl:text-[0.85rem]">
+        {title}
+      </h2>
+      <ul className="mt-4 grid gap-2.5 text-sm">{children}</ul>
+    </div>
+  );
+}
