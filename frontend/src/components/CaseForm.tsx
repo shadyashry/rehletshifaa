@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
 import Script from "next/script";
 import { CheckCircle2, FileUp, LockKeyhole } from "lucide-react";
 import type { Dictionary } from "@/lib/dictionary";
@@ -65,7 +65,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   if (caseNumber) {
     const message = `Hello RehletShifaa, I submitted my medical case. My Case ID is ${caseNumber}.`;
-    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-[#168a86]" size={42} /><h2 className="mt-6 text-3xl font-bold text-[#08263b]">{d.form.successTitle}</h2><p className="lead mt-4">{d.form.successBody}</p><div className="mt-7 rounded-lg bg-[#f4f8fa] p-5"><span className="text-sm text-[#5c7180]">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-[#08263b]">{caseNumber}</strong></div><a className="btn-primary mt-7 w-full sm:w-auto" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "201000000000"}?text=${encodeURIComponent(message)}`}>{d.form.continue}</a></section>;
+    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><a className="btn-primary mt-7 w-full sm:w-auto" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "201000000000"}?text=${encodeURIComponent(message)}`}>{d.form.continue}</a></section>;
   }
 
   return <>
@@ -77,15 +77,19 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       </div>
       <div className="mt-6"><Field label={d.form.phone} error={errors.whatsappNumber}><input className={`field ${errors.whatsappNumber ? "field-error" : ""}`} dir="ltr" inputMode="tel" autoComplete="tel" placeholder="+20 100 000 0000" value={values.whatsappNumber} onChange={e => update("whatsappNumber", e.target.value)} /></Field></div>
       <div className="mt-6"><Field label={`${d.form.description} (${d.form.optional})`} error={errors.conditionDescription}><textarea className="field min-h-28 resize-y" value={values.conditionDescription} maxLength={2000} onChange={e => update("conditionDescription", e.target.value)} /></Field></div>
-      <div className="mt-6"><span className="mb-2 block text-sm font-bold text-[#274a5e]">{d.form.files} ({d.form.optional})</span><label className="flex cursor-pointer flex-col items-center rounded-lg border border-dashed border-[#9cb5c0] bg-[#f8fbfc] px-5 py-8 text-center hover:border-[#176b92]"><FileUp className="text-[#168a86]" /><span className="mt-3 font-bold text-[#176b92]">{d.form.choose}</span>{files.length > 0 && <span className="mt-2 text-sm text-[#5c7180]">{files.length} {d.form.selected}</span>}<input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => onFiles(Array.from(e.target.files ?? []))} /></label>{errors.files && <p className="error-text mt-2">{errors.files}</p>}<p className="mt-3 text-sm leading-6 text-[#5c7180]">{d.form.uploadHelp}</p></div>
-      <label className="mt-7 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-[#168a86]" type="checkbox" checked={values.consent} onChange={e => update("consent", e.target.checked)} /><span className="text-sm leading-6 text-[#385366]">{d.form.consent} <a className="font-bold text-[#176b92] underline" href={`/${locale}/privacy`}>{d.common.privacy}</a></span></label>{errors.consent && <p className="error-text mt-2">{errors.consent}</p>}
+      <div className="mt-6"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.files} ({d.form.optional})</span><label className="flex cursor-pointer flex-col items-center rounded-lg border border-dashed border-line-strong bg-brand-50 px-5 py-8 text-center hover:border-brand-600"><FileUp className="text-accent-700" /><span className="mt-3 font-bold text-brand-700">{d.form.choose}</span>{files.length > 0 && <span className="mt-2 text-sm text-ink-500">{files.length} {d.form.selected}</span>}<input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => onFiles(Array.from(e.target.files ?? []))} /></label>{errors.files && <p className="error-text mt-2">{errors.files}</p>}<p className="mt-3 text-sm leading-6 text-ink-500">{d.form.uploadHelp}</p></div>
+      <label className="mt-7 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={values.consent} onChange={e => update("consent", e.target.checked)} /><span className="text-sm leading-6 text-ink-700">{d.form.consent} <a className="font-bold text-brand-700 underline" href={`/${locale}/privacy`}>{d.common.privacy}</a></span></label>{errors.consent && <p className="error-text mt-2">{errors.consent}</p>}
       {siteKey && <div className="cf-turnstile mt-6" data-sitekey={siteKey} data-callback="onRehletShifaaTurnstile" />}
-      {errors.server && <p className="mt-6 rounded-md bg-[#fff1f2] p-4 text-sm text-[#9c2630]" role="alert">{errors.server}</p>}
-      <button className="btn-primary mt-7 w-full" disabled={busy} type="submit">{busy ? d.form.sending : d.form.send}</button><p className="mt-4 flex items-center justify-center gap-2 text-xs text-[#6a7e8a]"><LockKeyhole size={14} />Secure transmission. Medical decisions remain consultant-led.</p>
+      {errors.server && <p className="mt-6 rounded-md border border-alert-200 bg-alert-50 p-4 text-sm text-alert-800" role="alert">{errors.server}</p>}
+      <button className="btn-primary mt-7 w-full" disabled={busy} type="submit">{busy ? d.form.sending : d.form.send}</button><p className="mt-4 flex items-center justify-center gap-2 text-xs text-ink-500"><LockKeyhole size={14} />Secure transmission. Medical decisions remain consultant-led.</p>
     </form>
   </>;
 }
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactElement<{ "aria-invalid"?: boolean; "aria-describedby"?: string }> }) {
-  return <label className="block"><span className="mb-2 block text-sm font-bold text-[#274a5e]">{label}</span>{children}{error && <span className="error-text mt-2 block">{error}</span>}</label>;
+  const errorId = useId();
+  const control = isValidElement(children)
+    ? cloneElement(children, { "aria-invalid": error ? true : undefined, "aria-describedby": error ? errorId : undefined })
+    : children;
+  return <label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{label}</span>{control}{error && <span id={errorId} className="error-text mt-2 block">{error}</span>}</label>;
 }
