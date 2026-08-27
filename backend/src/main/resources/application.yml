@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: rehletshifaa-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/rehletshifaa}
+    username: ${DB_USERNAME:rehletshifaa}
+    password: ${DB_PASSWORD:rehletshifaa}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 16MB
+      max-request-size: 16MB
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties.mail.smtp.auth: ${MAIL_AUTH:false}
+    properties.mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+  forward-headers-strategy: framework
+management:
+  endpoints.web.exposure.include: health
+  endpoint:
+    health:
+      show-details: never
+      probes.enabled: true
+springdoc:
+  api-docs.enabled: ${OPENAPI_ENABLED:true}
+  swagger-ui.enabled: ${OPENAPI_ENABLED:true}
+app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+  cors.allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000}
+  storage:
+    mode: ${STORAGE_MODE:mock}
+    bucket: ${S3_BUCKET:}
+    region: ${AWS_REGION:eu-central-1}
+    sse-algorithm: ${S3_SSE_ALGORITHM:AES256}
+    kms-key-id: ${S3_KMS_KEY_ID:}
+    max-bytes: ${UPLOAD_MAX_BYTES:15728640}
+    presign-expiry-seconds: ${PRESIGN_EXPIRY_SECONDS:300}
+    allowed-types: application/pdf,image/jpeg,image/png
+  mail:
+    mode: ${MAIL_MODE:noop}
+    coordinator: ${COORDINATOR_EMAIL:coordinator@example.com}
+    from: ${MAIL_FROM:no-reply@example.com}
+  turnstile:
+    enabled: ${TURNSTILE_ENABLED:false}
+    secret: ${TURNSTILE_SECRET:}
+  rate-limit:
+    requests: ${RATE_LIMIT_REQUESTS:30}
+    window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+    trust-proxy: ${RATE_LIMIT_TRUST_PROXY:false}
+

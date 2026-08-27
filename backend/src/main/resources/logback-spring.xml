@@ -1,0 +1,7 @@
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder><pattern>{"timestamp":"%date{ISO8601}","level":"%level","service":"rehletshifaa-backend","requestId":"%X{requestId:-}","logger":"%logger{36}","message":"%replace(%msg){'[\r\n]',' '}"}%n</pattern></encoder>
+  </appender>
+  <root level="INFO"><appender-ref ref="CONSOLE"/></root>
+</configuration>
+

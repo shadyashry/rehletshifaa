@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-unconfirmed-uploads",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "cases/" },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    }
+  ]
+}

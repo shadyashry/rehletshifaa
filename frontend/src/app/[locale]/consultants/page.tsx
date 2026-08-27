@@ -1,0 +1,13 @@
+import type { Metadata } from "next";
+import { BadgeCheck, UserRound } from "lucide-react";
+import { notFound } from "next/navigation";
+import { PageHero } from "@/components/PageHero";
+import { CtaPanel } from "@/components/CtaPanel";
+import { TrackedLink } from "@/components/TrackedLink";
+import { getDictionary } from "@/lib/dictionary";
+import { isLocale } from "@/lib/i18n";
+import { pageMetadata } from "@/lib/metadata";
+type Props = { params: Promise<{ locale: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> { const { locale } = await params; if (!isLocale(locale)) return {}; const d = getDictionary(locale); return pageMetadata(locale, "consultants", d.consultants.title, d.consultants.intro); }
+export default async function Consultants({ params }: Props) { const { locale } = await params; if (!isLocale(locale)) notFound(); const d = getDictionary(locale); return <><PageHero eyebrow={d.consultants.eyebrow} title={d.consultants.title} intro={d.consultants.intro} /><section className="section"><div className="container-site"><p className="rounded-lg border border-[#e8cf8b] bg-[#fffaf0] p-4 text-sm leading-6 text-[#6b541e]">{d.consultants.notice}</p><div className="mt-8 grid gap-6 lg:grid-cols-3">{d.consultants.people.map(person => <article className="card overflow-hidden" key={person.name}><div className="flex aspect-[4/3] items-center justify-center bg-[#eaf1f4]" role="img" aria-label={`${person.name} placeholder portrait`}><UserRound size={72} strokeWidth={1} className="text-[#7894a2]" /></div><div className="p-6"><p className="text-xs font-bold uppercase tracking-wider text-[#168a86]">{person.title}</p><h2 className="mt-2 text-2xl font-bold text-[#08263b]">{person.name}</h2><dl className="mt-6 space-y-4 text-sm">{([['expertise', person.expertise], ['position', person.position], ['experience', person.experience], ['procedures', person.procedures], ['qualifications', person.qualifications], ['memberships', person.memberships]] as const).map(([key, value]) => <div key={key}><dt className="font-bold text-[#385366]">{d.consultants.labels[key]}</dt><dd className="mt-1 leading-6 text-[#6a7e8a]">{value}</dd></div>)}</dl><TrackedLink event="consultant_profile_viewed" href={`/${locale}/consultants#${encodeURIComponent(person.name)}`} className="mt-7 inline-flex items-center gap-2 font-bold text-[#176b92]"><BadgeCheck size={18} />{d.common.profile}</TrackedLink></div></article>)}</div></div></section><CtaPanel locale={locale} title={d.consultants.finalTitle} body={d.consultants.finalBody} button={d.common.send} /></>; }
+

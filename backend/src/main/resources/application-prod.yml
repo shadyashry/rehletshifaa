@@ -1,0 +1,11 @@
+spring:
+  jpa:
+    hibernate.ddl-auto: validate
+springdoc:
+  api-docs.enabled: false
+  swagger-ui.enabled: false
+app:
+  storage.mode: s3
+  mail.mode: smtp
+  turnstile.enabled: true
+

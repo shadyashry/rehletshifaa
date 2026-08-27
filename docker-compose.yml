@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: rehletshifaa
+      POSTGRES_USER: rehletshifaa
+      POSTGRES_PASSWORD: rehletshifaa
+    ports: ["5432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rehletshifaa"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["1025:1025", "8025:8025"]
+  backend:
+    build: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/rehletshifaa
+      DB_USERNAME: rehletshifaa
+      DB_PASSWORD: rehletshifaa
+      STORAGE_MODE: mock
+      MAIL_MODE: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      COORDINATOR_EMAIL: coordinator@local.test
+      MAIL_FROM: no-reply@local.test
+      FRONTEND_ALLOWED_ORIGINS: http://localhost:3000
+      APP_PUBLIC_BASE_URL: http://localhost:8080
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+  frontend:
+    build:
+      context: ./frontend
+      args: {}
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_WHATSAPP_NUMBER: "201000000000"
+    ports: ["3000:3000"]
+    depends_on: [backend]
+volumes:
+  postgres-data:
+

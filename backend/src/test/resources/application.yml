@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:rehletshifaa;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate.ddl-auto: validate
+  flyway.enabled: true
+app:
+  storage.mode: mock
+  public-base-url: http://localhost:8080
+  storage.max-bytes: 15728640
+  storage.presign-expiry-seconds: 300
+  storage.allowed-types: application/pdf,image/jpeg,image/png
+  mail.mode: noop
+  turnstile.enabled: false
+  cors.allowed-origins: http://localhost:3000
+
