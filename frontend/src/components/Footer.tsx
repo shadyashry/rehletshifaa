@@ -16,11 +16,11 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="on-dark bg-brand-900 text-brand-100">
+    <footer className="border-t-2 border-brand-600 bg-mist text-ink-500">
       <div className="container-site grid gap-10 py-14 sm:grid-cols-2 md:py-16 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] lg:gap-8">
         <div className="max-w-sm sm:col-span-2 lg:col-span-1">
-          <Logo label={d.common.brand} tone="light" />
-          <p className="mt-4 text-sm leading-6 text-brand-200">{d.footer.description}</p>
+          <Logo label={d.common.brand} arabicLabel={d.common.brandArabic} size={36} />
+          <p className="mt-4 text-sm leading-6 text-ink-500">{d.footer.description}</p>
         </div>
 
         <FooterColumn title={d.footer.explore}>
@@ -58,10 +58,10 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
         </FooterColumn>
       </div>
 
-      <div className="border-t border-white/10">
+      <div className="border-t border-line">
         <div className="container-site flex flex-col gap-5 py-8 md:flex-row md:items-start md:justify-between">
-          <p className="max-w-3xl text-xs leading-6 text-brand-300">{d.common.medicalNotice}</p>
-          <p className="shrink-0 text-xs text-brand-300">
+          <p className="max-w-3xl text-xs leading-6 text-ink-500">{d.common.medicalNotice}</p>
+          <p className="shrink-0 text-xs text-ink-500">
             © {year} {d.common.brand}. {d.footer.rights}
           </p>
         </div>
@@ -73,7 +73,7 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
 function FooterColumn({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="text-[0.78rem] font-semibold uppercase tracking-[0.12em] text-accent-200 rtl:tracking-normal rtl:normal-case rtl:text-[0.85rem]">
+      <h2 className="text-[0.78rem] font-semibold uppercase tracking-[0.12em] text-accent-700 rtl:tracking-normal rtl:normal-case rtl:text-[0.85rem]">
         {title}
       </h2>
       <ul className="mt-4 grid gap-2.5 text-sm">{children}</ul>

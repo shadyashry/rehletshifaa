@@ -1,51 +1,60 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Design tokens
-   The brand palette (navy / clinical blue / teal) is unchanged; it is promoted
-   from ad-hoc hex literals into a Tailwind theme so utilities such as
-   `bg-brand-900` or `text-ink-500` replace repeated arbitrary values.
+   Design tokens — "Light Healing" system
+   Soft Ink + Healing Teal carry headings and primary actions; Warm Cream and
+   the soft washes (Pale Aqua / Sky Blue / Peach / Lavender) are the only
+   backgrounds — never a full dark fill. Gentle Coral is reserved for the
+   logo's arrival dot and is intentionally absent from the UI utilities.
 --------------------------------------------------------------------------- */
 @theme {
   --font-sans: var(--font-latin), "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-serif: var(--font-brand-serif), Georgia, "Times New Roman", serif;
 
-  /* Primary — deep navy through clinical blue */
-  --color-brand-50: #f2f7fa;
-  --color-brand-100: #dfebf2;
-  --color-brand-200: #c1d8e4;
-  --color-brand-300: #94bccf;
-  --color-brand-400: #5d97b1;
-  --color-brand-500: #327d9c;
-  --color-brand-600: #176b92;
-  --color-brand-700: #145679;
-  --color-brand-800: #103c57;
-  --color-brand-900: #08263b;
-  --color-brand-950: #05192a;
+  /* Brand ramp: aqua tints → Healing Teal → Soft Ink */
+  --color-brand-50: #eef7f5;
+  --color-brand-100: #ddf4f0; /* Pale Aqua */
+  --color-brand-200: #cdeee8;
+  --color-brand-300: #a9ddd6;
+  --color-brand-400: #65bdb5; /* Fresh Aqua */
+  --color-brand-500: #2f8f8a;
+  --color-brand-600: #247c86; /* Healing Teal — primary action, links */
+  --color-brand-700: #1f6b73; /* darker teal — hover / high-contrast text */
+  --color-brand-800: #29454d;
+  --color-brand-900: #29454d; /* Soft Ink — headings, wordmark */
+  --color-brand-950: #1c333a;
 
-  /* Accent — clinical teal, used sparingly for signals and markers */
+  /* Accent = teal signal family (checks, eyebrows, icon strokes) */
   --color-accent-50: #edf7f6;
-  --color-accent-100: #d2ecea;
-  --color-accent-200: #a5d9d5;
-  --color-accent-500: #189a95;
-  --color-accent-600: #168a86;
-  --color-accent-700: #11706d;
-  --color-accent-800: #0d5654;
+  --color-accent-100: #d6efec;
+  --color-accent-200: #a9ddd6;
+  --color-accent-500: #2f8f8a;
+  --color-accent-600: #247c86;
+  --color-accent-700: #1f6b73;
+  --color-accent-800: #17565c;
 
-  /* Neutral ink — all body values meet WCAG AA on white and on --color-mist */
-  --color-ink-900: #0c2434;
-  --color-ink-800: #16344a;
-  --color-ink-700: #27475c;
-  --color-ink-600: #375a6d;
-  --color-ink-500: #4b6a7c;
-  --color-ink-400: #667f8f;
-  --color-ink-300: #93a8b4;
+  /* Neutral ink — all body values meet WCAG AA on white, cream and the washes */
+  --color-ink-900: #29454d;
+  --color-ink-800: #29454d;
+  --color-ink-700: #3c565e;
+  --color-ink-600: #47636b;
+  --color-ink-500: #526970; /* Body Text */
+  --color-ink-400: #6b828a;
+  --color-ink-300: #9fb0b6;
 
   /* Surfaces and rules */
-  --color-line: #dce7ed;
-  --color-line-strong: #c2d5df;
-  --color-mist: #f4f8fa;
-  --color-mist-deep: #eaf1f5;
+  --color-line: #e2ecec;
+  --color-line-strong: #cdd9d9;
+  --color-mist: #fff9f2; /* Warm Cream — dominant soft background */
+  --color-mist-deep: #ddf4f0;
+
+  /* Soft section / card washes */
+  --color-wash-aqua: #ddf4f0;
+  --color-wash-sky: #dcecf9;
+  --color-wash-peach: #fdebe4;
+  --color-wash-lavender: #eeeaf8;
+
+  /* Gentle Coral — logo arrival dot only */
+  --color-coral: #e98d78;
 
   /* Safety notice */
   --color-alert-50: #fdf5f4;
@@ -57,10 +66,9 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Base
-   These declarations must stay inside @layer base. Unlayered rules outrank
-   every Tailwind utility, which previously made `a { color: inherit }` defeat
-   all text-colour utilities on links (the primary CTA rendered white-on-white).
+   Base — must stay inside @layer base. Unlayered rules outrank every Tailwind
+   utility, which would let `a { color: inherit }` defeat text-colour utilities
+   on links (the primary CTA once rendered white-on-white because of this).
 --------------------------------------------------------------------------- */
 @layer base {
   * {
@@ -73,9 +81,9 @@
     overflow-x: hidden;
   }
 
-  /* Arabic copy leads with the Arabic face and falls through to the Latin face
-     for embedded Latin runs. Redefining the theme variable keeps every
-     `font-sans` utility consistent with the document direction. */
+  /* Arabic copy leads with Cairo and falls through to the Latin face for
+     embedded Latin runs. Redefining the theme variable keeps every `font-sans`
+     utility consistent with the document direction. */
   :root[dir="rtl"] {
     --font-sans: var(--font-arabic), var(--font-latin), "Segoe UI", Tahoma, system-ui, sans-serif;
   }
@@ -119,7 +127,7 @@
     border-radius: 3px;
   }
 
-  /* Focus ring inverted on navy surfaces so it stays visible. */
+  /* Focus ring lightened on saturated teal surfaces so it stays visible. */
   .on-dark :focus-visible,
   .on-dark:focus-visible {
     outline-color: var(--color-accent-200);
@@ -145,9 +153,9 @@
   }
 
   .font-brand {
-    font-family: var(--font-serif);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+    font-family: var(--font-latin), "Segoe UI", system-ui, sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.035em;
   }
 
   .eyebrow {
@@ -164,7 +172,7 @@
     font-size: clamp(2.1rem, 1.35rem + 2.55vw, 3.5rem);
     line-height: 1.1;
     letter-spacing: -0.022em;
-    font-weight: 600;
+    font-weight: 800;
     text-wrap: balance;
   }
 
@@ -173,7 +181,7 @@
     font-size: clamp(1.7rem, 1.25rem + 1.5vw, 2.4rem);
     line-height: 1.18;
     letter-spacing: -0.018em;
-    font-weight: 600;
+    font-weight: 700;
     text-wrap: balance;
   }
 
@@ -182,7 +190,7 @@
     font-size: 1.125rem;
     line-height: 1.4;
     letter-spacing: -0.008em;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .lead {
@@ -202,7 +210,7 @@
     min-height: 3rem;
     padding: 0.7rem 1.35rem;
     border-radius: 0.55rem;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 0.975rem;
     text-align: center;
     transition:
@@ -211,10 +219,11 @@
       color 0.18s ease;
   }
 
+  /* Healing Teal is the single primary-action colour. */
   .btn-primary {
-    background: var(--color-brand-900);
+    background: var(--color-brand-600);
     color: #ffffff;
-    border: 1px solid var(--color-brand-900);
+    border: 1px solid var(--color-brand-600);
   }
 
   .btn-primary:hover {
@@ -234,15 +243,16 @@
     background: var(--color-brand-50);
   }
 
+  /* White action on a teal surface. */
   .btn-inverse {
     background: #ffffff;
-    color: var(--color-brand-900);
+    color: var(--color-brand-700);
     border: 1px solid #ffffff;
   }
 
   .btn-inverse:hover {
-    background: var(--color-accent-100);
-    border-color: var(--color-accent-100);
+    background: var(--color-brand-50);
+    border-color: var(--color-brand-50);
   }
 
   .link-cta {
@@ -250,7 +260,7 @@
     align-items: center;
     gap: 0.4rem;
     color: var(--color-brand-600);
-    font-weight: 600;
+    font-weight: 700;
     border-bottom: 1px solid transparent;
     transition:
       color 0.18s ease,
@@ -258,17 +268,17 @@
   }
 
   .link-cta:hover {
-    color: var(--color-brand-800);
+    color: var(--color-brand-700);
     border-bottom-color: currentColor;
   }
 
   .footer-link {
-    color: var(--color-brand-100);
+    color: var(--color-ink-600);
     transition: color 0.18s ease;
   }
 
   .footer-link:hover {
-    color: #ffffff;
+    color: var(--color-brand-700);
     text-decoration: underline;
     text-underline-offset: 4px;
   }
@@ -311,9 +321,9 @@
     z-index: 100;
     padding: 0.75rem 1.15rem;
     border-radius: 0.5rem;
-    background: var(--color-brand-900);
+    background: var(--color-brand-600);
     color: #ffffff;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .skip-link:focus-visible {
