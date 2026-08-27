@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import Image from "next/image";
 
 type LogoVariant = "color" | "reversed" | "mono";
 
@@ -14,9 +15,12 @@ type LogoProps = {
 };
 
 /**
- * "The Guided Arc" — an open ring for an ongoing journey, one pulse notch for
- * vitality, and a warm arrival dot where care is reached. The path data is the
- * final artwork from the brand handoff and must not be altered.
+ * Brand icon — a hand offering a heart: care extended and received, read
+ * left-to-right and right-to-left alike. Sourced from the brand handoff as a
+ * flattened image; the transparent PNG in /public/brand is the one canonical
+ * asset, and the "reversed" (white, for dark surfaces) and "mono" (single
+ * ink) variants are produced from it with CSS filters rather than shipping
+ * separate exports.
  */
 export function GuidedArc({
   variant = "color",
@@ -28,39 +32,23 @@ export function GuidedArc({
   /** Accessible name; omit when the adjacent wordmark already labels the mark. */
   title?: string;
 }) {
-  const ink = variant === "reversed" ? "#ffffff" : "#29454d";
-  const teal = variant === "mono" ? ink : variant === "reversed" ? "#65bdb5" : "#247c86";
-  const coral = variant === "mono" ? ink : "#e98d78";
+  const filter =
+    variant === "reversed"
+      ? "brightness(0) invert(1)"
+      : variant === "mono"
+        ? "brightness(0) saturate(0)"
+        : undefined;
 
   return (
-    <svg
+    <Image
+      src="/brand/icon.png"
+      alt={title ?? ""}
       width={size}
       height={size}
-      viewBox="0 0 100 100"
-      role={title ? "img" : undefined}
-      aria-hidden={title ? undefined : true}
-      aria-label={title}
-      focusable="false"
-    >
-      {title ? <title>{title}</title> : null}
-      <path
-        d="M61.63 81.95 A34 34 0 1 1 81.95 61.63"
-        fill="none"
-        stroke={ink}
-        strokeWidth="9"
-        strokeLinecap="round"
-      />
-      <path
-        d="M81.95 61.63 L81.69 81.69 L61.63 81.95"
-        fill="none"
-        stroke={teal}
-        strokeWidth="9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="81.95" cy="61.63" r="5" fill={ink} />
-      <circle cx="61.63" cy="81.95" r="9" fill={coral} />
-    </svg>
+      className="shrink-0"
+      style={{ width: size, height: size, filter }}
+      priority
+    />
   );
 }
 
