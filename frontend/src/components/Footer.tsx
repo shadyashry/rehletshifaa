@@ -19,7 +19,7 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
     <footer className="border-t-2 border-brand-600 bg-mist text-ink-500">
       <div className="container-site grid gap-10 py-14 sm:grid-cols-2 md:py-16 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] lg:gap-8">
         <div className="max-w-sm sm:col-span-2 lg:col-span-1">
-          <Logo label={d.common.brand} arabicLabel={d.common.brandArabic} size={36} />
+          <Logo label={d.common.brand} accent={d.common.brandAccent} arabicLabel={d.common.brandArabic} arabicAccent={d.common.brandArabicAccent} size={44} />
           <p className="mt-4 text-sm leading-6 text-ink-500">{d.footer.description}</p>
         </div>
 

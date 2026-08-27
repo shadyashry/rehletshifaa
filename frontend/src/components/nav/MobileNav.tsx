@@ -69,7 +69,7 @@ export function MobileNav({ locale, items, labels }: MobileNavProps) {
                 href={item.href}
                 onClick={close}
                 aria-current={pathname === item.href ? "page" : undefined}
-                className="rounded-md px-3 py-3 font-medium text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
+                className="rounded-md px-4 py-3.5 text-[1.02rem] font-medium text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
               >
                 {item.label}
               </Link>

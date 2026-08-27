@@ -93,7 +93,7 @@
     background: #ffffff;
     color: var(--color-ink-800);
     font-family: var(--font-sans);
-    font-size: clamp(1rem, 0.985rem + 0.08vw, 1.05rem);
+    font-size: clamp(1.0625rem, 1.04rem + 0.12vw, 1.125rem);
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -144,7 +144,7 @@
   }
 
   .section {
-    padding-block: clamp(3.25rem, 5.5vw, 5.5rem);
+    padding-block: clamp(4rem, 6.5vw, 6.5rem);
   }
 
   .section-soft {
@@ -160,7 +160,7 @@
 
   .eyebrow {
     color: var(--color-accent-700);
-    font-size: 0.78rem;
+    font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -169,8 +169,8 @@
 
   .display {
     color: var(--color-brand-900);
-    font-size: clamp(2.05rem, 1.4rem + 2.35vw, 3.35rem);
-    line-height: 1.12;
+    font-size: clamp(2.4rem, 1.6rem + 2.75vw, 3.9rem);
+    line-height: 1.1;
     letter-spacing: -0.022em;
     font-weight: 700;
     text-wrap: balance;
@@ -178,7 +178,7 @@
 
   .headline {
     color: var(--color-brand-900);
-    font-size: clamp(1.7rem, 1.25rem + 1.5vw, 2.4rem);
+    font-size: clamp(1.9rem, 1.4rem + 1.7vw, 2.7rem);
     line-height: 1.18;
     letter-spacing: -0.018em;
     font-weight: 700;
@@ -187,7 +187,7 @@
 
   .title {
     color: var(--color-brand-900);
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     line-height: 1.4;
     letter-spacing: -0.008em;
     font-weight: 700;
@@ -195,7 +195,7 @@
 
   .lead {
     color: var(--color-ink-600);
-    font-size: clamp(1.02rem, 0.98rem + 0.25vw, 1.15rem);
+    font-size: clamp(1.1rem, 1.05rem + 0.3vw, 1.25rem);
     line-height: 1.72;
     text-wrap: pretty;
   }
@@ -207,11 +207,11 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    min-height: 3.25rem;
-    padding: 0.78rem 1.4rem;
+    min-height: 3.5rem;
+    padding: 0.9rem 1.6rem;
     border-radius: 0.75rem;
     font-weight: 700;
-    font-size: 0.975rem;
+    font-size: 1.0625rem;
     text-align: center;
     transition:
       background-color 0.18s ease,
@@ -295,7 +295,7 @@
 
   .field {
     width: 100%;
-    min-height: 3.1rem;
+    min-height: 3.35rem;
     padding: 0.8rem 0.9rem;
     border: 1px solid var(--color-line-strong);
     border-radius: 0.55rem;
@@ -370,7 +370,7 @@
   [dir="rtl"] .eyebrow {
     letter-spacing: 0;
     text-transform: none;
-    font-size: 0.85rem;
+    font-size: 0.92rem;
   }
 
   [dir="rtl"] .lead,

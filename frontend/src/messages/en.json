@@ -24,7 +24,9 @@
     "menu": "Open menu",
     "menuClose": "Close menu",
     "skip": "Skip to main content",
-    "brandArabic": "رحلة شفاء"
+    "brandArabic": "رحلة شفاء",
+    "brandAccent": "Shifaa",
+    "brandArabicAccent": "شفاء"
   },
   "home": {
     "eyebrow": "International cardiac care coordination",
