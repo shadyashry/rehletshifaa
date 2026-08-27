@@ -15,7 +15,7 @@
     "whatsapp": "Talk to a Patient Coordinator",
     "explore": "Explore Cardiology",
     "profile": "View Consultant Profile",
-    "emergency": "RehletShifaa is not an emergency medical service. If you are experiencing severe chest pain, severe shortness of breath, loss of consciousness, or another medical emergency, seek immediate emergency medical care in your current location.",
+    "emergency": "Emergency symptoms? RehletShifaa is not an emergency service. Call your local emergency number or seek urgent care now.",
     "emergencyLabel": "Emergency",
     "medicalNotice": "RehletShifaa coordinates access to medical review and care. Information provided through the platform does not replace emergency care or a complete clinical assessment. Final medical decisions are made by the treating consultant following appropriate evaluation.",
     "privacy": "Privacy Policy",
@@ -30,14 +30,48 @@
     "eyebrow": "International cardiac care coordination",
     "title": "Your Journey to Better Heart Care",
     "intro": "Send your medical reports and let RehletShifaa help direct your case to the appropriate cardiac consultant before you travel to Egypt.",
-    "reassurance": "Not sure which cardiac specialty you need? You don't have to be.",
+    "primaryAction": "Start My Care Review",
+    "watchJourney": "Watch the Journey",
+    "reassurance": "You do not need a diagnosis or the name of a procedure to begin.",
     "assurances": [
       "Reviewed by a cardiac consultant before you decide to travel",
       "Reports uploaded through private, short-lived links",
       "One coordinator, in Arabic or English, from first contact to follow-up"
     ],
-    "heroCardTitle": "After you send your case",
-    "heroCardNote": "The platform does not diagnose. Every clinical recommendation comes from the treating consultant.",
+    "heroCardTitle": "Begin with what you already have",
+    "prepareItems": [
+      "Your latest medical report or discharge summary",
+      "Available scans, test results, or medical images",
+      "A short note about what you need help with"
+    ],
+    "heroCardNote": "Your coordinator will tell you what is missing before a consultant reviews your case.",
+    "video": {
+      "eyebrow": "Your journey, explained",
+      "title": "See what happens after you start",
+      "intro": "A short, silent visual guide designed to make every next step clear before you share any medical information.",
+      "duration": "Under one minute · no sound needed",
+      "play": "Play guide",
+      "pause": "Pause guide",
+      "stepLabel": "Step",
+      "steps": [
+        {
+          "title": "Share what you already have",
+          "body": "Start with your latest report, available tests, and a short note. You do not need a complete file."
+        },
+        {
+          "title": "Your coordinator organizes it",
+          "body": "One person checks the information, explains what is missing, and stays in contact with you."
+        },
+        {
+          "title": "The right consultant reviews it",
+          "body": "Your case is directed by clinical need, so you do not have to choose a specialty yourself."
+        },
+        {
+          "title": "You decide with clarity",
+          "body": "Understand the proposed next step and expected arrangements before deciding about treatment or travel."
+        }
+      ]
+    },
     "areasEyebrow": "Cardiac care areas",
     "areasTitle": "Specialist pathways, guided by your case",
     "areas": [
@@ -120,6 +154,7 @@
     "eyebrow": "Consultant-led cardiac pathways",
     "title": "Advanced Cardiac Care, Guided by Your Case",
     "intro": "You don't need to choose a cardiac specialty yourself. Send your medical information and RehletShifaa will help direct your case to the appropriate consultant.",
+    "exploreAction": "Explore cardiac care areas",
     "coronaryTitle": "Coronary Arteries & Interventional Cardiology",
     "coronaryItems": [
       "Coronary Angiography",
@@ -264,6 +299,7 @@
     "successBody": "Thank you. A Patient Coordinator will help organize your case and guide you through the next steps.",
     "caseNumber": "Case Number",
     "continue": "Continue on WhatsApp",
+    "secureNote": "Secure transmission. Medical decisions remain consultant-led.",
     "errors": {
       "required": "This field is required.",
       "name": "Please enter your full name.",

@@ -81,7 +81,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       <label className="mt-7 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={values.consent} onChange={e => update("consent", e.target.checked)} /><span className="text-sm leading-6 text-ink-700">{d.form.consent} <a className="font-bold text-brand-700 underline" href={`/${locale}/privacy`}>{d.common.privacy}</a></span></label>{errors.consent && <p className="error-text mt-2">{errors.consent}</p>}
       {siteKey && <div className="cf-turnstile mt-6" data-sitekey={siteKey} data-callback="onRehletShifaaTurnstile" />}
       {errors.server && <p className="mt-6 rounded-md border border-alert-200 bg-alert-50 p-4 text-sm text-alert-800" role="alert">{errors.server}</p>}
-      <button className="btn-primary mt-7 w-full" disabled={busy} type="submit">{busy ? d.form.sending : d.form.send}</button><p className="mt-4 flex items-center justify-center gap-2 text-xs text-ink-500"><LockKeyhole size={14} />Secure transmission. Medical decisions remain consultant-led.</p>
+      <button className="btn-primary mt-7 w-full" disabled={busy} type="submit">{busy ? d.form.sending : d.form.send}</button><p className="mt-4 flex items-center justify-center gap-2 text-xs text-ink-500"><LockKeyhole size={14} />{d.form.secureNote}</p>
     </form>
   </>;
 }

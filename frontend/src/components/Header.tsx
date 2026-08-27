@@ -17,7 +17,11 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
     <header className="sticky top-0 z-40 border-b border-line bg-white">
       <div className="container-site flex min-h-[4.5rem] items-center justify-between gap-4">
         <Link href={localeHref(locale)} aria-label={`${d.common.brand} — ${d.nav.home}`}>
-          <Logo label={d.common.brand} />
+          <Logo
+            label={d.common.brand}
+            arabicLabel={locale === "ar" ? d.common.brandArabic : undefined}
+            size={38}
+          />
         </Link>
 
         <PrimaryNav items={items} label={navLabel} />

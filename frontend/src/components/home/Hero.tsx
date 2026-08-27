@@ -1,11 +1,12 @@
-import { ArrowRight, Check, MessageCircle } from "lucide-react";
+import { ArrowRight, Check, FileText, Image, MessageSquareText, PlayCircle } from "lucide-react";
 import Link from "next/link";
 
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
-import { localeHref, whatsappHref, WHATSAPP_INTRO } from "@/lib/links";
-import { GuidedArc } from "@/components/Logo";
+import { localeHref } from "@/lib/links";
 import { TrackedLink } from "@/components/TrackedLink";
+
+const PREP_ICONS = [FileText, Image, MessageSquareText] as const;
 
 export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
   return (
@@ -31,18 +32,16 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
               className="btn-primary"
               href={localeHref(locale, "send-my-case")}
             >
-              {d.common.send}
+              {d.home.primaryAction}
               <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
             </TrackedLink>
-            <TrackedLink
-              event="whatsapp_clicked"
-              target="_blank"
+            <Link
               className="btn-secondary"
-              href={whatsappHref(WHATSAPP_INTRO)}
+              href="#journey-video"
             >
-              <MessageCircle size={18} aria-hidden="true" />
-              {d.common.whatsapp}
-            </TrackedLink>
+              <PlayCircle size={18} aria-hidden="true" />
+              {d.home.watchJourney}
+            </Link>
           </div>
 
           <ul className="mt-9 grid gap-3 border-t border-line-strong pt-7">
@@ -55,41 +54,25 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
           </ul>
         </div>
 
-        <aside className="overflow-hidden rounded-2xl border border-brand-200 bg-brand-100 p-7 sm:p-9">
-          <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-full border border-brand-200 bg-white">
-              <GuidedArc size={24} />
-            </span>
-            <p className="text-[0.78rem] font-semibold uppercase tracking-[0.14em] text-accent-700 rtl:tracking-normal">
-              {d.home.heroCardTitle}
-            </p>
-          </div>
-          <p className="mt-5 text-lg leading-7 text-ink-700">{d.home.reassurance}</p>
+        <aside className="overflow-hidden rounded-3xl border border-brand-200 bg-white/85 p-7 shadow-[0_24px_70px_-44px_rgba(41,69,77,.38)] backdrop-blur sm:p-9">
+          <p className="eyebrow">{d.home.heroCardTitle}</p>
+          <p className="mt-4 text-lg font-semibold leading-7 text-brand-900">{d.home.reassurance}</p>
 
-          <ol className="mt-6 space-y-px">
-            {d.home.steps.map((step, index) => (
-              <li
-                key={step}
-                className={`flex items-center gap-4 py-3.5 ${index > 0 ? "border-t border-brand-200" : ""}`}
-              >
-                <span className="w-6 shrink-0 text-sm font-bold tabular-nums text-brand-700">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <span className="text-[0.95rem] font-semibold leading-6 text-ink-800">{step}</span>
-              </li>
-            ))}
-          </ol>
+          <ul className="mt-7 grid gap-3">
+            {d.home.prepareItems.map((item, index) => {
+              const Icon = PREP_ICONS[index] ?? FileText;
+              return (
+                <li key={item} className="grid grid-cols-[2.75rem_1fr] items-center gap-3 rounded-2xl bg-brand-50 p-4">
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-white text-brand-700">
+                    <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+                  </span>
+                  <span className="text-[0.95rem] font-semibold leading-6 text-ink-700">{item}</span>
+                </li>
+              );
+            })}
+          </ul>
 
-          <p className="mt-6 border-t border-brand-200 pt-5 text-sm leading-6 text-ink-600">
-            {d.home.heroCardNote}
-          </p>
-          <Link
-            href={localeHref(locale, "how-it-works")}
-            className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-brand-700 underline-offset-4 hover:underline"
-          >
-            {d.nav.how}
-            <ArrowRight size={15} aria-hidden="true" className="rtl:-scale-x-100" />
-          </Link>
+          <p className="mt-6 border-t border-line pt-5 text-sm leading-6 text-ink-600">{d.home.heroCardNote}</p>
         </aside>
       </div>
     </section>

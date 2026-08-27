@@ -24,7 +24,12 @@ export default async function LocaleLayout({
   const d = getDictionary(locale);
 
   return (
-    <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"} className={fontVariables}>
+    <html
+      lang={locale}
+      dir={locale === "ar" ? "rtl" : "ltr"}
+      className={fontVariables}
+      data-scroll-behavior="smooth"
+    >
       <body>
         <a href="#main" className="skip-link">
           {d.common.skip}

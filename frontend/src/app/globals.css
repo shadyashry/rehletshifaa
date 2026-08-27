@@ -93,8 +93,8 @@
     background: #ffffff;
     color: var(--color-ink-800);
     font-family: var(--font-sans);
-    font-size: 1rem;
-    line-height: 1.65;
+    font-size: clamp(1rem, 0.985rem + 0.08vw, 1.05rem);
+    line-height: 1.7;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -144,7 +144,7 @@
   }
 
   .section {
-    padding-block: clamp(3.5rem, 6vw, 6rem);
+    padding-block: clamp(3.25rem, 5.5vw, 5.5rem);
   }
 
   .section-soft {
@@ -169,10 +169,10 @@
 
   .display {
     color: var(--color-brand-900);
-    font-size: clamp(2.1rem, 1.35rem + 2.55vw, 3.5rem);
-    line-height: 1.1;
+    font-size: clamp(2.05rem, 1.4rem + 2.35vw, 3.35rem);
+    line-height: 1.12;
     letter-spacing: -0.022em;
-    font-weight: 800;
+    font-weight: 700;
     text-wrap: balance;
   }
 
@@ -194,7 +194,7 @@
   }
 
   .lead {
-    color: var(--color-ink-500);
+    color: var(--color-ink-600);
     font-size: clamp(1.02rem, 0.98rem + 0.25vw, 1.15rem);
     line-height: 1.72;
     text-wrap: pretty;
@@ -207,9 +207,9 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    min-height: 3rem;
-    padding: 0.7rem 1.35rem;
-    border-radius: 0.55rem;
+    min-height: 3.25rem;
+    padding: 0.78rem 1.4rem;
+    border-radius: 0.75rem;
     font-weight: 700;
     font-size: 0.975rem;
     text-align: center;
@@ -289,6 +289,10 @@
     background: #ffffff;
   }
 
+  .journey-scene {
+    animation: journey-scene-in 0.55s ease both;
+  }
+
   .field {
     width: 100%;
     min-height: 3.1rem;
@@ -328,6 +332,17 @@
 
   .skip-link:focus-visible {
     top: 1rem;
+  }
+}
+
+@keyframes journey-scene-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

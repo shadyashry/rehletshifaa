@@ -5,7 +5,7 @@ import { CtaPanel } from "@/components/CtaPanel";
 import { AudiencePaths } from "@/components/home/AudiencePaths";
 import { CarePathways } from "@/components/home/CarePathways";
 import { Hero } from "@/components/home/Hero";
-import { SupportBand } from "@/components/home/SupportBand";
+import { JourneyFilm } from "@/components/home/JourneyFilm";
 import { TrustSection } from "@/components/home/TrustSection";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
@@ -28,9 +28,9 @@ export default async function Home({ params }: Props) {
   return (
     <>
       <Hero locale={locale} d={d} />
+      <JourneyFilm d={d} />
       <CarePathways locale={locale} d={d} />
       <AudiencePaths locale={locale} d={d} />
-      <SupportBand d={d} />
       <TrustSection d={d} />
       <CtaPanel
         locale={locale}
