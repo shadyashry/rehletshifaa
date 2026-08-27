@@ -1,3 +1,22 @@
-import { AlertCircle } from "lucide-react";
-export function EmergencyNotice({ text }: { text: string }) { return <aside className="border-b border-[#ead8da] bg-[#fff8f8]" aria-label="Emergency medical notice"><div className="container-site flex gap-3 py-3 text-xs leading-5 text-[#71353b]"><AlertCircle className="mt-0.5 shrink-0" size={16} aria-hidden="true" /><p>{text}</p></div></aside>; }
+import { TriangleAlert } from "lucide-react";
 
+/**
+ * Clinical safety notice. Deliberately not dismissible and always ahead of the
+ * header in the reading order, but visually restrained so it reads as guidance
+ * rather than as the page's headline.
+ */
+export function EmergencyNotice({ label, text }: { label: string; text: string }) {
+  return (
+    <aside
+      aria-label={label}
+      className="border-b border-alert-200 bg-alert-50 text-alert-800"
+    >
+      <div className="container-site flex items-start gap-2.5 py-2.5">
+        <TriangleAlert size={15} className="mt-[3px] text-alert-700" aria-hidden="true" />
+        <p className="text-[0.8125rem] leading-5">
+          <span className="font-semibold">{label}:</span> {text}
+        </p>
+      </div>
+    </aside>
+  );
+}

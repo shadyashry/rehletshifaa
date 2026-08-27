@@ -1,16 +1,24 @@
 {
-  "nav": { "home": "Home", "cardiology": "Cardiology", "consultants": "Consultants", "how": "How It Works", "send": "Send My Case", "language": "العربية" },
+  "nav": { "home": "Home", "cardiology": "Cardiology", "consultants": "Consultants", "how": "How It Works", "send": "Send My Case", "language": "العربية", "languageAria": "Switch language to Arabic" },
   "common": {
     "brand": "RehletShifaa", "tagline": "Your Journey to Better Care", "send": "Send My Case", "whatsapp": "Talk to a Patient Coordinator", "explore": "Explore Cardiology", "profile": "View Consultant Profile",
     "emergency": "RehletShifaa is not an emergency medical service. If you are experiencing severe chest pain, severe shortness of breath, loss of consciousness, or another medical emergency, seek immediate emergency medical care in your current location.",
+    "emergencyLabel": "Emergency",
     "medicalNotice": "RehletShifaa coordinates access to medical review and care. Information provided through the platform does not replace emergency care or a complete clinical assessment. Final medical decisions are made by the treating consultant following appropriate evaluation.",
-    "privacy": "Privacy Policy", "terms": "Terms of Use", "disclaimer": "Medical Disclaimer", "menu": "Open menu"
+    "privacy": "Privacy Policy", "terms": "Terms of Use", "disclaimer": "Medical Disclaimer", "menu": "Open menu", "menuClose": "Close menu", "skip": "Skip to main content"
   },
   "home": {
     "eyebrow": "International cardiac care coordination",
     "title": "Your Journey to Better Heart Care",
     "intro": "Send your medical reports and let RehletShifaa help direct your case to the appropriate cardiac consultant before you travel to Egypt.",
     "reassurance": "Not sure which cardiac specialty you need? You don't have to be.",
+    "assurances": [
+      "Reviewed by a cardiac consultant before you decide to travel",
+      "Reports uploaded through private, short-lived links",
+      "One coordinator, in Arabic or English, from first contact to follow-up"
+    ],
+    "heroCardTitle": "After you send your case",
+    "heroCardNote": "The platform does not diagnose. Every clinical recommendation comes from the treating consultant.",
     "areasEyebrow": "Cardiac care areas", "areasTitle": "Specialist pathways, guided by your case",
     "areas": [
       { "title": "Coronary Arteries & Cardiac Catheterization", "body": "For patients requiring evaluation for coronary angiography, PCI, stents or complex coronary intervention." },
@@ -18,10 +26,40 @@
       { "title": "Heart Rhythm & Cardiac Devices", "body": "Assessment for Pacemaker, ICD, CRT-P and CRT-D when medically appropriate." }
     ],
     "howEyebrow": "A clear process", "howTitle": "How your journey works",
+    "howIntro": "Five steps, each with a named person responsible for it.",
     "steps": ["Send Your Case", "Your Coordinator Organizes It", "Consultant Review", "Understand Your Next Step", "We Coordinate Your Journey"],
+    "pathsEyebrow": "Two ways in", "pathsTitle": "For patients and for referring doctors",
+    "patientTitle": "For patients",
+    "patientBody": "You do not need to know the name of the specialty or the procedure. Send the reports you already have.",
+    "patientItems": [
+      "Send reports in Arabic or English — your coordinator identifies what is missing.",
+      "A cardiac consultant reviews your case and sets out the next step.",
+      "Understand the proposed pathway before you decide to travel."
+    ],
+    "doctorTitle": "For referring doctors",
+    "doctorBody": "Refer a patient for a consultant cardiac opinion while your own relationship with them stays intact.",
+    "doctorItems": [
+      "Share a case with your patient's documented consent.",
+      "Your patient is reviewed by a named cardiac consultant, not by software.",
+      "Receive discharge documentation and the follow-up outcome with the patient's consent."
+    ],
     "coordinatorTitle": "One Person Supporting Your Journey", "coordinatorBody": "Your Patient Coordinator stays connected with you from your first contact through treatment coordination and follow-up.",
     "beforeTitle": "Understand Your Care Path Before You Travel", "beforeBody": "Where medically possible, RehletShifaa helps you understand the proposed next steps and expected arrangements before deciding to travel.",
-    "finalTitle": "Start With Your Medical Case", "finalBody": "You don't need to know the name of the specialty or procedure. Send what you have. We'll help with the next step."
+    "trustEyebrow": "Privacy and clinical governance", "trustTitle": "How your information is handled",
+    "trustIntro": "Coordinating a cardiac case means handling sensitive medical information. These are the rules the platform is built on.",
+    "trust": [
+      { "title": "The consultant decides", "body": "RehletShifaa coordinates your case. Diagnosis, procedure selection and clinical suitability remain decisions of the treating consultant after appropriate evaluation." },
+      { "title": "Private document handling", "body": "Reports are uploaded straight to private storage through short-lived links. Files are not published, indexed, or listed anywhere public." },
+      { "title": "Consent before review", "body": "Your case is submitted only after you give explicit consent for your information to be processed for the purpose of coordinating your care." },
+      { "title": "Emergency comes first", "body": "If your situation appears urgent, you will be advised to seek emergency care where you are rather than wait to travel." }
+    ],
+    "finalTitle": "Start With Your Medical Case", "finalBody": "You don't need to know the name of the specialty or procedure. Send what you have. We'll help with the next step.",
+    "finalNote": "Sending your case does not commit you to treatment or travel."
+  },
+  "footer": {
+    "description": "Consultant-led coordination of international cardiac care in Egypt, in Arabic and English.",
+    "explore": "Explore", "legal": "Legal", "contact": "Get in touch",
+    "rights": "All rights reserved."
   },
   "cardiology": {
     "eyebrow": "Consultant-led cardiac pathways", "title": "Advanced Cardiac Care, Guided by Your Case", "intro": "You don't need to choose a cardiac specialty yourself. Send your medical information and RehletShifaa will help direct your case to the appropriate consultant.",
@@ -64,4 +102,3 @@
   },
   "legal": { "review": "Placeholder policy — legal review is required before production.", "privacyTitle": "Privacy Policy", "termsTitle": "Terms of Use", "disclaimerTitle": "Medical Disclaimer", "body": "This page outlines the intended policy structure only. It must be reviewed and approved by qualified legal and privacy advisers before RehletShifaa processes real patient information." }
 }
-

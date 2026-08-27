@@ -1,44 +1,375 @@
 @import "tailwindcss";
 
-:root {
-  --navy: #08263b;
-  --navy-2: #103c57;
-  --blue: #176b92;
-  --teal: #168a86;
-  --ink: #132f3f;
-  --muted: #5c7180;
-  --line: #d9e4e9;
-  --mist: #f4f8fa;
-  --white: #ffffff;
+/* ---------------------------------------------------------------------------
+   Design tokens
+   The brand palette (navy / clinical blue / teal) is unchanged; it is promoted
+   from ad-hoc hex literals into a Tailwind theme so utilities such as
+   `bg-brand-900` or `text-ink-500` replace repeated arbitrary values.
+--------------------------------------------------------------------------- */
+@theme {
+  --font-sans: var(--font-latin), "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-brand-serif), Georgia, "Times New Roman", serif;
+
+  /* Primary — deep navy through clinical blue */
+  --color-brand-50: #f2f7fa;
+  --color-brand-100: #dfebf2;
+  --color-brand-200: #c1d8e4;
+  --color-brand-300: #94bccf;
+  --color-brand-400: #5d97b1;
+  --color-brand-500: #327d9c;
+  --color-brand-600: #176b92;
+  --color-brand-700: #145679;
+  --color-brand-800: #103c57;
+  --color-brand-900: #08263b;
+  --color-brand-950: #05192a;
+
+  /* Accent — clinical teal, used sparingly for signals and markers */
+  --color-accent-50: #edf7f6;
+  --color-accent-100: #d2ecea;
+  --color-accent-200: #a5d9d5;
+  --color-accent-500: #189a95;
+  --color-accent-600: #168a86;
+  --color-accent-700: #11706d;
+  --color-accent-800: #0d5654;
+
+  /* Neutral ink — all body values meet WCAG AA on white and on --color-mist */
+  --color-ink-900: #0c2434;
+  --color-ink-800: #16344a;
+  --color-ink-700: #27475c;
+  --color-ink-600: #375a6d;
+  --color-ink-500: #4b6a7c;
+  --color-ink-400: #667f8f;
+  --color-ink-300: #93a8b4;
+
+  /* Surfaces and rules */
+  --color-line: #dce7ed;
+  --color-line-strong: #c2d5df;
+  --color-mist: #f4f8fa;
+  --color-mist-deep: #eaf1f5;
+
+  /* Safety notice */
+  --color-alert-50: #fdf5f4;
+  --color-alert-200: #f0d4d1;
+  --color-alert-700: #8c2b28;
+  --color-alert-800: #74201e;
+
+  --radius-card: 0.875rem;
 }
 
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; color: var(--ink); background: var(--white); font-family: Arial, sans-serif; }
-a { color: inherit; text-decoration: none; }
-button, input, textarea { font: inherit; }
-button, a { -webkit-tap-highlight-color: transparent; }
-:focus-visible { outline: 3px solid #65c8c1; outline-offset: 3px; }
+/* ---------------------------------------------------------------------------
+   Base
+   These declarations must stay inside @layer base. Unlayered rules outrank
+   every Tailwind utility, which previously made `a { color: inherit }` defeat
+   all text-colour utilities on links (the primary CTA rendered white-on-white).
+--------------------------------------------------------------------------- */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 
-.font-brand { font-family: Arial, sans-serif; letter-spacing: -.035em; }
-.container-site { width: min(1160px, calc(100% - 2rem)); margin-inline: auto; }
-.section { padding-block: clamp(4rem, 8vw, 7rem); }
-.eyebrow { color: var(--teal); font-size: .77rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.display { color: var(--navy); font-size: clamp(2.55rem, 7vw, 5.75rem); line-height: .98; letter-spacing: -.055em; font-weight: 760; text-wrap: balance; }
-.headline { color: var(--navy); font-size: clamp(2rem, 4vw, 3.65rem); line-height: 1.06; letter-spacing: -.045em; font-weight: 740; text-wrap: balance; }
-.lead { color: var(--muted); font-size: clamp(1.04rem, 2vw, 1.25rem); line-height: 1.75; }
-.btn-primary, .btn-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 3.15rem; padding: .75rem 1.2rem; border-radius: .6rem; font-weight: 750; transition: background .2s, color .2s, transform .2s; }
-.btn-primary { background: var(--navy); color: white; border: 1px solid var(--navy); }
-.btn-primary:hover { background: var(--blue); border-color: var(--blue); transform: translateY(-1px); }
-.btn-secondary { color: var(--navy); background: white; border: 1px solid var(--line); }
-.btn-secondary:hover { border-color: var(--blue); color: var(--blue); }
-.card { border: 1px solid var(--line); border-radius: .9rem; background: white; }
-.section-soft { background: var(--mist); border-block: 1px solid #e9f0f3; }
-.field { width: 100%; min-height: 3.2rem; padding: .8rem .9rem; border: 1px solid #b9cbd3; border-radius: .55rem; background: white; color: var(--ink); }
-.field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px #d8eef7; outline: 0; }
-.field-error { border-color: #b62f3a; }
-.error-text { color: #9c2630; font-size: .86rem; }
-[dir="rtl"] .eyebrow { letter-spacing: 0; }
-@media (max-width: 767px) { .container-site { width: min(100% - 1.25rem, 1160px); } .section { padding-block: 3.75rem; } }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+  }
 
+  /* Arabic copy leads with the Arabic face and falls through to the Latin face
+     for embedded Latin runs. Redefining the theme variable keeps every
+     `font-sans` utility consistent with the document direction. */
+  :root[dir="rtl"] {
+    --font-sans: var(--font-arabic), var(--font-latin), "Segoe UI", Tahoma, system-ui, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    background: #ffffff;
+    color: var(--color-ink-800);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  svg {
+    flex: none;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-brand-600);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  /* Focus ring inverted on navy surfaces so it stays visible. */
+  .on-dark :focus-visible,
+  .on-dark:focus-visible {
+    outline-color: var(--color-accent-200);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Composed primitives
+--------------------------------------------------------------------------- */
+@layer components {
+  .container-site {
+    width: min(1160px, calc(100% - 2.5rem));
+    margin-inline: auto;
+  }
+
+  .section {
+    padding-block: clamp(3.5rem, 6vw, 6rem);
+  }
+
+  .section-soft {
+    background: var(--color-mist);
+    border-block: 1px solid var(--color-line);
+  }
+
+  .font-brand {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .eyebrow {
+    color: var(--color-accent-700);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+
+  .display {
+    color: var(--color-brand-900);
+    font-size: clamp(2.1rem, 1.35rem + 2.55vw, 3.5rem);
+    line-height: 1.1;
+    letter-spacing: -0.022em;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  .headline {
+    color: var(--color-brand-900);
+    font-size: clamp(1.7rem, 1.25rem + 1.5vw, 2.4rem);
+    line-height: 1.18;
+    letter-spacing: -0.018em;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  .title {
+    color: var(--color-brand-900);
+    font-size: 1.125rem;
+    line-height: 1.4;
+    letter-spacing: -0.008em;
+    font-weight: 600;
+  }
+
+  .lead {
+    color: var(--color-ink-500);
+    font-size: clamp(1.02rem, 0.98rem + 0.25vw, 1.15rem);
+    line-height: 1.72;
+    text-wrap: pretty;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-inverse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0.7rem 1.35rem;
+    border-radius: 0.55rem;
+    font-weight: 600;
+    font-size: 0.975rem;
+    text-align: center;
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease;
+  }
+
+  .btn-primary {
+    background: var(--color-brand-900);
+    color: #ffffff;
+    border: 1px solid var(--color-brand-900);
+  }
+
+  .btn-primary:hover {
+    background: var(--color-brand-700);
+    border-color: var(--color-brand-700);
+  }
+
+  .btn-secondary {
+    color: var(--color-brand-900);
+    background: #ffffff;
+    border: 1px solid var(--color-line-strong);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--color-brand-600);
+    color: var(--color-brand-700);
+    background: var(--color-brand-50);
+  }
+
+  .btn-inverse {
+    background: #ffffff;
+    color: var(--color-brand-900);
+    border: 1px solid #ffffff;
+  }
+
+  .btn-inverse:hover {
+    background: var(--color-accent-100);
+    border-color: var(--color-accent-100);
+  }
+
+  .link-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--color-brand-600);
+    font-weight: 600;
+    border-bottom: 1px solid transparent;
+    transition:
+      color 0.18s ease,
+      border-color 0.18s ease;
+  }
+
+  .link-cta:hover {
+    color: var(--color-brand-800);
+    border-bottom-color: currentColor;
+  }
+
+  .footer-link {
+    color: var(--color-brand-100);
+    transition: color 0.18s ease;
+  }
+
+  .footer-link:hover {
+    color: #ffffff;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .card {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    background: #ffffff;
+  }
+
+  .field {
+    width: 100%;
+    min-height: 3.1rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 0.55rem;
+    background: #ffffff;
+    color: var(--color-ink-900);
+  }
+
+  .field:focus {
+    border-color: var(--color-brand-600);
+    box-shadow: 0 0 0 3px var(--color-brand-100);
+    outline: 0;
+  }
+
+  .field-error {
+    border-color: var(--color-alert-700);
+  }
+
+  .error-text {
+    color: var(--color-alert-800);
+    font-size: 0.86rem;
+  }
+
+  .skip-link {
+    position: absolute;
+    inset-inline-start: 1rem;
+    top: -100%;
+    z-index: 100;
+    padding: 0.75rem 1.15rem;
+    border-radius: 0.5rem;
+    background: var(--color-brand-900);
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  .skip-link:focus-visible {
+    top: 1rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Arabic / RTL
+   Latin display tracking is negative; applying it to Arabic collapses the
+   joined letterforms, so tracking is reset and leading is opened up instead.
+--------------------------------------------------------------------------- */
+@layer components {
+  [dir="rtl"] .display,
+  [dir="rtl"] .headline,
+  [dir="rtl"] .title,
+  [dir="rtl"] .font-brand {
+    letter-spacing: 0;
+  }
+
+  [dir="rtl"] .display {
+    line-height: 1.32;
+  }
+
+  [dir="rtl"] .headline {
+    line-height: 1.38;
+  }
+
+  [dir="rtl"] .eyebrow {
+    letter-spacing: 0;
+    text-transform: none;
+    font-size: 0.85rem;
+  }
+
+  [dir="rtl"] .lead,
+  [dir="rtl"] body {
+    line-height: 1.85;
+  }
+}
+
+@media (max-width: 640px) {
+  .container-site {
+    width: min(100% - 2rem, 1160px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
