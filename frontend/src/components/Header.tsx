@@ -14,7 +14,7 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
   const navLabel = locale === "ar" ? "التنقل الرئيسي" : "Primary navigation";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-white">
+    <header className="sticky top-0 z-50 isolate border-b border-line bg-white">
       <div className="container-site flex min-h-[5.5rem] items-center justify-between gap-4 md:min-h-[6rem]">
         <Link href={localeHref(locale)} aria-label={`${d.common.brand} — ${d.nav.home}`}>
           <Logo

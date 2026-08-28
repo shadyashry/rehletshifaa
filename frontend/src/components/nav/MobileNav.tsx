@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
@@ -29,37 +29,34 @@ type MobileNavProps = {
  * and whenever a link inside it is followed.
  */
 export function MobileNav({ locale, items, labels }: MobileNavProps) {
-  const [open, setOpen] = useState(false);
   const panelId = useId();
   const pathname = usePathname();
-  const close = () => setOpen(false);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const close = () => detailsRef.current?.removeAttribute("open");
 
   useEffect(() => {
-    if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") close();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+  }, []);
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
+    <details ref={detailsRef} className="group lg:hidden">
+      <summary
         aria-controls={panelId}
-        aria-label={open ? labels.close : labels.open}
-        className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line text-brand-900 transition-colors hover:bg-brand-50 lg:hidden"
+        aria-label={labels.open}
+        className="inline-flex h-12 w-12 cursor-pointer touch-manipulation list-none items-center justify-center rounded-lg border border-line bg-white text-brand-900 transition-colors hover:bg-brand-50 [&::-webkit-details-marker]:hidden"
       >
-        {open ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
-      </button>
+        <Menu size={22} className="group-open:hidden" aria-hidden="true" />
+        <X size={22} className="hidden group-open:block" aria-hidden="true" />
+        <span className="sr-only">{labels.open} / {labels.close}</span>
+      </summary>
 
       <div
         id={panelId}
-        hidden={!open}
-        className="absolute inset-x-0 top-full border-b border-line bg-white shadow-[0_18px_40px_-24px_rgba(8,38,59,0.45)] lg:hidden"
+        className="absolute inset-x-0 top-full z-50 border-b border-line bg-white shadow-[0_18px_40px_-24px_rgba(8,38,59,0.45)]"
       >
         <div className="container-site py-4">
           <nav aria-label={labels.nav} className="grid gap-1">
@@ -69,7 +66,7 @@ export function MobileNav({ locale, items, labels }: MobileNavProps) {
                 href={item.href}
                 onClick={close}
                 aria-current={pathname === item.href ? "page" : undefined}
-                className="rounded-md px-4 py-3.5 text-[1.02rem] font-medium text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
+                className="relative z-10 block min-h-14 touch-manipulation rounded-md px-4 py-3.5 text-[1.02rem] font-medium text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
               >
                 {item.label}
               </Link>
@@ -94,6 +91,6 @@ export function MobileNav({ locale, items, labels }: MobileNavProps) {
           </div>
         </div>
       </div>
-    </>
+    </details>
   );
 }

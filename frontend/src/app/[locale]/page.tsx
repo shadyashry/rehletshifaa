@@ -29,7 +29,7 @@ export default async function Home({ params }: Props) {
   return (
     <>
       <Hero locale={locale} d={d} />
-      <JourneyFilm d={d} />
+      <JourneyFilm d={d} locale={locale} />
       <CarePathways locale={locale} d={d} />
       <PromiseSection d={d} />
       <TravelServices d={d} />
