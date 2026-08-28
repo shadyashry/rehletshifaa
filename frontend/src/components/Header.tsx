@@ -20,7 +20,7 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
           <Logo
             label={d.common.brand}
             accent={d.common.brandAccent}
-            arabicLabel={locale === "ar" ? d.common.brandArabic : undefined}
+            arabicLabel={d.common.brandArabic}
             arabicAccent={d.common.brandArabicAccent}
             size={48}
           />

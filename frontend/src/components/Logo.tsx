@@ -86,7 +86,7 @@ export function Logo({
   const [arabicLead, arabicAccentText] = arabicLabel ? splitWordmark(arabicLabel, arabicAccent) : ["", ""];
 
   return (
-    <span className={`inline-flex items-center gap-3 ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 ${className}`}>
       <GuidedArc variant={variant} size={size} />
       <span className="inline-flex flex-col leading-none">
         <span className="font-brand" style={{ fontSize: wordmarkSize, color: inkColor }}>
