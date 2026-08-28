@@ -13,6 +13,7 @@ export type CategoryContent = {
   title: string;
   intro: string;
   videoTitle: string;
+  highlight?: string;
   sections: readonly { title: string; items: readonly string[] }[];
   note: string;
   finalTitle: string;
@@ -33,6 +34,12 @@ export function CategoryDetail({ locale, d, content }: { locale: Locale; d: Dict
     <>
       <PageHero eyebrow={content.eyebrow} title={content.title} intro={content.intro} />
       <CategoryTabs tabs={tabs} label={d.careAreasPage.tabsLabel} />
+
+      {content.highlight ? (
+        <div className="border-b border-line bg-wash-aqua">
+          <p className="container-site py-3.5 text-center text-sm font-bold text-accent-800">{content.highlight}</p>
+        </div>
+      ) : null}
 
       <section className="section">
         <div className="container-site grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">

@@ -359,23 +359,56 @@
     letter-spacing: 0;
   }
 
+  /* Cairo has a larger x-height than the Latin face, so the Latin type scale
+     reads oversized in Arabic. Step the RTL headings, lead, body and the large
+     component utilities down to a comfortable Arabic size (LTR is untouched). */
+  [dir="rtl"] body {
+    font-size: 1rem;
+    line-height: 1.85;
+  }
+
   [dir="rtl"] .display {
-    line-height: 1.32;
+    font-size: clamp(1.85rem, 1.3rem + 2vw, 2.9rem);
+    line-height: 1.3;
   }
 
   [dir="rtl"] .headline {
-    line-height: 1.38;
+    font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.1rem);
+    line-height: 1.36;
+  }
+
+  [dir="rtl"] .title {
+    font-size: 1.12rem;
+  }
+
+  [dir="rtl"] .lead {
+    font-size: clamp(1rem, 0.96rem + 0.2vw, 1.1rem);
+    line-height: 1.85;
   }
 
   [dir="rtl"] .eyebrow {
     letter-spacing: 0;
     text-transform: none;
-    font-size: 0.92rem;
+    font-size: 0.88rem;
   }
 
-  [dir="rtl"] .lead,
-  [dir="rtl"] body {
-    line-height: 1.85;
+  /* Large hard-coded heading utilities used inside components (hero video,
+     CTA panel, support band, category/consultant pages). */
+  [dir="rtl"] .text-2xl {
+    font-size: 1.35rem;
+  }
+
+  [dir="rtl"] .text-3xl {
+    font-size: 1.6rem;
+  }
+
+  [dir="rtl"] .text-4xl,
+  [dir="rtl"] .sm\:text-4xl {
+    font-size: 1.85rem;
+  }
+
+  [dir="rtl"] .md\:text-\[2\.4rem\] {
+    font-size: 1.9rem;
   }
 }
 

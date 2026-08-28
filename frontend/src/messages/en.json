@@ -37,7 +37,7 @@
     "watchJourney": "Watch the Journey",
     "reassurance": "You do not need a diagnosis or the name of a procedure to begin.",
     "assurances": [
-      "Reviewed by a cardiac consultant before you decide to travel",
+      "Reviewed by a consultant before you decide to travel",
       "Reports uploaded through private, short-lived links",
       "One coordinator, in Arabic or English, from first contact to follow-up"
     ],
@@ -83,8 +83,8 @@
         "body": "Consultant-led coronary, structural-heart and rhythm care — from angiography and stents to valve and device procedures."
       },
       {
-        "title": "Rheumatology, Rehabilitation & Physical Medicine",
-        "body": "Inflammatory and autoimmune joint disease, osteoarthritis and chronic pain, with rehabilitation and physical medicine."
+        "title": "Rehabilitation, Dysphagia & Physical Medicine",
+        "body": "Adult and pediatric dysphagia (swallowing) rehabilitation — a rare, focused service — with broader rehabilitation, physical medicine and rheumatology."
       },
       {
         "title": "Orthopedics",
@@ -107,14 +107,14 @@
     "patientBody": "You do not need to know the name of the specialty or the procedure. Send the reports you already have.",
     "patientItems": [
       "Send reports in Arabic or English — your coordinator identifies what is missing.",
-      "A cardiac consultant reviews your case and sets out the next step.",
+      "A consultant reviews your case and sets out the next step.",
       "Understand the proposed pathway before you decide to travel."
     ],
     "doctorTitle": "For referring doctors",
-    "doctorBody": "Refer a patient for a consultant cardiac opinion while your own relationship with them stays intact.",
+    "doctorBody": "Refer a patient for a consultant opinion while your own relationship with them stays intact.",
     "doctorItems": [
       "Share a case with your patient's documented consent.",
-      "Your patient is reviewed by a named cardiac consultant, not by software.",
+      "Your patient is reviewed by a named consultant, not by software.",
       "Receive discharge documentation and the follow-up outcome with the patient's consent."
     ],
     "coordinatorTitle": "One Person Supporting Your Journey",
@@ -123,7 +123,7 @@
     "beforeBody": "Where medically possible, RehletShifaa helps you understand the proposed next steps and expected arrangements before deciding to travel.",
     "trustEyebrow": "Privacy and clinical governance",
     "trustTitle": "How your information is handled",
-    "trustIntro": "Coordinating a cardiac case means handling sensitive medical information. These are the rules the platform is built on.",
+    "trustIntro": "Coordinating your care means handling sensitive medical information. These are the rules the platform is built on.",
     "trust": [
       {
         "title": "The consultant decides",
@@ -298,11 +298,11 @@
       },
       {
         "title": "Consultant Review",
-        "body": "Your case is directed to the appropriate cardiac consultant."
+        "body": "Your case is directed to the appropriate consultant."
       },
       {
         "title": "Understand Your Care Path",
-        "body": "Recommendations may include further investigation, medical treatment, catheterization, coronary or valve intervention, cardiac devices, surgical evaluation, or another appropriate pathway."
+        "body": "Recommendations may include further investigation, medical treatment, a procedure or intervention, surgical evaluation, rehabilitation, or another appropriate pathway."
       },
       {
         "title": "Treatment Coordination",
@@ -350,7 +350,7 @@
       "summaryLabel": "Care area requested",
       "options": {
         "cardiology": "Cardiology",
-        "rheumatology": "Rheumatology, Rehabilitation & Physical Medicine",
+        "rheumatology": "Rehabilitation, Dysphagia & Physical Medicine",
         "orthopedics": "Orthopedics"
       }
     }
@@ -369,7 +369,7 @@
     "tabsLabel": "Care areas",
     "tabs": {
       "cardiology": "Cardiology",
-      "rheumatology": "Rheumatology & Rehab",
+      "rheumatology": "Rehab & Dysphagia",
       "orthopedics": "Orthopedics"
     },
     "video": {
@@ -379,28 +379,21 @@
     }
   },
   "rheumatology": {
-    "eyebrow": "Consultant-led rheumatology & rehabilitation",
-    "title": "Rheumatology, Rehabilitation & Physical Medicine",
-    "intro": "From inflammatory joint disease to recovery and physical medicine — send your reports and RehletShifaa will help direct your case to the appropriate consultant.",
-    "videoTitle": "Meet your rheumatology & rehabilitation consultant — coming soon",
+    "eyebrow": "Consultant-led rehabilitation & dysphagia care",
+    "title": "Dysphagia Rehabilitation & Physical Medicine",
+    "intro": "A rare, focused service for adults and children with swallowing (dysphagia) difficulties — alongside broader rehabilitation, physical medicine and rheumatology. Send your reports and RehletShifaa will help direct your case to the appropriate consultant.",
+    "highlight": "A rare, specialised service — Adult & Pediatric Dysphagia (swallowing) Rehabilitation.",
+    "videoTitle": "Meet your rehabilitation & dysphagia consultant — coming soon",
     "sections": [
       {
-        "title": "Inflammatory & Autoimmune Conditions",
+        "title": "Adult & Pediatric Dysphagia Rehabilitation",
         "items": [
-          "Rheumatoid arthritis",
-          "Ankylosing spondylitis & spondyloarthritis",
-          "Psoriatic arthritis",
-          "Systemic lupus & connective-tissue disease",
-          "Gout & crystal arthritis"
-        ]
-      },
-      {
-        "title": "Osteoarthritis & Chronic Joint Pain",
-        "items": [
-          "Knee & hip osteoarthritis",
-          "Chronic back & neck pain",
-          "Soft-tissue & tendon pain",
-          "Osteoporosis & bone-health review"
+          "Post-stroke & neurological swallowing rehabilitation",
+          "Head & neck cancer swallowing rehabilitation",
+          "Post-intubation & tracheostomy swallowing recovery",
+          "Pediatric feeding & swallowing disorders",
+          "Congenital & developmental dysphagia",
+          "Safe-feeding assessment & family support"
         ]
       },
       {
@@ -411,9 +404,18 @@
           "Musculoskeletal & sports rehabilitation",
           "Pain-management programmes"
         ]
+      },
+      {
+        "title": "Rheumatology & Joint Care",
+        "items": [
+          "Rheumatoid arthritis & inflammatory joint disease",
+          "Ankylosing spondylitis & spondyloarthritis",
+          "Osteoarthritis & chronic joint pain",
+          "Osteoporosis & bone-health review"
+        ]
       }
     ],
-    "note": "Your treatment plan is decided by the consultant after review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
+    "note": "Your treatment and therapy plan is decided by the consultant after review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
     "finalTitle": "Not Sure Where Your Condition Fits?",
     "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate consultant."
   },
