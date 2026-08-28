@@ -11,7 +11,7 @@
   },
   "common": {
     "brand": "RehletShifaa",
-    "tagline": "Your Journey to Better Care",
+    "tagline": "A clearer path to specialist care",
     "send": "Send My Case",
     "whatsapp": "Talk to a Patient Coordinator",
     "explore": "Explore Cardiology",
@@ -31,8 +31,8 @@
   },
   "home": {
     "eyebrow": "International specialist care coordination",
-    "title": "Your Journey to Trusted Care in Egypt",
-    "intro": "Share your medical reports and let RehletShifaa guide your case to the right consultant — across cardiology, rheumatology & rehabilitation, and orthopedics — with your whole journey coordinated before you travel.",
+    "title": "From Medical Reports to a Clearer Care Path in Egypt",
+    "intro": "Share your medical reports and let RehletShifaa guide your case to the right consultant — across cardiology, adult and pediatric dysphagia (swallowing) rehabilitation, and orthopedics — with your whole journey coordinated before you travel.",
     "primaryAction": "Start My Care Review",
     "watchJourney": "Watch the Journey",
     "reassurance": "You do not need a diagnosis or the name of a procedure to begin.",
@@ -101,22 +101,6 @@
       "Understand Your Next Step",
       "We Coordinate Your Journey"
     ],
-    "pathsEyebrow": "Two ways in",
-    "pathsTitle": "For patients and for referring doctors",
-    "patientTitle": "For patients",
-    "patientBody": "You do not need to know the name of the specialty or the procedure. Send the reports you already have.",
-    "patientItems": [
-      "Send reports in Arabic or English — your coordinator identifies what is missing.",
-      "A consultant reviews your case and sets out the next step.",
-      "Understand the proposed pathway before you decide to travel."
-    ],
-    "doctorTitle": "For referring doctors",
-    "doctorBody": "Refer a patient for a consultant opinion while your own relationship with them stays intact.",
-    "doctorItems": [
-      "Share a case with your patient's documented consent.",
-      "Your patient is reviewed by a named consultant, not by software.",
-      "Receive discharge documentation and the follow-up outcome with the patient's consent."
-    ],
     "coordinatorTitle": "One Person Supporting Your Journey",
     "coordinatorBody": "Your Patient Coordinator stays connected with you from your first contact through treatment coordination and follow-up.",
     "beforeTitle": "Understand Your Care Path Before You Travel",
@@ -145,7 +129,7 @@
     "finalTitle": "Start With Your Medical Case",
     "finalBody": "You don't need to know the name of the specialty or procedure. Send what you have. We'll help with the next step.",
     "finalNote": "Sending your case does not commit you to treatment or travel.",
-    "slogan": "We care for your health from your first message to your follow-up back home.",
+    "slogan": "Clarity before you travel. Support every step of the way.",
     "areasIntro": "Start with the area closest to your need. Not sure? Send your case and your coordinator will help direct it.",
     "areasAction": "View care area",
     "consultantsPromise": {
@@ -155,27 +139,27 @@
     },
     "travel": {
       "eyebrow": "Optional travel support",
-      "title": "Flights, hotels and visas — only if you need them",
-      "intro": "Your treatment comes first. If you want it, we can help coordinate the journey around it.",
+      "title": "Professional travel packages, tailored to your needs",
+      "intro": "When you choose to continue care in Egypt, our professionals can arrange an optional staycation journey around your needs — from your flight to a smooth airport reception and onward stay.",
       "items": [
         {
           "title": "Flights",
-          "body": "Help finding and booking suitable flights around your treatment dates."
+          "body": "A professional travel plan and flight coordination shaped around your treatment dates and preferences."
         },
         {
           "title": "Hotel & stay",
-          "body": "Comfortable accommodation for you and a companion, close to the hospital."
+          "body": "Comfortable stay options for you and a companion, selected for access, comfort and recovery needs."
         },
         {
           "title": "Visa assistance",
-          "body": "Guidance and documentation support for your medical-travel visa."
+          "body": "Practical guidance and documentation support for your medical-travel visa."
         },
         {
           "title": "Airport reception",
-          "body": "Airport pick-up and transfers, so you never navigate a new city alone."
+          "body": "Personal airport reception and coordinated transfers, so your journey starts calmly from the moment you land."
         }
       ],
-      "note": "Travel support is optional and arranged only after your medical proposal. You pay official providers directly — never cash to a coordinator."
+      "note": "Packages are optional, personalised to your needs, and arranged after your medical proposal. Our travel professionals coordinate the journey from flight to airport reception and stay."
     }
   },
   "footer": {

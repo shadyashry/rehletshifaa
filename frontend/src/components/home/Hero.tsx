@@ -14,10 +14,10 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
       {/* Soft healing washes — decorative, kept subtle and out of the a11y tree. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 end-0 hidden w-3/5 opacity-90 md:block"
+        className="pointer-events-none absolute inset-0 hidden opacity-90 md:block"
         style={{
           backgroundImage:
-            "radial-gradient(circle at 78% 26%, var(--color-wash-aqua) 0, transparent 46%), radial-gradient(circle at 58% 82%, var(--color-wash-lavender) 0, transparent 42%), radial-gradient(circle at 94% 64%, var(--color-wash-peach) 0, transparent 38%)",
+            "radial-gradient(circle at 78% 26%, var(--color-wash-aqua) 0, transparent 34%), radial-gradient(circle at 22% 78%, var(--color-wash-lavender) 0, transparent 32%), radial-gradient(circle at 94% 64%, var(--color-wash-peach) 0, transparent 28%)",
         }}
       />
       <div className="container-site relative grid gap-12 py-14 md:py-18 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:items-center lg:gap-16 lg:py-24">

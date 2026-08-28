@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { CtaPanel } from "@/components/CtaPanel";
-import { AudiencePaths } from "@/components/home/AudiencePaths";
 import { CarePathways } from "@/components/home/CarePathways";
 import { Hero } from "@/components/home/Hero";
 import { JourneyFilm } from "@/components/home/JourneyFilm";
@@ -34,7 +33,6 @@ export default async function Home({ params }: Props) {
       <CarePathways locale={locale} d={d} />
       <PromiseSection d={d} />
       <TravelServices d={d} />
-      <AudiencePaths locale={locale} d={d} />
       <TrustSection d={d} />
       <CtaPanel
         locale={locale}
