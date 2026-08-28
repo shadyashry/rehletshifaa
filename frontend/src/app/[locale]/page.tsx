@@ -6,6 +6,8 @@ import { AudiencePaths } from "@/components/home/AudiencePaths";
 import { CarePathways } from "@/components/home/CarePathways";
 import { Hero } from "@/components/home/Hero";
 import { JourneyFilm } from "@/components/home/JourneyFilm";
+import { PromiseSection } from "@/components/home/PromiseSection";
+import { TravelServices } from "@/components/home/TravelServices";
 import { TrustSection } from "@/components/home/TrustSection";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
@@ -30,6 +32,8 @@ export default async function Home({ params }: Props) {
       <Hero locale={locale} d={d} />
       <JourneyFilm d={d} />
       <CarePathways locale={locale} d={d} />
+      <PromiseSection d={d} />
+      <TravelServices d={d} />
       <AudiencePaths locale={locale} d={d} />
       <TrustSection d={d} />
       <CtaPanel

@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 
 import { CtaPanel } from "@/components/CtaPanel";
 import { PageHero } from "@/components/PageHero";
+import { CategoryTabs } from "@/components/CategoryTabs";
+import { ConsultantVideo } from "@/components/ConsultantVideo";
+import { careAreaTabs } from "@/lib/care-areas";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { pageMetadata } from "@/lib/metadata";
@@ -63,7 +66,23 @@ export default async function Cardiology({ params }: Props) {
         </a>
       </PageHero>
 
-      <div id="care-areas" className="container-site scroll-mt-24 py-14 md:py-20">
+      <CategoryTabs tabs={careAreaTabs(locale, d)} label={d.careAreasPage.tabsLabel} />
+
+      <section className="section">
+        <div className="container-site grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+          <ConsultantVideo
+            label={d.careAreasPage.video.label}
+            title={d.careAreasPage.video.title}
+            note={d.careAreasPage.video.note}
+          />
+          <div>
+            <p className="eyebrow">{d.cardiology.eyebrow}</p>
+            <p className="lead mt-3">{d.cardiology.intro}</p>
+          </div>
+        </div>
+      </section>
+
+      <div id="care-areas" className="container-site scroll-mt-24 pb-14 md:pb-20">
         {sections.map((section, index) => {
           const Icon = section.icon;
           return (

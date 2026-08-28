@@ -6,7 +6,8 @@
     "how": "How It Works",
     "send": "Send My Case",
     "language": "العربية",
-    "languageAria": "Switch language to Arabic"
+    "languageAria": "Switch language to Arabic",
+    "careAreas": "Care Areas"
   },
   "common": {
     "brand": "RehletShifaa",
@@ -29,9 +30,9 @@
     "brandArabicAccent": "شفاء"
   },
   "home": {
-    "eyebrow": "International cardiac care coordination",
-    "title": "Your Journey to Better Heart Care",
-    "intro": "Send your medical reports and let RehletShifaa help direct your case to the appropriate cardiac consultant before you travel to Egypt.",
+    "eyebrow": "International specialist care coordination",
+    "title": "Your Journey to Trusted Care in Egypt",
+    "intro": "Share your medical reports and let RehletShifaa guide your case to the right consultant — across cardiology, rheumatology & rehabilitation, and orthopedics — with your whole journey coordinated before you travel.",
     "primaryAction": "Start My Care Review",
     "watchJourney": "Watch the Journey",
     "reassurance": "You do not need a diagnosis or the name of a procedure to begin.",
@@ -74,20 +75,20 @@
         }
       ]
     },
-    "areasEyebrow": "Cardiac care areas",
-    "areasTitle": "Specialist pathways, guided by your case",
+    "areasEyebrow": "What we care for",
+    "areasTitle": "Three care areas, one coordinated journey",
     "areas": [
       {
-        "title": "Coronary Arteries & Cardiac Catheterization",
-        "body": "For patients requiring evaluation for coronary angiography, PCI, stents or complex coronary intervention."
+        "title": "Cardiology",
+        "body": "Consultant-led coronary, structural-heart and rhythm care — from angiography and stents to valve and device procedures."
       },
       {
-        "title": "Heart Valves & Structural Heart",
-        "body": "Advanced assessment and catheter-based valve interventions including TAVI/TAVR and selected mitral and tricuspid interventions."
+        "title": "Rheumatology, Rehabilitation & Physical Medicine",
+        "body": "Inflammatory and autoimmune joint disease, osteoarthritis and chronic pain, with rehabilitation and physical medicine."
       },
       {
-        "title": "Heart Rhythm & Cardiac Devices",
-        "body": "Assessment for Pacemaker, ICD, CRT-P and CRT-D when medically appropriate."
+        "title": "Orthopedics",
+        "body": "Joint replacement, sports injuries and arthroscopy, and spine and trauma evaluation — with a second opinion before surgery."
       }
     ],
     "howEyebrow": "A clear process",
@@ -143,7 +144,39 @@
     ],
     "finalTitle": "Start With Your Medical Case",
     "finalBody": "You don't need to know the name of the specialty or procedure. Send what you have. We'll help with the next step.",
-    "finalNote": "Sending your case does not commit you to treatment or travel."
+    "finalNote": "Sending your case does not commit you to treatment or travel.",
+    "slogan": "We care for your health from your first message to your follow-up back home.",
+    "areasIntro": "Start with the area closest to your need. Not sure? Send your case and your coordinator will help direct it.",
+    "areasAction": "View care area",
+    "consultantsPromise": {
+      "eyebrow": "Consultants, not just specialists",
+      "title": "We choose consultants, not just specialists.",
+      "body": "Your case is reviewed by a responsible consultant who owns the clinical decision — chosen for senior experience and accountability, so a named person stands behind your care."
+    },
+    "travel": {
+      "eyebrow": "Optional travel support",
+      "title": "Flights, hotels and visas — only if you need them",
+      "intro": "Your treatment comes first. If you want it, we can help coordinate the journey around it.",
+      "items": [
+        {
+          "title": "Flights",
+          "body": "Help finding and booking suitable flights around your treatment dates."
+        },
+        {
+          "title": "Hotel & stay",
+          "body": "Comfortable accommodation for you and a companion, close to the hospital."
+        },
+        {
+          "title": "Visa assistance",
+          "body": "Guidance and documentation support for your medical-travel visa."
+        },
+        {
+          "title": "Airport reception",
+          "body": "Airport pick-up and transfers, so you never navigate a new city alone."
+        }
+      ],
+      "note": "Travel support is optional and arranged only after your medical proposal. You pay official providers directly — never cash to a coordinator."
+    }
   },
   "footer": {
     "description": "Consultant-led coordination of international cardiac care in Egypt, in Arabic and English.",
@@ -284,7 +317,7 @@
   "form": {
     "eyebrow": "A secure first step",
     "title": "Send Your Medical Case",
-    "intro": "You don't need to know which cardiac specialty you need. Send what you already have and we'll help guide the next step.",
+    "intro": "You don't need to know which specialty you need. Send what you already have and we'll help guide the next step.",
     "name": "Full Name",
     "country": "Country",
     "phone": "WhatsApp Number",
@@ -309,6 +342,17 @@
       "consent": "Consent is required to coordinate your case.",
       "file": "Use PDF, JPG, JPEG or PNG files up to 15 MB each.",
       "server": "We couldn't send your case right now. Please try again or contact us on WhatsApp."
+    },
+    "category": {
+      "label": "Which care area is your case about?",
+      "help": "Optional. If you're not sure, leave it — your coordinator will help direct your case.",
+      "placeholder": "Select a care area (optional)",
+      "summaryLabel": "Care area requested",
+      "options": {
+        "cardiology": "Cardiology",
+        "rheumatology": "Rheumatology, Rehabilitation & Physical Medicine",
+        "orthopedics": "Orthopedics"
+      }
     }
   },
   "legal": {
@@ -317,5 +361,98 @@
     "termsTitle": "Terms of Use",
     "disclaimerTitle": "Medical Disclaimer",
     "body": "This page outlines the intended policy structure only. It must be reviewed and approved by qualified legal and privacy advisers before RehletShifaa processes real patient information."
+  },
+  "careAreasPage": {
+    "eyebrow": "Care areas",
+    "title": "Choose the care area closest to your need",
+    "intro": "RehletShifaa coordinates consultant-led care across three areas. Not sure where your case fits? Send it and your coordinator will help direct it.",
+    "tabsLabel": "Care areas",
+    "tabs": {
+      "cardiology": "Cardiology",
+      "rheumatology": "Rheumatology & Rehab",
+      "orthopedics": "Orthopedics"
+    },
+    "video": {
+      "label": "Consultant introduction",
+      "title": "A short talk from your consultant — coming soon",
+      "note": "A named consultant will introduce this care area and explain how your case is reviewed. The recorded talk will appear here."
+    }
+  },
+  "rheumatology": {
+    "eyebrow": "Consultant-led rheumatology & rehabilitation",
+    "title": "Rheumatology, Rehabilitation & Physical Medicine",
+    "intro": "From inflammatory joint disease to recovery and physical medicine — send your reports and RehletShifaa will help direct your case to the appropriate consultant.",
+    "videoTitle": "Meet your rheumatology & rehabilitation consultant — coming soon",
+    "sections": [
+      {
+        "title": "Inflammatory & Autoimmune Conditions",
+        "items": [
+          "Rheumatoid arthritis",
+          "Ankylosing spondylitis & spondyloarthritis",
+          "Psoriatic arthritis",
+          "Systemic lupus & connective-tissue disease",
+          "Gout & crystal arthritis"
+        ]
+      },
+      {
+        "title": "Osteoarthritis & Chronic Joint Pain",
+        "items": [
+          "Knee & hip osteoarthritis",
+          "Chronic back & neck pain",
+          "Soft-tissue & tendon pain",
+          "Osteoporosis & bone-health review"
+        ]
+      },
+      {
+        "title": "Rehabilitation & Physical Medicine",
+        "items": [
+          "Post-surgical rehabilitation",
+          "Post-stroke & neurological rehabilitation",
+          "Musculoskeletal & sports rehabilitation",
+          "Pain-management programmes"
+        ]
+      }
+    ],
+    "note": "Your treatment plan is decided by the consultant after review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
+    "finalTitle": "Not Sure Where Your Condition Fits?",
+    "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate consultant."
+  },
+  "orthopedics": {
+    "eyebrow": "Consultant-led orthopedic care",
+    "title": "Orthopedics & Joint Surgery",
+    "intro": "From joint replacement to sports injuries and spine evaluation — send your reports and RehletShifaa will help direct your case to the appropriate consultant.",
+    "videoTitle": "Meet your orthopedics consultant — coming soon",
+    "sections": [
+      {
+        "title": "Joint Replacement",
+        "items": [
+          "Hip replacement",
+          "Knee replacement",
+          "Revision joint-surgery evaluation",
+          "Pre-operative assessment"
+        ]
+      },
+      {
+        "title": "Sports Injuries & Arthroscopy",
+        "items": [
+          "Knee arthroscopy (ACL, meniscus)",
+          "Shoulder arthroscopy",
+          "Cartilage & ligament injury evaluation",
+          "Return-to-activity planning"
+        ]
+      },
+      {
+        "title": "Spine, Trauma & Deformity",
+        "items": [
+          "Spine evaluation & selected interventions",
+          "Fracture & trauma follow-up",
+          "Limb-deformity & corrective assessment",
+          "Second opinion before surgery"
+        ]
+      }
+    ],
+    "note": "Suitability for any procedure is determined only after consultant review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
+    "finalTitle": "Not Sure Where Your Condition Fits?",
+    "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate consultant."
   }
 }

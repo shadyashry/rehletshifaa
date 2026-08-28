@@ -22,9 +22,9 @@ export function swapLocale(pathname: string, next: Locale): string {
 export function primaryNav(locale: Locale, d: Dictionary): readonly NavItem[] {
   return [
     { href: localeHref(locale), label: d.nav.home },
-    { href: localeHref(locale, "cardiology"), label: d.nav.cardiology },
-    { href: localeHref(locale, "consultants"), label: d.nav.consultants },
+    { href: localeHref(locale, "care-areas"), label: d.nav.careAreas },
     { href: localeHref(locale, "how-it-works"), label: d.nav.how },
+    { href: localeHref(locale, "consultants"), label: d.nav.consultants },
   ];
 }
 
@@ -41,4 +41,4 @@ export function whatsappHref(message?: string): string {
   return message ? `https://wa.me/${number}?text=${encodeURIComponent(message)}` : `https://wa.me/${number}`;
 }
 
-export const WHATSAPP_INTRO = "Hello RehletShifaa, I would like help reviewing a cardiac medical case.";
+export const WHATSAPP_INTRO = "Hello RehletShifaa, I would like help reviewing a medical case.";

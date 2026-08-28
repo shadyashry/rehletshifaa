@@ -25,6 +25,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
           <p className="eyebrow">{d.home.eyebrow}</p>
           <h1 className="display mt-4">{d.home.title}</h1>
           <p className="lead mt-5 max-w-xl">{d.home.intro}</p>
+          <p className="mt-4 max-w-xl text-base font-semibold leading-7 text-brand-700">{d.home.slogan}</p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <TrackedLink
