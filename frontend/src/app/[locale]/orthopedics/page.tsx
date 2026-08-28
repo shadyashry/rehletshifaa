@@ -19,5 +19,5 @@ export default async function Orthopedics({ params }: Props) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const d = getDictionary(locale);
-  return <CategoryDetail locale={locale} d={d} content={d.orthopedics} />;
+  return <CategoryDetail locale={locale} d={d} content={d.orthopedics} consultantSlug="hossam-kibba" />;
 }

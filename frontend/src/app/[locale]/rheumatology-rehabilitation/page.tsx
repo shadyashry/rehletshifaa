@@ -19,5 +19,5 @@ export default async function Rheumatology({ params }: Props) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const d = getDictionary(locale);
-  return <CategoryDetail locale={locale} d={d} content={d.rheumatology} />;
+  return <CategoryDetail locale={locale} d={d} content={d.rheumatology} consultantSlug="hanan-elshoura" />;
 }

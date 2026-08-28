@@ -4,9 +4,10 @@ import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { careAreaTabs } from "@/lib/care-areas";
 import { CategoryTabs } from "@/components/CategoryTabs";
-import { ConsultantVideo } from "@/components/ConsultantVideo";
+import { ConsultantSpotlight } from "@/components/ConsultantProfileCard";
 import { CtaPanel } from "@/components/CtaPanel";
 import { PageHero } from "@/components/PageHero";
+import { getConsultant, type ConsultantSlug } from "@/lib/consultants";
 
 export type CategoryContent = {
   eyebrow: string;
@@ -21,14 +22,13 @@ export type CategoryContent = {
 };
 
 /**
- * Shared layout for the Rheumatology and Orthopedics care-area pages: hero,
- * the care-area tab strip, a consultant-introduction video placeholder, the
- * scope of care, a consultant-led safety note, and the closing call to action.
- * Cardiology keeps its own richer layout but reuses the same tabs and video.
+ * Shared layout for the Rehabilitation/Dysphagia and Orthopedics pages: hero,
+ * care-area tabs, the relevant consultant profile, scope of care, a clinical
+ * safety note, and the closing call to action.
  */
-export function CategoryDetail({ locale, d, content }: { locale: Locale; d: Dictionary; content: CategoryContent }) {
+export function CategoryDetail({ locale, d, content, consultantSlug }: { locale: Locale; d: Dictionary; content: CategoryContent; consultantSlug: ConsultantSlug }) {
   const tabs = careAreaTabs(locale, d);
-  const video = d.careAreasPage.video;
+  const consultant = getConsultant(locale, consultantSlug);
 
   return (
     <>
@@ -42,10 +42,9 @@ export function CategoryDetail({ locale, d, content }: { locale: Locale; d: Dict
       ) : null}
 
       <section className="section">
-        <div className="container-site grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-          <ConsultantVideo label={video.label} title={content.videoTitle} note={video.note} />
-
-          <div className="grid gap-6">
+        <div className="container-site">
+          {consultant ? <ConsultantSpotlight profile={consultant} locale={locale} /> : null}
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
             {content.sections.map((section) => (
               <div key={section.title} className="card p-6 sm:p-7">
                 <h2 className="text-xl font-bold tracking-[-0.01em] text-brand-900 rtl:tracking-normal">

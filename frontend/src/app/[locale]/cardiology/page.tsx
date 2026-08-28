@@ -5,8 +5,9 @@ import { notFound } from "next/navigation";
 import { CtaPanel } from "@/components/CtaPanel";
 import { PageHero } from "@/components/PageHero";
 import { CategoryTabs } from "@/components/CategoryTabs";
-import { ConsultantVideo } from "@/components/ConsultantVideo";
+import { ConsultantSpotlight } from "@/components/ConsultantProfileCard";
 import { careAreaTabs } from "@/lib/care-areas";
+import { getConsultant } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { pageMetadata } from "@/lib/metadata";
@@ -37,6 +38,7 @@ export default async function Cardiology({ params }: Props) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const d = getDictionary(locale);
+  const consultant = getConsultant(locale, "ahmed-alashry");
   const sections = [
     {
       icon: Stethoscope,
@@ -68,19 +70,7 @@ export default async function Cardiology({ params }: Props) {
 
       <CategoryTabs tabs={careAreaTabs(locale, d)} label={d.careAreasPage.tabsLabel} />
 
-      <section className="section">
-        <div className="container-site grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-          <ConsultantVideo
-            label={d.careAreasPage.video.label}
-            title={d.careAreasPage.video.title}
-            note={d.careAreasPage.video.note}
-          />
-          <div>
-            <p className="eyebrow">{d.cardiology.eyebrow}</p>
-            <p className="lead mt-3">{d.cardiology.intro}</p>
-          </div>
-        </div>
-      </section>
+      {consultant ? <section className="section"><div className="container-site"><ConsultantSpotlight profile={consultant} locale={locale} /></div></section> : null}
 
       <div id="care-areas" className="container-site scroll-mt-24 pb-14 md:pb-20">
         {sections.map((section, index) => {
