@@ -14,7 +14,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
       {/* Soft healing washes — decorative, kept subtle and out of the a11y tree. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 hidden opacity-90 md:block"
+        className="pointer-events-none absolute inset-0 hidden opacity-90 md:block rtl:-scale-x-100"
         style={{
           backgroundImage:
             "radial-gradient(circle at 78% 26%, var(--color-wash-aqua) 0, transparent 34%), radial-gradient(circle at 22% 78%, var(--color-wash-lavender) 0, transparent 32%), radial-gradient(circle at 94% 64%, var(--color-wash-peach) 0, transparent 28%)",

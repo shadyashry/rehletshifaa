@@ -4,8 +4,8 @@ import type { Locale } from "@/lib/i18n";
 
 export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
   const arabic = locale === "ar";
-  const source = arabic ? "/media/rehletshifaa-journey-ar.mp4?v=4" : "/media/rehletshifaa-journey-en.mp4?v=2";
-  const poster = arabic ? "/media/rehletshifaa-journey-ar-poster.jpg" : "/media/rehletshifaa-journey-en-poster.jpg";
+  const source = arabic ? "/media/rehletshifaa-journey-ar.mp4?v=5" : "/media/rehletshifaa-journey-en.mp4?v=3";
+  const poster = arabic ? "/media/rehletshifaa-journey-ar-poster.jpg?v=2" : "/media/rehletshifaa-journey-en-poster.jpg?v=2";
   const label = arabic
     ? "رحلة المريض مع رحلة شفاء، من مشاركة التقارير الطبية إلى المتابعة المنظمة"
     : "RehletShifaa patient journey from sharing medical reports to coordinated follow-up";
@@ -28,7 +28,7 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
           </video>
         </div>
         <p className="mt-4 text-center text-sm font-medium text-ink-500">
-          {arabic ? "٧٠ ثانية · صوت نسائي عربي واضح · موسيقى هادئة · نصوص توضيحية كاملة" : "62 seconds · professionally narrated · fully captioned"}
+          {arabic ? "٥٣ ثانية · النسخة العربية" : "53 seconds · English version"}
         </p>
       </div>
     </section>
