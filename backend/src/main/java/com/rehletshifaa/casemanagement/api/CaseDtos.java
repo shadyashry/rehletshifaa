@@ -12,8 +12,12 @@ public final class CaseDtos {
         @Size(max=2000) String conditionDescription,
         @NotBlank @Pattern(regexp="en|ar") String preferredLanguage,
         @AssertTrue Boolean consent,
-        @Size(max=2048) String turnstileToken
-    ) {}
+        @Size(max=2048) String turnstileToken,
+        @Email @Size(max=254) String email,
+        @Size(max=80) String timeZone
+    ) {
+        public CreateCaseRequest(String fullName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken){this(fullName,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,null,null);}
+    }
     public record CreateCaseResponse(UUID caseId, String caseNumber, String status) {}
     public record SubmitCaseResponse(String caseNumber, String status) {}
 }

@@ -13,6 +13,12 @@ spring:
       hibernate.jdbc.time_zone: UTC
   flyway:
     enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER_URI:}
+          jwk-set-uri: ${OIDC_JWK_SET_URI:}
   servlet:
     multipart:
       max-file-size: 16MB
@@ -40,21 +46,43 @@ springdoc:
   api-docs.enabled: ${OPENAPI_ENABLED:true}
   swagger-ui.enabled: ${OPENAPI_ENABLED:true}
 app:
+  security.enabled: ${APP_SECURITY_ENABLED:false}
+  claim:
+    pepper: ${CLAIM_TOKEN_PEPPER:local-development-pepper-only}
+    expiry-seconds: ${CLAIM_TOKEN_EXPIRY_SECONDS:900}
+    max-attempts: ${CLAIM_TOKEN_MAX_ATTEMPTS:5}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
   cors.allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000}
   storage:
     mode: ${STORAGE_MODE:mock}
     bucket: ${S3_BUCKET:}
     region: ${AWS_REGION:eu-central-1}
+    endpoint: ${S3_ENDPOINT:}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:}
+    path-style: ${S3_PATH_STYLE:false}
     sse-algorithm: ${S3_SSE_ALGORITHM:AES256}
     kms-key-id: ${S3_KMS_KEY_ID:}
     max-bytes: ${UPLOAD_MAX_BYTES:15728640}
+    max-files-per-case: ${UPLOAD_MAX_FILES_PER_CASE:25}
+    max-case-bytes: ${UPLOAD_MAX_CASE_BYTES:104857600}
     presign-expiry-seconds: ${PRESIGN_EXPIRY_SECONDS:300}
     allowed-types: application/pdf,image/jpeg,image/png
+    scanning-mode: ${DOCUMENT_SCANNING_MODE:signature}
+    clamav:
+      host: ${CLAMAV_HOST:localhost}
+      port: ${CLAMAV_PORT:3310}
+      timeout-milliseconds: ${CLAMAV_TIMEOUT_MILLISECONDS:10000}
   mail:
     mode: ${MAIL_MODE:noop}
     coordinator: ${COORDINATOR_EMAIL:coordinator@example.com}
     from: ${MAIL_FROM:no-reply@example.com}
+  notifications:
+    mode: ${NOTIFICATIONS_MODE:noop}
+    poll-milliseconds: ${NOTIFICATION_POLL_MILLISECONDS:5000}
+  whatsapp:
+    mode: ${WHATSAPP_MODE:noop}
+    webhook-url: ${WHATSAPP_WEBHOOK_URL:}
+    token: ${WHATSAPP_TOKEN:}
   turnstile:
     enabled: ${TURNSTILE_ENABLED:false}
     secret: ${TURNSTILE_SECRET:}
@@ -62,4 +90,3 @@ app:
     requests: ${RATE_LIMIT_REQUESTS:30}
     window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
     trust-proxy: ${RATE_LIMIT_TRUST_PROXY:false}
-

@@ -4,8 +4,8 @@
     {
       "Sid": "WriteAndVerifyMedicalDocuments",
       "Effect": "Allow",
-      "Action": ["s3:PutObject", "s3:GetObject"],
-      "Resource": "arn:aws:s3:::REPLACE_WITH_BUCKET/cases/*"
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:PutObjectTagging", "s3:GetObjectTagging", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::REPLACE_WITH_BUCKET/medical/*"
     },
     {
       "Sid": "UseApplicationKmsKey",

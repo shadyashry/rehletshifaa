@@ -20,7 +20,9 @@ public class MedicalDocument {
     @Version @Column(nullable=false) private long version;
     protected MedicalDocument() {}
     public MedicalDocument(UUID id, MedicalCase medicalCase, String objectKey, String originalFileName, String safeFileName, String contentType, long sizeBytes, Instant now) { this.id=id; this.medicalCase=medicalCase; this.objectKey=objectKey; this.originalFileName=originalFileName; this.safeFileName=safeFileName; this.contentType=contentType; this.sizeBytes=sizeBytes; this.status=DocumentStatus.PENDING; this.createdAt=now; }
-    public void confirm(Instant now) { if (status != DocumentStatus.PENDING) throw new IllegalStateException("Document is not pending"); status=DocumentStatus.UPLOADED; confirmedAt=now; }
+    public void quarantine(Instant now) { if (status != DocumentStatus.PENDING) throw new IllegalStateException("Document is not pending"); status=DocumentStatus.QUARANTINED; confirmedAt=now; }
+    public void markClean() { if (status != DocumentStatus.QUARANTINED) throw new IllegalStateException("Document is not quarantined"); status=DocumentStatus.CLEAN; }
+    public void scanFailed() { if (status != DocumentStatus.QUARANTINED) throw new IllegalStateException("Document is not quarantined"); status=DocumentStatus.SCAN_FAILED; }
     public void reject() { status=DocumentStatus.REJECTED; }
-    public UUID getId(){return id;} public MedicalCase getMedicalCase(){return medicalCase;} public String getObjectKey(){return objectKey;} public String getContentType(){return contentType;} public long getSizeBytes(){return sizeBytes;} public DocumentStatus getStatus(){return status;}
+    public UUID getId(){return id;} public MedicalCase getMedicalCase(){return medicalCase;} public String getObjectKey(){return objectKey;} public String getOriginalFileName(){return originalFileName;} public String getSafeFileName(){return safeFileName;} public String getContentType(){return contentType;} public long getSizeBytes(){return sizeBytes;} public DocumentStatus getStatus(){return status;}
 }

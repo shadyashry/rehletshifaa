@@ -11,17 +11,81 @@ services:
       test: ["CMD-SHELL", "pg_isready -U rehletshifaa"]
       interval: 5s
       timeout: 3s
-      retries: 12
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.3
+    command: ["start-dev", "--import-realm", "--hostname", "http://localhost:8180"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: Admin123!
+      KC_HEALTH_ENABLED: "true"
+    ports: ["8180:8080"]
+    volumes:
+      - ./infrastructure/keycloak/realm-rehletshifaa.json:/opt/keycloak/data/import/realm-rehletshifaa.json:ro
+      - keycloak-data:/opt/keycloak/data
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: rehletshifaa
+      MINIO_ROOT_PASSWORD: RehletShifaaLocal123!
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio-data:/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    depends_on:
+      minio: { condition: service_healthy }
+    volumes:
+      - ./infrastructure/minio/cors.json:/config/cors.json:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set local http://minio:9000 rehletshifaa 'RehletShifaaLocal123!' &&
+        mc mb --ignore-existing local/medical-documents &&
+        mc anonymous set none local/medical-documents &&
+        mc cors set local/medical-documents /config/cors.json
+
+  clamav:
+    image: clamav/clamav:stable-debian13-slim
+    ports: ["3310:3310"]
+    volumes: ["clamav-data:/var/lib/clamav"]
+
   mailpit:
     image: axllent/mailpit:v1.27
     ports: ["1025:1025", "8025:8025"]
+
   backend:
     build: ./backend
     environment:
+      SPRING_PROFILES_ACTIVE: local
       DB_URL: jdbc:postgresql://postgres:5432/rehletshifaa
       DB_USERNAME: rehletshifaa
       DB_PASSWORD: rehletshifaa
-      STORAGE_MODE: mock
+      APP_SECURITY_ENABLED: "true"
+      OIDC_ISSUER_URI: http://localhost:8180/realms/rehletshifaa
+      OIDC_JWK_SET_URI: http://keycloak:8080/realms/rehletshifaa/protocol/openid-connect/certs
+      CLAIM_TOKEN_PEPPER: local-only-claim-pepper-change-in-production
+      STORAGE_MODE: s3
+      AWS_ACCESS_KEY_ID: rehletshifaa
+      AWS_SECRET_ACCESS_KEY: RehletShifaaLocal123!
+      AWS_REGION: us-east-1
+      S3_BUCKET: medical-documents
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_PATH_STYLE: "true"
+      S3_SSE_ALGORITHM: AES256
+      DOCUMENT_SCANNING_MODE: clamav
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      NOTIFICATIONS_MODE: live
       MAIL_MODE: smtp
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
@@ -29,19 +93,36 @@ services:
       MAIL_FROM: no-reply@local.test
       FRONTEND_ALLOWED_ORIGINS: http://localhost:3000
       APP_PUBLIC_BASE_URL: http://localhost:8080
+      OPENAPI_ENABLED: "true"
     ports: ["8080:8080"]
     depends_on:
       postgres: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_started }
+      clamav: { condition: service_started }
+      mailpit: { condition: service_started }
+
   frontend:
     build:
       context: ./frontend
-      args: {}
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+        NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        NEXT_PUBLIC_WHATSAPP_NUMBER: "201000000000"
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ""
+        NEXT_PUBLIC_OIDC_AUTHORITY: http://localhost:8180/realms/rehletshifaa
+        NEXT_PUBLIC_OIDC_CLIENT_ID: rehletshifaa-web
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
       NEXT_PUBLIC_WHATSAPP_NUMBER: "201000000000"
+      NEXT_PUBLIC_OIDC_AUTHORITY: http://localhost:8180/realms/rehletshifaa
+      NEXT_PUBLIC_OIDC_CLIENT_ID: rehletshifaa-web
     ports: ["3000:3000"]
     depends_on: [backend]
+
 volumes:
   postgres-data:
-
+  keycloak-data:
+  minio-data:
+  clamav-data:

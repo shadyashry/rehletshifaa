@@ -1,6 +1,5 @@
 package com.rehletshifaa;
-import org.junit.jupiter.api.Test; import org.springframework.beans.factory.annotation.Autowired; import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest; import org.springframework.context.annotation.Import; import org.springframework.jdbc.core.JdbcTemplate; import org.springframework.test.context.TestPropertySource;
+import org.junit.jupiter.api.Test; import org.springframework.beans.factory.annotation.Autowired; import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase; import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest; import org.springframework.jdbc.core.JdbcTemplate; import org.springframework.test.context.TestPropertySource;
 import static org.assertj.core.api.Assertions.assertThat;
-@JdbcTest @TestPropertySource(properties={"spring.flyway.enabled=true","spring.jpa.hibernate.ddl-auto=none"})
+@JdbcTest @AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.NONE) @TestPropertySource(properties={"spring.flyway.enabled=true","spring.jpa.hibernate.ddl-auto=none"})
 class FlywayMigrationTest { @Autowired JdbcTemplate jdbc; @Test void createsCoreTables(){Integer cases=jdbc.queryForObject("select count(*) from information_schema.tables where table_name='medical_cases'",Integer.class);Integer docs=jdbc.queryForObject("select count(*) from information_schema.tables where table_name='medical_documents'",Integer.class);assertThat(cases).isEqualTo(1);assertThat(docs).isEqualTo(1);} }
-

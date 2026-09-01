@@ -29,7 +29,7 @@ public class MedicalCase {
         this.preferredLanguage = preferredLanguage; this.status = CaseStatus.DRAFT; this.consentTimestamp = now; this.createdAt = now; this.updatedAt = now;
     }
 
-    public void submit(Instant now) { if (status != CaseStatus.DRAFT) throw new IllegalStateException("Case is not in draft state"); status = CaseStatus.NEW; submittedAt = now; updatedAt = now; }
+    public void submit(Instant now) { if (status != CaseStatus.DRAFT) throw new IllegalStateException("Case is not in draft state"); status = CaseStatus.RECEIVED; submittedAt = now; updatedAt = now; }
     public UUID getId() { return id; } public String getCaseNumber() { return caseNumber; } public String getFullName() { return fullName; }
     public String getCountry() { return country; } public String getWhatsappNumber() { return whatsappNumber; } public String getConditionDescription() { return conditionDescription; }
     public String getPreferredLanguage() { return preferredLanguage; } public CaseStatus getStatus() { return status; } public Instant getSubmittedAt() { return submittedAt; }

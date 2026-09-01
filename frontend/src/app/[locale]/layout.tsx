@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AnalyticsScripts } from "@/components/AnalyticsScripts";
+import { AuthProvider } from "@/components/AuthProvider";
 import { EmergencyNotice } from "@/components/EmergencyNotice";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -36,9 +37,7 @@ export default async function LocaleLayout({
         </a>
         <EmergencyNotice label={d.common.emergencyLabel} text={d.common.emergency} />
         <Header locale={locale} d={d} />
-        <main id="main" tabIndex={-1}>
-          {children}
-        </main>
+        <AuthProvider><main id="main" tabIndex={-1}>{children}</main></AuthProvider>
         <Footer locale={locale} d={d} />
         <AnalyticsScripts />
       </body>

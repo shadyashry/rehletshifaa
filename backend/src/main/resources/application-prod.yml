@@ -5,7 +5,7 @@ springdoc:
   api-docs.enabled: false
   swagger-ui.enabled: false
 app:
+  security.enabled: true
   storage.mode: s3
   mail.mode: smtp
   turnstile.enabled: true
-

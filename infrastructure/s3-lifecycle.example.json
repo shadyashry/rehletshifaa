@@ -3,7 +3,13 @@
     {
       "ID": "expire-unconfirmed-uploads",
       "Status": "Enabled",
-      "Filter": { "Prefix": "cases/" },
+      "Filter": {
+        "And": {
+          "Prefix": "medical/",
+          "Tags": [{ "Key": "upload-state", "Value": "pending" }]
+        }
+      },
+      "Expiration": { "Days": 1 },
       "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
     }
   ]

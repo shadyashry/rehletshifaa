@@ -1,6 +1,6 @@
-# RehletShifaa V1
+# RehletShifaa Care Platform
 
-RehletShifaa is a bilingual Arabic/English medical case-intake platform. Patients can learn how the service works, select a specialty, submit a concise case, upload private medical documents directly to object storage, and receive a human-readable reference number.
+RehletShifaa is a bilingual Arabic/English international-care coordination platform. It connects a verified patient request to an accountable coordinator, credentialed consultant, operations, finance, treatment, and follow-up workflow.
 
 > Medical disclaimer: RehletShifaa is an intake and coordination service. It does not provide emergency care, diagnosis, or a substitute for professional medical advice.
 
@@ -10,7 +10,10 @@ RehletShifaa is a bilingual Arabic/English medical case-intake platform. Patient
 - Premium, responsive marketing pages and specialty/consultant discovery
 - Accessible multi-step case intake with consent and anti-spam support
 - Private, presigned document uploads with server-side confirmation
-- Transactional case submission and coordinator email notification
+- Verified patient case claiming and longitudinal tracking
+- Role-scoped portals for patients, coordinators, doctors, operations, finance, credentialing, administration, and audit
+- Versioned clinical reviews and proposals with clinical, operational, finance, and patient approvals
+- Durable notification outbox, immutable audit events, tasks, secure case messages, travel, treatment, and follow-up records
 - Privacy, terms, and medical-disclaimer pages
 - SEO metadata, sitemap, robots, canonical/hreflang, Open Graph image, and analytics abstraction
 - Structured logs, correlation IDs, rate limiting, health endpoint, and OpenAPI UI
@@ -18,14 +21,14 @@ RehletShifaa is a bilingual Arabic/English medical case-intake platform. Patient
 ## Architecture
 
 ```text
-Browser (Next.js) ── case metadata ──> Spring Boot API ──> PostgreSQL
-       │                                      │
-       └── presigned PUT ──────────────> private S3 bucket
+Browser (Next.js + OIDC PKCE) ── JWT ──> Spring Boot API ──> PostgreSQL
+             │                                │       │
+             └── presigned PUT/GET ──> private S3     └── durable outbox ──> SMTP/WhatsApp
                                               │
-                                              └── minimal notification ──> SMTP
+                                         quarantine + ClamAV
 ```
 
-The API deliberately exposes no public case-retrieval endpoint. Uploaded objects use random keys that contain no patient identifiers. See [docs/architecture.md](docs/architecture.md) and [docs/security-and-production-readiness.md](docs/security-and-production-readiness.md).
+Anonymous users can create and submit a case but cannot retrieve it. A short-lived verification code links the case to an authenticated patient account. All subsequent reads are object-authorized and audited. See [docs/architecture.md](docs/architecture.md), [docs/end-to-end-workflows.md](docs/end-to-end-workflows.md), and [docs/security-and-production-readiness.md](docs/security-and-production-readiness.md).
 
 ## Repository layout
 
@@ -50,8 +53,11 @@ Then open:
 - API docs: http://localhost:8080/swagger-ui.html
 - Health: http://localhost:8080/actuator/health
 - Mailpit: http://localhost:8025
+- Patient/staff portal: http://localhost:3000/en/portal (Arabic: `/ar/portal`)
+- Keycloak: http://localhost:8180 (admin console: `admin` / `Admin123!`)
+- MinIO console: http://localhost:9001 (`rehletshifaa` / `RehletShifaaLocal123!`)
 
-Compose uses PostgreSQL, mock local document storage, and Mailpit. It is a development configuration only.
+Compose uses PostgreSQL, Keycloak, private MinIO storage, ClamAV, and Mailpit. It is a development configuration only. Local portal users and passwords are documented in [docs/local-development.md](docs/local-development.md).
 
 To run each application directly:
 
@@ -88,17 +94,20 @@ CI runs these checks on every pull request and push to `main`. Frontend unit tes
 1. `POST /api/v1/cases` creates a draft case and returns its UUID.
 2. For each document, `POST /api/v1/cases/{caseId}/documents/presign` returns a short-lived upload URL.
 3. The browser uploads the document directly using `PUT`.
-4. `POST /api/v1/cases/{caseId}/documents/{documentId}/confirm` verifies the remote object.
+4. `POST /api/v1/cases/{caseId}/documents/confirm` verifies metadata, quarantines and scans the object, and marks it clean or rejects it.
 5. `POST /api/v1/cases/{caseId}/submit` validates consent and document state, marks the case submitted, and returns the public reference number.
 
-Supported documents are PDF, JPEG, and PNG, up to the configured limit. Production uses the `s3` storage mode; local development uses `mock`.
+6. The patient signs in and `POST /api/v1/patient/cases/{caseId}/claim` verifies the one-time code and binds the case to that identity.
+7. Role-specific `/api/v1/{patient|coordinator|doctor|operations|finance|admin}` endpoints drive the controlled care journey.
+
+Supported documents are PDF, JPEG, and PNG, subject to per-file, per-case count, and aggregate-size limits. Production and Docker Compose use private S3-compatible storage; tests can use the in-memory adapter.
 
 ## Configuration
 
 Copy `frontend/.env.example` and `backend/.env.example`. The important production settings are:
 
-- Frontend: public API/site URLs, WhatsApp number, Turnstile site key, and optional GA4/Google Ads identifiers.
-- Backend: PostgreSQL credentials, CORS origins, Turnstile secret, SMTP settings, rate limits, and upload limits.
+- Frontend: public API/site URLs, OIDC authority/client, WhatsApp number, Turnstile site key, and optional analytics identifiers.
+- Backend: PostgreSQL, OIDC/JWK, claim-token pepper, CORS, Turnstile, SMTP/WhatsApp, rate limits, upload quotas, ClamAV, and notification-worker settings.
 - Storage: region, private bucket, and either AES-256 or KMS server-side encryption.
 
 Never place secrets in a `NEXT_PUBLIC_*` variable or commit real environment files. Production startup intentionally fails when required integrations are missing.
@@ -110,4 +119,3 @@ Build the two Dockerfiles and deploy them behind HTTPS. Use a managed PostgreSQL
 ## Production readiness
 
 The repository implements secure defaults, but operating a medical-data system also requires organizational controls: a jurisdiction-specific privacy/legal review, vendor agreements, access-control and audit procedures, incident response, retention decisions, backups and restore testing, monitoring, vulnerability management, and clinical escalation processes. The included legal copy is placeholder content and must be approved by qualified counsel.
-

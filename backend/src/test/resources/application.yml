@@ -8,12 +8,21 @@ spring:
     hibernate.ddl-auto: validate
   flyway.enabled: true
 app:
+  security.enabled: false
+  claim:
+    pepper: test-only-claim-pepper
+    expiry-seconds: 900
+    max-attempts: 5
   storage.mode: mock
   public-base-url: http://localhost:8080
   storage.max-bytes: 15728640
+  storage.max-case-bytes: 104857600
+  storage.max-files-per-case: 25
   storage.presign-expiry-seconds: 300
   storage.allowed-types: application/pdf,image/jpeg,image/png
   mail.mode: noop
+  mail.coordinator: coordinator@test.invalid
+  mail.from: no-reply@test.invalid
+  notifications.mode: noop
   turnstile.enabled: false
   cors.allowed-origins: http://localhost:3000
-
