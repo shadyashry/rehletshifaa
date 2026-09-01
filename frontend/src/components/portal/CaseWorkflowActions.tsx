@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import type { Locale } from "@/lib/i18n";
 
 type CaseSummary={id:string;status:string;version:number};
-type Mutate=(path:string,body?:unknown,method?:string)=>Promise<void>;
+type Mutate=(path:string,body?:unknown,method?:string)=>Promise<unknown>;
 const transitions:Record<string,string[]>={RECEIVED:["INTAKE_REVIEW","CANCELLED"],INTAKE_REVIEW:["INFORMATION_REQUIRED","READY_FOR_CONSULTANT","CANCELLED"],INFORMATION_REQUIRED:["INTAKE_REVIEW","READY_FOR_CONSULTANT","CANCELLED"],READY_FOR_CONSULTANT:["CONSULTANT_ASSIGNMENT_PENDING","CANCELLED"],REVISION_REQUESTED:["PROPOSAL_PREPARATION"],ACCEPTED:["TRAVEL_COORDINATION"],TRAVEL_COORDINATION:["ARRIVAL_CONFIRMED","CANCELLED"],FOLLOW_UP:["CLOSED"]};
 const words={en:{title:"Workflow controls",transition:"Change case state",reason:"Reason",assign:"Assign care-team member",subject:"OIDC account subject",task:"Create task",taskTitle:"Task title",travel:"Update travel plan",arrival:"Planned arrival",facility:"Facility",treatment:"Record treatment episode",procedures:"Procedures / milestones",follow:"Schedule follow-up",due:"Due date",instructions:"Instructions",save:"Save"},ar:{title:"إدارة مسار العمل",transition:"تغيير حالة الطلب",reason:"سبب التغيير",assign:"تعيين عضو في فريق الرعاية",subject:"معرّف حساب الهوية",task:"إنشاء مهمة",taskTitle:"عنوان المهمة",travel:"تحديث خطة السفر",arrival:"موعد الوصول المخطط",facility:"المنشأة الطبية",treatment:"تسجيل مرحلة العلاج",procedures:"الإجراءات والمراحل",follow:"جدولة المتابعة",due:"موعد الاستحقاق",instructions:"التعليمات",save:"حفظ"}};
 
@@ -17,5 +17,5 @@ export function CaseWorkflowActions({locale,role,caseSummary,mutate}:{locale:Loc
  <form className="space-y-3" onSubmit={event=>submit(event,data=>mutate(`/doctor/cases/${caseSummary.id}/follow-ups`,{dueAt:date(data.get("dueAt")),mode:data.get("mode"),requiredTests:data.get("tests"),instructions:data.get("instructions")}))}><h4 className="font-bold">{t.follow}</h4><input className="field" name="dueAt" type="datetime-local" aria-label={t.due} required/><select className="field" name="mode"><option>VIDEO</option><option>PHONE</option><option>IN_PERSON</option></select><textarea className="field" name="tests" placeholder="Required tests"/><textarea className="field" name="instructions" placeholder={t.instructions}/><button className="btn-primary">{t.save}</button></form></>}
  </div></section>}
 
-function submit(event:FormEvent<HTMLFormElement>,action:(data:FormData)=>Promise<void>){event.preventDefault();const form=event.currentTarget;void action(new FormData(form)).then(()=>form.reset());}
+function submit(event:FormEvent<HTMLFormElement>,action:(data:FormData)=>Promise<unknown>){event.preventDefault();const form=event.currentTarget;void action(new FormData(form)).then(()=>form.reset());}
 function date(value:FormDataEntryValue|null){return value?new Date(String(value)).toISOString():null;}
