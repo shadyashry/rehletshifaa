@@ -1,0 +1,411 @@
+<title>RehletShifaa Care Journey</title>
+<meta name="description" content="The end-to-end care journey a patient case travels, from anonymous intake through treatment and follow-up.">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:ital,opt@0,400;0,500;1,400&family=JetBrains+Mono:wght@500;600&display=swap');
+
+  :root{
+    --bg:#eef2f0; --surface:#ffffff; --surface-2:#e6ece9; --surface-3:#dbe4e0;
+    --ink:#14201d; --ink-soft:#4c5b57; --ink-faint:#7c8a85; --line:#d3ddd8;
+    --accent:#0e8c7f; --accent-strong:#0b6b60; --accent-weak:#dcede9;
+    --patient:#0e8c7f; --coordinator:#3767a0; --doctor:#7b57c4; --operations:#bd7f22; --finance:#3f8c55; --credential:#5a6d7e; --system:#8a7250;
+    --happy-fill:#dcede9; --happy-line:#0e8c7f;
+    --hold-fill:#f6e7cd; --hold-line:#bd7f22;
+    --exit-fill:#f2d8d5; --exit-line:#c15048;
+    --success-fill:#d7ecdd; --success-line:#3f8c55;
+    --arrow:#63736e;
+    --shadow:0 1px 2px rgba(20,32,29,.06),0 8px 24px -12px rgba(20,32,29,.18);
+  }
+  :root:not([data-theme="light"]){
+    @media (prefers-color-scheme: dark){
+      --bg:#0e1614; --surface:#152020; --surface-2:#1c2a27; --surface-3:#243430;
+      --ink:#e6ede9; --ink-soft:#a6b4af; --ink-faint:#76837e; --line:#2b3a35;
+      --accent:#54c9b8; --accent-strong:#7fe0d1; --accent-weak:#12302a;
+      --patient:#54c9b8; --coordinator:#7ba7de; --doctor:#b49ae8; --operations:#e0ad54; --finance:#6fbe84; --credential:#93a6b7; --system:#c2a880;
+      --happy-fill:#12302a; --happy-line:#54c9b8;
+      --hold-fill:#33280f; --hold-line:#e0ad54;
+      --exit-fill:#341f1d; --exit-line:#e58a82;
+      --success-fill:#15301f; --success-line:#6fbe84;
+      --arrow:#8a9994;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1614; --surface:#152020; --surface-2:#1c2a27; --surface-3:#243430;
+    --ink:#e6ede9; --ink-soft:#a6b4af; --ink-faint:#76837e; --line:#2b3a35;
+    --accent:#54c9b8; --accent-strong:#7fe0d1; --accent-weak:#12302a;
+    --patient:#54c9b8; --coordinator:#7ba7de; --doctor:#b49ae8; --operations:#e0ad54; --finance:#6fbe84; --credential:#93a6b7; --system:#c2a880;
+    --happy-fill:#12302a; --happy-line:#54c9b8;
+    --hold-fill:#33280f; --hold-line:#e0ad54;
+    --exit-fill:#341f1d; --exit-line:#e58a82;
+    --success-fill:#15301f; --success-line:#6fbe84;
+    --arrow:#8a9994;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -14px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:"Plus Jakarta Sans",system-ui,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:clamp(20px,4vw,56px) clamp(16px,4vw,40px) 96px}
+
+  .eyebrow{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--accent-strong)}
+  h1{font-size:clamp(30px,5.5vw,50px);line-height:1.04;font-weight:800;letter-spacing:-.02em;margin:14px 0 0;text-wrap:balance}
+  .lede{font-family:"Newsreader",Georgia,serif;font-size:clamp(17px,2.1vw,21px);line-height:1.5;color:var(--ink-soft);max-width:60ch;margin:18px 0 0}
+  h2{font-size:clamp(21px,3vw,27px);font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balance}
+  h3{font-size:16px;font-weight:700;margin:0}
+  .sub{color:var(--ink-soft);font-size:14.5px;margin:6px 0 0;max-width:64ch}
+  section{margin-top:clamp(44px,6vw,76px)}
+  .sechead{display:flex;flex-direction:column;gap:2px;margin-bottom:22px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+  .sechead .eyebrow{color:var(--ink-faint)}
+
+  .disclaimer{margin-top:22px;display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-inline-start:3px solid var(--operations);border-radius:12px;padding:14px 16px;max-width:70ch;box-shadow:var(--shadow)}
+  .disclaimer b{color:var(--ink)}
+  .disclaimer p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+
+  /* phase strip */
+  .phases{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:8px}
+  .phase{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
+  .phase .pn{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-faint);font-weight:600}
+  .phase h3{font-size:14.5px;margin-top:4px}
+  .phase p{margin:6px 0 0;font-size:12.5px;color:var(--ink-soft)}
+  .phase .who{margin-top:9px;font-size:11px;color:var(--ink-faint);font-family:"JetBrains Mono",monospace}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:0 0 18px;font-size:12.5px;color:var(--ink-soft)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .sw{width:22px;height:14px;border-radius:4px;border:1.5px solid}
+  .sw.happy{background:var(--happy-fill);border-color:var(--happy-line)}
+  .sw.hold{background:var(--hold-fill);border-color:var(--hold-line)}
+  .sw.exit{background:var(--exit-fill);border-color:var(--exit-line)}
+  .sw.success{background:var(--success-fill);border-color:var(--success-line)}
+  .swl{width:26px;height:0;border-top:2px solid var(--accent)}
+  .swl.dash{border-top:2px dashed var(--hold-line)}
+  .swl.dashx{border-top:2px dashed var(--exit-line)}
+
+  figure{margin:0}
+  .diagram{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 16px;box-shadow:var(--shadow);overflow-x:auto}
+  .diagram svg{display:block;min-width:1040px;width:100%;height:auto}
+  figcaption{font-size:13px;color:var(--ink-soft);margin-top:12px;max-width:78ch}
+  figcaption code{font-family:"JetBrains Mono",monospace;font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px;color:var(--ink)}
+
+  /* svg */
+  .band{fill:var(--surface-2)}
+  .bandlbl{font-family:"Plus Jakarta Sans",sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;fill:var(--ink-faint);text-transform:uppercase}
+  .box rect{rx:8;stroke-width:1.6}
+  .b-happy rect{fill:var(--happy-fill);stroke:var(--happy-line)}
+  .b-hold rect{fill:var(--hold-fill);stroke:var(--hold-line)}
+  .b-exit rect{fill:var(--exit-fill);stroke:var(--exit-line)}
+  .b-success rect{fill:var(--success-fill);stroke:var(--success-line)}
+  .code{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:600;fill:var(--ink);text-anchor:middle}
+  .elbl{font-family:"JetBrains Mono",monospace;font-size:8.5px;fill:var(--ink-soft);text-anchor:middle}
+  .start{font-family:"JetBrains Mono",monospace;font-size:9px;fill:var(--ink-faint);text-anchor:middle}
+  .edge{stroke:var(--arrow);stroke-width:1.6;fill:none}
+  .edge-phase{stroke:var(--accent);stroke-width:2.2;fill:none}
+  .edge-loop{stroke:var(--hold-line);stroke-width:1.5;stroke-dasharray:5 4;fill:none}
+  .edge-exit{stroke:var(--exit-line);stroke-width:1.5;stroke-dasharray:5 4;fill:none}
+  .mk-fwd{fill:var(--arrow)} .mk-phase{fill:var(--accent)} .mk-loop{fill:var(--hold-line)} .mk-exit{fill:var(--exit-line)}
+
+  /* stage cards */
+  .stages{display:grid;gap:14px}
+  .stage{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);display:grid;grid-template-columns:44px 1fr;gap:16px;align-items:start}
+  .stage .idx{font-family:"JetBrains Mono",monospace;font-weight:600;font-size:13px;color:var(--surface);background:var(--accent-strong);width:36px;height:36px;border-radius:9px;display:grid;place-items:center}
+  .stage .body{min-width:0}
+  .stage .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+  .stage .top h3{font-size:15.5px}
+  .stage p{margin:8px 0 0;font-size:13.5px;color:var(--ink-soft)}
+  .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .tag{font-family:"JetBrains Mono",monospace;font-size:11px;padding:3px 8px;border-radius:6px;background:var(--surface-2);color:var(--ink-soft);border:1px solid var(--line);word-break:break-word}
+  .tag.state{background:var(--happy-fill);border-color:var(--happy-line);color:var(--ink)}
+  .tag.gate{background:transparent;border-style:dashed;border-color:var(--operations);color:var(--operations)}
+  .chip{font-size:11px;font-weight:700;letter-spacing:.02em;padding:3px 10px;border-radius:999px;color:#fff;white-space:nowrap}
+  .c-patient{background:var(--patient)} .c-coordinator{background:var(--coordinator)} .c-doctor{background:var(--doctor)} .c-operations{background:var(--operations)} .c-finance{background:var(--finance)} .c-credential{background:var(--credential)} .c-system{background:var(--system)} .c-anon{background:var(--ink-faint)}
+  :root[data-theme="dark"] .chip,:root:not([data-theme="light"]) .chip{color:#0e1614}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip{color:#0e1614}}
+
+  /* rails */
+  .rails{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .rail{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:16px;box-shadow:var(--shadow)}
+  .rail h3{font-size:14.5px;display:flex;align-items:center;gap:8px}
+  .rail .dot{width:9px;height:9px;border-radius:3px;background:var(--accent)}
+  .rail p{margin:8px 0 0;font-size:13px;color:var(--ink-soft)}
+  .rail .k{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-faint);margin-top:9px;display:block}
+
+  /* table */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;min-width:560px;background:var(--surface);font-size:13.5px}
+  th,td{text-align:start;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;background:var(--surface-2)}
+  tr:last-child td{border-bottom:none}
+  td code{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--accent-strong)}
+
+  .foot{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-faint);max-width:78ch}
+  .foot code{font-family:"JetBrains Mono",monospace;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">RehletShifaa · رحلة شفاء</p>
+    <h1>The end-to-end care journey</h1>
+    <p class="lede">How a single patient case travels the platform — from an anonymous request, through identity, clinical review, a four-party proposal, and treatment, to closed follow-up. One shared map for coordinators, clinicians, operations, finance, credentialing, and engineering.</p>
+    <div class="disclaimer">
+      <div>
+        <p><b>Coordination, not care.</b> RehletShifaa is an intake-and-coordination service. It does not diagnose, provide emergency care, or replace professional medical advice. Proposal acceptance is never procedure-specific medical consent.</p>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="sechead"><p class="eyebrow">The shape of it</p><h2>Five phases, one accountable case</h2><p class="sub">Every case is created once and carries a single accountable coordinator from intake to close. Work moves through five phases; the case status advances only along explicit, audited transitions.</p></div>
+    <div class="phases">
+      <div class="phase"><span class="pn">Phase 1</span><h3>Intake</h3><p>An anonymous request is captured with consent, documents are uploaded privately and scanned.</p><span class="who">patient (anonymous)</span></div>
+      <div class="phase"><span class="pn">Phase 2</span><h3>Identity &amp; ownership</h3><p>The patient claims the case with a one-time code; a coordinator takes ownership and triages.</p><span class="who">patient · coordinator</span></div>
+      <div class="phase"><span class="pn">Phase 3</span><h3>Clinical review</h3><p>A verified consultant is assigned, reviews the case, and approves a versioned recommendation.</p><span class="who">coordinator · doctor</span></div>
+      <div class="phase"><span class="pn">Phase 4</span><h3>Proposal &amp; decision</h3><p>Clinical → operations → finance → release, then the patient accepts, declines, or asks to revise.</p><span class="who">coordinator · ops · finance · patient</span></div>
+      <div class="phase"><span class="pn">Phase 5</span><h3>Care delivery</h3><p>Travel is coordinated, arrival confirmed, treatment delivered and discharged, follow-up closed.</p><span class="who">operations · doctor · coordinator</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><p class="eyebrow">The state machine</p><h2>Every state a case can hold</h2><p class="sub">The authoritative map of case status. Solid teal arrows advance a case between phases; grey arrows move it within a phase; amber dashed arrows send it back into a holding state; red dashed arrows are terminal exits.</p></div>
+
+    <div class="legend" aria-hidden="true">
+      <span><i class="sw happy"></i> active state</span>
+      <span><i class="sw hold"></i> holding / rework</span>
+      <span><i class="sw exit"></i> terminal exit</span>
+      <span><i class="sw success"></i> completed</span>
+      <span><i class="swl"></i> advance</span>
+      <span><i class="swl dash"></i> loop back</span>
+      <span><i class="swl dashx"></i> exit</span>
+    </div>
+
+    <figure>
+      <div class="diagram">
+        <svg viewBox="0 0 1300 690" role="img" aria-label="Case status state machine: DRAFT to RECEIVED to INTAKE_REVIEW (with INFORMATION_REQUIRED hold and CANCELLED exit), then READY_FOR_CONSULTANT, CONSULTANT_ASSIGNMENT_PENDING, CONSULTANT_REVIEW, CLINICAL_RECOMMENDATION_READY, then PROPOSAL_PREPARATION, PROPOSAL_INTERNAL_APPROVAL, PATIENT_DECISION (with REVISION_REQUESTED loop and DECLINED or EXPIRED exits), then ACCEPTED, TRAVEL_COORDINATION, ARRIVAL_CONFIRMED, TREATMENT_IN_PROGRESS, DISCHARGED, FOLLOW_UP, CLOSED.">
+          <defs>
+            <marker id="fwd" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path class="mk-fwd" d="M0,0 L9,4.5 L0,9 Z"/></marker>
+            <marker id="phase" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path class="mk-phase" d="M0,0 L10,5 L0,10 Z"/></marker>
+            <marker id="loop" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path class="mk-loop" d="M0,0 L9,4.5 L0,9 Z"/></marker>
+            <marker id="ex" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path class="mk-exit" d="M0,0 L9,4.5 L0,9 Z"/></marker>
+          </defs>
+
+          <!-- phase bands -->
+          <rect class="band" x="8" y="46" width="1284" height="72" rx="10"/>
+          <rect class="band" x="8" y="216" width="1284" height="72" rx="10"/>
+          <rect class="band" x="8" y="396" width="1284" height="152" rx="10"/>
+          <rect class="band" x="8" y="576" width="1284" height="72" rx="10"/>
+          <text class="bandlbl" x="20" y="42">1 · Intake</text>
+          <text class="bandlbl" x="20" y="212">3 · Clinical review</text>
+          <text class="bandlbl" x="20" y="392">4 · Proposal &amp; decision</text>
+          <text class="bandlbl" x="20" y="572">5 · Care delivery</text>
+
+          <!-- ===== edges (drawn under nodes) ===== -->
+          <!-- Row A forward -->
+          <path class="edge" d="M152,80 L203,80" marker-end="url(#fwd)"/>
+          <path class="edge" d="M337,80 L388,80" marker-end="url(#fwd)"/>
+          <path class="edge" d="M522,80 L573,80" marker-end="url(#fwd)"/>
+          <text class="elbl" x="178" y="72">submit</text>
+          <text class="elbl" x="362" y="72">claim</text>
+          <text class="elbl" x="548" y="72">need info</text>
+          <!-- INFO loop back to INTAKE_REVIEW -->
+          <path class="edge-loop" d="M643,56 C643,32 458,32 458,56" marker-end="url(#loop)"/>
+          <text class="elbl" x="550" y="30">resubmit</text>
+          <!-- CANCELLED exit from intake band -->
+          <path class="edge-exit" d="M707,80 L885,80" marker-end="url(#ex)"/>
+          <text class="elbl" x="796" y="72">cancel</text>
+
+          <!-- A -> B advance -->
+          <path class="edge-phase" d="M458,104 C458,168 88,168 88,224" marker-end="url(#phase)"/>
+          <text class="elbl" x="250" y="162">ready for consultant</text>
+
+          <!-- Row B forward -->
+          <path class="edge" d="M152,250 L203,250" marker-end="url(#fwd)"/>
+          <path class="edge" d="M337,250 L388,250" marker-end="url(#fwd)"/>
+          <path class="edge" d="M522,250 L573,250" marker-end="url(#fwd)"/>
+          <text class="elbl" x="178" y="242">assign</text>
+          <text class="elbl" x="362" y="242">accept</text>
+          <text class="elbl" x="548" y="242">approve</text>
+          <!-- B reassign loop -->
+          <path class="edge-loop" d="M273,226 C273,200 88,200 88,226" marker-end="url(#loop)"/>
+          <text class="elbl" x="180" y="196">reassign</text>
+          <!-- CONSULTANT_REVIEW -> INFORMATION_REQUIRED (more info) -->
+          <path class="edge-loop" d="M458,226 C458,165 643,165 643,106" marker-end="url(#loop)"/>
+          <text class="elbl" x="556" y="150">more info</text>
+
+          <!-- B -> C advance -->
+          <path class="edge-phase" d="M643,274 C643,338 88,338 88,404" marker-end="url(#phase)"/>
+          <text class="elbl" x="250" y="332">clinical review approved</text>
+
+          <!-- Row C forward -->
+          <path class="edge" d="M152,430 L203,430" marker-end="url(#fwd)"/>
+          <path class="edge" d="M337,430 L388,430" marker-end="url(#fwd)"/>
+          <path class="edge" d="M522,430 L573,430" marker-end="url(#fwd)"/>
+          <text class="elbl" x="178" y="422">internal</text>
+          <text class="elbl" x="362" y="422">release</text>
+          <text class="elbl" x="548" y="422">revise</text>
+          <!-- REVISION loop back to PREP -->
+          <path class="edge-loop" d="M643,406 C643,378 88,378 88,406" marker-end="url(#loop)"/>
+          <text class="elbl" x="360" y="374">re-draft proposal</text>
+          <!-- PATIENT_DECISION exits: declined, expired -->
+          <path class="edge-exit" d="M458,454 L488,486" marker-end="url(#ex)"/>
+          <path class="edge-exit" d="M470,454 C560,470 640,470 660,486" marker-end="url(#ex)"/>
+          <text class="elbl" x="452" y="474">decline</text>
+          <text class="elbl" x="612" y="474">expired</text>
+
+          <!-- C -> D advance -->
+          <path class="edge-phase" d="M446,454 C300,504 88,516 88,584" marker-end="url(#phase)"/>
+          <text class="elbl" x="196" y="512">accept</text>
+
+          <!-- Row D forward -->
+          <path class="edge" d="M152,610 L203,610" marker-end="url(#fwd)"/>
+          <path class="edge" d="M337,610 L388,610" marker-end="url(#fwd)"/>
+          <path class="edge" d="M522,610 L573,610" marker-end="url(#fwd)"/>
+          <path class="edge" d="M707,610 L758,610" marker-end="url(#fwd)"/>
+          <path class="edge" d="M892,610 L943,610" marker-end="url(#fwd)"/>
+          <path class="edge" d="M1077,610 L1128,610" marker-end="url(#fwd)"/>
+          <text class="elbl" x="178" y="602">coordinate</text>
+          <text class="elbl" x="362" y="602">arrived</text>
+          <text class="elbl" x="548" y="602">admitted</text>
+          <text class="elbl" x="732" y="602">discharge</text>
+          <text class="elbl" x="918" y="602">follow-up</text>
+          <text class="elbl" x="1102" y="602">close</text>
+
+          <!-- start marker -->
+          <text class="start" x="88" y="40">▼ intake submitted</text>
+
+          <!-- ===== nodes ===== -->
+          <!-- Row A  cy=80 top=56 -->
+          <g class="box b-happy"><rect x="24" y="56" width="128" height="48"/><text class="code" x="88" y="83.5">DRAFT</text></g>
+          <g class="box b-happy"><rect x="209" y="56" width="128" height="48"/><text class="code" x="273" y="83.5">RECEIVED</text></g>
+          <g class="box b-happy"><rect x="394" y="56" width="128" height="48"/><text class="code" x="458" y="78"><tspan x="458">INTAKE</tspan><tspan x="458" dy="11">REVIEW</tspan></text></g>
+          <g class="box b-hold"><rect x="579" y="56" width="128" height="48"/><text class="code" x="643" y="78"><tspan x="643">INFORMATION</tspan><tspan x="643" dy="11">REQUIRED</tspan></text></g>
+          <g class="box b-exit"><rect x="885" y="56" width="120" height="48"/><text class="code" x="945" y="83.5">CANCELLED</text></g>
+
+          <!-- Row B cy=250 top=226 -->
+          <g class="box b-happy"><rect x="24" y="226" width="128" height="48"/><text class="code" x="88" y="248"><tspan x="88">READY FOR</tspan><tspan x="88" dy="11">CONSULTANT</tspan></text></g>
+          <g class="box b-happy"><rect x="209" y="226" width="128" height="48"/><text class="code" x="273" y="242.5"><tspan x="273">CONSULTANT</tspan><tspan x="273" dy="11">ASSIGNMENT</tspan><tspan x="273" dy="11">PENDING</tspan></text></g>
+          <g class="box b-happy"><rect x="394" y="226" width="128" height="48"/><text class="code" x="458" y="248"><tspan x="458">CONSULTANT</tspan><tspan x="458" dy="11">REVIEW</tspan></text></g>
+          <g class="box b-happy"><rect x="579" y="226" width="128" height="48"/><text class="code" x="643" y="242.5"><tspan x="643">CLINICAL</tspan><tspan x="643" dy="11">RECOMMENDATION</tspan><tspan x="643" dy="11">READY</tspan></text></g>
+
+          <!-- Row C cy=430 top=406 -->
+          <g class="box b-happy"><rect x="24" y="406" width="128" height="48"/><text class="code" x="88" y="428"><tspan x="88">PROPOSAL</tspan><tspan x="88" dy="11">PREPARATION</tspan></text></g>
+          <g class="box b-happy"><rect x="209" y="406" width="128" height="48"/><text class="code" x="273" y="422.5"><tspan x="273">PROPOSAL</tspan><tspan x="273" dy="11">INTERNAL</tspan><tspan x="273" dy="11">APPROVAL</tspan></text></g>
+          <g class="box b-happy"><rect x="394" y="406" width="128" height="48"/><text class="code" x="458" y="428"><tspan x="458">PATIENT</tspan><tspan x="458" dy="11">DECISION</tspan></text></g>
+          <g class="box b-hold"><rect x="579" y="406" width="128" height="48"/><text class="code" x="643" y="428"><tspan x="643">REVISION</tspan><tspan x="643" dy="11">REQUESTED</tspan></text></g>
+          <!-- exits below decision -->
+          <g class="box b-exit"><rect x="398" y="486" width="120" height="42"/><text class="code" x="458" y="510.5">DECLINED</text></g>
+          <g class="box b-exit"><rect x="583" y="486" width="120" height="42"/><text class="code" x="643" y="510.5">EXPIRED</text></g>
+
+          <!-- Row D cy=610 top=586 -->
+          <g class="box b-happy"><rect x="24" y="586" width="128" height="48"/><text class="code" x="88" y="613.5">ACCEPTED</text></g>
+          <g class="box b-happy"><rect x="209" y="586" width="128" height="48"/><text class="code" x="273" y="608"><tspan x="273">TRAVEL</tspan><tspan x="273" dy="11">COORDINATION</tspan></text></g>
+          <g class="box b-happy"><rect x="394" y="586" width="128" height="48"/><text class="code" x="458" y="608"><tspan x="458">ARRIVAL</tspan><tspan x="458" dy="11">CONFIRMED</tspan></text></g>
+          <g class="box b-happy"><rect x="579" y="586" width="128" height="48"/><text class="code" x="643" y="608"><tspan x="643">TREATMENT</tspan><tspan x="643" dy="11">IN PROGRESS</tspan></text></g>
+          <g class="box b-happy"><rect x="764" y="586" width="128" height="48"/><text class="code" x="828" y="613.5">DISCHARGED</text></g>
+          <g class="box b-happy"><rect x="949" y="586" width="128" height="48"/><text class="code" x="1013" y="613.5">FOLLOW_UP</text></g>
+          <g class="box b-success"><rect x="1134" y="586" width="128" height="48"/><text class="code" x="1198" y="613.5">CLOSED</text></g>
+        </svg>
+      </div>
+      <figcaption>Source of truth: the <code>TRANSITIONS</code> map in <code>JourneyService.java</code>. <code>CANCELLED</code> is reachable from most active states before treatment (<code>RECEIVED</code>, <code>INTAKE_REVIEW</code>, <code>INFORMATION_REQUIRED</code>, <code>READY_FOR_CONSULTANT</code>, <code>CONSULTANT_ASSIGNMENT_PENDING</code>, <code>TRAVEL_COORDINATION</code>) — shown once to keep the map legible. Two states exist in the schema but are currently unreachable in code: <code>CLAIM_PENDING</code> and <code>PROPOSAL_READY</code>.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="sechead"><p class="eyebrow">Step by step</p><h2>The sixteen moves that make the journey</h2><p class="sub">Each step names who acts, what they do, the API that carries it, the state it lands the case in, and the control that guards it.</p></div>
+    <div class="stages">
+
+      <div class="stage"><div class="idx">1</div><div class="body"><div class="top"><span class="chip c-anon">Patient · anonymous</span><h3>Create &amp; submit the request</h3></div><p>An unauthenticated patient fills the intake form with explicit consent. A draft case and a provisional patient profile are created, then submitted.</p><div class="meta"><span class="tag">POST /api/v1/cases</span><span class="tag">POST …/submit</span><span class="tag state">DRAFT → RECEIVED</span><span class="tag gate">consent + Turnstile + rate limit</span></div></div></div>
+
+      <div class="stage"><div class="idx">2</div><div class="body"><div class="top"><span class="chip c-anon">Patient · anonymous</span><h3>Upload &amp; scan documents</h3></div><p>Files are uploaded straight to private storage via a short-lived presigned URL, then confirmed: size, declared type, and true file signature are checked, the object is quarantined and virus-scanned, and only then marked clean.</p><div class="meta"><span class="tag">…/documents/presign</span><span class="tag">…/documents/confirm</span><span class="tag gate">MIME + signature + ClamAV + quotas</span></div></div></div>
+
+      <div class="stage"><div class="idx">3</div><div class="body"><div class="top"><span class="chip c-patient">Patient</span><h3>Claim the case</h3></div><p>After signing in with OIDC, the patient enters the case ID and the one-time code delivered over WhatsApp/email. The code is pepper-hashed, single-use, attempt-limited, and compared in constant time; a match binds the case to their identity.</p><div class="meta"><span class="tag">POST /api/v1/patient/cases/{id}/claim</span><span class="tag state">RECEIVED → INTAKE_REVIEW</span><span class="tag gate">one-time code · replay-protected</span></div></div></div>
+
+      <div class="stage"><div class="idx">4</div><div class="body"><div class="top"><span class="chip c-coordinator">Coordinator</span><h3>Take ownership</h3></div><p>A coordinator claims the case from the shared intake queue, becoming its one accountable owner. A row-lock guarantees a single primary coordinator.</p><div class="meta"><span class="tag">POST /api/v1/coordinator/cases/{id}/claim</span><span class="tag gate">one active PRIMARY owner</span></div></div></div>
+
+      <div class="stage"><div class="idx">5</div><div class="body"><div class="top"><span class="chip c-coordinator">Coordinator</span><h3>Triage completeness</h3></div><p>The coordinator verifies the case is complete, exchanging secure messages and raising blocking tasks. Incomplete cases loop to <code style="font-family:'JetBrains Mono',monospace;font-size:12px">INFORMATION_REQUIRED</code> and back until ready.</p><div class="meta"><span class="tag">POST …/transition</span><span class="tag state">→ READY_FOR_CONSULTANT</span></div></div></div>
+
+      <div class="stage"><div class="idx">6</div><div class="body"><div class="top"><span class="chip c-coordinator">Coordinator</span><h3>Assign a verified consultant</h3></div><p>The coordinator assigns a doctor — but only one whose practitioner profile is <code style="font-family:'JetBrains Mono',monospace;font-size:12px">VERIFIED</code> through the credentialing track. Operations and finance are assigned in parallel.</p><div class="meta"><span class="tag">POST …/assignments</span><span class="tag state">→ CONSULTANT_ASSIGNMENT_PENDING</span><span class="tag gate">practitioner must be VERIFIED</span></div></div></div>
+
+      <div class="stage"><div class="idx">7</div><div class="body"><div class="top"><span class="chip c-doctor">Doctor</span><h3>Accept the assignment</h3></div><p>The consultant accepts (or declines) the case. Declines end the assignment; acceptance opens the clinical workspace.</p><div class="meta"><span class="tag">POST …/assignments/{id}?accept=</span><span class="tag state">→ CONSULTANT_REVIEW</span></div></div></div>
+
+      <div class="stage"><div class="idx">8</div><div class="body"><div class="top"><span class="chip c-doctor">Doctor</span><h3>Write &amp; approve the clinical review</h3></div><p>The consultant records a versioned clinical review (suitability, treatment, risks, follow-up). Final approval requires fresh re-authentication and locks the version as the mandatory basis for any proposal.</p><div class="meta"><span class="tag">POST …/reviews</span><span class="tag">…/reviews/{id}/approve</span><span class="tag state">→ CLINICAL_RECOMMENDATION_READY</span><span class="tag gate">step-up re-auth (≤10 min)</span></div></div></div>
+
+      <div class="stage"><div class="idx">9</div><div class="body"><div class="top"><span class="chip c-coordinator">Coordinator</span><h3>Draft the proposal</h3></div><p>Built strictly from an approved clinical review: included/excluded services, itemized pricing, terms, validity, and disclaimers. A new immutable version is created.</p><div class="meta"><span class="tag">POST …/proposals</span><span class="tag state">→ PROPOSAL_PREPARATION</span><span class="tag gate">requires APPROVED review</span></div></div></div>
+
+      <div class="stage"><div class="idx">10</div><div class="body"><div class="top"><span class="chip c-operations">Operations</span><h3>Confirm the operational plan</h3></div><p>Operations confirms delivery and travel feasibility on the proposal version.</p><div class="meta"><span class="tag">POST …/proposals/{v}/complete</span><span class="tag">version: OPERATIONS_COMPLETED</span></div></div></div>
+
+      <div class="stage"><div class="idx">11</div><div class="body"><div class="top"><span class="chip c-finance">Finance</span><h3>Approve commercial terms</h3></div><p>Finance re-authenticates and approves the pricing and terms.</p><div class="meta"><span class="tag">POST …/proposals/{v}/approve</span><span class="tag state">→ PROPOSAL_INTERNAL_APPROVAL</span><span class="tag gate">step-up re-auth (≤10 min)</span></div></div></div>
+
+      <div class="stage"><div class="idx">12</div><div class="body"><div class="top"><span class="chip c-coordinator">Coordinator</span><h3>Release to the patient</h3></div><p>The coordinator releases the finance-approved version, freezing an immutable HTML snapshot. Only released versions are ever visible to the patient.</p><div class="meta"><span class="tag">POST …/proposals/{v}/release</span><span class="tag state">→ PATIENT_DECISION</span><span class="tag gate">requires FINANCE_APPROVED</span></div></div></div>
+
+      <div class="stage"><div class="idx">13</div><div class="body"><div class="top"><span class="chip c-patient">Patient</span><h3>Decide</h3></div><p>The patient re-authenticates and accepts, declines, or requests a revision. Expired proposals are refused. A revision loops back to preparation; acceptance moves into care delivery.</p><div class="meta"><span class="tag">POST …/proposals/{v}/decision</span><span class="tag state">→ ACCEPTED / DECLINED / REVISION_REQUESTED</span><span class="tag gate">step-up re-auth · not medical consent</span></div></div></div>
+
+      <div class="stage"><div class="idx">14</div><div class="body"><div class="top"><span class="chip c-operations">Operations</span><h3>Coordinate travel &amp; confirm arrival</h3></div><p>Visa, flights, reception, accommodation, and transport are planned; confirmed arrival advances the case.</p><div class="meta"><span class="tag">POST …/travel</span><span class="tag state">ACCEPTED → TRAVEL_COORDINATION → ARRIVAL_CONFIRMED</span></div></div></div>
+
+      <div class="stage"><div class="idx">15</div><div class="body"><div class="top"><span class="chip c-doctor">Doctor</span><h3>Deliver treatment &amp; discharge</h3></div><p>Treatment episodes record procedures, milestones, and complications. A discharge document (clean, from this case) closes the episode.</p><div class="meta"><span class="tag">POST …/treatment</span><span class="tag state">→ TREATMENT_IN_PROGRESS → DISCHARGED</span></div></div></div>
+
+      <div class="stage"><div class="idx">16</div><div class="body"><div class="top"><span class="chip c-doctor">Doctor</span><span class="chip c-coordinator">Coordinator</span><h3>Follow up &amp; close</h3></div><p>A follow-up plan (mode, tests, instructions) is scheduled and, once complete, the case is closed.</p><div class="meta"><span class="tag">POST …/follow-ups</span><span class="tag state">→ FOLLOW_UP → CLOSED</span></div></div></div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><p class="eyebrow">A parallel track</p><h2>Practitioner credentialing — the gate before step 6</h2><p class="sub">A doctor cannot receive a case until credentialing verifies them. This runs independently of any single case and feeds the assignment gate.</p></div>
+    <figure>
+      <div class="diagram">
+        <svg viewBox="0 0 1040 150" role="img" aria-label="Credentialing flow: a credentialing admin creates a practitioner profile (UNDER_REVIEW), adds credentials with evidence, and approves to VERIFIED or rejects to REJECTED. Only VERIFIED practitioners can be assigned to a case.">
+          <defs><marker id="fwd2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path class="mk-fwd" d="M0,0 L9,4.5 L0,9 Z"/></marker><marker id="ok2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path class="mk-phase" d="M0,0 L9,4.5 L0,9 Z"/></marker><marker id="ex2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path class="mk-exit" d="M0,0 L9,4.5 L0,9 Z"/></marker></defs>
+          <path class="edge" d="M212,58 L253,58" marker-end="url(#fwd2)"/>
+          <path class="edge" d="M441,58 L482,58" marker-end="url(#fwd2)"/>
+          <text class="elbl" x="232" y="50">evidence</text>
+          <text class="elbl" x="461" y="50">decision</text>
+          <path class="edge-phase" d="M610,58 L731,58" marker-end="url(#ok2)"/>
+          <text class="elbl" x="670" y="50">approve</text>
+          <path class="edge-exit" d="M546,82 C546,116 360,116 360,82" marker-end="url(#ex2)"/>
+          <text class="elbl" x="452" y="114">reject</text>
+          <path class="edge-phase" d="M795,82 C795,120 900,120 900,90" marker-end="url(#ok2)"/>
+          <text class="elbl" x="892" y="72">unlocks</text>
+          <g class="box b-happy"><rect x="84" y="34" width="128" height="48"/><text class="code" x="148" y="56"><tspan x="148">PRACTITIONER</tspan><tspan x="148" dy="11">created</tspan></text></g>
+          <g class="box b-happy"><rect x="313" y="34" width="128" height="48"/><text class="code" x="377" y="61.5">UNDER_REVIEW</text></g>
+          <g class="box b-hold"><rect x="482" y="34" width="128" height="48"/><text class="code" x="546" y="56"><tspan x="546">CREDENTIALS</tspan><tspan x="546" dy="11">recorded</tspan></text></g>
+          <g class="box b-success"><rect x="731" y="34" width="128" height="48"/><text class="code" x="795" y="61.5">VERIFIED</text></g>
+          <g class="box b-exit"><rect x="300" y="34" width="120" height="48" opacity="0"/></g>
+          <g class="box b-happy"><rect x="836" y="90" width="150" height="44"/><text class="code" x="911" y="116">assignable (step 6)</text></g>
+        </svg>
+      </div>
+      <figcaption>A <span style="color:var(--credential);font-weight:700">credentialing admin</span> owns this track. Credentials carry a type, reference, issuing source, and optional evidence document; only a <code>VERIFIED</code> profile linked to an OIDC subject can be assigned a case.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="sechead"><p class="eyebrow">Always on</p><h2>The rails that run under every step</h2><p class="sub">These systems are not stages — they operate continuously alongside the whole journey, and are how the platform stays accountable, safe, and recoverable.</p></div>
+    <div class="rails">
+      <div class="rail"><h3><span class="dot"></span> Immutable audit</h3><p>Every action writes an append-only audit event: identity, role, case, entity, action, outcome, reason, correlation ID, and time.</p><span class="k">audit_events</span></div>
+      <div class="rail"><h3><span class="dot"></span> Status history</h3><p>Each transition is recorded with its from/to states and reason — a full, replayable case timeline.</p><span class="k">case_status_history</span></div>
+      <div class="rail"><h3><span class="dot"></span> Notification outbox</h3><p>The one-time code and staff alerts go through a transactional outbox with retries, backoff, and dead-lettering. No clinical narrative in messages.</p><span class="k">notification_outbox</span></div>
+      <div class="rail"><h3><span class="dot"></span> Secure messages</h3><p>Two scoped threads — patient↔coordinator and coordinator↔doctor. Doctors are confined to their thread; internal notes stay hidden from patients.</p><span class="k">case_messages</span></div>
+      <div class="rail"><h3><span class="dot"></span> Blocking tasks</h3><p>Coordinators, doctors, and operations raise tasks that can block progress until completed with evidence.</p><span class="k">case_tasks</span></div>
+      <div class="rail"><h3><span class="dot"></span> Private documents</h3><p>Random object keys, presigned short-lived access, quarantine-then-scan, and audited downloads only for clean objects.</p><span class="k">medical_documents</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><p class="eyebrow">The gates</p><h2>Where the journey is guarded</h2><p class="sub">The controls that decide whether a step is allowed to happen at all.</p></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Gate</th><th>Guards</th><th>Enforced by</th></tr></thead>
+        <tbody>
+          <tr><td>Consent + anti-abuse</td><td>Case creation &amp; document ops</td><td><code>consent</code>, Turnstile, per-IP rate limit</td></tr>
+          <tr><td>Document safety</td><td>Every uploaded file</td><td>MIME + size + true signature + ClamAV, quarantine, quotas</td></tr>
+          <tr><td>One-time claim</td><td>Binding a case to a patient identity</td><td>pepper-hash, single-use, attempt-limited, constant-time</td></tr>
+          <tr><td>Verified practitioner</td><td>Doctor assignment (step 6)</td><td>practitioner <code>credentialing_status = VERIFIED</code></td></tr>
+          <tr><td>Clinical-before-commercial</td><td>Proposal creation (step 9)</td><td>requires an <code>APPROVED</code> clinical review</td></tr>
+          <tr><td>Step-up re-authentication</td><td>Clinical approval, finance approval, patient decision</td><td>recent OIDC <code>auth_time</code> (≤10 min)</td></tr>
+          <tr><td>Object-level authorization</td><td>Every read and write</td><td>role <em>and</em> case ownership / active assignment</td></tr>
+          <tr><td>Optimistic locking</td><td>Concurrent edits &amp; transitions</td><td>version check → <code>409</code> conflict</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="foot">Reference compiled from the backend implementation — case states from the <code>TRANSITIONS</code> map and controllers in <code>com.rehletshifaa.journey</code>, gates from <code>ActorContext</code>, <code>SecurityConfig</code>, and <code>DocumentService</code>, and the schema in <code>V2__end_to_end_care_platform.sql</code>. It describes the system as built; it is not a substitute for the security &amp; production-readiness review before real patient data is handled.</p>
+
+</div>
