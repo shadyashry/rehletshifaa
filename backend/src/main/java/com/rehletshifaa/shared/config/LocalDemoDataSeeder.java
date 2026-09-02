@@ -15,9 +15,11 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 @Profile("local")
 public class LocalDemoDataSeeder implements ApplicationRunner {
     public static final String DOCTOR_SUBJECT="00000000-0000-0000-0000-000000000103";
-    private final JdbcClient jdbc; private final Clock clock;
-    public LocalDemoDataSeeder(JdbcClient jdbc,Clock clock){this.jdbc=jdbc;this.clock=clock;}
+    public static final String COORDINATOR_SUBJECT="00000000-0000-0000-0000-000000000102";
+    private final JdbcClient jdbc; private final Clock clock; private final com.rehletshifaa.shared.crypto.CryptoService crypto;
+    public LocalDemoDataSeeder(JdbcClient jdbc,Clock clock,com.rehletshifaa.shared.crypto.CryptoService crypto){this.jdbc=jdbc;this.clock=clock;this.crypto=crypto;}
     @Override public void run(ApplicationArguments args){Instant now=clock.instant();
+        jdbc.sql("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0) ON CONFLICT (external_subject) DO UPDATE SET display_name_encrypted=EXCLUDED.display_name_encrypted,updated_at=EXCLUDED.updated_at").params(UUID.randomUUID(),COORDINATOR_SUBJECT,"COORDINATOR_LEAD",crypto.encrypt("Layla Hassan"),timestamp(now),timestamp(now)).update();
         // One verified consultant per care category. The cardiology consultant reuses the
         // seeded doctor login (DOCTOR_SUBJECT) so the accept/review flow can be demonstrated.
         seedConsultant(DOCTOR_SUBJECT,"Dr Ahmed Alashry","General and Interventional Cardiology","Interventional cardiology","cardiology",now);

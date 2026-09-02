@@ -53,6 +53,8 @@ app:
     max-attempts: ${CLAIM_TOKEN_MAX_ATTEMPTS:5}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
   cors.allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000}
+  crypto:
+    pii-key: ${PII_ENCRYPTION_KEY:rehletshifaa-local-dev-only-change-me}
   storage:
     mode: ${STORAGE_MODE:mock}
     bucket: ${S3_BUCKET:}
