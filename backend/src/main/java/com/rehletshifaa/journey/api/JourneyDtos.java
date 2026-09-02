@@ -12,7 +12,7 @@ public final class JourneyDtos {
     private JourneyDtos() {}
     public record ClaimRequest(@NotBlank @Pattern(regexp="[0-9]{6}") String code) {}
     public record ClaimCaseRequest(@NotBlank @Pattern(regexp="RS-[0-9]{4}-[0-9]{6}")String caseNumber,@NotBlank @Pattern(regexp="[0-9]{6}")String code) {}
-    public record TransitionRequest(@NotBlank String targetStatus,@NotBlank @Size(max=1000)String reason,@NotNull Long expectedVersion) {}
+    public record TransitionRequest(@NotBlank String targetStatus,@Size(max=1000)String reason,@NotNull Long expectedVersion) {}
     public record AssignmentRequest(@NotBlank @Size(max=255)String assigneeSubject,@NotBlank String assigneeRole,@NotBlank String assignmentType,@Size(max=100)String pod,@NotBlank @Size(max=500)String reason) {}
     public record MessageRequest(@NotBlank String threadType,@NotBlank @Size(max=10000)String body,@Pattern(regexp="en|ar")String language,boolean internalOnly) {}
     public record TaskRequest(@NotBlank @Size(max=80)String taskType,@NotBlank @Size(max=240)String title,@Size(max=10000)String description,@Size(max=255)String ownerSubject,@Size(max=40)String ownerRole,@NotBlank String priority,boolean blocking,Instant dueAt) {}
