@@ -1,0 +1,48 @@
+{
+	email {$ACME_EMAIL}
+	admin localhost:2019
+}
+
+(common_security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+{$APP_DOMAIN} {
+	import common_security_headers
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}
+
+{$API_DOMAIN} {
+	import common_security_headers
+
+	@private_endpoints path /actuator/* /v3/api-docs* /swagger-ui* /swagger-ui.html
+	respond @private_endpoints 404
+
+	request_body {
+		max_size 20MB
+	}
+	reverse_proxy backend:8080
+}
+
+{$AUTH_DOMAIN} {
+	import common_security_headers
+	reverse_proxy keycloak:8080
+}
+
+{$STORAGE_DOMAIN} {
+	import common_security_headers
+
+	@admin_api path /minio/admin/* /minio/ui/*
+	respond @admin_api 404
+
+	request_body {
+		max_size 16MB
+	}
+	reverse_proxy minio:9000
+}

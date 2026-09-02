@@ -37,6 +37,7 @@ frontend/       Next.js 16, React 19, TypeScript, Tailwind CSS
 backend/        Spring Boot 3.5, Java 21, PostgreSQL, Flyway
 docs/           Architecture, security, and deployment guides
 infrastructure/ Least-privilege AWS policy and S3 lifecycle examples
+deploy/oracle/  Oracle A1 single-VM production deployment bundle
 ```
 
 ## Run locally
@@ -114,7 +115,9 @@ Never place secrets in a `NEXT_PUBLIC_*` variable or commit real environment fil
 
 ## Deployment
 
-Build the two Dockerfiles and deploy them behind HTTPS. Use a managed PostgreSQL database, private object storage, a transactional SMTP provider, and a CDN/WAF in front of the frontend and API. Follow [docs/deployment.md](docs/deployment.md) before exposing the service to real patient information.
+For an Oracle Cloud Always Free-class Ampere A1 VM, follow [docs/oracle-free-vm-deployment.md](docs/oracle-free-vm-deployment.md). The separate production Compose bundle uses Caddy TLS, private container networking, PostgreSQL-backed Keycloak, private MinIO storage, ClamAV, resource limits, secret preflight checks, health checks, and encrypted backups.
+
+For higher availability, build the two application images and use managed PostgreSQL, private object storage, a transactional SMTP provider, and a CDN/WAF in front of the frontend and API. Follow [docs/deployment.md](docs/deployment.md) before exposing the service to real patient information.
 
 ## Production readiness
 

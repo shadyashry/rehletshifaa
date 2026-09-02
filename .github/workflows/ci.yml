@@ -28,3 +28,10 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "21", cache: maven }
       - run: mvn -B verify
+  oracle-deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n deploy/oracle/postgres-init/10-create-databases.sh deploy/oracle/scripts/*.sh
+      - run: cp deploy/oracle/.env.example deploy/oracle/.env && chmod 600 deploy/oracle/.env
+      - run: docker compose --env-file deploy/oracle/.env -f deploy/oracle/docker-compose.yml config --quiet

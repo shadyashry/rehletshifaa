@@ -1,5 +1,7 @@
 # Deployment guide
 
+For a cost-constrained single-host installation, use the dedicated [Oracle Cloud Free VM guide](oracle-free-vm-deployment.md). It adds an Arm-compatible production Compose stack, automatic TLS, private service networking, strict configuration checks, and encrypted backups. The managed-service topology below remains the recommended architecture for higher availability and regulated production use.
+
 ## Recommended topology
 
 - Deploy `frontend/Dockerfile` behind a CDN and TLS termination.

@@ -6,6 +6,7 @@ import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { buildCaseSchema, filesAreValid } from "@/lib/case-form-schema";
 import { track } from "@/lib/analytics";
+import { whatsappHref } from "@/lib/links";
 
 type FormValues = { fullName: string; country: string; whatsappNumber: string; conditionDescription: string; consent: boolean };
 type CareAreaKey = "" | "cardiology" | "rheumatology" | "orthopedics";
@@ -71,7 +72,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   if (caseNumber) {
     const careSuffix = careArea ? ` ${d.form.category.summaryLabel}: ${d.form.category.options[careArea]}.` : "";
     const message = `Hello RehletShifaa, I submitted my medical case. My Case ID is ${caseNumber}.${careSuffix}`;
-    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><a className="btn-primary mt-7 w-full sm:w-auto" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "201000000000"}?text=${encodeURIComponent(message)}`}>{d.form.continue}</a></section>;
+    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><a className="btn-primary mt-7 w-full sm:w-auto" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappHref(message)}>{d.form.continue}</a></section>;
   }
 
   return <>

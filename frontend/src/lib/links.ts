@@ -3,7 +3,7 @@ import type { Locale } from "./i18n";
 
 export type NavItem = { readonly href: string; readonly label: string };
 
-const WHATSAPP_FALLBACK = "201000000000";
+const WHATSAPP_FALLBACK = "201010447898";
 
 /** Locale-prefixed internal href. `localeHref("en")` → `/en`. */
 export function localeHref(locale: Locale, path = ""): string {
@@ -38,7 +38,8 @@ export function legalNav(locale: Locale, d: Dictionary): readonly NavItem[] {
 }
 
 export function whatsappHref(message?: string): string {
-  const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? WHATSAPP_FALLBACK;
+  const configured = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? WHATSAPP_FALLBACK;
+  const number = configured.replace(/\D/g, "") || WHATSAPP_FALLBACK;
   return message ? `https://wa.me/${number}?text=${encodeURIComponent(message)}` : `https://wa.me/${number}`;
 }
 

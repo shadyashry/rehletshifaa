@@ -1,0 +1,324 @@
+name: ${COMPOSE_PROJECT_NAME:-rehletshifaa}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging: *default-logging
+
+services:
+  postgres:
+    <<: *service-defaults
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_DB: postgres
+      APP_DB_NAME: ${APP_DB_NAME:-rehletshifaa}
+      APP_DB_USERNAME: ${APP_DB_USERNAME:-rehletshifaa_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD}
+      KEYCLOAK_DB_NAME: ${KEYCLOAK_DB_NAME:-keycloak}
+      KEYCLOAK_DB_USERNAME: ${KEYCLOAK_DB_USERNAME:-keycloak_app}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Set KEYCLOAK_DB_PASSWORD}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=100
+      - -c
+      - password_encryption=scram-sha-256
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init/10-create-databases.sh:/docker-entrypoint-initdb.d/10-create-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: 1280m
+    stop_grace_period: 60s
+    networks: [app]
+
+  keycloak:
+    <<: *service-defaults
+    build:
+      context: ./keycloak
+    command: ["start", "--optimized", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USERNAME:-keycloak_app}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Set KEYCLOAK_DB_PASSWORD}
+      KC_DB_POOL_INITIAL_SIZE: "2"
+      KC_DB_POOL_MIN_SIZE: "2"
+      KC_DB_POOL_MAX_SIZE: "10"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: https://${AUTH_DOMAIN:?Set AUTH_DOMAIN}
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "false"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?Set KEYCLOAK_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_CLIENT_ID: admin-cli
+      KC_SPI_STICKY_SESSION_ENCODER_INFINISPAN_SHOULD_ATTACH_ROUTE: "false"
+      JAVA_OPTS_KC_HEAP: -Xms256m -Xmx1024m
+      APP_ORIGIN: https://${APP_DOMAIN:?Set APP_DOMAIN}
+      MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
+      MAIL_USERNAME: ${MAIL_USERNAME:?Set MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?Set MAIL_PASSWORD}
+      MAIL_AUTH: ${MAIL_AUTH:-true}
+      MAIL_STARTTLS: ${MAIL_STARTTLS:-true}
+    volumes:
+      - ./keycloak/rehletshifaa-realm.json:/opt/keycloak/data/import/rehletshifaa-realm.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; grep -q '200 OK' <&3"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    mem_limit: 1536m
+    stop_grace_period: 60s
+    networks: [app]
+
+  minio:
+    <<: *service-defaults
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER: "off"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: 1024m
+    stop_grace_period: 60s
+    networks: [app]
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET:-medical-documents}
+      APP_ORIGIN: https://${APP_DOMAIN:?Set APP_DOMAIN}
+    volumes:
+      - ./minio/app-policy.json:/config/app-policy.json:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        mc mb --ignore-existing "local/$${S3_BUCKET}"
+        mc anonymous set none "local/$${S3_BUCKET}"
+        sed "s/REPLACE_WITH_BUCKET/$${S3_BUCKET}/g" /config/app-policy.json > /tmp/app-policy.json
+        mc admin policy create local rehletshifaa-app /tmp/app-policy.json
+        mc admin user add local "$${S3_ACCESS_KEY}" "$${S3_SECRET_KEY}"
+        mc admin policy attach local rehletshifaa-app --user "$${S3_ACCESS_KEY}"
+        printf '%s\n' '<CORSConfiguration><CORSRule><AllowedOrigin>'"$${APP_ORIGIN}"'</AllowedOrigin><AllowedMethod>GET</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedMethod>HEAD</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>' | mc cors set "local/$${S3_BUCKET}" -
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks: [app]
+
+  clamav:
+    <<: *service-defaults
+    image: clamav/clamav:stable-debian13-slim
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 1 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    mem_limit: 2048m
+    stop_grace_period: 60s
+    networks: [app]
+
+  backend:
+    <<: *service-defaults
+    build:
+      context: ../../backend
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_TOOL_OPTIONS: -XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError
+      DB_URL: jdbc:postgresql://postgres:5432/${APP_DB_NAME:-rehletshifaa}
+      DB_USERNAME: ${APP_DB_USERNAME:-rehletshifaa_app}
+      DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD}
+      APP_SECURITY_ENABLED: "true"
+      OIDC_ISSUER_URI: https://${AUTH_DOMAIN:?Set AUTH_DOMAIN}/realms/rehletshifaa
+      OIDC_JWK_SET_URI: http://keycloak:8080/realms/rehletshifaa/protocol/openid-connect/certs
+      CLAIM_TOKEN_PEPPER: ${CLAIM_TOKEN_PEPPER:?Set CLAIM_TOKEN_PEPPER}
+      CLAIM_TOKEN_EXPIRY_SECONDS: ${CLAIM_TOKEN_EXPIRY_SECONDS:-900}
+      CLAIM_TOKEN_MAX_ATTEMPTS: ${CLAIM_TOKEN_MAX_ATTEMPTS:-5}
+      STORAGE_MODE: s3
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+      AWS_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-medical-documents}
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: https://${STORAGE_DOMAIN:?Set STORAGE_DOMAIN}
+      S3_PATH_STYLE: "true"
+      S3_SSE_ALGORITHM: AES256
+      DOCUMENT_SCANNING_MODE: clamav
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+      CLAMAV_TIMEOUT_MILLISECONDS: ${CLAMAV_TIMEOUT_MILLISECONDS:-20000}
+      UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-15728640}
+      UPLOAD_MAX_FILES_PER_CASE: ${UPLOAD_MAX_FILES_PER_CASE:-25}
+      UPLOAD_MAX_CASE_BYTES: ${UPLOAD_MAX_CASE_BYTES:-104857600}
+      PRESIGN_EXPIRY_SECONDS: ${PRESIGN_EXPIRY_SECONDS:-300}
+      NOTIFICATIONS_MODE: live
+      MAIL_MODE: smtp
+      MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:?Set MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?Set MAIL_PASSWORD}
+      MAIL_AUTH: ${MAIL_AUTH:-true}
+      MAIL_STARTTLS: ${MAIL_STARTTLS:-true}
+      COORDINATOR_EMAIL: ${COORDINATOR_EMAIL:?Set COORDINATOR_EMAIL}
+      MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
+      WHATSAPP_MODE: webhook
+      WHATSAPP_WEBHOOK_URL: ${WHATSAPP_WEBHOOK_URL:?Set WHATSAPP_WEBHOOK_URL}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:?Set WHATSAPP_TOKEN}
+      TURNSTILE_ENABLED: "true"
+      TURNSTILE_SECRET: ${TURNSTILE_SECRET:?Set TURNSTILE_SECRET}
+      FRONTEND_ALLOWED_ORIGINS: https://${APP_DOMAIN:?Set APP_DOMAIN}
+      APP_PUBLIC_BASE_URL: https://${API_DOMAIN:?Set API_DOMAIN}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      RATE_LIMIT_TRUST_PROXY: "true"
+      OPENAPI_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    mem_limit: 1536m
+    stop_grace_period: 60s
+    networks: [app]
+
+  frontend:
+    <<: *service-defaults
+    build:
+      context: ../../frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://${API_DOMAIN:?Set API_DOMAIN}
+        NEXT_PUBLIC_SITE_URL: https://${APP_DOMAIN:?Set APP_DOMAIN}
+        NEXT_PUBLIC_STORAGE_ORIGIN: https://${STORAGE_DOMAIN:?Set STORAGE_DOMAIN}
+        NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:?Set NEXT_PUBLIC_WHATSAPP_NUMBER}
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?Set NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+        NEXT_PUBLIC_OIDC_AUTHORITY: https://${AUTH_DOMAIN:?Set AUTH_DOMAIN}/realms/rehletshifaa
+        NEXT_PUBLIC_OIDC_CLIENT_ID: rehletshifaa-web
+        NEXT_PUBLIC_GA4_ID: ${NEXT_PUBLIC_GA4_ID:-}
+        NEXT_PUBLIC_GOOGLE_ADS_ID: ${NEXT_PUBLIC_GOOGLE_ADS_ID:-}
+        NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL: ${NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL:-}
+        NEXT_PUBLIC_SEARCH_CONSOLE_VERIFICATION: ${NEXT_PUBLIC_SEARCH_CONSOLE_VERIFICATION:-}
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/en >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    mem_limit: 768m
+    stop_grace_period: 30s
+    networks: [app]
+
+  caddy:
+    <<: *service-defaults
+    image: caddy:2.10.2-alpine
+    read_only: true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN}
+      AUTH_DOMAIN: ${AUTH_DOMAIN:?Set AUTH_DOMAIN}
+      STORAGE_DOMAIN: ${STORAGE_DOMAIN:?Set STORAGE_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:2019/config/ >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    mem_limit: 256m
+    networks: [app]
+
+networks:
+  app:
+    name: ${COMPOSE_PROJECT_NAME:-rehletshifaa}_app
+
+volumes:
+  postgres-data:
+  minio-data:
+  clamav-data:
+  caddy-data:
+  caddy-config:
