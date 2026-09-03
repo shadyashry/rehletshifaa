@@ -8,6 +8,7 @@ public class SecurityConfig {
         .requestMatchers(HttpMethod.POST,"/api/v1/cases/*/documents/presign","/api/v1/cases/*/documents/confirm","/api/v1/cases/*/submit").permitAll()
         .requestMatchers(HttpMethod.PUT,"/api/v1/local-uploads/*").permitAll()
         .requestMatchers(HttpMethod.GET,"/api/v1/local-downloads/*").permitAll()
+        .requestMatchers("/api/v1/public/**").permitAll()
         .requestMatchers("/actuator/health/**","/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
         .requestMatchers("/api/v1/patient/**").hasAnyRole("PATIENT","PATIENT_REPRESENTATIVE")
         .requestMatchers("/api/v1/coordinator/**").hasAnyRole("COORDINATOR","COORDINATOR_LEAD")

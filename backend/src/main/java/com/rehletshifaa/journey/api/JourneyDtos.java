@@ -28,6 +28,10 @@ public final class JourneyDtos {
     public record CredentialRequest(@NotBlank @Size(max=80)String credentialType,@Size(max=160)String referenceNumber,@Size(max=500)String source,UUID evidenceDocumentId,Instant issuedAt,Instant expiresAt) {}
     public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName) {}
     public record StaffRequest(@NotBlank @Size(max=160)String name,@NotBlank @Size(max=255)String externalSubject,@Size(max=40)String role) {}
+    public record ReviewDecisionRequest(@NotBlank String decision,@Size(max=20000)String recommendedTreatment,@Size(max=20000)String risksAndLimitations) {}
+    public record SendProposalResponse(UUID versionId,String token,String patientWhatsapp,String patientEmail,String caseNumber) {}
+    public record PublicProposalView(UUID caseId,String caseNumber,String patientName,String currency,List<ProposalItemView>items,Instant validUntil,boolean signed,String recommendedTreatment,String risksAndLimitations) {}
+    public record SignProposalRequest(@NotBlank @Size(max=160)String signatureName,UUID signedDocumentId) {}
     public record TimelineEvent(String type,String label,Instant occurredAt,String status) {}
     public record MessageView(UUID id,String threadType,String senderRole,String body,String language,boolean internalOnly,Instant createdAt) {}
     public record TaskView(UUID id,String type,String title,String description,String ownerRole,String priority,String status,boolean blocking,Instant dueAt,long version) {}

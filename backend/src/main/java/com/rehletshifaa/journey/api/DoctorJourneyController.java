@@ -9,6 +9,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
  @PostMapping("/cases/{caseId}/reviews")public IdResponse review(@PathVariable UUID caseId,@Valid @RequestBody ClinicalReviewRequest request){return service.saveClinicalReview(caseId,request);}
  @PostMapping("/cases/{caseId}/reviews/{reviewId}/approve")public IdResponse approve(@PathVariable UUID caseId,@PathVariable UUID reviewId){return service.approveClinicalReview(caseId,reviewId);}
+ @PostMapping("/cases/{caseId}/review-decision")public CaseView reviewDecision(@PathVariable UUID caseId,@Valid @RequestBody ReviewDecisionRequest request){return service.reviewDecision(caseId,request);}
  @PostMapping("/cases/{caseId}/treatment-episodes")public IdResponse treatment(@PathVariable UUID caseId,@Valid @RequestBody TreatmentRequest request){return service.treatment(caseId,request);}
  @PostMapping("/cases/{caseId}/follow-ups")public IdResponse followUp(@PathVariable UUID caseId,@Valid @RequestBody FollowUpRequest request){return service.followUp(caseId,request);}
 }
