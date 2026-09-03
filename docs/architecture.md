@@ -9,6 +9,16 @@
 - **Object storage:** Medical files are private. The API issues short-lived presigned PUT URLs, enforces quotas, quarantines and scans content, and issues audited short-lived GET URLs only for clean objects.
 - **Notifications:** A transactional outbox retries SMTP and WhatsApp delivery with idempotency keys, exponential delay, and a terminal dead-letter state. Templates contain no clinical narrative.
 
+## Patient identity model
+
+Three concepts are kept distinct (see `end-to-end-workflows.md`):
+
+- **Provisional patient record** — created internally on submission; no account required.
+- **Verified identity** — an OTP-protected, purpose-scoped, expiring proof of contact ownership required only for sensitive pre-acceptance actions. It never changes case status.
+- **Activated account** — offered only after a proposal is accepted; activation links the provisional profile and all its cases to the authenticated subject automatically.
+
+Verification challenges (`case_claim_challenges`, `proposal_access_challenges`) and activation tokens (`account_activations`) are stored only as pepper-hashed values; raw values travel solely through the notification outbox.
+
 ## Domain and state
 
 A medical case is created as `DRAFT`, submitted as `RECEIVED`, and advances only through the explicit care state machine documented in `end-to-end-workflows.md`. A document moves through `PENDING → QUARANTINED → CLEAN`, or into a rejected/scan-failed terminal state. Database constraints enforce states, relationships, proposal versions, consent, and assignment history.

@@ -32,10 +32,11 @@ class JourneyServiceIntegrationTest {
         entityManager.flush();entityManager.clear();
         String raw=jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key LIKE 'claim:%' AND destination=?",String.class,"+254700000001");
         String code=json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");
-        authenticate("patient-subject","PATIENT");var claimed=journey.claim(created.caseId(),new ClaimRequest(code));assertThat(claimed.status()).isEqualTo("INTAKE_REVIEW");
+        authenticate("patient-subject","PATIENT");var claimed=journey.claim(created.caseId(),new ClaimRequest(code));assertThat(claimed.status()).isEqualTo("RECEIVED");
 
         authenticate("coordinator-subject","COORDINATOR");journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
-        var ready=journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",claimed.version()));assertThat(ready.status()).isEqualTo("READY_FOR_CONSULTANT");
+        long intakeVersion=journey.workspace(created.caseId()).caseSummary().version();
+        var ready=journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",intakeVersion));assertThat(ready.status()).isEqualTo("READY_FOR_CONSULTANT");
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,0)",UUID.randomUUID(),"doctor-subject","Doctor One","Doctor One","VERIFIED",Instant.now(),Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
         journey.assign(created.caseId(),new AssignmentRequest("operations-subject","OPERATIONS","PRIMARY","cardiac-pod","Travel and hospital planning"));

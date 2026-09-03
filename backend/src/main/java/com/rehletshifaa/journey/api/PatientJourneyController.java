@@ -9,4 +9,5 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/decision")public ProposalView decide(@PathVariable UUID caseId,@PathVariable UUID versionId,@Valid @RequestBody ProposalDecisionRequest request){return service.decideProposal(caseId,versionId,request);}
+ @PostMapping("/account/activate")public IdResponse activate(@Valid @RequestBody ActivateAccountRequest request){return service.activateAccount(request.activationToken());}
 }

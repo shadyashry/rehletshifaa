@@ -52,6 +52,7 @@ app:
     expiry-seconds: ${CLAIM_TOKEN_EXPIRY_SECONDS:900}
     max-attempts: ${CLAIM_TOKEN_MAX_ATTEMPTS:5}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+  web-base-url: ${APP_WEB_BASE_URL:http://localhost:3000}
   cors.allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000}
   crypto:
     pii-key: ${PII_ENCRYPTION_KEY:rehletshifaa-local-dev-only-change-me}

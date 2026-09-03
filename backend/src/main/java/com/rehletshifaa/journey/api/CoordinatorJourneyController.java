@@ -14,6 +14,5 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/tasks")public IdResponse task(@PathVariable UUID caseId,@Valid @RequestBody TaskRequest request){return service.task(caseId,request);}
  @PostMapping("/cases/{caseId}/tasks/{taskId}/complete")public IdResponse complete(@PathVariable UUID caseId,@PathVariable UUID taskId,@Valid @RequestBody CompleteTaskRequest request){return service.completeTask(caseId,taskId,request);}
  @PostMapping("/cases/{caseId}/proposals")public ProposalView proposal(@PathVariable UUID caseId,@Valid @RequestBody ProposalDraftRequest request){return service.createProposal(caseId,request);}
- @PostMapping("/cases/{caseId}/send-proposal")public SendProposalResponse sendProposal(@PathVariable UUID caseId,@Valid @RequestBody ProposalDraftRequest request){return service.sendProposal(caseId,request);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/release")public ProposalView release(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.releaseProposal(caseId,versionId);}
 }

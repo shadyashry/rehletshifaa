@@ -13,7 +13,12 @@
 - Database constraints and transactional services enforce state transitions.
 - No anonymous case lookup exists. Authenticated downloads require object-level case authorization, clean status, short-lived URLs, and an audit event.
 - OIDC roles are deny-by-default and combined with patient ownership or active assignment; sensitive clinical, finance, and patient decisions require recent authentication.
-- One-time claim tokens are pepper-hashed, short-lived, replay-protected, and attempt-limited.
+- One-time claim tokens are pepper-hashed, short-lived, replay-protected, and attempt-limited, and are only minted **after** case submission (never for a draft that is still uploading).
+- Identity verification never mutates the operational/clinical case status.
+- Released proposals are only reachable through a random, expiring, case-scoped link **plus** an OTP: the code is exchanged for a short-lived hashed view grant, and both viewing sensitive clinical/pricing detail and recording a decision require that grant. Possession of the URL plus a typed name is never accepted. Access codes and view grants are stored only as hashes; resend is rate-limited (5/hour), attempts are capped (5), and neutral errors avoid case enumeration.
+- Proposal decisions are recorded against the exact released version; superseded, revoked, already-decided, and expired versions are rejected. There is no single-call create-and-release path.
+- Secure-message thread membership and visibility are enforced server-side from a role→thread map; the client `internalOnly` flag is not trusted, and message reads are scoped to the actor's permitted threads.
+- Account-activation invitations are sent only after acceptance, once per patient (unique constraint / idempotent), as pepper-hashed one-time tokens; activation links the existing profile and its cases and cannot undo the recorded acceptance.
 - Notifications use a transactional outbox with bounded retries and dead-letter handling.
 - Consents, assignment history, case transitions, proposal versions, and audit events are retained as append-oriented evidence.
 - Secrets are environment supplied and example values are non-sensitive.

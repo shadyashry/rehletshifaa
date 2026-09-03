@@ -41,6 +41,11 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
               </Link>
             </li>
           ))}
+          <li>
+            <Link href={localeHref(locale, "portal")} className="footer-link">
+              {d.nav.staff}
+            </Link>
+          </li>
         </FooterColumn>
 
         <FooterColumn title={d.footer.contact}>
