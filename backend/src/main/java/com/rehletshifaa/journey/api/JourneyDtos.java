@@ -32,7 +32,8 @@ public final class JourneyDtos {
     public record CredentialRequest(@NotBlank @Size(max=80)String credentialType,@NotBlank @Size(max=160)String referenceNumber,@NotBlank @Size(max=500)String source,UUID evidenceDocumentId,Instant issuedAt,Instant expiresAt) {}
     public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName) {}
     public record StaffRequest(@NotBlank @Size(max=160)String name,@NotBlank @Size(max=255)String externalSubject,@Size(max=40)String role) {}
-    public record ReviewDecisionRequest(@NotBlank @Pattern(regexp="INFO|NOT_SUITABLE|RETURN_TO_COORDINATOR|REASSIGN|ACCEPT")String decision,@Size(max=20000)String recommendedTreatment,@Size(max=20000)String risksAndLimitations) {}
+    public record CostEstimateItem(@NotBlank @Size(max=500)String serviceDescription,@NotNull @DecimalMin("0.00")BigDecimal estimatedCost,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency) {}
+    public record ReviewDecisionRequest(@NotBlank @Pattern(regexp="INFO|NOT_SUITABLE|RETURN_TO_COORDINATOR|REASSIGN|ACCEPT")String decision,@Size(max=20000)String recommendedTreatment,@Size(max=20000)String risksAndLimitations,@Size(max=50)List<@Valid CostEstimateItem>costEstimates) {}
     public record PublicProposalView(String caseNumber,String patientName,String currency,List<ProposalItemView>items,Instant validUntil,boolean decided,String recommendedTreatment,String risksAndLimitations) {}
     public record PublicProposalSummary(String caseNumber,String channel,String destinationHint) {}
     public record ProposalVerifyRequest(@NotBlank @Pattern(regexp="[0-9]{6}")String code) {}
@@ -49,7 +50,7 @@ public final class JourneyDtos {
     public record AssignmentView(UUID id,String assigneeSubject,String assigneeRole,String assignmentType,String status,Instant assignedAt,long version) {}
     public record VerifiedDoctorView(String subject,String displayName,String specialty,String subspecialty,String availabilityStatus,String careCategory) {}
     public record CareCategoryView(String slug,String nameEn,String nameAr) {}
-    public record ClinicalReviewView(UUID id,int versionNumber,String status,String suitability,String recommendedTreatment,String risksAndLimitations,Instant createdAt) {}
+    public record ClinicalReviewView(UUID id,int versionNumber,String status,String suitability,String recommendedTreatment,String risksAndLimitations,Instant createdAt,List<CostEstimateItem>costEstimates) {}
     public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal) {}
     public record IdResponse(UUID id,String status) {}
 }

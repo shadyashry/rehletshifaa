@@ -214,7 +214,7 @@ class SecureJourneyCorrectionsTest {
     @Test void doctorReassignReturnsToConsultantQueueAndEndsAssignment() throws Exception {
         var ctx=assignedDoctorCase();
         authenticate("doctor-subject","DOCTOR");
-        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("REASSIGN",null,"Needs a different specialty"));
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("REASSIGN",null,"Needs a different specialty",null));
         assertThat(status(ctx.caseId)).isEqualTo("READY_FOR_CONSULTANT");
         assertThat(count("SELECT count(*) FROM case_assignments WHERE case_id=? AND assignee_role='DOCTOR' AND status='ACTIVE'",ctx.caseId)).isZero();
     }
@@ -254,8 +254,23 @@ class SecureJourneyCorrectionsTest {
     @Test void doctorNotSuitableIsADistinctClinicalOutcome() throws Exception {
         var ctx=assignedDoctorCase();
         authenticate("doctor-subject","DOCTOR");
-        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("NOT_SUITABLE",null,"Not a candidate"));
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("NOT_SUITABLE",null,"Not a candidate",null));
         assertThat(status(ctx.caseId)).isEqualTo("CLINICALLY_NOT_SUITABLE");
+    }
+
+    @Test void doctorAcceptPersistsCostEstimatesAndExposesThemOnTheApprovedReview() throws Exception {
+        var ctx=assignedDoctorCase();
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Angioplasty with stent","Standard cardiac risks",
+            List.of(new CostEstimateItem("Coronary angioplasty",new BigDecimal("8500.00"),"USD"),
+                    new CostEstimateItem("Hospital stay (3 nights)",new BigDecimal("2100.00"),"USD"))));
+        assertThat(status(ctx.caseId)).isEqualTo("CLINICAL_RECOMMENDATION_READY");
+        assertThat(count("SELECT count(*) FROM clinical_review_cost_estimates")).isEqualTo(2);
+        var approved=journey.workspace(ctx.caseId).clinicalReviews().stream().filter(r->"APPROVED".equals(r.status())).findFirst().orElseThrow();
+        assertThat(approved.costEstimates()).hasSize(2);
+        assertThat(approved.costEstimates().get(0).serviceDescription()).isEqualTo("Coronary angioplasty");
+        assertThat(approved.costEstimates().get(0).estimatedCost()).isEqualByComparingTo("8500.00");
+        assertThat(approved.costEstimates().get(0).currency()).isEqualTo("USD");
     }
 
     // ---- No create-and-release shortcut at the transition level ----
