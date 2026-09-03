@@ -307,6 +307,7 @@
     "name": "Full Name",
     "country": "Country",
     "phone": "WhatsApp Number",
+    "email": "Email",
     "description": "Tell Us Briefly About Your Condition",
     "optional": "optional",
     "files": "Upload Medical Reports / Images",
@@ -325,6 +326,7 @@
       "required": "This field is required.",
       "name": "Please enter your full name.",
       "phone": "Please enter a valid WhatsApp number.",
+      "email": "Please enter a valid email address.",
       "consent": "Consent is required to coordinate your case.",
       "file": "Use PDF, JPG, JPEG or PNG files up to 15 MB each.",
       "server": "We couldn't send your case right now. Please try again or contact us on WhatsApp."
