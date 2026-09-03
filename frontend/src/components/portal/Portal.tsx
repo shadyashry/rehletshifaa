@@ -5,7 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import type { Locale } from "@/lib/i18n";
 
-type CaseView={id:string;caseNumber:string;status:string;patientName:string;country:string;preferredLanguage:string;createdAt:string;updatedAt:string;version:number;coordinatorSubject?:string;doctorSubject?:string;coordinatorName?:string};
+type CaseView={id:string;caseNumber:string;status:string;patientName:string;country:string;preferredLanguage:string;createdAt:string;updatedAt:string;version:number;coordinatorSubject?:string;doctorSubject?:string;coordinatorName?:string;doctorName?:string};
 type Assignment={id:string;assigneeSubject:string;assigneeRole:string;assignmentType:string;status:string;assignedAt:string;version:number};
 type CaseDocument={documentId:string;fileName:string;contentType:string;sizeBytes:number;status:string;createdAt:string;confirmedAt?:string};
 type VerifiedDoctor={subject:string;displayName:string;specialty?:string;subspecialty?:string;availabilityStatus?:string;careCategory?:string};
@@ -76,12 +76,12 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,downloa
  const isDoctor=role==="doctor";
  const myPending=isDoctor?value.assignments.find(a=>a.assigneeRole==="DOCTOR"&&a.status==="PENDING"&&(!mySubject||a.assigneeSubject===mySubject)):undefined;
  const doctorDecided=isDoctor&&!["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
- const hideCoordinatorWorkflow=isCoordinator&&c.status==="CLINICAL_RECOMMENDATION_READY";
+ const hideCoordinatorWorkflow=isCoordinator&&!["INTAKE_REVIEW","CANCELLED","INFORMATION_REQUIRED"].includes(c.status);
  const renderWorkflow=showActions&&!(isDoctor&&doctorPhase)&&!doctorDecided&&!hideCoordinatorWorkflow;
  return <div>
   <button className="link-cta mb-5" onClick={back}>← {t.back}</button>
   <div className="card p-6"><div className="flex flex-wrap justify-between gap-3"><div><p className="text-sm font-bold text-brand-700">{c.caseNumber}</p><h2 className="headline mt-1">{c.patientName}</h2><p>{c.country}</p></div><Status value={c.status} locale={locale}/></div>
-   <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-line pt-4 text-sm"><span><span className="text-ink-500">{t.status}: </span><strong>{statusLabel(c.status,locale)}</strong></span>{c.coordinatorSubject&&<span><span className="text-ink-500">{t.coordinatorLabel}: </span><strong className="break-all">{owned?t.you:(c.coordinatorName??c.coordinatorSubject)}</strong></span>}{isCoordinator&&assignedDoctorName&&<span><span className="text-ink-500">{t.consultantLabel}: </span><strong>{assignedDoctorName}</strong></span>}</div>
+   <div className="mt-4 flex flex-col gap-1 border-t border-line pt-4 text-sm"><span><span className="text-ink-500">{t.status}: </span><strong>{statusLabel(c.status,locale)}</strong></span>{c.coordinatorSubject&&<span><span className="text-ink-500">{t.coordinatorLabel}: </span><strong className="break-all">{c.coordinatorName??c.coordinatorSubject}</strong></span>}{isCoordinator&&c.doctorName&&<span><span className="text-ink-500">{t.consultantLabel}: </span><strong>{c.doctorName}</strong></span>}</div>
   </div>
   {doctorDecided&&<div className="mt-6 card flex items-center gap-3 border-l-4 border-brand-500 bg-brand-50 p-5"><span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-brand-600 font-bold text-white">✓</span><p className="font-bold text-brand-800">{c.status==="CLINICAL_RECOMMENDATION_READY"?t.doctorAccepted:c.status==="INFORMATION_REQUIRED"?t.doctorInfoSent:c.status==="CANCELLED"?t.doctorCancelled:t.doctorReturned}</p></div>}
   <div className={doctorDecided?"pointer-events-none opacity-50":""}>
