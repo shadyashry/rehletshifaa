@@ -21,6 +21,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [caseNumber, setCaseNumber] = useState<string>();
+  const [statusToken, setStatusToken] = useState<string>();
   const [turnstileToken, setTurnstileToken] = useState<string>();
   const started = useRef(false);
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -63,16 +64,16 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       }
       const finalResponse = await fetch(`${apiBase}/api/v1/cases/${created.caseId}/submit`, { method: "POST" });
       if (!finalResponse.ok) throw new Error("submit_failed");
-      const submitted = await finalResponse.json() as { caseNumber: string };
-      setCaseNumber(submitted.caseNumber); track("case_submitted");
+      const submitted = await finalResponse.json() as { caseNumber: string; statusToken: string };
+      setCaseNumber(submitted.caseNumber);setStatusToken(submitted.statusToken); track("case_submitted");
     } catch { setErrors({ server: d.form.errors.server }); }
     finally { setBusy(false); }
   }
 
   if (caseNumber) {
-    const careSuffix = careArea ? ` ${d.form.category.summaryLabel}: ${d.form.category.options[careArea]}.` : "";
-    const message = `Hello RehletShifaa, I submitted my medical case. My Case ID is ${caseNumber}.${careSuffix}`;
-    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><a className="btn-primary mt-7 w-full sm:w-auto" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappHref(message)}>{d.form.continue}</a></section>;
+    const message = `Hello RehletShifaa, I submitted my medical case. My Case ID is ${caseNumber}.`;
+    const statusHref=statusToken?`/${locale}/status/${statusToken}`:undefined;
+    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><div className="mt-7 flex flex-wrap gap-3">{statusHref&&<a className="btn-primary" href={statusHref}>{locale==="ar"?"متابعة حالة الطلب":"Track your case"}</a>}<a className="btn-secondary" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappHref(message)}>{d.form.continue}</a></div></section>;
   }
 
   return <>

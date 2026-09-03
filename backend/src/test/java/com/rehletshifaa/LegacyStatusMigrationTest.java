@@ -45,7 +45,7 @@ class LegacyStatusMigrationTest {
         assertThat(status(jdbc, "RS-2020-000002")).isEqualTo("INTAKE_REVIEW");
         assertThat(status(jdbc, "RS-2020-000003")).isEqualTo("CLINICAL_RECOMMENDATION_READY");
         assertThat(status(jdbc, "RS-2020-000004")).isEqualTo("TRAVEL_COORDINATION");
-        assertThat(status(jdbc, "RS-2020-000005")).isEqualTo("PATIENT_DECISION");
+        assertThat(status(jdbc, "RS-2020-000005")).isEqualTo("PROPOSAL_INTERNAL_APPROVAL");
         assertThat(status(jdbc, "RS-2020-000006")).isEqualTo("RECEIVED");
         // No case retains a legacy value.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM medical_cases WHERE status IN ('NEW','COORDINATOR_REVIEW','RECOMMENDATION_READY','TREATMENT_COORDINATION','PROPOSAL_READY','CLAIM_PENDING')", Integer.class)).isZero();

@@ -71,6 +71,7 @@ services:
       OIDC_ISSUER_URI: http://localhost:8180/realms/rehletshifaa
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/rehletshifaa/protocol/openid-connect/certs
       CLAIM_TOKEN_PEPPER: local-only-claim-pepper-change-in-production
+      PII_ENCRYPTION_KEY: local-only-pii-key-change-in-production
       STORAGE_MODE: s3
       AWS_ACCESS_KEY_ID: rehletshifaa
       AWS_SECRET_ACCESS_KEY: RehletShifaaLocal123!
@@ -91,6 +92,7 @@ services:
       MAIL_FROM: no-reply@local.test
       FRONTEND_ALLOWED_ORIGINS: http://localhost:3000
       APP_PUBLIC_BASE_URL: http://localhost:8080
+      APP_WEB_BASE_URL: http://localhost:3000
       OPENAPI_ENABLED: "true"
     ports: ["8080:8080"]
     depends_on:

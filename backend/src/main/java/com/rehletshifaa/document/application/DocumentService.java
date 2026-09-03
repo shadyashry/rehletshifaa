@@ -16,7 +16,13 @@ public class DocumentService {
     private final MedicalDocumentRepository documents; private final CaseService cases; private final StoragePort storage; private final DocumentInspectionPort inspector; private final Clock clock; private final long maxBytes; private final long maxCaseBytes; private final int maxFilesPerCase; private final Set<String> allowedTypes;
     public DocumentService(MedicalDocumentRepository documents, CaseService cases, StoragePort storage, DocumentInspectionPort inspector, Clock clock, @Value("${app.storage.max-bytes}") long maxBytes, @Value("${app.storage.max-case-bytes}") long maxCaseBytes, @Value("${app.storage.max-files-per-case}") int maxFilesPerCase, @Value("${app.storage.allowed-types}") String allowedTypes) { this.documents=documents; this.cases=cases; this.storage=storage; this.inspector=inspector; this.clock=clock; this.maxBytes=maxBytes; this.maxCaseBytes=maxCaseBytes;this.maxFilesPerCase=maxFilesPerCase;this.allowedTypes=Set.of(allowedTypes.split(",")); }
     @Transactional public PresignResponse presign(UUID caseId, PresignRequest request) {
-        var medicalCase = cases.findDraft(caseId); validate(request.contentType(), request.sizeBytes()); validateQuota(caseId,request.sizeBytes());
+        return presignForCase(cases.findDraft(caseId),caseId,request);
+    }
+    @Transactional public PresignResponse presignAdditional(UUID caseId, PresignRequest request) {
+        var medicalCase=cases.findById(caseId); if(medicalCase.getStatus()==com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT)throw new ApiException(409,"CASE_NOT_SUBMITTED","Additional documents require a submitted case");
+        return presignForCase(medicalCase,caseId,request);
+    }
+    private PresignResponse presignForCase(com.rehletshifaa.casemanagement.domain.MedicalCase medicalCase,UUID caseId,PresignRequest request){validate(request.contentType(), request.sizeBytes()); validateQuota(caseId,request.sizeBytes());
         UUID documentId=UUID.randomUUID(); String extension=extensionFor(request.contentType()); LocalDate date=LocalDate.now(clock);
         String objectKey="medical/%d/%02d/%s".formatted(date.getYear(), date.getMonthValue(), UUID.randomUUID());
         String safeName=documentId+extension; String original=sanitizeFileName(request.originalFileName());
@@ -24,7 +30,10 @@ public class DocumentService {
         var upload=storage.presign(objectKey, request.contentType(), request.sizeBytes()); return new PresignResponse(documentId, upload.url(), upload.requiredHeaders(), upload.expiresInSeconds());
     }
     @Transactional(noRollbackFor=ApiException.class) public ConfirmResponse confirm(UUID caseId, ConfirmRequest request) {
-        cases.findDraft(caseId); var document=documents.findByIdAndMedicalCaseId(request.documentId(), caseId).orElseThrow(() -> new ApiException(404,"DOCUMENT_NOT_FOUND","Document was not found"));
+        cases.findDraft(caseId); return confirmForCase(caseId,request);
+    }
+    @Transactional(noRollbackFor=ApiException.class) public ConfirmResponse confirmAdditional(UUID caseId,ConfirmRequest request){cases.findById(caseId);return confirmForCase(caseId,request);}
+    private ConfirmResponse confirmForCase(UUID caseId,ConfirmRequest request){var document=documents.findByIdAndMedicalCaseId(request.documentId(), caseId).orElseThrow(() -> new ApiException(404,"DOCUMENT_NOT_FOUND","Document was not found"));
         if (document.getStatus()!=DocumentStatus.PENDING) throw new ApiException(409,"DOCUMENT_NOT_PENDING","Document cannot be confirmed in its current state");
         StoragePort.StoredObject stored=storage.verify(document.getObjectKey());
         if (stored.sizeBytes()!=document.getSizeBytes() || !document.getContentType().equalsIgnoreCase(stored.contentType())) { document.reject(); documents.save(document); storage.delete(document.getObjectKey()); throw new ApiException(422,"DOCUMENT_METADATA_MISMATCH","Uploaded document metadata does not match the request"); }

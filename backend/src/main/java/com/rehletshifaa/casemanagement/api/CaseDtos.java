@@ -19,5 +19,5 @@ public final class CaseDtos {
         public CreateCaseRequest(String fullName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken){this(fullName,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,null,null);}
     }
     public record CreateCaseResponse(UUID caseId, String caseNumber, String status) {}
-    public record SubmitCaseResponse(String caseNumber, String status) {}
+    public record SubmitCaseResponse(String caseNumber, String status, String statusToken) {}
 }

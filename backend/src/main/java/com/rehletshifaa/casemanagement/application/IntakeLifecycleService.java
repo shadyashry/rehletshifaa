@@ -3,6 +3,7 @@ package com.rehletshifaa.casemanagement.application;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.domain.MedicalCase;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.crypto.CryptoService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.UUID;
@@ -22,13 +24,15 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 @Service
 public class IntakeLifecycleService {
     private final JdbcClient jdbc; private final Clock clock; private final SecureRandom random = new SecureRandom();
-    private final String pepper; private final long expirySeconds; private final int maxAttempts;
+    private final CryptoService crypto;
+    private final String pepper;
     private final String coordinatorEmail;
     public IntakeLifecycleService(JdbcClient jdbc, Clock clock, @Value("${app.claim.pepper}")String pepper,
                                   @Value("${app.claim.expiry-seconds}")long expirySeconds,
                                   @Value("${app.claim.max-attempts}")int maxAttempts,
-                                  @Value("${app.mail.coordinator}")String coordinatorEmail) {
-        this.jdbc=jdbc;this.clock=clock;this.pepper=pepper;this.expirySeconds=expirySeconds;this.maxAttempts=maxAttempts;this.coordinatorEmail=coordinatorEmail;
+                                  @Value("${app.mail.coordinator}")String coordinatorEmail,
+                                  CryptoService crypto) {
+        this.jdbc=jdbc;this.clock=clock;this.pepper=pepper;this.coordinatorEmail=coordinatorEmail;this.crypto=crypto;
     }
 
     /**
@@ -54,28 +58,31 @@ public class IntakeLifecycleService {
     }
 
     /**
-     * Runs once the case has been successfully submitted (DRAFT -> RECEIVED). Only now do we mint
-     * the identity-verification challenge (OTP) and deliver it, so its expiry clock starts against
-     * a finalized submission rather than a draft that is still uploading documents. The delivered
-     * notification carries only the code and no clinical detail.
+     * Runs once the case has been successfully submitted (DRAFT -> RECEIVED). It creates a
+     * purpose-scoped status link; the patient requests a short-lived verification code only when
+     * they use that link. The notification contains no clinical detail.
      */
-    @Transactional public void onSubmitted(MedicalCase medicalCase) {
+    @Transactional public String onSubmitted(MedicalCase medicalCase) {
         Instant now=clock.instant();
         jdbc.sql("INSERT INTO case_status_history(id,case_id,from_status,to_status,actor_subject,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?)")
             .params(UUID.randomUUID(),medicalCase.getId(),"DRAFT","RECEIVED","guest","GUEST","Patient submitted intake",timestamp(now)).update();
         UUID patientId=jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(medicalCase.getId()).query(UUID.class).single();
-        UUID challengeId=UUID.randomUUID(); String code="%06d".formatted(random.nextInt(1_000_000));
-        jdbc.sql("INSERT INTO case_claim_challenges(id,case_id,patient_id,token_hash,delivery_channel,destination_hint,expires_at,attempts,max_attempts,created_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM case_claim_challenges WHERE case_id=? AND consumed_at IS NULL AND revoked_at IS NULL)")
-            .params(challengeId,medicalCase.getId(),patientId,hash(code),"WHATSAPP",mask(medicalCase.getWhatsappNumber()),timestamp(now.plusSeconds(expirySeconds)),0,maxAttempts,timestamp(now),medicalCase.getId()).update();
+        UUID linkId=UUID.randomUUID(); String linkToken=randomToken();
+        jdbc.sql("INSERT INTO case_access_links(id,case_id,patient_id,purpose,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?,?)")
+            .params(linkId,medicalCase.getId(),patientId,"STATUS",hash(linkToken),timestamp(now.plus(Duration.ofDays(30))),timestamp(now)).update();
+        String lang="ar".equals(medicalCase.getPreferredLanguage())?"ar":"en";
+        String payload=encryptedJson("{\"token\":\""+linkToken+"\",\"lang\":\""+lang+"\"}");
         jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
-            .params(UUID.randomUUID(),"CASE_CLAIM","WHATSAPP",medicalCase.getWhatsappNumber(),"case-claim-code","{\"code\":\""+code+"\"}","PENDING",0,5,timestamp(now),"claim:"+challengeId,timestamp(now),"claim:"+challengeId).update();
+            .params(UUID.randomUUID(),"CASE_STATUS_LINK","WHATSAPP",medicalCase.getWhatsappNumber(),"case-status-link",payload,"PENDING",0,5,timestamp(now),"case-status:"+linkId,timestamp(now),"case-status:"+linkId).update();
         jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
             .params(UUID.randomUUID(),"NEW_CASE","EMAIL",coordinatorEmail,"new-case-received","{}","PENDING",0,5,timestamp(now),"case-submitted:"+medicalCase.getId(),timestamp(now),"case-submitted:"+medicalCase.getId()).update();
         audit("CASE_SUBMITTED","guest","GUEST",medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"SUBMIT","SUCCESS",null,now);
+        return linkToken;
     }
 
     public String hash(String token){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((pepper+":"+token).getBytes(StandardCharsets.UTF_8)));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
+    public String encryptedJson(String json){return "enc:"+crypto.encrypt(json);}
+    private String randomToken(){return UUID.randomUUID().toString().replace("-","")+UUID.randomUUID().toString().replace("-","");}
     private String blankToNull(String value){return value==null||value.isBlank()?null:value.trim();}
-    private String mask(String value){String clean=value==null?"":value.replaceAll("\\s","");return clean.length()<4?"***":"***"+clean.substring(clean.length()-4);}
     private void audit(String type,String subject,String role,UUID caseId,String entity,String entityId,String action,String outcome,String reason,Instant now){jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),type,subject,role,caseId,entity,entityId,action,outcome,reason,timestamp(now)).update();}
 }

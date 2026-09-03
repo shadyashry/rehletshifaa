@@ -14,10 +14,10 @@ For a cost-constrained single-host installation, use the dedicated [Oracle Cloud
 
 1. Run the complete CI suite and scan both images and dependencies.
 2. Provision database, bucket, KMS key if used, application roles, SMTP, DNS, TLS, WAF, secrets, and monitoring.
-3. Deploy the backend with `SPRING_PROFILES_ACTIVE=prod`, OIDC issuer/JWK configuration, `APP_SECURITY_ENABLED=true`, `STORAGE_MODE=s3`, a non-default claim pepper, scanning, `NOTIFICATIONS_MODE=live`, `MAIL_MODE=smtp`, `WHATSAPP_MODE=webhook`, and `TURNSTILE_ENABLED=true`.
+3. Deploy the backend with `SPRING_PROFILES_ACTIVE=prod`, OIDC issuer/JWK configuration, `APP_SECURITY_ENABLED=true`, `STORAGE_MODE=s3`, distinct high-entropy `CLAIM_TOKEN_PEPPER` and `PII_ENCRYPTION_KEY` values, public HTTPS `APP_PUBLIC_BASE_URL` and `APP_WEB_BASE_URL`, scanning, `NOTIFICATIONS_MODE=live`, `MAIL_MODE=smtp`, `WHATSAPP_MODE=webhook`, and `TURNSTILE_ENABLED=true`.
 4. Verify Flyway migration success and `/actuator/health` from inside the trusted network.
 5. Build the frontend with API/site and OIDC public values at image-build time, then deploy it.
-6. Perform bilingual role-portal smoke tests, patient claim, clean/malicious upload, complete proposal approval, email/WhatsApp delivery, backup restore, rollback rehearsal, and alert verification using non-sensitive fixtures.
+6. Perform bilingual role-portal smoke tests, anonymous submission, OTP-protected case status and information response, clean/malicious upload, the complete doctor → operations → finance → coordinator release → patient decision sequence, post-acceptance activation, email/WhatsApp delivery, backup restore, rollback rehearsal, and alert verification using non-sensitive fixtures.
 
 ## Storage policy
 

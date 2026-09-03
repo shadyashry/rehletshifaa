@@ -24,12 +24,14 @@ public class ProductionSafetyValidator implements ApplicationRunner {
         require(failures, "S3_BUCKET", false);
         require(failures, "FRONTEND_ALLOWED_ORIGINS", true);
         require(failures, "APP_PUBLIC_BASE_URL", true);
+        require(failures, "APP_WEB_BASE_URL", true);
         require(failures, "TURNSTILE_SECRET", false);
         require(failures, "COORDINATOR_EMAIL", false);
         require(failures, "MAIL_FROM", false);
         require(failures, "OIDC_ISSUER_URI", true);
         require(failures, "OIDC_JWK_SET_URI", true);
         require(failures, "CLAIM_TOKEN_PEPPER", false);
+        require(failures, "PII_ENCRYPTION_KEY", false);
         require(failures, "WHATSAPP_WEBHOOK_URL", true);
         require(failures, "WHATSAPP_TOKEN", false);
         if (!"s3".equals(environment.getProperty("app.storage.mode"))) failures.add("STORAGE_MODE must resolve to s3");

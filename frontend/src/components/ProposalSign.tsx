@@ -6,7 +6,7 @@ import type { Locale } from "@/lib/i18n";
 
 type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean };
 type Summary = { caseNumber: string; channel: string; destinationHint: string };
-type Proposal = { caseId: string; caseNumber: string; patientName: string; currency?: string; items: Item[]; validUntil?: string; decided: boolean; recommendedTreatment?: string; risksAndLimitations?: string };
+type Proposal = { caseNumber: string; patientName: string; currency?: string; items: Item[]; validUntil?: string; decided: boolean; recommendedTreatment?: string; risksAndLimitations?: string };
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 

@@ -21,7 +21,11 @@ public class ActorContext {
         Set<ActorRole> roles = auth.getAuthorities().stream().map(a -> a.getAuthority()).filter(a -> a.startsWith("ROLE_"))
             .map(a -> role(a.substring(5))).filter(java.util.Objects::nonNull).collect(Collectors.toCollection(() -> EnumSet.noneOf(ActorRole.class)));
         if (roles.isEmpty()) throw new ApiException(403, "ROLE_REQUIRED", "The account has no authorized platform role");
-        Instant authenticatedAt=auth instanceof JwtAuthenticationToken jwt && jwt.getToken().getClaimAsInstant("auth_time")!=null?jwt.getToken().getClaimAsInstant("auth_time"):Instant.EPOCH;
+        Instant authenticatedAt=Instant.EPOCH;
+        if(auth instanceof JwtAuthenticationToken jwt){
+            Instant authTime=jwt.getToken().getClaimAsInstant("auth_time");
+            authenticatedAt=authTime!=null?authTime:java.util.Objects.requireNonNullElse(jwt.getToken().getIssuedAt(),Instant.EPOCH);
+        }
         return new Actor(auth.getName(), roles, authenticatedAt);
     }
 
