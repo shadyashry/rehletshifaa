@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 
 import { AnalyticsScripts } from "@/components/AnalyticsScripts";
 import { AuthProvider } from "@/components/AuthProvider";
-import { EmergencyNotice } from "@/components/EmergencyNotice";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { getDictionary } from "@/lib/dictionary";
@@ -35,7 +34,6 @@ export default async function LocaleLayout({
         <a href="#main" className="skip-link">
           {d.common.skip}
         </a>
-        <EmergencyNotice label={d.common.emergencyLabel} text={d.common.emergency} />
         <Header locale={locale} d={d} />
         <AuthProvider><main id="main" tabIndex={-1}>{children}</main></AuthProvider>
         <Footer locale={locale} d={d} />

@@ -3,6 +3,7 @@ package com.rehletshifaa.journey.api;
 import com.rehletshifaa.document.api.DocumentDtos;
 import com.rehletshifaa.journey.application.PublicCaseAccessService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -14,6 +15,7 @@ import static com.rehletshifaa.journey.api.PublicCaseDtos.*;
 public class PublicCaseController {
     private final PublicCaseAccessService service;
     public PublicCaseController(PublicCaseAccessService service){this.service=service;}
+    @PostMapping("/recover") @ResponseStatus(HttpStatus.ACCEPTED) public CaseLinkRecoveryResponse recover(@Valid @RequestBody CaseLinkRecoveryRequest request){service.recoverStatusLink(request);return new CaseLinkRecoveryResponse("If the details match a case, a secure tracking link will be sent shortly.");}
     @GetMapping("/{token}") public CaseAccessSummary summary(@PathVariable String token){return service.summary(token);}
     @PostMapping("/{token}/request-access") public CaseAccessSummary requestAccess(@PathVariable String token){return service.requestAccess(token);}
     @PostMapping("/{token}/verify") public CaseAccessGrant verify(@PathVariable String token,@Valid @RequestBody CaseAccessVerifyRequest request){return service.verify(token,request.code());}

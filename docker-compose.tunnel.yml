@@ -6,35 +6,36 @@ services:
     command:
       - start-dev
       - --import-realm
-      - --hostname=https://pond-proposed-msie-aids.trycloudflare.com
+      - --hostname=https://celebrate-marks-resources-sleeping.trycloudflare.com
       - --proxy-headers=xforwarded
 
   minio:
     environment:
-      MINIO_API_CORS_ALLOW_ORIGIN: https://caroline-begins-decorative-thesaurus.trycloudflare.com
+      MINIO_API_CORS_ALLOW_ORIGIN: https://spelling-oxide-minister-min.trycloudflare.com
 
   backend:
     environment:
-      FRONTEND_ALLOWED_ORIGINS: https://caroline-begins-decorative-thesaurus.trycloudflare.com
-      APP_PUBLIC_BASE_URL: https://invoice-investigate-computed-gsm.trycloudflare.com
-      OIDC_ISSUER_URI: https://pond-proposed-msie-aids.trycloudflare.com/realms/rehletshifaa
-      S3_PUBLIC_ENDPOINT: https://arbor-retrieval-figured-twins.trycloudflare.com
+      FRONTEND_ALLOWED_ORIGINS: https://spelling-oxide-minister-min.trycloudflare.com
+      APP_PUBLIC_BASE_URL: https://casino-colors-wiring-consult.trycloudflare.com
+      APP_WEB_BASE_URL: https://spelling-oxide-minister-min.trycloudflare.com
+      OIDC_ISSUER_URI: https://celebrate-marks-resources-sleeping.trycloudflare.com/realms/rehletshifaa
+      S3_PUBLIC_ENDPOINT: https://equivalent-roses-elementary-reviews.trycloudflare.com
 
   frontend:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_BASE_URL: https://invoice-investigate-computed-gsm.trycloudflare.com
-        NEXT_PUBLIC_SITE_URL: https://caroline-begins-decorative-thesaurus.trycloudflare.com
-        NEXT_PUBLIC_STORAGE_ORIGIN: https://arbor-retrieval-figured-twins.trycloudflare.com
+        NEXT_PUBLIC_API_BASE_URL: https://casino-colors-wiring-consult.trycloudflare.com
+        NEXT_PUBLIC_SITE_URL: https://spelling-oxide-minister-min.trycloudflare.com
+        NEXT_PUBLIC_STORAGE_ORIGIN: https://equivalent-roses-elementary-reviews.trycloudflare.com
         NEXT_PUBLIC_WHATSAPP_NUMBER: "201010447898"
         NEXT_PUBLIC_TURNSTILE_SITE_KEY: ""
-        NEXT_PUBLIC_OIDC_AUTHORITY: https://pond-proposed-msie-aids.trycloudflare.com/realms/rehletshifaa
+        NEXT_PUBLIC_OIDC_AUTHORITY: https://celebrate-marks-resources-sleeping.trycloudflare.com/realms/rehletshifaa
         NEXT_PUBLIC_OIDC_CLIENT_ID: rehletshifaa-web
     environment:
-      NEXT_PUBLIC_API_BASE_URL: https://invoice-investigate-computed-gsm.trycloudflare.com
-      NEXT_PUBLIC_SITE_URL: https://caroline-begins-decorative-thesaurus.trycloudflare.com
-      NEXT_PUBLIC_STORAGE_ORIGIN: https://arbor-retrieval-figured-twins.trycloudflare.com
+      NEXT_PUBLIC_API_BASE_URL: https://casino-colors-wiring-consult.trycloudflare.com
+      NEXT_PUBLIC_SITE_URL: https://spelling-oxide-minister-min.trycloudflare.com
+      NEXT_PUBLIC_STORAGE_ORIGIN: https://equivalent-roses-elementary-reviews.trycloudflare.com
       NEXT_PUBLIC_WHATSAPP_NUMBER: "201010447898"
-      NEXT_PUBLIC_OIDC_AUTHORITY: https://pond-proposed-msie-aids.trycloudflare.com/realms/rehletshifaa
+      NEXT_PUBLIC_OIDC_AUTHORITY: https://celebrate-marks-resources-sleeping.trycloudflare.com/realms/rehletshifaa
       NEXT_PUBLIC_OIDC_CLIENT_ID: rehletshifaa-web

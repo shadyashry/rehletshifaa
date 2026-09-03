@@ -9,7 +9,7 @@ import { track } from "@/lib/analytics";
 import { whatsappHref } from "@/lib/links";
 
 type FormValues = { fullName: string; country: string; whatsappNumber: string; email: string; conditionDescription: string; consent: boolean };
-type CareAreaKey = "" | "cardiology" | "rheumatology" | "orthopedics";
+type CareAreaKey = "" | "cardiology" | "rheumatology-rehabilitation" | "orthopedics";
 type Errors = Partial<Record<keyof FormValues | "files" | "server", string>>;
 type CreateCaseResponse = { caseId: string; caseNumber: string; status: "DRAFT" };
 type PresignResponse = { documentId: string; uploadUrl: string; requiredHeaders: Record<string, string> };
@@ -46,10 +46,11 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     if (Object.keys(nextErrors).length) { setErrors(nextErrors); return; }
     if (!result.success) return;
     setBusy(true);
-    const careLine = careArea ? `${d.form.category.summaryLabel}: ${d.form.category.options[careArea]}` : "";
+    const dictionaryKey = careArea === "rheumatology-rehabilitation" ? "rheumatology" : careArea;
+    const careLine = dictionaryKey ? `${d.form.category.summaryLabel}: ${d.form.category.options[dictionaryKey]}` : "";
     const describedCase = [careLine, result.data.conditionDescription].filter(Boolean).join("\n\n");
     try {
-      const createResponse = await fetch(`${apiBase}/api/v1/cases`, { method: "POST", headers: { "Content-Type": "application/json", "X-Request-ID": crypto.randomUUID() }, body: JSON.stringify({ ...result.data, conditionDescription: describedCase, preferredLanguage: locale, turnstileToken }) });
+      const createResponse = await fetch(`${apiBase}/api/v1/cases`, { method: "POST", headers: { "Content-Type": "application/json", "X-Request-ID": crypto.randomUUID() }, body: JSON.stringify({ ...result.data, conditionDescription: describedCase, preferredLanguage: locale, careArea: careArea || null, turnstileToken }) });
       if (!createResponse.ok) throw new Error("case_create_failed");
       const created = await createResponse.json() as CreateCaseResponse;
       for (const file of files) {
@@ -65,6 +66,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       const finalResponse = await fetch(`${apiBase}/api/v1/cases/${created.caseId}/submit`, { method: "POST" });
       if (!finalResponse.ok) throw new Error("submit_failed");
       const submitted = await finalResponse.json() as { caseNumber: string; statusToken: string };
+      window.localStorage.setItem("rehletshifaa:last-status-path", `/${locale}/status/${submitted.statusToken}`);
       setCaseNumber(submitted.caseNumber);setStatusToken(submitted.statusToken); track("case_submitted");
     } catch { setErrors({ server: d.form.errors.server }); }
     finally { setBusy(false); }
@@ -83,7 +85,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
         <Field label={d.form.name} error={errors.fullName}><input className={`field ${errors.fullName ? "field-error" : ""}`} autoComplete="name" value={values.fullName} onChange={e => update("fullName", e.target.value)} /></Field>
         <Field label={d.form.country} error={errors.country}><input className={`field ${errors.country ? "field-error" : ""}`} autoComplete="country-name" value={values.country} onChange={e => update("country", e.target.value)} /></Field>
       </div>
-      <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} ({d.form.optional})</span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option></select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
+      <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} ({d.form.optional})</span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option></select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
       <div className="mt-6 grid gap-6 sm:grid-cols-2"><Field label={d.form.phone} error={errors.whatsappNumber}><input className={`field ${errors.whatsappNumber ? "field-error" : ""}`} dir="ltr" inputMode="tel" autoComplete="tel" placeholder="+20 100 000 0000" value={values.whatsappNumber} onChange={e => update("whatsappNumber", e.target.value)} /></Field><Field label={`${d.form.email} (${d.form.optional})`} error={errors.email}><input className={`field ${errors.email ? "field-error" : ""}`} type="email" dir="ltr" inputMode="email" autoComplete="email" placeholder="name@example.com" value={values.email} onChange={e => update("email", e.target.value)} /></Field></div>
       <div className="mt-6"><Field label={`${d.form.description} (${d.form.optional})`} error={errors.conditionDescription}><textarea className="field min-h-28 resize-y" value={values.conditionDescription} maxLength={1900} onChange={e => update("conditionDescription", e.target.value)} /></Field></div>
       <div className="mt-6"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.files} ({d.form.optional})</span><label className="flex cursor-pointer flex-col items-center rounded-lg border border-dashed border-line-strong bg-brand-50 px-5 py-8 text-center hover:border-brand-600"><FileUp className="text-accent-700" /><span className="mt-3 font-bold text-brand-700">{d.form.choose}</span>{files.length > 0 && <span className="mt-2 text-sm text-ink-500">{files.length} {d.form.selected}</span>}<input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => onFiles(Array.from(e.target.files ?? []))} /></label>{errors.files && <p className="error-text mt-2">{errors.files}</p>}<p className="mt-3 text-sm leading-6 text-ink-500">{d.form.uploadHelp}</p></div>

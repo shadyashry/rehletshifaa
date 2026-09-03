@@ -25,11 +25,32 @@ public class PublicCaseAccessService {
     private static final Duration GRANT_TTL=Duration.ofMinutes(30);
     private static final int MAX_ATTEMPTS=5;
     private static final int MAX_SENDS_PER_HOUR=5;
+    private static final int MAX_RECOVERY_SENDS_PER_HOUR=3;
     private final JdbcClient jdbc; private final IntakeLifecycleService intake; private final DocumentService documents; private final Clock clock; private final SecureRandom random=new SecureRandom();
 
     public PublicCaseAccessService(JdbcClient jdbc,IntakeLifecycleService intake,DocumentService documents,Clock clock){this.jdbc=jdbc;this.intake=intake;this.documents=documents;this.clock=clock;}
 
     @Transactional(readOnly=true) public CaseAccessSummary summary(String token){return summary(find(token));}
+
+    /**
+     * Sends a fresh status link only when both identifiers match. The public response is deliberately
+     * identical for matches, misses, and throttled cases so this endpoint cannot be used to enumerate
+     * patients or case numbers.
+     */
+    @Transactional public void recoverStatusLink(CaseLinkRecoveryRequest request){
+        String caseNumber=request.caseNumber().trim().toUpperCase(Locale.ROOT);
+        Optional<RecoveryContact> match=jdbc.sql("SELECT c.id,c.patient_id,p.whatsapp_number,p.preferred_language FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.case_number=? AND c.status<>'DRAFT'")
+            .param(caseNumber).query((rs,n)->new RecoveryContact(rs.getObject("id",UUID.class),rs.getObject("patient_id",UUID.class),rs.getString("whatsapp_number"),rs.getString("preferred_language"))).optional();
+        if(match.isEmpty()||!samePhone(match.get().whatsapp(),request.whatsappNumber()))return;
+        RecoveryContact contact=match.get();Instant now=clock.instant();String prefix="case-status-recovery:"+contact.caseId()+":";
+        Integer recent=jdbc.sql("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE ? AND created_at>?").params(prefix+"%",timestamp(now.minus(Duration.ofHours(1)))).query(Integer.class).single();
+        if(recent!=null&&recent>=MAX_RECOVERY_SENDS_PER_HOUR)return;
+        String token=randomToken();UUID linkId=UUID.randomUUID();String language="ar".equals(request.language())||("ar".equals(contact.language())&&request.language()==null)?"ar":"en";
+        jdbc.sql("INSERT INTO case_access_links(id,case_id,patient_id,purpose,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?,?)").params(linkId,contact.caseId(),contact.patientId(),"STATUS",intake.hash(token),timestamp(now.plus(Duration.ofDays(30))),timestamp(now)).update();
+        jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+            .params(UUID.randomUUID(),"CASE_STATUS_RECOVERY","WHATSAPP",contact.whatsapp(),"case-status-link",intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+language+"\"}"),"PENDING",0,5,timestamp(now),prefix+linkId,timestamp(now)).update();
+        audit("CASE_STATUS_LINK_RECOVERED",contact.caseId(),linkId.toString(),"RECOVER");
+    }
 
     @Transactional public CaseAccessSummary requestAccess(String token){Link link=find(token);Instant now=clock.instant();Integer recent=jdbc.sql("SELECT count(*) FROM case_access_challenges WHERE link_id=? AND created_at>?").params(link.id(),timestamp(now.minus(Duration.ofHours(1)))).query(Integer.class).single();if(recent!=null&&recent>=MAX_SENDS_PER_HOUR)throw new ApiException(429,"TOO_MANY_REQUESTS","Too many verification requests. Please try again later.");jdbc.sql("UPDATE case_access_challenges SET revoked_at=? WHERE link_id=? AND consumed_at IS NULL AND revoked_at IS NULL").params(timestamp(now),link.id()).update();Contact contact=contact(link.caseId());String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();if(!hasText(destination))throw new ApiException(409,"CONTACT_UNAVAILABLE","A verified contact method is not available");String code="%06d".formatted(random.nextInt(1_000_000));UUID id=UUID.randomUUID();jdbc.sql("INSERT INTO case_access_challenges(id,link_id,code_hash,delivery_channel,destination_hint,expires_at,attempts,max_attempts,created_at) VALUES(?,?,?,?,?,?,?,?,?)").params(id,link.id(),intake.hash(code),channel,mask(destination),timestamp(now.plus(CODE_TTL)),0,MAX_ATTEMPTS,timestamp(now)).update();jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),"CASE_ACCESS",channel,destination,"case-access-code",intake.encryptedJson("{\"code\":\""+code+"\"}"),"PENDING",0,5,timestamp(now),"case-access:"+id,timestamp(now)).update();audit("CASE_ACCESS_REQUESTED",link.caseId(),link.id().toString(),"REQUEST_ACCESS");return summary(link);}
 
@@ -54,6 +75,8 @@ public class PublicCaseAccessService {
     private Challenge challenge(ResultSet rs,int n)throws SQLException{return new Challenge(rs.getObject("id",UUID.class),rs.getString("code_hash"),instant(rs,"expires_at"),rs.getInt("attempts"),rs.getInt("max_attempts"),instantNullable(rs,"consumed_at"),instantNullable(rs,"revoked_at"));}
     private ApiException invalid(){return new ApiException(400,"VERIFICATION_INVALID","The verification code is invalid or has expired");}
     private String randomToken(){return UUID.randomUUID().toString().replace("-","")+UUID.randomUUID().toString().replace("-","");}
+    private boolean samePhone(String left,String right){return normalizePhone(left).equals(normalizePhone(right));}
+    private String normalizePhone(String value){String digits=value==null?"":value.replaceAll("\\D","");return digits.startsWith("00")?digits.substring(2):digits;}
     private boolean hasText(String value){return value!=null&&!value.isBlank();}
     private String mask(String value){if(value==null)return "***";String clean=value.replaceAll("\\s","");if(clean.contains("@")){int at=clean.indexOf('@');return (at==0?"*":clean.charAt(0)+"***")+clean.substring(at);}return clean.length()<4?"***":"***"+clean.substring(clean.length()-4);}
     private Labels labels(String status){return switch(status){case "RECEIVED"->new Labels("Case received","تم استلام الحالة");case "INTAKE_REVIEW"->new Labels("Reviewing your information","جارٍ مراجعة معلوماتك");case "INFORMATION_REQUIRED"->new Labels("Action required from you","مطلوب إجراء منك");case "READY_FOR_CONSULTANT","CONSULTANT_ASSIGNMENT_PENDING"->new Labels("Matching your consultant","جارٍ اختيار الاستشاري المناسب");case "CONSULTANT_REVIEW"->new Labels("Under consultant review","قيد مراجعة الاستشاري");case "CLINICAL_RECOMMENDATION_READY"->new Labels("Treatment recommendation ready","توصية العلاج جاهزة");case "PROPOSAL_PREPARATION","PROPOSAL_INTERNAL_APPROVAL"->new Labels("Preparing your proposal","جارٍ إعداد عرضك");case "PATIENT_DECISION"->new Labels("Waiting for your decision","بانتظار قرارك");case "ACCEPTED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED"->new Labels("Coordinating your journey","جارٍ تنسيق رحلتك");case "TREATMENT_IN_PROGRESS","DISCHARGED"->new Labels("Treatment in progress","العلاج جارٍ");case "FOLLOW_UP"->new Labels("Follow-up","المتابعة");case "CLOSED"->new Labels("Journey completed","اكتملت الرحلة");case "DECLINED"->new Labels("Proposal declined by patient","تم رفض العرض من المريض");case "EXPIRED"->new Labels("Proposal expired","انتهت صلاحية العرض");case "CLINICALLY_NOT_SUITABLE"->new Labels("Your coordinator will contact you","سيتواصل معك منسق حالتك");default->new Labels("Your case is being coordinated","جارٍ تنسيق حالتك");};}
@@ -63,6 +86,7 @@ public class PublicCaseAccessService {
     private record Link(UUID id,UUID caseId,UUID patientId,String purpose,Instant expiresAt,Instant revokedAt){}
     private record Challenge(UUID id,String hash,Instant expiresAt,int attempts,int maxAttempts,Instant consumedAt,Instant revokedAt){}
     private record Contact(String caseNumber,String whatsapp,String email){}
+    private record RecoveryContact(UUID caseId,UUID patientId,String whatsapp,String language){}
     private record Status(String caseNumber,String status){}
     private record Labels(String en,String ar){}
 }

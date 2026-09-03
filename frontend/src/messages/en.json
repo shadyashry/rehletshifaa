@@ -16,7 +16,7 @@
     "tagline": "A clearer path to specialist care",
     "send": "Send My Case",
     "whatsapp": "Talk to a Patient Coordinator",
-    "explore": "Explore Cardiology",
+    "explore": "Explore All Care Areas",
     "profile": "View Consultant Profile",
     "emergency": "Emergency symptoms? RehletShifaa is not an emergency service. Call your local emergency number or seek urgent care now.",
     "emergencyLabel": "Emergency",
@@ -53,8 +53,7 @@
     "video": {
       "eyebrow": "Your journey, explained",
       "title": "See what happens after you start",
-      "intro": "A short, silent visual guide designed to make every next step clear before you share any medical information.",
-      "duration": "Under one minute · no sound needed",
+      "intro": "Discover how RehletShifaa turns your medical reports into a consultant-led care journey, with one dedicated coordinator guiding every step from review to treatment and follow-up.",
       "play": "Play guide",
       "pause": "Pause guide",
       "stepLabel": "Step",

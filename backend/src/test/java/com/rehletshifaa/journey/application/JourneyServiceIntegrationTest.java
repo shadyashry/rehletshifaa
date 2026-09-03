@@ -26,7 +26,7 @@ class JourneyServiceIntegrationTest {
     @AfterEach void clearSecurity(){SecurityContextHolder.clearContext();}
 
     @Test void completesClaimAssignmentClinicalProposalAndDecisionFlow()throws Exception{
-        var created=cases.create(new CreateCaseRequest("Patient One","Kenya","+254700000001","Cardiac reports","en",true,null,"patient@local.test","Africa/Nairobi"));
+        var created=cases.create(new CreateCaseRequest("Patient One","Kenya","+254700000001","Cardiac reports","en",true,null,"patient@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());
         entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
@@ -35,7 +35,7 @@ class JourneyServiceIntegrationTest {
         long intakeVersion=journey.workspace(created.caseId()).caseSummary().version();
         var ready=journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",intakeVersion));assertThat(ready.status()).isEqualTo("READY_FOR_CONSULTANT");
         UUID practitionerId=UUID.randomUUID();
-        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,0)",practitionerId,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE",Instant.now(),Instant.now());
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",practitionerId,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());
         jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),practitionerId,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());
         jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"operations-subject","OPERATIONS",crypto.encrypt("Operations One"),Instant.now(),Instant.now());
         jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"finance-subject","FINANCE",crypto.encrypt("Finance One"),Instant.now(),Instant.now());

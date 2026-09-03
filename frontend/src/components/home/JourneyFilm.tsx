@@ -27,9 +27,6 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
             {arabic ? "متصفحك لا يدعم تشغيل الفيديو." : "Your browser does not support embedded video."}
           </video>
         </div>
-        <p className="mt-4 text-center text-sm font-medium text-ink-500">
-          {arabic ? "٥٣ ثانية · النسخة العربية" : "53 seconds · English version"}
-        </p>
       </div>
     </section>
   );

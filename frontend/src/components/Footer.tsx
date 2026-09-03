@@ -3,15 +3,12 @@ import { MessageCircle } from "lucide-react";
 
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
-import { legalNav, localeHref, primaryNav, whatsappHref, WHATSAPP_INTRO } from "@/lib/links";
+import { legalNav, primaryNav, whatsappHref, WHATSAPP_INTRO } from "@/lib/links";
 import { Logo } from "./Logo";
 import { TrackedLink } from "./TrackedLink";
 
 export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
-  const explore = [
-    ...primaryNav(locale, d).slice(1),
-    { href: localeHref(locale, "send-my-case"), label: d.nav.send },
-  ];
+  const explore = primaryNav(locale, d).slice(1, 4);
   const legal = legalNav(locale, d);
   const year = new Date().getFullYear();
 
@@ -41,11 +38,6 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
               </Link>
             </li>
           ))}
-          <li>
-            <Link href={localeHref(locale, "portal")} className="footer-link">
-              {d.nav.staff}
-            </Link>
-          </li>
         </FooterColumn>
 
         <FooterColumn title={d.footer.contact}>

@@ -54,6 +54,17 @@ class SecureJourneyCorrectionsTest {
         assertThatThrownBy(()->publicCases.verify(submitted.statusToken(),code)).isInstanceOf(ApiException.class);
     }
 
+    @Test void patientCanRecoverStatusLinkWithoutCaseEnumeration() throws Exception {
+        var created=cases.create(new CreateCaseRequest("Recovery Patient","Egypt","+20 101 044 7898","Reports","en",true,null,null,null));
+        cases.submit(created.caseId());em.flush();
+        int originalLinks=count("SELECT count(*) FROM case_access_links WHERE case_id=? AND purpose='STATUS'",created.caseId());
+        publicCases.recoverStatusLink(new CaseLinkRecoveryRequest(created.caseNumber(),"+20 000 000 0000","en"));em.flush();
+        assertThat(count("SELECT count(*) FROM case_access_links WHERE case_id=? AND purpose='STATUS'",created.caseId())).isEqualTo(originalLinks);
+        publicCases.recoverStatusLink(new CaseLinkRecoveryRequest(created.caseNumber().toLowerCase(Locale.ROOT),"00201010447898","en"));em.flush();
+        assertThat(count("SELECT count(*) FROM case_access_links WHERE case_id=? AND purpose='STATUS'",created.caseId())).isEqualTo(originalLinks+1);
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='CASE_STATUS_RECOVERY' AND destination=?","+20 101 044 7898")).isEqualTo(1);
+    }
+
     @Test void informationResponseIsPurposeScopedCompletesPatientActionAndReturnsToIntake() throws Exception {
         var created=cases.create(new CreateCaseRequest("Action Patient","Kenya","+254700000012","Reports","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush(); em.clear();
@@ -260,11 +271,32 @@ class SecureJourneyCorrectionsTest {
             .isInstanceOf(ApiException.class).hasMessageContaining("dedicated authorized operation");
     }
 
+    @Test void coordinatorClassifiesCaseAndCanOnlyAssignAMatchingConsultant() {
+        var created=cases.create(new CreateCaseRequest("Category Patient","Kenya","+254700000031","Reports","en",true,null,null,null));
+        cases.submit(created.caseId());em.flush();em.clear();
+        authenticate("coordinator-subject","COORDINATOR");
+        journey.claimCoordinatorCase(created.caseId(),"intake-pod");
+        var intake=journey.workspace(created.caseId()).caseSummary();
+        assertThat(intake.careCategory()).isNull();
+
+        var classified=journey.updateCareCategory(created.caseId(),new CareCategoryUpdateRequest("cardiology",intake.version(),"Coordinator clinical routing review"));
+        assertThat(classified.careCategory()).isEqualTo("cardiology");
+
+        UUID orthopedistId=UUID.randomUUID();
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",orthopedistId,"orthopedist-subject","Orthopedist","Orthopedist","VERIFIED","CONSULTANT","AVAILABLE","orthopedics",Instant.now(),Instant.now());
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),orthopedistId,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());
+        assertThatThrownBy(()->journey.assign(created.caseId(),new AssignmentRequest("orthopedist-subject","DOCTOR","PRIMARY",null,"Clinical review")))
+            .isInstanceOf(ApiException.class).hasMessageContaining("matches the case care area");
+
+        seedDoctor();
+        assertThat(journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY",null,"Clinical review")).status()).isEqualTo("PENDING");
+    }
+
     // ================= helpers =================
     private record Ctx(UUID caseId,UUID versionId,String token,String caseNumber){}
 
     private Ctx releaseProposalWithoutPatientAccount() throws Exception {
-        var created=cases.create(new CreateCaseRequest("Link Patient","Kenya","+254700000020","Cardiac reports","en",true,null,"link@local.test","Africa/Nairobi"));
+        var created=cases.create(new CreateCaseRequest("Link Patient","Kenya","+254700000020","Cardiac reports","en",true,null,"link@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject","COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
@@ -291,7 +323,7 @@ class SecureJourneyCorrectionsTest {
     }
 
     private Ctx assignedDoctorCase() throws Exception {
-        var created=cases.create(new CreateCaseRequest("Doc Patient","Kenya","+254700000021","Reports","en",true,null,null,null));
+        var created=cases.create(new CreateCaseRequest("Doc Patient","Kenya","+254700000021","Reports","en",true,null,null,null,"cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject","COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(),"pod");
@@ -303,7 +335,7 @@ class SecureJourneyCorrectionsTest {
         return new Ctx(created.caseId(),null,null,created.caseNumber());
     }
 
-    private void seedDoctor(){UUID id=UUID.randomUUID();jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,0)",id,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE",Instant.now(),Instant.now());jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),id,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());}
+    private void seedDoctor(){UUID id=UUID.randomUUID();jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",id,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),id,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());}
     private void seedStaff(){jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"operations-subject","OPERATIONS",crypto.encrypt("Operations One"),Instant.now(),Instant.now());jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"finance-subject","FINANCE",crypto.encrypt("Finance One"),Instant.now(),Instant.now());}
     private String caseAccessCode(String dest) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='CASE_ACCESS' AND destination=? ORDER BY created_at DESC LIMIT 1",String.class,dest));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}
     private String proposalAccessCode(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PROPOSAL_ACCESS' AND destination IN (SELECT p.whatsapp_number FROM patient_profiles p JOIN medical_cases c ON c.patient_id=p.id WHERE c.id=?) ORDER BY created_at DESC LIMIT 1",String.class,caseId));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}

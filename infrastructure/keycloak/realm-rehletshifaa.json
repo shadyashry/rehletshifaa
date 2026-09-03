@@ -17,8 +17,8 @@
     "publicClient": true,
     "standardFlowEnabled": true,
     "directAccessGrantsEnabled": false,
-    "redirectUris": ["http://localhost:3000/auth/callback", "https://*.trycloudflare.com/auth/callback"],
-    "webOrigins": ["http://localhost:3000", "+"],
+    "redirectUris": ["http://localhost:3000/*", "https://spelling-oxide-minister-min.trycloudflare.com/*"],
+    "webOrigins": ["http://localhost:3000", "https://spelling-oxide-minister-min.trycloudflare.com"],
     "attributes": {"pkce.code.challenge.method":"S256"}
   }],
   "users": [

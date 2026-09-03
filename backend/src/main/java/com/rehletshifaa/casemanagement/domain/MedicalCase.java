@@ -13,6 +13,7 @@ public class MedicalCase {
     @Column(nullable=false, length=80) private String country;
     @Column(name="whatsapp_number", nullable=false, length=32) private String whatsappNumber;
     @Column(name="condition_description", length=2000) private String conditionDescription;
+    @Column(name="care_category", length=60) private String careCategory;
     @Column(name="preferred_language", nullable=false, length=8) private String preferredLanguage;
     @Enumerated(EnumType.STRING) @Column(nullable=false, length=40) private CaseStatus status;
     @Column(name="consent_timestamp", nullable=false) private Instant consentTimestamp;
@@ -24,13 +25,19 @@ public class MedicalCase {
     protected MedicalCase() {}
 
     public MedicalCase(UUID id, String caseNumber, String fullName, String country, String whatsappNumber, String conditionDescription, String preferredLanguage, Instant now) {
+        this(id, caseNumber, fullName, country, whatsappNumber, conditionDescription, preferredLanguage, null, now);
+    }
+
+    public MedicalCase(UUID id, String caseNumber, String fullName, String country, String whatsappNumber, String conditionDescription, String preferredLanguage, String careCategory, Instant now) {
         this.id = id; this.caseNumber = caseNumber; this.fullName = fullName.trim(); this.country = country.trim(); this.whatsappNumber = whatsappNumber.trim();
         this.conditionDescription = conditionDescription == null || conditionDescription.isBlank() ? null : conditionDescription.trim();
+        this.careCategory = careCategory;
         this.preferredLanguage = preferredLanguage; this.status = CaseStatus.DRAFT; this.consentTimestamp = now; this.createdAt = now; this.updatedAt = now;
     }
 
     public void submit(Instant now) { if (status != CaseStatus.DRAFT) throw new IllegalStateException("Case is not in draft state"); status = CaseStatus.RECEIVED; submittedAt = now; updatedAt = now; }
     public UUID getId() { return id; } public String getCaseNumber() { return caseNumber; } public String getFullName() { return fullName; }
     public String getCountry() { return country; } public String getWhatsappNumber() { return whatsappNumber; } public String getConditionDescription() { return conditionDescription; }
+    public String getCareCategory() { return careCategory; }
     public String getPreferredLanguage() { return preferredLanguage; } public CaseStatus getStatus() { return status; } public Instant getSubmittedAt() { return submittedAt; }
 }

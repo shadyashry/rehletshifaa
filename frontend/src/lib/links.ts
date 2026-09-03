@@ -25,7 +25,7 @@ export function primaryNav(locale: Locale, d: Dictionary): readonly NavItem[] {
     { href: localeHref(locale, "care-areas"), label: d.nav.careAreas },
     { href: localeHref(locale, "how-it-works"), label: d.nav.how },
     { href: localeHref(locale, "consultants"), label: d.nav.consultants },
-    { href: localeHref(locale, "portal"), label: d.nav.portal },
+    { href: localeHref(locale, "track-case"), label: d.nav.portal },
   ];
 }
 

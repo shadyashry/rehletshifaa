@@ -8,6 +8,12 @@ import java.time.Instant;
 
 public final class PublicCaseDtos {
     private PublicCaseDtos() {}
+    public record CaseLinkRecoveryRequest(
+        @NotBlank @Pattern(regexp="(?i)^RS-[0-9]{4}-[0-9]{6}$") String caseNumber,
+        @NotBlank @Pattern(regexp="^\\+?[0-9][0-9\\s()\\-]{6,24}$") String whatsappNumber,
+        @Pattern(regexp="en|ar") String language
+    ) {}
+    public record CaseLinkRecoveryResponse(String message) {}
     public record CaseAccessSummary(String caseNumber,String purpose,String channel,String destinationHint) {}
     public record CaseAccessVerifyRequest(@NotBlank @Pattern(regexp="[0-9]{6}")String code) {}
     public record CaseAccessGrant(String grant,Instant expiresAt) {}
