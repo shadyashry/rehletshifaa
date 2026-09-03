@@ -6,14 +6,14 @@ import type { Locale } from "@/lib/i18n";
 
 type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean };
 type Summary = { caseNumber: string; channel: string; destinationHint: string };
-type Proposal = { caseNumber: string; patientName: string; currency?: string; items: Item[]; validUntil?: string; decided: boolean; recommendedTreatment?: string; risksAndLimitations?: string };
+type Proposal = { caseNumber: string; patientName: string; currency?: string; items: Item[]; validUntil?: string; decided: boolean; recommendedTreatment?: string; risksAndLimitations?: string; notes?: string };
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 const copy = {
   en: {
     title: "Your treatment proposal", greeting: "Prepared for", total: "Total", validUntil: "Valid until",
-    treatmentLabel: "Recommended treatment", risksLabel: "Risks & limitations", servicesLabel: "Services & costs",
+    treatmentLabel: "Recommended treatment", risksLabel: "Risks & limitations", servicesLabel: "Services & costs", notesLabel: "Notes from your coordinator",
     verifyTitle: "Verify it's you", verifyIntroWhatsapp: "To protect your information, we'll send a 6-digit code to your WhatsApp",
     verifyIntroEmail: "To protect your information, we'll send a 6-digit code to your email",
     sendCode: "Send code", sending: "Sending…", codeSent: "We sent a code to", resend: "Resend code",
@@ -28,7 +28,7 @@ const copy = {
   },
   ar: {
     title: "عرض العلاج الخاص بك", greeting: "أُعدّ لصالح", total: "الإجمالي", validUntil: "صالح حتى",
-    treatmentLabel: "العلاج الموصى به", risksLabel: "المخاطر والقيود", servicesLabel: "الخدمات والتكاليف",
+    treatmentLabel: "العلاج الموصى به", risksLabel: "المخاطر والقيود", servicesLabel: "الخدمات والتكاليف", notesLabel: "ملاحظات من منسّق حالتك",
     verifyTitle: "لنتأكد أنه أنت", verifyIntroWhatsapp: "لحماية معلوماتك، سنرسل رمزًا من 6 أرقام إلى واتساب الخاص بك",
     verifyIntroEmail: "لحماية معلوماتك، سنرسل رمزًا من 6 أرقام إلى بريدك الإلكتروني",
     sendCode: "إرسال الرمز", sending: "جارٍ الإرسال…", codeSent: "أرسلنا رمزًا إلى", resend: "إعادة إرسال الرمز",
@@ -149,6 +149,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
             <div className="mt-4 flex justify-between border-t border-line pt-4 text-lg font-bold">
               <span>{t.total}</span><span>{money(total)}</span>
             </div>
+            {proposal.notes && <div className="mt-6 rounded-xl bg-mist p-4"><p className="text-sm font-bold text-brand-700">{t.notesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.notes}</p></div>}
             {proposal.validUntil && <p className="mt-2 text-sm text-ink-500">{t.validUntil} {new Intl.DateTimeFormat(locale).format(new Date(proposal.validUntil))}</p>}
 
             {proposal.decided ? (

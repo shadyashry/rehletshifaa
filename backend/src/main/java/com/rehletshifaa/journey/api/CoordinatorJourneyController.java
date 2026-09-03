@@ -3,6 +3,7 @@ import com.rehletshifaa.journey.application.JourneyService;import jakarta.valida
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/coordinator") public class CoordinatorJourneyController{
  private final JourneyService service;public CoordinatorJourneyController(JourneyService service){this.service=service;}
+ @GetMapping("/me")public StaffProfileView me(){return service.myCoordinatorProfile();}
  @GetMapping("/cases")public List<CaseView>queue(){return service.coordinatorQueue();}
  @GetMapping("/doctors")public List<VerifiedDoctorView>doctors(){return service.verifiedDoctors();}
  @GetMapping("/care-categories")public List<CareCategoryView>careCategories(){return service.careCategories();}
