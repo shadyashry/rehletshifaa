@@ -3,6 +3,7 @@ import com.rehletshifaa.journey.application.JourneyService;import com.rehletshif
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/doctor") public class DoctorJourneyController{
  private final JourneyService service;public DoctorJourneyController(JourneyService service){this.service=service;}
+ @GetMapping("/me")public DoctorProfileView me(){return service.myDoctorProfile();}
  @GetMapping("/cases")public List<CaseView>cases(){return service.assignedCases(ActorRole.DOCTOR);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@RequestParam boolean accept){return service.acceptDoctorAssignment(caseId,assignmentId,accept);}
