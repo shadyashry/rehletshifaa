@@ -86,6 +86,39 @@ class JourneyServiceIntegrationTest {
         assertThat(journey.workspace(created.caseId()).caseSummary().status()).isEqualTo("PATIENT_DECISION");
     }
 
+    @Test void resendRefreshesLinkWithoutNewVersionOrTransition()throws Exception{
+        var created=cases.create(new CreateCaseRequest("Resend Patient","Kenya","+254700000091","Cardiac reports","en",true,null,"rs@local.test","Africa/Nairobi","cardiology"));
+        cases.submit(created.caseId());entityManager.flush();entityManager.clear();
+        jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
+        authenticate("coordinator-subject","COORDINATOR");journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        long v=journey.workspace(created.caseId()).caseSummary().version();
+        journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",v));
+        UUID practitionerId=UUID.randomUUID();
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",practitionerId,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),practitionerId,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());
+        UUID catalogId=UUID.randomUUID();
+        jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",catalogId,practitionerId,"CARD-CONSULT","Consultation","Consultation",new BigDecimal("3500.00"),true,"admin-subject",Instant.now(),Instant.now());
+        var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended","Alt","Risks","Seq","7 days","Follow-up"));
+        journey.approveClinicalReview(created.caseId(),review.id());
+        jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,catalog_service_id,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultation",new BigDecimal("3500.00"),"EGP",0,catalogId,new BigDecimal("3500.00"),false);
+        authenticate("coordinator-subject","COORDINATOR");
+        var proposal=journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Consultation","EGP","Incl","Excl","Deposit","Refund","Consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Consultation",BigDecimal.ONE,new BigDecimal("3500.00"),false,0)),null));
+        UUID versionId=proposal.versionId();
+        journey.releaseProposal(created.caseId(),versionId);
+        assertThat(journey.workspace(created.caseId()).caseSummary().status()).isEqualTo("PATIENT_DECISION");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notification_outbox WHERE idempotency_key=?",Integer.class,"proposal-ready:"+versionId)).isEqualTo(1); // #22 exactly one
+        UUID shareId=jdbc.queryForObject("SELECT id FROM proposal_share_tokens WHERE proposal_version_id=? AND revoked_at IS NULL AND consumed_at IS NULL",UUID.class,versionId);
+        jdbc.update("INSERT INTO proposal_access_challenges(id,share_token_id,proposal_version_id,case_id,code_hash,delivery_channel,destination_hint,expires_at,attempts,max_attempts,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),shareId,versionId,created.caseId(),"hash","EMAIL","r***@x",Instant.now().plusSeconds(600),0,5,Instant.now());
+        int versionsBefore=jdbc.queryForObject("SELECT count(*) FROM proposal_versions pv JOIN proposals p ON p.id=pv.proposal_id WHERE p.case_id=?",Integer.class,created.caseId());
+        journey.resendProposalLink(created.caseId(),versionId);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM proposal_versions pv JOIN proposals p ON p.id=pv.proposal_id WHERE p.case_id=?",Integer.class,created.caseId())).isEqualTo(versionsBefore); // #23 no new version
+        assertThat(journey.workspace(created.caseId()).caseSummary().status()).isEqualTo("PATIENT_DECISION"); // #23 no transition
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM proposal_access_challenges WHERE proposal_version_id=? AND revoked_at IS NOT NULL",Integer.class,versionId)).isEqualTo(1); // #24 old challenge revoked
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE ?",Integer.class,"proposal-ready:resend:"+versionId+":%")).isEqualTo(1); // one resend job
+    }
+
     @Test void proposalConvertsEgpBaseToDisplayCurrencyAndFreezesAtRelease()throws Exception{
         var created=cases.create(new CreateCaseRequest("FX Patient","Kuwait","+96500000010","Cardiac reports","en",true,null,"fx@local.test","Asia/Kuwait","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
