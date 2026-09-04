@@ -15,10 +15,12 @@ public final class CaseDtos {
         @Size(max=2048) String turnstileToken,
         @Email @Size(max=254) String email,
         @Size(max=80) String timeZone,
-        @Pattern(regexp="cardiology|rheumatology-rehabilitation|orthopedics") String careArea
+        @Pattern(regexp="cardiology|rheumatology-rehabilitation|orthopedics") String careArea,
+        Boolean travelPackageRequested
     ) {
-        public CreateCaseRequest(String fullName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken){this(fullName,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,null,null,null);}
-        public CreateCaseRequest(String fullName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken,String email,String timeZone){this(fullName,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,email,timeZone,null);}
+        public CreateCaseRequest(String fullName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken){this(fullName,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,null,null,null,null);}
+        public CreateCaseRequest(String fullName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken,String email,String timeZone){this(fullName,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,email,timeZone,null,null);}
+        public CreateCaseRequest(String fullName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken,String email,String timeZone,String careArea){this(fullName,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,email,timeZone,careArea,null);}
     }
     public record CreateCaseResponse(UUID caseId, String caseNumber, String status) {}
     public record SubmitCaseResponse(String caseNumber, String status, String statusToken) {}

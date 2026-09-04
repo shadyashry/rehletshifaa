@@ -16,6 +16,7 @@ public class MedicalCase {
     @Column(name="care_category", length=60) private String careCategory;
     @Column(name="preferred_language", nullable=false, length=8) private String preferredLanguage;
     @Enumerated(EnumType.STRING) @Column(nullable=false, length=40) private CaseStatus status;
+    @Column(name="travel_package_requested", nullable=false) private boolean travelPackageRequested;
     @Column(name="consent_timestamp", nullable=false) private Instant consentTimestamp;
     @Column(name="submitted_at") private Instant submittedAt;
     @Column(name="created_at", nullable=false) private Instant createdAt;
@@ -40,4 +41,6 @@ public class MedicalCase {
     public String getCountry() { return country; } public String getWhatsappNumber() { return whatsappNumber; } public String getConditionDescription() { return conditionDescription; }
     public String getCareCategory() { return careCategory; }
     public String getPreferredLanguage() { return preferredLanguage; } public CaseStatus getStatus() { return status; } public Instant getSubmittedAt() { return submittedAt; }
+    public boolean isTravelPackageRequested() { return travelPackageRequested; }
+    public void setTravelPackageRequested(boolean value) { this.travelPackageRequested = value; }
 }
