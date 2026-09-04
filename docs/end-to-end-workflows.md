@@ -108,6 +108,13 @@ stored and the patient never sees a paid status without a recorded receipt. Conf
 a non-cancellable booking is gated on the required deposit being `PAID`. At the final
 quote, eligible deposits are credited and the remaining balance or refund is shown.
 
+The patient sees this through the secure proposal view: the preliminary estimate shows
+a **"What you pay now"** coordination-deposit figure (the amount that will be due on
+acknowledgement, credited to the final balance), and the final quote shows the amount
+**already paid and credited**. The public proposal DTO exposes these deposit figures
+and the min/expected/max package totals converted at the frozen rate, but never the
+provider net cost, the margin rate, or the profit amount.
+
 ### Delivery, resend and treatment prerequisites
 
 Releasing mints a high-entropy, case-scoped secure token (only its hash is stored)
