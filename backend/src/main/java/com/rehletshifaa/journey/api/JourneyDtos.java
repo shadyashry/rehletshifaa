@@ -59,7 +59,10 @@ public final class JourneyDtos {
     public record StaffProfileView(String displayName,String role) {}
     public record CareCategoryView(String slug,String nameEn,String nameAr) {}
     public record ClinicalReviewView(UUID id,int versionNumber,String status,String suitability,String recommendedTreatment,String risksAndLimitations,Instant createdAt,List<CostEstimateItem>costEstimates) {}
-    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal) {}
+    // Backend-computed approval gates for the latest pre-release proposal; null once released or when no proposal exists.
+    // The UI must drive Operations/Finance/Release from these, never infer requirements from proposal.status alone.
+    public record ProposalGates(boolean operationsRequired,String operationsReason,boolean operationsCompleted,boolean financeRequired,List<String>financeReasons,boolean financeCompleted,boolean readyForRelease) {}
+    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates) {}
     public record IdResponse(UUID id,String status) {}
     // --- Consultant price catalog, specialty templates, and FX (Phase 2) ---
     public record CatalogServiceView(UUID id,String serviceCode,String serviceName,String category,BigDecimal priceEgp,boolean active,LocalDate validUntil) {}

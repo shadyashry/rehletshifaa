@@ -66,7 +66,8 @@ public class JourneyService {
         jdbc.sql("SELECT e.clinical_review_id,e.service_description,e.estimated_cost,e.currency FROM clinical_review_cost_estimates e JOIN clinical_review_versions v ON v.id=e.clinical_review_id WHERE v.case_id=? ORDER BY e.sort_order").param(caseId).query((rs,n)->{estimatesByReview.computeIfAbsent(rs.getObject("clinical_review_id",UUID.class),k->new ArrayList<>()).add(new CostEstimateItem(rs.getString("service_description"),rs.getBigDecimal("estimated_cost"),rs.getString("currency")));return null;}).list();
         List<ClinicalReviewView>reviews=jdbc.sql("SELECT id,version_number,status,suitability,recommended_treatment,risks_and_limitations,created_at FROM clinical_review_versions WHERE case_id=? ORDER BY version_number DESC").param(caseId).query((rs,n)->{UUID reviewId=rs.getObject("id",UUID.class);return new ClinicalReviewView(reviewId,rs.getInt("version_number"),rs.getString("status"),rs.getString("suitability"),rs.getString("recommended_treatment"),rs.getString("risks_and_limitations"),instant(rs,"created_at"),estimatesByReview.getOrDefault(reviewId,List.of()));}).list();
         if(patientActor)reviews=reviews.stream().filter(r->"APPROVED".equals(r.status())).toList();
-        return new CaseWorkspace(summary,timeline,tasks,messages,assignments,reviews,latestProposal(caseId,actor));
+        ProposalView latest=latestProposal(caseId,actor);
+        return new CaseWorkspace(summary,timeline,tasks,messages,assignments,reviews,latest,computeGates(caseId,latest));
     }
 
     @Transactional public CaseView transition(UUID caseId,TransitionRequest request){var actor=actors.require(ActorRole.COORDINATOR,ActorRole.COORDINATOR_LEAD,ActorRole.SYSTEM_ADMIN);authorizeWrite(caseId,actor);requireCoordinatorOwnership(caseId,actor);if(!Set.of("INTAKE_REVIEW","INFORMATION_REQUIRED","READY_FOR_CONSULTANT","CANCELLED").contains(request.targetStatus()))throw new ApiException(403,"DEDICATED_OPERATION_REQUIRED","This state can only be entered through its dedicated authorized operation");transitionInternal(caseId,request.targetStatus(),request.reason(),request.expectedVersion(),actor);if("INFORMATION_REQUIRED".equals(request.targetStatus()))publicCases.issueInformationRequest(caseId,caseView(caseId).preferredLanguage());return caseView(caseId);}
@@ -189,6 +190,18 @@ public class JourneyService {
     private boolean travelRequested(UUID caseId){Boolean b=jdbc.sql("SELECT travel_package_requested FROM medical_cases WHERE id=?").param(caseId).query(Boolean.class).optional().orElse(false);return b!=null&&b;}
     private boolean requiresFinanceApproval(UUID versionId){Boolean b=jdbc.sql("SELECT requires_finance_approval FROM proposal_versions WHERE id=?").param(versionId).query(Boolean.class).optional().orElse(true);return b==null||b;}
     private boolean operationsCompleted(UUID versionId){Integer c=jdbc.sql("SELECT count(*) FROM proposal_versions WHERE id=? AND operations_completed_at IS NOT NULL").param(versionId).query(Integer.class).single();return c!=null&&c>0;}
+    private boolean financeApproved(UUID versionId){Integer c=jdbc.sql("SELECT count(*) FROM proposal_versions WHERE id=? AND finance_approved_at IS NOT NULL").param(versionId).query(Integer.class).single();return c!=null&&c>0;}
+    // Authoritative approval-gate computation for the latest pre-release proposal. The UI must drive the
+    // Operations/Finance/Release actions from these fields rather than inferring them from proposal.status.
+    private ProposalGates computeGates(UUID caseId,ProposalView p){
+        if(p==null||!Set.of("CLINICALLY_APPROVED","OPERATIONS_COMPLETED","FINANCE_APPROVED").contains(p.status()))return null;
+        boolean opsReq=travelRequested(caseId);boolean opsDone=operationsCompleted(p.versionId());
+        boolean finReq=requiresFinanceApproval(p.versionId());boolean finDone=financeApproved(p.versionId());
+        boolean ready=(!opsReq||opsDone)&&(!finReq||finDone);
+        String opsReason=opsReq?"A travel package was requested — Operations must complete the plan.":"No travel package requested.";
+        List<String>finReasons=finReq?List.of("A manually-priced (non-catalog) service requires finance approval."):List.of();
+        return new ProposalGates(opsReq,opsReason,opsDone,finReq,finReasons,finDone,ready);
+    }
     @Transactional public ProposalView releaseProposal(UUID caseId,UUID versionId){var actor=actors.require(ActorRole.COORDINATOR,ActorRole.COORDINATOR_LEAD);authorizeWrite(caseId,actor);requireCoordinatorOwnership(caseId,actor);requireOneOfStates(caseId,Set.of("PROPOSAL_PREPARATION","PROPOSAL_INTERNAL_APPROVAL"));ensureProposalBelongs(caseId,versionId);ProposalView view=proposal(versionId);if(!Set.of("CLINICALLY_APPROVED","OPERATIONS_COMPLETED","FINANCE_APPROVED").contains(view.status()))throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal is not ready for release");
         // Conditional internal gates: Operations only when a travel package was requested;
         // Finance only when the quote contains a manually-priced (non-catalog) service. A quote
