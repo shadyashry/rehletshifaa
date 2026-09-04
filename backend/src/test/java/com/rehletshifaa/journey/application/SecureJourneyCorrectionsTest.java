@@ -313,6 +313,7 @@ class SecureJourneyCorrectionsTest {
     private Ctx releaseProposalWithoutPatientAccount() throws Exception {
         var created=cases.create(new CreateCaseRequest("Link Patient","Kenya","+254700000020","Cardiac reports","en",true,null,"link@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
+        jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?",created.caseId()); // exercises the Operations gate
         authenticate("coordinator-subject","COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();

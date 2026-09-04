@@ -12,6 +12,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/transition")public CaseView transition(@PathVariable UUID caseId,@Valid @RequestBody TransitionRequest request){return service.transition(caseId,request);}
  @PutMapping("/cases/{caseId}/care-category")public CaseView careCategory(@PathVariable UUID caseId,@Valid @RequestBody CareCategoryUpdateRequest request){return service.updateCareCategory(caseId,request);}
+ @PutMapping("/cases/{caseId}/travel-package")public CaseView travelPackage(@PathVariable UUID caseId,@Valid @RequestBody TravelPackageRequest request){return service.setTravelPackage(caseId,request.requested());}
  @PostMapping("/cases/{caseId}/assignments")public IdResponse assign(@PathVariable UUID caseId,@Valid @RequestBody AssignmentRequest request){return service.assign(caseId,request);}
  @PostMapping("/cases/{caseId}/coordinator-assignment")public IdResponse reassignCoordinator(@PathVariable UUID caseId,@Valid @RequestBody CoordinatorReassignmentRequest request){return service.reassignCoordinator(caseId,request);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
