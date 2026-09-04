@@ -30,6 +30,7 @@ Provision these external integrations before deployment:
 - Transactional SMTP on port 587/465. OCI blocks outbound port 25 by default.
 - WhatsApp provider webhook and bearer token.
 - Cloudflare Turnstile site and secret keys for the exact web hostname.
+- Outbound HTTPS for daily currency rates (`open.er-api.com` by default; override with `CURRENCY_PROVIDER_URL`, or set `CURRENCY_API_ENABLED=false` and have senior Finance pin rates manually). Prices are held in EGP and converted for the patient; rates are frozen onto each released document.
 
 ## 3. Prepare the host
 

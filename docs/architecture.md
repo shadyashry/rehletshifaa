@@ -9,6 +9,17 @@
 - **Object storage:** Medical files are private. The API issues short-lived presigned PUT URLs, enforces quotas, quarantines and scans content, and issues audited short-lived GET URLs only for clean objects.
 - **Notifications:** A transactional outbox retries SMTP and WhatsApp delivery with idempotency keys, exponential delay, and a terminal dead-letter state. Templates contain no clinical narrative.
 
+## Commercial and payment subsystem
+
+Pricing is EGP-based and computed only on the backend. Supporting services and tables were added additively in Flyway migrations `V9`–`V15` (never editing earlier scripts):
+
+- **Consultant price catalog** (`PricingCatalogService`): per-consultant catalogs derived from care-area **service templates**; admin CRUD and CSV import; catalog-vs-manual price provenance drives the Finance gate.
+- **Currency** (`CurrencyService`): daily EGP rates from a market provider cached in `fx_rates`, with a senior-Finance override; the rate is snapshotted and frozen on each released document.
+- **Commercial policy** (`CommercialPolicyService`): a central, versioned, audited margin policy (default 12%) configured by senior Finance — never a per-case slider. The internal margin is baked into an inclusive patient package and never exposed to the patient.
+- **Documents:** `proposal_versions.document_type` distinguishes an immutable `PRELIMINARY_ESTIMATE` from a `FINAL_TREATMENT_QUOTE`; items carry min/expected/max EGP ranges plus a provider base, and the version snapshots provider net, policy id/version, margin, and patient totals.
+- **Deposits & payments** (`PaymentService`): `deposit_policies`, `deposits`, `deposit_components`, and an append-only `payment_events` ledger. Offline record-only: Finance records receipts/refunds with recent authentication, idempotent by key. Deposit state stays out of `medical_cases.status`.
+- **Consent:** `consent_records` captures a doctor-owned `PROCEDURE_SPECIFIC` consent (or an audited emergency override) required before treatment; financial acceptance is never medical consent.
+
 ## Patient identity model
 
 Three concepts are kept distinct (see `end-to-end-workflows.md`):

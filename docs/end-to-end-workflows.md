@@ -93,6 +93,21 @@ patient's final decision (`ACCEPTED | REVISION_REQUESTED | DECLINED`) **do not m
 the macro case off `ARRIVAL_CONFIRMED`** — final revision/decline/expiry keep it there
 and allow a new final-quote version.
 
+### Deposit and payment sub-workflow
+
+Deposit and payment state live in dedicated tables (`deposits`, `deposit_components`,
+append-only `payment_events`) and are **never** added to `medical_cases.status`. When
+the patient acknowledges the preliminary estimate, the backend creates a deposit from
+the active **deposit policy** — a senior-Finance-configured, versioned central policy
+(default: a **3,000 EGP coordination-initiation** component, PLATFORM beneficiary,
+credited to the final balance). Provider-reservation and travel components are added
+later per booking. Payments are **offline record-only** in this build: Finance records
+receipts and refunds with recent authentication, each idempotent by key and appended
+to the ledger; the deposit status is recomputed from the ledger. No card data is
+stored and the patient never sees a paid status without a recorded receipt. Confirming
+a non-cancellable booking is gated on the required deposit being `PAID`. At the final
+quote, eligible deposits are credited and the remaining balance or refund is shown.
+
 ### Delivery, resend and treatment prerequisites
 
 Releasing mints a high-entropy, case-scoped secure token (only its hash is stored)
