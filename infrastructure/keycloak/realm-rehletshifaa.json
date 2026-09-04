@@ -17,16 +17,17 @@
     "publicClient": true,
     "standardFlowEnabled": true,
     "directAccessGrantsEnabled": false,
-    "redirectUris": ["http://localhost:3000/*", "https://spelling-oxide-minister-min.trycloudflare.com/*"],
-    "webOrigins": ["http://localhost:3000", "https://spelling-oxide-minister-min.trycloudflare.com"],
+    "redirectUris": ["http://localhost:3000/*", "https://fisher-despite-tagged-talked.trycloudflare.com/*"],
+    "webOrigins": ["http://localhost:3000", "https://fisher-despite-tagged-talked.trycloudflare.com"],
     "attributes": {"pkce.code.challenge.method":"S256"}
   }],
   "users": [
-    {"id":"00000000-0000-0000-0000-000000000101","username":"patient","email":"patient@local.test","firstName":"Local","lastName":"Patient","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Patient123!","temporary":false}],"realmRoles":["PATIENT"]},
-    {"id":"00000000-0000-0000-0000-000000000102","username":"coordinator","email":"coordinator@local.test","firstName":"Local","lastName":"Coordinator","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Coordinator123!","temporary":false}],"realmRoles":["COORDINATOR","COORDINATOR_LEAD"]},
-    {"id":"00000000-0000-0000-0000-000000000103","username":"doctor","email":"doctor@local.test","firstName":"Local","lastName":"Doctor","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Doctor123!","temporary":false}],"realmRoles":["DOCTOR"]},
-    {"id":"00000000-0000-0000-0000-000000000104","username":"operations","email":"operations@local.test","firstName":"Local","lastName":"Operations","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Operations123!","temporary":false}],"realmRoles":["OPERATIONS"]},
-    {"id":"00000000-0000-0000-0000-000000000105","username":"finance","email":"finance@local.test","firstName":"Local","lastName":"Finance","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Finance123!","temporary":false}],"realmRoles":["FINANCE"]},
-    {"id":"00000000-0000-0000-0000-000000000106","username":"credential-admin","email":"credential-admin@local.test","firstName":"Local","lastName":"Credential Admin","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Admin123!","temporary":false}],"realmRoles":["CREDENTIALING_ADMIN","SYSTEM_ADMIN"]}
+    {"id":"00000000-0000-0000-0000-000000000101","username":"patient","email":"patient@local.test","firstName":"Nour","lastName":"Hassan","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Patient123!","temporary":false}],"realmRoles":["PATIENT"]},
+    {"id":"00000000-0000-0000-0000-000000000102","username":"coordinator","email":"coordinator@local.test","firstName":"Layla","lastName":"Hassan","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Coordinator123!","temporary":false}],"realmRoles":["COORDINATOR","COORDINATOR_LEAD"]},
+    {"id":"06d5980a-76fe-4e34-9900-89aef8a9d87a","username":"coordinator2","email":"coordinator2@local.test","firstName":"Omar","lastName":"Nasser","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Coordinator123!","temporary":false}],"realmRoles":["COORDINATOR"]},
+    {"id":"00000000-0000-0000-0000-000000000103","username":"doctor","email":"doctor@local.test","firstName":"Ahmed","lastName":"AlAshry","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Doctor123!","temporary":false}],"realmRoles":["DOCTOR"]},
+    {"id":"00000000-0000-0000-0000-000000000104","username":"operations","email":"operations@local.test","firstName":"Mariam","lastName":"Soliman","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Operations123!","temporary":false}],"realmRoles":["OPERATIONS"]},
+    {"id":"00000000-0000-0000-0000-000000000105","username":"finance","email":"finance@local.test","firstName":"Youssef","lastName":"Adel","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Finance123!","temporary":false}],"realmRoles":["FINANCE"]},
+    {"id":"00000000-0000-0000-0000-000000000106","username":"credential-admin","email":"credential-admin@local.test","firstName":"Maya","lastName":"Farid","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Admin123!","temporary":false}],"realmRoles":["CREDENTIALING_ADMIN","SYSTEM_ADMIN"]}
   ]
 }
