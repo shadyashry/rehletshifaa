@@ -24,6 +24,8 @@ type Workspace={caseSummary:CaseView;timeline:{type:string;label:string;occurred
 type RoleKey="patient"|"coordinator"|"doctor"|"operations"|"finance"|"admin";
 type MutationResult={id?:string;status?:string};
 type Mutate=(path:string,body?:unknown,method?:string)=>Promise<MutationResult|undefined>;
+type Api=<T,>(path:string,init?:RequestInit)=>Promise<T>;
+type PractitionerSummary={id:string;displayName?:string;specialty?:string;subspecialty?:string;careCategory?:string;credentialingStatus?:string;availabilityStatus?:string};
 
 const roleMap:Record<RoleKey,string[]>={patient:["PATIENT","PATIENT_REPRESENTATIVE"],coordinator:["COORDINATOR","COORDINATOR_LEAD"],doctor:["DOCTOR"],operations:["OPERATIONS"],finance:["FINANCE"],admin:["CREDENTIALING_ADMIN","SYSTEM_ADMIN","AUDITOR"]};
 // Display labels for currencies the doctor can view/quote in (EGP is the base).
@@ -70,7 +72,7 @@ export function Portal({locale}:{locale:Locale}){
     {!available.length&&<p className="rounded-xl bg-alert-50 p-4 text-alert-800">{t.roleDenied}</p>}
     {notice&&<p role="status" className="mb-4 rounded-xl bg-brand-50 p-4 text-brand-800">{notice}</p>}{error&&<p role="alert" className="mb-4 rounded-xl bg-alert-50 p-4 text-alert-800">{error}</p>}
     {currentRole === "admin"
-      ? <AdminForm t={t} busy={busy} mutate={mutate}/>
+      ? <AdminForm t={t} busy={busy} locale={locale} api={api} mutate={mutate}/>
       : workspace
         ? <WorkspaceView locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={roles.includes("COORDINATOR_LEAD")} downloadDoc={downloadDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={()=>setWorkspace(null)} mutate={mutate}/>
         : <Queue locale={locale} t={t} role={currentRole} cases={cases} tasks={myTasks} busy={busy} mySubject={user?.profile?.sub} coordinatorLead={roles.includes("COORDINATOR_LEAD")} openCase={openCase} mutate={mutate}/>}
@@ -228,9 +230,50 @@ function RoleActions({role,t,c,proposal,locale,mutate}:{role:RoleKey;t:typeof co
  return null;
 }
 function ProposalCard({locale,t,proposal}:{locale:Locale;t:typeof copy.en;proposal:Proposal}){const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-xl bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>v{proposal.versionNumber} · {proposal.status}</strong><strong>{new Intl.NumberFormat(locale,{style:"currency",currency:proposal.currency??"USD"}).format(total)}</strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?" (optional)":""}</span><strong className="whitespace-nowrap">{money(item.quantity*item.unitPrice,proposal.currency??"USD",locale)}</strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">Valid until {new Intl.DateTimeFormat(locale).format(new Date(proposal.validUntil))}</p>}</div>}
-function AdminForm({t,busy,mutate}:{t:typeof copy.en;busy:boolean;mutate:Mutate}){
+function CatalogAdmin({api,locale}:{api:Api;locale:Locale}){
+ const[list,setList]=useState<PractitionerSummary[]>([]);const[sel,setSel]=useState("");
+ const[rows,setRows]=useState<CatalogService[]>([]);const[fx,setFx]=useState<FxRate[]>([]);
+ const[busy,setBusy]=useState(false);const[msg,setMsg]=useState("");const[err,setErr]=useState("");
+ const g=locale==="ar"?{title:"قوائم أسعار الاستشاريين",intro:"لكل استشاري قائمته الخاصة المشتقة من قالب مجال رعايته. التعديلات تظهر فورًا في صفحة الطبيب.",pick:"اختر استشاريًا",derive:"اشتقاق من قالب المجال",noCatalog:"لا توجد قائمة أسعار بعد. اشتقّها من قالب المجال أو أضف خدمة يدويًا.",service:"الخدمة",code:"الرمز",category:"الفئة",price:"السعر (ج.م)",active:"مفعّل",save:"حفظ",deactivate:"إيقاف",add:"إضافة خدمة",saved:"تم الحفظ.",fxTitle:"أسعار الصرف",fxIntro:"الأساس بالجنيه المصري. يمكنك تثبيت سعر البنك المركزي المصري لأي عملة.",fxRate:"جنيه لكل وحدة",pin:"تثبيت",source:"المصدر"}:{title:"Consultant price lists",intro:"Each consultant has their own list derived from their care-area template. Edits show on the doctor's page immediately.",pick:"Select a consultant",derive:"Derive from care-area template",noCatalog:"No price list yet. Derive it from the care-area template, or add a service manually.",service:"Service",code:"Code",category:"Category",price:"Price (EGP)",active:"Active",save:"Save",deactivate:"Deactivate",add:"Add a service",saved:"Saved.",fxTitle:"Exchange rates",fxIntro:"EGP is the base. Pin the Central Bank of Egypt rate for any currency.",fxRate:"EGP per 1 unit",pin:"Pin",source:"Source"};
+ useEffect(()=>{void api<PractitionerSummary[]>("/admin/practitioners").then(setList).catch(()=>setList([]));},[api]);
+ const load=useCallback(async(id:string)=>{if(!id){setRows([]);setFx([]);return;}setBusy(true);setErr("");try{const[cat,rates]=await Promise.all([api<CatalogService[]>(`/admin/practitioners/${id}/catalog`),api<FxRate[]>("/admin/fx-rates")]);setRows(cat);setFx(rates);}catch(e){setErr(e instanceof Error?e.message:"Error");}finally{setBusy(false);}},[api]);
+ useEffect(()=>{void load(sel);},[sel,load]);
+ const run=async(fn:()=>Promise<unknown>)=>{setBusy(true);setErr("");setMsg("");try{await fn();setMsg(g.saved);await load(sel);}catch(e){setErr(e instanceof Error?e.message:"Error");}finally{setBusy(false);}};
+ const patch=(id:string,field:keyof CatalogService,val:string|number|boolean)=>setRows(rs=>rs.map(r=>r.id===id?{...r,[field]:val}:r));
+ const selCare=list.find(p=>p.id===sel)?.careCategory;
+ return <div className="card space-y-5 p-6">
+  <div><h2 className="title">{g.title}</h2><p className="mt-1 text-sm text-ink-500">{g.intro}</p></div>
+  <label className="block text-sm font-bold">{g.pick}<select className="field mt-1" value={sel} onChange={e=>setSel(e.target.value)}><option value="">—</option>{list.map(p=><option key={p.id} value={p.id}>{p.displayName} — {p.specialty??p.careCategory} · {p.credentialingStatus}</option>)}</select></label>
+  {msg&&<p className="rounded-lg bg-brand-50 p-2 text-sm text-brand-800">{msg}</p>}{err&&<p className="rounded-lg bg-alert-50 p-2 text-sm text-alert-800">{err}</p>}
+  {sel&&<>
+   <button type="button" disabled={busy} className="btn-secondary" onClick={()=>void run(()=>api(`/admin/practitioners/${sel}/catalog/derive`,{method:"POST"}))}>{g.derive}{selCare?` · ${selCare}`:""}</button>
+   {rows.length===0?<p className="rounded-lg bg-mist p-3 text-sm text-ink-600">{g.noCatalog}</p>:
+    <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-xs uppercase tracking-wide text-ink-500"><th className="p-2 text-start">{g.service}</th><th className="p-2 text-start">{g.category}</th><th className="p-2 text-end">{g.price}</th><th className="p-2 text-center">{g.active}</th><th className="p-2"></th></tr></thead>
+     <tbody>{rows.map(r=><tr key={r.id} className="border-t border-line align-top">
+       <td className="p-2"><input className="field !mt-0" value={r.serviceName} onChange={e=>patch(r.id,"serviceName",e.target.value)}/><span className="ms-1 text-xs text-ink-400">{r.serviceCode}</span></td>
+       <td className="p-2"><input className="field !mt-0 w-32" value={r.category??""} onChange={e=>patch(r.id,"category",e.target.value)}/></td>
+       <td className="p-2 text-end"><input className="field !mt-0 w-28 text-end" type="number" min="0" step="0.01" value={r.priceEgp} onChange={e=>patch(r.id,"priceEgp",Number(e.target.value))}/></td>
+       <td className="p-2 text-center"><input type="checkbox" checked={r.active} onChange={e=>patch(r.id,"active",e.target.checked)}/></td>
+       <td className="whitespace-nowrap p-2 text-end"><button type="button" disabled={busy} className="btn-secondary" onClick={()=>void run(()=>api(`/admin/practitioners/${sel}/catalog/${r.id}`,{method:"PUT",body:JSON.stringify({serviceCode:r.serviceCode,serviceName:r.serviceName,category:r.category,priceEgp:r.priceEgp,active:r.active})}))}>{g.save}</button> <button type="button" disabled={busy} className="text-sm font-semibold text-alert-700" onClick={()=>void run(()=>api(`/admin/practitioners/${sel}/catalog/${r.id}`,{method:"DELETE"}))}>{g.deactivate}</button></td>
+     </tr>)}</tbody></table></div>}
+   <form className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-line p-3" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void run(()=>api(`/admin/practitioners/${sel}/catalog`,{method:"POST",body:JSON.stringify({serviceCode:String(d.get("code")).trim(),serviceName:String(d.get("name")).trim(),category:(String(d.get("category")||"").trim())||undefined,priceEgp:Number(d.get("price"))||0,active:true})})).then(()=>f.reset());}}>
+    <input className="field flex-1" name="name" placeholder={g.service} required/><input className="field w-32" name="category" placeholder={g.category}/><input className="field w-28" name="code" placeholder={g.code} required/><input className="field w-28" name="price" type="number" min="0" step="0.01" placeholder={g.price} required/><button className="btn-primary" disabled={busy}>{g.add}</button>
+   </form>
+   <div className="border-t border-line pt-4"><h3 className="font-bold text-ink-800">{g.fxTitle}</h3><p className="text-xs text-ink-500">{g.fxIntro}</p>
+    <div className="mt-2 overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-xs uppercase tracking-wide text-ink-500"><th className="p-2 text-start">Currency</th><th className="p-2 text-end">{g.fxRate}</th><th className="p-2 text-start">{g.source}</th><th className="p-2"></th></tr></thead>
+     <tbody>{fx.filter(f=>f.currency!=="EGP").map(f=><FxRow key={f.currency} f={f} busy={busy} pinLabel={g.pin} onPin={(cur,stored)=>void run(()=>api(`/admin/fx-rates/${cur}`,{method:"PUT",body:JSON.stringify({rate:stored})}))}/>)}</tbody></table></div>
+   </div>
+  </>}
+ </div>;
+}
+function FxRow({f,busy,pinLabel,onPin}:{f:FxRate;busy:boolean;pinLabel:string;onPin:(currency:string,storedRate:number)=>void}){
+ const[egpPer,setEgpPer]=useState((f.rate?1/f.rate:0).toFixed(4));
+ return <tr className="border-t border-line"><td className="p-2 font-semibold">{f.currency}</td><td className="p-2 text-end"><input className="field !mt-0 w-28 text-end" type="number" min="0" step="0.0001" value={egpPer} onChange={e=>setEgpPer(e.target.value)}/></td><td className="p-2 text-xs text-ink-500">{f.source} · {f.rateDate}</td><td className="p-2 text-end"><button type="button" disabled={busy||!(Number(egpPer)>0)} className="btn-secondary" onClick={()=>onPin(f.currency,1/Number(egpPer))}>{pinLabel}</button></td></tr>;
+}
+function AdminForm({t,busy,locale,api,mutate}:{t:typeof copy.en;busy:boolean;locale:Locale;api:Api;mutate:Mutate}){
  const[practitionerId,setPractitionerId]=useState("");
  return <div className="space-y-6">
+  <CatalogAdmin api={api} locale={locale}/>
   <form className="card grid gap-4 p-6 md:grid-cols-2" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/coordinators",{name:data.get("name"),externalSubject:data.get("subject"),role:data.get("role")}).then(result=>{if(result)form.reset();});}}>
    <h2 className="title md:col-span-2">{t.coordinatorTitle}</h2>
    <label className="block text-sm font-bold">{t.name}<input className="field mt-1" name="name" required/></label>

@@ -50,6 +50,12 @@ public class PricingCatalogService {
     }
 
     // ---- Consultant catalog (admin managed) ----
+    public List<PractitionerSummaryView> practitioners() {
+        actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        return jdbc.sql("SELECT id,display_name,specialty,subspecialty,care_category,credentialing_status,availability_status FROM practitioner_profiles WHERE practitioner_type='CONSULTANT' ORDER BY display_name")
+                .query((rs, n) -> new PractitionerSummaryView(rs.getObject("id", UUID.class), rs.getString("display_name"), rs.getString("specialty"), rs.getString("subspecialty"), rs.getString("care_category"), rs.getString("credentialing_status"), rs.getString("availability_status"))).list();
+    }
+
     public List<CatalogServiceView> practitionerCatalog(UUID practitionerId) {
         actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
         requirePractitioner(practitionerId);
