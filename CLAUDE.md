@@ -1,4 +1,25 @@
-# Codex Project Instructions
+# Project Instructions
+
+## Running the local stack (Docker Compose)
+
+The live local environment is served through Cloudflare quick tunnels (`*.trycloudflare.com`).
+Those URLs are baked into the containers by the **tunnel overlay**, `docker-compose.tunnel.yml`.
+
+- To (re)build or start the stack, ALWAYS include the overlay:
+
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up --build -d
+  ```
+
+- NEVER run a bare `docker compose up` / `--build` (base file only). It recreates
+  keycloak/backend/frontend/minio with `localhost` config and rebuilds the frontend
+  image with `localhost` API URLs baked in — which breaks the tunnel-served portal
+  (`https://fisher-despite-tagged-talked.trycloudflare.com/en/portal`).
+- The `cloudflared` tunnels run as host processes; the compose files only carry the URLs.
+  Before recreating containers, assume the tunnel stack is live unless told otherwise.
+- Ports: frontend 3000, backend 8080, keycloak 8180, minio 9000/9001, mailpit 8025.
+- Deployment is separate: `deploy/oracle/` is the public Oracle VM stack (run on the VM,
+  needs `deploy/oracle/.env`). Do not run it locally.
 
 ## Token-efficient workflow
 
