@@ -18,7 +18,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest(properties="spring.task.scheduling.enabled=false")
 @Transactional
@@ -98,7 +98,7 @@ class JourneyServiceIntegrationTest {
         jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),practitionerId,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());
         UUID catalogId=UUID.randomUUID();
         jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",catalogId,practitionerId,"CARD-CONSULT","Diagnostic cardiology consultation","Consultation",new BigDecimal("3500.00"),true,"admin-subject",Instant.now(),Instant.now());
-        jdbc.update("INSERT INTO fx_rates(id,base_currency,quote_currency,rate,rate_date,source,fetched_at) VALUES(?,?,?,?,?,?,?)",UUID.randomUUID(),"EGP","USD",new BigDecimal("0.02"),LocalDate.now(),"API",Instant.now());
+        jdbc.update("INSERT INTO fx_rates(id,base_currency,quote_currency,rate,rate_date,source,fetched_at) VALUES(?,?,?,?,?,?,?)",UUID.randomUUID(),"EGP","USD",new BigDecimal("0.02"),LocalDate.now(java.time.ZoneOffset.UTC),"API",Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
         authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended intervention","Alt","Risks","Seq","7 days","Follow-up"));
@@ -175,6 +175,37 @@ class JourneyServiceIntegrationTest {
         // The patient-facing item price is the inclusive amount (margin baked in), not the provider price.
         var proposal=journey.workspace(created.caseId()).proposal();
         assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("11200.00"));
+    }
+
+    private UUID arriveWithDoctor(String name,String phone,String email)throws Exception{
+        var created=cases.create(new CreateCaseRequest(name,"Kenya",phone,"Cardiac reports","en",true,null,email,"Africa/Nairobi","cardiology"));
+        cases.submit(created.caseId());entityManager.flush();entityManager.clear();
+        UUID practitionerId=UUID.randomUUID();
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",practitionerId,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),practitionerId,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());
+        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,?,?,?,?,?,?,0)",UUID.randomUUID(),created.caseId(),"doctor-subject","DOCTOR","PRIMARY","ACTIVE","Treatment","coordinator-subject",Instant.now());
+        jdbc.update("UPDATE medical_cases SET status='ARRIVAL_CONFIRMED' WHERE id=?",created.caseId());
+        return created.caseId();
+    }
+
+    @Test void treatmentRequiresProcedureConsentThenSucceeds()throws Exception{
+        UUID caseId=arriveWithDoctor("Consent Patient","+254700000088","cn@local.test");
+        authenticate("doctor-subject","DOCTOR");
+        var episode=new TreatmentRequest("Cairo Heart",null,Instant.now(),null,"IN_PROGRESS","Angioplasty",null,null,null,false,null);
+        assertThatThrownBy(()->journey.treatment(caseId,episode)).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("consent");
+        journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("The treating doctor explained the procedure, risks and alternatives; I consent.","en","v1",null,null,"Provider consent ref #123"));
+        var result=journey.treatment(caseId,new TreatmentRequest("Cairo Heart",null,Instant.now(),null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        assertThat(result.status()).isEqualTo("IN_PROGRESS");
+    }
+
+    @Test void emergencyOverrideAllowsTreatmentAndCreatesReviewTask()throws Exception{
+        UUID caseId=arriveWithDoctor("Emergency Patient","+254700000089","em@local.test");
+        authenticate("doctor-subject","DOCTOR");
+        journey.emergencyOverride(caseId,new EmergencyOverrideRequest("Acute STEMI — immediate primary PCI required"));
+        var result=journey.treatment(caseId,new TreatmentRequest("Cairo Heart",null,Instant.now(),null,"IN_PROGRESS","Primary PCI",null,null,null,false,null));
+        assertThat(result.status()).isEqualTo("IN_PROGRESS");
+        Integer reviewTasks=jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='EMERGENCY_OVERRIDE_REVIEW'",Integer.class,caseId);
+        assertThat(reviewTasks).isEqualTo(1);
     }
 
     private void authenticate(String subject,String role){Jwt jwt=Jwt.withTokenValue("test").header("alg","none").subject(subject).claim("auth_time",Instant.now().getEpochSecond()).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,List.of(new SimpleGrantedAuthority("ROLE_"+role)),subject));}
