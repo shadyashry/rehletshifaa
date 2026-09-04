@@ -81,6 +81,14 @@ public final class JourneyDtos {
     public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus) {}
     public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,boolean active,int version,String createdBy,LocalDate validFrom) {}
     public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate) {}
+    // Deposit + payment sub-workflow (offline record-only in this build).
+    public record DepositComponentView(String beneficiary,String purpose,BigDecimal amountEgp,BigDecimal amountDisplay,String refundability,String cancellationTerms,boolean creditedToFinal) {}
+    public record PaymentEventView(String eventType,BigDecimal amountDisplay,String currency,String method,String provider,String providerReference,String status,String reason,Instant occurredAt) {}
+    public record DepositView(UUID id,String status,String currency,BigDecimal totalEgp,BigDecimal totalDisplay,BigDecimal paidDisplay,BigDecimal balanceDisplay,List<DepositComponentView>components,List<PaymentEventView>events) {}
+    public record RecordReceiptRequest(@NotNull @DecimalMin("0.01")BigDecimal amountEgp,@Size(max=40)String method,@Size(max=200)String providerReference,@NotBlank @Size(max=180)String idempotencyKey) {}
+    public record RefundRequest(@NotNull @DecimalMin("0.01")BigDecimal amountEgp,@NotBlank @Size(max=2000)String reason,@NotBlank @Size(max=180)String idempotencyKey) {}
+    public record DepositPolicyView(UUID id,String name,String careCategory,BigDecimal coordinationDepositEgp,boolean active,int version,String createdBy,LocalDate validFrom) {}
+    public record DepositPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal coordinationDepositEgp) {}
     public record CatalogImportRow(int line,String serviceCode,String serviceName,String category,BigDecimal priceEgp,String action,String message) {}
     public record CatalogImportResult(boolean committed,int added,int updated,int unchanged,int errors,List<CatalogImportRow> rows) {}
 }

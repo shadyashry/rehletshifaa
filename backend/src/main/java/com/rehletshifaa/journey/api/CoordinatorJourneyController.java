@@ -5,6 +5,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  private final JourneyService service;private final PricingCatalogService pricing;public CoordinatorJourneyController(JourneyService service,PricingCatalogService pricing){this.service=service;this.pricing=pricing;}
  @GetMapping("/me")public StaffProfileView me(){return service.myCoordinatorProfile();}
  @GetMapping("/fx-rates")public List<FxRateView>fxRates(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return pricing.fxRates(date);}
+ @GetMapping("/cases/{caseId}/deposit")public DepositView deposit(@PathVariable UUID caseId){return service.depositView(caseId);}
  @GetMapping("/cases")public List<CaseView>queue(){return service.coordinatorQueue();}
  @GetMapping("/doctors")public List<VerifiedDoctorView>doctors(){return service.verifiedDoctors();}
  @GetMapping("/care-categories")public List<CareCategoryView>careCategories(){return service.careCategories();}
