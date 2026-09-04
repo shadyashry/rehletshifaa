@@ -56,7 +56,7 @@ public final class JourneyDtos {
     public record MessageView(UUID id,String threadType,String senderRole,String senderName,String direction,String body,String language,boolean internalOnly,boolean read,Instant createdAt) {}
     public record TaskView(UUID id,UUID caseId,String type,String title,String description,String ownerSubject,String ownerRole,String visibilityScope,String priority,String status,boolean blocking,boolean overdue,Instant dueAt,long version) {}
     public record StaffDirectoryView(String subject,String name,String role) {}
-    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes) {}
+    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason) {}
     public record ProposalItemView(UUID id,String category,String description,BigDecimal quantity,BigDecimal unitPrice,boolean optional) {}
     public record AssignmentView(UUID id,String assigneeSubject,String assigneeRole,String assignmentType,String status,Instant assignedAt,long version) {}
     public record VerifiedDoctorView(String subject,String displayName,String specialty,String subspecialty,String availabilityStatus,String careCategory) {}
