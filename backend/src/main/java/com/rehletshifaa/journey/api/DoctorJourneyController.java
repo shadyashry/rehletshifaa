@@ -1,9 +1,11 @@
 package com.rehletshifaa.journey.api;
-import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.security.ActorRole;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
+import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.PricingCatalogService;import com.rehletshifaa.security.ActorRole;import jakarta.validation.Valid;import org.springframework.format.annotation.DateTimeFormat;import org.springframework.web.bind.annotation.*;import java.time.LocalDate;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/doctor") public class DoctorJourneyController{
- private final JourneyService service;public DoctorJourneyController(JourneyService service){this.service=service;}
+ private final JourneyService service;private final PricingCatalogService pricing;public DoctorJourneyController(JourneyService service,PricingCatalogService pricing){this.service=service;this.pricing=pricing;}
  @GetMapping("/me")public DoctorProfileView me(){return service.myDoctorProfile();}
+ @GetMapping("/catalog")public List<CatalogServiceView>catalog(){return pricing.myCatalog();}
+ @GetMapping("/fx-rates")public List<FxRateView>fxRates(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return pricing.fxRates(date);}
  @GetMapping("/cases")public List<CaseView>cases(){return service.assignedCases(ActorRole.DOCTOR);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@RequestParam boolean accept){return service.acceptDoctorAssignment(caseId,assignmentId,accept);}

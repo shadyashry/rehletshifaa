@@ -26,3 +26,6 @@ app:
   notifications.mode: noop
   turnstile.enabled: false
   cors.allowed-origins: http://localhost:3000
+  currency:
+    enabled: false
+    supported: EGP,USD,EUR,SAR,AED,GBP

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -55,4 +56,11 @@ public final class JourneyDtos {
     public record ClinicalReviewView(UUID id,int versionNumber,String status,String suitability,String recommendedTreatment,String risksAndLimitations,Instant createdAt,List<CostEstimateItem>costEstimates) {}
     public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal) {}
     public record IdResponse(UUID id,String status) {}
+    // --- Consultant price catalog, specialty templates, and FX (Phase 2) ---
+    public record CatalogServiceView(UUID id,String serviceCode,String serviceName,String category,BigDecimal priceEgp,boolean active,LocalDate validUntil) {}
+    public record CatalogServiceRequest(@NotBlank @Size(max=60)String serviceCode,@NotBlank @Size(max=500)String serviceName,@Size(max=120)String category,@NotNull @DecimalMin("0.00")BigDecimal priceEgp,Boolean active,LocalDate validUntil) {}
+    public record ServiceTemplateView(UUID id,String careCategory,String name) {}
+    public record ServiceTemplateItemView(String serviceCode,String serviceName,String category,BigDecimal suggestedPriceEgp,int sortOrder) {}
+    public record FxRateView(String currency,BigDecimal rate,LocalDate rateDate,String source) {}
+    public record FxOverrideRequest(@NotNull @DecimalMin("0.00000001")BigDecimal rate,LocalDate date) {}
 }

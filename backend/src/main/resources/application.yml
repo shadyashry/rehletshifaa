@@ -93,3 +93,7 @@ app:
     requests: ${RATE_LIMIT_REQUESTS:30}
     window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
     trust-proxy: ${RATE_LIMIT_TRUST_PROXY:false}
+  currency:
+    enabled: ${CURRENCY_API_ENABLED:true}
+    provider-url: ${CURRENCY_PROVIDER_URL:https://open.er-api.com}
+    supported: ${CURRENCY_SUPPORTED:EGP,USD,EUR,SAR,AED,GBP}
