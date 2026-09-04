@@ -44,7 +44,8 @@ public final class JourneyDtos {
         public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency){this(serviceDescription,estimatedCost,currency,null);}
     }
     public record ReviewDecisionRequest(@NotBlank @Pattern(regexp="INFO|NOT_SUITABLE|RETURN_TO_COORDINATOR|REASSIGN|ACCEPT")String decision,@Size(max=20000)String recommendedTreatment,@Size(max=20000)String risksAndLimitations,@Size(max=50)List<@Valid CostEstimateItem>costEstimates) {}
-    public record PublicProposalView(String caseNumber,String patientName,String currency,List<ProposalItemView>items,Instant validUntil,boolean decided,String recommendedTreatment,String risksAndLimitations,String notes) {}
+    // Patient-facing proposal view. Never exposes provider net cost, margin rate, or profit.
+    public record PublicProposalView(String caseNumber,String patientName,String documentType,int versionNumber,String currency,List<ProposalItemView>items,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax,String assumptions,String includedServices,String excludedServices,String scopeChangeReason,String paymentTerms,String refundTerms,String disclaimers,Instant validUntil,boolean decided,String decisionState,String recommendedTreatment,String risksAndLimitations,String notes) {}
     public record PublicProposalSummary(String caseNumber,String channel,String destinationHint) {}
     public record ProposalVerifyRequest(@NotBlank @Pattern(regexp="[0-9]{6}")String code) {}
     public record ProposalAccessGrant(String grant,Instant expiresAt,UUID versionId) {}
