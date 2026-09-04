@@ -106,9 +106,11 @@ class JourneyServiceIntegrationTest {
         authenticate("coordinator-subject","COORDINATOR");
         var proposal=journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Consultation","EGP","Incl","Excl","Deposit","Refund","Consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Consultation",BigDecimal.ONE,new BigDecimal("3500.00"),false,0)),null));
         journey.releaseProposal(created.caseId(),proposal.versionId());
-        // Patient acknowledges the preliminary estimate -> deposit created from the default 3000 EGP policy.
+        // Patient ACKNOWLEDGES the preliminary estimate -> recorded as ACKNOWLEDGED, macro case ACCEPTED, deposit created.
         authenticate("patient-subject","PATIENT");
-        journey.decideProposal(created.caseId(),proposal.versionId(),new ProposalDecisionRequest("ACCEPTED",List.of(),"Acknowledged"));
+        journey.decideProposal(created.caseId(),proposal.versionId(),new ProposalDecisionRequest("ACKNOWLEDGED",List.of(),"Acknowledged"));
+        assertThat(journey.workspace(created.caseId()).caseSummary().status()).isEqualTo("ACCEPTED");
+        assertThat(jdbc.queryForObject("SELECT decision FROM proposal_decisions WHERE proposal_version_id=?",String.class,proposal.versionId())).isEqualTo("ACKNOWLEDGED");
         var deposit=payment.depositForCase(created.caseId());
         assertThat(deposit).isNotNull();
         assertThat(deposit.totalEgp()).isEqualByComparingTo("3000.00");

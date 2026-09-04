@@ -26,7 +26,7 @@ public final class JourneyDtos {
     public record ProposalItemRequest(@NotBlank String category,@NotBlank @Size(max=500)String description,@NotNull @DecimalMin("0.01")BigDecimal quantity,@NotNull @DecimalMin("0.00")BigDecimal unitPrice,boolean optional,Integer sortOrder) {}
     public record ProposalDraftRequest(@NotNull UUID clinicalReviewId,@Pattern(regexp="en|ar")String language,@Size(max=30000)String operationalPlan,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,@Size(max=20000)String includedServices,@Size(max=20000)String excludedServices,@Size(max=20000)String paymentTerms,@Size(max=20000)String refundTerms,@Size(max=20000)String disclaimers,@NotNull @Future Instant validUntil,@NotEmpty List<@Valid ProposalItemRequest> items,@Size(max=20000)String coordinatorNotes) {}
     public record OperationsPlanRequest(@NotBlank @Size(max=30000)String plan) {}
-    public record ProposalDecisionRequest(@NotBlank @Pattern(regexp="ACCEPTED|DECLINED|REVISION_REQUESTED")String decision,List<UUID>selectedOptionalItemIds,@Size(max=10000)String comment) {}
+    public record ProposalDecisionRequest(@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,List<UUID>selectedOptionalItemIds,@Size(max=10000)String comment) {}
     public record TravelPlanRequest(Instant plannedArrival,Instant confirmedArrival,@Size(max=80)String visaStatus,@Size(max=5000)String flightDetails,@Size(max=5000)String airportReception,@Size(max=5000)String accommodation,@Size(max=5000)String localTransport,@Size(max=5000)String companionDetails,@Size(max=300)String facility,@Size(max=5000)String exceptions,@NotBlank @Pattern(regexp="PLANNING|CONFIRMED|ARRIVED")String status) {}
     public record TreatmentRequest(@NotBlank @Size(max=300)String facility,UUID practitionerId,@NotNull Instant startAt,Instant endAt,@NotBlank @Pattern(regexp="PLANNED|IN_PROGRESS|COMPLETED")String status,@Size(max=20000)String plannedProcedures,@Size(max=20000)String actualProcedures,@Size(max=20000)String milestones,@Size(max=20000)String complications,boolean dischargeReady,UUID dischargeDocumentId) {}
     public record FinalAssessmentRequest(@Size(max=20000)String recommendedTreatment,@Size(max=20000)String risksAndLimitations,@Size(max=50)List<@Valid CostEstimateItem>costEstimates) {}
@@ -50,7 +50,7 @@ public final class JourneyDtos {
     public record ProposalVerifyRequest(@NotBlank @Pattern(regexp="[0-9]{6}")String code) {}
     public record ProposalAccessGrant(String grant,Instant expiresAt,UUID versionId) {}
     public record ProposalViewRequest(@NotBlank @Size(max=256)String grant) {}
-    public record PublicProposalDecisionRequest(@NotBlank @Size(max=256)String grant,@NotBlank @Pattern(regexp="ACCEPTED|DECLINED|REVISION_REQUESTED")String decision,@Size(max=10000)String comment) {}
+    public record PublicProposalDecisionRequest(@NotBlank @Size(max=256)String grant,@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,@Size(max=10000)String comment) {}
     public record ActivateAccountRequest(@NotBlank @Size(max=256)String activationToken) {}
     public record TimelineEvent(String type,String label,Instant occurredAt,String status) {}
     public record MessageView(UUID id,String threadType,String senderRole,String senderName,String direction,String body,String language,boolean internalOnly,boolean read,Instant createdAt) {}

@@ -89,7 +89,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const [code, setCode] = useState("");
   const [comment, setComment] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
-  const [outcome, setOutcome] = useState<"ACCEPTED" | "DECLINED" | "REVISION_REQUESTED" | null>(null);
+  const [outcome, setOutcome] = useState<"ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED" | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -126,7 +126,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   }
 
-  async function decide(decision: "ACCEPTED" | "DECLINED" | "REVISION_REQUESTED") {
+  async function decide(decision: "ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED") {
     setBusy(true); setError("");
     try {
       const r = await fetch(`${API}/api/v1/public/proposals/${token}/decision`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grant, decision, comment: comment || undefined }) });
@@ -235,7 +235,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                 </label>
                 {error && <p role="alert" className="mt-4 rounded-xl bg-alert-50 p-3 text-alert-800">{error}</p>}
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <button className="btn-primary" disabled={busy || !acknowledged} onClick={() => void decide("ACCEPTED")}>{busy ? t.deciding : primaryLabel}</button>
+                  <button className="btn-primary" disabled={busy || !acknowledged} onClick={() => void decide(isFinal ? "ACCEPTED" : "ACKNOWLEDGED")}>{busy ? t.deciding : primaryLabel}</button>
                   <button className="btn-secondary" disabled={busy} onClick={() => void decide("REVISION_REQUESTED")}>{t.requestRevision}</button>
                   <button className="btn-secondary" disabled={busy} onClick={() => void decide("DECLINED")}>{t.decline}</button>
                 </div>
