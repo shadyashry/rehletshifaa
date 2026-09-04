@@ -33,5 +33,12 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
             .params(UUID.randomUUID(),subject,name,name,"LOCAL-"+subject.substring(subject.length()-3),specialty,subspecialty,category,"CONSULTANT","Local development profile","Arabic, English","Clinical review","ACTIVE","AVAILABLE",24,"VERIFIED",timestamp(now),timestamp(now)).update();
         jdbc.sql("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,reference_number,source,issued_at,verified_at,verified_by,status,created_at) SELECT ?,p.id,'LOCAL_DEMO_LICENSE',?,'Local development seed',?,?,?,'VERIFIED',? FROM practitioner_profiles p WHERE p.external_subject=? AND NOT EXISTS(SELECT 1 FROM practitioner_credentials pc WHERE pc.practitioner_id=p.id AND pc.status='VERIFIED' AND (pc.expires_at IS NULL OR pc.expires_at>?))")
             .params(UUID.randomUUID(),"LOCAL-DEMO-"+subject.substring(subject.length()-3),timestamp(now),timestamp(now),"local-demo-seeder",timestamp(now),subject,timestamp(now)).update();
+        // Derive the consultant's price list from their care-area template so the doctor
+        // portal shows the approved multi-select out of the box (idempotent by service_code).
+        jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) "
+                +"SELECT gen_random_uuid(),p.id,i.service_code,i.service_name,i.category,COALESCE(i.suggested_price_egp,0),TRUE,'local-demo-seeder',?,?,0 "
+                +"FROM practitioner_profiles p JOIN service_templates t ON t.care_category=p.care_category AND t.active JOIN service_template_items i ON i.template_id=t.id "
+                +"WHERE p.external_subject=? AND NOT EXISTS(SELECT 1 FROM consultant_service_catalog c WHERE c.practitioner_id=p.id AND c.service_code=i.service_code)")
+            .params(timestamp(now),timestamp(now),subject).update();
     }
 }
