@@ -31,6 +31,8 @@ type MutationResult={id?:string;status?:string};
 type Mutate=(path:string,body?:unknown,method?:string)=>Promise<MutationResult|undefined>;
 type Api=<T,>(path:string,init?:RequestInit)=>Promise<T>;
 type PractitionerSummary={id:string;displayName?:string;specialty?:string;subspecialty?:string;careCategory?:string;credentialingStatus?:string;availabilityStatus?:string};
+type CommercialPolicy={id:string;name:string;careCategory?:string;marginRate:number;active:boolean;version:number;createdBy?:string;validFrom?:string};
+type DepositPolicy={id:string;name:string;careCategory?:string;coordinationDepositEgp:number;active:boolean;version:number;createdBy?:string;validFrom?:string};
 type CatalogImportRow={line:number;serviceCode:string;serviceName:string;category?:string;priceEgp?:number;action:string;message?:string};
 type CatalogImportResult={committed:boolean;added:number;updated:number;unchanged:number;errors:number;rows:CatalogImportRow[]};
 
@@ -78,6 +80,7 @@ export function Portal({locale}:{locale:Locale}){
     {available.length>1&&<div className="mb-8 flex flex-wrap gap-2">{available.map(role=><button key={role} className={currentRole===role?"btn-primary":"btn-secondary"} onClick={()=>{setActive(role);setWorkspace(null);}}>{roleLabel(role,locale)}</button>)}</div>}
     {!available.length&&<p className="rounded-xl bg-alert-50 p-4 text-alert-800">{t.roleDenied}</p>}
     {notice&&<p role="status" className="mb-4 rounded-xl bg-brand-50 p-4 text-brand-800">{notice}</p>}{error&&<p role="alert" className="mb-4 rounded-xl bg-alert-50 p-4 text-alert-800">{error}</p>}
+    {currentRole==="finance"&&!workspace&&<FinancePolicies api={api} locale={locale}/>}
     {currentRole === "admin"
       ? <AdminForm t={t} busy={busy} locale={locale} api={api} mutate={mutate}/>
       : workspace
@@ -308,6 +311,34 @@ function RoleActions({role,t,c,proposal,gates,locale,mutate}:{role:RoleKey;t:typ
  return null;
 }
 function ProposalCard({locale,t,proposal}:{locale:Locale;t:typeof copy.en;proposal:Proposal}){const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-xl bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>v{proposal.versionNumber} · {proposal.status}</strong><strong>{new Intl.NumberFormat(locale,{style:"currency",currency:proposal.currency??"USD"}).format(total)}</strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?" (optional)":""}</span><strong className="whitespace-nowrap">{money(item.quantity*item.unitPrice,proposal.currency??"USD",locale)}</strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">Valid until {new Intl.DateTimeFormat(locale).format(new Date(proposal.validUntil))}</p>}</div>}
+function FinancePolicies({api,locale}:{api:Api;locale:Locale}){
+ const[commercial,setCommercial]=useState<CommercialPolicy[]>([]);const[deposits,setDeposits]=useState<DepositPolicy[]>([]);
+ const[busy,setBusy]=useState(false);const[msg,setMsg]=useState("");const[err,setErr]=useState("");
+ const g=locale==="ar"?{title:"الإعدادات التجارية (مالية عليا)",intro:"تُطبَّق هذه السياسات المركزية على الحالات الجديدة فقط، ولا تتغيّر بعد إصدار تقدير مبدئي. تتطلب مصادقة حديثة.",marginTitle:"سياسة الهامش (تُدمج في باقة المريض)",depositTitle:"سياسة الوديعة",careArea:"مجال الرعاية",default:"الافتراضي (الكل)",rate:"الهامش %",amount:"وديعة التنسيق (ج.م)",active:"نشِطة",version:"الإصدار",save:"حفظ إصدار جديد",saved:"تم الحفظ."}:{title:"Commercial settings (senior Finance)",intro:"These central policies apply to new cases only and never change after a preliminary estimate is released. Saving requires recent authentication.",marginTitle:"Margin policy (included in the patient package)",depositTitle:"Deposit policy",careArea:"Care area",default:"Default (all)",rate:"Margin %",amount:"Coordination deposit (EGP)",active:"Active",version:"Version",save:"Save new version",saved:"Saved."};
+ const load=useCallback(async()=>{try{const[c,d]=await Promise.all([api<CommercialPolicy[]>("/finance/commercial-policies"),api<DepositPolicy[]>("/finance/deposit-policies")]);setCommercial(c);setDeposits(d);}catch(e){setErr(e instanceof Error?e.message:"Error");}},[api]);
+ useEffect(()=>{void load();},[load]);
+ const areas=["cardiology","rheumatology-rehabilitation","orthopedics"];
+ const areaLabel=(a?:string)=>a?a:g.default;
+ const run=async(fn:()=>Promise<unknown>)=>{setBusy(true);setErr("");setMsg("");try{await fn();setMsg(g.saved);await load();}catch(e){setErr(e instanceof Error?e.message:"Error");}finally{setBusy(false);}};
+ return <section className="card mb-8 space-y-6 p-6">
+  <div><h2 className="title">{g.title}</h2><p className="mt-1 text-sm text-ink-500">{g.intro}</p></div>
+  {msg&&<p className="rounded-lg bg-brand-50 p-2 text-sm text-brand-800">{msg}</p>}{err&&<p className="rounded-lg bg-alert-50 p-2 text-sm text-alert-800">{err}</p>}
+  <div><h3 className="font-bold text-ink-800">{g.marginTitle}</h3>
+   <div className="mt-2 overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-xs uppercase tracking-wide text-ink-500"><th className="p-2 text-start">{g.careArea}</th><th className="p-2 text-end">{g.rate}</th><th className="p-2 text-end">{g.version}</th></tr></thead><tbody>{commercial.filter(p=>p.active).map(p=><tr key={p.id} className="border-t border-line"><td className="p-2">{areaLabel(p.careCategory)}</td><td className="p-2 text-end">{(p.marginRate*100).toFixed(2)}%</td><td className="p-2 text-end">v{p.version}</td></tr>)}</tbody></table></div>
+   <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void run(()=>api("/finance/commercial-policies",{method:"PUT",body:JSON.stringify({careCategory:String(d.get("area")||"")||undefined,marginRate:(Number(d.get("rate"))||0)/100})})).then(()=>f.reset());}}>
+    <label className="text-xs font-bold">{g.careArea}<select className="field w-52" name="area"><option value="">{g.default}</option>{areas.map(a=><option key={a} value={a}>{a}</option>)}</select></label>
+    <label className="text-xs font-bold">{g.rate}<input className="field w-24" name="rate" type="number" min="0" max="50" step="0.1" placeholder="12" required/></label>
+    <button className="btn-primary" disabled={busy}>{g.save}</button>
+   </form></div>
+  <div className="border-t border-line pt-4"><h3 className="font-bold text-ink-800">{g.depositTitle}</h3>
+   <div className="mt-2 overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-xs uppercase tracking-wide text-ink-500"><th className="p-2 text-start">{g.careArea}</th><th className="p-2 text-end">{g.amount}</th><th className="p-2 text-end">{g.version}</th></tr></thead><tbody>{deposits.filter(p=>p.active).map(p=><tr key={p.id} className="border-t border-line"><td className="p-2">{areaLabel(p.careCategory)}</td><td className="p-2 text-end">{new Intl.NumberFormat(locale).format(p.coordinationDepositEgp)} EGP</td><td className="p-2 text-end">v{p.version}</td></tr>)}</tbody></table></div>
+   <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void run(()=>api("/finance/deposit-policies",{method:"PUT",body:JSON.stringify({careCategory:String(d.get("area")||"")||undefined,coordinationDepositEgp:Number(d.get("amount"))||0})})).then(()=>f.reset());}}>
+    <label className="text-xs font-bold">{g.careArea}<select className="field w-52" name="area"><option value="">{g.default}</option>{areas.map(a=><option key={a} value={a}>{a}</option>)}</select></label>
+    <label className="text-xs font-bold">{g.amount}<input className="field w-32" name="amount" type="number" min="0" step="0.01" placeholder="3000" required/></label>
+    <button className="btn-primary" disabled={busy}>{g.save}</button>
+   </form></div>
+ </section>;
+}
 function CatalogAdmin({api,locale}:{api:Api;locale:Locale}){
  const[list,setList]=useState<PractitionerSummary[]>([]);const[sel,setSel]=useState("");
  const[rows,setRows]=useState<CatalogService[]>([]);const[fx,setFx]=useState<FxRate[]>([]);
