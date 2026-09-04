@@ -69,7 +69,7 @@ public class JourneyService {
         if(patientActor)reviews=reviews.stream().filter(r->"APPROVED".equals(r.status())).toList();
         ProposalView latest=latestProposal(caseId,actor);
         DeliveryStatus delivery=latest!=null&&Set.of("RELEASED","VIEWED","ACCEPTED","DECLINED","REVISION_REQUESTED").contains(latest.status())?deliveryStatus(latest.versionId()):null;
-        return new CaseWorkspace(summary,timeline,tasks,messages,assignments,reviews,latest,computeGates(caseId,latest),delivery);
+        return new CaseWorkspace(summary,timeline,tasks,messages,assignments,reviews,latest,computeGates(caseId,latest),delivery,payment.depositForCase(caseId));
     }
 
     @Transactional public CaseView transition(UUID caseId,TransitionRequest request){var actor=actors.require(ActorRole.COORDINATOR,ActorRole.COORDINATOR_LEAD,ActorRole.SYSTEM_ADMIN);authorizeWrite(caseId,actor);requireCoordinatorOwnership(caseId,actor);if(!Set.of("INTAKE_REVIEW","INFORMATION_REQUIRED","READY_FOR_CONSULTANT","CANCELLED").contains(request.targetStatus()))throw new ApiException(403,"DEDICATED_OPERATION_REQUIRED","This state can only be entered through its dedicated authorized operation");transitionInternal(caseId,request.targetStatus(),request.reason(),request.expectedVersion(),actor);if("INFORMATION_REQUIRED".equals(request.targetStatus()))publicCases.issueInformationRequest(caseId,caseView(caseId).preferredLanguage());return caseView(caseId);}
