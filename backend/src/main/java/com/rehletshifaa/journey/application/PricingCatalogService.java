@@ -154,6 +154,84 @@ public class PricingCatalogService {
         return added;
     }
 
+    // ---- Bulk import (CSV; Excel via "Save As CSV") ----
+    /**
+     * Parse a CSV price list and upsert it against the consultant's catalog by service_code.
+     * With commit=false it returns a preview (no writes); with commit=true it applies the changes.
+     * Header row required: service_code, service_name, price_egp (category, active, valid_until optional).
+     */
+    @Transactional
+    public CatalogImportResult importCatalog(UUID practitionerId, byte[] content, boolean commit) {
+        var actor = actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        requirePractitioner(practitionerId);
+        List<String[]> table = parseCsv(new String(content, java.nio.charset.StandardCharsets.UTF_8));
+        if (table.isEmpty()) throw new ApiException(400, "IMPORT_EMPTY", "The file is empty");
+        java.util.Map<String, Integer> col = new java.util.HashMap<>();
+        String[] header = table.get(0);
+        for (int i = 0; i < header.length; i++) col.put(header[i].trim().toLowerCase().replace(' ', '_'), i);
+        for (String required : new String[]{"service_code", "service_name", "price_egp"})
+            if (!col.containsKey(required)) throw new ApiException(400, "IMPORT_HEADER_MISSING", "Missing required column: " + required);
+        List<CatalogImportRow> rows = new java.util.ArrayList<>();
+        int added = 0, updated = 0, unchanged = 0, errors = 0;
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (int i = 1; i < table.size(); i++) {
+            String[] r = table.get(i);
+            String code = cell(r, col, "service_code"), name = cell(r, col, "service_name"), category = cell(r, col, "category");
+            String priceStr = cell(r, col, "price_egp");
+            if (code.isBlank() && name.isBlank() && priceStr.isBlank()) continue; // blank line
+            String error = null;
+            java.math.BigDecimal price = null;
+            try { price = new java.math.BigDecimal(priceStr.trim()); } catch (Exception e) { error = "Invalid price"; }
+            if (code.isBlank() || name.isBlank()) error = "service_code and service_name are required";
+            else if (code.length() > 60) error = "service_code is too long (max 60)";
+            else if (price != null && price.signum() < 0) error = "Price cannot be negative";
+            else if (!seen.add(code)) error = "Duplicate service_code in file";
+            if (error != null) { errors++; rows.add(new CatalogImportRow(i + 1, code, name, category, price, "ERROR", error)); continue; }
+            boolean active = parseActive(cell(r, col, "active"));
+            var existing = jdbc.sql("SELECT service_name,category,price_egp,active FROM consultant_service_catalog WHERE practitioner_id=? AND service_code=?")
+                    .params(practitionerId, code).query((rs, n) -> new String[]{rs.getString("service_name"), rs.getString("category"), rs.getBigDecimal("price_egp").toPlainString(), String.valueOf(rs.getBoolean("active"))}).optional().orElse(null);
+            String action;
+            if (existing == null) {
+                action = "NEW"; added++;
+                if (commit) jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)")
+                        .params(UUID.randomUUID(), practitionerId, code, name.trim(), blankToNull(category), price, active, actor.subject(), timestamp(clock.instant()), timestamp(clock.instant())).update();
+            } else if (name.trim().equals(existing[0]) && java.util.Objects.equals(blankToNull(category), existing[1]) && price.compareTo(new java.math.BigDecimal(existing[2])) == 0 && active == Boolean.parseBoolean(existing[3])) {
+                action = "UNCHANGED"; unchanged++;
+            } else {
+                action = "UPDATE"; updated++;
+                if (commit) jdbc.sql("UPDATE consultant_service_catalog SET service_name=?,category=?,price_egp=?,active=?,updated_at=?,version=version+1 WHERE practitioner_id=? AND service_code=?")
+                        .params(name.trim(), blankToNull(category), price, active, timestamp(clock.instant()), practitionerId, code).update();
+            }
+            rows.add(new CatalogImportRow(i + 1, code, name, category, price, action, null));
+        }
+        if (commit) audit(actor, "CATALOG_IMPORTED", practitionerId + " +" + added + " ~" + updated);
+        return new CatalogImportResult(commit, added, updated, unchanged, errors, rows);
+    }
+
+    private static boolean parseActive(String v) { if (v == null || v.isBlank()) return true; String s = v.trim().toLowerCase(); return !(s.equals("false") || s.equals("no") || s.equals("0") || s.equals("inactive")); }
+    private static String blankToNull(String v) { return v == null || v.isBlank() ? null : v.trim(); }
+    private static String cell(String[] row, java.util.Map<String, Integer> col, String name) { Integer i = col.get(name); return i == null || i >= row.length || row[i] == null ? "" : row[i]; }
+    /** Minimal RFC-4180-ish CSV parser: handles quoted fields, embedded commas/newlines, and "" escapes. */
+    static List<String[]> parseCsv(String text) {
+        List<String[]> out = new java.util.ArrayList<>();
+        List<String> field = new java.util.ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        boolean inQuotes = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (inQuotes) {
+                if (c == '"') { if (i + 1 < text.length() && text.charAt(i + 1) == '"') { cur.append('"'); i++; } else inQuotes = false; }
+                else cur.append(c);
+            } else if (c == '"') inQuotes = true;
+            else if (c == ',') { field.add(cur.toString()); cur.setLength(0); }
+            else if (c == '\r') { /* ignore, handled by \n */ }
+            else if (c == '\n') { field.add(cur.toString()); cur.setLength(0); out.add(field.toArray(new String[0])); field = new java.util.ArrayList<>(); }
+            else cur.append(c);
+        }
+        if (cur.length() > 0 || !field.isEmpty()) { field.add(cur.toString()); out.add(field.toArray(new String[0])); }
+        return out;
+    }
+
     // ---- Doctor's own catalog (read) ----
     public List<CatalogServiceView> myCatalog() {
         var actor = actors.require(ActorRole.DOCTOR);

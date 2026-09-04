@@ -69,4 +69,6 @@ public final class JourneyDtos {
     public record FxRateView(String currency,BigDecimal rate,LocalDate rateDate,String source) {}
     public record FxOverrideRequest(@NotNull @DecimalMin("0.00000001")BigDecimal rate,LocalDate date) {}
     public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus) {}
+    public record CatalogImportRow(int line,String serviceCode,String serviceName,String category,BigDecimal priceEgp,String action,String message) {}
+    public record CatalogImportResult(boolean committed,int added,int updated,int unchanged,int errors,List<CatalogImportRow> rows) {}
 }

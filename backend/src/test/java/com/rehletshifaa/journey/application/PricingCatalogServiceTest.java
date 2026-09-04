@@ -100,6 +100,28 @@ class PricingCatalogServiceTest {
         assertThat(pricing.practitionerCatalog(created.id())).hasSize(11).allSatisfy(s -> assertThat(s.priceEgp()).isNotNull());
     }
 
+    @Test void importsCsvAsPreviewThenCommit() {
+        UUID practitionerId = seedVerifiedCardiologist();
+        authenticate("admin-subject", "CREDENTIALING_ADMIN");
+        pricing.addCatalogService(practitionerId, new CatalogServiceRequest("CARD-CONSULT", "Consultation", "Consultation", new BigDecimal("3000.00"), true, null));
+        String csv = "service_code,service_name,category,price_egp,active\n"
+                + "CARD-CONSULT,Consultation,Consultation,3500,true\n"   // UPDATE (price changed)
+                + "CARD-ECHO,Echocardiogram,Diagnostics,4500,true\n"     // NEW
+                + ",Missing code,Diagnostics,100,true\n";                // ERROR (no code)
+        var preview = pricing.importCatalog(practitionerId, csv.getBytes(), false);
+        assertThat(preview.committed()).isFalse();
+        assertThat(preview.added()).isEqualTo(1);
+        assertThat(preview.updated()).isEqualTo(1);
+        assertThat(preview.errors()).isEqualTo(1);
+        assertThat(pricing.practitionerCatalog(practitionerId)).hasSize(1); // preview did not write
+
+        var committed = pricing.importCatalog(practitionerId, csv.getBytes(), true);
+        assertThat(committed.committed()).isTrue();
+        assertThat(pricing.practitionerCatalog(practitionerId)).hasSize(2);
+        assertThat(pricing.practitionerCatalog(practitionerId)).filteredOn(s -> s.serviceCode().equals("CARD-CONSULT"))
+                .singleElement().satisfies(s -> assertThat(s.priceEgp()).isEqualByComparingTo("3500.00"));
+    }
+
     @Test void doctorCannotManageCatalog() {
         UUID practitionerId = seedVerifiedCardiologist();
         authenticate("doctor-subject", "DOCTOR");
