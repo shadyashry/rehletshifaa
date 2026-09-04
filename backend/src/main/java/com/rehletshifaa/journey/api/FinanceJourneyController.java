@@ -1,8 +1,10 @@
 package com.rehletshifaa.journey.api;
-import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.security.ActorRole;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
+import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.CommercialPolicyService;import com.rehletshifaa.security.ActorRole;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/finance") public class FinanceJourneyController{
- private final JourneyService service;public FinanceJourneyController(JourneyService service){this.service=service;}
+ private final JourneyService service;private final CommercialPolicyService policies;public FinanceJourneyController(JourneyService service,CommercialPolicyService policies){this.service=service;this.policies=policies;}
+ @GetMapping("/commercial-policies")public List<CommercialPolicyView>policies(){return policies.list();}
+ @PutMapping("/commercial-policies")public CommercialPolicyView configurePolicy(@Valid @RequestBody CommercialPolicyRequest request){return policies.configure(request);}
  @GetMapping("/cases")public List<CaseView>cases(){return service.assignedCases(ActorRole.FINANCE);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@RequestParam boolean accept){return service.decideAssignment(caseId,assignmentId,accept,ActorRole.FINANCE);}

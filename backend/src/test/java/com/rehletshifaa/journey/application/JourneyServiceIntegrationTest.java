@@ -107,10 +107,10 @@ class JourneyServiceIntegrationTest {
         authenticate("coordinator-subject","COORDINATOR");
         var proposal=journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Consultation only","USD","Consultation","None","Deposit","Refund","Consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Consultation",BigDecimal.ONE,new BigDecimal("3500.00"),false,0)),null));
         assertThat(proposal.currency()).isEqualTo("USD");
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("70.00")); // 3500 EGP * 0.02
+        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("78.40")); // 3500 EGP * 1.12 margin * 0.02 fx
         proposal=journey.releaseProposal(created.caseId(),proposal.versionId());
         assertThat(proposal.status()).isEqualTo("RELEASED");
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("70.00")); // frozen at the release rate
+        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("78.40")); // frozen: 3500 * 1.12 * 0.02
     }
 
     @Test void manualNoTravelRequiresFinanceFromClinicallyApprovedAndGatesReflectIt()throws Exception{
@@ -144,6 +144,37 @@ class JourneyServiceIntegrationTest {
         authenticate("coordinator-subject","COORDINATOR");ws=journey.workspace(created.caseId());
         assertThat(ws.gates().financeCompleted()).isTrue();
         assertThat(ws.gates().readyForRelease()).isTrue();
+    }
+
+    @Test void appliesCentralMarginPolicyDeterministicallyAndSnapshotsIt()throws Exception{
+        var created=cases.create(new CreateCaseRequest("Margin Patient","Kenya","+254700000077","Cardiac reports","en",true,null,"mg@local.test","Africa/Nairobi","cardiology"));
+        cases.submit(created.caseId());entityManager.flush();entityManager.clear();
+        jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
+        authenticate("coordinator-subject","COORDINATOR");journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        long v=journey.workspace(created.caseId()).caseSummary().version();
+        journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",v));
+        UUID practitionerId=UUID.randomUUID();
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",practitionerId,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),practitionerId,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());
+        UUID catalogId=UUID.randomUUID();
+        jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",catalogId,practitionerId,"CARD-CONSULT","Consultation","Consultation",new BigDecimal("10000.00"),true,"admin-subject",Instant.now(),Instant.now());
+        var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended intervention","Alt","Risks","Seq","7 days","Follow-up"));
+        journey.approveClinicalReview(created.caseId(),review.id());
+        jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,catalog_service_id,price_egp,price_egp_min,price_egp_max,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultation",new BigDecimal("10000.00"),"EGP",0,catalogId,new BigDecimal("10000.00"),new BigDecimal("10000.00"),new BigDecimal("10000.00"),false);
+        authenticate("coordinator-subject","COORDINATOR");
+        journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Consultation only","EGP","Consultation","None","Deposit","Refund","Consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Consultation",BigDecimal.ONE,new BigDecimal("10000.00"),false,0)),null));
+        // Seeded default policy is 12%: patient inclusive expected = 10000 * 1.12 = 11200; margin held internally.
+        var pv=jdbc.queryForMap("SELECT provider_net_egp,margin_rate,margin_amount_egp,patient_total_expected_egp,commercial_policy_id FROM proposal_versions WHERE clinical_review_id=? ORDER BY version_number DESC LIMIT 1",review.id());
+        assertThat(new BigDecimal(pv.get("provider_net_egp").toString())).isEqualByComparingTo("10000.00");
+        assertThat(new BigDecimal(pv.get("margin_rate").toString())).isEqualByComparingTo("0.1200");
+        assertThat(new BigDecimal(pv.get("margin_amount_egp").toString())).isEqualByComparingTo("1200.00");
+        assertThat(new BigDecimal(pv.get("patient_total_expected_egp").toString())).isEqualByComparingTo("11200.00");
+        assertThat(pv.get("commercial_policy_id")).isNotNull();
+        // The patient-facing item price is the inclusive amount (margin baked in), not the provider price.
+        var proposal=journey.workspace(created.caseId()).proposal();
+        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("11200.00"));
     }
 
     private void authenticate(String subject,String role){Jwt jwt=Jwt.withTokenValue("test").header("alg","none").subject(subject).claim("auth_time",Instant.now().getEpochSecond()).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,List.of(new SimpleGrantedAuthority("ROLE_"+role)),subject));}
