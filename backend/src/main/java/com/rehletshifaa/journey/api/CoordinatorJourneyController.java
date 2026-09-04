@@ -1,9 +1,10 @@
 package com.rehletshifaa.journey.api;
-import com.rehletshifaa.journey.application.JourneyService;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
+import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.PricingCatalogService;import jakarta.validation.Valid;import org.springframework.format.annotation.DateTimeFormat;import org.springframework.web.bind.annotation.*;import java.time.LocalDate;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/coordinator") public class CoordinatorJourneyController{
- private final JourneyService service;public CoordinatorJourneyController(JourneyService service){this.service=service;}
+ private final JourneyService service;private final PricingCatalogService pricing;public CoordinatorJourneyController(JourneyService service,PricingCatalogService pricing){this.service=service;this.pricing=pricing;}
  @GetMapping("/me")public StaffProfileView me(){return service.myCoordinatorProfile();}
+ @GetMapping("/fx-rates")public List<FxRateView>fxRates(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return pricing.fxRates(date);}
  @GetMapping("/cases")public List<CaseView>queue(){return service.coordinatorQueue();}
  @GetMapping("/doctors")public List<VerifiedDoctorView>doctors(){return service.verifiedDoctors();}
  @GetMapping("/care-categories")public List<CareCategoryView>careCategories(){return service.careCategories();}
