@@ -134,6 +134,24 @@ public class PaymentService {
                 .query((rs, n) -> new DepositPolicyView(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("care_category"), rs.getBigDecimal("coordination_deposit_egp"), rs.getBoolean("active"), rs.getInt("version"), rs.getString("created_by"), rs.getObject("valid_from", LocalDate.class))).single();
     }
 
+    /** The coordination deposit that will be due on acknowledgement (existing deposit total, else the active policy amount). */
+    public BigDecimal anticipatedCoordinationDepositEgp(UUID caseId) {
+        BigDecimal existing = jdbc.sql("SELECT total_egp FROM deposits WHERE case_id=? AND status<>'CANCELLED' ORDER BY created_at DESC LIMIT 1").param(caseId).query(BigDecimal.class).optional().orElse(null);
+        if (existing != null) return existing;
+        String careArea = jdbc.sql("SELECT care_category FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
+        DepositPolicy p = activeDepositPolicyFor(careArea);
+        return p == null || p.coordinationEgp() == null ? BigDecimal.ZERO : p.coordinationEgp();
+    }
+
+    /** Net amount recorded as paid on the case's latest deposit, in EGP (paid minus refunded). */
+    public BigDecimal netPaidEgp(UUID caseId) {
+        UUID depositId = jdbc.sql("SELECT id FROM deposits WHERE case_id=? AND status<>'CANCELLED' ORDER BY created_at DESC LIMIT 1").param(caseId).query(UUID.class).optional().orElse(null);
+        if (depositId == null) return BigDecimal.ZERO;
+        BigDecimal paid = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'").param(depositId).query(BigDecimal.class).single());
+        BigDecimal refunded = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='REFUND_RECORDED'").param(depositId).query(BigDecimal.class).single());
+        return paid.subtract(refunded);
+    }
+
     /** True when the case's deposit is fully PAID — used to gate non-cancellable bookings. */
     public boolean depositPaid(UUID caseId) {
         String s = jdbc.sql("SELECT status FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1").param(caseId).query(String.class).optional().orElse(null);

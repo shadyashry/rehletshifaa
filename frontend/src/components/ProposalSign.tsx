@@ -13,6 +13,7 @@ type Proposal = {
   paymentTerms?: string; refundTerms?: string; disclaimers?: string;
   validUntil?: string; decided: boolean; decisionState?: string;
   recommendedTreatment?: string; risksAndLimitations?: string; notes?: string;
+  depositDueDisplay?: number; depositPaidDisplay?: number;
 };
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -33,6 +34,7 @@ const copy = {
     assumptionsLabel: "Important assumptions", changeLabel: "What may change after your physical assessment",
     excludedLabel: "Not included", rangeLabel: "Estimated coordinated-care package", expectedLabel: "Expected", rangeSep: "to",
     coordinationNote: "This package price includes RehletShifaa's case coordination, provider arrangements, scheduling and patient-support services.",
+    payNow: "What you pay now", payNowNote: "A coordination deposit to begin — credited to your final balance.", alreadyPaid: "Already paid (credited to this quote)",
     ackStatement: "I understand that this estimate is based on remote review. The final treatment plan and price may increase or decrease after the treating doctor examines me. I will receive and decide on a final quote before non-emergency treatment.",
     acknowledge: "Acknowledge estimate and continue",
     // final
@@ -61,6 +63,7 @@ const copy = {
     assumptionsLabel: "افتراضات مهمة", changeLabel: "ما قد يتغيّر بعد الفحص السريري",
     excludedLabel: "غير مشمول", rangeLabel: "باقة الرعاية المنسّقة التقديرية", expectedLabel: "المتوقع", rangeSep: "إلى",
     coordinationNote: "يشمل سعر الباقة تنسيق الحالة وترتيبات مقدّمي الخدمة والجدولة وخدمات دعم المريض من رحلة شفاء.",
+    payNow: "ما تدفعه الآن", payNowNote: "وديعة تنسيق للبدء — تُخصم من رصيدك النهائي.", alreadyPaid: "مدفوع مسبقًا (يُخصم من هذا العرض)",
     ackStatement: "أفهم أن هذا التقدير يستند إلى مراجعة عن بُعد. قد ترتفع أو تنخفض خطة العلاج النهائية وسعرها بعد فحص الطبيب المعالج لي. سأستلم عرضًا نهائيًا وأقرّره قبل أي علاج غير طارئ.",
     acknowledge: "الإقرار بالتقدير والمتابعة",
     finalBadge: "خطة العلاج والعرض النهائي", finalTitle: "خطة علاجك وعرضك النهائي",
@@ -203,6 +206,17 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
               {hasRange && <p className="mt-1 text-sm text-ink-600">{t.expectedLabel}: <strong>{money(expected)}</strong></p>}
               <p className="mt-2 text-xs leading-5 text-ink-600">{t.coordinationNote}</p>
             </div>
+
+            {!isFinal && proposal.depositDueDisplay != null && proposal.depositDueDisplay > 0 && (
+              <div className="mt-4 rounded-xl border border-brand-200 p-4">
+                <p className="text-sm font-bold text-brand-800">{t.payNow}</p>
+                <p className="mt-1 text-xl font-bold text-ink-900">{money(proposal.depositDueDisplay)}</p>
+                <p className="mt-1 text-xs text-ink-600">{t.payNowNote}</p>
+              </div>
+            )}
+            {isFinal && proposal.depositPaidDisplay != null && proposal.depositPaidDisplay > 0 && (
+              <p className="mt-4 text-sm text-ink-600">{t.alreadyPaid}: <strong>{money(proposal.depositPaidDisplay)}</strong></p>
+            )}
 
             <Section label={t.notesLabel} text={proposal.notes} />
             {proposal.disclaimers && <p className="mt-4 text-xs text-ink-500">{proposal.disclaimers}</p>}
