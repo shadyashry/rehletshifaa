@@ -397,47 +397,106 @@ function FxRow({f,busy,pinLabel,onPin}:{f:FxRate;busy:boolean;pinLabel:string;on
  const[egpPer,setEgpPer]=useState((f.rate?1/f.rate:0).toFixed(4));
  return <tr className="border-t border-line"><td className="p-2 font-semibold">{f.currency}</td><td className="p-2 text-end"><input className="field !mt-0 w-28 text-end" type="number" min="0" step="0.0001" value={egpPer} onChange={e=>setEgpPer(e.target.value)}/></td><td className="p-2 text-xs text-ink-500">{f.source} · {f.rateDate}</td><td className="p-2 text-end"><button type="button" disabled={busy||!(Number(egpPer)>0)} className="btn-secondary" onClick={()=>onPin(f.currency,1/Number(egpPer))}>{pinLabel}</button></td></tr>;
 }
+type AdminTab="practitioners"|"staff"|"catalog";
 function AdminForm({t,busy,locale,api,mutate}:{t:typeof copy.en;busy:boolean;locale:Locale;api:Api;mutate:Mutate}){
  const[practitionerId,setPractitionerId]=useState("");
+ const[justCreated,setJustCreated]=useState(false);
+ const[tab,setTab]=useState<AdminTab>("practitioners");
+ const L=locale==="ar"?{
+  consoleTitle:"لوحة اعتماد مقدّمي الخدمة",consoleSubtitle:"إضافة الاستشاريين والموظفين، وتسجيل مستندات الاعتماد، وتسجيل قرارات التحقق — كلٌّ في مكانه.",
+  tabPractitioners:"الاستشاريون",tabStaff:"حسابات الموظفين",tabCatalog:"قائمة الأسعار",
+  flowHint:"أضِف الاستشاري أولًا (خطوة 1)، ثم سجّل مستند الاعتماد (خطوة 2)، وأخيرًا سجّل القرار (خطوة 3).",
+  step1:"إضافة ملف استشاري",step1hint:"يُنشئ ملفًا جديدًا بحالة «قيد المراجعة». بعد الإنشاء يُحدَّد الملف تلقائيًا للخطوتين التاليتين.",
+  careCategory:"مجال الرعاية",selectCategory:"اختر مجال الرعاية",
+  selectedTitle:"الملف قيد العمل",selectedNone:"لم يُحدَّد ملف بعد",selectedHint:"أنشئ استشاريًا في الأعلى، أو الصق معرّف ملف موجودًا، لتفعيل الخطوتين 2 و3.",createdOk:"تم إنشاء الملف — تابِع خطوتي الاعتماد والقرار.",clear:"مسح",
+  step2:"تسجيل مستند اعتماد موثّق",step2hint:"مثال: رخصة مزاولة، شهادة زمالة، أو وثيقة تأمين مسؤولية.",
+  step3:"قرار الاعتماد",step3hint:"الموافقة تُتيح الاستشاري للتعيين على الحالات؛ الرفض يتطلب سببًا.",
+  staffTitle:"إضافة حساب موظف",staffHint:"أنشئ حساب منسّق أو عمليات أو مالية واربطه بمعرّف الهوية.",gated:"حدِّد ملفًا أولًا لتفعيل هذا الإجراء."
+ }:{
+  consoleTitle:"Credentialing console",consoleSubtitle:"Onboard consultants and staff, register credentials, and record verification decisions — each in its own place.",
+  tabPractitioners:"Consultants",tabStaff:"Staff accounts",tabCatalog:"Price catalog",
+  flowHint:"Add the consultant first (step 1), then register their credential (step 2), then record the decision (step 3).",
+  step1:"Create consultant profile",step1hint:"Creates a new profile in ‘under review’. After creating, it becomes the selected profile for the next two steps.",
+  careCategory:"Care area",selectCategory:"Select a care area",
+  selectedTitle:"Working on profile",selectedNone:"No profile selected yet",selectedHint:"Create a consultant above, or paste an existing profile ID, to enable steps 2 and 3.",createdOk:"Profile created — continue with the credential and decision steps.",clear:"Clear",
+  step2:"Register verified credential",step2hint:"For example: practice licence, fellowship certificate, or indemnity cover.",
+  step3:"Credentialing decision",step3hint:"Approving makes the consultant available for assignment; rejecting requires a reason.",
+  staffTitle:"Onboard a staff account",staffHint:"Create a coordinator, operations, or finance account and link it to an identity subject.",gated:"Select a profile first to enable this action."
+ };
+ const tabs:Array<{id:AdminTab;label:string}>=[{id:"practitioners",label:L.tabPractitioners},{id:"staff",label:L.tabStaff},{id:"catalog",label:L.tabCatalog}];
+ const selectProfile=(id:string)=>{setPractitionerId(id);setJustCreated(false);};
  return <div className="space-y-6">
-  <CatalogAdmin api={api} locale={locale}/>
-  <form className="card grid gap-4 p-6 md:grid-cols-2" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/coordinators",{name:data.get("name"),externalSubject:data.get("subject"),role:data.get("role")}).then(result=>{if(result)form.reset();});}}>
-   <h2 className="title md:col-span-2">{t.coordinatorTitle}</h2>
-   <label className="block text-sm font-bold">{t.name}<input className="field mt-1" name="name" required/></label>
-   <label className="block text-sm font-bold">{t.subject}<input className="field mt-1" name="subject" required/></label>
-    <label className="block text-sm font-bold">{t.coordinatorRole}<select className="field mt-1" name="role"><option value="COORDINATOR">COORDINATOR</option><option value="COORDINATOR_LEAD">COORDINATOR_LEAD</option><option value="OPERATIONS">OPERATIONS</option><option value="FINANCE">FINANCE</option></select></label>
-   <div className="flex items-end"><button disabled={busy} className="btn-primary">{t.create}</button></div>
-  </form>
-  <div className="grid gap-6 xl:grid-cols-2">
-   <form className="card space-y-4 p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/practitioners",{legalName:data.get("name"),displayName:data.get("name"),externalSubject:data.get("subject"),specialty:data.get("specialty"),careCategory:data.get("careCategory"),practitionerType:"CONSULTANT",contractStatus:"ACTIVE",availabilityStatus:"AVAILABLE",expectedReviewHours:48}).then(result=>{if(result?.id){setPractitionerId(result.id);form.reset();}});}}>
-   <h2 className="title">{t.adminTitle}</h2>
-   <label className="block text-sm font-bold">{t.name}<input className="field mt-1" name="name" required/></label>
-   <label className="block text-sm font-bold">{t.subject}<input className="field mt-1" name="subject" required/></label>
-    <label className="block text-sm font-bold">{t.specialty}<input className="field mt-1" name="specialty" required/></label>
-    <label className="block text-sm font-bold">Care category<select className="field mt-1" name="careCategory" required><option value="">Select</option><option value="cardiology">Cardiology</option><option value="rheumatology-rehabilitation">Rehabilitation & Dysphagia</option><option value="orthopedics">Orthopedics</option></select></label>
-   <button disabled={busy} className="btn-primary">{t.create}</button>
-  </form>
-  <div className="space-y-6">
-   <form className="card space-y-4 p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate(`/admin/practitioners/${practitionerId}/credentials`,{credentialType:data.get("credentialType"),referenceNumber:data.get("reference"),source:data.get("source"),expiresAt:toInstant(data.get("expires"))}).then(result=>{if(result)form.reset();});}}>
-    <h2 className="title">{t.credentialTitle}</h2>
-    <ProfileIdInput t={t} value={practitionerId} setValue={setPractitionerId}/>
-    <label className="block text-sm font-bold">{t.credentialType}<input className="field mt-1" name="credentialType" required/></label>
-    <label className="block text-sm font-bold">{t.reference}<input className="field mt-1" name="reference" required/></label>
-    <label className="block text-sm font-bold">{t.source}<input className="field mt-1" name="source" required/></label>
-    <label className="block text-sm font-bold">{t.expires}<input className="field mt-1" name="expires" type="date"/></label>
-    <button disabled={busy||!practitionerId} className="btn-primary">{t.addCredential}</button>
-   </form>
-   <form className="card space-y-4 p-6" onSubmit={event=>event.preventDefault()}>
-    <h2 className="title">{t.decisionTitle}</h2>
-    <ProfileIdInput t={t} value={practitionerId} setValue={setPractitionerId}/>
-    <label className="block text-sm font-bold">{t.rejectionReason}<textarea className="field mt-1" name="reason"/></label>
-    <div className="flex flex-wrap gap-3"><button disabled={busy||!practitionerId} className="btn-primary" onClick={()=>void mutate(`/admin/practitioners/${practitionerId}/decision?approved=true`)}>{t.approvePractitioner}</button><button disabled={busy||!practitionerId} className="btn-secondary" onClick={event=>{const form=event.currentTarget.form;if(!form)return;const reason=new FormData(form).get("reason");void mutate(`/admin/practitioners/${practitionerId}/decision?approved=false&reason=${encodeURIComponent(String(reason??""))}`);}}>{t.rejectPractitioner}</button></div>
-   </form>
+  <header><h2 className="headline">{L.consoleTitle}</h2><p className="lead mt-2 max-w-2xl text-base">{L.consoleSubtitle}</p></header>
+  <div role="tablist" aria-label={L.consoleTitle} className="flex flex-wrap gap-1 border-b border-line">
+   {tabs.map(item=><button key={item.id} role="tab" aria-selected={tab===item.id} onClick={()=>setTab(item.id)}
+     className={`-mb-px rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-bold transition ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}>{item.label}</button>)}
   </div>
-  </div>
+
+  {tab==="practitioners"&&<div className="space-y-6" role="tabpanel">
+   <p className="rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">{L.flowHint}</p>
+
+   {/* Step 1 — create profile */}
+   <form className="card p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/practitioners",{legalName:data.get("name"),displayName:data.get("name"),externalSubject:data.get("subject"),specialty:data.get("specialty"),careCategory:data.get("careCategory"),practitionerType:"CONSULTANT",contractStatus:"ACTIVE",availabilityStatus:"AVAILABLE",expectedReviewHours:48}).then(result=>{if(result?.id){setPractitionerId(result.id);setJustCreated(true);form.reset();}});}}>
+    <StepHead n={1} title={L.step1} hint={L.step1hint}/>
+    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+     <Field label={t.name}><input className="field" name="name" required/></Field>
+     <Field label={t.subject}><input className="field" name="subject" required/></Field>
+     <Field label={t.specialty}><input className="field" name="specialty" required/></Field>
+     <Field label={L.careCategory}><select className="field" name="careCategory" required defaultValue=""><option value="" disabled>{L.selectCategory}</option><option value="cardiology">{prettyCategory("cardiology",locale)}</option><option value="rheumatology-rehabilitation">{prettyCategory("rheumatology-rehabilitation",locale)}</option><option value="orthopedics">{prettyCategory("orthopedics",locale)}</option></select></Field>
+    </div>
+    <div className="mt-5"><button disabled={busy} className="btn-primary">{t.create}</button></div>
+   </form>
+
+   {/* Selected-profile context bar */}
+   <div className={`card border-s-4 p-5 ${practitionerId?"border-brand-500 bg-brand-50":"border-line"}`}>
+    <p className="text-xs font-bold uppercase tracking-wide text-ink-500">{L.selectedTitle}</p>
+    {practitionerId?<div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+      <div className="min-w-0"><p className="mono break-all font-mono text-sm font-semibold text-brand-800">{practitionerId}</p>{justCreated&&<p className="mt-1 text-sm text-brand-700">✓ {L.createdOk}</p>}</div>
+      <button className="btn-secondary !py-1.5 text-sm" onClick={()=>selectProfile("")}>{L.clear}</button>
+     </div>
+     :<div className="mt-2"><p className="mb-2 text-sm text-ink-600">{L.selectedHint}</p><ProfileIdInput t={t} value={practitionerId} setValue={selectProfile}/></div>}
+   </div>
+
+   {/* Steps 2 & 3 — gated on a selected profile */}
+   <div className={`grid gap-6 xl:grid-cols-2 ${practitionerId?"":"opacity-60"}`}>
+    <form className="card p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate(`/admin/practitioners/${practitionerId}/credentials`,{credentialType:data.get("credentialType"),referenceNumber:data.get("reference"),source:data.get("source"),expiresAt:toInstant(data.get("expires"))}).then(result=>{if(result)form.reset();});}}>
+     <StepHead n={2} title={L.step2} hint={L.step2hint}/>
+     <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <Field label={t.credentialType}><input className="field" name="credentialType" required disabled={!practitionerId}/></Field>
+      <Field label={t.reference}><input className="field" name="reference" required disabled={!practitionerId}/></Field>
+      <Field label={t.source}><input className="field" name="source" required disabled={!practitionerId}/></Field>
+      <Field label={t.expires}><input className="field" name="expires" type="date" disabled={!practitionerId}/></Field>
+     </div>
+     <div className="mt-5"><button disabled={busy||!practitionerId} className="btn-primary">{t.addCredential}</button>{!practitionerId&&<span className="ms-3 text-sm text-ink-500">{L.gated}</span>}</div>
+    </form>
+
+    <form className="card p-6" onSubmit={event=>event.preventDefault()}>
+     <StepHead n={3} title={L.step3} hint={L.step3hint}/>
+     <div className="mt-5"><Field label={t.rejectionReason}><textarea className="field min-h-24" name="reason" disabled={!practitionerId}/></Field></div>
+     <div className="mt-5 flex flex-wrap gap-3">
+      <button disabled={busy||!practitionerId} className="btn-primary" onClick={()=>void mutate(`/admin/practitioners/${practitionerId}/decision?approved=true`)}>{t.approvePractitioner}</button>
+      <button disabled={busy||!practitionerId} className="btn-secondary" onClick={event=>{const form=event.currentTarget.form;if(!form)return;const reason=new FormData(form).get("reason");void mutate(`/admin/practitioners/${practitionerId}/decision?approved=false&reason=${encodeURIComponent(String(reason??""))}`);}}>{t.rejectPractitioner}</button>
+     </div>
+    </form>
+   </div>
+  </div>}
+
+  {tab==="staff"&&<div role="tabpanel"><form className="card max-w-2xl p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/coordinators",{name:data.get("name"),externalSubject:data.get("subject"),role:data.get("role")}).then(result=>{if(result)form.reset();});}}>
+   <StepHead title={L.staffTitle} hint={L.staffHint}/>
+   <div className="mt-5 grid gap-4 sm:grid-cols-2">
+    <Field label={t.name}><input className="field" name="name" required/></Field>
+    <Field label={t.subject}><input className="field" name="subject" required/></Field>
+    <Field label={t.coordinatorRole}><select className="field" name="role"><option value="COORDINATOR">COORDINATOR</option><option value="COORDINATOR_LEAD">COORDINATOR_LEAD</option><option value="OPERATIONS">OPERATIONS</option><option value="FINANCE">FINANCE</option></select></Field>
+   </div>
+   <div className="mt-5"><button disabled={busy} className="btn-primary">{t.create}</button></div>
+  </form></div>}
+
+  {tab==="catalog"&&<div role="tabpanel"><CatalogAdmin api={api} locale={locale}/></div>}
  </div>;
 }
-function ProfileIdInput({t,value,setValue}:{t:typeof copy.en;value:string;setValue:(value:string)=>void}){return <label className="block text-sm font-bold">{t.profileId}<input className="field mt-1" value={value} onChange={event=>setValue(event.target.value)} pattern="[0-9a-fA-F-]{36}" required/></label>}
+function StepHead({n,title,hint}:{n?:number;title:string;hint:string}){return <div className="flex items-start gap-3 border-b border-line pb-4">{n!=null&&<span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">{n}</span>}<div><h3 className="title">{title}</h3><p className="mt-0.5 text-sm text-ink-500">{hint}</p></div></div>}
+function Field({label,children}:{label:string;children:React.ReactNode}){return <label className="block"><span className="mb-1 block text-sm font-bold text-ink-700">{label}</span>{children}</label>}
+function ProfileIdInput({t,value,setValue}:{t:typeof copy.en;value:string;setValue:(value:string)=>void}){return <label className="block text-sm font-bold">{t.profileId}<input className="field mt-1" value={value} onChange={event=>setValue(event.target.value)} pattern="[0-9a-fA-F-]{36}" placeholder="00000000-0000-0000-0000-000000000000"/></label>}
 function toInstant(value:FormDataEntryValue|null){return value?new Date(`${value}T23:59:59Z`).toISOString():null;}
 function Panel({title,children,wide=false}:{title:string;children:React.ReactNode;wide?:boolean}){return <section className={`card mt-6 p-5 ${wide?"":""}`}><h3 className="title mb-4">{title}</h3><div className="space-y-3">{children}</div></section>}
 function Empty(){return <p className="text-ink-500">—</p>}
