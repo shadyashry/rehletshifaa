@@ -23,7 +23,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
       <div className="container-site relative grid gap-12 py-14 md:py-18 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:items-center lg:gap-16 lg:py-24">
         <div>
           <p className="eyebrow">{d.home.eyebrow}</p>
-          <h1 className="display mt-4">{d.home.title}</h1>
+          <h1 className="display mt-4 max-w-2xl [text-wrap:balance]">{d.home.title}</h1>
           <p className="lead mt-5 max-w-xl">{d.home.intro}</p>
           <p className="mt-4 max-w-xl text-base font-semibold leading-7 text-brand-700">{d.home.slogan}</p>
 
@@ -53,6 +53,9 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
               </li>
             ))}
           </ul>
+
+          {/* Calm preliminary-review microcopy — legible, subordinate to the CTA, never an alert. */}
+          <p className="mt-6 max-w-xl text-sm leading-6 text-ink-500">{d.home.preliminaryNotice}</p>
         </div>
 
         <aside className="overflow-hidden rounded-3xl border border-brand-200 bg-white/85 p-7 shadow-[0_24px_70px_-44px_rgba(41,69,77,.38)] backdrop-blur sm:p-9">

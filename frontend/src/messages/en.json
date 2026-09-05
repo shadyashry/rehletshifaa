@@ -32,17 +32,18 @@
     "brandArabicAccent": "شفاء"
   },
   "home": {
-    "eyebrow": "International specialist care coordination",
-    "title": "From Medical Reports to a Clearer Care Path in Egypt",
-    "intro": "Share your medical reports and let RehletShifaa guide your case to the right consultant — across cardiology, adult and pediatric dysphagia (swallowing) rehabilitation, and orthopedics — with your whole journey coordinated before you travel.",
-    "primaryAction": "Start My Care Review",
-    "watchJourney": "Watch the Journey",
-    "reassurance": "You do not need a diagnosis or the name of a procedure to begin.",
+    "eyebrow": "International patient care coordination",
+    "title": "Understand Your Care Options in Egypt—Before You Travel",
+    "intro": "Share the medical information you already have. RehletShifaa securely prepares your case for review by a credentialed consultant in the relevant specialty, then helps you understand the proposed next steps, initial cost estimate, and practical arrangements before you decide whether to travel.",
+    "primaryAction": "Request My Case Review",
+    "watchJourney": "See How It Works",
+    "reassurance": "You do not need a final diagnosis or procedure name to begin.",
     "assurances": [
-      "Reviewed by a consultant before you decide to travel",
-      "Reports uploaded through private, short-lived links",
-      "One coordinator, in Arabic or English, from first contact to follow-up"
+      "Consultant review before you decide whether to travel",
+      "Reports handled through private, short-lived upload links",
+      "One bilingual coordinator from first contact through follow-up"
     ],
+    "preliminaryNotice": "Recommendations and cost estimates are preliminary and may change after an in-person clinical assessment.",
     "heroCardTitle": "Begin with what you already have",
     "prepareItems": [
       "Your latest medical report or discharge summary",
@@ -130,7 +131,7 @@
     "finalTitle": "Start With Your Medical Case",
     "finalBody": "You don't need to know the name of the specialty or procedure. Send what you have. We'll help with the next step.",
     "finalNote": "Sending your case does not commit you to treatment or travel.",
-    "slogan": "Clarity before you travel. Support every step of the way.",
+    "slogan": "Clear information. One dedicated coordinator. The decision remains yours.",
     "areasIntro": "Start with the area closest to your need. Not sure? Send your case and your coordinator will help direct it.",
     "areasAction": "View care area",
     "consultantsPromise": {
