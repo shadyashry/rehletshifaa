@@ -411,7 +411,9 @@ function AdminForm({t,busy,locale,api,mutate}:{t:typeof copy.en;busy:boolean;loc
   selectedTitle:"الملف قيد العمل",selectedNone:"لم يُحدَّد ملف بعد",selectedHint:"أنشئ استشاريًا في الأعلى، أو الصق معرّف ملف موجودًا، لتفعيل الخطوتين 2 و3.",createdOk:"تم إنشاء الملف — تابِع خطوتي الاعتماد والقرار.",clear:"مسح",
   step2:"تسجيل مستند اعتماد موثّق",step2hint:"مثال: رخصة مزاولة، شهادة زمالة، أو وثيقة تأمين مسؤولية.",
   step3:"قرار الاعتماد",step3hint:"الموافقة تُتيح الاستشاري للتعيين على الحالات؛ الرفض يتطلب سببًا.",
-  staffTitle:"إضافة حساب موظف",staffHint:"أنشئ حساب منسّق أو عمليات أو مالية واربطه بمعرّف الهوية.",gated:"حدِّد ملفًا أولًا لتفعيل هذا الإجراء."
+  staffTitle:"إضافة حساب موظف",staffHint:"أنشئ حساب منسّق أو عمليات أو مالية واربطه بمعرّف الهوية.",gated:"حدِّد ملفًا أولًا لتفعيل هذا الإجراء.",
+  roleLabel:"الدور",roleCoordinator:"منسّق",roleOperations:"العمليات",roleFinance:"المالية",
+  teamLead:"قائد الفريق",leadHint:"يمنح صلاحيات القيادة، مثل إعادة تعيين ملكية الحالة بين المنسّقين.",leadUnavailable:"مستوى القيادة متاح للمنسّقين فقط حاليًا."
  }:{
   consoleTitle:"Credentialing console",consoleSubtitle:"Onboard consultants and staff, register credentials, and record verification decisions — each in its own place.",
   tabPractitioners:"Consultants",tabStaff:"Staff accounts",tabCatalog:"Price catalog",
@@ -421,7 +423,9 @@ function AdminForm({t,busy,locale,api,mutate}:{t:typeof copy.en;busy:boolean;loc
   selectedTitle:"Working on profile",selectedNone:"No profile selected yet",selectedHint:"Create a consultant above, or paste an existing profile ID, to enable steps 2 and 3.",createdOk:"Profile created — continue with the credential and decision steps.",clear:"Clear",
   step2:"Register verified credential",step2hint:"For example: practice licence, fellowship certificate, or indemnity cover.",
   step3:"Credentialing decision",step3hint:"Approving makes the consultant available for assignment; rejecting requires a reason.",
-  staffTitle:"Onboard a staff account",staffHint:"Create a coordinator, operations, or finance account and link it to an identity subject.",gated:"Select a profile first to enable this action."
+  staffTitle:"Onboard a staff account",staffHint:"Create a coordinator, operations, or finance account and link it to an identity subject.",gated:"Select a profile first to enable this action.",
+  roleLabel:"Role",roleCoordinator:"Coordinator",roleOperations:"Operations",roleFinance:"Finance",
+  teamLead:"Team lead",leadHint:"Grants lead permissions, such as reassigning case ownership between coordinators.",leadUnavailable:"A lead tier currently applies to coordinators only."
  };
  const tabs:Array<{id:AdminTab;label:string}>=[{id:"practitioners",label:L.tabPractitioners},{id:"staff",label:L.tabStaff},{id:"catalog",label:L.tabCatalog}];
  const selectProfile=(id:string)=>{setPractitionerId(id);setJustCreated(false);};
@@ -481,18 +485,37 @@ function AdminForm({t,busy,locale,api,mutate}:{t:typeof copy.en;busy:boolean;loc
    </div>
   </div>}
 
-  {tab==="staff"&&<div role="tabpanel"><form className="card max-w-2xl p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/coordinators",{name:data.get("name"),externalSubject:data.get("subject"),role:data.get("role")}).then(result=>{if(result)form.reset();});}}>
-   <StepHead title={L.staffTitle} hint={L.staffHint}/>
-   <div className="mt-5 grid gap-4 sm:grid-cols-2">
-    <Field label={t.name}><input className="field" name="name" required/></Field>
-    <Field label={t.subject}><input className="field" name="subject" required/></Field>
-    <Field label={t.coordinatorRole}><select className="field" name="role"><option value="COORDINATOR">COORDINATOR</option><option value="COORDINATOR_LEAD">COORDINATOR_LEAD</option><option value="OPERATIONS">OPERATIONS</option><option value="FINANCE">FINANCE</option></select></Field>
-   </div>
-   <div className="mt-5"><button disabled={busy} className="btn-primary">{t.create}</button></div>
-  </form></div>}
+  {tab==="staff"&&<div role="tabpanel"><StaffAccountForm t={t} L={L} busy={busy} mutate={mutate}/></div>}
 
   {tab==="catalog"&&<div role="tabpanel"><CatalogAdmin api={api} locale={locale}/></div>}
  </div>;
+}
+// Base staff role + a "Team lead" promotion checkbox. Only Coordinator has a lead tier in the role
+// model, so the checkbox shows for every role but activates only where a lead role actually exists —
+// professional intent over a literal (and broken) lead option for operations/finance.
+const STAFF_ROLES=["COORDINATOR","OPERATIONS","FINANCE"] as const;
+const LEAD_ROLE:Record<string,string>={COORDINATOR:"COORDINATOR_LEAD"};
+function StaffAccountForm({t,L,busy,mutate}:{t:typeof copy.en;L:Record<string,string>;busy:boolean;mutate:Mutate}){
+ const[role,setRole]=useState<string>("COORDINATOR");
+ const[lead,setLead]=useState(false);
+ const leadCapable=!!LEAD_ROLE[role];
+ const effectiveRole=leadCapable&&lead?LEAD_ROLE[role]:role;
+ const roleName=(value:string)=>value==="COORDINATOR"?L.roleCoordinator:value==="OPERATIONS"?L.roleOperations:L.roleFinance;
+ return <form className="card max-w-2xl p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/coordinators",{name:data.get("name"),externalSubject:data.get("subject"),role:effectiveRole}).then(result=>{if(result){form.reset();setRole("COORDINATOR");setLead(false);}});}}>
+  <StepHead title={L.staffTitle} hint={L.staffHint}/>
+  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+   <Field label={t.name}><input className="field" name="name" required/></Field>
+   <Field label={t.subject}><input className="field" name="subject" required/></Field>
+   <Field label={L.roleLabel}><select className="field" value={role} onChange={event=>setRole(event.target.value)}>{STAFF_ROLES.map(value=><option key={value} value={value}>{roleName(value)}</option>)}</select></Field>
+   <div className="flex items-end">
+    <label className={`flex w-full items-start gap-3 rounded-xl border p-3 ${leadCapable?"cursor-pointer border-line bg-brand-50/60":"border-line opacity-60"}`}>
+     <input type="checkbox" className="mt-0.5 h-4 w-4 flex-none accent-brand-600" checked={leadCapable&&lead} disabled={!leadCapable} onChange={event=>setLead(event.target.checked)}/>
+     <span className="text-sm"><span className="font-bold text-ink-800">{L.teamLead}</span><span className="mt-0.5 block text-xs text-ink-500">{leadCapable?L.leadHint:L.leadUnavailable}</span></span>
+    </label>
+   </div>
+  </div>
+  <div className="mt-5 flex flex-wrap items-center gap-3"><button disabled={busy} className="btn-primary">{t.create}</button><span className="text-sm text-ink-500">{roleName(role)}{leadCapable&&lead?` · ${L.teamLead}`:""}</span></div>
+ </form>;
 }
 function StepHead({n,title,hint}:{n?:number;title:string;hint:string}){return <div className="flex items-start gap-3 border-b border-line pb-4">{n!=null&&<span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">{n}</span>}<div><h3 className="title">{title}</h3><p className="mt-0.5 text-sm text-ink-500">{hint}</p></div></div>}
 function Field({label,children}:{label:string;children:React.ReactNode}){return <label className="block"><span className="mb-1 block text-sm font-bold text-ink-700">{label}</span>{children}</label>}
