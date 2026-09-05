@@ -5,7 +5,7 @@
   <text x="100" y="49" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="800" letter-spacing="-1.2">
     <tspan fill="#29454d">Rehlet</tspan><tspan fill="#65bdb5">Shifaa</tspan>
   </text>
-  <text x="100" y="82" direction="rtl" unicode-bidi="bidi-override" text-anchor="end" font-family="Cairo, Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">
-    <tspan fill="#65bdb5">شفاء</tspan><tspan fill="#29454d"> رحلة</tspan>
+  <text x="100" y="82" direction="rtl" unicode-bidi="isolate" text-anchor="end" font-family="Cairo, Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">
+    <tspan fill="#29454d">رحلة </tspan><tspan fill="#65bdb5">شفاء</tspan>
   </text>
 </svg>
