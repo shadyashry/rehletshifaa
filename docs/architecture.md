@@ -5,7 +5,7 @@
 - **Web:** Next.js App Router renders localized marketing, intake, and role portals. Browser OIDC Authorization Code + PKCE supplies short-lived access tokens; tokens use session storage rather than persistent local storage.
 - **API:** A Spring Boot modular monolith owns validation, state transitions, upload authorization, notification orchestration, and operational controls.
 - **Database:** PostgreSQL stores cases and document metadata. Flyway is the only schema-change mechanism.
-- **Identity:** Keycloak-compatible OIDC tokens map approved realm roles into Spring Security authorities. API services additionally enforce patient ownership or active case assignment.
+- **Identity:** Keycloak-compatible OIDC tokens map approved realm roles into Spring Security authorities. API services additionally enforce patient ownership or active case assignment. The Keycloak-hosted login/registration/reset/OTP pages use the branded `rehletshifaa` login theme (`infrastructure/keycloak/themes`) — bilingual EN/AR with RTL; the portal passes `ui_locales` on sign-in. See [commercial-workflow-status.md](commercial-workflow-status.md#keycloak-custom-login-theme-done).
 - **Object storage:** Medical files are private. The API issues short-lived presigned PUT URLs, enforces quotas, quarantines and scans content, and issues audited short-lived GET URLs only for clean objects.
 - **Notifications:** A transactional outbox retries SMTP and WhatsApp delivery with idempotency keys, exponential delay, and a terminal dead-letter state. Templates contain no clinical narrative.
 

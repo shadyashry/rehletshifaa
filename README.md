@@ -58,7 +58,7 @@ Then open:
 - Keycloak: http://localhost:8180 (admin console: `admin` / `Admin123!`)
 - MinIO console: http://localhost:9001 (`rehletshifaa` / `RehletShifaaLocal123!`)
 
-Compose uses PostgreSQL, Keycloak, private MinIO storage, ClamAV, and Mailpit. It is a development configuration only. Local portal users and passwords are documented in [docs/local-development.md](docs/local-development.md).
+Compose uses PostgreSQL, Keycloak, private MinIO storage, ClamAV, and Mailpit. It is a development configuration only. Sign-in uses the Keycloak-hosted, branded `rehletshifaa` login theme (bilingual EN/AR with RTL). Local portal users and passwords are documented in [docs/local-development.md](docs/local-development.md).
 
 To run each application directly:
 

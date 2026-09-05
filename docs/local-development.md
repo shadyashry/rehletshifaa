@@ -30,3 +30,9 @@ The local profile routes simulated WhatsApp messages to Mailpit at `patient@loca
 The local Compose file supplies development-only `CLAIM_TOKEN_PEPPER`, `PII_ENCRYPTION_KEY`, and `APP_WEB_BASE_URL` values. Production must use distinct random secrets and the public HTTPS web origin.
 
 The realm file is imported only into a new Keycloak data volume. To re-import changed seed data, remove only the named Compose development volumes after confirming no local data must be retained.
+
+The branded `rehletshifaa` login theme is bind-mounted from `infrastructure/keycloak/themes` with theme caching disabled, so CSS/logo edits appear on reload. Realm settings such as `loginTheme` are seeded on first import only; on an already-persisted `keycloak-data` volume, activate the theme once (idempotent, non-destructive — it never deletes the volume):
+
+```bash
+bash infrastructure/keycloak/apply-theme.sh
+```

@@ -99,6 +99,8 @@ Open `https://auth.your-domain.tld/admin` and sign in with the bootstrap adminis
 
 The production realm contains no demo users or default staff passwords. Realm import runs only when the realm does not already exist; later JSON edits must be applied through a reviewed Keycloak migration or Admin API process.
 
+The branded `rehletshifaa` login theme (bilingual EN/AR, RTL) is baked into the optimized Keycloak image — `deploy/oracle/keycloak/Dockerfile` copies `deploy/oracle/keycloak/themes` (kept in sync with `infrastructure/keycloak/themes`; see that directory's `README.md`) before `kc.sh build`. A fresh realm import sets `loginTheme` and EN/AR locales automatically; to activate the theme on a realm that already exists in the database, run `infrastructure/keycloak/apply-theme.sh` against the running container (idempotent; never deletes data).
+
 ## 7. Back up and update
 
 Create an encrypted application, identity, and document backup:
