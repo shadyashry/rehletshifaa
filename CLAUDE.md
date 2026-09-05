@@ -1,5 +1,15 @@
 # Project Instructions
 
+## Start here (current work)
+
+The active epic is the proposal-to-patient **commercial workflow** on branch
+`codex/end-to-end-care-platform`. Before changing related code, read
+**[docs/commercial-workflow-status.md](docs/commercial-workflow-status.md)** — the handoff
+covering what's implemented, the money model, migrations, tests, and the remaining backlog
+(the Keycloak theme is the main open item). See also
+[docs/end-to-end-workflows.md](docs/end-to-end-workflows.md) and
+[docs/architecture.md](docs/architecture.md).
+
 ## Running the local stack (Docker Compose)
 
 The live local environment is served through Cloudflare quick tunnels (`*.trycloudflare.com`).

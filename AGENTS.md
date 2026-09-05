@@ -1,5 +1,41 @@
 # Codex Project Instructions
 
+## Start here (current work)
+
+The active epic is the proposal-to-patient **commercial workflow** on branch
+`codex/end-to-end-care-platform`. Before changing related code, read
+**[`docs/commercial-workflow-status.md`](docs/commercial-workflow-status.md)** — it is the
+handoff: what is implemented, the money model, migrations, tests, and the remaining backlog
+(the Keycloak theme is the main open item). Behaviour is in
+[`docs/end-to-end-workflows.md`](docs/end-to-end-workflows.md); structure in
+[`docs/architecture.md`](docs/architecture.md).
+
+## Running the local stack (Docker Compose)
+
+The live local environment is served through Cloudflare quick tunnels (`*.trycloudflare.com`),
+whose URLs are baked into the containers by the **tunnel overlay** `docker-compose.tunnel.yml`.
+
+- To (re)build or start the stack, ALWAYS include the overlay:
+
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up --build -d
+  ```
+
+- NEVER run a bare `docker compose up` / `--build` (base file only): it recreates
+  keycloak/backend/frontend/minio with `localhost` config and rebuilds the frontend with
+  `localhost` API URLs baked in, breaking the tunnel-served portal. NEVER delete Docker volumes
+  (especially `keycloak-data`).
+- Ports: frontend 3000, backend 8080, keycloak 8180, minio 9000/9001, mailpit 8025.
+- `deploy/oracle/` is the separate public VM stack; do not run it locally.
+
+## Build, test, migrations
+
+- Backend is **offline Maven**: `cd backend && mvn -o -q test`. Do not add a dependency missing
+  from local `~/.m2` (breaks the offline build). Frontend gate: `cd frontend && pnpm typecheck`.
+- Flyway migrations are **additive and immutable** — never edit `V1`–`V15`; add `V16+`. Keep them
+  H2-safe (see the status doc: `TIMESTAMP WITH TIME ZONE`, no partial indexes, one `ADD COLUMN`
+  per `ALTER`, fixed seed UUIDs).
+
 ## Token-efficient workflow
 
 Use a proportional verification strategy. Match investigation and testing effort to the risk and scope of the requested change.
