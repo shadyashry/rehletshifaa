@@ -286,6 +286,17 @@ class SecureJourneyCorrectionsTest {
             .isInstanceOf(ApiException.class).hasMessageContaining("dedicated authorized operation");
     }
 
+    @Test void staffLeadsAreListedUnderTheirBaseFunctionDirectory() {
+        seedStaffMember("ops-lead-subject","OPERATIONS_LEAD");
+        seedStaffMember("ops-base-subject","OPERATIONS");
+        seedStaffMember("fin-lead-subject","FINANCE_LEAD");
+        // A lead is listed in — and therefore assignable through — its base-function directory.
+        authenticate("coordinator-subject","COORDINATOR");
+        assertThat(journey.staffDirectory("OPERATIONS")).extracting(StaffDirectoryView::subject).contains("ops-lead-subject","ops-base-subject");
+        assertThat(journey.staffDirectory("FINANCE")).extracting(StaffDirectoryView::subject).contains("fin-lead-subject");
+    }
+    private void seedStaffMember(String subject,String role){jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),subject,role,crypto.encrypt(role+" member"),Instant.now(),Instant.now());}
+
     @Test void coordinatorClassifiesCaseAndCanOnlyAssignAMatchingConsultant() {
         var created=cases.create(new CreateCaseRequest("Category Patient","Kenya","+254700000031","Reports","en",true,null,null,null));
         cases.submit(created.caseId());em.flush();em.clear();
