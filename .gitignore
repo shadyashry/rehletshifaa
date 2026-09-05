@@ -19,3 +19,9 @@ javac-*.args
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# Generated report/render artifacts (not source)
+.brand-render-cache/
+output/
+/RehletShifaaQATestProtocol.pdf
+/rehletshifaa-tester-access-guide.pdf
