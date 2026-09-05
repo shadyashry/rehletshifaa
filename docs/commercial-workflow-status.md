@@ -76,14 +76,23 @@ policy, or a requested policy exception. The ordinary margin never creates a cas
 `travel_package_requested` · `V13` document type + ranges + commercial policy · `V14` consent
 linkage + `ACKNOWLEDGED` decision · `V15` deposit policies + deposits + `payment_events`.
 
+## Keycloak custom login theme (done)
+
+Branded theme at `infrastructure/keycloak/themes/rehletshifaa/login` (parent `keycloak` classic; CSS +
+logo + EN/AR message bundles only, so KC's forms/validation survive upgrades). Warm cream + healing
+teal, soft-ink headings, pale-aqua surfaces; RTL via logical properties + KC's `dir="rtl"` for `ar`.
+Delivery: **local** bind-mounts the theme with caching off (`KC_SPI_THEME_CACHE_*=false`); **Oracle**
+`COPY`s a synced copy (`deploy/oracle/keycloak/themes`) into the `start --optimized` image. Both realm
+JSONs set `loginTheme` + `internationalizationEnabled` + `supportedLocales [en,ar]` for fresh imports;
+already-persisted realms are activated by the idempotent, non-destructive
+`infrastructure/keycloak/apply-theme.sh` (kcadm, never deletes the volume). The portal passes
+`ui_locales` on sign-in (`AuthProvider.signIn`). See `infrastructure/keycloak/themes/README.md`.
+Verified: EN + AR login forms render the theme (assets 200), teal primary button, `dir="rtl"` + Arabic
+labels under `ui_locales=ar`.
+
 ## Remaining work (backlog)
 
-1. **Keycloak custom theme** (the last headline deliverable): login/registration/reset/verify/OTP/
-   errors; warm cream + healing teal; EN/AR + RTL; **idempotent, non-destructive activation**
-   (never delete `keycloak-data`); apply to local and `deploy/oracle/keycloak/`. Realm-JSON import
-   does not re-theme an already-persisted realm — use a theme volume mount + `KC_SPI` theme settings
-   or a documented one-shot admin step.
-2. Optional: extract focused components out of `Portal.tsx` (do **not** rewrite the whole portal);
+1. Optional: extract focused components out of `Portal.tsx` (do **not** rewrite the whole portal);
    add a frontend test matrix (Playwright/Vitest) for the preliminary/final patient views, the gate
    checklist, and bilingual/RTL critical content.
 3. Decisions still owed to Egyptian legal/tax/PSP advisers (see references in the task brief): exact

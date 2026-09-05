@@ -6,7 +6,8 @@ The active epic is the proposal-to-patient **commercial workflow** on branch
 `codex/end-to-end-care-platform`. Before changing related code, read
 **[`docs/commercial-workflow-status.md`](docs/commercial-workflow-status.md)** — it is the
 handoff: what is implemented, the money model, migrations, tests, and the remaining backlog
-(the Keycloak theme is the main open item). Behaviour is in
+(the commercial workflow and the branded Keycloak login theme are done; optional Portal.tsx
+component extraction and a frontend test matrix remain). Behaviour is in
 [`docs/end-to-end-workflows.md`](docs/end-to-end-workflows.md); structure in
 [`docs/architecture.md`](docs/architecture.md).
 

@@ -1,0 +1,298 @@
+/* RehletShifaa — branded Keycloak login theme (parent: keycloak classic).
+   Palette: warm cream background, healing teal primary, soft ink headings,
+   pale aqua surfaces. Bilingual EN/AR with logical properties for RTL. */
+
+:root {
+  --rs-cream: #f7f3ec;
+  --rs-cream-2: #efe8dc;
+  --rs-surface: #ffffff;
+  --rs-aqua: #e6f2f0;
+  --rs-teal: #0f8a7e;
+  --rs-teal-strong: #0b6f66;
+  --rs-teal-soft: #14a599;
+  --rs-ink: #23343a;
+  --rs-ink-soft: #4a5b62;
+  --rs-border: #d9d0c2;
+  --rs-danger: #b23a48;
+  --rs-radius: 14px;
+  --rs-shadow: 0 18px 48px rgba(15, 138, 126, 0.12), 0 2px 8px rgba(35, 52, 58, 0.06);
+}
+
+html {
+  height: 100%;
+}
+
+body.login-pf,
+.login-pf body {
+  background: var(--rs-cream);
+  color: var(--rs-ink);
+  font-family: "Segoe UI", "Cairo", "Helvetica Neue", Arial, "Noto Sans Arabic", sans-serif;
+}
+
+/* Soft healing backdrop */
+body.login-pf {
+  background-color: var(--rs-cream);
+  background-image:
+    radial-gradient(1200px 620px at 88% -8%, rgba(20, 165, 153, 0.16), transparent 60%),
+    radial-gradient(980px 560px at -6% 108%, rgba(15, 138, 126, 0.12), transparent 60%);
+  background-attachment: fixed;
+}
+
+.login-pf-page {
+  padding-top: 3vh;
+  padding-inline: 1rem;
+}
+
+.login-pf-page .login-pf-page-header {
+  margin-bottom: 1.5rem;
+}
+
+/* Brand logo replaces the default realm-name text */
+#kc-header,
+#kc-header-wrapper {
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  white-space: normal;
+  text-shadow: none;
+  padding: 0;
+}
+
+#kc-header-wrapper {
+  display: block;
+  height: 92px;
+  background-image: url("../img/logo.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  filter: none;
+}
+
+/* Card */
+.card-pf {
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-border);
+  border-radius: var(--rs-radius);
+  box-shadow: var(--rs-shadow);
+  border-top: 4px solid var(--rs-teal);
+  padding: 2rem 2.25rem 2.25rem;
+  max-width: 480px;
+  margin-inline: auto;
+}
+
+#kc-page-title {
+  color: var(--rs-ink);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+#kc-content-wrapper {
+  margin-top: 0.75rem;
+}
+
+/* Labels & inputs */
+.control-label,
+label {
+  color: var(--rs-ink-soft);
+  font-weight: 600;
+}
+
+input.form-control,
+.pf-c-form-control,
+select.form-control {
+  border: 1px solid var(--rs-border);
+  border-radius: 10px;
+  background: var(--rs-cream);
+  color: var(--rs-ink);
+  min-height: 44px;
+  box-shadow: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+input.form-control:focus,
+.pf-c-form-control:focus,
+select.form-control:focus {
+  border-color: var(--rs-teal);
+  background: var(--rs-surface);
+  box-shadow: 0 0 0 3px rgba(20, 165, 153, 0.25);
+  outline: none;
+}
+
+/* Primary / secondary buttons */
+.btn {
+  border-radius: 10px;
+  min-height: 44px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.btn-primary,
+input.btn-primary {
+  background: var(--rs-teal);
+  border-color: var(--rs-teal-strong);
+  color: #ffffff;
+  transition: background 0.15s ease, transform 0.02s ease;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+input.btn-primary:hover,
+input.btn-primary:focus {
+  background: var(--rs-teal-strong);
+  border-color: var(--rs-teal-strong);
+  color: #ffffff;
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-default,
+.btn-secondary {
+  background: var(--rs-aqua);
+  border-color: #cfe4e0;
+  color: var(--rs-teal-strong);
+}
+
+/* PatternFly v4 buttons (KC 26 classic theme uses these) */
+.pf-c-button.pf-m-primary {
+  --pf-c-button--m-primary--BackgroundColor: var(--rs-teal);
+  --pf-c-button--m-primary--hover--BackgroundColor: var(--rs-teal-strong);
+  --pf-c-button--m-primary--focus--BackgroundColor: var(--rs-teal-strong);
+  --pf-c-button--m-primary--active--BackgroundColor: var(--rs-teal-strong);
+  background-color: var(--rs-teal);
+  border-radius: 10px;
+  min-height: 44px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.pf-c-button.pf-m-primary:hover,
+.pf-c-button.pf-m-primary:focus,
+.pf-c-button.pf-m-primary:active {
+  background-color: var(--rs-teal-strong);
+}
+
+/* Input-group control button (e.g. password show/hide) */
+.pf-c-button.pf-m-control {
+  border-radius: 0 10px 10px 0;
+  border-color: var(--rs-border);
+  color: var(--rs-ink-soft);
+}
+
+html[dir="rtl"] .pf-c-button.pf-m-control {
+  border-radius: 10px 0 0 10px;
+}
+
+.pf-c-form-control {
+  --pf-c-form-control--BorderTopColor: var(--rs-border);
+  --pf-c-form-control--BorderRightColor: var(--rs-border);
+  --pf-c-form-control--BorderBottomColor: var(--rs-border);
+  --pf-c-form-control--BorderLeftColor: var(--rs-border);
+  --pf-c-form-control--focus--BorderBottomColor: var(--rs-teal);
+}
+
+/* Links */
+a,
+#kc-registration a,
+#kc-info-wrapper a,
+.login-pf-page a {
+  color: var(--rs-teal-strong);
+  font-weight: 600;
+}
+
+a:hover {
+  color: var(--rs-teal);
+}
+
+/* Checkbox (remember me / consent) */
+.checkbox label,
+.login-pf-settings label {
+  color: var(--rs-ink-soft);
+  font-weight: 500;
+}
+
+/* Info / registration footer block */
+#kc-info,
+#kc-info-wrapper {
+  background: var(--rs-aqua);
+  border-radius: 0 0 var(--rs-radius) var(--rs-radius);
+  color: var(--rs-ink-soft);
+}
+
+/* Alerts */
+.alert {
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.alert-error,
+.pf-m-danger {
+  background: #fbeced;
+  border-color: #f0c4c9;
+  color: var(--rs-danger);
+}
+
+.alert-success,
+.pf-m-success {
+  background: var(--rs-aqua);
+  border-color: #bfe0da;
+  color: var(--rs-teal-strong);
+}
+
+/* Language switcher */
+#kc-locale ul {
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-border);
+  border-radius: 10px;
+  box-shadow: var(--rs-shadow);
+}
+
+#kc-locale-dropdown a {
+  color: var(--rs-ink-soft);
+}
+
+/* OTP / code inputs stay legible */
+input[type="text"][id*="otp"],
+input[name="otp"],
+#kc-otp-login-form input {
+  letter-spacing: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- RTL (Arabic) ---- */
+html[dir="rtl"] body,
+html[dir="rtl"] .card-pf,
+html[dir="rtl"] input.form-control,
+html[dir="rtl"] .pf-c-form-control {
+  text-align: right;
+}
+
+html[dir="rtl"] #kc-locale {
+  inset-inline-end: auto;
+  inset-inline-start: 20px;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 520px) {
+  .card-pf {
+    padding: 1.5rem 1.25rem 1.75rem;
+    border-radius: 12px;
+  }
+
+  #kc-header-wrapper {
+    height: 72px;
+  }
+}
+
+/* ---- Reduced motion & focus visibility (a11y) ---- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+:focus-visible {
+  outline: 3px solid rgba(20, 165, 153, 0.55);
+  outline-offset: 2px;
+}

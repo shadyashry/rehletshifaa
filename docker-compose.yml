@@ -20,9 +20,14 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: Admin123!
       KC_HEALTH_ENABLED: "true"
+      # Dev: serve theme edits live (no cache) so branding changes appear on reload.
+      KC_SPI_THEME_CACHE_THEMES: "false"
+      KC_SPI_THEME_CACHE_TEMPLATES: "false"
+      KC_SPI_THEME_STATIC_MAX_AGE: "-1"
     ports: ["8180:8080"]
     volumes:
       - ./infrastructure/keycloak/realm-rehletshifaa.json:/opt/keycloak/data/import/realm-rehletshifaa.json:ro
+      - ./infrastructure/keycloak/themes:/opt/keycloak/themes:ro
       - keycloak-data:/opt/keycloak/data
 
   minio:
