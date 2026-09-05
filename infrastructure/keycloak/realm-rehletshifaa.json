@@ -22,8 +22,8 @@
     "publicClient": true,
     "standardFlowEnabled": true,
     "directAccessGrantsEnabled": false,
-    "redirectUris": ["http://localhost:3000/*", "https://fisher-despite-tagged-talked.trycloudflare.com/*"],
-    "webOrigins": ["http://localhost:3000", "https://fisher-despite-tagged-talked.trycloudflare.com"],
+    "redirectUris": ["http://localhost:3000/*", "https://you-pull-digit-thus.trycloudflare.com/*"],
+    "webOrigins": ["http://localhost:3000", "https://you-pull-digit-thus.trycloudflare.com"],
     "attributes": {"pkce.code.challenge.method":"S256"}
   }],
   "users": [

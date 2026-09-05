@@ -7,7 +7,9 @@ Branded login/registration/reset/verify/OTP/error pages for the `rehletshifaa` r
   Keycloak's forms and validation keep working across upgrades.
 - **Bilingual:** English + Arabic with RTL handled via logical CSS properties and Keycloak's
   built-in `dir="rtl"` for `ar`.
-- **Logo:** `login/resources/img/logo.png` (copied from `frontend/public/brand/`).
+- **Logo:** `login/resources/img/brand-lockup.png`, generated from
+  `brand-lockup.svg` and the canonical `frontend/public/brand/icon.png` with the same bilingual
+  wordmark treatment as the website header.
 
 ## How it is delivered per environment
 
