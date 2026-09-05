@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 
 type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean };
-type Summary = { caseNumber: string; channel: string; destinationHint: string };
+type Summary = { caseNumber: string; channel: string; destinationHint: string; whatsappHint?: string | null; emailHint?: string | null };
 type Proposal = {
   caseNumber: string; patientName: string; documentType?: string; versionNumber?: number; currency?: string;
   items: Item[]; totalMin?: number; totalExpected?: number; totalMax?: number;
@@ -24,6 +24,7 @@ const copy = {
     treatmentLabel: "Clinical recommendation", risksLabel: "Risks & limitations", notesLabel: "Notes from your coordinator",
     verifyTitle: "Verify it's you", verifyIntroWhatsapp: "To protect your information, we'll send a 6-digit code to your WhatsApp",
     verifyIntroEmail: "To protect your information, we'll send a 6-digit code to your email",
+    emailInstead: "Use email instead", whatsappInstead: "Use WhatsApp instead",
     sendCode: "Send code", sending: "Sending…", codeSent: "We sent a code to", resend: "Resend code",
     codeLabel: "Enter the 6-digit code", codePlaceholder: "______", verify: "Verify", verifying: "Verifying…",
     requestRevision: "Request changes", decline: "Decline", commentLabel: "Add a note (optional)", deciding: "Submitting…",
@@ -54,6 +55,7 @@ const copy = {
     treatmentLabel: "التوصية السريرية", risksLabel: "المخاطر والقيود", notesLabel: "ملاحظات من منسّق حالتك",
     verifyTitle: "لنتأكد أنه أنت", verifyIntroWhatsapp: "لحماية معلوماتك، سنرسل رمزًا من 6 أرقام إلى واتساب الخاص بك",
     verifyIntroEmail: "لحماية معلوماتك، سنرسل رمزًا من 6 أرقام إلى بريدك الإلكتروني",
+    emailInstead: "استخدم البريد الإلكتروني بدلًا من ذلك", whatsappInstead: "استخدم واتساب بدلًا من ذلك",
     sendCode: "إرسال الرمز", sending: "جارٍ الإرسال…", codeSent: "أرسلنا رمزًا إلى", resend: "إعادة إرسال الرمز",
     codeLabel: "أدخل الرمز المكوّن من 6 أرقام", codePlaceholder: "______", verify: "تحقّق", verifying: "جارٍ التحقق…",
     requestRevision: "طلب تعديلات", decline: "رفض", commentLabel: "أضف ملاحظة (اختياري)", deciding: "جارٍ الإرسال…",
@@ -86,6 +88,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const [summary, setSummary] = useState<Summary | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [grant, setGrant] = useState("");
+  const [channel, setChannel] = useState<"WHATSAPP" | "EMAIL">("WHATSAPP");
   const [code, setCode] = useState("");
   const [comment, setComment] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
@@ -96,14 +99,14 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   useEffect(() => {
     void fetch(`${API}/api/v1/public/proposals/${token}`)
       .then(async (r) => { if (!r.ok) throw new Error(); return r.json() as Promise<Summary>; })
-      .then((s) => { setSummary(s); setPhase("intro"); })
+      .then((s) => { setSummary(s); setChannel(s.channel === "EMAIL" ? "EMAIL" : "WHATSAPP"); setPhase("intro"); })
       .catch(() => setPhase("invalid"));
   }, [token]);
 
-  async function requestAccess() {
+  async function requestAccess(ch: "WHATSAPP" | "EMAIL" = channel) {
     setBusy(true); setError("");
     try {
-      const r = await fetch(`${API}/api/v1/public/proposals/${token}/request-access`, { method: "POST" });
+      const r = await fetch(`${API}/api/v1/public/proposals/${token}/request-access`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch }) });
       if (r.status === 429) throw new Error(t.tooMany);
       if (!r.ok) throw new Error(t.error);
       setSummary((await r.json()) as Summary);
@@ -159,12 +162,22 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
           <div className="card p-6 sm:p-8">
             <p className="eyebrow">RehletShifaa · {summary.caseNumber}</p>
             <h1 className="headline mt-2">{t.verifyTitle}</h1>
-            <p className="mt-3 text-ink-700">{summary.channel === "WHATSAPP" ? t.verifyIntroWhatsapp : t.verifyIntroEmail} <strong dir="ltr">{summary.destinationHint}</strong>.</p>
+            <p className="mt-3 text-ink-700">{channel === "WHATSAPP" ? t.verifyIntroWhatsapp : t.verifyIntroEmail} <strong dir="ltr">{(channel === "WHATSAPP" ? summary.whatsappHint : summary.emailHint) ?? summary.destinationHint}</strong>.</p>
+            {(() => {
+              const other = channel === "WHATSAPP" ? "EMAIL" : "WHATSAPP";
+              const otherAvailable = other === "EMAIL" ? !!summary.emailHint : !!summary.whatsappHint;
+              return otherAvailable ? (
+                <button type="button" className="mt-3 text-sm font-bold text-brand-700 underline disabled:opacity-50" disabled={busy}
+                  onClick={() => { setChannel(other); setCode(""); if (phase === "code") void requestAccess(other); }}>
+                  {other === "EMAIL" ? t.emailInstead : t.whatsappInstead}
+                </button>
+              ) : null;
+            })()}
             {phase === "intro" ? (
               <button className="btn-primary mt-6 w-full" disabled={busy} onClick={() => void requestAccess()}>{busy ? t.sending : t.sendCode}</button>
             ) : (
               <>
-                <p className="mt-4 text-sm text-ink-600">{t.codeSent} <strong dir="ltr">{summary.destinationHint}</strong></p>
+                <p className="mt-4 text-sm text-ink-600">{t.codeSent} <strong dir="ltr">{(channel === "WHATSAPP" ? summary.whatsappHint : summary.emailHint) ?? summary.destinationHint}</strong></p>
                 <label className="mt-4 block text-sm font-bold">{t.codeLabel}
                   <input className="field mt-2 text-center tracking-[0.5em]" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder={t.codePlaceholder} aria-label={t.codeLabel} />
                 </label>

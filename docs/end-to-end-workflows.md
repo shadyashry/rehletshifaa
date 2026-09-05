@@ -1,12 +1,20 @@
 # End-to-end care workflows
 
-## Three distinct identity concepts
+## Distinct identity & conversion concepts
 
-The platform deliberately separates three things that used to be conflated:
+The platform deliberately separates things that must never be conflated. **Entering a WhatsApp/email OTP, acknowledging an estimate, activating a Keycloak account, or creating a deposit does not make the patient a legally verified or fully onboarded customer.**
 
-1. **Provisional patient record** — created internally the moment an anonymous case is submitted. No account, no password, no OTP is required to create it.
-2. **Verified identity** — a purpose-scoped, expiring, OTP-protected proof of contact ownership, required only for *sensitive pre-acceptance actions* (viewing clinical detail/pricing, deciding on a proposal). Verification never changes the operational/clinical case status.
-3. **Activated account** — a full patient account, **offered only after a proposal is accepted**. Activating it links the existing provisional profile — and therefore every related case — to the newly authenticated identity automatically.
+1. **Provisional patient profile** (`PROVISIONAL_PROFILE`) — created internally the moment an anonymous case is submitted. No account, no password, no legal identity proofing.
+2. **Contact-verified secure access** (`CONTACT_VERIFIED`) — a purpose-scoped, expiring, OTP-protected proof that the patient controls one *registered* contact channel. The verified channel is tracked separately (`WHATSAPP_VERIFIED` → `phone_verified_at`, `EMAIL_VERIFIED` → `email_verified_at`); one successfully verified selected channel is sufficient. It proves **contact possession, not legal identity**, and never changes case status.
+3. **Account activation** (`ACCOUNT_ACTIVATED`) — links the existing provisional profile (and every related case) to the authenticated subject. Activation **only** links the subject and consumes the one-time token; it is not contact verification and not identity verification, and it never sets a verification timestamp.
+4. **Legal identity verification** (`IDENTITY_VERIFIED`) — the patient or authorized representative passes a configured identity-proofing process (test simulator → authorized manual review, or a future external-provider adapter).
+5. **Onboarding completion** (`ONBOARDING_COMPLETED`) — required profile info, declarations, representative details and applicable consents are complete.
+6. **Deposit satisfaction** (`DEPOSIT_SATISFIED`) — no deposit required, PAID, or an authorized Finance waiver.
+7. **Customer readiness** (`COORDINATION_READY`) — all applicable conversion gates are satisfied (backend-computed).
+
+### Contact-channel choice
+
+When both a registered WhatsApp number and email exist, the patient chooses either channel for the OTP (default WhatsApp; "Use email instead"). One selected channel per challenge; switching or resending mints a fresh independent challenge and revokes the prior one. The destination is always the patient's own on-file contact — never a caller-supplied value — and public responses expose only masked destinations.
 
 New patients are never forced to register during inquiry, intake, consultant review, or proposal evaluation. Returning patients who already have accounts may sign in earlier.
 
@@ -20,13 +28,27 @@ New patients are never forced to register during inquiry, intake, consultant rev
 6. Pre-acceptance sensitive actions use purpose-scoped, expiring, case-scoped secure links protected by OTP.
 7. A verified consultant produces an approved clinical recommendation.
 8. The proposal completes only its **required** internal gates — Operations when a travel package was requested, Finance when any manual/off-catalog price is present — then the coordinator releases it (a catalog-only, no-travel quote releases immediately).
-9. Release mints the random, expiring, case-scoped **secure proposal link** and moves the case to `PATIENT_DECISION`. The patient verifies identity (OTP → short-lived view grant) before any clinical recommendation, risk, pricing, or document is exposed.
+9. Release mints the random, expiring, case-scoped **secure proposal link** and moves the case to `PATIENT_DECISION`. The patient completes **contact-verified secure access** (OTP → short-lived view grant) before any clinical recommendation, risk, pricing, or document is exposed — this proves contact possession, not legal identity.
 10. The patient accepts, declines, or requests a revision — recorded against the exact released version.
 11. On `ACCEPTED`, an account-activation invitation is sent to the already-verified contact.
 12. Activation links the existing profile and all related cases automatically (no manual case UUID/code re-entry).
 13. After activation the patient lands in "My Journey".
 14. A patient who declines needs no account. A revision stays in the verified-link journey until acceptance.
 15. Activation failure or delay never undoes proposal acceptance (acceptance is persisted independently).
+
+## Patient conversion layer (preliminary acknowledged → coordination-ready)
+
+Acknowledging a **preliminary estimate** is not final treatment-plan acceptance, not procedure-specific medical consent, and confirms no non-cancellable booking. On a preliminary `ACKNOWLEDGED` decision the platform additively:
+
+- idempotently creates/resumes a **`patient_onboardings`** record (unique per patient/case/acknowledged proposal; never for `DECLINED`/`REVISION_REQUESTED`);
+- creates the deposit via the existing `PaymentService`;
+- sends an account-activation invite when the provisional patient has no account.
+
+Nothing is auto-marked complete. The resumable onboarding sub-workflow (`OnboardingService`) then covers: patient / guardian / representative / payer selection (reusing `patient_representatives`; a **payer never gets medical-record access**), verified-contact display, **legal identity verification** (`IdentityVerificationService` + `IdentityVerificationPort`; authorized manual review by the narrowly-scoped `PATIENT_IDENTITY_REVIEWER` role, with recent authentication, reason and audit), applicable onboarding **consents** (reusing `consent_records` — procedure-specific consent stays doctor-owned and is not duplicated), **deposit** status (PAID or an authorized Finance waiver), and final review/submission.
+
+**Customer readiness** is computed only by the backend (`CustomerReadinessService` → `CustomerReadiness` DTO) and reports `accountActivated`, `contactVerified`, `verifiedChannel`, `identityRequired/Verified`, `onboardingCompleted`, `requiredConsentsCompleted`, `representativeAuthorizationValid`, `depositRequired/Status/Satisfied`, structured `blockingItems`, and `readyForCoordination`. The frontend renders this DTO verbatim and never infers readiness from unrelated statuses.
+
+**Where the gate sits:** administrative planning may proceed before payment, but the non-cancellable commitment (`upsertTravel` with `status=CONFIRMED`) requires full readiness — legacy cases with no onboarding record keep the pre-existing deposit-only gate (backward compatible), and progressed pre-feature cases use a documented `LEGACY_EXEMPT` state rather than any fabricated identity evidence. The macro transition `ACCEPTED → TRAVEL_COORDINATION` is **not** overloaded with the gate.
 
 ## Secure-link + OTP lifecycle
 

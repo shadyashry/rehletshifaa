@@ -10,8 +10,9 @@ RehletShifaa is a bilingual Arabic/English international-care coordination platf
 - Premium, responsive marketing pages and specialty/consultant discovery
 - Accessible multi-step case intake with consent and anti-spam support
 - Private, presigned document uploads with server-side confirmation
-- OTP-protected case status and information-response links before account activation
-- Role-scoped portals for patients, coordinators, doctors, operations, finance, credentialing, administration, and audit
+- OTP-protected case status and information-response links (contact-verified secure access — not legal identity) before account activation, with a patient-chosen WhatsApp or email channel
+- Patient conversion layer: resumable onboarding, legal identity verification (behind a provider port), applicable consents, deposit satisfaction/waiver, and a backend-computed customer-readiness gate before chargeable coordination
+- Role-scoped portals for patients, coordinators, doctors, operations, finance, credentialing, patient-identity review, administration, and audit
 - Versioned clinical reviews and proposals with clinical, operational, finance, and patient approvals
 - Durable notification outbox, immutable audit events, tasks, secure case messages, travel, treatment, and follow-up records
 - Privacy, terms, and medical-disclaimer pages

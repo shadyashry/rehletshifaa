@@ -19,9 +19,11 @@ continuing the proposal-to-patient **commercial workflow** epic. Read it with
   why CSV, not Apache POI, was used for the price-list import).
 - **Frontend**: `cd frontend && pnpm typecheck` (the reliable gate). `pnpm lint` has **two
   pre-existing errors** in `ProposalSign`/`TrackCaseLanding` unrelated to this epic.
-- Full backend suite is currently **52 tests, green**. Key classes:
+- Full backend suite is currently **79 tests, green**. Key classes:
   `JourneyServiceIntegrationTest` (the long end-to-end flows), `SecureJourneyCorrectionsTest`
-  (secure link/OTP/decision), `PricingCatalogServiceTest` (catalog + FX + CSV import).
+  (secure link/OTP/decision), `PricingCatalogServiceTest` (catalog + FX + CSV import),
+  `PatientConversionLayerTest` (contact-verification split, channel choice, onboarding, identity,
+  deposit waiver, readiness gate).
 - **Flyway migrations are additive** — never edit `V1`–`V15`; add `V16+`. H2 (test) runs in
   PostgreSQL mode; keep migrations H2-safe: `TIMESTAMP WITH TIME ZONE` (not `TIMESTAMPTZ`), no
   partial indexes (`WHERE`), one `ADD COLUMN` per `ALTER`, fixed UUIDs in seeds (not
@@ -74,7 +76,9 @@ policy, or a requested policy exception. The ordinary margin never creates a cas
 
 `V9` cost estimates · `V11` catalog/templates/FX + proposal snapshot cols · `V12`
 `travel_package_requested` · `V13` document type + ranges + commercial policy · `V14` consent
-linkage + `ACKNOWLEDGED` decision · `V15` deposit policies + deposits + `payment_events`.
+linkage + `ACKNOWLEDGED` decision · `V15` deposit policies + deposits + `payment_events` ·
+`V16` Meta WhatsApp delivery tracking · `V17` `patient_onboardings` · `V18`
+`patient_identity_verifications` · `V19` deposit-waiver columns on `deposits`.
 
 ## Keycloak custom login theme (done)
 
@@ -89,6 +93,32 @@ already-persisted realms are activated by the idempotent, non-destructive
 `ui_locales` on sign-in (`AuthProvider.signIn`). See `infrastructure/keycloak/themes/README.md`.
 Verified: EN + AR login forms render the theme (assets 200), teal primary button, `dir="rtl"` + Arabic
 labels under `ui_locales=ar`.
+
+## Patient conversion layer (done)
+
+Additive layer turning an acknowledged preliminary estimate into a coordination-ready customer, without
+rebuilding the commercial workflow. Terminology is now precise: OTP possession is **contact-verified
+secure access**, never legal identity (see [end-to-end-workflows.md](end-to-end-workflows.md#distinct-identity--conversion-concepts)).
+
+- **Verification split (correctness fix).** `JourneyService.activateAccount` now links `external_subject`
+  only — it no longer sets `phone_verified_at`. A verified OTP stamps only the channel used
+  (`WHATSAPP`→`phone_verified_at`, `EMAIL`→`email_verified_at`), preserving existing timestamps.
+- **Contact-channel choice.** `requestProposalAccess`/`requestAccess` accept an optional `channel`
+  (default WhatsApp; backward compatible). Destination always from the profile; masked in responses;
+  switching/resending revokes the prior challenge.
+- **Onboarding sub-workflow** — `patient_onboardings` (`OnboardingService`), created idempotently on
+  `ACKNOWLEDGED`; subject selection (reuses `patient_representatives`; payer gets no clinical access);
+  onboarding consents reuse `consent_records` (procedure-specific consent not duplicated); resumable.
+- **Legal identity verification** — `patient_identity_verifications` (`IdentityVerificationService` +
+  `IdentityVerificationPort`, `LocalSimulatorIdentityVerificationPort`); encrypted legal name/DOB, masked
+  doc ref, no biometrics; new `PATIENT_IDENTITY_REVIEWER` role (local + Oracle realms) with recent-auth,
+  reason, audit.
+- **Deposit waiver** — `PaymentService.waiveDeposit` (Finance/System-Admin, recent-auth, reason, audit;
+  additive `deposits.waived_*` columns preserve the append-only ledger).
+- **Customer readiness** — `CustomerReadinessService` → `CustomerReadiness` DTO; enforced at the
+  non-cancellable commitment (`upsertTravel` `CONFIRMED`); legacy cases keep the deposit-only gate;
+  `LEGACY_EXEMPT` for progressed pre-feature cases. Frontend: `PatientOnboarding.tsx`,
+  `CustomerReadinessCard.tsx`, and the `ProposalSign.tsx` channel picker.
 
 ## Remaining work (backlog)
 

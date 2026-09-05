@@ -8,6 +8,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @GetMapping("/cases/{caseId}/deposit")public DepositView deposit(@PathVariable UUID caseId){return payment.depositForCase(caseId);}
  @PostMapping("/cases/{caseId}/deposits/{depositId}/payments")public DepositView recordPayment(@PathVariable UUID caseId,@PathVariable UUID depositId,@Valid @RequestBody RecordReceiptRequest request){return payment.recordReceipt(caseId,depositId,request);}
  @PostMapping("/cases/{caseId}/deposits/{depositId}/refunds")public DepositView recordRefund(@PathVariable UUID caseId,@PathVariable UUID depositId,@Valid @RequestBody RefundRequest request){return payment.recordRefund(caseId,depositId,request);}
+ @PostMapping("/cases/{caseId}/deposits/{depositId}/waiver")public DepositView waive(@PathVariable UUID caseId,@PathVariable UUID depositId,@Valid @RequestBody DepositWaiverRequest request){return payment.waiveDeposit(caseId,depositId,request.reason());}
  @GetMapping("/deposit-policies")public List<DepositPolicyView>depositPolicies(){return payment.listPolicies();}
  @PutMapping("/deposit-policies")public DepositPolicyView configureDepositPolicy(@Valid @RequestBody DepositPolicyRequest request){return payment.configurePolicy(request);}
  @GetMapping("/cases")public List<CaseView>cases(){return service.assignedCases(ActorRole.FINANCE);}

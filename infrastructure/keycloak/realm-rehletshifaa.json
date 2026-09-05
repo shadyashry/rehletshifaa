@@ -12,7 +12,8 @@
   "defaultRoles": ["PATIENT"],
   "roles": {"realm": [
     {"name":"PATIENT"},{"name":"PATIENT_REPRESENTATIVE"},{"name":"COORDINATOR"},{"name":"COORDINATOR_LEAD"},
-    {"name":"DOCTOR"},{"name":"OPERATIONS"},{"name":"FINANCE"},{"name":"CREDENTIALING_ADMIN"},{"name":"SYSTEM_ADMIN"},{"name":"AUDITOR"}
+    {"name":"DOCTOR"},{"name":"OPERATIONS"},{"name":"FINANCE"},{"name":"CREDENTIALING_ADMIN"},{"name":"SYSTEM_ADMIN"},{"name":"AUDITOR"},
+    {"name":"PATIENT_IDENTITY_REVIEWER","description":"Reviews patient legal-identity proofing (distinct from practitioner CREDENTIALING_ADMIN)"}
   ]},
   "clients": [{
     "clientId": "rehletshifaa-web",

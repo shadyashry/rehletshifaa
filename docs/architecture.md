@@ -22,11 +22,15 @@ Pricing is EGP-based and computed only on the backend. Supporting services and t
 
 ## Patient identity model
 
-Three concepts are kept distinct (see `end-to-end-workflows.md`):
+Several concepts are kept strictly distinct (see `end-to-end-workflows.md`). OTP possession is **not** identity:
 
-- **Provisional patient record** — created internally on submission; no account required.
-- **Verified identity** — an OTP-protected, purpose-scoped, expiring proof of contact ownership required only for sensitive pre-acceptance actions. It never changes case status.
-- **Activated account** — offered only after a proposal is accepted; activation links the provisional profile and all its cases to the authenticated subject automatically.
+- **Provisional patient profile** (`PROVISIONAL_PROFILE`) — created internally on submission; no account, no legal identity proofing.
+- **Contact-verified secure access** (`CONTACT_VERIFIED`) — an OTP-protected, purpose-scoped, expiring proof that the patient controls one *registered* contact channel (`WHATSAPP_VERIFIED` → `phone_verified_at`, `EMAIL_VERIFIED` → `email_verified_at`). It proves contact possession only, never legal identity, and never changes case status.
+- **Account activation** (`ACCOUNT_ACTIVATED`) — offered after a proposal is acknowledged/accepted; activation links the provisional profile and all its cases to the authenticated subject. Activation **only** links `external_subject` and consumes the one-time token — it never sets a contact-verification timestamp and is not identity verification.
+- **Legal identity verification** (`IDENTITY_VERIFIED`) — a configured identity-proofing process for the patient or authorized representative (`patient_identity_verifications`, behind `IdentityVerificationPort`). Minimum-necessary data only; legal name/DOB encrypted, document reference masked, no biometrics stored.
+- **Onboarding completion** (`ONBOARDING_COMPLETED`) — required profile/declarations/representative details and applicable consents complete (`patient_onboardings`, never folded into `medical_cases.status`).
+- **Deposit satisfaction** (`DEPOSIT_SATISFIED`) — no deposit required, or PAID, or an authorized Finance waiver (`deposits.waived_at`).
+- **Customer readiness** (`COORDINATION_READY`) — the single backend-computed `CustomerReadiness` DTO combining all applicable gates; enforced server-side before chargeable/non-cancellable coordination.
 
 Purpose-scoped links (`case_access_links`, `proposal_share_tokens`), verification challenges (`case_access_challenges`, `proposal_access_challenges`), and activation tokens (`account_activations`) store only pepper-hashed secrets. Raw OTPs and link tokens are encrypted inside the notification outbox; the initial status token is also returned once to the submitting browser for the confirmation-page link.
 

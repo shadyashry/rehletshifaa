@@ -396,7 +396,8 @@
         <tbody>
           <tr><td>Consent + anti-abuse</td><td>Case creation &amp; document ops</td><td><code>consent</code>, Turnstile, per-IP rate limit</td></tr>
           <tr><td>Document safety</td><td>Every uploaded file</td><td>MIME + size + true signature + ClamAV, quarantine, quotas</td></tr>
-          <tr><td>Verified secure access</td><td>Status, information response, proposal view/decision</td><td>purpose-scoped hashed link + on-demand OTP + short-lived hashed grant</td></tr>
+          <tr><td>Contact-verified secure access</td><td>Status, information response, proposal view/decision</td><td>purpose-scoped hashed link + patient-chosen (WhatsApp/email) on-demand OTP + short-lived hashed grant — proves contact possession, <b>not</b> legal identity</td></tr>
+          <tr><td>Customer readiness</td><td>Non-cancellable commitment (confirmed travel/booking)</td><td>backend-computed <code>CustomerReadiness</code>: account activated + contact verified + <b>legal identity verified</b> + consents + onboarding submitted + deposit paid/waived (legacy cases keep the deposit-only gate)</td></tr>
           <tr><td>Verified practitioner</td><td>Doctor assignment (step 6)</td><td><code>VERIFIED</code>, consultant, available, current verified credential</td></tr>
           <tr><td>Clinical-before-commercial</td><td>Proposal creation (step 9)</td><td>requires an <code>APPROVED</code> clinical review</td></tr>
           <tr><td>Step-up re-authentication</td><td>Clinical approval, finance approval, authenticated patient decision</td><td>recent OIDC authentication/token issue time (≤10 min), redirect to login when stale</td></tr>

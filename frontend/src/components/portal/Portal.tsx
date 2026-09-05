@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { CaseWorkflowActions, TaskCreateForm } from "@/components/portal/CaseWorkflowActions";
+import { PatientOnboarding } from "@/components/portal/PatientOnboarding";
+import { CustomerReadinessCard } from "@/components/portal/CustomerReadinessCard";
 import type { Locale } from "@/lib/i18n";
 
 type CaseView={id:string;caseNumber:string;status:string;patientName:string;country:string;preferredLanguage:string;careCategory?:string;createdAt:string;updatedAt:string;version:number;coordinatorSubject?:string;doctorSubject?:string;coordinatorName?:string;doctorName?:string;travelPackageRequested?:boolean};
@@ -144,6 +146,8 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
     {c.doctorName&&role!=="patient"&&<Fact label={t.consultantLabel} value={`${c.doctorName}${isDoctor&&doctorAssignment&&doctorAssignment.assigneeSubject===mySubject?` (${t.you})`:""}`}/>}
    </div>
   </div>
+  {role==="patient"&&["ACCEPTED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED","TREATMENT_IN_PROGRESS","DISCHARGED","FOLLOW_UP"].includes(c.status)&&<div className="mt-6"><PatientOnboarding caseId={c.id} locale={locale}/></div>}
+  {isCoordinator&&["ACCEPTED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED"].includes(c.status)&&<div className="mt-6 card p-5"><CustomerReadinessCard caseId={c.id} role="coordinator" locale={locale}/></div>}
   {doctorReviewComplete&&<div className="mt-6 card flex items-center gap-3 border-l-4 border-brand-500 bg-brand-50 p-5"><span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-brand-600 font-bold text-white">✓</span><p className="font-bold text-brand-800">{c.status==="CLINICAL_RECOMMENDATION_READY"?t.doctorAccepted:c.status==="INFORMATION_REQUIRED"?t.doctorInfoSent:c.status==="CLINICALLY_NOT_SUITABLE"?t.doctorNotSuitable:t.doctorReturned}</p></div>}
   <div>
   {isCoordinator&&!owned&&<div className="mt-6 card flex flex-wrap items-center justify-between gap-3 border-l-4 border-brand-400 p-5"><p className="text-ink-600">{c.coordinatorSubject?t.ownedByOther:t.ownershipHint}</p>{!c.coordinatorSubject&&<button className="btn-primary" disabled={busy} onClick={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}>{t.coordinatorClaim}</button>}</div>}

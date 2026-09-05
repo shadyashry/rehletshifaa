@@ -45,7 +45,8 @@
       {"name": "FINANCE"},
       {"name": "CREDENTIALING_ADMIN"},
       {"name": "SYSTEM_ADMIN"},
-      {"name": "AUDITOR"}
+      {"name": "AUDITOR"},
+      {"name": "PATIENT_IDENTITY_REVIEWER", "description": "Reviews patient legal-identity proofing (distinct from practitioner CREDENTIALING_ADMIN)"}
     ]
   },
   "clients": [

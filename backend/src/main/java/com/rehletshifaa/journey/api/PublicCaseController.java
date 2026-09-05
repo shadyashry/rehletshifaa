@@ -17,7 +17,7 @@ public class PublicCaseController {
     public PublicCaseController(PublicCaseAccessService service){this.service=service;}
     @PostMapping("/recover") @ResponseStatus(HttpStatus.ACCEPTED) public CaseLinkRecoveryResponse recover(@Valid @RequestBody CaseLinkRecoveryRequest request){service.recoverStatusLink(request);return new CaseLinkRecoveryResponse("If the details match a case, a secure tracking link will be sent shortly.");}
     @GetMapping("/{token}") public CaseAccessSummary summary(@PathVariable String token){return service.summary(token);}
-    @PostMapping("/{token}/request-access") public CaseAccessSummary requestAccess(@PathVariable String token){return service.requestAccess(token);}
+    @PostMapping("/{token}/request-access") public CaseAccessSummary requestAccess(@PathVariable String token,@RequestBody(required=false) @Valid com.rehletshifaa.journey.api.JourneyDtos.ProposalAccessRequest request){return service.requestAccess(token,request==null?null:request.channel());}
     @PostMapping("/{token}/verify") public CaseAccessGrant verify(@PathVariable String token,@Valid @RequestBody CaseAccessVerifyRequest request){return service.verify(token,request.code());}
     @PostMapping("/{token}/view") public PublicCaseStatus view(@PathVariable String token,@Valid @RequestBody CaseAccessRequest request){return service.view(token,request.grant());}
     @PostMapping("/{token}/respond") public UUID respond(@PathVariable String token,@Valid @RequestBody InformationResponseRequest request){return service.respond(token,request);}

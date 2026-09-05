@@ -158,6 +158,44 @@ public class PaymentService {
         return s == null || "PAID".equals(s); // no deposit required => not blocking
     }
 
+    private record DepositState(UUID id, String status, java.time.Instant waivedAt) {}
+    private DepositState latestDeposit(UUID caseId) {
+        return jdbc.sql("SELECT id,status,waived_at FROM deposits WHERE case_id=? AND status<>'CANCELLED' ORDER BY created_at DESC LIMIT 1").param(caseId)
+                .query((rs, n) -> new DepositState(rs.getObject("id", UUID.class), rs.getString("status"), rs.getObject("waived_at", java.time.OffsetDateTime.class) == null ? null : rs.getObject("waived_at", java.time.OffsetDateTime.class).toInstant())).optional().orElse(null);
+    }
+    /** True when an authorized Finance/System-Admin waiver has been recorded on the active deposit. */
+    public boolean depositWaived(UUID caseId) { DepositState d = latestDeposit(caseId); return d != null && d.waivedAt() != null; }
+    /** Deposit readiness: no deposit required, or PAID, or WAIVED by an authorized actor. */
+    public boolean depositSatisfied(UUID caseId) {
+        DepositState d = latestDeposit(caseId);
+        if (d == null) return anticipatedCoordinationDepositEgp(caseId).signum() <= 0;
+        return d.waivedAt() != null || "PAID".equals(d.status());
+    }
+    /** Patient-safe deposit status string for readiness: NONE / REQUIRED / REQUESTED / PARTIALLY_PAID / PAID / WAIVED. */
+    public String depositStatusFor(UUID caseId) {
+        DepositState d = latestDeposit(caseId);
+        if (d != null && d.waivedAt() != null) return "WAIVED";
+        if (d != null) return d.status();
+        return anticipatedCoordinationDepositEgp(caseId).signum() > 0 ? "REQUIRED" : "NONE";
+    }
+
+    /**
+     * Record an authorized deposit waiver. Requires recent authentication, an explicit Finance/System-Admin
+     * role and a mandatory reason — there is no silent coordinator waiver. The append-only payment_events
+     * ledger is preserved untouched: the waiver is captured as narrowly-scoped columns plus an audit event.
+     */
+    @Transactional
+    public DepositView waiveDeposit(UUID caseId, UUID depositId, String reason) {
+        var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.FINANCE, ActorRole.SYSTEM_ADMIN);
+        if (reason == null || reason.isBlank()) throw new ApiException(400, "WAIVER_REASON_REQUIRED", "A reason is required to waive a deposit");
+        requireDeposit(caseId, depositId);
+        int changed = jdbc.sql("UPDATE deposits SET waived_at=?,waived_by=?,waiver_reason=?,version=version+1 WHERE id=? AND waived_at IS NULL AND status<>'CANCELLED'")
+                .params(timestamp(clock.instant()), actor.subject(), reason.trim(), depositId).update();
+        if (changed != 1) throw new ApiException(409, "DEPOSIT_NOT_WAIVABLE", "This deposit cannot be waived");
+        audit(actor, caseId, "DEPOSIT_WAIVED", depositId, reason.trim());
+        return depositForCase(caseId);
+    }
+
     // ---- helpers ----
     private void requireDeposit(UUID caseId, UUID depositId) {
         Integer c = jdbc.sql("SELECT count(*) FROM deposits WHERE id=? AND case_id=?").params(depositId, caseId).query(Integer.class).single();

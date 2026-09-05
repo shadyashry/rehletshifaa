@@ -20,8 +20,10 @@ public class PublicProposalController {
 
     /** Non-sensitive summary for a valid link (case number + masked contact hint). */
     @GetMapping("/{token}") public PublicProposalSummary summary(@PathVariable String token){return service.publicProposalSummary(token);}
-    /** Send (or resend) the OTP to the verified contact. */
-    @PostMapping("/{token}/request-access") public PublicProposalSummary requestAccess(@PathVariable String token){return service.requestProposalAccess(token);}
+    /** Send (or resend) the OTP to the patient's own registered contact. The optional body may choose the
+     *  channel ({"channel":"WHATSAPP"|"EMAIL"}); absent => default (WhatsApp when available). Old clients
+     *  that send no body keep working. The destination is never caller-supplied. */
+    @PostMapping("/{token}/request-access") public PublicProposalSummary requestAccess(@PathVariable String token,@RequestBody(required=false) @Valid ProposalAccessRequest request){return service.requestProposalAccess(token,request==null?null:request.channel());}
     /** Exchange the OTP for a short-lived view grant. */
     @PostMapping("/{token}/verify") public ProposalAccessGrant verify(@PathVariable String token,@Valid @RequestBody ProposalVerifyRequest request){return service.verifyProposalAccess(token,request.code());}
     /** Full sensitive view — requires a valid grant. */

@@ -15,6 +15,7 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/doctor/**").hasRole("DOCTOR")
         .requestMatchers("/api/v1/operations/**").hasRole("OPERATIONS")
         .requestMatchers("/api/v1/finance/**").hasRole("FINANCE")
+        .requestMatchers("/api/v1/identity-review/**").hasAnyRole("PATIENT_IDENTITY_REVIEWER","SYSTEM_ADMIN")
         .requestMatchers("/api/v1/tasks/**").authenticated()
         .requestMatchers("/api/v1/admin/**").hasAnyRole("CREDENTIALING_ADMIN","SYSTEM_ADMIN","AUDITOR")
         .requestMatchers(HttpMethod.GET,"/api/v1/documents/*/download").authenticated()
