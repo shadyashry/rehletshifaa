@@ -6,20 +6,20 @@ services:
     command:
       - start-dev
       - --import-realm
-      - --hostname=https://divide-interested-statutes-blend.trycloudflare.com
+      - --hostname=https://motorcycle-pilot-rings-shoot.trycloudflare.com
       - --proxy-headers=xforwarded
 
   minio:
     environment:
-      MINIO_API_CORS_ALLOW_ORIGIN: https://fisher-despite-tagged-talked.trycloudflare.com
+      MINIO_API_CORS_ALLOW_ORIGIN: https://you-pull-digit-thus.trycloudflare.com
 
   backend:
     environment:
-      FRONTEND_ALLOWED_ORIGINS: https://fisher-despite-tagged-talked.trycloudflare.com
-      APP_PUBLIC_BASE_URL: https://dallas-observation-extend-era.trycloudflare.com
-      APP_WEB_BASE_URL: https://fisher-despite-tagged-talked.trycloudflare.com
-      OIDC_ISSUER_URI: https://divide-interested-statutes-blend.trycloudflare.com/realms/rehletshifaa
-      S3_PUBLIC_ENDPOINT: https://silent-break-rocky-ireland.trycloudflare.com
+      FRONTEND_ALLOWED_ORIGINS: https://you-pull-digit-thus.trycloudflare.com
+      APP_PUBLIC_BASE_URL: https://spider-modems-assumed-purple.trycloudflare.com
+      APP_WEB_BASE_URL: https://you-pull-digit-thus.trycloudflare.com
+      OIDC_ISSUER_URI: https://motorcycle-pilot-rings-shoot.trycloudflare.com/realms/rehletshifaa
+      S3_PUBLIC_ENDPOINT: https://properties-fraction-winner-allowing.trycloudflare.com
       WHATSAPP_MODE: ${WHATSAPP_MODE:-noop}
       WHATSAPP_META_GRAPH_VERSION: ${WHATSAPP_META_GRAPH_VERSION:-v23.0}
       WHATSAPP_META_PHONE_NUMBER_ID: ${WHATSAPP_META_PHONE_NUMBER_ID:-}
@@ -33,17 +33,17 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_BASE_URL: https://dallas-observation-extend-era.trycloudflare.com
-        NEXT_PUBLIC_SITE_URL: https://fisher-despite-tagged-talked.trycloudflare.com
-        NEXT_PUBLIC_STORAGE_ORIGIN: https://silent-break-rocky-ireland.trycloudflare.com
+        NEXT_PUBLIC_API_BASE_URL: https://spider-modems-assumed-purple.trycloudflare.com
+        NEXT_PUBLIC_SITE_URL: https://you-pull-digit-thus.trycloudflare.com
+        NEXT_PUBLIC_STORAGE_ORIGIN: https://properties-fraction-winner-allowing.trycloudflare.com
         NEXT_PUBLIC_WHATSAPP_NUMBER: "201010447898"
         NEXT_PUBLIC_TURNSTILE_SITE_KEY: ""
-        NEXT_PUBLIC_OIDC_AUTHORITY: https://divide-interested-statutes-blend.trycloudflare.com/realms/rehletshifaa
+        NEXT_PUBLIC_OIDC_AUTHORITY: https://motorcycle-pilot-rings-shoot.trycloudflare.com/realms/rehletshifaa
         NEXT_PUBLIC_OIDC_CLIENT_ID: rehletshifaa-web
     environment:
-      NEXT_PUBLIC_API_BASE_URL: https://dallas-observation-extend-era.trycloudflare.com
-      NEXT_PUBLIC_SITE_URL: https://fisher-despite-tagged-talked.trycloudflare.com
-      NEXT_PUBLIC_STORAGE_ORIGIN: https://silent-break-rocky-ireland.trycloudflare.com
+      NEXT_PUBLIC_API_BASE_URL: https://spider-modems-assumed-purple.trycloudflare.com
+      NEXT_PUBLIC_SITE_URL: https://you-pull-digit-thus.trycloudflare.com
+      NEXT_PUBLIC_STORAGE_ORIGIN: https://properties-fraction-winner-allowing.trycloudflare.com
       NEXT_PUBLIC_WHATSAPP_NUMBER: "201010447898"
-      NEXT_PUBLIC_OIDC_AUTHORITY: https://divide-interested-statutes-blend.trycloudflare.com/realms/rehletshifaa
+      NEXT_PUBLIC_OIDC_AUTHORITY: https://motorcycle-pilot-rings-shoot.trycloudflare.com/realms/rehletshifaa
       NEXT_PUBLIC_OIDC_CLIENT_ID: rehletshifaa-web
