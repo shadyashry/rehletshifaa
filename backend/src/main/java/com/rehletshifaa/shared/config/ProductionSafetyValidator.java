@@ -32,12 +32,19 @@ public class ProductionSafetyValidator implements ApplicationRunner {
         require(failures, "OIDC_JWK_SET_URI", true);
         require(failures, "CLAIM_TOKEN_PEPPER", false);
         require(failures, "PII_ENCRYPTION_KEY", false);
-        require(failures, "WHATSAPP_WEBHOOK_URL", true);
-        require(failures, "WHATSAPP_TOKEN", false);
+        String whatsappMode=environment.getProperty("app.whatsapp.mode", "");
+        if ("webhook".equals(whatsappMode)) {
+            require(failures, "WHATSAPP_WEBHOOK_URL", true);
+            require(failures, "WHATSAPP_TOKEN", false);
+        } else if ("meta".equals(whatsappMode)) {
+            require(failures, "WHATSAPP_META_PHONE_NUMBER_ID", false);
+            require(failures, "WHATSAPP_META_ACCESS_TOKEN", false);
+            require(failures, "WHATSAPP_META_VERIFY_TOKEN", false);
+            require(failures, "WHATSAPP_META_APP_SECRET", false);
+        } else failures.add("WHATSAPP_MODE must resolve to webhook or meta");
         if (!"s3".equals(environment.getProperty("app.storage.mode"))) failures.add("STORAGE_MODE must resolve to s3");
         if (!"smtp".equals(environment.getProperty("app.mail.mode"))) failures.add("MAIL_MODE must resolve to smtp");
         if (!"live".equals(environment.getProperty("app.notifications.mode"))) failures.add("NOTIFICATIONS_MODE must resolve to live");
-        if (!"webhook".equals(environment.getProperty("app.whatsapp.mode"))) failures.add("WHATSAPP_MODE must resolve to webhook");
         if (!environment.getProperty("app.security.enabled", Boolean.class, false)) failures.add("APP_SECURITY_ENABLED must resolve to true");
         if (!environment.getProperty("app.turnstile.enabled", Boolean.class, false)) failures.add("TURNSTILE_ENABLED must resolve to true");
         if (!failures.isEmpty()) throw new IllegalStateException("Unsafe production configuration: " + String.join("; ", failures));

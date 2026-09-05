@@ -20,6 +20,14 @@ services:
       APP_WEB_BASE_URL: https://fisher-despite-tagged-talked.trycloudflare.com
       OIDC_ISSUER_URI: https://divide-interested-statutes-blend.trycloudflare.com/realms/rehletshifaa
       S3_PUBLIC_ENDPOINT: https://silent-break-rocky-ireland.trycloudflare.com
+      WHATSAPP_MODE: ${WHATSAPP_MODE:-noop}
+      WHATSAPP_META_GRAPH_VERSION: ${WHATSAPP_META_GRAPH_VERSION:-v23.0}
+      WHATSAPP_META_PHONE_NUMBER_ID: ${WHATSAPP_META_PHONE_NUMBER_ID:-}
+      WHATSAPP_META_ACCESS_TOKEN: ${WHATSAPP_META_ACCESS_TOKEN:-}
+      WHATSAPP_META_VERIFY_TOKEN: ${WHATSAPP_META_VERIFY_TOKEN:-}
+      WHATSAPP_META_APP_SECRET: ${WHATSAPP_META_APP_SECRET:-}
+      WHATSAPP_META_AUTH_TEMPLATE: ${WHATSAPP_META_AUTH_TEMPLATE:-}
+      WHATSAPP_META_AUTH_TEMPLATE_LANGUAGE: ${WHATSAPP_META_AUTH_TEMPLATE_LANGUAGE:-en_US}
 
   frontend:
     build:

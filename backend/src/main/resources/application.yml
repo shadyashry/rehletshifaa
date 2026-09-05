@@ -86,6 +86,15 @@ app:
     mode: ${WHATSAPP_MODE:noop}
     webhook-url: ${WHATSAPP_WEBHOOK_URL:}
     token: ${WHATSAPP_TOKEN:}
+    meta:
+      graph-base-url: ${WHATSAPP_META_GRAPH_BASE_URL:https://graph.facebook.com}
+      graph-version: ${WHATSAPP_META_GRAPH_VERSION:v23.0}
+      phone-number-id: ${WHATSAPP_META_PHONE_NUMBER_ID:}
+      access-token: ${WHATSAPP_META_ACCESS_TOKEN:}
+      verify-token: ${WHATSAPP_META_VERIFY_TOKEN:}
+      app-secret: ${WHATSAPP_META_APP_SECRET:}
+      authentication-template: ${WHATSAPP_META_AUTH_TEMPLATE:}
+      authentication-template-language: ${WHATSAPP_META_AUTH_TEMPLATE_LANGUAGE:en_US}
   turnstile:
     enabled: ${TURNSTILE_ENABLED:false}
     secret: ${TURNSTILE_SECRET:}
