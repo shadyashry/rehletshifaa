@@ -6,7 +6,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @GetMapping("/me")public DoctorProfileView me(){return service.myDoctorProfile();}
  @GetMapping("/catalog")public List<CatalogServiceView>catalog(){return pricing.myCatalog();}
  @GetMapping("/fx-rates")public List<FxRateView>fxRates(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return pricing.fxRates(date);}
- @GetMapping("/cases")public List<CaseView>cases(){return service.assignedCases(ActorRole.DOCTOR);}
+ @GetMapping("/cases")public List<StaffCaseCardView>cases(){return service.assignedCaseCards(ActorRole.DOCTOR);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@RequestParam boolean accept){return service.acceptDoctorAssignment(caseId,assignmentId,accept);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}

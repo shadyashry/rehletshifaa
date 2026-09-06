@@ -3,7 +3,7 @@ import com.rehletshifaa.journey.application.JourneyService;import com.rehletshif
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/operations") public class OperationsJourneyController{
  private final JourneyService service;public OperationsJourneyController(JourneyService service){this.service=service;}
- @GetMapping("/cases")public List<CaseView>cases(){return service.assignedCases(ActorRole.OPERATIONS);}
+ @GetMapping("/cases")public List<StaffCaseCardView>cases(){return service.assignedCaseCards(ActorRole.OPERATIONS);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@RequestParam boolean accept){return service.decideAssignment(caseId,assignmentId,accept,ActorRole.OPERATIONS);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}

@@ -11,7 +11,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/deposits/{depositId}/waiver")public DepositView waive(@PathVariable UUID caseId,@PathVariable UUID depositId,@Valid @RequestBody DepositWaiverRequest request){return payment.waiveDeposit(caseId,depositId,request.reason());}
  @GetMapping("/deposit-policies")public List<DepositPolicyView>depositPolicies(){return payment.listPolicies();}
  @PutMapping("/deposit-policies")public DepositPolicyView configureDepositPolicy(@Valid @RequestBody DepositPolicyRequest request){return payment.configurePolicy(request);}
- @GetMapping("/cases")public List<CaseView>cases(){return service.assignedCases(ActorRole.FINANCE);}
+ @GetMapping("/cases")public List<StaffCaseCardView>cases(){return service.assignedCaseCards(ActorRole.FINANCE);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@RequestParam boolean accept){return service.decideAssignment(caseId,assignmentId,accept,ActorRole.FINANCE);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
