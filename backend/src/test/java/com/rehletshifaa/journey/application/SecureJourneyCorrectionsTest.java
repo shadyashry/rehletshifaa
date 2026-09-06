@@ -243,6 +243,9 @@ class SecureJourneyCorrectionsTest {
         authenticate("coordinator-subject","COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(),"pod");
         jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"replacement-coordinator","COORDINATOR",crypto.encrypt("Replacement Coordinator"),Instant.now(),Instant.now());
+        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"lead-subject","COORDINATOR_LEAD",crypto.encrypt("Team Lead"),Instant.now(),Instant.now());
+        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"coordinator-subject","COORDINATOR",crypto.encrypt("Original Coordinator"),Instant.now(),Instant.now());
+        jdbc.update("UPDATE staff_members SET manager_subject='lead-subject' WHERE external_subject IN ('coordinator-subject','replacement-coordinator')");
         authenticate("lead-subject","COORDINATOR_LEAD");
         journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("replacement-coordinator","Workload rebalance"));
         authenticate("coordinator-subject","COORDINATOR");

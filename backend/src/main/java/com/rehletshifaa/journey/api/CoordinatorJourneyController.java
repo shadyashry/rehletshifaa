@@ -12,6 +12,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @GetMapping("/care-categories")public List<CareCategoryView>careCategories(){return service.careCategories();}
  @GetMapping("/staff")public List<StaffDirectoryView>staff(@RequestParam String role){return service.staffDirectory(role);}
  @PostMapping("/cases/{caseId}/claim")public IdResponse claim(@PathVariable UUID caseId,@RequestParam(required=false)String pod){return service.claimCoordinatorCase(caseId,pod);}
+ @GetMapping("/cases/{caseId}/intake-preview")public IntakePreview preview(@PathVariable UUID caseId){return service.intakePreview(caseId);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/transition")public CaseView transition(@PathVariable UUID caseId,@Valid @RequestBody TransitionRequest request){return service.transition(caseId,request);}
  @PutMapping("/cases/{caseId}/care-category")public CaseView careCategory(@PathVariable UUID caseId,@Valid @RequestBody CareCategoryUpdateRequest request){return service.updateCareCategory(caseId,request);}

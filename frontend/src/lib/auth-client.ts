@@ -14,7 +14,11 @@ export function authManager() {
     scope: "openid profile email",
     userStore: new WebStorageStateStore({ store: window.sessionStorage }),
     stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
-    automaticSilentRenew: false,
+    // Renew the access token from the refresh token before it expires so an
+    // in-progress action (e.g. taking ownership) is never rejected with a 401
+    // that would drop the coordinator back to the queue.
+    automaticSilentRenew: true,
+    accessTokenExpiringNotificationTimeInSeconds: 70,
     monitorSession: false,
   });
   return manager;

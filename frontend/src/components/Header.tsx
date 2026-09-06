@@ -31,7 +31,7 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
           <PrimaryNav items={items} label={navLabel} />
         </HideOnPortal>
 
-        <div className="hidden items-center gap-2 lg:flex">
+        <HideOnPortal locale={locale}><div className="hidden items-center gap-2 lg:flex">
           <LocaleSwitch locale={locale} label={d.nav.language} ariaLabel={d.nav.languageAria} />
           <HideOnPortal locale={locale}>
             <TrackedLink
@@ -42,7 +42,8 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
               {d.nav.send}
             </TrackedLink>
           </HideOnPortal>
-        </div>
+        </div></HideOnPortal>
+        <div id="portal-account-slot" />
 
         <HideOnPortal locale={locale}>
           <MobileNav

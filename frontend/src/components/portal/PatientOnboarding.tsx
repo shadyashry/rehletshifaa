@@ -84,7 +84,7 @@ export function PatientOnboarding({ caseId, locale }: { caseId: string; locale: 
   if (!data) return <div className="card p-6" aria-live="polite">{error ? <span className="text-alert-800">{error}</span> : t.loading}</div>;
   const r = data.readiness;
   const steps: Array<[string, boolean]> = [
-    [t.stepSubject, !!data.subjectType], [t.stepContact, r.contactVerified], [t.stepIdentity, r.identityVerified],
+    [t.stepSubject, !!data.subjectType], [t.stepContact, r.contactVerified], [t.stepIdentity, !r.identityRequired || r.identityVerified],
     [t.stepConsents, r.requiredConsentsCompleted], [t.stepDeposit, r.depositSatisfied], [t.review, r.onboardingCompleted],
   ];
   const doneCount = steps.filter(([, ok]) => ok).length;
@@ -99,7 +99,7 @@ export function PatientOnboarding({ caseId, locale }: { caseId: string; locale: 
       {/* progress */}
       <div className="mt-5">
         <div className="flex items-center justify-between text-sm font-bold text-ink-700"><span>{t.progress}</span><span>{doneCount}/{steps.length}</span></div>
-        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-mist"><div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${(doneCount / steps.length) * 100}%` }} /></div>
+        <div role="progressbar" aria-label={t.progress} aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={doneCount} className="mt-2 h-2 w-full overflow-hidden rounded-full bg-mist"><div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${(doneCount / steps.length) * 100}%` }} /></div>
         <ol className="mt-4 grid gap-2 sm:grid-cols-2">{steps.map(([label, ok]) => (
           <li key={label} className="flex items-center gap-2 text-sm"><span aria-hidden className={`flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold ${ok ? "bg-brand-600 text-white" : "bg-mist text-ink-500"}`}>{ok ? "✓" : "•"}</span><span className={ok ? "text-ink-500 line-through" : "font-semibold text-ink-800"}>{label}</span></li>
         ))}</ol>
@@ -126,25 +126,26 @@ export function PatientOnboarding({ caseId, locale }: { caseId: string; locale: 
           </div>
 
           {/* 3. identity */}
-          <fieldset className="rounded-xl border border-line p-4"><legend className="px-1 text-sm font-bold text-brand-700">{t.stepIdentity}</legend>
+          {r.identityRequired && <fieldset className="rounded-xl border border-line p-4"><legend className="px-1 text-sm font-bold text-brand-700">{t.stepIdentity}</legend>
             {r.identityVerified ? <p className="text-brand-800">{t.identityVerified}</p> : (
               <>
                 <p className="text-sm text-ink-600">{t.identityIntro}</p>
                 {identityStatus === "PENDING" && <p className="mt-2 rounded-lg bg-mist p-2 text-sm">{t.identityPending}</p>}
                 {identityStatus === "MANUAL_REVIEW" && <p className="mt-2 rounded-lg bg-mist p-2 text-sm">{t.identityReview}</p>}
                 {identityStatus === "REJECTED" && <p className="mt-2 rounded-lg bg-alert-50 p-2 text-sm text-alert-800">{t.identityRejected}{data.identity?.rejectionReason ? ` — ${data.identity.rejectionReason}` : ""}</p>}
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {!["PENDING", "MANUAL_REVIEW"].includes(identityStatus ?? "") && <><div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <input className="field" placeholder={t.legalName} value={idForm.legalName} onChange={(e) => setIdForm({ ...idForm, legalName: e.target.value })} aria-label={t.legalName} />
                   <input className="field" type="date" value={idForm.dateOfBirth} onChange={(e) => setIdForm({ ...idForm, dateOfBirth: e.target.value })} aria-label={t.dob} />
                   <input className="field" placeholder={t.nationality} value={idForm.nationality} onChange={(e) => setIdForm({ ...idForm, nationality: e.target.value })} aria-label={t.nationality} />
-                  <select className="field" value={idForm.documentType} onChange={(e) => setIdForm({ ...idForm, documentType: e.target.value })} aria-label={t.docType}><option value="PASSPORT">Passport</option><option value="NATIONAL_ID">National ID</option></select>
+                  <select className="field" value={idForm.documentType} onChange={(e) => setIdForm({ ...idForm, documentType: e.target.value })} aria-label={t.docType}><option value="PASSPORT">{locale === "ar" ? "جواز سفر" : "Passport"}</option><option value="NATIONAL_ID">{locale === "ar" ? "هوية وطنية" : "National ID"}</option></select>
                   <input className="field" placeholder={t.issuingCountry} value={idForm.issuingCountry} onChange={(e) => setIdForm({ ...idForm, issuingCountry: e.target.value })} aria-label={t.issuingCountry} />
                   <input className="field" placeholder={t.docRef} value={idForm.documentReference} onChange={(e) => setIdForm({ ...idForm, documentReference: e.target.value })} aria-label={t.docRef} />
                 </div>
                 <button className="btn-secondary mt-3" disabled={busy || !idForm.legalName.trim()} onClick={() => void run(() => api(`/patient/cases/${caseId}/identity`, { method: "POST", body: JSON.stringify({ subjectType: subject === "PATIENT" ? "PATIENT" : "REPRESENTATIVE", representativeRelationship: relationship || undefined, method: "DOCUMENT", legalName: idForm.legalName, dateOfBirth: idForm.dateOfBirth || undefined, nationality: idForm.nationality || undefined, documentType: idForm.documentType, issuingCountry: idForm.issuingCountry || undefined, documentReference: idForm.documentReference || undefined }) }))}>{busy ? t.saving : t.submitIdentity}</button>
+                </>}
               </>
             )}
-          </fieldset>
+          </fieldset>}
 
           {/* 4. consents */}
           <fieldset className="rounded-xl border border-line p-4"><legend className="px-1 text-sm font-bold text-brand-700">{t.stepConsents}</legend>

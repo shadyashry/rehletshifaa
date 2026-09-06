@@ -431,3 +431,26 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+@layer components {
+  .portal-shell { min-height: 70vh; padding-block: 2rem 4rem; font-size: 1rem; line-height: 1.65; }
+  .portal-shell .headline { font-size: clamp(1.5rem, 3vw, 2rem); }
+  .portal-shell .title { font-size: 1.1rem; }
+  .portal-shell .btn-primary, .portal-shell .btn-secondary, .account-dialog .btn-primary { min-height: 2.75rem; padding: .6rem 1rem; font-size: .9rem; }
+  .portal-shell .field, .account-dialog .field { min-height: 2.75rem; padding-block: .6rem; font-size: .95rem; }
+  .portal-shell button:disabled, .account-dialog button:disabled, .portal-account button:disabled { opacity: .55; cursor: not-allowed; }
+  .portal-shell .card { box-shadow: 0 2px 8px #29454d04; }
+  .portal-shell fieldset:disabled { opacity: .65; }
+  .portal-shell h2, .portal-shell h3 { scroll-margin-top: 7rem; }
+  .status-badge { display: inline-flex; border: 1px solid var(--color-brand-200); border-radius: .5rem; padding: .25rem .65rem; background: var(--color-brand-50); color: var(--color-brand-800); font-size: .8rem; font-weight: 600; }
+  .account-option { display: flex; align-items: center; gap: .75rem; width: 100%; min-height: 2.75rem; padding: .65rem .75rem; text-align: start; border-radius: .5rem; font-size: .9rem; }
+  .account-option:hover { background: var(--color-brand-50); }
+  .portal-account summary::-webkit-details-marker { display: none; }
+  .account-dialog { margin: auto; padding: 1.5rem; width: min(30rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; border: 1px solid var(--color-line); border-radius: 1rem; background: white; color: var(--color-ink-900); }
+  .account-dialog::backdrop { background: #1c333a80; }
+  .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: .5rem; }
+  .icon-button:hover { background: var(--color-brand-50); }
+}
+@media (max-width: 640px) {
+  .portal-shell { padding-top: 1.5rem; }
+}

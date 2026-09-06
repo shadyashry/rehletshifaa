@@ -31,13 +31,14 @@ export function CustomerReadinessCard({ caseId, role, locale }: { caseId: string
 
   const load = useCallback(() => {
     if (!user) return;
+    setMissing(false);
     fetch(`${API}/api/v1/${role}/cases/${caseId}/readiness`, { headers: { Authorization: `Bearer ${user.access_token}` }, cache: "no-store" })
       .then((res) => { if (!res.ok) throw new Error(); return res.json() as Promise<Readiness>; })
       .then(setR).catch(() => setMissing(true));
   }, [user, role, caseId]);
   useEffect(() => { load(); }, [load]);
 
-  if (missing) return null;
+  if (missing) return <p role="alert" className="text-sm text-alert-800">{t.error} <button className="link-cta" onClick={load}>{locale === "ar" ? "إعادة المحاولة" : "Retry"}</button></p>;
   if (!r) return <p className="text-sm text-ink-500">{t.loading}</p>;
   const label = (b: BlockingItem) => (locale === "ar" ? b.labelAr : b.labelEn);
   const current = r.blockingItems[0];
