@@ -95,7 +95,7 @@ export function Portal({locale}:{locale:Locale}){
   }
   function backToQueue(){opening.current++;setWorkspace(null);setError("");setNotice("");const url=new URL(window.location.href);url.searchParams.delete("case");window.history.replaceState({},"",url);requestAnimationFrame(()=>window.scrollTo({top:queuePosition.current,behavior:"instant"}));}
   // Keep only navigation preferences in this browser session, scoped to the signed-in account.
-  useEffect(()=>{if(!user||!currentRole)return;try{const saved=sessionStorage.getItem(`portal-queue:${user.profile.sub}:${currentRole}`);setQueueState(saved?JSON.parse(saved):initialQueue);}catch{setQueueState(initialQueue);}},[user,currentRole]);
+  useEffect(()=>{if(!user||!currentRole)return;try{const saved=sessionStorage.getItem(`portal-queue:${user.profile.sub}:${currentRole}`);setQueueState(saved?{...initialQueue,...JSON.parse(saved)}:initialQueue);}catch{setQueueState(initialQueue);}},[user,currentRole]);
   function changeQueue(next:QueueState){setQueueState(next);if(user&&currentRole)try{sessionStorage.setItem(`portal-queue:${user.profile.sub}:${currentRole}`,JSON.stringify(next));}catch{}}
   const restored=useRef(false);
   useEffect(()=>{if(queueLoading||restored.current||!cases.length)return;restored.current=true;const id=new URLSearchParams(window.location.search).get("case");const item=cases.find(c=>c.id===id);if(item)void openCase(item);});
