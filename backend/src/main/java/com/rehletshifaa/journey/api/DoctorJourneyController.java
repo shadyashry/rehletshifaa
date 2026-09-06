@@ -10,6 +10,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@RequestParam boolean accept){return service.acceptDoctorAssignment(caseId,assignmentId,accept);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
+ @PostMapping("/cases/{caseId}/tasks")public IdResponse task(@PathVariable UUID caseId,@Valid @RequestBody TaskRequest request){return service.task(caseId,request);}
  @PostMapping("/cases/{caseId}/messages/{messageId}/read")public IdResponse read(@PathVariable UUID caseId,@PathVariable UUID messageId){return service.markMessageRead(caseId,messageId);}
  @PostMapping("/cases/{caseId}/reviews")public IdResponse review(@PathVariable UUID caseId,@Valid @RequestBody ClinicalReviewRequest request){return service.saveClinicalReview(caseId,request);}
  @PostMapping("/cases/{caseId}/reviews/{reviewId}/approve")public IdResponse approve(@PathVariable UUID caseId,@PathVariable UUID reviewId){return service.approveClinicalReview(caseId,reviewId);}
