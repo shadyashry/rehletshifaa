@@ -81,7 +81,7 @@ export function Portal({locale}:{locale:Locale}){
     try{
       if(currentRole==="coordinator"&&!item.coordinatorSubject){
         const preview=await api<{caseSummary:CaseView;intakeSummary?:string}>(`/coordinator/cases/${item.id}/intake-preview`);
-        if(request===opening.current){setWorkspace({...preview,preview:true,timeline:[],tasks:[],messages:[],assignments:[],clinicalReviews:[]});setDocuments([]);}
+        if(request===opening.current){setWorkspace({...preview,preview:true,timeline:[],tasks:[],messages:[],assignments:[],clinicalReviews:[]});setDocuments([]);try{const docs=await api<CaseDocument[]>(`/cases/${item.id}/documents`);if(request===opening.current)setDocuments(docs);}catch{if(request===opening.current)setDocumentError(true);}}
       }else{
         const ws=await api<Workspace>(`/${currentRole}/cases/${item.id}`);
         if(request!==opening.current)return;setWorkspace(ws);setDocuments([]);
@@ -98,6 +98,7 @@ export function Portal({locale}:{locale:Locale}){
   const restored=useRef(false);
   useEffect(()=>{if(queueLoading||restored.current||!cases.length)return;restored.current=true;const id=new URLSearchParams(window.location.search).get("case");const item=cases.find(c=>c.id===id);if(item)void openCase(item);});
   async function downloadDoc(id:string){setError("");try{const res=await api<{downloadUrl:string}>(`/documents/${id}/download`);if(res?.downloadUrl)window.open(res.downloadUrl,"_blank","noopener,noreferrer");}catch(e){setError(e instanceof Error?e.message:t.error);}}
+  async function viewDoc(id:string){setError("");try{const res=await api<{downloadUrl:string}>(`/documents/${id}/view`);if(res?.downloadUrl)window.open(res.downloadUrl,"_blank","noopener,noreferrer");}catch(e){setError(e instanceof Error?e.message:t.error);}}
   async function sendProposal(caseId:string,body:unknown){setBusy(true);setError("");setNotice("");try{await api(`/coordinator/cases/${caseId}/proposals`,{method:"POST",body:JSON.stringify(body)});setShare(null);setNotice(t.success);if(workspace)await openCase(workspace.caseSummary);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}}
   async function mutate(path:string,body?:unknown,method="POST"):Promise<MutationResult|undefined>{
     if(mutationPending.current)return;mutationPending.current=true;setBusy(true);setError("");setNotice("");
@@ -129,7 +130,7 @@ export function Portal({locale}:{locale:Locale}){
       ? <AdminForm t={t} busy={busy} locale={locale} api={api} mutate={mutate} readOnly={roles.includes("AUDITOR")} systemAdmin={roles.includes("SYSTEM_ADMIN")}/>
       : currentRole==="identity" ? <IdentityReviewQueue api={api} locale={locale}/>
       : workspace
-        ? <WorkspaceView locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={roles.includes("COORDINATOR_LEAD")} downloadDoc={downloadDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate}/>
+        ? <WorkspaceView locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={roles.includes("COORDINATOR_LEAD")} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate}/>
         : null}
     {currentRole&&!["admin","identity"].includes(currentRole)&&<div hidden={!!workspace}><Queue queueState={queueState} changeQueue={changeQueue} locale={locale} t={t} role={currentRole} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={roles.includes("COORDINATOR_LEAD")} openCase={openCase} mutate={mutate}/></div>}
     {currentRole==="finance"&&!workspace&&roles.some(role=>["FINANCE_LEAD","SYSTEM_ADMIN"].includes(role))&&<details className="card mt-8 p-5"><summary className="cursor-pointer font-bold">{locale==="ar"?"السياسات المالية":"Financial policies"}</summary><FinancePolicies api={api} locale={locale}/></details>}
@@ -145,7 +146,7 @@ function Queue({locale,t,role,cases,tasks,busy,mySubject,coordinatorLead,openCas
   </>;
 }
 
-function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,downloadDoc,mySubject,share,sendProposal,busy,back,mutate}:{locale:Locale;t:typeof copy.en;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;downloadDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate}){
+function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate}:{locale:Locale;t:typeof copy.en;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate}){
  const c=value.caseSummary;const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
  const doctorPhase=["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
@@ -161,7 +162,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
  // Evidence panels are reused so the consultant reads them before deciding, while the coordinator keeps
  // them below the action panels. Rendered once (the guards below are mutually exclusive by role).
  const intakePanel=value.intakeSummary?.trim()?<Panel title={locale==="ar"?"ملخص الحالة عند الاستقبال":"Intake summary"}><p className="whitespace-pre-wrap break-words text-ink-700">{value.intakeSummary}</p></Panel>:null;
- const documentsPanel=documents.length>0?<Panel title={t.documents}>{documents.map(doc=><div key={doc.documentId} className="flex flex-wrap items-center justify-between gap-3"><div><strong className="break-all">{doc.fileName}</strong><p className="text-sm text-ink-500">{formatBytes(doc.sizeBytes)} · {new Intl.DateTimeFormat(locale,{dateStyle:"medium"}).format(new Date(doc.createdAt))}</p></div>{doc.status==="CLEAN"?<button className="btn-secondary" onClick={()=>downloadDoc(doc.documentId)}>{t.download}</button>:<span className="rounded-full bg-mist px-3 py-1 text-sm font-bold text-ink-600">{(doc.status==="PENDING"||doc.status==="UPLOADED")?t.docScanning:t.docUnavailable}</span>}</div>)}</Panel>:null;
+ const documentsPanel=documents.length>0?<Panel title={t.documents}>{documents.map(doc=><div key={doc.documentId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line p-3"><div><strong className="break-all">{doc.fileName}</strong><p className="text-sm text-ink-500">{formatBytes(doc.sizeBytes)} · {new Intl.DateTimeFormat(locale,{dateStyle:"medium"}).format(new Date(doc.createdAt))}</p></div>{doc.status==="CLEAN"?<div className="flex gap-2"><button className="btn-secondary" onClick={()=>viewDoc(doc.documentId)}>{locale==="ar"?"عرض":"View"}</button><button className="btn-secondary" onClick={()=>downloadDoc(doc.documentId)}>{t.download}</button></div>:<span className="rounded-full bg-mist px-3 py-1 text-sm font-bold text-ink-600">{(doc.status==="PENDING"||doc.status==="UPLOADED")?t.docScanning:t.docUnavailable}</span>}</div>)}</Panel>:null;
  const workflowBlock=renderWorkflow?<div className={dim?"pointer-events-none opacity-50":""}><CaseWorkflowActions locale={locale} role={role} caseSummary={c} mutate={mutate} doctors={doctors} categories={categories} staff={staff} documents={documents} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired}/></div>:null;
  return <div>
   <nav className="mb-5 flex flex-wrap items-center gap-2 text-sm" aria-label={t.caseWorkspaceLabel}>

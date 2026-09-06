@@ -19,7 +19,7 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/account/preferences").authenticated()
         .requestMatchers("/api/v1/tasks/**").authenticated()
         .requestMatchers("/api/v1/admin/**").hasAnyRole("CREDENTIALING_ADMIN","SYSTEM_ADMIN","AUDITOR")
-        .requestMatchers(HttpMethod.GET,"/api/v1/documents/*/download").authenticated()
+        .requestMatchers(HttpMethod.GET,"/api/v1/documents/*/download","/api/v1/documents/*/view").authenticated()
         .requestMatchers(HttpMethod.GET,"/api/v1/cases/*/documents").authenticated()
         .anyRequest().denyAll());if(securityEnabled)http.oauth2ResourceServer(oauth2->oauth2.jwt(jwt->jwt.jwtAuthenticationConverter(new JwtRoleConverter())));return http.headers(headers->headers.contentSecurityPolicy(csp->csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))).build();}
     @Bean CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}")String configured){var config=new CorsConfiguration();config.setAllowedOrigins(Arrays.stream(configured.split(",")).map(String::trim).filter(s->!s.isBlank()).toList());config.setAllowedMethods(ListHolder.METHODS);config.setAllowedHeaders(ListHolder.HEADERS);config.setExposedHeaders(ListHolder.EXPOSED);config.setAllowCredentials(false);config.setMaxAge(3600L);var source=new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/api/**",config);return source;}

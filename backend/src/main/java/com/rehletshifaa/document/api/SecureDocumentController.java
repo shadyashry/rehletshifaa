@@ -10,4 +10,5 @@ public class SecureDocumentController {
     private final SecureDocumentService service;
     public SecureDocumentController(SecureDocumentService service){this.service=service;}
     @GetMapping("/{documentId}/download") public SecureDocumentService.DownloadResponse download(@PathVariable UUID documentId){return service.download(documentId);}
+    @GetMapping("/{documentId}/view") public SecureDocumentService.DownloadResponse view(@PathVariable UUID documentId){return service.view(documentId);}
 }

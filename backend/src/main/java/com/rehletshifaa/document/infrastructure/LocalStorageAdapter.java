@@ -13,13 +13,15 @@ public class LocalStorageAdapter implements StoragePort {
     public void upload(String token,String type,byte[] body){Token pending=tokens.remove(token);if(pending==null||Instant.now().isAfter(pending.expiresAt()))throw new ApiException(404,"UPLOAD_TOKEN_INVALID","Upload token is invalid or expired");if(body.length<=0||body.length>maxBytes||body.length!=pending.size()||!pending.type().equalsIgnoreCase(type))throw new ApiException(422,"UPLOAD_METADATA_MISMATCH","Uploaded document metadata does not match the request");stored.put(pending.key(),new LocalObject(type,body.clone(),false));}
     @Override public StoredObject verify(String key){LocalObject value=required(key);return new StoredObject(value.contentType(),value.body().length);}
     @Override public byte[] read(String key,long maximumBytes){LocalObject value=required(key);if(value.body().length>maximumBytes)throw new ApiException(422,"DOCUMENT_TOO_LARGE_TO_SCAN","Document exceeds the inspection limit");return value.body().clone();}
-    @Override public PresignedDownload presignDownload(String key,String safeName){LocalObject value=required(key);if(!value.clean())throw new ApiException(403,"DOCUMENT_NOT_CLEAN","Document is not available for download");String token=UUID.randomUUID().toString();downloadTokens.put(token,new DownloadToken(key,Instant.now().plusSeconds(expiry)));return new PresignedDownload(baseUrl+"/api/v1/local-downloads/"+token,expiry);}
+    @Override public PresignedDownload presignDownload(String key,String safeName){return presignAccess(key,false);}
+    @Override public PresignedDownload presignView(String key,String safeName){return presignAccess(key,true);}
+    private PresignedDownload presignAccess(String key,boolean inline){LocalObject value=required(key);if(!value.clean())throw new ApiException(403,"DOCUMENT_NOT_CLEAN","Document is not available");String token=UUID.randomUUID().toString();downloadTokens.put(token,new DownloadToken(key,Instant.now().plusSeconds(expiry),inline));return new PresignedDownload(baseUrl+"/api/v1/local-downloads/"+token,expiry);}
     @Override public void markClean(String key){LocalObject value=required(key);stored.put(key,new LocalObject(value.contentType(),value.body(),true));}
     @Override public void delete(String key){stored.remove(key);}
-    public Download download(String token){DownloadToken access=downloadTokens.get(token);if(access==null||Instant.now().isAfter(access.expiresAt())){downloadTokens.remove(token);throw new ApiException(404,"DOWNLOAD_TOKEN_INVALID","Download token is invalid or expired");}LocalObject value=required(access.key());if(!value.clean())throw new ApiException(403,"DOCUMENT_NOT_CLEAN","Document is not available for download");return new Download(value.contentType(),value.body().clone());}
+    public Download download(String token){DownloadToken access=downloadTokens.get(token);if(access==null||Instant.now().isAfter(access.expiresAt())){downloadTokens.remove(token);throw new ApiException(404,"DOWNLOAD_TOKEN_INVALID","Download token is invalid or expired");}LocalObject value=required(access.key());if(!value.clean())throw new ApiException(403,"DOCUMENT_NOT_CLEAN","Document is not available for download");return new Download(value.contentType(),value.body().clone(),access.inline());}
     private LocalObject required(String key){LocalObject value=stored.get(key);if(value==null)throw new ApiException(422,"UPLOAD_NOT_FOUND","Uploaded document could not be verified");return value;}
     private record Token(String key,String type,long size,Instant expiresAt){}
-    private record DownloadToken(String key,Instant expiresAt){}
+    private record DownloadToken(String key,Instant expiresAt,boolean inline){}
     private record LocalObject(String contentType,byte[] body,boolean clean){}
-    public record Download(String contentType,byte[] body){}
+    public record Download(String contentType,byte[] body,boolean inline){}
 }
