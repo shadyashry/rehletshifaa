@@ -150,12 +150,14 @@ public class OnboardingService {
         Onboarding ob = requireOnboarding(caseId);
         String caseNumber = jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?").param(caseId).query(String.class).single();
         UUID patientId = jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(caseId).query(UUID.class).single();
+        PatientProfileSummary profile = jdbc.sql("SELECT full_name,country,whatsapp_number,email,phone_verified_at,email_verified_at FROM patient_profiles WHERE id=?").param(patientId)
+                .query((rs, n) -> new PatientProfileSummary(rs.getString("full_name"), rs.getString("country"), rs.getString("whatsapp_number"), rs.getString("email"), rs.getObject("phone_verified_at") != null, rs.getObject("email_verified_at") != null)).single();
         CustomerReadiness r = readiness.compute(caseId);
         IdentityVerificationView iv = identity.latestForPatient(patientId);
         List<String> required = readiness.requiredConsentTypes(ob.subjectType());
         List<String> completed = jdbc.sql("SELECT DISTINCT consent_type FROM consent_records WHERE patient_id=? AND revoked_at IS NULL AND (case_id IS NULL OR case_id=?) AND consent_type IN ('PRIVACY_DATA_PROCESSING','CROSS_BORDER_CARE','MEDICAL_INFORMATION_SHARING','TELECONSULTATION','DEPOSIT_CANCELLATION_TERMS','REPRESENTATIVE_AUTHORIZATION')")
                 .params(patientId, caseId).query(String.class).list();
-        return new OnboardingView(ob.id(), caseId, caseNumber, ob.state(), ob.subjectType(), ob.startedAt(), ob.contactVerifiedAt(), ob.identityVerifiedAt(), ob.submittedAt(), ob.completedAt(), ob.expiresAt(), ob.version(), r, iv, completed, required);
+        return new OnboardingView(ob.id(), caseId, caseNumber, ob.state(), ob.subjectType(), ob.startedAt(), ob.contactVerifiedAt(), ob.identityVerifiedAt(), ob.submittedAt(), ob.completedAt(), ob.expiresAt(), ob.version(), profile, r, iv, completed, required);
     }
 
     private Onboarding requireOnboarding(UUID caseId) {

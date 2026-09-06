@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { CaseWorkflowActions, TaskCreateForm } from "@/components/portal/CaseWorkflowActions";
+import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { PatientOnboarding } from "@/components/portal/PatientOnboarding";
 import { CustomerReadinessCard } from "@/components/portal/CustomerReadinessCard";
 import { CaseMessages, TaskActions, PatientProposalDecision } from "@/components/portal/CaseMessages";
@@ -205,7 +205,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
      {value.preview&&<p className="text-sm text-ink-500">{locale==="ar"?"هذه معاينة للاستقبال. تتاح المستندات والرسائل بعد تولّي مسؤولية الحالة.":"This intake preview supports your ownership decision. Documents and messages become available after you take responsibility."}</p>}
      {!isDoctor&&documentsPanel}
      <div className="grid gap-6 xl:grid-cols-2">
-      <div className="space-y-6">{value.tasks.length>0&&<Panel title={t.tasks}>{value.tasks.length?value.tasks.map(task=><div key={task.id} className={task.overdue?"rounded-lg border border-alert-200 bg-alert-50 p-3":""}><strong>{task.title}</strong><p className="text-sm">{task.status==="OPEN"?(locale==="ar"?"مفتوحة":"Open"):task.status==="IN_PROGRESS"?(locale==="ar"?"قيد التنفيذ":"In progress"):(locale==="ar"?"مكتملة":"Completed")}{task.overdue?(locale==="ar"?" · متأخرة":" · Overdue"):""}</p>{task.ownerSubject===mySubject&&<TaskActions locale={locale} caseId={c.id} task={task} mutate={mutate}/>}</div>):<Empty/>}</Panel>}{isCoordinator&&owned&&<TaskCreateForm locale={locale} caseId={c.id} mutate={mutate} members={value.assignments.filter(a=>a.status==="ACTIVE").map(a=>({subject:a.assigneeSubject,role:a.assigneeRole,name:doctors.find(d=>d.subject===a.assigneeSubject)?.displayName??staff.find(p=>p.subject===a.assigneeSubject)?.name??(a.assigneeSubject===mySubject?(locale==="ar"?"أنا":"Me"):(locale==="ar"?"عضو فريق الرعاية":"Care team member"))}))}/>}</div>
+      <div className="space-y-6">{value.tasks.length>0&&<Panel title={t.tasks}>{value.tasks.length?value.tasks.map(task=><div key={task.id} className={task.overdue?"rounded-lg border border-alert-200 bg-alert-50 p-3":""}><strong>{task.title}</strong><p className="text-sm">{task.status==="OPEN"?(locale==="ar"?"مفتوحة":"Open"):task.status==="IN_PROGRESS"?(locale==="ar"?"قيد التنفيذ":"In progress"):(locale==="ar"?"مكتملة":"Completed")}{task.overdue?(locale==="ar"?" · متأخرة":" · Overdue"):""}</p>{task.ownerSubject===mySubject&&<TaskActions locale={locale} caseId={c.id} task={task} mutate={mutate}/>}</div>):<Empty/>}</Panel>}</div>
       {!value.preview&&<CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={role==="patient"||showActions} busy={busy} mutate={mutate}/>}
      </div>
     </div>

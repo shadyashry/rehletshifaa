@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LockKeyhole } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
 
@@ -15,9 +16,10 @@ type Readiness = {
   blockingItems: BlockingItem[]; readyForCoordination: boolean; updatedAt: string;
 };
 type Identity = { id: string; subjectType: string; status: string; documentType?: string; issuingCountry?: string; documentReferenceMasked?: string; rejectionReason?: string } | null;
+type PatientProfile = { fullName: string; country: string; whatsappNumber: string; email?: string | null; phoneVerified: boolean; emailVerified: boolean };
 type Onboarding = {
   id: string; caseId: string; caseNumber: string; state: string; subjectType?: string | null;
-  version: number; readiness: Readiness; identity: Identity; completedConsentTypes: string[]; requiredConsentTypes: string[];
+  version: number; profile: PatientProfile; readiness: Readiness; identity: Identity; completedConsentTypes: string[]; requiredConsentTypes: string[];
 };
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -25,6 +27,7 @@ const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 const copy = {
   en: {
     title: "Complete your onboarding", subtitle: "A few secure steps before we begin coordinating your care.",
+    profileTitle: "Details from your care request", profileIntro: "These details created your patient profile. They are locked here to prevent an unverified change to your identity or contact channel.", profileLocked: "Read-only. Contact support to request a verified correction.", name: "Full name", country: "Country", whatsapp: "WhatsApp", email: "Email", notProvided: "Not provided", verified: "Verified", required: "Required",
     progress: "Progress", ready: "You're ready — your coordinator can begin arranging your care.",
     stepSubject: "Who is completing this?", subjectPatient: "I am the patient", subjectGuardian: "Parent / legal guardian", subjectRep: "Authorized representative", subjectPayer: "I am paying only",
     relationship: "Relationship (e.g. parent, spouse)", save: "Save", saving: "Saving…",
@@ -41,6 +44,7 @@ const copy = {
   },
   ar: {
     title: "أكمل تسجيلك", subtitle: "بضع خطوات آمنة قبل أن نبدأ تنسيق رعايتك.",
+    profileTitle: "بيانات طلب الرعاية", profileIntro: "أنشأت هذه البيانات ملف المريض، وهي مقفلة هنا لمنع أي تغيير غير موثّق في الهوية أو وسيلة التواصل.", profileLocked: "للقراءة فقط. تواصل مع الدعم لطلب تصحيح موثّق.", name: "الاسم الكامل", country: "الدولة", whatsapp: "واتساب", email: "البريد الإلكتروني", notProvided: "غير مُضاف", verified: "موثّق", required: "مطلوب",
     progress: "التقدّم", ready: "أنت جاهز — يمكن لمنسّقك بدء ترتيب رعايتك.",
     stepSubject: "من يكمل هذه الخطوات؟", subjectPatient: "أنا المريض", subjectGuardian: "أحد الوالدين / الوصي القانوني", subjectRep: "ممثل مفوّض", subjectPayer: "أقوم بالدفع فقط",
     relationship: "صلة القرابة (مثال: والد، زوج)", save: "حفظ", saving: "جارٍ الحفظ…",
@@ -96,6 +100,14 @@ export function PatientOnboarding({ caseId, locale }: { caseId: string; locale: 
       <h2 className="headline mt-2">{t.title}</h2>
       <p className="mt-2 text-ink-600">{t.subtitle}</p>
 
+      <section className="mt-5 rounded-xl border border-line bg-mist/60 p-4" aria-label={t.profileTitle}>
+        <div className="flex items-start gap-3"><LockKeyhole className="mt-0.5 flex-none text-brand-700" size={19} aria-hidden/><div><h3 className="font-bold text-ink-900">{t.profileTitle}</h3><p className="mt-1 text-sm text-ink-600">{t.profileIntro}</p></div></div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {[[t.name,data.profile.fullName,""],[t.country,data.profile.country,""],[t.whatsapp,data.profile.whatsappNumber,data.profile.phoneVerified?t.verified:""],[t.email,data.profile.email||t.notProvided,data.profile.emailVerified?t.verified:""]].map(([label,value,badge])=><label key={label} className="block text-sm font-semibold text-ink-700"><span className="mb-1.5 flex items-center gap-2">{label}{badge&&<span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-bold text-brand-800">✓ {badge}</span>}</span><input className="field cursor-not-allowed bg-mist text-ink-500" value={value} readOnly aria-readonly="true"/></label>)}
+        </div>
+        <p className="mt-3 text-xs text-ink-500">{t.profileLocked}</p>
+      </section>
+
       {/* progress */}
       <div className="mt-5">
         <div className="flex items-center justify-between text-sm font-bold text-ink-700"><span>{t.progress}</span><span>{doneCount}/{steps.length}</span></div>
@@ -134,14 +146,14 @@ export function PatientOnboarding({ caseId, locale }: { caseId: string; locale: 
                 {identityStatus === "MANUAL_REVIEW" && <p className="mt-2 rounded-lg bg-mist p-2 text-sm">{t.identityReview}</p>}
                 {identityStatus === "REJECTED" && <p className="mt-2 rounded-lg bg-alert-50 p-2 text-sm text-alert-800">{t.identityRejected}{data.identity?.rejectionReason ? ` — ${data.identity.rejectionReason}` : ""}</p>}
                 {!["PENDING", "MANUAL_REVIEW"].includes(identityStatus ?? "") && <><div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <input className="field" placeholder={t.legalName} value={idForm.legalName} onChange={(e) => setIdForm({ ...idForm, legalName: e.target.value })} aria-label={t.legalName} />
-                  <input className="field" type="date" value={idForm.dateOfBirth} onChange={(e) => setIdForm({ ...idForm, dateOfBirth: e.target.value })} aria-label={t.dob} />
-                  <input className="field" placeholder={t.nationality} value={idForm.nationality} onChange={(e) => setIdForm({ ...idForm, nationality: e.target.value })} aria-label={t.nationality} />
-                  <select className="field" value={idForm.documentType} onChange={(e) => setIdForm({ ...idForm, documentType: e.target.value })} aria-label={t.docType}><option value="PASSPORT">{locale === "ar" ? "جواز سفر" : "Passport"}</option><option value="NATIONAL_ID">{locale === "ar" ? "هوية وطنية" : "National ID"}</option></select>
-                  <input className="field" placeholder={t.issuingCountry} value={idForm.issuingCountry} onChange={(e) => setIdForm({ ...idForm, issuingCountry: e.target.value })} aria-label={t.issuingCountry} />
-                  <input className="field" placeholder={t.docRef} value={idForm.documentReference} onChange={(e) => setIdForm({ ...idForm, documentReference: e.target.value })} aria-label={t.docRef} />
+                  <RequiredField label={t.legalName} requiredText={t.required}><input className="field" required value={idForm.legalName} onChange={(e) => setIdForm({ ...idForm, legalName: e.target.value })} /></RequiredField>
+                  <RequiredField label={t.dob} requiredText={t.required}><input className="field" required type="date" value={idForm.dateOfBirth} onChange={(e) => setIdForm({ ...idForm, dateOfBirth: e.target.value })} /></RequiredField>
+                  <RequiredField label={t.nationality} requiredText={t.required}><input className="field" required value={idForm.nationality} onChange={(e) => setIdForm({ ...idForm, nationality: e.target.value })} /></RequiredField>
+                  <RequiredField label={t.docType} requiredText={t.required}><select className="field" required value={idForm.documentType} onChange={(e) => setIdForm({ ...idForm, documentType: e.target.value })}><option value="PASSPORT">{locale === "ar" ? "جواز سفر" : "Passport"}</option><option value="NATIONAL_ID">{locale === "ar" ? "هوية وطنية" : "National ID"}</option></select></RequiredField>
+                  <RequiredField label={t.issuingCountry} requiredText={t.required}><input className="field" required value={idForm.issuingCountry} onChange={(e) => setIdForm({ ...idForm, issuingCountry: e.target.value })} /></RequiredField>
+                  <RequiredField label={t.docRef} requiredText={t.required}><input className="field" required value={idForm.documentReference} onChange={(e) => setIdForm({ ...idForm, documentReference: e.target.value })} /></RequiredField>
                 </div>
-                <button className="btn-secondary mt-3" disabled={busy || !idForm.legalName.trim()} onClick={() => void run(() => api(`/patient/cases/${caseId}/identity`, { method: "POST", body: JSON.stringify({ subjectType: subject === "PATIENT" ? "PATIENT" : "REPRESENTATIVE", representativeRelationship: relationship || undefined, method: "DOCUMENT", legalName: idForm.legalName, dateOfBirth: idForm.dateOfBirth || undefined, nationality: idForm.nationality || undefined, documentType: idForm.documentType, issuingCountry: idForm.issuingCountry || undefined, documentReference: idForm.documentReference || undefined }) }))}>{busy ? t.saving : t.submitIdentity}</button>
+                <button className="btn-secondary mt-3" disabled={busy || Object.values(idForm).some(value=>!value.trim())} onClick={() => void run(() => api(`/patient/cases/${caseId}/identity`, { method: "POST", body: JSON.stringify({ subjectType: subject === "PATIENT" ? "PATIENT" : "REPRESENTATIVE", representativeRelationship: relationship || undefined, method: "DOCUMENT", legalName: idForm.legalName, dateOfBirth: idForm.dateOfBirth, nationality: idForm.nationality, documentType: idForm.documentType, issuingCountry: idForm.issuingCountry, documentReference: idForm.documentReference }) }))}>{busy ? t.saving : t.submitIdentity}</button>
                 </>}
               </>
             )}
@@ -173,4 +185,8 @@ export function PatientOnboarding({ caseId, locale }: { caseId: string; locale: 
       )}
     </section>
   );
+}
+
+function RequiredField({label,requiredText,children}:{label:string;requiredText:string;children:React.ReactElement}){
+  return <label className="block text-sm font-semibold text-ink-700"><span className="mb-1.5 block">{label} <span className="text-alert-700" aria-hidden>*</span><span className="sr-only"> ({requiredText})</span></span>{children}</label>;
 }

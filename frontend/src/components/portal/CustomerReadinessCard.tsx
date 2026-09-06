@@ -31,10 +31,10 @@ export function CustomerReadinessCard({ caseId, role, locale }: { caseId: string
 
   const load = useCallback(() => {
     if (!user) return;
-    setMissing(false);
+    // State is set only from the async result, never synchronously in the effect body.
     fetch(`${API}/api/v1/${role}/cases/${caseId}/readiness`, { headers: { Authorization: `Bearer ${user.access_token}` }, cache: "no-store" })
       .then((res) => { if (!res.ok) throw new Error(); return res.json() as Promise<Readiness>; })
-      .then(setR).catch(() => setMissing(true));
+      .then((data) => { setR(data); setMissing(false); }).catch(() => setMissing(true));
   }, [user, role, caseId]);
   useEffect(() => { load(); }, [load]);
 

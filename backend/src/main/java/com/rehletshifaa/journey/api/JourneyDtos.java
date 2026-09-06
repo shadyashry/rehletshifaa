@@ -115,14 +115,17 @@ public final class JourneyDtos {
     public record OnboardingView(
         UUID id,UUID caseId,String caseNumber,String state,String subjectType,
         Instant startedAt,Instant contactVerifiedAt,Instant identityVerifiedAt,Instant submittedAt,Instant completedAt,Instant expiresAt,
-        long version,CustomerReadiness readiness,IdentityVerificationView identity,List<String>completedConsentTypes,List<String>requiredConsentTypes) {}
+        long version,PatientProfileSummary profile,CustomerReadiness readiness,IdentityVerificationView identity,List<String>completedConsentTypes,List<String>requiredConsentTypes) {}
+    // Intake details become the initial account profile. Corrections require a separately verified,
+    // audited workflow rather than silently rewriting identity or contact data.
+    public record PatientProfileSummary(String fullName,String country,String whatsappNumber,String email,boolean phoneVerified,boolean emailVerified) {}
     public record OnboardingSubjectRequest(@NotBlank @Pattern(regexp="PATIENT|GUARDIAN|REPRESENTATIVE|PAYER")String subjectType,@Size(max=80)String relationship,@Size(max=500)String permissionScope,Instant expiresAt,@NotNull Long expectedVersion) {}
     public record OnboardingConsentRequest(@NotBlank @Size(max=60)String consentType,@NotBlank @Size(max=20000)String exactText,@Size(max=40)String policyVersion,@Pattern(regexp="en|ar")String language,@Size(max=500)String purpose,@Size(max=500)String scope) {}
     public record OnboardingSubmitRequest(@NotNull Long expectedVersion) {}
     // Patient-facing identity verification view — never exposes encrypted legal name/DOB or document content.
     public record IdentityVerificationView(UUID id,String subjectType,String status,String assuranceLevel,String method,String provider,String nationality,String documentType,String issuingCountry,String documentReferenceMasked,Instant requestedAt,Instant verifiedAt,Instant expiresAt,String rejectionReason,long version) {}
     // Patient-submitted identity proofing. legalName/dateOfBirth are encrypted at rest; documentReference is masked.
-    public record IdentityStartRequest(@NotBlank @Pattern(regexp="PATIENT|REPRESENTATIVE")String subjectType,@Size(max=80)String representativeRelationship,@Size(max=40)String method,@NotBlank @Size(max=160)String legalName,@Size(max=40)String dateOfBirth,@Size(max=80)String nationality,@Size(max=40)String documentType,@Size(max=80)String issuingCountry,@Size(max=80)String documentReference) {}
+    public record IdentityStartRequest(@NotBlank @Pattern(regexp="PATIENT|REPRESENTATIVE")String subjectType,@Size(max=80)String representativeRelationship,@Size(max=40)String method,@NotBlank @Size(max=160)String legalName,@NotBlank @Size(max=40)String dateOfBirth,@NotBlank @Size(max=80)String nationality,@NotBlank @Size(max=40)String documentType,@NotBlank @Size(max=80)String issuingCountry,@NotBlank @Size(max=80)String documentReference) {}
     // Reviewer decision (authorized identity reviewer only; requires recent authentication + reason).
     public record IdentityReviewRequest(@NotBlank @Pattern(regexp="VERIFY|REJECT")String decision,@NotBlank @Size(max=2000)String reason,@Size(max=20)String assuranceLevel) {}
     // Finance/System-Admin deposit waiver (recent authentication + mandatory reason; never silent).
