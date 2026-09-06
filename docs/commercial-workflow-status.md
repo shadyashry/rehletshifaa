@@ -78,7 +78,17 @@ policy, or a requested policy exception. The ordinary margin never creates a cas
 `travel_package_requested` · `V13` document type + ranges + commercial policy · `V14` consent
 linkage + `ACKNOWLEDGED` decision · `V15` deposit policies + deposits + `payment_events` ·
 `V16` Meta WhatsApp delivery tracking · `V17` `patient_onboardings` · `V18`
-`patient_identity_verifications` · `V19` deposit-waiver columns on `deposits`.
+`patient_identity_verifications` · `V19` deposit-waiver columns on `deposits` · `V20` staff lead
+roles · `V21` portal preferences and legacy coordinator reporting · `V22` generalized
+`staff_team_assignments` for Coordination, Operations, and Finance.
+
+## Staff teams and lead scope
+
+Each staff function has base and lead tiers: Coordinator, Operations, and Finance. An administrator
+can create multiple leads in the same function and assign each staff member to one direct lead;
+cross-function assignments and reporting cycles are rejected. Existing coordinator reporting data is
+migrated into `staff_team_assignments`. Leads can see cases assigned to their direct or indirect team
+members, while protected work still requires the lead's own accepted case assignment.
 
 ## Keycloak custom login theme (done)
 

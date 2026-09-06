@@ -44,7 +44,11 @@ async function setup(page:Page, role="COORDINATOR", options:{documentsFail?:bool
     if(api.endsWith("/messages"))return options.saveFail?reply({message:"Unable to save changes"},500):reply({id:"message",status:"SENT"});
     if(api.endsWith("/me"))return reply({displayName:"Layla Hassan",specialty:"Cardiology"});
     if(api.endsWith("/readiness"))return reply({readyForCoordination:false,depositStatus:"REQUESTED",blockingItems:[{code:"DEPOSIT",labelEn:"Deposit outstanding",labelAr:"الوديعة مستحقة"}],updatedAt:stamp});
-    if(api==="/admin/reporting")return reply([{subject:"lead",name:"Team Lead",role:"COORDINATOR_LEAD"},{subject:"report",name:"Team Coordinator",role:"COORDINATOR",managerSubject:"lead"}]);
+    if(api==="/admin/staff-teams")return reply([
+      {subject:"lead",name:"Coordination Lead",role:"COORDINATOR_LEAD",staffFunction:"COORDINATOR"},{subject:"report",name:"Team Coordinator",role:"COORDINATOR",staffFunction:"COORDINATOR",leadSubject:"lead"},
+      {subject:"ops-lead",name:"Operations Lead",role:"OPERATIONS_LEAD",staffFunction:"OPERATIONS"},{subject:"ops-staff",name:"Operations Staff",role:"OPERATIONS",staffFunction:"OPERATIONS"},
+      {subject:"finance-lead",name:"Finance Lead",role:"FINANCE_LEAD",staffFunction:"FINANCE"},{subject:"finance-staff",name:"Finance Staff",role:"FINANCE",staffFunction:"FINANCE"}
+    ]);
     if(api==="/identity-review/queue")return reply([{id:"identity",subjectType:"PATIENT",status:"MANUAL_REVIEW",documentType:"PASSPORT",issuingCountry:"Kenya",documentReferenceMasked:"***1234",requestedAt:stamp}]);
     return reply([]);
   });
@@ -81,6 +85,16 @@ test("team tab supports keyboard navigation and only appears for leads",async({p
   await setup(page,"COORDINATOR_LEAD");await page.goto("/en/portal");
   await page.getByRole("tab",{name:/My cases/}).focus();await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab",{name:/Team cases/})).toBeFocused();await expect(page.getByText("Omar Example")).toBeVisible();await expect(page.getByText("Maya Example")).toHaveCount(0);
+});
+
+test("administration assigns every staff function to its lead inline",async({page})=>{
+  const {writes}=await setup(page,"SYSTEM_ADMIN");await page.goto("/en/portal");
+  await page.getByRole("tab",{name:"Staff accounts"}).click();
+  await expect(page.getByRole("heading",{name:"Staff teams & leads"})).toBeVisible();
+  await page.getByRole("tab",{name:/Operations/}).click();
+  await page.getByLabel("Lead: Operations Staff").selectOption("ops-lead");
+  await expect(page.getByText("Saved")).toBeVisible();
+  expect(writes).toContainEqual({path:"/admin/staff-teams/ops-staff",body:{leadSubject:"ops-lead"}});
 });
 
 test("account settings persist and keep the current case when switching language",async({page})=>{

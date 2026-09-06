@@ -499,6 +499,7 @@ function AdminForm({t,busy,locale,api,mutate,readOnly,systemAdmin}:{t:typeof cop
  const[practitionerId,setPractitionerId]=useState("");
  const[justCreated,setJustCreated]=useState(false);
  const[tab,setTab]=useState<AdminTab>("practitioners");
+ const[staffVersion,setStaffVersion]=useState(0);
  const L=locale==="ar"?{
   consoleTitle:"لوحة اعتماد مقدّمي الخدمة",consoleSubtitle:"إضافة الاستشاريين والموظفين، وتسجيل مستندات الاعتماد، وتسجيل قرارات التحقق — كلٌّ في مكانه.",
   tabPractitioners:"الاستشاريون",tabStaff:"حسابات الموظفين",tabCatalog:"قائمة الأسعار",
@@ -510,7 +511,7 @@ function AdminForm({t,busy,locale,api,mutate,readOnly,systemAdmin}:{t:typeof cop
   step3:"قرار الاعتماد",step3hint:"الموافقة تُتيح الاستشاري للتعيين على الحالات؛ الرفض يتطلب سببًا.",
   staffTitle:"إضافة حساب موظف",staffHint:"أنشئ حساب منسّق أو عمليات أو مالية واربطه بمعرّف الهوية.",gated:"حدِّد ملفًا أولًا لتفعيل هذا الإجراء.",
   roleLabel:"الدور",roleCoordinator:"منسّق",roleOperations:"العمليات",roleFinance:"المالية",
-  teamLead:"قائد الفريق",leadHint:"يمنح صلاحيات القيادة، مثل إعادة تعيين ملكية الحالة بين المنسّقين.",leadUnavailable:"مستوى القيادة متاح للمنسّقين فقط حاليًا."
+  teamLead:"قائد الفريق",leadHint:"ينشئ قائدًا لهذا القسم ويمكن تعيين أعضاء فريق له من الشاشة أدناه.",leadUnavailable:""
  }:{
   consoleTitle:"Credentialing console",consoleSubtitle:"Onboard consultants and staff, register credentials, and record verification decisions — each in its own place.",
   tabPractitioners:"Consultants",tabStaff:"Staff accounts",tabCatalog:"Price catalog",
@@ -522,7 +523,7 @@ function AdminForm({t,busy,locale,api,mutate,readOnly,systemAdmin}:{t:typeof cop
   step3:"Credentialing decision",step3hint:"Approving makes the consultant available for assignment; rejecting requires a reason.",
   staffTitle:"Onboard a staff account",staffHint:"Create a coordinator, operations, or finance account and link it to an identity subject.",gated:"Select a profile first to enable this action.",
   roleLabel:"Role",roleCoordinator:"Coordinator",roleOperations:"Operations",roleFinance:"Finance",
-  teamLead:"Team lead",leadHint:"Grants lead permissions, such as reassigning case ownership between coordinators.",leadUnavailable:"A lead tier currently applies to coordinators only."
+  teamLead:"Team lead",leadHint:"Creates a lead for this function; assign their team directly below.",leadUnavailable:""
  };
  if(readOnly)return <div className="space-y-5"><p className="card p-4 text-sm">{locale==="ar"?"وصول للقراءة فقط. لا يمكن لهذا الحساب تعديل السجلات.":"Read-only access. This account cannot change records."}</p><ReportingTeam api={api} locale={locale} editable={false}/></div>;
  const tabs:Array<{id:AdminTab;label:string}>=[{id:"practitioners",label:L.tabPractitioners},{id:"staff",label:L.tabStaff},{id:"catalog",label:L.tabCatalog}];
@@ -583,24 +584,21 @@ function AdminForm({t,busy,locale,api,mutate,readOnly,systemAdmin}:{t:typeof cop
    </div>
   </div>}
 
-  {tab==="staff"&&<div role="tabpanel"><StaffAccountForm t={t} L={L} busy={busy} mutate={mutate}/><ReportingTeam api={api} locale={locale} editable={systemAdmin}/></div>}
+  {tab==="staff"&&<div role="tabpanel"><StaffAccountForm t={t} L={L} busy={busy} mutate={mutate} onSaved={()=>setStaffVersion(value=>value+1)}/><ReportingTeam key={staffVersion} api={api} locale={locale} editable={systemAdmin}/></div>}
 
   {tab==="catalog"&&<div role="tabpanel"><CatalogAdmin api={api} locale={locale}/></div>}
  </div>;
 }
-// Base staff role + a "Team lead" promotion checkbox. Only Coordinator has a lead tier in the role
-// model, so the checkbox shows for every role but activates only where a lead role actually exists —
-// professional intent over a literal (and broken) lead option for operations/finance.
 const STAFF_ROLES=["COORDINATOR","OPERATIONS","FINANCE"] as const;
 // Every staff function has a lead tier; the base role is submitted as its composite _LEAD variant.
 const LEAD_ROLE:Record<string,string>={COORDINATOR:"COORDINATOR_LEAD",OPERATIONS:"OPERATIONS_LEAD",FINANCE:"FINANCE_LEAD"};
-function StaffAccountForm({t,L,busy,mutate}:{t:typeof copy.en;L:Record<string,string>;busy:boolean;mutate:Mutate}){
+function StaffAccountForm({t,L,busy,mutate,onSaved}:{t:typeof copy.en;L:Record<string,string>;busy:boolean;mutate:Mutate;onSaved:()=>void}){
  const[role,setRole]=useState<string>("COORDINATOR");
  const[lead,setLead]=useState(false);
  const leadCapable=!!LEAD_ROLE[role];
  const effectiveRole=leadCapable&&lead?LEAD_ROLE[role]:role;
  const roleName=(value:string)=>value==="COORDINATOR"?L.roleCoordinator:value==="OPERATIONS"?L.roleOperations:L.roleFinance;
- return <form className="card max-w-2xl p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/coordinators",{name:data.get("name"),externalSubject:data.get("subject"),role:effectiveRole}).then(result=>{if(result){form.reset();setRole("COORDINATOR");setLead(false);}});}}>
+ return <form className="card max-w-2xl p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/staff",{name:data.get("name"),externalSubject:data.get("subject"),role:effectiveRole}).then(result=>{if(result){form.reset();setRole("COORDINATOR");setLead(false);onSaved();}});}}>
   <StepHead title={L.staffTitle} hint={L.staffHint}/>
   <div className="mt-5 grid gap-4 sm:grid-cols-2">
    <Field label={t.name}><input className="field" name="name" required/></Field>

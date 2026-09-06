@@ -76,6 +76,23 @@ class PortalExperienceTest {
         auth("lead-a","COORDINATOR_LEAD");assertThatThrownBy(()->portal.updateReporting("staff",new ReportingRequest("lead-a","Add"))).isInstanceOf(ApiException.class);
         auth("auditor","AUDITOR");assertThat(portal.reportingDirectory()).isNotEmpty();assertThatThrownBy(()->portal.updateReporting("staff",new ReportingRequest("lead-a","Add"))).isInstanceOf(ApiException.class);
     }
+    @Test void supportsSeparateTeamsForEveryStaffFunction(){
+        member("coord-lead",true);member("coord-staff",false);
+        seedMember("ops-lead-a","OPERATIONS_LEAD");seedMember("ops-lead-b","OPERATIONS_LEAD");seedMember("ops-staff-a","OPERATIONS");seedMember("ops-staff-b","OPERATIONS");
+        seedMember("finance-lead","FINANCE_LEAD");seedMember("finance-staff","FINANCE");
+        report("coord-staff","coord-lead");report("ops-staff-a","ops-lead-a");report("ops-staff-b","ops-lead-b");report("finance-staff","finance-lead");
+        var directory=portal.reportingDirectory();
+        assertThat(directory).extracting(ReportingMember::staffFunction).contains("COORDINATOR","OPERATIONS","FINANCE");
+        assertThat(portal.reports("ops-lead-a")).containsExactly("ops-staff-a");
+        assertThat(portal.reports("ops-lead-b")).containsExactly("ops-staff-b");
+        UUID opsCase=intake();
+        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",UUID.randomUUID(),opsCase,"ops-staff-a","OPERATIONS","PRIMARY","ACTIVE","Team visibility","admin",Instant.now(),Instant.now());
+        auth("ops-lead-a","OPERATIONS","OPERATIONS_LEAD");
+        assertThat(journey.assignedCases(com.rehletshifaa.security.ActorRole.OPERATIONS)).extracting(c->c.id()).contains(opsCase);
+        assertThat(journey.workspace(opsCase).caseSummary().id()).isEqualTo(opsCase);
+        auth("admin","SYSTEM_ADMIN");
+        assertThatThrownBy(()->portal.updateReporting("finance-staff",new ReportingRequest("ops-lead-a","Wrong function"))).isInstanceOf(ApiException.class);
+    }
     @Test void preferencesPersistPerAccountAndDoNotChangeLegalIdentity(){
         UUID id=intake();auth("person-a","COORDINATOR");
         portal.savePreferences(new PreferencesRequest("Display One","ar"));
@@ -86,4 +103,5 @@ class PortalExperienceTest {
         auth("person-b","COORDINATOR");assertThat(portal.preferences().displayName()).isNull();
         assertThat(jdbc.queryForObject("SELECT full_name FROM medical_cases WHERE id=?",String.class,id)).isEqualTo("Private Patient");
     }
+    private void seedMember(String subject,String role){jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),subject,role,crypto.encrypt(subject),Instant.now(),Instant.now());}
 }
