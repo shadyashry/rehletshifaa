@@ -39,7 +39,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
 
   return <>
     <section className="border-b border-line bg-mist">
-      <div className="container-site py-12 md:py-18">
+      <div className="container-site py-10 md:py-14">
         <Link href={localeHref(locale, "consultants")} className="inline-flex items-center gap-2 text-sm font-bold text-brand-700"><BackIcon size={17} aria-hidden="true" />{ui.back}</Link>
         <div className="mt-8 grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-center">
           <div className="overflow-hidden rounded-3xl border border-line bg-white"><ConsultantPortrait profile={profile} locale={locale} compact /></div>
@@ -53,6 +53,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
             <p className="mt-3 text-lg leading-8 text-ink-700">{profile.role}</p>
             <p className="mt-3 flex items-center gap-2 text-sm text-ink-500"><MapPin size={16} aria-hidden="true" />{profile.location}</p>
             <p className="lead mt-6">{profile.summary}</p>
+            <div className="mt-6 flex flex-wrap gap-3"><Link className="btn-primary" href={localeHref(locale,"send-my-case")}>{locale==="ar"?"ابدأ مراجعة حالتي":"Request a case review"}<ArrowRight size={17} className="rtl:-scale-x-100"/></Link><Link className="btn-secondary" href={localeHref(locale, profile.careAreaHref)}>{ui.careArea}</Link></div>
           </div>
         </div>
       </div>
@@ -67,7 +68,6 @@ export default async function ConsultantProfilePage({ params }: Props) {
           <div className="flex gap-2"><BadgeCheck size={18} className="mt-0.5 shrink-0 text-accent-700" aria-hidden="true" /><p>{profile.verification}</p></div>
           {profile.externalLinks?.length ? <div className="mt-4 flex flex-wrap gap-4">{profile.externalLinks.map(link => <a className="inline-flex items-center gap-1.5 font-bold text-brand-700" href={link.href} target="_blank" rel="noreferrer" key={link.href}>{link.label}<ExternalLink size={14} aria-hidden="true" /></a>)}</div> : null}
         </div>
-        <Link href={localeHref(locale, profile.careAreaHref)} className="btn-secondary mt-7">{ui.careArea}<ArrowRight size={17} className="rtl:-scale-x-100" aria-hidden="true" /></Link>
       </div>
     </section>
 

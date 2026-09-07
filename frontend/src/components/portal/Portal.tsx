@@ -7,6 +7,7 @@ import { PatientOnboarding } from "@/components/portal/PatientOnboarding";
 import { CustomerReadinessCard } from "@/components/portal/CustomerReadinessCard";
 import { CaseMessages, TaskActions, PatientProposalDecision } from "@/components/portal/CaseMessages";
 import { PortalAccount, type Preferences } from "@/components/portal/PortalAccount";
+import { RoleDashboardSummary } from "@/components/portal/RoleDashboardSummary";
 import { CaseQueue, initialQueue, type QueueState } from "@/components/portal/CaseQueue";
 import { ReportingTeam, IdentityReviewQueue, PractitionerDirectory } from "@/components/portal/PortalDirectories";
 import type { Locale } from "@/lib/i18n";
@@ -142,7 +143,7 @@ function PortalFrame({title,subtitle,children}:{title:string;subtitle:string;chi
 function roleLabel(role:RoleKey,locale:Locale){const labels={en:{patient:"Patient",coordinator:"Coordinator",doctor:"Doctor",operations:"Operations",finance:"Finance",admin:"Administration",identity:"Identity review"},ar:{patient:"المريض",coordinator:"منسق الحالة",doctor:"الطبيب",operations:"العمليات",finance:"المالية",admin:"الإدارة",identity:"مراجعة الهوية"}};return labels[locale][role];}
 
 function Queue({locale,t,role,cases,tasks,busy,mySubject,coordinatorLead,openCase,mutate,queueState,changeQueue}:{locale:Locale;t:typeof copy.en;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;openCase:(item:CaseView)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
-  return <>{tasks.length>0&&<section className="card mb-6 p-5"><h2 className="title mb-3">{locale==="ar"?"مهامي":"My tasks"} <span className="text-ink-500">({tasks.length})</span></h2><div className="grid gap-3 sm:grid-cols-2">{tasks.map(task=>{const item=cases.find(c=>c.id===task.caseId);return <div key={task.id} className="flex items-center justify-between gap-3 rounded-xl bg-brand-50 p-3"><div><p className="text-sm font-bold">{task.title}</p>{task.overdue&&<p className="text-xs font-semibold text-alert-800">{locale==="ar"?"متأخرة":"Overdue"}</p>}</div>{item&&<button className="btn-secondary" disabled={busy} onClick={()=>openCase(item)}>{locale==="ar"?"فتح":"Open"}</button>}</div>;})}</div></section>}
+  return <><RoleDashboardSummary locale={locale} role={role??""} cases={cases} tasks={tasks}/>{tasks.length>0&&<section className="card mb-6 overflow-hidden"><div className="border-b border-line bg-brand-50 px-5 py-4"><h2 className="title">{locale==="ar"?"المهام ذات الأولوية":"Priority tasks"} <span className="text-ink-500">({tasks.length})</span></h2></div><div className="grid gap-3 p-5 sm:grid-cols-2">{tasks.map(task=>{const item=cases.find(c=>c.id===task.caseId);return <div key={task.id} className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${task.overdue?"border-alert-200 bg-alert-50":"border-line bg-white"}`}><div><p className="text-sm font-bold">{task.title}</p>{task.overdue&&<p className="text-xs font-semibold text-alert-800">{locale==="ar"?"متأخرة":"Overdue"}</p>}</div>{item&&<button className="btn-secondary" disabled={busy} onClick={()=>openCase(item)}>{locale==="ar"?"فتح":"Open"}</button>}</div>;})}</div></section>}
     <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} onChange={changeQueue} onOpen={openCase} onMutate={mutate} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>prettyCategory(value,locale)}/>
   </>;
 }
@@ -184,6 +185,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
     {c.doctorName&&role!=="patient"&&<Fact label={t.consultantLabel} value={`${c.doctorName}${isDoctor&&doctorAssignment&&doctorAssignment.assigneeSubject===mySubject?` (${t.you})`:""}`}/>}
    </div>
   </div>
+  <CaseNextStep role={role} status={c.status} locale={locale} pendingAssignment={!!myPending}/>
   {isPatient&&<PatientStatusCard status={c.status} locale={locale}/>}
   {role==="patient"&&["ACCEPTED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED","TREATMENT_IN_PROGRESS","DISCHARGED","FOLLOW_UP"].includes(c.status)&&<div className="mt-6"><PatientOnboarding caseId={c.id} locale={locale}/></div>}
   {isCoordinator&&["ACCEPTED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED"].includes(c.status)&&<div className="mt-6 card p-5"><CustomerReadinessCard caseId={c.id} role="coordinator" locale={locale}/></div>}
@@ -216,6 +218,20 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
    {isCoordinator&&!owned&&<div className="mt-6 card flex flex-wrap items-center justify-between gap-3 border-s-4 border-brand-400 p-5"><p className="text-ink-600">{c.coordinatorSubject?t.ownedByOther:t.ownershipHint}</p>{!c.coordinatorSubject&&<button className="btn-primary" disabled={busy} onClick={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}>{t.coordinatorClaim}</button>}</div>}
   </fieldset>
  </div>;
+}
+
+function CaseNextStep({role,status,locale,pendingAssignment}:{role:RoleKey;status:string;locale:Locale;pendingAssignment:boolean}){
+ if(role==="patient")return null;
+ const ar=locale==="ar";
+ let title=ar?"راجع أحدث بيانات الحالة":"Review the latest case information";
+ let body=ar?"استخدم مساحة العمل أدناه، وستظهر الإجراءات المسموح بها فقط حسب المرحلة الحالية.":"Use the workspace below; only actions valid for the current stage are shown.";
+ if(pendingAssignment){title=ar?"قرار التعيين مطلوب":"Assignment decision required";body=ar?"راجع ملخص الحالة ثم اقبل أو ارفض التعيين قبل بدء العمل.":"Review the case summary, then accept or decline the assignment before starting work.";}
+ else if(role==="doctor"&&status==="CONSULTANT_REVIEW"){title=ar?"الخطوة التالية: القرار السريري":"Next: clinical decision";body=ar?"راجع ملخص الاستقبال والمستندات، ثم سجّل النتيجة والتوصية والتكاليف المتوقعة.":"Review the intake summary and documents, then record the outcome, recommendation and expected costs.";}
+ else if(role==="coordinator"&&status==="RECEIVED"){title=ar?"الخطوة التالية: مراجعة الطلب":"Next: review the request";body=ar?"تحقق من البيانات المتاحة قبل تولّي الحالة؛ لا تُعرض إجراءات الملكية إذا كانت الحالة مسندة بالفعل.":"Check the available intake data before taking ownership; ownership actions stay hidden once assigned.";}
+ else if(role==="coordinator"&&["CLINICAL_RECOMMENDATION_READY","PROPOSAL_PREPARATION","REVISION_REQUESTED"].includes(status)){title=ar?"الخطوة التالية: تجهيز عرض المريض":"Next: prepare the patient proposal";body=ar?"راجع التوصية المعتمدة والمتطلبات الداخلية قبل إصدار النسخة للمريض.":"Review the approved recommendation and required internal gates before release to the patient.";}
+ else if(role==="operations"){title=ar?"الخطوة التالية: ترتيبات الرعاية والسفر":"Next: care and travel arrangements";body=ar?"أكمل فقط الترتيبات المطلوبة لهذه المرحلة وسجّل المعلومات المؤكدة.":"Complete only the arrangements required at this stage and record confirmed information.";}
+ else if(role==="finance"){title=ar?"الخطوة التالية: المراجعة المالية المطلوبة":"Next: required financial review";body=ar?"راجع عناصر التكلفة والموافقة المطلوبة لهذه الحالة دون تعديل النطاق الطبي.":"Review the case pricing and required approval without changing clinical scope.";}
+ return <section className="mt-5 flex items-start gap-4 rounded-2xl border border-brand-200 bg-brand-50 p-5"><span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-brand-600 font-bold text-white" aria-hidden>→</span><div><p className="font-bold text-brand-900">{title}</p><p className="mt-1 text-sm leading-6 text-ink-600">{body}</p></div></section>;
 }
 
 function CaseAdministration({caseId,currentCoordinator,mySubject,locale,staff,busy,mutate}:{caseId:string;currentCoordinator?:string;mySubject?:string;locale:Locale;staff:StaffMember[];busy:boolean;mutate:Mutate}){
