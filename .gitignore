@@ -25,3 +25,4 @@ javac-*.args
 output/
 /RehletShifaaQATestProtocol.pdf
 /rehletshifaa-tester-access-guide.pdf
+.cloudflared-runtime/
