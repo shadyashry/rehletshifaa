@@ -25,6 +25,8 @@ const copy = {
     accountBody: "Sign in to the secure care portal to see your complete care journey.",
     signIn: "Sign in to the secure portal",
     privacy: "For your privacy, we never confirm publicly whether a Case ID or WhatsApp number exists. The tracking link still requires a new 6-digit verification code before any case information is shown.",
+    findId: "Where can I find my Case ID?",
+    findIdHelp: "It appears on the confirmation screen after you send your case and in the secure message sent by our team.",
   },
   ar: {
     eyebrow: "وصول خاص للمريض",
@@ -43,6 +45,8 @@ const copy = {
     accountBody: "سجّل الدخول إلى بوابة الرعاية الآمنة لمشاهدة رحلة رعايتك كاملة.",
     signIn: "تسجيل الدخول إلى البوابة الآمنة",
     privacy: "لحماية خصوصيتك، لا نؤكد علنًا وجود رقم الحالة أو رقم واتساب. ويظل رابط المتابعة محميًا برمز تحقق جديد من 6 أرقام قبل عرض أي معلومات.",
+    findId: "أين أجد رقم الحالة؟",
+    findIdHelp: "يظهر في شاشة التأكيد بعد إرسال الحالة، وفي الرسالة الآمنة التي يرسلها فريقنا.",
   },
 } as const;
 
@@ -81,7 +85,7 @@ export function TrackCaseLanding({ locale }: { locale: Locale }) {
           <p className="lead mt-5">{t.intro}</p>
 
           <form className="mt-7 space-y-5" onSubmit={recover}>
-            <label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{t.caseId}</span><input className="field" required maxLength={20} placeholder="RS-2026-000001" value={caseNumber} onChange={event=>setCaseNumber(event.target.value.toUpperCase())}/></label>
+            <label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{t.caseId}</span><input className="field font-mono tracking-wide" required maxLength={20} placeholder="RS-2026-000001" value={caseNumber} onChange={event=>setCaseNumber(event.target.value.toUpperCase())}/><span className="mt-2 block text-xs leading-5 text-ink-500"><strong className="text-ink-700">{t.findId}</strong> {t.findIdHelp}</span></label>
             <label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{t.whatsapp}</span><input className="field" required dir="ltr" inputMode="tel" autoComplete="tel" placeholder="+20 100 000 0000" value={whatsappNumber} onChange={event=>setWhatsappNumber(event.target.value)}/><span className="mt-2 block text-sm text-ink-500">{t.whatsappHelp}</span></label>
             <button className="btn-primary w-full sm:w-auto" disabled={busy}>{busy?t.sending:t.send}</button>
           </form>

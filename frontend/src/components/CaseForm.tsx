@@ -1,7 +1,7 @@
 "use client";
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react";
 import Script from "next/script";
-import { CheckCircle2, FileUp, FileText, LockKeyhole, ChevronDown, Search, Check, X, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, FileUp, FileText, LockKeyhole, ChevronDown, Search, Check, X, Trash2, Plus } from "lucide-react";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { buildCaseSchema, filesAreValid } from "@/lib/case-form-schema";
@@ -29,6 +29,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({});
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState(1);
   const [caseNumber, setCaseNumber] = useState<string>();
   const [statusToken, setStatusToken] = useState<string>();
   const [turnstileToken, setTurnstileToken] = useState<string>();
@@ -46,6 +47,12 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     reviewTitle: ar ? "أكمل الحقول المطلوبة للإرسال" : "Complete the required fields to send",
     clearCountry: ar ? "مسح الدولة" : "Clear country",
     countryLabel: ar ? "الدولة" : d.form.country,
+    progress: ar ? "تقدم إرسال الحالة" : "Case submission progress",
+    steps: ar ? ["التواصل", "الحالة والمستندات", "المراجعة والموافقة"] : ["Contact", "Case & documents", "Review & consent"],
+    next: ar ? "التالي" : "Continue",
+    back: ar ? "السابق" : "Back",
+    review: ar ? "راجع البيانات قبل الإرسال" : "Review before sending",
+    reviewHelp: ar ? "يمكنك الرجوع لتعديل أي معلومة. لن تُرسل البيانات قبل الضغط على زر الإرسال النهائي." : "You can go back to change anything. Nothing is submitted until you use the final send button.",
   };
 
   useEffect(() => {
@@ -71,6 +78,21 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     consent: values.consent === true,
     files: filesAreValid(files),
   }), [values.fullName, country, digits.length, emailTrimmed, values.consent, files]);
+  const contactValid = valid.fullName && valid.country && valid.whatsappNumber && valid.email;
+
+  function nextStep() {
+    if (step === 1 && !contactValid) {
+      setTouched(current => ({ ...current, fullName: true, country: true, whatsappNumber: true, email: true }));
+      return;
+    }
+    setStep(current => Math.min(3, current + 1));
+    window.requestAnimationFrame(() => document.getElementById("case-form-heading")?.focus());
+  }
+
+  function previousStep() {
+    setStep(current => Math.max(1, current - 1));
+    window.requestAnimationFrame(() => document.getElementById("case-form-heading")?.focus());
+  }
   const allValid = valid.fullName && valid.country && valid.whatsappNumber && valid.email && valid.consent && valid.files;
 
   function fieldError(key: FieldKey): string | undefined {
@@ -131,9 +153,16 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   return <>
     {siteKey && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" />}
-    <form className="card p-6 md:p-9" onSubmit={submit} noValidate>
+    <form className="card overflow-hidden" onSubmit={submit} noValidate>
+      <div className="border-b border-line bg-brand-50/70 px-6 py-5 md:px-9">
+        <p id="case-form-heading" tabIndex={-1} className="text-sm font-bold text-brand-900">{t.steps[step-1]}</p>
+        <ol className="mt-4 grid grid-cols-3 gap-2" aria-label={t.progress}>
+          {t.steps.map((label,index) => <li key={label} className="min-w-0"><div className="flex items-center gap-2"><span className="step-dot" data-active={index+1<=step}>{index+1<step?<Check size={15}/>:index+1}</span><span className="hidden truncate text-xs font-semibold text-ink-600 sm:block">{label}</span></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-white"><div className={`h-full bg-brand-600 transition-all ${index+1<=step?"w-full":"w-0"}`}/></div></li>)}
+        </ol>
+      </div>
+      <div className="p-6 md:p-9">
       {/* Section 1 — contact details */}
-      <fieldset className="min-w-0 border-0 p-0">
+      {step===1&&<fieldset className="min-w-0 border-0 p-0">
         <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{ar ? "بيانات التواصل" : "Your contact details"}</legend>
         <div className="mt-4 grid gap-6 sm:grid-cols-2">
           <Field label={d.form.name} required requiredMark={t.requiredMark} valid={valid.fullName && !!values.fullName} error={fieldError("fullName")}>
@@ -156,18 +185,19 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
             <input className={`field ${fieldError("email") ? "field-error" : ""}`} type="email" dir="ltr" inputMode="email" autoComplete="email" placeholder="name@example.com" value={values.email} onChange={e => update("email", e.target.value)} onBlur={() => touch("email")} />
           </Field>
         </div>
-      </fieldset>
+      </fieldset>}
 
       {/* Section 2 — the case */}
-      <fieldset className="mt-9 min-w-0 border-0 p-0">
+      {step===2&&<fieldset className="min-w-0 border-0 p-0">
         <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{ar ? "عن حالتك" : "About your case"}</legend>
         <div className="mt-4"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} <span className="font-normal text-ink-400">({d.form.optional})</span></span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option></select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
         <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.description} <span className="font-normal text-ink-400">({d.form.optional})</span></span><textarea className="field min-h-28 resize-y" value={values.conditionDescription} maxLength={1900} onChange={e => update("conditionDescription", e.target.value)} /></label></div>
         <div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><span className="block text-sm font-bold text-ink-800">{d.form.files} <span className="font-normal text-ink-400">({d.form.optional})</span></span>{files.length>0&&<span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800">{files.length} {d.form.selected}</span>}</div><div className="overflow-hidden rounded-2xl border border-line bg-white"><label className="flex cursor-pointer items-center gap-4 border-b border-dashed border-line-strong bg-brand-50 p-5 transition hover:border-brand-600 hover:bg-brand-100/60"><span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-white text-accent-700 shadow-sm"><FileUp /></span><span className="min-w-0 flex-1"><strong className="block text-brand-800">{d.form.choose}</strong><span className="mt-1 block text-sm text-ink-500">{d.form.uploadHelp}</span></span><Plus className="flex-none text-brand-700"/><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => { onFiles(Array.from(e.currentTarget.files ?? []));e.currentTarget.value="";touch("files"); }} /></label>{files.length>0&&<ul className="grid gap-2 p-3 sm:grid-cols-2">{files.map((file,index)=><li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-mist/50 p-3"><FileText className="flex-none text-brand-600" size={20}/><span className="min-w-0 flex-1"><strong className="block truncate text-sm" title={file.name}>{file.name}</strong><span className="text-xs text-ink-500">{(file.size/1024/1024).toFixed(file.size<1024*1024?2:1)} MB</span></span><button type="button" className="rounded-lg p-2 text-ink-500 hover:bg-alert-50 hover:text-alert-800" aria-label={`${ar?"حذف":"Remove"} ${file.name}`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><Trash2 size={17}/></button></li>)}</ul>}</div>{fieldError("files") && <p className="error-text mt-2">{fieldError("files")}</p>}</div>
-      </fieldset>
+      </fieldset>}
 
       {/* Section 3 — options & consent */}
-      <label className="mt-9 flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-brand-50 p-4"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={travelPackage} onChange={e => { begin(); setTravelPackage(e.target.checked); }} /><span className="text-sm leading-6 text-ink-700"><strong className="block text-ink-900">{ar ? "أرغب في تنظيم باقة سفر وعلاج متكاملة" : "I'd like a full travel & treatment package"}</strong>{ar ? "إذا قُبلت حالتي من قبل الاستشاري، يتولى فريق رحلة شفاء ترتيب الطيران والتأشيرة والإقامة والتنقلات من وإلى المستشفى." : "If my case is accepted by the consultant, RehletShifaa will arrange your flights, visa, accommodation, and hospital transfers."}</span></label>
+      {step===3&&<><div className="rounded-2xl border border-brand-200 bg-brand-50 p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{d.form.name}</dt><dd className="font-bold text-ink-900">{values.fullName}</dd></div><div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country?.name}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{d.form.files}</dt><dd className="font-bold text-ink-900">{files.length}</dd></div></dl></div>
+      <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white p-4"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={travelPackage} onChange={e => { begin(); setTravelPackage(e.target.checked); }} /><span className="text-sm leading-6 text-ink-700"><strong className="block text-ink-900">{ar ? "أرغب في تنظيم باقة سفر وعلاج متكاملة" : "I'd like a full travel & treatment package"}</strong>{ar ? "إذا قُبلت حالتي من قبل الاستشاري، يتولى فريق رحلة شفاء ترتيب الطيران والتأشيرة والإقامة والتنقلات من وإلى المستشفى." : "If my case is accepted by the consultant, RehletShifaa will arrange your flights, visa, accommodation, and hospital transfers."}</span></label>
       <label className="mt-4 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={values.consent} onChange={e => { update("consent", e.target.checked); touch("consent"); }} /><span className="text-sm leading-6 text-ink-700">{d.form.consent} <a className="font-bold text-brand-700 underline" href={`/${locale}/privacy`}>{d.common.privacy}</a></span></label>{fieldError("consent") && <p className="error-text mt-2">{fieldError("consent")}</p>}
 
       {siteKey && <div className="cf-turnstile mt-6" data-sitekey={siteKey} data-callback="onRehletShifaaTurnstile" />}
@@ -175,7 +205,13 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
       {!allValid && <p className="mt-7 flex items-center gap-2 text-sm text-ink-500"><span aria-hidden className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-mist text-ink-400">i</span>{t.reviewTitle}</p>}
       <button className="btn-primary mt-3 w-full transition-opacity disabled:opacity-50 disabled:saturate-[.6] disabled:cursor-not-allowed" disabled={busy || !allValid} type="submit" aria-disabled={busy || !allValid}>{busy ? d.form.sending : d.form.send}</button>
-      <p className="mt-4 flex items-center justify-center gap-2 text-xs text-ink-500"><LockKeyhole size={14} />{d.form.secureNote}</p>
+      <p className="mt-4 flex items-center justify-center gap-2 text-xs text-ink-500"><LockKeyhole size={14} />{d.form.secureNote}</p></>}
+
+      <div className="mt-7 flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:justify-between">
+        {step>1?<button className="btn-secondary" type="button" onClick={previousStep}><ArrowLeft size={18} className="rtl:-scale-x-100"/>{t.back}</button>:<span/>}
+        {step<3?<button className="btn-primary" type="button" onClick={nextStep}>{t.next}<ArrowRight size={18} className="rtl:-scale-x-100"/></button>:null}
+      </div>
+      </div>
     </form>
   </>;
 }

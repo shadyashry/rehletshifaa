@@ -39,13 +39,13 @@ export default async function CareAreas({ params }: Props) {
             const wash = WASHES[index] ?? WASHES[0];
             const href = localeHref(locale, CARE_AREA_SLUGS[index]);
             return (
-              <article key={area.title} className={`flex flex-col rounded-[0.875rem] p-6 sm:p-7 ${wash}`}>
+              <article key={area.title} className={`group relative flex flex-col overflow-hidden rounded-2xl border border-white/80 p-6 shadow-[0_18px_50px_-38px_rgba(28,51,58,.5)] transition hover:-translate-y-1 hover:shadow-[0_24px_58px_-34px_rgba(28,51,58,.48)] sm:p-7 ${wash}`}>
                 <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/70 text-accent-700">
                   <Icon size={24} strokeWidth={1.8} aria-hidden="true" />
                 </span>
                 <h2 className="title mt-5">{area.title}</h2>
                 <p className="mt-3 text-[0.95rem] leading-7 text-ink-600">{area.body}</p>
-                <Link href={href} className="link-cta mt-auto pt-6">
+                <Link href={href} className="link-cta mt-auto pt-6 after:absolute after:inset-0">
                   {d.home.areasAction}
                   <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
                 </Link>

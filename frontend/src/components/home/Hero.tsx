@@ -1,4 +1,4 @@
-import { ArrowRight, Check, FileText, Image, MessageSquareText, PlayCircle } from "lucide-react";
+import { ArrowRight, Check, Clock3, FileText, Image, Languages, MessageSquareText, PlayCircle, ShieldCheck, Stethoscope } from "lucide-react";
 import Link from "next/link";
 
 import type { Dictionary } from "@/lib/dictionary";
@@ -9,6 +9,9 @@ import { TrackedLink } from "@/components/TrackedLink";
 const PREP_ICONS = [FileText, Image, MessageSquareText] as const;
 
 export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
+  const trust = locale === "ar"
+    ? [[Stethoscope, "مراجعة بقيادة استشاري"], [Clock3, "خطوات واضحة قبل السفر"], [Languages, "دعم عربي وإنجليزي"], [ShieldCheck, "تداول خاص للمستندات"]] as const
+    : [[Stethoscope, "Consultant-led review"], [Clock3, "Clear steps before travel"], [Languages, "Arabic & English support"], [ShieldCheck, "Private document handling"]] as const;
   return (
     <section className="relative overflow-hidden border-b border-line bg-mist">
       {/* Soft healing washes — decorative, kept subtle and out of the a11y tree. */}
@@ -20,7 +23,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
             "radial-gradient(circle at 78% 26%, var(--color-wash-aqua) 0, transparent 34%), radial-gradient(circle at 22% 78%, var(--color-wash-lavender) 0, transparent 32%), radial-gradient(circle at 94% 64%, var(--color-wash-peach) 0, transparent 28%)",
         }}
       />
-      <div className="container-site relative grid gap-12 py-14 md:py-18 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:items-center lg:gap-16 lg:py-24">
+      <div className="container-site relative grid gap-10 py-11 md:py-14 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:items-center lg:gap-14 lg:py-16">
         <div>
           <p className="eyebrow">{d.home.eyebrow}</p>
           <h1 className="display mt-4 max-w-2xl [text-wrap:balance]">{d.home.title}</h1>
@@ -45,7 +48,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
             </Link>
           </div>
 
-          <ul className="mt-9 grid gap-3 border-t border-line-strong pt-7">
+          <ul className="mt-7 grid gap-2.5 border-t border-line-strong pt-6 sm:grid-cols-2">
             {d.home.assurances.map((item) => (
               <li key={item} className="flex items-start gap-3 text-[0.95rem] leading-6 text-ink-700">
                 <Check size={17} className="mt-0.5 text-accent-700" aria-hidden="true" />
@@ -58,7 +61,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
           <p className="mt-6 max-w-xl text-sm leading-6 text-ink-500">{d.home.preliminaryNotice}</p>
         </div>
 
-        <aside className="overflow-hidden rounded-3xl border border-brand-200 bg-white/85 p-7 shadow-[0_24px_70px_-44px_rgba(41,69,77,.38)] backdrop-blur sm:p-9">
+        <aside className="overflow-hidden rounded-3xl border border-brand-200 bg-white/90 p-6 shadow-[0_30px_80px_-48px_rgba(41,69,77,.48)] backdrop-blur sm:p-8">
           <p className="eyebrow">{d.home.heroCardTitle}</p>
           <p className="mt-4 text-lg font-semibold leading-7 text-brand-900">{d.home.reassurance}</p>
 
@@ -78,6 +81,11 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
 
           <p className="mt-6 border-t border-line pt-5 text-sm leading-6 text-ink-600">{d.home.heroCardNote}</p>
         </aside>
+      </div>
+      <div className="trust-strip relative">
+        <ul className="container-site grid grid-cols-2 gap-x-5 gap-y-4 py-5 lg:grid-cols-4">
+          {trust.map(([Icon, label]) => <li key={label} className="flex items-center gap-2.5 text-sm font-semibold text-ink-700"><Icon size={18} className="text-brand-600" aria-hidden />{label}</li>)}
+        </ul>
       </div>
     </section>
   );

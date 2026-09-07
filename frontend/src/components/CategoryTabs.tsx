@@ -23,10 +23,10 @@ export function CategoryTabs({ tabs, label }: { tabs: readonly NavItem[]; label:
               key={tab.href}
               href={tab.href}
               aria-current={active ? "page" : undefined}
-              className={`whitespace-nowrap rounded-full px-4 py-2.5 text-[0.95rem] font-semibold transition-colors ${
+              className={`whitespace-nowrap border-b-[3px] px-4 py-3 text-[0.95rem] font-semibold transition-colors ${
                 active
-                  ? "bg-brand-600 text-white"
-                  : "text-ink-600 hover:bg-brand-50 hover:text-brand-700"
+                  ? "border-brand-600 text-brand-800"
+                  : "border-transparent text-ink-600 hover:bg-brand-50 hover:text-brand-700"
               }`}
             >
               {tab.label}

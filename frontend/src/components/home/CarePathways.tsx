@@ -38,13 +38,13 @@ export function CarePathways({ locale, d }: { locale: Locale; d: Dictionary }) {
             const wash = WASHES[index] ?? WASHES[0];
             const href = localeHref(locale, CARE_AREA_SLUGS[index]);
             return (
-              <li key={area.title} className={`flex flex-col rounded-[0.875rem] p-6 sm:p-7 ${wash}`}>
+              <li key={area.title} className={`group relative flex flex-col overflow-hidden rounded-2xl border border-white/80 p-6 shadow-[0_16px_48px_-38px_rgba(28,51,58,.45)] transition hover:-translate-y-1 hover:shadow-[0_24px_54px_-34px_rgba(28,51,58,.48)] sm:p-7 ${wash}`}>
                 <span className="grid h-11 w-11 place-items-center rounded-lg bg-white/70 text-accent-700">
                   <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
                 </span>
                 <h3 className="title mt-5">{area.title}</h3>
                 <p className="mt-3 text-[0.95rem] leading-7 text-ink-600">{area.body}</p>
-                <Link href={href} className="link-cta mt-auto pt-6">
+                <Link href={href} className="link-cta mt-auto pt-6 after:absolute after:inset-0">
                   {d.home.areasAction}
                   <ArrowRight size={15} aria-hidden="true" className="rtl:-scale-x-100" />
                 </Link>

@@ -23,7 +23,7 @@ export function ConsultantPortrait({ profile, locale, compact = false }: { profi
 export function ConsultantProfileCard({ profile, locale }: { profile: ConsultantProfile; locale: Locale }) {
   const ui = consultantUi[locale];
   return (
-    <article className="card flex h-full flex-col overflow-hidden">
+    <article className="card group relative flex h-full flex-col overflow-hidden transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-[0_24px_54px_-36px_rgba(28,51,58,.52)]">
       <ConsultantPortrait profile={profile} locale={locale} />
       <div className="flex flex-1 flex-col p-6 sm:p-7">
         <p className="eyebrow">{profile.careAreaLabel}</p>
@@ -42,7 +42,7 @@ export function ConsultantProfileCard({ profile, locale }: { profile: Consultant
           <MapPin size={16} className="mt-1 shrink-0 text-accent-700" aria-hidden="true" />
           {profile.location}
         </div>
-        <Link className="mt-auto inline-flex items-center gap-2 pt-7 font-bold text-brand-700 hover:text-brand-900" href={localeHref(locale, `consultants/${profile.slug}`)}>
+        <Link className="mt-auto inline-flex items-center gap-2 pt-7 font-bold text-brand-700 after:absolute after:inset-0 hover:text-brand-900" href={localeHref(locale, `consultants/${profile.slug}`)}>
           <BadgeCheck size={18} aria-hidden="true" />
           {ui.viewProfile}
           <ArrowRight size={17} className="rtl:-scale-x-100" aria-hidden="true" />
