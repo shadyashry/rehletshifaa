@@ -53,6 +53,13 @@ app:
     max-attempts: ${CLAIM_TOKEN_MAX_ATTEMPTS:5}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
   web-base-url: ${APP_WEB_BASE_URL:http://localhost:3000}
+  identity-admin:
+    base-url: ${IDENTITY_ADMIN_BASE_URL:http://localhost:8180}
+    realm: ${IDENTITY_ADMIN_REALM:rehletshifaa}
+    client-id: ${IDENTITY_ADMIN_CLIENT_ID:staff-identity-admin}
+    client-secret: ${IDENTITY_ADMIN_CLIENT_SECRET:}
+    web-client-id: ${IDENTITY_ADMIN_WEB_CLIENT_ID:rehletshifaa-web}
+    invite-lifespan-seconds: ${STAFF_INVITE_LIFESPAN_SECONDS:43200}
   cors.allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000}
   crypto:
     pii-key: ${PII_ENCRYPTION_KEY:rehletshifaa-local-dev-only-change-me}

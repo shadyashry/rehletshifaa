@@ -9,7 +9,7 @@ import { CaseMessages, TaskActions, PatientProposalDecision } from "@/components
 import { PortalAccount, type Preferences } from "@/components/portal/PortalAccount";
 import { RoleDashboardSummary } from "@/components/portal/RoleDashboardSummary";
 import { CaseQueue, initialQueue, type QueueState } from "@/components/portal/CaseQueue";
-import { ReportingTeam, IdentityReviewQueue, PractitionerDirectory } from "@/components/portal/PortalDirectories";
+import { ReportingTeam, IdentityReviewQueue, PractitionerDirectory, ConsultantAccounts } from "@/components/portal/PortalDirectories";
 import type { Locale } from "@/lib/i18n";
 import { portalRoles, type PortalRoleKey as RoleKey } from "@/lib/portal-role-access";
 
@@ -38,11 +38,13 @@ type Workspace={preview?:boolean;intakeSummary?:string;caseSummary:CaseView;time
 type MutationResult={id?:string;status?:string};
 type Mutate=(path:string,body?:unknown,method?:string)=>Promise<MutationResult|undefined>;
 type Api=<T,>(path:string,init?:RequestInit)=>Promise<T>;
-type PractitionerSummary={id:string;displayName?:string;specialty?:string;subspecialty?:string;careCategory?:string;credentialingStatus?:string;availabilityStatus?:string};
+type PractitionerSummary={id:string;displayName?:string;specialty?:string;subspecialty?:string;careCategory?:string;credentialingStatus?:string;availabilityStatus?:string;email?:string;accountStatus?:"INVITED"|"ACTIVE"|"DISABLED";invitedAt?:string};
 type CommercialPolicy={id:string;name:string;careCategory?:string;marginRate:number;active:boolean;version:number;createdBy?:string;validFrom?:string};
 type DepositPolicy={id:string;name:string;careCategory?:string;coordinationDepositEgp:number;active:boolean;version:number;createdBy?:string;validFrom?:string};
 type CatalogImportRow={line:number;serviceCode:string;serviceName:string;category?:string;priceEgp?:number;action:string;message?:string};
 type CatalogImportResult={committed:boolean;added:number;updated:number;unchanged:number;errors:number;rows:CatalogImportRow[]};
+type ServiceTemplate={id:string;careCategory:string;name:string;referenceStandard?:string;guidanceNote?:string};
+type ServiceTemplateItem={serviceCode:string;serviceName:string;category?:string;suggestedPriceEgp?:number;sortOrder:number;active:boolean};
 
 function normalizeCases(rows:(CaseView|StaffCaseResponse)[]):CaseView[]{return rows.map(row=>"caseSummary" in row?{...row.caseSummary,assignmentId:row.assignmentId,assignmentStatus:row.assignmentStatus,openTaskCount:row.openTaskCount,overdueTaskCount:row.overdueTaskCount,documentCount:row.documentCount}:row);}
 // Display labels for currencies the doctor can view/quote in (EGP is the base).
@@ -438,7 +440,13 @@ function FinancePolicies({api,locale}:{api:Api;locale:Locale}){
    </form></div>
  </section>;
 }
-function CatalogAdmin({api,locale}:{api:Api;locale:Locale}){
+function CareAreaTemplateAdmin({api,locale,editable}:{api:Api;locale:Locale;editable:boolean}){
+ const[templates,setTemplates]=useState<ServiceTemplate[]>([]),[selected,setSelected]=useState(""),[items,setItems]=useState<ServiceTemplateItem[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");const ar=locale==="ar";const current=templates.find(t=>t.id===selected);
+ const loadTemplates=useCallback(async()=>{try{const rows=await api<ServiceTemplate[]>("/admin/service-templates");setTemplates(rows);setSelected(value=>value||rows[0]?.id||"");}catch(e){setError(e instanceof Error?e.message:"Unable to load templates");}},[api]);useEffect(()=>{void loadTemplates();},[loadTemplates]);useEffect(()=>{if(!selected){setItems([]);return;}void api<ServiceTemplateItem[]>(`/admin/service-templates/${selected}/items`).then(setItems).catch(e=>setError(e instanceof Error?e.message:"Unable to load template"));},[selected,api]);
+ const run=async(fn:()=>Promise<unknown>)=>{setBusy(true);setError("");setNotice("");try{await fn();setNotice(ar?"تم حفظ القالب.":"Template saved.");await loadTemplates();if(selected)setItems(await api<ServiceTemplateItem[]>(`/admin/service-templates/${selected}/items`));return true;}catch(e){setError(e instanceof Error?e.message:"Unable to save template");return false;}finally{setBusy(false);}};
+ return <section className="overflow-hidden rounded-2xl border border-brand-200 bg-white"><header className="bg-gradient-to-br from-brand-50 to-accent-50 p-5"><p className="eyebrow">{ar?"مرجع موحّد لكل مجال":"One governed baseline per care area"}</p><h2 className="title mt-2">{ar?"قوالب خدمات مجالات الرعاية":"Care-area service templates"}</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-600">{ar?"قائمة مرجعية للخدمات والفوترة، وليست خطة علاج. يختار الاستشاري ما يلزم سريريًا وتراجع المالية السعر المحلي قبل التفعيل.":"A service and billing reference—not a treatment plan. The consultant selects what is clinically appropriate and Finance validates local prices before activation."}</p></header><div className="space-y-5 p-5">{error&&<p role="alert" className="rounded-xl bg-alert-50 p-3 text-sm text-alert-800">{error}</p>}{notice&&<p role="status" className="rounded-xl bg-brand-50 p-3 text-sm text-brand-800">✓ {notice}</p>}<div role="tablist" aria-label={ar?"مجالات الرعاية":"Care areas"} className="flex flex-wrap gap-2">{templates.map(t=><button type="button" role="tab" aria-selected={selected===t.id} key={t.id} className={selected===t.id?"btn-primary":"btn-secondary"} onClick={()=>setSelected(t.id)}>{prettyCategory(t.careCategory,locale)}</button>)}</div>{current&&<><div className="rounded-xl border border-line bg-mist p-4"><p className="font-bold text-ink-900">{current.name}</p><p className="mt-1 text-xs font-semibold text-brand-700">{current.referenceStandard}</p><p className="mt-2 text-sm text-ink-600">{current.guidanceNote}</p></div><div className="overflow-x-auto rounded-xl border border-line"><table className="w-full text-sm"><thead className="bg-mist text-xs uppercase tracking-wide text-ink-500"><tr><th className="p-3 text-start">{ar?"الخدمة":"Service"}</th><th className="p-3 text-start">{ar?"الفئة":"Category"}</th><th className="p-3 text-end">{ar?"السعر الأساسي":"Base price"}</th><th className="p-3 text-end">{ar?"الإجراء":"Action"}</th></tr></thead><tbody>{items.map(item=><tr key={item.serviceCode} className={`border-t border-line ${item.active?"":"opacity-55"}`}><td className="p-3"><p className="font-semibold">{item.serviceName}</p><p className="text-xs text-ink-400">{item.serviceCode}</p></td><td className="p-3">{item.category}</td><td className="p-3 text-end">{item.suggestedPriceEgp?money(item.suggestedPriceEgp,"EGP",locale):(ar?"يُحدَّد محليًا":"Set locally")}</td><td className="p-3 text-end">{editable&&<button type="button" className="text-sm font-semibold text-brand-700" disabled={busy} onClick={()=>void run(()=>api(`/admin/service-templates/${selected}/items/${encodeURIComponent(item.serviceCode)}`,{method:"PUT",body:JSON.stringify({...item,active:!item.active})}))}>{item.active?(ar?"إيقاف":"Deactivate"):(ar?"تفعيل":"Activate")}</button>}</td></tr>)}</tbody></table></div>{editable&&<form className="grid gap-3 rounded-xl border border-dashed border-line-strong p-4 sm:grid-cols-2 lg:grid-cols-5" onSubmit={e=>{e.preventDefault();const f=e.currentTarget,d=new FormData(f);void run(()=>api(`/admin/service-templates/${selected}/items`,{method:"POST",body:JSON.stringify({serviceCode:d.get("code"),serviceName:d.get("name"),category:d.get("category"),suggestedPriceEgp:d.get("price")?Number(d.get("price")):null,sortOrder:items.length+1,active:true})})).then(ok=>{if(ok)f.reset();});}}><input className="field" name="name" placeholder={ar?"اسم الخدمة *":"Service name *"} required/><input className="field" name="code" placeholder={ar?"رمز ثابت *":"Stable code *"} required/><input className="field" name="category" placeholder={ar?"الفئة":"Category"}/><input className="field" name="price" type="number" min="0" step="0.01" placeholder={ar?"سعر اختياري":"Optional EGP"}/><button className="btn-primary" disabled={busy}>{ar?"إضافة للقالب":"Add to template"}</button></form>}</>}</div></section>;
+}
+function CatalogAdmin({api,locale,editable}:{api:Api;locale:Locale;editable:boolean}){
  const[list,setList]=useState<PractitionerSummary[]>([]);const[sel,setSel]=useState("");
  const[rows,setRows]=useState<CatalogService[]>([]);const[fx,setFx]=useState<FxRate[]>([]);
  const[busy,setBusy]=useState(false);const[msg,setMsg]=useState("");const[err,setErr]=useState("");
@@ -454,7 +462,7 @@ function CatalogAdmin({api,locale}:{api:Api;locale:Locale}){
  const selCare=list.find(p=>p.id===sel)?.careCategory;
  const dispCurrencies=["EGP",...fx.filter(f=>f.currency!=="EGP").map(f=>f.currency)];
  const dispRate=display==="EGP"?1:(fx.find(f=>f.currency===display)?.rate??null);
- return <div className="card space-y-5 p-6">
+ return <div className="space-y-6"><CareAreaTemplateAdmin api={api} locale={locale} editable={editable}/><div className="card space-y-5 p-6">
   <div><h2 className="title">{g.title}</h2><p className="mt-1 text-sm text-ink-500">{g.intro}</p></div>
   <label className="block text-sm font-bold">{g.pick}<select className="field mt-1" value={sel} onChange={e=>setSel(e.target.value)}><option value="">—</option>{list.map(p=><option key={p.id} value={p.id}>{p.displayName} — {p.specialty??p.careCategory} · {p.credentialingStatus}</option>)}</select></label>
   {msg&&<p className="rounded-lg bg-brand-50 p-2 text-sm text-brand-800">{msg}</p>}{err&&<p className="rounded-lg bg-alert-50 p-2 text-sm text-alert-800">{err}</p>}
@@ -492,7 +500,7 @@ function CatalogAdmin({api,locale}:{api:Api;locale:Locale}){
      <tbody>{fx.filter(f=>f.currency!=="EGP").map(f=><FxRow key={f.currency} f={f} locale={locale} busy={busy} saveLabel={g.pin} lockedLabel={g.fxLocked} onPin={async(cur,stored)=>{setBusy(true);setErr("");setMsg("");try{await api(`/admin/fx-rates/${cur}`,{method:"PUT",body:JSON.stringify({rate:stored})});setMsg(g.saved);await load(sel);return true;}catch(e){setErr(e instanceof Error?e.message:"Error");return false;}finally{setBusy(false);}}}/>)}</tbody></table></div>
    </div>
   </>}
- </div>;
+ </div></div>;
 }
 function FxRow({f,locale,busy,saveLabel,lockedLabel,onPin}:{f:FxRate;locale:Locale;busy:boolean;saveLabel:string;lockedLabel:string;onPin:(currency:string,storedRate:number)=>Promise<boolean>}){
  const[egpPer,setEgpPer]=useState((f.rate?1/f.rate:0).toFixed(4));
@@ -522,24 +530,24 @@ function AdminForm({t,busy,locale,api,mutate,readOnly,systemAdmin}:{t:typeof cop
   consoleTitle:"لوحة اعتماد مقدّمي الخدمة",consoleSubtitle:"إضافة الاستشاريين والموظفين، وتسجيل مستندات الاعتماد، وتسجيل قرارات التحقق — كلٌّ في مكانه.",
   tabPractitioners:"الاستشاريون",tabStaff:"حسابات الموظفين",tabCatalog:"قائمة الأسعار",
   flowHint:"أضِف الاستشاري أولًا (خطوة 1)، ثم سجّل مستند الاعتماد (خطوة 2)، وأخيرًا سجّل القرار (خطوة 3).",
-  step1:"إضافة ملف استشاري",step1hint:"يُنشئ ملفًا جديدًا بحالة «قيد المراجعة». بعد الإنشاء يُحدَّد الملف تلقائيًا للخطوتين التاليتين.",
+  step1:"دعوة استشاري وإنشاء ملفه",step1hint:"يُرسل رابطًا آمنًا لبريد الاستشاري لاختيار كلمة المرور، وينشئ ملف اعتماد بحالة «قيد المراجعة».",
   careCategory:"مجال الرعاية",selectCategory:"اختر مجال الرعاية",
   selectedTitle:"الملف قيد العمل",selectedNone:"لم يُحدَّد ملف بعد",selectedHint:"أنشئ استشاريًا في الأعلى أو اختر استشاريًا موجودًا للمتابعة.",createdOk:"تم إنشاء الملف — تابِع خطوتي الاعتماد والقرار.",clear:"مسح",
   step2:"تسجيل مستند اعتماد موثّق",step2hint:"مثال: رخصة مزاولة، شهادة زمالة، أو وثيقة تأمين مسؤولية.",
   step3:"قرار الاعتماد",step3hint:"الموافقة تُتيح الاستشاري للتعيين على الحالات؛ الرفض يتطلب سببًا.",
-  staffTitle:"إضافة حساب موظف",staffHint:"أنشئ حساب منسّق أو عمليات أو مالية واربطه بمعرّف الهوية.",gated:"حدِّد ملفًا أولًا لتفعيل هذا الإجراء.",
+  staffTitle:"دعوة موظف جديد",staffHint:"أدخل بيانات العمل فقط. سنرسل للموظف رابطًا آمنًا للتحقق من البريد واختيار كلمة مروره؛ لن تظهر كلمة المرور للمدير.",gated:"حدِّد ملفًا أولًا لتفعيل هذا الإجراء.",
   roleLabel:"الدور",roleCoordinator:"منسّق",roleOperations:"العمليات",roleFinance:"المالية",
   teamLead:"قائد الفريق",leadHint:"ينشئ قائدًا لهذا القسم ويمكن تعيين أعضاء فريق له من الشاشة أدناه.",leadUnavailable:""
  }:{
   consoleTitle:"Credentialing console",consoleSubtitle:"Onboard consultants and staff, register credentials, and record verification decisions — each in its own place.",
   tabPractitioners:"Consultants",tabStaff:"Staff accounts",tabCatalog:"Price catalog",
   flowHint:"Add the consultant first (step 1), then register their credential (step 2), then record the decision (step 3).",
-  step1:"Create consultant profile",step1hint:"Creates a new profile in ‘under review’. After creating, it becomes the selected profile for the next two steps.",
+  step1:"Invite consultant & create profile",step1hint:"Sends a secure password-setup link to the consultant and creates an ‘under review’ credentialing profile.",
   careCategory:"Care area",selectCategory:"Select a care area",
   selectedTitle:"Working on profile",selectedNone:"No profile selected yet",selectedHint:"Create a consultant above, or select an existing consultant, to continue with credentials and verification.",createdOk:"Profile created — continue with the credential and decision steps.",clear:"Clear",
   step2:"Register verified credential",step2hint:"For example: practice licence, fellowship certificate, or indemnity cover.",
   step3:"Credentialing decision",step3hint:"Approving makes the consultant available for assignment; rejecting requires a reason.",
-  staffTitle:"Onboard a staff account",staffHint:"Create a coordinator, operations, or finance account and link it to an identity subject.",gated:"Select a profile first to enable this action.",
+  staffTitle:"Invite a new staff member",staffHint:"Enter work details only. We send a secure link for email verification and password setup; administrators never see the password.",gated:"Select a profile first to enable this action.",
   roleLabel:"Role",roleCoordinator:"Coordinator",roleOperations:"Operations",roleFinance:"Finance",
   teamLead:"Team lead",leadHint:"Creates a lead for this function; assign their team directly below.",leadUnavailable:""
  };
@@ -557,15 +565,16 @@ function AdminForm({t,busy,locale,api,mutate,readOnly,systemAdmin}:{t:typeof cop
    <p className="rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">{L.flowHint}</p>
 
    {/* Step 1 — create profile */}
-   <form className="card p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/practitioners",{legalName:data.get("name"),displayName:data.get("name"),externalSubject:data.get("subject"),specialty:data.get("specialty"),careCategory:data.get("careCategory"),practitionerType:"CONSULTANT",contractStatus:"ACTIVE",availabilityStatus:"AVAILABLE",expectedReviewHours:48}).then(result=>{if(result?.id){setPractitionerId(result.id);setJustCreated(true);form.reset();}});}}>
+   <form className="card p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/practitioners",{legalName:data.get("name"),displayName:data.get("name"),email:data.get("email"),locale:data.get("locale"),specialty:data.get("specialty"),careCategory:data.get("careCategory"),practitionerType:"CONSULTANT",contractStatus:"ACTIVE",availabilityStatus:"UNAVAILABLE",expectedReviewHours:48}).then(result=>{if(result?.id){setPractitionerId(result.id);setJustCreated(true);form.reset();}});}}>
     <StepHead n={1} title={L.step1} hint={L.step1hint}/>
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
-     <Field label={t.name}><input className="field" name="name" required/></Field>
-     <Field label={t.subject}><input className="field" name="subject" required/></Field>
-     <Field label={t.specialty}><input className="field" name="specialty" required/></Field>
+     <Field label={`${t.name} *`}><input className="field" name="name" autoComplete="name" maxLength={160} required/></Field>
+     <Field label={`${locale==="ar"?"بريد العمل":"Work email"} *`}><input className="field" name="email" type="email" inputMode="email" autoComplete="email" maxLength={254} required/></Field>
+     <Field label={`${t.specialty} *`}><input className="field" name="specialty" maxLength={120} required/></Field>
      <Field label={L.careCategory}><select className="field" name="careCategory" required defaultValue=""><option value="" disabled>{L.selectCategory}</option><option value="cardiology">{prettyCategory("cardiology",locale)}</option><option value="rheumatology-rehabilitation">{prettyCategory("rheumatology-rehabilitation",locale)}</option><option value="orthopedics">{prettyCategory("orthopedics",locale)}</option></select></Field>
+     <Field label={`${locale==="ar"?"لغة الدعوة":"Invitation language"} *`}><select className="field" name="locale" defaultValue={locale}><option value="en">English</option><option value="ar">العربية</option></select></Field>
     </div>
-    <div className="mt-5"><button disabled={busy} className="btn-primary">{t.create}</button></div>
+    <div className="mt-5"><button disabled={busy} className="btn-primary">{busy?(locale==="ar"?"جارٍ إرسال الدعوة…":"Sending invitation…"):(locale==="ar"?"إرسال الدعوة وإنشاء الملف":"Send invite & create profile")}</button><p className="mt-3 text-xs text-ink-500">{locale==="ar"?"يبقى الاستشاري غير متاح للتعيين حتى اكتمال التحقق من اعتماده.":"The consultant remains unavailable for case assignment until credential verification is complete."}</p></div>
    </form>
 
    {/* Selected-profile context bar */}
@@ -600,11 +609,12 @@ function AdminForm({t,busy,locale,api,mutate,readOnly,systemAdmin}:{t:typeof cop
      </div>
     </form>
    </div>
+   <ConsultantAccounts api={api} locale={locale} editable={systemAdmin}/>
   </div>}
 
   {tab==="staff"&&<div role="tabpanel"><StaffAccountForm t={t} L={L} busy={busy} mutate={mutate} onSaved={()=>setStaffVersion(value=>value+1)}/><ReportingTeam key={staffVersion} api={api} locale={locale} editable={systemAdmin}/></div>}
 
-  {tab==="catalog"&&<div role="tabpanel"><CatalogAdmin api={api} locale={locale}/></div>}
+  {tab==="catalog"&&<div role="tabpanel"><CatalogAdmin api={api} locale={locale} editable={systemAdmin}/></div>}
  </div>;
 }
 const STAFF_ROLES=["COORDINATOR","OPERATIONS","FINANCE"] as const;
@@ -613,15 +623,21 @@ const LEAD_ROLE:Record<string,string>={COORDINATOR:"COORDINATOR_LEAD",OPERATIONS
 function StaffAccountForm({t,L,busy,mutate,onSaved}:{t:typeof copy.en;L:Record<string,string>;busy:boolean;mutate:Mutate;onSaved:()=>void}){
  const[role,setRole]=useState<string>("COORDINATOR");
  const[lead,setLead]=useState(false);
+ const[language,setLanguage]=useState<Locale>("en");
+ const[invited,setInvited]=useState("");
  const leadCapable=!!LEAD_ROLE[role];
  const effectiveRole=leadCapable&&lead?LEAD_ROLE[role]:role;
  const roleName=(value:string)=>value==="COORDINATOR"?L.roleCoordinator:value==="OPERATIONS"?L.roleOperations:L.roleFinance;
- return <form className="card max-w-2xl p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);void mutate("/admin/staff",{name:data.get("name"),externalSubject:data.get("subject"),role:effectiveRole}).then(result=>{if(result){form.reset();setRole("COORDINATOR");setLead(false);onSaved();}});}}>
-  <StepHead title={L.staffTitle} hint={L.staffHint}/>
+ const ar=L.staffTitle.includes("دعوة");
+ return <div className="space-y-5"><section className="overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-accent-50 p-5 sm:p-6"><div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]"><div><p className="eyebrow">{ar?"وصول آمن للفريق":"Secure team access"}</p><h2 className="headline mt-2">{L.staffTitle}</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-ink-600">{L.staffHint}</p></div><ol className="grid gap-2 text-sm" aria-label={ar?"خطوات تفعيل الحساب":"Account activation steps"}>{[ar?"1. ترسل الدعوة إلى بريد العمل":"1. Invitation goes to the work email",ar?"2. يتحقق الموظف من البريد":"2. Staff member verifies the email",ar?"3. يختار كلمة المرور ثم يسجل الدخول":"3. They set a password and sign in"].map(item=><li key={item} className="rounded-xl border border-white bg-white/80 px-3 py-2.5 font-semibold text-ink-700 shadow-sm">{item}</li>)}</ol></div></section>
+ <form className="card max-w-3xl p-6" onSubmit={event=>{event.preventDefault();const form=event.currentTarget;const data=new FormData(form);setInvited("");void mutate("/admin/staff",{name:data.get("name"),email:data.get("email"),role:effectiveRole,locale:language}).then(result=>{if(result){setInvited(String(data.get("email")??""));form.reset();setRole("COORDINATOR");setLead(false);onSaved();}});}}>
+  <StepHead title={ar?"بيانات الدعوة":"Invitation details"} hint={ar?"الحقول المعلّمة بنجمة مطلوبة. استخدم بريد العمل الخاص بالموظف.":"Fields marked with an asterisk are required. Use the staff member’s own work email."}/>
+  {invited&&<div role="status" className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><p className="font-bold">✓ {ar?"تم إرسال الدعوة":"Invitation sent"}</p><p className="mt-1">{ar?`سيختار ${invited} كلمة المرور من الرابط الآمن.`:`${invited} will choose their password from the secure link.`}</p></div>}
   <div className="mt-5 grid gap-4 sm:grid-cols-2">
-   <Field label={t.name}><input className="field" name="name" required/></Field>
-   <Field label={t.subject}><input className="field" name="subject" required/></Field>
-   <Field label={L.roleLabel}><select className="field" value={role} onChange={event=>setRole(event.target.value)}>{STAFF_ROLES.map(value=><option key={value} value={value}>{roleName(value)}</option>)}</select></Field>
+   <Field label={`${ar?"الاسم الكامل":"Full name"} *`}><input className="field" name="name" autoComplete="name" maxLength={160} required/></Field>
+   <Field label={`${ar?"بريد العمل":"Work email"} *`}><input className="field" name="email" type="email" inputMode="email" autoComplete="email" maxLength={254} required/></Field>
+   <Field label={`${L.roleLabel} *`}><select className="field" value={role} onChange={event=>setRole(event.target.value)}>{STAFF_ROLES.map(value=><option key={value} value={value}>{roleName(value)}</option>)}</select></Field>
+   <Field label={`${ar?"لغة الدعوة":"Invitation language"} *`}><select className="field" value={language} onChange={event=>setLanguage(event.target.value as Locale)}><option value="en">English</option><option value="ar">العربية</option></select></Field>
    <div className="flex items-end">
     <label className={`flex w-full items-start gap-3 rounded-xl border p-3 ${leadCapable?"cursor-pointer border-line bg-brand-50/60":"border-line opacity-60"}`}>
      <input type="checkbox" className="mt-0.5 h-4 w-4 flex-none accent-brand-600" checked={leadCapable&&lead} disabled={!leadCapable} onChange={event=>setLead(event.target.checked)}/>
@@ -629,8 +645,9 @@ function StaffAccountForm({t,L,busy,mutate,onSaved}:{t:typeof copy.en;L:Record<s
     </label>
    </div>
   </div>
-  <div className="mt-5 flex flex-wrap items-center gap-3"><button disabled={busy} className="btn-primary">{t.create}</button><span className="text-sm text-ink-500">{roleName(role)}{leadCapable&&lead?` · ${L.teamLead}`:""}</span></div>
- </form>;
+  <div className="mt-5 flex flex-wrap items-center gap-3"><button disabled={busy} className="btn-primary">{busy?(ar?"جارٍ إرسال الدعوة…":"Sending invitation…"):(ar?"إرسال دعوة آمنة":"Send secure invitation")}</button><span className="text-sm text-ink-500">{roleName(role)}{leadCapable&&lead?` · ${L.teamLead}`:""}</span></div>
+  <p className="mt-4 text-xs leading-5 text-ink-500">{ar?"تنتهي صلاحية الرابط بعد 12 ساعة. لا تُرسل كلمات مرور بالبريد أو واتساب.":"The link expires after 12 hours. Never send passwords by email or WhatsApp."}</p>
+ </form></div>;
 }
 function StepHead({n,title,hint}:{n?:number;title:string;hint:string}){return <div className="flex items-start gap-3 border-b border-line pb-4">{n!=null&&<span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">{n}</span>}<div><h3 className="title">{title}</h3><p className="mt-0.5 text-sm text-ink-500">{hint}</p></div></div>}
 function Field({label,children}:{label:string;children:React.ReactNode}){return <label className="block"><span className="mb-1 block text-sm font-bold text-ink-700">{label}</span>{children}</label>}

@@ -69,6 +69,24 @@
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "${APP_ORIGIN}/*"
       }
+    },
+    {
+      "clientId": "staff-identity-admin",
+      "name": "Staff identity provisioning",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${STAFF_IDENTITY_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-staff-identity-admin",
+      "enabled": true,
+      "serviceAccountClientId": "staff-identity-admin",
+      "clientRoles": {"realm-management": ["manage-users", "view-users", "query-users"]}
     }
   ]
 }

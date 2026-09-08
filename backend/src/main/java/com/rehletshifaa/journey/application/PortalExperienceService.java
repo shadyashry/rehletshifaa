@@ -2,13 +2,14 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.security.ActorContext;
 import com.rehletshifaa.security.ActorRole;
+import com.rehletshifaa.identity.KeycloakStaffIdentityService;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import jakarta.validation.constraints.*;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.time.Clock;
+import java.time.*;
 import java.util.*;
 import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
@@ -19,12 +20,13 @@ public class PortalExperienceService {
     private final ActorContext actors;
     private final CryptoService crypto;
     private final Clock clock;
-    public PortalExperienceService(JdbcClient jdbc, ActorContext actors, CryptoService crypto, Clock clock) {
-        this.jdbc=jdbc; this.actors=actors; this.crypto=crypto; this.clock=clock;
+    private final KeycloakStaffIdentityService staffIdentity;
+    public PortalExperienceService(JdbcClient jdbc, ActorContext actors, CryptoService crypto, Clock clock, KeycloakStaffIdentityService staffIdentity) {
+        this.jdbc=jdbc; this.actors=actors; this.crypto=crypto; this.clock=clock; this.staffIdentity=staffIdentity;
     }
     public record Preferences(String displayName, String locale) {}
     public record PreferencesRequest(@Size(max=160) String displayName, @NotNull @Pattern(regexp="en|ar") String locale) {}
-    public record ReportingMember(String subject, String name, String role, String staffFunction, String leadSubject, String managerSubject) {}
+    public record ReportingMember(String subject,String name,String role,String staffFunction,String leadSubject,String managerSubject,String email,String accountStatus,Instant invitedAt) {}
     public record ReportingRequest(@Size(max=255) String leadSubject, @Size(max=255) String managerSubject, @Size(max=500) String reason) {
         public ReportingRequest(String leadSubject,String reason){this(leadSubject,null,reason);}
         String selectedLead(){return leadSubject!=null?leadSubject:managerSubject;}
@@ -53,8 +55,8 @@ public class PortalExperienceService {
         return directory();
     }
     private List<ReportingMember> directory() {
-        return jdbc.sql("SELECT s.external_subject,s.display_name_encrypted,s.staff_role,t.staff_function,COALESCE(t.lead_subject,CASE WHEN s.staff_role IN ('COORDINATOR','COORDINATOR_LEAD') THEN s.manager_subject ELSE NULL END) lead_subject FROM staff_members s LEFT JOIN staff_team_assignments t ON t.staff_subject=s.external_subject WHERE s.external_subject IS NOT NULL AND s.staff_role IN ('COORDINATOR','COORDINATOR_LEAD','OPERATIONS','OPERATIONS_LEAD','FINANCE','FINANCE_LEAD') ORDER BY s.staff_role,s.external_subject")
-            .query((rs,n)->{String role=rs.getString("staff_role"),lead=rs.getString("lead_subject");return new ReportingMember(rs.getString("external_subject"),crypto.decrypt(rs.getString("display_name_encrypted")),role,rs.getString("staff_function")==null?staffFunction(role):rs.getString("staff_function"),lead,lead);}).list();
+        return jdbc.sql("SELECT s.external_subject,s.display_name_encrypted,s.email_encrypted,s.invitation_status,s.invited_at,s.staff_role,t.staff_function,COALESCE(t.lead_subject,CASE WHEN s.staff_role IN ('COORDINATOR','COORDINATOR_LEAD') THEN s.manager_subject ELSE NULL END) lead_subject FROM staff_members s LEFT JOIN staff_team_assignments t ON t.staff_subject=s.external_subject WHERE s.external_subject IS NOT NULL AND s.staff_role IN ('COORDINATOR','COORDINATOR_LEAD','OPERATIONS','OPERATIONS_LEAD','FINANCE','FINANCE_LEAD') ORDER BY s.staff_role,s.external_subject")
+            .query((rs,n)->{String subject=rs.getString("external_subject"),role=rs.getString("staff_role"),lead=rs.getString("lead_subject"),stored=rs.getString("invitation_status");return new ReportingMember(subject,crypto.decrypt(rs.getString("display_name_encrypted")),role,rs.getString("staff_function")==null?staffFunction(role):rs.getString("staff_function"),lead,lead,crypto.decrypt(rs.getString("email_encrypted")),staffIdentity.status(subject,stored),rs.getTimestamp("invited_at")==null?null:rs.getTimestamp("invited_at").toInstant());}).list();
     }
     public Set<String> reports(String manager) {
         List<ReportingMember> members=directory();

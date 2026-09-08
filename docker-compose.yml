@@ -95,6 +95,10 @@ services:
       MAIL_PORT: 1025
       COORDINATOR_EMAIL: coordinator@local.test
       MAIL_FROM: no-reply@local.test
+      IDENTITY_ADMIN_BASE_URL: http://keycloak:8080
+      IDENTITY_ADMIN_CLIENT_ID: staff-identity-admin
+      IDENTITY_ADMIN_CLIENT_SECRET: local-only-staff-identity-secret-change-me
+      STAFF_INVITE_LIFESPAN_SECONDS: 43200
       FRONTEND_ALLOWED_ORIGINS: http://localhost:3000
       APP_PUBLIC_BASE_URL: http://localhost:8080
       APP_WEB_BASE_URL: http://localhost:3000

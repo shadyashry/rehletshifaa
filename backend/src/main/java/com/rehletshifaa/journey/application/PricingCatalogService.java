@@ -5,6 +5,8 @@ import com.rehletshifaa.security.ActorContext;
 import com.rehletshifaa.security.ActorRole;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.currency.CurrencyService;
+import com.rehletshifaa.shared.crypto.CryptoService;
+import com.rehletshifaa.identity.KeycloakStaffIdentityService;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,33 +29,39 @@ public class PricingCatalogService {
     private final ActorContext actors;
     private final Clock clock;
     private final CurrencyService currency;
+    private final CryptoService crypto;
+    private final KeycloakStaffIdentityService identity;
 
-    public PricingCatalogService(JdbcClient jdbc, ActorContext actors, Clock clock, CurrencyService currency) {
-        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.currency = currency;
+    public PricingCatalogService(JdbcClient jdbc, ActorContext actors, Clock clock, CurrencyService currency,CryptoService crypto,KeycloakStaffIdentityService identity) {
+        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.currency = currency;this.crypto=crypto;this.identity=identity;
     }
 
     // ---- Specialty templates (admin) ----
     public List<ServiceTemplateView> templates(String careCategory) {
         actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
-        String sql = "SELECT id,care_category,name FROM service_templates WHERE active" +
+        String sql = "SELECT id,care_category,name,reference_standard,guidance_note FROM service_templates WHERE active" +
                 (careCategory == null || careCategory.isBlank() ? "" : " AND care_category=?") + " ORDER BY care_category";
         var spec = (careCategory == null || careCategory.isBlank())
                 ? jdbc.sql(sql) : jdbc.sql(sql).param(careCategory.trim());
-        return spec.query((rs, n) -> new ServiceTemplateView(rs.getObject("id", UUID.class), rs.getString("care_category"), rs.getString("name"))).list();
+        return spec.query((rs, n) -> template(rs)).list();
     }
 
     public List<ServiceTemplateItemView> templateItems(UUID templateId) {
         actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
-        return jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order FROM service_template_items WHERE template_id=? ORDER BY sort_order,service_name")
+        return jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order,active FROM service_template_items WHERE template_id=? ORDER BY active DESC,sort_order,service_name")
                 .param(templateId)
-                .query((rs, n) -> new ServiceTemplateItemView(rs.getString("service_code"), rs.getString("service_name"), rs.getString("category"), rs.getBigDecimal("suggested_price_egp"), rs.getInt("sort_order"))).list();
+                .query((rs, n) -> templateItem(rs)).list();
     }
+
+    @Transactional public ServiceTemplateView updateTemplate(UUID id,ServiceTemplateUpdateRequest request){var actor=actors.require(ActorRole.SYSTEM_ADMIN);int changed=jdbc.sql("UPDATE service_templates SET name=?,reference_standard=?,guidance_note=?,updated_at=? WHERE id=? AND active").params(request.name().trim(),request.referenceStandard(),request.guidanceNote(),timestamp(clock.instant()),id).update();if(changed!=1)throw new ApiException(404,"TEMPLATE_NOT_FOUND","The care-area template was not found");audit(actor,"SERVICE_TEMPLATE_UPDATED",id.toString());return templateById(id);}
+    @Transactional public ServiceTemplateItemView addTemplateItem(UUID templateId,ServiceTemplateItemRequest request){var actor=actors.require(ActorRole.SYSTEM_ADMIN);templateById(templateId);Integer exists=jdbc.sql("SELECT count(*) FROM service_template_items WHERE template_id=? AND service_code=?").params(templateId,request.serviceCode().trim()).query(Integer.class).single();if(exists!=null&&exists>0)throw new ApiException(409,"TEMPLATE_CODE_EXISTS","This service code already exists in the template");jdbc.sql("INSERT INTO service_template_items(id,template_id,service_code,service_name,category,suggested_price_egp,sort_order,active) VALUES(?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),templateId,request.serviceCode().trim(),request.serviceName().trim(),request.category(),request.suggestedPriceEgp(),request.sortOrder()==null?0:request.sortOrder(),request.active()==null||request.active()).update();audit(actor,"SERVICE_TEMPLATE_ITEM_CREATED",templateId.toString());return templateItemByCode(templateId,request.serviceCode().trim());}
+    @Transactional public ServiceTemplateItemView updateTemplateItem(UUID templateId,String code,ServiceTemplateItemRequest request){var actor=actors.require(ActorRole.SYSTEM_ADMIN);int changed=jdbc.sql("UPDATE service_template_items SET service_name=?,category=?,suggested_price_egp=?,sort_order=?,active=? WHERE template_id=? AND service_code=?").params(request.serviceName().trim(),request.category(),request.suggestedPriceEgp(),request.sortOrder()==null?0:request.sortOrder(),request.active()==null||request.active(),templateId,code).update();if(changed!=1)throw new ApiException(404,"TEMPLATE_ITEM_NOT_FOUND","The template service was not found");audit(actor,"SERVICE_TEMPLATE_ITEM_UPDATED",templateId+":"+code);return templateItemByCode(templateId,code);}
 
     // ---- Consultant catalog (admin managed) ----
     public List<PractitionerSummaryView> practitioners() {
         actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
-        return jdbc.sql("SELECT id,display_name,specialty,subspecialty,care_category,credentialing_status,availability_status FROM practitioner_profiles WHERE practitioner_type='CONSULTANT' ORDER BY display_name")
-                .query((rs, n) -> new PractitionerSummaryView(rs.getObject("id", UUID.class), rs.getString("display_name"), rs.getString("specialty"), rs.getString("subspecialty"), rs.getString("care_category"), rs.getString("credentialing_status"), rs.getString("availability_status"))).list();
+        return jdbc.sql("SELECT id,external_subject,display_name,specialty,subspecialty,care_category,credentialing_status,availability_status,email_encrypted,account_status,invited_at FROM practitioner_profiles WHERE practitioner_type='CONSULTANT' ORDER BY display_name")
+                .query((rs, n) -> {String subject=rs.getString("external_subject"),stored=rs.getString("account_status");return new PractitionerSummaryView(rs.getObject("id", UUID.class), rs.getString("display_name"), rs.getString("specialty"), rs.getString("subspecialty"), rs.getString("care_category"), rs.getString("credentialing_status"), rs.getString("availability_status"),crypto.decrypt(rs.getString("email_encrypted")),identity.status(subject,stored),rs.getTimestamp("invited_at")==null?null:rs.getTimestamp("invited_at").toInstant());}).list();
     }
 
     public List<CatalogServiceView> practitionerCatalog(UUID practitionerId) {
@@ -140,19 +148,25 @@ public class PricingCatalogService {
     }
 
     private int copyTemplateToCatalog(UUID practitionerId, UUID templateId, String bySubject) {
-        List<ServiceTemplateItemView> items = jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order FROM service_template_items WHERE template_id=? ORDER BY sort_order,service_name")
+        List<ServiceTemplateItemView> items = jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order,active FROM service_template_items WHERE template_id=? AND active ORDER BY sort_order,service_name")
                 .param(templateId)
-                .query((rs, n) -> new ServiceTemplateItemView(rs.getString("service_code"), rs.getString("service_name"), rs.getString("category"), rs.getBigDecimal("suggested_price_egp"), rs.getInt("sort_order"))).list();
+                .query((rs, n) -> templateItem(rs)).list();
         int added = 0;
         for (ServiceTemplateItemView item : items) {
+            boolean priced=item.suggestedPriceEgp()!=null&&item.suggestedPriceEgp().signum()>0;
             added += jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) " +
-                            "SELECT ?,?,?,?,?,?,TRUE,?,?,?,0 WHERE NOT EXISTS(SELECT 1 FROM consultant_service_catalog c WHERE c.practitioner_id=? AND c.service_code=?)")
+                            "SELECT ?,?,?,?,?,?,?, ?,?,?,0 WHERE NOT EXISTS(SELECT 1 FROM consultant_service_catalog c WHERE c.practitioner_id=? AND c.service_code=?)")
                     .params(UUID.randomUUID(), practitionerId, item.serviceCode(), item.serviceName(), item.category(),
-                            item.suggestedPriceEgp() == null ? java.math.BigDecimal.ZERO : item.suggestedPriceEgp(),
+                            priced?item.suggestedPriceEgp():java.math.BigDecimal.ZERO,priced,
                             bySubject, timestamp(clock.instant()), timestamp(clock.instant()), practitionerId, item.serviceCode()).update();
         }
         return added;
     }
+
+    private ServiceTemplateView templateById(UUID id){return jdbc.sql("SELECT id,care_category,name,reference_standard,guidance_note FROM service_templates WHERE id=? AND active").param(id).query((rs,n)->template(rs)).optional().orElseThrow(()->new ApiException(404,"TEMPLATE_NOT_FOUND","The care-area template was not found"));}
+    private ServiceTemplateItemView templateItemByCode(UUID id,String code){return jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order,active FROM service_template_items WHERE template_id=? AND service_code=?").params(id,code).query((rs,n)->templateItem(rs)).optional().orElseThrow(()->new ApiException(404,"TEMPLATE_ITEM_NOT_FOUND","The template service was not found"));}
+    private ServiceTemplateView template(java.sql.ResultSet rs)throws java.sql.SQLException{return new ServiceTemplateView(rs.getObject("id",UUID.class),rs.getString("care_category"),rs.getString("name"),rs.getString("reference_standard"),rs.getString("guidance_note"));}
+    private ServiceTemplateItemView templateItem(java.sql.ResultSet rs)throws java.sql.SQLException{return new ServiceTemplateItemView(rs.getString("service_code"),rs.getString("service_name"),rs.getString("category"),rs.getBigDecimal("suggested_price_egp"),rs.getInt("sort_order"),rs.getBoolean("active"));}
 
     // ---- Bulk import (CSV; Excel via "Save As CSV") ----
     /**
