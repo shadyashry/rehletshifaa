@@ -29,9 +29,10 @@ public class PaymentService {
     private final JdbcClient jdbc;
     private final ActorContext actors;
     private final Clock clock;
+    private final CaseHandoffService handoff;
 
-    public PaymentService(JdbcClient jdbc, ActorContext actors, Clock clock) {
-        this.jdbc = jdbc; this.actors = actors; this.clock = clock;
+    public PaymentService(JdbcClient jdbc, ActorContext actors, Clock clock, CaseHandoffService handoff) {
+        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.handoff = handoff;
     }
 
     record DepositPolicy(UUID id, BigDecimal coordinationEgp, int version) {}
@@ -89,14 +90,40 @@ public class PaymentService {
         return new DepositView(d.id(), d.status(), d.currency(), d.totalEgp(), d.totalDisplay(), paidDisplay, balanceDisplay, components, events);
     }
 
+    /**
+     * Provider-agnostic authoritative settlement — the one domain operation every confirmation path goes
+     * through. Today that is the Finance-recorded offline receipt below; adding an online provider later
+     * means a controller that verifies the callback signature and then calls this same method with its own
+     * provider name and reference, so the ledger, the deposit status and the coordinator handoff can never
+     * diverge between providers and the case journey needs no redesign.
+     *
+     * <p>Authorization is the caller's responsibility (staff role here, signature verification for a
+     * webhook). Idempotent on {@code idempotencyKey}: a replayed receipt or duplicate callback records
+     * nothing new and cannot hand the case over twice.
+     */
+    @Transactional
+    public DepositView confirmPayment(ConfirmedPayment confirmed) {
+        requireDeposit(confirmed.caseId(), confirmed.depositId());
+        appendEvent(confirmed.caseId(), confirmed.depositId(), "PAYMENT_RECORDED", confirmed.amountEgp(),
+                displayFor(confirmed.depositId(), confirmed.amountEgp()), currencyOf(confirmed.depositId()),
+                confirmed.method(), confirmed.provider(), confirmed.providerReference(), "RECORDED",
+                confirmed.confirmedBy(), null, confirmed.idempotencyKey());
+        recomputeStatus(confirmed.caseId(), confirmed.depositId());
+        return depositForCase(confirmed.caseId());
+    }
+
+    /** One authoritative confirmation, whichever provider established it. */
+    public record ConfirmedPayment(UUID caseId, UUID depositId, String provider, String providerReference,
+                                   String method, BigDecimal amountEgp, String confirmedBy, String idempotencyKey) {}
+
+    /** Offline confirmation: Finance records a receipt it has verified, with recent authentication. */
     @Transactional
     public DepositView recordReceipt(UUID caseId, UUID depositId, RecordReceiptRequest request) {
         var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.FINANCE, ActorRole.SYSTEM_ADMIN);
-        requireDeposit(caseId, depositId);
-        appendEvent(caseId, depositId, "PAYMENT_RECORDED", request.amountEgp(), displayFor(depositId, request.amountEgp()), currencyOf(depositId), request.method(), "OFFLINE", request.providerReference(), "RECORDED", actor.subject(), null, request.idempotencyKey());
-        recomputeStatus(depositId);
+        DepositView view = confirmPayment(new ConfirmedPayment(caseId, depositId, "OFFLINE", request.providerReference(),
+                request.method(), request.amountEgp(), actor.subject(), request.idempotencyKey()));
         audit(actor, caseId, "DEPOSIT_PAYMENT_RECORDED", depositId, "amount=" + request.amountEgp());
-        return depositForCase(caseId);
+        return view;
     }
 
     @Transactional
@@ -104,7 +131,7 @@ public class PaymentService {
         var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.FINANCE, ActorRole.SYSTEM_ADMIN);
         requireDeposit(caseId, depositId);
         appendEvent(caseId, depositId, "REFUND_RECORDED", request.amountEgp(), displayFor(depositId, request.amountEgp()), currencyOf(depositId), null, "OFFLINE", null, "RECORDED", actor.subject(), request.reason(), request.idempotencyKey());
-        recomputeStatus(depositId);
+        recomputeStatus(caseId, depositId);
         audit(actor, caseId, "DEPOSIT_REFUND_RECORDED", depositId, request.reason());
         return depositForCase(caseId);
     }
@@ -193,6 +220,7 @@ public class PaymentService {
                 .params(timestamp(clock.instant()), actor.subject(), reason.trim(), depositId).update();
         if (changed != 1) throw new ApiException(409, "DEPOSIT_NOT_WAIVABLE", "This deposit cannot be waived");
         audit(actor, caseId, "DEPOSIT_WAIVED", depositId, reason.trim());
+        handoff.onDepositSettled(caseId); // an authorized waiver settles the deposit just as a receipt does
         return depositForCase(caseId);
     }
 
@@ -207,13 +235,17 @@ public class PaymentService {
                         "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM payment_events WHERE idempotency_key=?)")
                 .params(UUID.randomUUID(), caseId, depositId, type, amountEgp, amountDisplay, currency, method, provider, providerRef, status, actor, reason, idempotencyKey, timestamp(clock.instant()), idempotencyKey).update();
     }
-    private void recomputeStatus(UUID depositId) {
+    /** Recompute from the append-only ledger and, on the first authoritative settlement, continue the journey. */
+    private void recomputeStatus(UUID caseId, UUID depositId) {
+        String previous = jdbc.sql("SELECT status FROM deposits WHERE id=?").param(depositId).query(String.class).optional().orElse(null);
         BigDecimal total = jdbc.sql("SELECT total_egp FROM deposits WHERE id=?").param(depositId).query(BigDecimal.class).single();
         BigDecimal paid = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'").param(depositId).query(BigDecimal.class).single());
         BigDecimal refunded = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='REFUND_RECORDED'").param(depositId).query(BigDecimal.class).single());
         BigDecimal net = paid.subtract(refunded);
         String status = net.signum() <= 0 ? (paid.signum() > 0 ? "REFUNDED" : "REQUESTED") : net.compareTo(total) >= 0 ? "PAID" : "PARTIALLY_PAID";
         jdbc.sql("UPDATE deposits SET status=?,version=version+1 WHERE id=?").params(status, depositId).update();
+        // Authoritative settlement is the ONLY trigger for continuing the journey; a browser never reaches here.
+        if ("PAID".equals(status) && !"PAID".equals(previous)) handoff.onDepositSettled(caseId);
     }
     private BigDecimal displayFor(UUID depositId, BigDecimal egp) {
         BigDecimal rate = jdbc.sql("SELECT fx_rate FROM deposits WHERE id=?").param(depositId).query(BigDecimal.class).optional().orElse(BigDecimal.ONE);

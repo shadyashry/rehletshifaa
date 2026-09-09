@@ -43,7 +43,7 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
             </TrackedLink>
           </HideOnPortal>
         </div></HideOnPortal>
-        <div id="portal-account-slot" />
+        <div id="portal-account-slot" className="flex items-center gap-2" />
 
         <HideOnPortal locale={locale}>
           <MobileNav

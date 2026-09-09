@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(properties="spring.task.scheduling.enabled=false")
 @Transactional
 class SecureJourneyCorrectionsTest {
-    @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases; @Autowired ProposalExpiryService expiry; @Autowired CredentialExpiryService credentialExpiry; @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases; @Autowired ProposalExpiryService expiry; @Autowired AccountActivationService accountActivations; @Autowired CredentialExpiryService credentialExpiry; @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear(){SecurityContextHolder.clearContext();}
 
     // ---- Core product decision: OTP timing + verification does not change status ----
@@ -77,7 +77,7 @@ class SecureJourneyCorrectionsTest {
         String code=caseAccessCode("+254700000012");
         var grant=publicCases.verify(token,code);
         assertThat(publicCases.view(token,grant.grant()).actionRequired()).isTrue();
-        publicCases.respond(token,new InformationResponseRequest(grant.grant(),"The requested report has been added","en"));
+        publicCases.respond(token,new InformationResponseRequest(grant.grant(),"The requested report has been added","en",null));
         assertThat(status(created.caseId())).isEqualTo("INTAKE_REVIEW");
         assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE case_id=? AND visibility_scope='PATIENT_ACTION'",String.class,created.caseId())).isEqualTo("COMPLETED");
         assertThat(jdbc.queryForObject("SELECT body FROM case_messages WHERE case_id=? ORDER BY created_at DESC LIMIT 1",String.class,created.caseId())).startsWith("enc:");
@@ -104,7 +104,7 @@ class SecureJourneyCorrectionsTest {
         assertThatThrownBy(()->journey.verifyProposalAccess(ctx.token,correct)).isInstanceOf(ApiException.class);
     }
 
-    @Test void verifiedPatientCanViewDecideAndTriggersActivationInvite() throws Exception {
+    @Test void verifiedPatientCanViewDecideAndReceivesOneContinuationMessage() throws Exception {
         var ctx=releaseProposalWithoutPatientAccount();
         journey.requestProposalAccess(ctx.token); em.flush();
         String code=proposalAccessCode(ctx.caseId);
@@ -114,6 +114,10 @@ class SecureJourneyCorrectionsTest {
         var decision=journey.decideProposalPublic(ctx.token,grant.grant(),new PublicProposalDecisionRequest(grant.grant(),"ACCEPTED","Yes"));
         assertThat(decision.status()).isEqualTo("ACCEPTED");
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
+        // Exactly one customer-facing message: the secure continuation link. The account-activation record is
+        // kept as an internal capability, but it no longer produces a second competing email.
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE 'onboarding:%'")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='ACCOUNT_ACTIVATION'")).isZero();
         assertThat(count("SELECT count(*) FROM account_activations WHERE case_id=?",ctx.caseId)).isEqualTo(1);
         assertThatThrownBy(()->journey.viewProposal(ctx.token,grant.grant())).isInstanceOf(ApiException.class);
     }
@@ -370,7 +374,8 @@ class SecureJourneyCorrectionsTest {
     private void seedStaff(){jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"operations-subject","OPERATIONS",crypto.encrypt("Operations One"),Instant.now(),Instant.now());jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"finance-subject","FINANCE",crypto.encrypt("Finance One"),Instant.now(),Instant.now());}
     private String caseAccessCode(String dest) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='CASE_ACCESS' AND destination=? ORDER BY created_at DESC LIMIT 1",String.class,dest));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}
     private String proposalAccessCode(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PROPOSAL_ACCESS' AND destination IN (SELECT p.whatsapp_number FROM patient_profiles p JOIN medical_cases c ON c.patient_id=p.id WHERE c.id=?) ORDER BY created_at DESC LIMIT 1",String.class,caseId));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}
-    private String activationToken(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='ACCOUNT_ACTIVATION' ORDER BY created_at DESC LIMIT 1",String.class));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("token");}
+    /** Internal binding credential: nothing emails it any more, so the test asks the owning service for one. */
+    private String activationToken(UUID caseId){UUID patientId=jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?",UUID.class,caseId);return accountActivations.issue(patientId,caseId);}
     private String informationActionToken(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PATIENT_ACTION' AND idempotency_key LIKE 'patient-action:%' ORDER BY created_at DESC LIMIT 1",String.class));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("token");}
     private String payload(String stored){return stored.startsWith("enc:")?crypto.decrypt(stored.substring(4)):stored;}
     private int count(String sql,Object... args){Integer n=jdbc.queryForObject(sql,Integer.class,args);return n==null?0:n;}

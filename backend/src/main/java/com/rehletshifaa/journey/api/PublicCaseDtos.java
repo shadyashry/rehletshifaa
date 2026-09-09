@@ -18,6 +18,8 @@ public final class PublicCaseDtos {
     public record CaseAccessVerifyRequest(@NotBlank @Pattern(regexp="[0-9]{6}")String code) {}
     public record CaseAccessGrant(String grant,Instant expiresAt) {}
     public record CaseAccessRequest(@NotBlank @Size(max=256)String grant) {}
-    public record PublicCaseStatus(String caseNumber,String statusEn,String statusAr,boolean actionRequired) {}
-    public record InformationResponseRequest(@NotBlank @Size(max=256)String grant,@NotBlank @Size(max=10000)String message,@Pattern(regexp="en|ar")String language) {}
+    /** Adds the concrete items requested from the patient so the action page shows only what was asked. */
+    public record PublicCaseStatus(String caseNumber,String statusEn,String statusAr,boolean actionRequired,WorkDtos.PatientActionView action) {}
+    /** The note stays optional once structured items carry the answer; the backend requires at least one. */
+    public record InformationResponseRequest(@NotBlank @Size(max=256)String grant,@Size(max=10000)String message,@Pattern(regexp="en|ar")String language,java.util.List<WorkDtos.ItemResponse> items) {}
 }

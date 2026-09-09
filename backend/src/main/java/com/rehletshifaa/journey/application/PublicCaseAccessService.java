@@ -26,9 +26,9 @@ public class PublicCaseAccessService {
     private static final int MAX_ATTEMPTS=5;
     private static final int MAX_SENDS_PER_HOUR=5;
     private static final int MAX_RECOVERY_SENDS_PER_HOUR=3;
-    private final JdbcClient jdbc; private final IntakeLifecycleService intake; private final DocumentService documents; private final Clock clock; private final SecureRandom random=new SecureRandom();
+    private final JdbcClient jdbc; private final IntakeLifecycleService intake; private final DocumentService documents; private final PatientActionService patientActions; private final Clock clock; private final SecureRandom random=new SecureRandom();
 
-    public PublicCaseAccessService(JdbcClient jdbc,IntakeLifecycleService intake,DocumentService documents,Clock clock){this.jdbc=jdbc;this.intake=intake;this.documents=documents;this.clock=clock;}
+    public PublicCaseAccessService(JdbcClient jdbc,IntakeLifecycleService intake,DocumentService documents,PatientActionService patientActions,Clock clock){this.jdbc=jdbc;this.intake=intake;this.documents=documents;this.patientActions=patientActions;this.clock=clock;}
 
     @Transactional(readOnly=true) public CaseAccessSummary summary(String token){return summary(find(token));}
 
@@ -60,16 +60,79 @@ public class PublicCaseAccessService {
 
     @Transactional(noRollbackFor=ApiException.class) public CaseAccessGrant verify(String token,String code){Link link=find(token);Instant now=clock.instant();Challenge challenge=jdbc.sql("SELECT id,code_hash,expires_at,attempts,max_attempts,consumed_at,revoked_at,delivery_channel FROM case_access_challenges WHERE link_id=? ORDER BY created_at DESC LIMIT 1").param(link.id()).query(this::challenge).optional().orElseThrow(this::invalid);if(challenge.consumedAt()!=null||challenge.revokedAt()!=null||!challenge.expiresAt().isAfter(now)||challenge.attempts()>=challenge.maxAttempts())throw invalid();boolean match=MessageDigest.isEqual(challenge.hash().getBytes(StandardCharsets.US_ASCII),intake.hash(code).getBytes(StandardCharsets.US_ASCII));if(!match){int next=challenge.attempts()+1;int changed=jdbc.sql("UPDATE case_access_challenges SET attempts=?,revoked_at=CASE WHEN ?>=max_attempts THEN ? ELSE revoked_at END WHERE id=? AND attempts=? AND consumed_at IS NULL AND revoked_at IS NULL").params(next,next,timestamp(now),challenge.id(),challenge.attempts()).update();if(changed!=1)throw invalid();audit("CASE_ACCESS_FAILED",link.caseId(),link.id().toString(),"VERIFY");throw invalid();}String grant=randomToken();Instant expires=now.plus(GRANT_TTL);int consumed=jdbc.sql("UPDATE case_access_challenges SET attempts=attempts+1,consumed_at=?,grant_hash=?,grant_expires_at=? WHERE id=? AND attempts=? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at>?").params(timestamp(now),intake.hash(grant),timestamp(expires),challenge.id(),challenge.attempts(),timestamp(now)).update();if(consumed!=1)throw invalid();markContactVerified(link.caseId(),challenge.channel(),now);audit("CASE_ACCESS_VERIFIED",link.caseId(),link.id().toString(),"VERIFY");return new CaseAccessGrant(grant,expires);}
 
-    @Transactional(readOnly=true) public PublicCaseStatus view(String token,String grant){Link link=requireGrant(token,grant);Status status=jdbc.sql("SELECT case_number,status FROM medical_cases WHERE id=?").param(link.caseId()).query((rs,n)->new Status(rs.getString("case_number"),rs.getString("status"))).single();Labels labels=labels(status.status());return new PublicCaseStatus(status.caseNumber(),labels.en(),labels.ar(),"INFORMATION_RESPONSE".equals(link.purpose()));}
+    /** Case status for a verified grant, plus exactly what is being asked of the patient on an action link. */
+    @Transactional(readOnly=true) public PublicCaseStatus view(String token,String grant){Link link=requireGrant(token,grant);Status status=jdbc.sql("SELECT case_number,status FROM medical_cases WHERE id=?").param(link.caseId()).query((rs,n)->new Status(rs.getString("case_number"),rs.getString("status"))).single();Labels labels=labels(status.status());boolean action="INFORMATION_RESPONSE".equals(link.purpose());return new PublicCaseStatus(status.caseNumber(),labels.en(),labels.ar(),action,action?patientActions.openAction(link.caseId()):null);}
 
-    @Transactional public UUID respond(String token,InformationResponseRequest request){Link link=requireGrant(token,request.grant());if(!"INFORMATION_RESPONSE".equals(link.purpose()))throw new ApiException(403,"LINK_PURPOSE_MISMATCH","This link cannot be used for that action");UUID id=UUID.randomUUID();Instant now=clock.instant();jdbc.sql("INSERT INTO case_messages(id,case_id,thread_type,sender_subject,sender_role,body,language,internal_only,created_at) VALUES(?,?,?,?,?,?,?,?,?)").params(id,link.caseId(),"PATIENT_COORDINATOR","SECURE_LINK","PATIENT",intake.encryptedJson(request.message()),request.language()==null?"en":request.language(),false,timestamp(now)).update();int changed=jdbc.sql("UPDATE medical_cases SET status='INTAKE_REVIEW',updated_at=?,version=version+1 WHERE id=? AND status='INFORMATION_REQUIRED'").params(timestamp(now),link.caseId()).update();if(changed!=1)throw new ApiException(409,"CASE_STATE_CONFLICT","The information request is no longer active");jdbc.sql("UPDATE case_tasks SET status='COMPLETED',completed_at=?,completion_evidence=?,updated_at=?,version=version+1 WHERE case_id=? AND visibility_scope='PATIENT_ACTION' AND blocking=TRUE AND status IN ('OPEN','IN_PROGRESS')").params(timestamp(now),intake.encryptedJson("Patient supplied the requested information"),timestamp(now),link.caseId()).update();jdbc.sql("INSERT INTO case_status_history(id,case_id,from_status,to_status,actor_subject,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),link.caseId(),"INFORMATION_REQUIRED","INTAKE_REVIEW","SECURE_LINK","PATIENT","Patient supplied requested information",timestamp(now)).update();jdbc.sql("UPDATE case_access_links SET revoked_at=? WHERE id=? AND revoked_at IS NULL").params(timestamp(now),link.id()).update();audit("PATIENT_INFORMATION_RECEIVED",link.caseId(),id.toString(),"RESPOND");return id;}
+    /**
+     * The patient's answer to an information request. Structured items are validated and stored by
+     * {@link PatientActionService}, which also completes the action, restores the stage and hands the case
+     * back to the coordinator; this method keeps the conversational note and burns the link.
+     */
+    @Transactional public UUID respond(String token,InformationResponseRequest request){
+        Link link=requireGrant(token,request.grant());
+        if(!"INFORMATION_RESPONSE".equals(link.purpose()))throw new ApiException(403,"LINK_PURPOSE_MISMATCH","This link cannot be used for that action");
+        boolean note=hasText(request.message());
+        if(!note&&(request.items()==null||request.items().isEmpty()))throw new ApiException(400,"RESPONSE_EMPTY","Please provide the requested information");
+        Instant now=clock.instant();UUID id=UUID.randomUUID();
+        patientActions.completeByPatient(link.caseId(),request.items(),request.message());
+        if(note)jdbc.sql("INSERT INTO case_messages(id,case_id,thread_type,sender_subject,sender_role,body,language,internal_only,created_at) VALUES(?,?,?,?,?,?,?,?,?)").params(id,link.caseId(),"PATIENT_COORDINATOR","SECURE_LINK","PATIENT",intake.encryptedJson(request.message().trim()),request.language()==null?"en":request.language(),false,timestamp(now)).update();
+        jdbc.sql("UPDATE case_access_links SET revoked_at=? WHERE id=? AND revoked_at IS NULL").params(timestamp(now),link.id()).update();
+        audit("PATIENT_INFORMATION_RECEIVED",link.caseId(),id.toString(),"RESPOND");
+        return id;
+    }
 
     public DocumentDtos.PresignResponse presign(String token,String grant,DocumentDtos.PresignRequest request){Link link=requireGrant(token,grant);requireInformationPurpose(link);return documents.presignAdditional(link.caseId(),request);}
     public DocumentDtos.ConfirmResponse confirm(String token,String grant,DocumentDtos.ConfirmRequest request){Link link=requireGrant(token,grant);requireInformationPurpose(link);return documents.confirmAdditional(link.caseId(),request);}
 
-    @Transactional public String issueInformationRequest(UUID caseId,String language){Instant now=clock.instant();UUID patientId=jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(caseId).query(UUID.class).single();String safeTitle="ar".equals(language)?"معلومات مطلوبة لحالتك":"Information required for your case";jdbc.sql("INSERT INTO case_tasks(id,case_id,task_type,title,owner_role,visibility_scope,priority,status,blocking,created_by,created_at,updated_at,version) SELECT ?,?,'INFORMATION_REQUEST',?,'PATIENT','PATIENT_ACTION','HIGH','OPEN',TRUE,'SYSTEM',?,?,0 WHERE NOT EXISTS (SELECT 1 FROM case_tasks WHERE case_id=? AND task_type='INFORMATION_REQUEST' AND visibility_scope='PATIENT_ACTION' AND status IN ('OPEN','IN_PROGRESS'))").params(UUID.randomUUID(),caseId,intake.encryptedJson(safeTitle),timestamp(now),timestamp(now),caseId).update();jdbc.sql("UPDATE case_access_links SET revoked_at=? WHERE case_id=? AND purpose='INFORMATION_RESPONSE' AND revoked_at IS NULL").params(timestamp(now),caseId).update();String token=randomToken();UUID id=UUID.randomUUID();jdbc.sql("INSERT INTO case_access_links(id,case_id,patient_id,purpose,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?,?)").params(id,caseId,patientId,"INFORMATION_RESPONSE",intake.hash(token),timestamp(now.plus(Duration.ofDays(14))),timestamp(now)).update();Contact contact=contact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();if(hasText(destination))jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),"PATIENT_ACTION",channel,destination,"patient-action-link",intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+("ar".equals(language)?"ar":"en")+"\"}"),"PENDING",0,5,timestamp(now),"patient-action:"+id,timestamp(now)).update();audit("PATIENT_ACTION_LINK_CREATED",caseId,id.toString(),"CREATE");return token;}
+    /**
+     * Issue (or re-issue) the secure no-login link the patient uses to answer an information request, and
+     * send it to their own registered contact. The work item that says what is being asked for is owned by
+     * {@code PatientActionService}: this method only carries the credential and the message.
+     */
+    @Transactional public String issueInformationLink(UUID caseId,String language){Instant now=clock.instant();UUID patientId=jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(caseId).query(UUID.class).single();jdbc.sql("UPDATE case_access_links SET revoked_at=? WHERE case_id=? AND purpose='INFORMATION_RESPONSE' AND revoked_at IS NULL").params(timestamp(now),caseId).update();String token=randomToken();UUID id=UUID.randomUUID();jdbc.sql("INSERT INTO case_access_links(id,case_id,patient_id,purpose,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?,?)").params(id,caseId,patientId,"INFORMATION_RESPONSE",intake.hash(token),timestamp(now.plus(Duration.ofDays(14))),timestamp(now)).update();Contact contact=contact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();if(hasText(destination))jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),"PATIENT_ACTION",channel,destination,"patient-action-link",intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+("ar".equals(language)?"ar":"en")+"\"}"),"PENDING",0,5,timestamp(now),"patient-action:"+id,timestamp(now)).update();audit("PATIENT_ACTION_LINK_CREATED",caseId,id.toString(),"CREATE");return token;}
 
     @Transactional public String issueStatusLink(UUID caseId,String language,String template,String idempotencyKey){Instant now=clock.instant();UUID patientId=jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(caseId).query(UUID.class).single();String token=randomToken();UUID id=UUID.randomUUID();jdbc.sql("INSERT INTO case_access_links(id,case_id,patient_id,purpose,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?,?)").params(id,caseId,patientId,"STATUS",intake.hash(token),timestamp(now.plus(Duration.ofDays(30))),timestamp(now)).update();Contact contact=contact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();if(hasText(destination))jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),"SECURE_MESSAGE",channel,destination,template,intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+("ar".equals(language)?"ar":"en")+"\"}"),"PENDING",0,5,timestamp(now),idempotencyKey,timestamp(now)).update();audit("CASE_STATUS_LINK_CREATED",caseId,id.toString(),"CREATE");return token;}
+
+    // ---- Onboarding continuation (profile activation) ----
+    /** Case + patient a verified ONBOARDING grant is bound to. */
+    public record OnboardingLinkContext(UUID caseId, UUID patientId) {}
+
+    /**
+     * Issue the secure "complete your profile" continuation link after the patient accepts a proposal.
+     * Idempotent per case: an existing live ONBOARDING link is reused so a replayed acceptance never
+     * mints a second credential. The token is delivered only to the patient's own on-file contact.
+     */
+    @Transactional public String issueOnboardingLink(UUID caseId,String language){
+        Instant now=clock.instant();
+        Integer live=jdbc.sql("SELECT count(*) FROM case_access_links WHERE case_id=? AND purpose='ONBOARDING' AND revoked_at IS NULL AND expires_at>?").params(caseId,timestamp(now)).query(Integer.class).single();
+        if(live!=null&&live>0)return null; // already invited; do not mint or resend a second token
+        UUID patientId=jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(caseId).query(UUID.class).optional().orElse(null);
+        if(patientId==null)return null;
+        String token=randomToken();UUID id=UUID.randomUUID();
+        jdbc.sql("INSERT INTO case_access_links(id,case_id,patient_id,purpose,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?,?)")
+            .params(id,caseId,patientId,"ONBOARDING",intake.hash(token),timestamp(now.plus(Duration.ofDays(30))),timestamp(now)).update();
+        Contact contact=contact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();
+        if(hasText(destination))
+            jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
+                .params(UUID.randomUUID(),"PROFILE_ACTIVATION",channel,destination,"onboarding-activation",intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+("ar".equals(language)?"ar":"en")+"\"}"),"PENDING",0,5,timestamp(now),"onboarding:"+id,timestamp(now),"onboarding:"+id).update();
+        audit("PATIENT_ONBOARDING_LINK_CREATED",caseId,id.toString(),"CREATE");
+        return token;
+    }
+
+    /** Resolve a verified ONBOARDING grant to its case/patient. Purpose-checked: a STATUS or
+     *  INFORMATION_RESPONSE link can never be replayed against the onboarding endpoints. */
+    @Transactional(readOnly=true) public OnboardingLinkContext requireOnboardingGrant(String token,String grant){
+        Link link=requireGrant(token,grant);
+        if(!"ONBOARDING".equals(link.purpose()))throw new ApiException(403,"LINK_PURPOSE_MISMATCH","This link cannot be used to complete your profile");
+        return new OnboardingLinkContext(link.caseId(),link.patientId());
+    }
+
+    /** Non-sensitive summary for an onboarding link (case number + masked contact hint only). */
+    @Transactional(readOnly=true) public CaseAccessSummary onboardingSummary(String token){
+        Link link=find(token);
+        if(!"ONBOARDING".equals(link.purpose()))throw new ApiException(403,"LINK_PURPOSE_MISMATCH","This link cannot be used to complete your profile");
+        return summary(link);
+    }
 
     private void requireInformationPurpose(Link link){if(!"INFORMATION_RESPONSE".equals(link.purpose()))throw new ApiException(403,"LINK_PURPOSE_MISMATCH","This link cannot upload documents");}
     private Link requireGrant(String token,String grant){Link link=find(token);Integer ok=jdbc.sql("SELECT count(*) FROM case_access_challenges WHERE link_id=? AND grant_hash=? AND grant_expires_at>? AND consumed_at IS NOT NULL AND revoked_at IS NULL").params(link.id(),intake.hash(grant),timestamp(clock.instant())).query(Integer.class).single();if(ok==null||ok==0)throw new ApiException(401,"VERIFICATION_REQUIRED","Please verify your identity to continue");return link;}

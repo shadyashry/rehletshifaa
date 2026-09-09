@@ -9,6 +9,8 @@ import { CaseMessages, TaskActions, PatientProposalDecision } from "@/components
 import { PortalAccount, type Preferences } from "@/components/portal/PortalAccount";
 import { RoleDashboardSummary } from "@/components/portal/RoleDashboardSummary";
 import { CaseQueue, initialQueue, type QueueState } from "@/components/portal/CaseQueue";
+import { MyWork, type WorkItem } from "@/components/portal/MyWork";
+import { NotificationBell } from "@/components/portal/NotificationBell";
 import { ReportingTeam, IdentityReviewQueue, PractitionerDirectory, ConsultantAccounts } from "@/components/portal/PortalDirectories";
 import type { Locale } from "@/lib/i18n";
 import { portalRoles, type PortalRoleKey as RoleKey } from "@/lib/portal-role-access";
@@ -28,13 +30,13 @@ type CostEstimate={serviceDescription:string;estimatedCost:number;currency:strin
 type Review={id:string;versionNumber:number;status:string;suitability?:string;recommendedTreatment?:string;risksAndLimitations?:string;createdAt:string;costEstimates?:CostEstimate[]};
 type ProposalItem={id:string;category:string;description:string;quantity:number;unitPrice:number;optional:boolean};
 type Proposal={proposalId:string;versionId:string;versionNumber:number;status:string;language:string;currency?:string;validUntil?:string;operationalPlan?:string;items:ProposalItem[];coordinatorNotes?:string;documentType?:string;scopeChangeReason?:string};
-type Task={id:string;caseId:string;title:string;description?:string;ownerSubject?:string;status:string;priority:string;blocking:boolean;overdue:boolean;version:number};
+type Task={id:string;caseId:string;title:string;description?:string;ownerSubject?:string;status:string;priority:string;blocking:boolean;overdue:boolean;version:number;caseNumber?:string;patientName?:string|null;caseStatus?:string;waitingOn?:string|null;type?:string;context?:string|null;dueAt?:string|null;createdAt?:string};
 type ProposalGates={operationsRequired:boolean;operationsReason:string;operationsCompleted:boolean;financeRequired:boolean;financeReasons:string[];financeCompleted:boolean;readyForRelease:boolean};
 type DeliveryStatus={status:string;channel:string;destinationMasked:string;attempts:number;deliveredAt?:string;nextAttemptAt?:string};
 type DepositComponentT={beneficiary:string;purpose:string;amountEgp:number;amountDisplay?:number;refundability:string;cancellationTerms?:string;creditedToFinal:boolean};
 type PaymentEvent={eventType:string;amountDisplay?:number;currency?:string;method?:string;provider?:string;providerReference?:string;status:string;reason?:string;occurredAt?:string};
 type DepositView={id:string;status:string;currency:string;totalEgp:number;totalDisplay?:number;paidDisplay?:number;balanceDisplay?:number;components:DepositComponentT[];events:PaymentEvent[]};
-type Workspace={preview?:boolean;intakeSummary?:string;caseSummary:CaseView;timeline:{type:string;label:string;occurredAt:string;status:string}[];tasks:Task[];messages:{id:string;senderRole:string;senderName?:string;direction:string;body:string;createdAt:string;internalOnly:boolean;read:boolean}[];assignments:Assignment[];clinicalReviews:Review[];proposal?:Proposal;gates?:ProposalGates|null;delivery?:DeliveryStatus|null;deposit?:DepositView|null};
+type Workspace={preview?:boolean;intakeSummary?:string;patientAction?:{taskId:string;title:string;message?:string;blocking:boolean;dueAt?:string;items:{id:string;kind:string;code:string;label:string;required:boolean;completed:boolean;response?:string}[]}|null;caseSummary:CaseView;timeline:{type:string;label:string;occurredAt:string;status:string}[];tasks:Task[];messages:{id:string;senderRole:string;senderName?:string;direction:string;body:string;createdAt:string;internalOnly:boolean;read:boolean}[];assignments:Assignment[];clinicalReviews:Review[];proposal?:Proposal;gates?:ProposalGates|null;delivery?:DeliveryStatus|null;deposit?:DepositView|null};
 type MutationResult={id?:string;status?:string};
 type Mutate=(path:string,body?:unknown,method?:string)=>Promise<MutationResult|undefined>;
 type Api=<T,>(path:string,init?:RequestInit)=>Promise<T>;
@@ -65,12 +67,12 @@ export function Portal({locale}:{locale:Locale}){
   const currentRole=active&&available.includes(active)?active:available[0];
   useEffect(()=>{const selected=new URLSearchParams(window.location.search).get("role") as RoleKey;if(available.includes(selected))setActive(selected);},[available]);
   const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{if(!user)throw new Error("AUTHENTICATION_REQUIRED");const response=await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL??"http://localhost:8080"}/api/v1${path}`,{...init,headers:{Authorization:`Bearer ${user.access_token}`,...(init?.body&&!(init.body instanceof FormData)?{"Content-Type":"application/json"}:{}),...init?.headers},cache:"no-store"});if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code==="REAUTHENTICATION_REQUIRED"){await signIn(true);throw new Error(body.message??t.error);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[user,t.error,signIn]);
-  const refresh=useCallback(async()=>{if(!currentRole||["admin","identity"].includes(currentRole))return;setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/tasks/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}},[currentRole,api,t.error]);
+  const refresh=useCallback(async()=>{if(!currentRole||["admin","identity"].includes(currentRole))return;setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}},[currentRole,api,t.error]);
   useEffect(()=>{if(!user)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[user,api]);
   useEffect(()=>{
     if(!currentRole||["admin","identity"].includes(currentRole)){setQueueLoading(false);return;}
     let cancelled=false;setQueueLoading(true);setCases([]);setMyTasks([]);setError("");
-    void Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),["coordinator","doctor","operations","finance","patient"].includes(currentRole)?api<Task[]>("/tasks/mine"):Promise.resolve([])])
+    void Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),["coordinator","doctor","operations","finance","patient"].includes(currentRole)?api<Task[]>("/work/mine"):Promise.resolve([])])
       .then(([nextCases,nextTasks])=>{if(!cancelled){setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}}).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:t.error);}).finally(()=>{if(!cancelled)setQueueLoading(false);});
     return()=>{cancelled=true;};
   },[currentRole,api,t.error]);
@@ -95,6 +97,8 @@ export function Portal({locale}:{locale:Locale}){
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}
     finally{if(request===opening.current)setBusy(false);}
   }
+  /** Open a case by id (from My Work or a notification), even before the queue has loaded it. */
+  async function openCaseById(caseId:string){const known=cases.find(item=>item.id===caseId);if(known){await openCase(known);return;}try{const ws=await api<Workspace>(`/${currentRole}/cases/${caseId}`);setWorkspace(ws);const url=new URL(window.location.href);url.searchParams.set("case",caseId);window.history.replaceState({},"",url);}catch(e){setError(e instanceof Error?e.message:t.error);}}
   function backToQueue(){opening.current++;setWorkspace(null);setError("");setNotice("");const url=new URL(window.location.href);url.searchParams.delete("case");window.history.replaceState({},"",url);requestAnimationFrame(()=>window.scrollTo({top:queuePosition.current,behavior:"instant"}));}
   // Keep only navigation preferences in this browser session, scoped to the signed-in account.
   useEffect(()=>{if(!user||!currentRole)return;try{const saved=sessionStorage.getItem(`portal-queue:${user.profile.sub}:${currentRole}`);setQueueState(saved?{...initialQueue,...JSON.parse(saved)}:initialQueue);}catch{setQueueState(initialQueue);}},[user,currentRole]);
@@ -124,6 +128,7 @@ export function Portal({locale}:{locale:Locale}){
   const descriptions:Record<RoleKey,string>=locale==="ar"?{coordinator:"راجع الحالات ونسّق الخطوة التالية للرعاية.",doctor:"راجع الحالات المسندة إليك وسجّل قراراتك السريرية.",operations:"تابع الترتيبات والإجراءات المطلوبة منك.",finance:"راجع المدفوعات والموافقات المطلوبة.",patient:"تابع رعايتك وتعرّف على الخطوة التالية.",admin:"إدارة الفريق واعتماد مقدّمي الرعاية.",identity:"راجع طلبات التحقق من الهوية."}:{coordinator:"Review cases and coordinate the next step in care.",doctor:"Review assigned cases and record your clinical decisions.",operations:"Manage your assigned care and travel arrangements.",finance:"Review payments and commercial approvals that need your attention.",patient:"Follow your care and see what happens next.",admin:"Manage your team and practitioner credentials.",identity:"Review identity verification requests."};
   const inWorkspace=!!workspace&&!!currentRole&&!["admin","identity"].includes(currentRole);
   return <PortalFrame title={currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace?"":currentRole?descriptions[currentRole]:t.subtitle}>
+    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>void openCaseById(caseId)}/>}
     <PortalAccount locale={locale} name={displayName} email={profile.email} role={currentRole?roleLabel(currentRole,locale):""} api={api} signOut={signOut} preferences={preferences} onSaved={value=>{setPreferences(value);setNotice(t.success);}}/>
     {available.length>1&&<div className="mb-8 flex flex-wrap gap-2">{available.map(role=><button key={role} className={currentRole===role?"btn-primary":"btn-secondary"} onClick={()=>{setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}}>{roleLabel(role,locale)}</button>)}</div>}
     {!available.length&&<p className="rounded-xl bg-alert-50 p-4 text-alert-800">{t.roleDenied}</p>}
@@ -136,7 +141,7 @@ export function Portal({locale}:{locale:Locale}){
       : workspace
         ? <WorkspaceView locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={roles.includes("COORDINATOR_LEAD")} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate}/>
         : null}
-    {currentRole&&!["admin","identity"].includes(currentRole)&&<div hidden={!!workspace}><Queue queueState={queueState} changeQueue={changeQueue} locale={locale} t={t} role={currentRole} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={roles.includes("COORDINATOR_LEAD")} openCase={openCase} mutate={mutate}/></div>}
+    {currentRole&&!["admin","identity"].includes(currentRole)&&<div hidden={!!workspace}><Queue queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={roles.includes("COORDINATOR_LEAD")} openCase={openCase} mutate={mutate}/></div>}
     {currentRole==="finance"&&!workspace&&roles.some(role=>["FINANCE_LEAD","SYSTEM_ADMIN"].includes(role))&&<details className="card mt-8 p-5"><summary className="cursor-pointer font-bold">{locale==="ar"?"السياسات المالية":"Financial policies"}</summary><FinancePolicies api={api} locale={locale}/></details>}
   </PortalFrame>;
 }
@@ -144,9 +149,29 @@ export function Portal({locale}:{locale:Locale}){
 function PortalFrame({title,subtitle,children}:{title:string;subtitle:string;children?:React.ReactNode}){return <section className="portal-shell bg-[linear-gradient(180deg,var(--color-mist)_0%,#fff_32rem)]"><div className="container-site"><h1 className="headline">{title}</h1>{subtitle&&<p className="mt-2 max-w-3xl text-sm text-ink-600">{subtitle}</p>}<div className="mt-6">{children}</div></div></section>}
 function roleLabel(role:RoleKey,locale:Locale){const labels={en:{patient:"Patient",coordinator:"Coordinator",doctor:"Doctor",operations:"Operations",finance:"Finance",admin:"Administration",identity:"Identity review"},ar:{patient:"المريض",coordinator:"منسق الحالة",doctor:"الطبيب",operations:"العمليات",finance:"المالية",admin:"الإدارة",identity:"مراجعة الهوية"}};return labels[locale][role];}
 
-function Queue({locale,t,role,cases,tasks,busy,mySubject,coordinatorLead,openCase,mutate,queueState,changeQueue}:{locale:Locale;t:typeof copy.en;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;openCase:(item:CaseView)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
-  return <><RoleDashboardSummary locale={locale} role={role??""} cases={cases} tasks={tasks}/>{tasks.length>0&&<section className="card mb-6 overflow-hidden"><div className="border-b border-line bg-brand-50 px-5 py-4"><h2 className="title">{locale==="ar"?"المهام ذات الأولوية":"Priority tasks"} <span className="text-ink-500">({tasks.length})</span></h2></div><div className="grid gap-3 p-5 sm:grid-cols-2">{tasks.map(task=>{const item=cases.find(c=>c.id===task.caseId);return <div key={task.id} className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${task.overdue?"border-alert-200 bg-alert-50":"border-line bg-white"}`}><div><p className="text-sm font-bold">{task.title}</p>{task.overdue&&<p className="text-xs font-semibold text-alert-800">{locale==="ar"?"متأخرة":"Overdue"}</p>}</div>{item&&<button className="btn-secondary" disabled={busy} onClick={()=>openCase(item)}>{locale==="ar"?"فتح":"Open"}</button>}</div>;})}</div></section>}
-    <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} onChange={changeQueue} onOpen={openCase} onMutate={mutate} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>prettyCategory(value,locale)}/>
+/**
+ * The operational dashboard: work first, then the cases I own, then what the team has available.
+ * Ownership ("Take ownership") belongs to the team queue; My Cases is accountability, not a task list.
+ */
+function Queue({locale,role,cases,tasks,busy,mySubject,coordinatorLead,openCase,openCaseById,mutate,queueState,changeQueue}:{locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
+  const ar=locale==="ar";
+  const staff=role!=="patient";
+  const tabs=[{id:"work",label:ar?"عملي":"My work",count:tasks.length},{id:"mine",label:ar?"حالاتي":"My cases",count:undefined},...(role==="coordinator"?[{id:"team",label:ar?"قائمة الفريق":"Team queue",count:undefined}]:[])];
+  const view=staff?(tabs.some(tab=>tab.id===queueState.view)?queueState.view:"work"):"cases";
+  return <><RoleDashboardSummary locale={locale} role={role??""} cases={cases} tasks={tasks}/>
+    {staff&&<div role="tablist" aria-label={ar?"لوحة العمل":"Operational views"} className="mb-6 flex flex-wrap gap-1 border-b border-line-strong">
+      {tabs.map(tab=><button key={tab.id} type="button" role="tab" aria-selected={view===tab.id} id={`work-tab-${tab.id}`} aria-controls="work-panel"
+        className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-bold transition ${view===tab.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
+        onClick={()=>changeQueue({...queueState,view:tab.id,tab:tab.id==="team"?"unowned":tab.id==="mine"?"mine":queueState.tab,page:1})}>
+        {tab.label}{tab.count!==undefined&&tab.count>0&&<span className="ms-2 rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-800">{tab.count}</span>}
+      </button>)}
+    </div>}
+    <div id="work-panel" role={staff?"tabpanel":undefined} aria-labelledby={staff?`work-tab-${view}`:undefined} tabIndex={staff?0:undefined}>
+      {!staff&&tasks.length>0&&<MyWork locale={locale} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>}
+      {view==="work"
+        ? <MyWork locale={locale} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>
+        : <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} scope={staff?(view==="team"?"team":"mine"):"all"} onChange={changeQueue} onOpen={openCase} onMutate={mutate} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>prettyCategory(value,locale)}/>}
+    </div>
   </>;
 }
 
@@ -167,7 +192,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
  // them below the action panels. Rendered once (the guards below are mutually exclusive by role).
  const intakePanel=value.intakeSummary?.trim()?<Panel title={locale==="ar"?"ملخص الحالة عند الاستقبال":"Intake summary"}><p className="whitespace-pre-wrap break-words text-ink-700">{value.intakeSummary}</p></Panel>:null;
  const documentsPanel=documents.length>0?<Panel title={t.documents}>{documents.map(doc=><div key={doc.documentId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line p-3"><div><strong className="break-all">{doc.fileName}</strong><p className="text-sm text-ink-500">{formatBytes(doc.sizeBytes)} · {new Intl.DateTimeFormat(locale,{dateStyle:"medium"}).format(new Date(doc.createdAt))}</p></div>{doc.status==="CLEAN"?<div className="flex gap-2"><button className="btn-secondary" onClick={()=>viewDoc(doc.documentId)}>{locale==="ar"?"عرض":"View"}</button><button className="btn-secondary" onClick={()=>downloadDoc(doc.documentId)}>{t.download}</button></div>:<span className="rounded-full bg-mist px-3 py-1 text-sm font-bold text-ink-600">{(doc.status==="PENDING"||doc.status==="UPLOADED")?t.docScanning:t.docUnavailable}</span>}</div>)}</Panel>:null;
- const workflowBlock=renderWorkflow?<div className={dim?"pointer-events-none opacity-50":""}><CaseWorkflowActions locale={locale} role={role} caseSummary={c} mutate={mutate} doctors={doctors} categories={categories} staff={staff} documents={documents} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired}/></div>:null;
+ const workflowBlock=renderWorkflow?<div className={dim?"pointer-events-none opacity-50":""}><CaseWorkflowActions locale={locale} role={role} caseSummary={c} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff} documents={documents} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired}/></div>:null;
  return <div>
   <nav className="mb-5 flex flex-wrap items-center gap-2 text-sm" aria-label={t.caseWorkspaceLabel}>
    <button type="button" className="inline-flex items-center gap-1.5 rounded-lg border border-line-strong bg-white px-3 py-2 font-semibold text-brand-800 transition hover:border-brand-600 hover:bg-brand-50 hover:text-brand-700" onClick={back}><span aria-hidden>{locale==="ar"?"→":"←"}</span>{t.myDashboard}</button>

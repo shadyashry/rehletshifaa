@@ -10,6 +10,7 @@ import java.time.Instant; import java.util.*;
 public class GlobalExceptionHandler {
     private static final Logger log=LoggerFactory.getLogger(GlobalExceptionHandler.class);
     @ExceptionHandler(ApiException.class) ResponseEntity<ApiError> api(ApiException e,HttpServletRequest request){return response(e.status(),e.code(),e.getMessage(),List.of(),request);}
+    @ExceptionHandler(FieldValidationException.class) ResponseEntity<ApiError> fieldValidation(FieldValidationException e,HttpServletRequest request){return response(400,"VALIDATION_FAILED",e.getMessage(),e.errors(),request);}
     @ExceptionHandler(MethodArgumentNotValidException.class) ResponseEntity<ApiError> validation(MethodArgumentNotValidException e,HttpServletRequest request){var errors=e.getBindingResult().getFieldErrors().stream().map(x->new ApiError.FieldError(x.getField(),safeValidationMessage(x.getDefaultMessage()))).toList();return response(400,"VALIDATION_FAILED","The request contains invalid fields",errors,request);}
     @ExceptionHandler(HttpMessageNotReadableException.class) ResponseEntity<ApiError> malformed(HttpServletRequest request){return response(400,"MALFORMED_REQUEST","The request body is invalid",List.of(),request);}
     @ExceptionHandler(Exception.class) ResponseEntity<ApiError> unknown(Exception e,HttpServletRequest request){log.error("Unhandled request failure",e);return response(500,"INTERNAL_ERROR","The request could not be completed",List.of(),request);}

@@ -1,29 +1,261 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, FileUp, LockKeyhole } from "lucide-react";
+import { FileUp, LockKeyhole, ShieldCheck, X } from "lucide-react";
+
 import type { Locale } from "@/lib/i18n";
 
-type Summary={caseNumber:string;purpose:"STATUS"|"INFORMATION_RESPONSE";channel:string;destinationHint:string};
-type Status={caseNumber:string;statusEn:string;statusAr:string;actionRequired:boolean};
-type Presign={documentId:string;uploadUrl:string;requiredHeaders:Record<string,string>};
-const API=process.env.NEXT_PUBLIC_API_BASE_URL??"http://localhost:8080";
-const text={
- en:{title:"Track your case securely",loading:"Checking your secure link…",send:"Send verification code",sent:"We sent a 6-digit code to",code:"Verification code",verify:"Verify and continue",status:"Current update",action:"Your coordinator needs more information",message:"Add a short note",files:"Add supporting documents",choose:"Choose files",submit:"Send information",done:"Thank you — your information was sent securely.",invalid:"This secure link is invalid or has expired.",error:"The request could not be completed. Please try again.",private:"Your medical information is shown only after contact verification."},
- ar:{title:"متابعة حالتك بأمان",loading:"جارٍ التحقق من الرابط الآمن…",send:"إرسال رمز التحقق",sent:"أرسلنا رمزًا مكوّنًا من 6 أرقام إلى",code:"رمز التحقق",verify:"تحقق وتابع",status:"آخر تحديث",action:"يحتاج منسق حالتك إلى معلومات إضافية",message:"أضف ملاحظة قصيرة",files:"إضافة مستندات داعمة",choose:"اختيار الملفات",submit:"إرسال المعلومات",done:"شكرًا — تم إرسال معلوماتك بأمان.",invalid:"هذا الرابط الآمن غير صالح أو انتهت صلاحيته.",error:"تعذر إكمال الطلب. يرجى المحاولة مرة أخرى.",private:"لا تظهر معلوماتك الطبية إلا بعد التحقق من جهة الاتصال."}
+type Summary = { caseNumber: string; destinationHint: string };
+type ActionItem = { id: string; kind: "INFORMATION" | "DOCUMENT"; code: string; label: string; required: boolean; completed: boolean; response: string | null };
+type Action = { taskId: string; title: string; message: string | null; blocking: boolean; dueAt: string | null; items: ActionItem[] };
+type Status = { caseNumber: string; statusEn: string; statusAr: string; actionRequired: boolean; action: Action | null };
+type Presign = { documentId: string; uploadUrl: string; requiredHeaders: Record<string, string> };
+
+const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+
+const copy = {
+  en: {
+    title: "Track your case securely", loading: "Checking your secure link…",
+    send: "Send verification code", sent: "We sent a 6-digit code to", code: "Verification code", verify: "Verify and continue",
+    private: "Your medical information is shown only after contact verification.",
+    status: "Current update", action: "Information required",
+    intro: "Your coordinator needs the following to continue your case.", noItems: "Add anything you would like your coordinator to know.",
+    required: "Required", optional: "Optional", already: "Already provided",
+    choose: "Choose a file", chosen: "file selected", replace: "Choose a different file", remove: "Remove",
+    note: "Anything else we should know?", submit: "Send information", sending: "Sending…",
+    doneTitle: "Thank you — your information was sent.", doneBody: "Your coordinator has been notified and will continue your case.",
+    invalid: "This secure link is invalid or has expired.", error: "The request could not be completed. Please try again.",
+    fix: "Please complete the highlighted items.", missing: "Please provide this information.", missingFile: "Please upload the requested document.",
+    due: "Needed by",
+  },
+  ar: {
+    title: "متابعة حالتك بأمان", loading: "جارٍ التحقق من الرابط الآمن…",
+    send: "إرسال رمز التحقق", sent: "أرسلنا رمزًا مكوّنًا من 6 أرقام إلى", code: "رمز التحقق", verify: "تحقق وتابع",
+    private: "لا تظهر معلوماتك الطبية إلا بعد التحقق من جهة الاتصال.",
+    status: "آخر تحديث", action: "معلومات مطلوبة",
+    intro: "يحتاج منسق حالتك إلى ما يلي لمتابعة حالتك.", noItems: "أضف أي معلومة تودّ أن يعرفها منسقك.",
+    required: "مطلوب", optional: "اختياري", already: "تم تقديمه",
+    choose: "اختيار ملف", chosen: "ملف محدد", replace: "اختيار ملف آخر", remove: "إزالة",
+    note: "هل من شيء آخر تودّ إخبارنا به؟", submit: "إرسال المعلومات", sending: "جارٍ الإرسال…",
+    doneTitle: "شكرًا — تم إرسال معلوماتك.", doneBody: "تم إشعار منسق حالتك وسيتابع حالتك.",
+    invalid: "هذا الرابط الآمن غير صالح أو انتهت صلاحيته.", error: "تعذر إكمال الطلب. يرجى المحاولة مرة أخرى.",
+    fix: "يرجى إكمال العناصر المحددة.", missing: "يرجى تقديم هذه المعلومة.", missingFile: "يرجى رفع المستند المطلوب.",
+    due: "مطلوب قبل",
+  },
 };
 
-export function CaseStatusAccess({locale,token}:{locale:Locale;token:string}){
- const t=text[locale];const[summary,setSummary]=useState<Summary|null>(null);const[status,setStatus]=useState<Status|null>(null);const[phase,setPhase]=useState<"loading"|"summary"|"code"|"view"|"done"|"invalid">("loading");const[code,setCode]=useState("");const[grant,setGrant]=useState("");const[message,setMessage]=useState("");const[files,setFiles]=useState<File[]>([]);const[busy,setBusy]=useState(false);const[error,setError]=useState("");
- useEffect(()=>{window.localStorage.setItem("rehletshifaa:last-status-path",`/${locale}/status/${token}`);void fetch(`${API}/api/v1/public/cases/${token}`,{cache:"no-store"}).then(async r=>{if(!r.ok)throw new Error();return r.json() as Promise<Summary>;}).then(s=>{setSummary(s);setPhase("summary");}).catch(()=>setPhase("invalid"));},[locale,token]);
- const request=async()=>{setBusy(true);setError("");try{const r=await fetch(`${API}/api/v1/public/cases/${token}/request-access`,{method:"POST"});if(!r.ok)throw new Error(await apiError(r,t.error));setSummary(await r.json() as Summary);setPhase("code");}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}};
- const verify=async()=>{setBusy(true);setError("");try{const r=await fetch(`${API}/api/v1/public/cases/${token}/verify`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:code.trim()})});if(!r.ok)throw new Error(await apiError(r,t.error));const access=await r.json() as {grant:string};setGrant(access.grant);const view=await fetch(`${API}/api/v1/public/cases/${token}/view`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({grant:access.grant})});if(!view.ok)throw new Error(await apiError(view,t.error));setStatus(await view.json() as Status);setPhase("view");}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}};
- const respond=async()=>{setBusy(true);setError("");try{for(const file of files){const pre=await fetch(`${API}/api/v1/public/cases/${token}/documents/presign`,{method:"POST",headers:{"Content-Type":"application/json","X-Case-Grant":grant},body:JSON.stringify({originalFileName:file.name,contentType:file.type,sizeBytes:file.size})});if(!pre.ok)throw new Error(await apiError(pre,t.error));const p=await pre.json() as Presign;const upload=await fetch(p.uploadUrl,{method:"PUT",headers:p.requiredHeaders,body:file});if(!upload.ok)throw new Error(t.error);const confirm=await fetch(`${API}/api/v1/public/cases/${token}/documents/confirm`,{method:"POST",headers:{"Content-Type":"application/json","X-Case-Grant":grant},body:JSON.stringify({documentId:p.documentId})});if(!confirm.ok)throw new Error(await apiError(confirm,t.error));}const response=await fetch(`${API}/api/v1/public/cases/${token}/respond`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({grant,message,language:locale})});if(!response.ok)throw new Error(await apiError(response,t.error));setPhase("done");}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}};
- if(phase==="loading")return <Frame t={t}><p>{t.loading}</p></Frame>;
- if(phase==="invalid")return <Frame t={t}><p role="alert" className="rounded-xl bg-alert-50 p-4 text-alert-800">{t.invalid}</p></Frame>;
- if(phase==="done")return <Frame t={t}><div className="flex items-center gap-3 rounded-xl bg-brand-50 p-5 text-brand-800"><CheckCircle2/><strong>{t.done}</strong></div></Frame>;
- return <Frame t={t}>{summary&&<p className="mb-5 font-bold text-brand-800">{summary.caseNumber}</p>}{phase==="summary"&&<><p className="text-ink-600"><LockKeyhole className="me-2 inline" size={17}/>{t.private}</p><button className="btn-primary mt-6" disabled={busy} onClick={()=>void request()}>{t.send}</button></>}{phase==="code"&&<div><p className="mb-4 text-ink-600">{t.sent} {summary?.destinationHint}</p><label className="block text-sm font-bold">{t.code}<input className="field mt-2" dir="ltr" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,""))}/></label><button className="btn-primary mt-5" disabled={busy||code.length!==6} onClick={()=>void verify()}>{t.verify}</button></div>}{phase==="view"&&status&&<div><p className="text-sm font-bold text-brand-700">{t.status}</p><h2 className="mt-2 text-2xl font-bold text-brand-900">{locale==="ar"?status.statusAr:status.statusEn}</h2>{status.actionRequired&&<form className="mt-7 space-y-4" onSubmit={e=>{e.preventDefault();void respond();}}><h3 className="title">{t.action}</h3><label className="block text-sm font-bold">{t.message}<textarea className="field mt-2 min-h-28" maxLength={10000} required value={message} onChange={e=>setMessage(e.target.value)}/></label><label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line-strong p-4"><FileUp/><span>{files.length?`${files.length} ${t.files}`:t.choose}</span><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e=>setFiles(Array.from(e.target.files??[]))}/></label><button className="btn-primary" disabled={busy||!message.trim()}>{t.submit}</button></form>}</div>}{error&&<p role="alert" className="mt-5 rounded-xl bg-alert-50 p-4 text-alert-800">{error}</p>}</Frame>;
+/**
+ * The patient's secure, no-login action page.
+ *
+ * <p>Possession of the link is never enough: a one-time code sent to the patient's own registered contact
+ * is exchanged for a short-lived grant first. After that the page shows only what this case's coordinator
+ * actually asked for — never the full case form, and never another case.
+ */
+export function CaseStatusAccess({ locale, token }: { locale: Locale; token: string }) {
+  const t = copy[locale];
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
+  const [phase, setPhase] = useState<"loading" | "summary" | "code" | "view" | "done" | "invalid">("loading");
+  const [code, setCode] = useState("");
+  const [grant, setGrant] = useState("");
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<Record<string, File>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch(`${API}/api/v1/public/cases/${token}`)
+      .then(async response => { if (!response.ok) throw new Error(); setSummary(await response.json() as Summary); setPhase("summary"); })
+      .catch(() => setPhase("invalid"));
+  }, [token]);
+
+  async function request() {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch(`${API}/api/v1/public/cases/${token}/request-access`, { method: "POST" });
+      if (!response.ok) throw new Error(await apiError(response, t.error));
+      setSummary(await response.json() as Summary); setPhase("code");
+    } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
+  }
+
+  async function verify() {
+    setBusy(true); setError("");
+    try {
+      const access = await post<{ grant: string }>(`/verify`, { code: code.trim() });
+      setGrant(access.grant);
+      const view = await post<Status>(`/view`, { grant: access.grant });
+      setStatus(view);
+      setValues(Object.fromEntries((view.action?.items ?? []).map(item => [item.id, item.response ?? ""])));
+      setPhase("view");
+    } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
+  }
+
+  async function post<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> {
+    const response = await fetch(`${API}/api/v1/public/cases/${token}${path}`, {
+      method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const problem = await response.json().catch(() => null);
+      const failure = new Error(problem?.message ?? t.error) as Error & { fields?: { field: string; message: string }[] };
+      failure.fields = problem?.errors;
+      throw failure;
+    }
+    return response.json() as Promise<T>;
+  }
+
+  /** Mirrors the backend rules so a patient is corrected before the round-trip; the backend still decides. */
+  function check(items: ActionItem[]) {
+    const found: Record<string, string> = {};
+    for (const item of items) {
+      if (!item.required || item.completed) continue;
+      if (item.kind === "DOCUMENT" ? !files[item.id] : !values[item.id]?.trim()) {
+        found[item.id] = item.kind === "DOCUMENT" ? t.missingFile : t.missing;
+      }
+    }
+    return found;
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const items = status?.action?.items ?? [];
+    const local = check(items);
+    if (Object.keys(local).length) { setErrors(local); setError(t.fix); return; }
+    if (!items.length && !note.trim()) { setError(t.fix); return; }
+    setBusy(true); setError(""); setErrors({});
+    try {
+      const answers: { itemId: string; value: string | null; documentId: string | null }[] = [];
+      for (const item of items) {
+        const file = files[item.id];
+        if (file) {
+          const presign = await post<Presign>(`/documents/presign`,
+            { originalFileName: file.name, contentType: file.type, sizeBytes: file.size }, { "X-Case-Grant": grant });
+          const upload = await fetch(presign.uploadUrl, { method: "PUT", headers: presign.requiredHeaders, body: file });
+          if (!upload.ok) throw new Error(t.error);
+          await post(`/documents/confirm`, { documentId: presign.documentId }, { "X-Case-Grant": grant });
+          answers.push({ itemId: item.id, value: values[item.id]?.trim() || null, documentId: presign.documentId });
+        } else if (values[item.id]?.trim()) {
+          answers.push({ itemId: item.id, value: values[item.id].trim(), documentId: null });
+        }
+      }
+      await post(`/respond`, { grant, message: note.trim() || null, language: locale, items: answers });
+      setPhase("done");
+    } catch (e) {
+      const failure = e as Error & { fields?: { field: string; message: string }[] };
+      if (failure.fields?.length) {
+        setErrors(Object.fromEntries(failure.fields.map(f => [f.field.replace(/^item:/, ""), f.message])));
+        setError(t.fix);
+      } else setError(failure.message || t.error);
+    } finally { setBusy(false); }
+  }
+
+  if (phase === "loading") return <Frame title={t.title}><p role="status" className="text-ink-600">{t.loading}</p></Frame>;
+  if (phase === "invalid") return <Frame title={t.title}><p role="alert" className="rounded-xl bg-alert-50 p-4 text-alert-800">{t.invalid}</p></Frame>;
+  if (phase === "done") return (
+    <Frame title={t.title}>
+      <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-2xl text-white">✓</span>
+      <h2 className="title mt-5">{t.doneTitle}</h2>
+      <p className="mt-2 leading-7 text-ink-600">{t.doneBody}</p>
+    </Frame>
+  );
+
+  const action = status?.action;
+  return (
+    <Frame title={t.title}>
+      {summary && <p className="mb-5 font-bold text-brand-800">{summary.caseNumber}</p>}
+
+      {phase === "summary" && <>
+        <p className="flex items-start gap-2 leading-7 text-ink-600"><LockKeyhole className="mt-1 flex-none" size={17} aria-hidden/>{t.private}</p>
+        <button className="btn-primary mt-6 w-full sm:w-auto" disabled={busy} onClick={() => void request()}>{t.send}</button>
+      </>}
+
+      {phase === "code" && (
+        <form onSubmit={event => { event.preventDefault(); void verify(); }}>
+          <p className="mb-4 text-ink-600">{t.sent} <strong dir="ltr">{summary?.destinationHint}</strong></p>
+          <label className="block text-sm font-bold">{t.code}
+            <input className="field mt-2 max-w-[16rem] text-center text-2xl tracking-[0.4em]" dir="ltr" inputMode="numeric"
+                   autoComplete="one-time-code" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))}/>
+          </label>
+          <button className="btn-primary mt-5 w-full sm:w-auto" disabled={busy || code.length !== 6}>{t.verify}</button>
+        </form>
+      )}
+
+      {phase === "view" && status && <>
+        <p className="text-sm font-bold text-brand-700">{t.status}</p>
+        <h2 className="mt-2 text-2xl font-bold text-brand-900">{locale === "ar" ? status.statusAr : status.statusEn}</h2>
+
+        {status.actionRequired && (
+          <form className="mt-8" onSubmit={submit} noValidate>
+            <h3 className="title">{t.action}</h3>
+            <p className="mt-2 leading-7 text-ink-600">{action?.message || t.intro}</p>
+            {action?.dueAt && <p className="mt-1 text-sm font-semibold text-ink-700">{t.due} {new Date(action.dueAt).toLocaleDateString(locale)}</p>}
+
+            <div className="mt-6 space-y-5">
+              {(action?.items ?? []).map(item => (
+                <div key={item.id}>
+                  <label className="block text-sm font-bold text-ink-800" htmlFor={`item-${item.id}`}>
+                    {item.label}
+                    {item.required
+                      ? <span className="ms-1 font-normal text-alert-600" aria-hidden>*</span>
+                      : <span className="ms-2 text-xs font-normal text-ink-500">({t.optional})</span>}
+                    {item.required && <span className="sr-only"> ({t.required})</span>}
+                  </label>
+                  {item.completed && <p className="mt-1 text-xs font-semibold text-brand-700">{t.already}</p>}
+                  {item.kind === "DOCUMENT" ? (
+                    <div className="mt-2">
+                      <label className={`flex cursor-pointer items-center gap-3 rounded-xl border border-dashed p-4 ${errors[item.id] ? "border-alert-400 bg-alert-50" : "border-line-strong"}`}>
+                        <FileUp aria-hidden className="text-brand-600"/>
+                        <span className="text-sm">{files[item.id] ? `${files[item.id].name}` : t.choose}</span>
+                        <input id={`item-${item.id}`} className="sr-only" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                               onChange={e => { const file = e.target.files?.[0]; if (file) setFiles(current => ({ ...current, [item.id]: file })); }}/>
+                      </label>
+                      {files[item.id] && (
+                        <button type="button" className="link-cta mt-2 text-sm"
+                                onClick={() => setFiles(current => { const next = { ...current }; delete next[item.id]; return next; })}>
+                          <X size={14} className="me-1 inline" aria-hidden/>{t.remove}
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <textarea id={`item-${item.id}`} className={`field mt-2 min-h-20 ${errors[item.id] ? "field-error" : ""}`} maxLength={4000}
+                              value={values[item.id] ?? ""} onChange={e => setValues(current => ({ ...current, [item.id]: e.target.value }))}/>
+                  )}
+                  {errors[item.id] && <p className="error-text mt-1">{errors[item.id]}</p>}
+                </div>
+              ))}
+
+              <label className="block text-sm font-bold text-ink-800">
+                {action?.items?.length ? t.note : t.noItems}
+                <textarea className="field mt-2 min-h-24" maxLength={10000} value={note} onChange={e => setNote(e.target.value)}/>
+              </label>
+            </div>
+
+            <p className="mt-6 flex items-start gap-2 rounded-xl bg-mist p-4 text-sm leading-6 text-ink-600">
+              <ShieldCheck className="mt-0.5 flex-none text-brand-600" size={17} aria-hidden/>{t.private}
+            </p>
+            <button className="btn-primary mt-6 w-full sm:w-auto" disabled={busy}>{busy ? t.sending : t.submit}</button>
+          </form>
+        )}
+      </>}
+
+      {error && <p role="alert" className="mt-5 rounded-xl bg-alert-50 p-4 text-alert-800">{error}</p>}
+    </Frame>
+  );
 }
 
-function Frame({t,children}:{t:typeof text.en;children:React.ReactNode}){return <section className="section bg-mist"><div className="container-site max-w-2xl"><div className="card p-6 md:p-9"><p className="eyebrow">RehletShifaa</p><h1 className="headline mt-3">{t.title}</h1><div className="mt-7">{children}</div></div></div></section>}
-async function apiError(response:Response,fallback:string){const body=await response.json().catch(()=>({}));return typeof body.message==="string"?body.message:fallback;}
+function Frame({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="section section-soft">
+      <div className="container-site" style={{ maxWidth: "42rem" }}>
+        <h1 className="headline">{title}</h1>
+        <div className="card mt-6 p-6 sm:p-8">{children}</div>
+      </div>
+    </section>
+  );
+}
+
+async function apiError(response: Response, fallback: string) {
+  const body = await response.json().catch(() => ({}));
+  return typeof body.message === "string" ? body.message : fallback;
+}

@@ -38,7 +38,8 @@ public final class JourneyDtos {
         public PractitionerRequest(String legalName,String displayName,String externalSubject,String registrationNumber,String specialty,String subspecialty,String qualifications,String appointments,String hospitalPrivileges,String languages,String approvedProcedures,String indemnityReference,String contractStatus,String availabilityStatus,Integer expectedReviewHours,String practitionerType,String careCategory){this(legalName,displayName,externalSubject,registrationNumber,specialty,subspecialty,qualifications,appointments,hospitalPrivileges,languages,approvedProcedures,indemnityReference,contractStatus,availabilityStatus,expectedReviewHours,practitionerType,careCategory,null,"en");}
     }
     public record CredentialRequest(@NotBlank @Size(max=80)String credentialType,@NotBlank @Size(max=160)String referenceNumber,@NotBlank @Size(max=500)String source,UUID evidenceDocumentId,Instant issuedAt,Instant expiresAt) {}
-    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested) {}
+    /** {@code waitingOn} answers "who must act next", which is deliberately not the same as the stage. */
+    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason) {}
     public record StaffCaseCardView(CaseView caseSummary,UUID assignmentId,String assignmentStatus,long openTaskCount,long overdueTaskCount,long documentCount) {}
     public record StaffInviteRequest(@NotBlank @Size(max=160)String name,@NotBlank @Email @Size(max=254)String email,@NotBlank @Pattern(regexp="COORDINATOR|COORDINATOR_LEAD|OPERATIONS|OPERATIONS_LEAD|FINANCE|FINANCE_LEAD")String role,@Pattern(regexp="en|ar")String locale) {}
     // catalogServiceId set => the service was picked from the consultant's approved catalog (no Finance approval);
@@ -74,7 +75,8 @@ public final class JourneyDtos {
     public record ProposalGates(boolean operationsRequired,String operationsReason,boolean operationsCompleted,boolean financeRequired,List<String>financeReasons,boolean financeCompleted,boolean readyForRelease) {}
     // Secure-delivery status of the latest released proposal notification (masked; no raw contact or token).
     public record DeliveryStatus(String status,String channel,String destinationMasked,int attempts,Instant deliveredAt,Instant nextAttemptAt) {}
-    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary) {}
+    /** {@code patientAction} is the open request to the patient, so staff can see and record exactly what was asked. */
+    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction) {}
     public record IntakePreview(CaseView caseSummary,String intakeSummary) {}
     public record IdResponse(UUID id,String status) {}
     // --- Consultant price catalog, specialty templates, and FX (Phase 2) ---

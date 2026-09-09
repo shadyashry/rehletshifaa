@@ -17,7 +17,7 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/finance/**").hasAnyRole("FINANCE","FINANCE_LEAD")
         .requestMatchers("/api/v1/identity-review/**").hasAnyRole("PATIENT_IDENTITY_REVIEWER","SYSTEM_ADMIN")
         .requestMatchers("/api/v1/account/preferences").authenticated()
-        .requestMatchers("/api/v1/tasks/**").authenticated()
+        .requestMatchers("/api/v1/tasks/**","/api/v1/work/**","/api/v1/notifications/**","/api/v1/notifications").authenticated()
         .requestMatchers("/api/v1/admin/**").hasAnyRole("CREDENTIALING_ADMIN","SYSTEM_ADMIN","AUDITOR")
         .requestMatchers(HttpMethod.GET,"/api/v1/documents/*/download","/api/v1/documents/*/view").authenticated()
         .requestMatchers(HttpMethod.GET,"/api/v1/cases/*/documents").authenticated()

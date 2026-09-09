@@ -15,6 +15,10 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @GetMapping("/cases/{caseId}/intake-preview")public IntakePreview preview(@PathVariable UUID caseId){return service.intakePreview(caseId);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @PostMapping("/cases/{caseId}/transition")public CaseView transition(@PathVariable UUID caseId,@Valid @RequestBody TransitionRequest request){return service.transition(caseId,request);}
+ /** Complete "Request more information": creates the patient action and sends the secure no-login link. */
+ @PostMapping("/cases/{caseId}/information-requests")public IdResponse requestInformation(@PathVariable UUID caseId,@Valid @RequestBody WorkDtos.InformationRequestCommand request){return service.requestInformation(caseId,request);}
+ /** Record what the patient provided over WhatsApp/phone, preserving provenance. */
+ @PostMapping("/cases/{caseId}/information-requests/on-behalf")public IdResponse recordInformation(@PathVariable UUID caseId,@Valid @RequestBody WorkDtos.OnBehalfRequest request){return service.recordPatientInformation(caseId,request);}
  @PutMapping("/cases/{caseId}/care-category")public CaseView careCategory(@PathVariable UUID caseId,@Valid @RequestBody CareCategoryUpdateRequest request){return service.updateCareCategory(caseId,request);}
  @PutMapping("/cases/{caseId}/travel-package")public CaseView travelPackage(@PathVariable UUID caseId,@Valid @RequestBody TravelPackageRequest request){return service.setTravelPackage(caseId,request.requested());}
  @PostMapping("/cases/{caseId}/assignments")public IdResponse assign(@PathVariable UUID caseId,@Valid @RequestBody AssignmentRequest request){return service.assign(caseId,request);}

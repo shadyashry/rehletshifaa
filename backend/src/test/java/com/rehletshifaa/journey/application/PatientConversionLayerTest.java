@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.*;
 class PatientConversionLayerTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired OnboardingService onboarding; @Autowired IdentityVerificationService identity; @Autowired PaymentService payment;
+    @Autowired AccountActivationService accountActivations;
     @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
@@ -64,7 +65,7 @@ class PatientConversionLayerTest {
         journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "ACKNOWLEDGED", null)); em.flush();
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull();
         authenticate("patient-subject-a", "PATIENT");
-        journey.activateAccount(activationToken());
+        journey.activateAccount(activationToken(ctx.caseId));
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull(); // activation added no verification
     }
 
@@ -325,7 +326,7 @@ class PatientConversionLayerTest {
         var ctx = releasePreliminary(whatsapp, email);
         acknowledge(ctx);
         authenticate(patientSubject, "PATIENT");
-        journey.activateAccount(activationToken());
+        journey.activateAccount(activationToken(ctx.caseId));
         em.flush(); SecurityContextHolder.clearContext();
         return new Ctx(ctx.caseId, ctx.versionId, ctx.token, ctx.caseNumber, patientSubject);
     }
@@ -365,7 +366,8 @@ class PatientConversionLayerTest {
 
     private String proposalCode(String channel) throws Exception { String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PROPOSAL_ACCESS' AND channel=? ORDER BY created_at DESC LIMIT 1", String.class, channel)); return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code"); }
     private String activeChannel(UUID caseId) { return jdbc.queryForObject("SELECT delivery_channel FROM proposal_access_challenges WHERE case_id=? AND revoked_at IS NULL AND consumed_at IS NULL", String.class, caseId); }
-    private String activationToken() throws Exception { String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='ACCOUNT_ACTIVATION' ORDER BY created_at DESC LIMIT 1", String.class)); return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("token"); }
+    /** The binding credential is internal now - no customer message carries it, so the test asks for it directly. */
+    private String activationToken(UUID caseId) { UUID patientId = jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?", UUID.class, caseId); return accountActivations.issue(patientId, caseId); }
     private Instant verifiedAt(UUID caseId, String column) { return jdbc.queryForObject("SELECT " + column + " FROM patient_profiles WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", Instant.class, caseId); }
     private UUID depositId(UUID caseId) { return jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, caseId); }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }

@@ -25,6 +25,9 @@ public class CustomerReadinessService {
     // Onboarding-stage consents that live in the existing consent_records table (never a new table).
     static final List<String> BASE_CONSENTS = List.of("PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS");
     static final String REP_CONSENT = "REPRESENTATIVE_AUTHORIZATION";
+    // Gates that legitimately remain open when the patient submits onboarding: activation IS the submission,
+    // and the deposit plus any operational identity step deliberately come after the profile is active.
+    private static final Set<String> SUBMIT_DEFERRED = Set.of("ONBOARDING_INCOMPLETE", "DEPOSIT_UNPAID", "ACCOUNT_NOT_ACTIVATED", "IDENTITY_NOT_VERIFIED");
 
     public CustomerReadinessService(JdbcClient jdbc, Clock clock, PaymentService payment) { this.jdbc = jdbc; this.clock = clock; this.payment = payment; }
 
@@ -36,9 +39,9 @@ public class CustomerReadinessService {
 
     /** Compute readiness for the case's patient. Throws 404 if the case/patient is unknown. */
     public CustomerReadiness compute(UUID caseId) {
-        record P(UUID patientId, String subject, Instant phone, Instant email) {}
-        P p = jdbc.sql("SELECT p.id,p.external_subject,p.phone_verified_at,p.email_verified_at FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?")
-                .param(caseId).query((rs, n) -> new P(rs.getObject("id", UUID.class), rs.getString("external_subject"), instN(rs, "phone_verified_at"), instN(rs, "email_verified_at")))
+        record P(UUID patientId, String subject, Instant phone, Instant email, String profileStatus, boolean travelPackage) {}
+        P p = jdbc.sql("SELECT p.id,p.external_subject,p.phone_verified_at,p.email_verified_at,p.profile_status,c.travel_package_requested FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?")
+                .param(caseId).query((rs, n) -> new P(rs.getObject("id", UUID.class), rs.getString("external_subject"), instN(rs, "phone_verified_at"), instN(rs, "email_verified_at"), rs.getString("profile_status"), rs.getBoolean("travel_package_requested")))
                 .optional().orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
         record OB(String state, String subjectType) {}
         OB ob = jdbc.sql("SELECT state,subject_type FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1")
@@ -48,12 +51,14 @@ public class CustomerReadinessService {
         boolean legacy = ob != null && "LEGACY_EXEMPT".equals(ob.state());
         String subjectType = ob == null ? null : ob.subjectType();
 
-        boolean accountActivated = p.subject() != null;
+        boolean accountActivated = "ACTIVE".equals(p.profileStatus()) || p.subject() != null;
         boolean whats = p.phone() != null, mail = p.email() != null;
         boolean contactVerified = whats || mail;
         String verifiedChannel = whats && mail ? "BOTH" : whats ? "WHATSAPP" : mail ? "EMAIL" : null;
 
-        boolean identityRequired = true;
+        // Legal identity is NOT a gate for profile activation or the coordination deposit. It becomes
+        // required only when an operational step needs it (visa / travel package / hospital registration).
+        boolean identityRequired = p.travelPackage();
         boolean identityVerified = legacy || identityVerified(p.patientId());
 
         List<String> required = requiredConsentTypes(subjectType);
@@ -68,7 +73,7 @@ public class CustomerReadinessService {
         boolean onboardingCompleted = legacy || (ob != null && "COMPLETED".equals(ob.state()));
 
         List<BlockingItem> blocking = new ArrayList<>();
-        if (!accountActivated) blocking.add(new BlockingItem("ACCOUNT_NOT_ACTIVATED", "Activate your account", "فعّل حسابك"));
+        if (!accountActivated) blocking.add(new BlockingItem("ACCOUNT_NOT_ACTIVATED", "Activate your profile", "فعّل ملفك"));
         if (!contactVerified) blocking.add(new BlockingItem("CONTACT_NOT_VERIFIED", "Verify a contact channel", "تأكيد وسيلة تواصل"));
         if (identityRequired && !identityVerified) blocking.add(new BlockingItem("IDENTITY_NOT_VERIFIED", "Complete identity verification", "أكمل التحقق من الهوية"));
         if (!repValid) blocking.add(new BlockingItem("REPRESENTATIVE_AUTH_MISSING", "Representative authorization required", "مطلوب تفويض ممثّل ساري"));
@@ -81,9 +86,9 @@ public class CustomerReadinessService {
                 onboardingCompleted, consentsDone, repValid, depositRequired, depositStatus, depositSatisfied, blocking, ready, clock.instant());
     }
 
-    /** True when everything except the final onboarding submission is satisfied (used by submit()). */
+    /** True when every gate that must precede profile activation is satisfied (deposit/identity come later). */
     public boolean readyToSubmit(UUID caseId) {
-        return compute(caseId).blockingItems().stream().allMatch(b -> "ONBOARDING_INCOMPLETE".equals(b.code()));
+        return compute(caseId).blockingItems().stream().allMatch(b -> SUBMIT_DEFERRED.contains(b.code()));
     }
 
     /**
