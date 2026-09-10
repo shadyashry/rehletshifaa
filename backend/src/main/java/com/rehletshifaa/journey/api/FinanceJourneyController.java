@@ -13,7 +13,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PutMapping("/deposit-policies")public DepositPolicyView configureDepositPolicy(@Valid @RequestBody DepositPolicyRequest request){return payment.configurePolicy(request);}
  @GetMapping("/cases")public List<StaffCaseCardView>cases(){return service.assignedCaseCards(ActorRole.FINANCE);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
- @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@RequestParam boolean accept){return service.decideAssignment(caseId,assignmentId,accept,ActorRole.FINANCE);}
+ @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@Valid @RequestBody AssignmentDecisionRequest request){return service.decideAssignment(caseId,assignmentId,request,ActorRole.FINANCE);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
  @PostMapping("/cases/{caseId}/messages/{messageId}/read")public IdResponse read(@PathVariable UUID caseId,@PathVariable UUID messageId){return service.markMessageRead(caseId,messageId);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/approve")public ProposalView approve(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.approveFinance(caseId,versionId);}

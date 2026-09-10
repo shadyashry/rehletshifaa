@@ -113,6 +113,98 @@ class PatientActivationJourneyTest {
         assertThat(profileStatus(ctx.caseId)).isEqualTo("PENDING");
     }
 
+    // ---------- profile readiness and the case deposit are separate questions ----------
+
+    @Test void anIncompleteProfileIsToldToCompleteItAndNothingAboutMoney() throws Exception {
+        var ctx = accepted();
+        var prefill = activation.prefill(ctx.token, grant(ctx));
+        assertThat(prefill.currentAction()).isEqualTo(PatientAction.COMPLETE_PROFILE);
+        assertThat(prefill.profileActive()).isFalse();
+        // Everything already known is offered back, so nothing trusted is retyped.
+        assertThat(prefill.fullName()).isNotBlank();
+        assertThat(prefill.caseNumber()).isEqualTo(ctx.caseNumber);
+    }
+
+    @Test void completingTheProfileActivatesItWithoutAnyPayment() throws Exception {
+        var ctx = accepted();
+        var result = activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
+
+        assertThat(result.profileActive()).isTrue();
+        assertThat(profileStatus(ctx.caseId)).isEqualTo("ACTIVE");
+        // The profile is ACTIVE while a deposit is still owed: the two states are independent.
+        assertThat(result.journeyStage()).isEqualTo(JourneyStage.DEPOSIT);
+        assertThat(result.deposit().satisfied()).isFalse();
+        // Offline deposits are arranged by staff, so the patient is honestly told they owe no action.
+        assertThat(result.currentAction()).isEqualTo(PatientAction.NONE);
+        assertThat(result.waitingOn()).isEqualTo("STAFF");
+    }
+
+    @Test void completingTheProfileCreatesNoPaymentOfItsOwn() throws Exception {
+        var ctx = accepted();
+        int paymentsBefore = count("SELECT count(*) FROM payment_events WHERE case_id=?", ctx.caseId);
+        activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
+        // The deposit was raised when the proposal was accepted; completing a profile must not move money.
+        assertThat(count("SELECT count(*) FROM payment_events WHERE case_id=?", ctx.caseId)).isEqualTo(paymentsBefore);
+    }
+
+    @Test void aSettledDepositLeavesNothingToPayAndSendsThePatientToTheirCase() throws Exception {
+        var ctx = accepted(); String g = grant(ctx);
+        activation.activate(ctx.token, g, request("Link Patient")); em.flush();
+        settleDeposit(ctx, "settled"); em.flush();
+
+        assertThat(activation.deposit(ctx.token, g).satisfied()).isTrue();
+        var settled = activation.prefill(ctx.token, g);
+        assertThat(settled.currentAction()).isEqualTo(PatientAction.CONTINUE_IN_PORTAL);
+        assertThat(settled.journeyStage()).isEqualTo(JourneyStage.CARE_COORDINATION);
+    }
+
+    @Test void aPartlyPaidDepositAsksThePatientForNothingFurther() throws Exception {
+        var ctx = accepted(); String g = grant(ctx);
+        activation.activate(ctx.token, g, request("Link Patient")); em.flush();
+        payPartOfDeposit(ctx, "part"); em.flush();
+
+        // A payment is mid-confirmation: still the deposit stage, still nothing for the patient to do.
+        var prefill = activation.prefill(ctx.token, g);
+        assertThat(prefill.journeyStage()).isEqualTo(JourneyStage.DEPOSIT);
+        assertThat(prefill.currentAction()).isEqualTo(PatientAction.NONE);
+    }
+
+    @Test void theNextActionIsNeverDictatedByTheClient() throws Exception {
+        var ctx = accepted();
+        // The activation payload has no field for eligibility, status or amount — only profile data.
+        var prefill = activation.prefill(ctx.token, grant(ctx));
+        assertThat(prefill.deposit().currency()).isNotBlank();
+        assertThat(prefill.deposit().amountDue()).isNotNull();
+        assertThat(prefill.currentAction()).isEqualTo(PatientAction.COMPLETE_PROFILE);
+    }
+
+    @Test void anOfflineDepositBecomesRealWorkForTheStaffWhoMustArrangeIt() throws Exception {
+        var ctx = accepted(); em.flush();
+
+        // Raising the deposit is not enough on its own — somebody has to send the instructions.
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT owner_role FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", String.class, ctx.caseId)).isEqualTo("COORDINATOR");
+        // Work to do, not a gate: it must not stop travel planning or any other legitimate next step.
+        assertThat(jdbc.queryForObject("SELECT blocking FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", Boolean.class, ctx.caseId)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("STAFF");
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_REQUIRED'", "coordinator-subject")).isEqualTo(1);
+    }
+
+    @Test void settlingTheDepositClosesTheArrangementWorkAndDoesNotDuplicateTheHandoff() throws Exception {
+        var ctx = accepted();
+        activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
+        settleDeposit(ctx, "once"); em.flush();
+
+        assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", String.class, ctx.caseId)).isEqualTo("COMPLETED");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='TRAVEL' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
+
+        // A second authoritative confirmation must not re-run the handoff.
+        settleDeposit(ctx, "twice"); em.flush();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='TRAVEL'", ctx.caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_DEPOSIT_HANDOFF'", ctx.caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_SETTLED'", "coordinator-subject")).isEqualTo(1);
+    }
+
     // ---------- automatic, idempotent activation ----------
 
     @Test void activationIsAutomaticAndNeedsNoApproval() throws Exception {
@@ -182,7 +274,9 @@ class PatientActivationJourneyTest {
 
         assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_DEPOSIT_HANDOFF'", ctx.caseId)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_role='COORDINATOR' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
-        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=?", "coordinator-subject")).isEqualTo(1);
+        // One notification per distinct event: arranging the deposit and settling it are different moments.
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type=?", "coordinator-subject", "DEPOSIT_SETTLED")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type=?", "coordinator-subject", "DEPOSIT_REQUIRED")).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM case_status_history WHERE case_id=? AND to_status='TRAVEL_COORDINATION'", ctx.caseId)).isEqualTo(1);
     }
 
@@ -266,7 +360,7 @@ class PatientActivationJourneyTest {
         patientsBefore = count("SELECT count(*) FROM patient_profiles");
         journey.requestProposalAccess(ctx.token, "WHATSAPP"); em.flush();
         var g = journey.verifyProposalAccess(ctx.token, proposalCode("WHATSAPP"));
-        journey.decideProposalPublic(ctx.token, g.grant(), new PublicProposalDecisionRequest(g.grant(), "ACKNOWLEDGED", null));
+        journey.decideProposalPublic(ctx.token, g.grant(), new PublicProposalDecisionRequest(g.grant(), "ACKNOWLEDGED", null, true));
         em.flush(); SecurityContextHolder.clearContext();
         return new Ctx(ctx.caseId(), ctx.versionId(), onboardingTokenFor(ctx.caseId()), ctx.caseNumber());
     }
@@ -277,6 +371,14 @@ class PatientActivationJourneyTest {
         var g = publicCases.verify(ctx.token, accessCode());
         SecurityContextHolder.clearContext();
         return g.grant();
+    }
+
+    private void payPartOfDeposit(Ctx ctx, String key) {
+        UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, ctx.caseId);
+        BigDecimal total = jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId);
+        authenticate("finance-subject", "FINANCE");
+        payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(total.divide(new BigDecimal("2"), 2, java.math.RoundingMode.HALF_UP), "BANK", "ref-" + key, key + "-" + ctx.caseId));
+        SecurityContextHolder.clearContext();
     }
 
     private void settleDeposit(Ctx ctx, String key) {
@@ -298,7 +400,7 @@ class PatientActivationJourneyTest {
         seedDoctor(); seedStaff();
         var doctorAssignment = journey.assign(created.caseId(), new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "cardiac-pod", "Clinical review"));
         authenticate("doctor-subject", "DOCTOR");
-        journey.acceptDoctorAssignment(created.caseId(), doctorAssignment.id(), true);
+        journey.acceptDoctorAssignment(created.caseId(), doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review = journey.saveClinicalReview(created.caseId(), new ClinicalReviewRequest("Reviewed", "SUITABLE", null, "Imaging", "Recommended intervention", "Alt", "Risks", "Seq", "7 days", "Follow-up"));
         journey.approveClinicalReview(created.caseId(), review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",
@@ -307,8 +409,8 @@ class PatientActivationJourneyTest {
         var proposal = journey.createProposal(created.caseId(), new ProposalDraftRequest(review.id(), "en", "Plan", "EGP", "Incl", "Excl", "Deposit", "Refund", "Not consent", Instant.now().plusSeconds(86400), List.of(new ProposalItemRequest("MEDICAL", "Treatment package", BigDecimal.ONE, new BigDecimal("1000.00"), false, 0)), null));
         var operationsAssignment = journey.assign(created.caseId(), new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", "cardiac-pod", "Ops"));
         var financeAssignment = journey.assign(created.caseId(), new AssignmentRequest("finance-subject", "FINANCE", "PRIMARY", "cardiac-pod", "Finance"));
-        authenticate("operations-subject", "OPERATIONS"); journey.decideAssignment(created.caseId(), operationsAssignment.id(), true, com.rehletshifaa.security.ActorRole.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
-        authenticate("finance-subject", "FINANCE"); journey.decideAssignment(created.caseId(), financeAssignment.id(), true, com.rehletshifaa.security.ActorRole.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
+        authenticate("operations-subject", "OPERATIONS"); journey.decideAssignment(created.caseId(), operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
+        authenticate("finance-subject", "FINANCE"); journey.decideAssignment(created.caseId(), financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
         authenticate("coordinator-subject", "COORDINATOR"); journey.releaseProposal(created.caseId(), proposal.versionId());
         em.flush();
         String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, "proposal-ready:" + proposal.versionId()));

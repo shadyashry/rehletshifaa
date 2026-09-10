@@ -21,7 +21,7 @@ export function PrimaryNav({ items, label }: { items: readonly NavItem[]; label:
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`rounded-md px-4 py-2.5 text-[0.95rem] font-medium transition-colors ${
+            className={`rounded-lg px-3 py-2 text-[0.9rem] font-medium transition-colors ${
               active
                 ? "text-brand-900 bg-brand-50"
                 : "text-ink-600 hover:text-brand-700 hover:bg-brand-50"

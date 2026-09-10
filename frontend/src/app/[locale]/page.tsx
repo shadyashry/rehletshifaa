@@ -29,9 +29,9 @@ export default async function Home({ params }: Props) {
   return (
     <>
       <Hero locale={locale} d={d} />
-      <JourneyFilm d={d} locale={locale} />
+      <JourneyFilm d={d} />
       <CarePathways locale={locale} d={d} />
-      <PromiseSection d={d} />
+      <PromiseSection d={d} locale={locale} />
       <TravelServices d={d} />
       <TrustSection d={d} />
       <CtaPanel

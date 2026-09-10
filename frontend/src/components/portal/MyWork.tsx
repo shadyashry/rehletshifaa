@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Clock3 } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Clock3, FileText } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 
 export type WorkItem = {
   id: string; caseId: string; caseNumber: string; patientName: string | null; caseStatus: string;
-  waitingOn: string | null; type: string; title: string; context: string | null; priority: string;
+  waitingOn: string | null; careCategory?: string | null; coordinatorName?: string | null; documentCount?: number;
+  type: string; title: string; context: string | null; priority: string;
   status: string; blocking: boolean; dueAt: string | null; overdue: boolean; createdAt: string; version: number;
 };
 
@@ -23,10 +24,12 @@ export function MyWork({ locale, items, busy, onOpen }: {
   const t = ar
     ? { title: "عملي", hint: "الإجراءات المسندة إليك مرتّبة حسب الأولوية.", empty: "لا يوجد عمل مفتوح لديك.",
         emptyHint: "سيظهر هنا كل إجراء يُسند إليك.", open: "فتح", due: "الاستحقاق", overdue: "متأخر", today: "اليوم",
-        blocking: "يوقف التقدم", loading: "جارٍ التحميل…", waiting: "بانتظار", results: "عنصر عمل" }
+        blocking: "يوقف التقدم", loading: "جارٍ التحميل…", waiting: "بانتظار", results: "عنصر عمل", reviewAssignment: "مراجعة التعيين",
+        newAssignment: "تعيين جديد", care: "مجال الرعاية", coordinator: "المنسق", docs: "مستندات" }
     : { title: "My work", hint: "Actions assigned to you, most urgent first.", empty: "You have no open work.",
         emptyHint: "Anything assigned to you shows up here.", open: "Open", due: "Due", overdue: "Overdue", today: "today",
-        blocking: "Blocking", loading: "Loading…", waiting: "Waiting on", results: "work items" };
+        blocking: "Blocking", loading: "Loading…", waiting: "Waiting on", results: "work items", reviewAssignment: "Review assignment",
+        newAssignment: "New assignment", care: "Care area", coordinator: "Coordinator", docs: "documents" };
 
   return (
     <section aria-labelledby="my-work-title" aria-busy={busy} className="mb-8">
@@ -60,10 +63,16 @@ export function MyWork({ locale, items, busy, onOpen }: {
                     {item.blocking && (
                       <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-900">{t.blocking}</span>
                     )}
-                    <span className="text-xs font-semibold text-brand-700">{item.caseNumber}</span>
-                    {item.patientName && <span className="truncate text-xs text-ink-500">· {item.patientName}</span>}
+                    <span className="text-xs font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>
+                    {item.patientName && <span className="truncate text-xs font-semibold text-ink-700">{item.patientName}</span>}
                   </div>
                   <p className="mt-2 font-bold leading-6 text-ink-900">{item.title}</p>
+                  {/* Enough case identity to act without opening it first. */}
+                  <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] text-ink-600">
+                    {item.careCategory && <span>{t.care}: <strong className="font-semibold text-ink-800">{item.careCategory.replaceAll("-", " ")}</strong></span>}
+                    {item.coordinatorName && <span>{t.coordinator}: <strong className="font-semibold text-ink-800">{item.coordinatorName}</strong></span>}
+                    {!!item.documentCount && <span className="inline-flex items-center gap-1"><FileText size={12} aria-hidden/>{item.documentCount} {t.docs}</span>}
+                  </p>
                   {item.context && <p className="mt-1 line-clamp-2 text-sm leading-6 text-ink-600">{item.context}</p>}
                   <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-500">
                     <span className="inline-flex items-center gap-1"><Clock3 size={13} aria-hidden/>{age(item.createdAt, locale)}</span>
@@ -76,7 +85,7 @@ export function MyWork({ locale, items, busy, onOpen }: {
                   </p>
                 </div>
                 <button type="button" className="btn-primary w-full justify-center sm:w-auto" onClick={() => onOpen(item.caseId)}>
-                  {t.open}<ArrowRight size={16} className="ms-1 rtl:rotate-180" aria-hidden/>
+                  {item.type==="CONSULTANT_ASSIGNMENT"?t.reviewAssignment:t.open}<ArrowRight size={16} className="ms-1 rtl:rotate-180" aria-hidden/>
                 </button>
               </article>
             </li>
@@ -99,8 +108,15 @@ function PriorityChip({ priority, locale }: { priority: string; locale: Locale }
   return <span className={`rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${chip.tone}`}>{ar ? chip.ar : chip.en}</span>;
 }
 
-/** Human phrasing for who owes the next move — never the raw enum. */
-export function waitingLabel(value: string, locale: Locale) {
+/**
+ * Human phrasing for who owes the next move — never the raw enum. When the signed-in person is the one
+ * being waited on, say so directly: a consultant should read "waiting on you", not "the consultant".
+ */
+export function waitingLabel(value: string, locale: Locale, viewerRole?: string) {
+  const mine = viewerRole && (
+    (value === "CONSULTANT" && viewerRole === "doctor") ||
+    (value === "STAFF" && ["coordinator", "operations", "finance"].includes(viewerRole)));
+  if (mine) return locale === "ar" ? "أنت" : "you";
   const map: Record<string, { en: string; ar: string }> = {
     STAFF: { en: "our team", ar: "فريقنا" },
     PATIENT: { en: "the patient", ar: "المريض" },

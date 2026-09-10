@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Clock3, FileText, Image, Languages, MessageSquareText, PlayCircle, ShieldCheck, Stethoscope } from "lucide-react";
+import { ArrowRight, Check, Clock3, Languages, ShieldCheck, Stethoscope } from "lucide-react";
 import Link from "next/link";
 
 import type { Dictionary } from "@/lib/dictionary";
@@ -6,85 +6,81 @@ import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import { TrackedLink } from "@/components/TrackedLink";
 
-const PREP_ICONS = [FileText, Image, MessageSquareText] as const;
-
+/**
+ * The opening screen carries one claim, one action and one piece of evidence.
+ *
+ * <p>The evidence is the journey film — real project media rather than stock clinicians — so it anchors
+ * the right column and the reassurance about what a patient needs to begin rides underneath it as a
+ * single quiet line. That reassurance used to be a white card the size of the headline, which made the
+ * page argue with itself about where to look.
+ */
 export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
-  const trust = locale === "ar"
+  const arabic = locale === "ar";
+  const source = arabic ? "/media/rehletshifaa-journey-ar.mp4?v=5" : "/media/rehletshifaa-journey-en.mp4?v=3";
+  const poster = arabic ? "/media/rehletshifaa-journey-ar-poster.jpg?v=2" : "/media/rehletshifaa-journey-en-poster.jpg?v=2";
+  const videoLabel = arabic
+    ? "رحلة المريض مع رحلة شفاء، من مشاركة التقارير الطبية إلى المتابعة المنظمة"
+    : "RehletShifaa patient journey from sharing medical reports to coordinated follow-up";
+
+  const trust = arabic
     ? [[Stethoscope, "مراجعة بقيادة استشاري"], [Clock3, "خطوات واضحة قبل السفر"], [Languages, "دعم عربي وإنجليزي"], [ShieldCheck, "تداول خاص للمستندات"]] as const
     : [[Stethoscope, "Consultant-led review"], [Clock3, "Clear steps before travel"], [Languages, "Arabic & English support"], [ShieldCheck, "Private document handling"]] as const;
-  return (
-    <section className="relative overflow-hidden border-b border-line bg-mist">
-      {/* Soft healing washes — decorative, kept subtle and out of the a11y tree. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 hidden opacity-90 md:block rtl:-scale-x-100"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 78% 26%, var(--color-wash-aqua) 0, transparent 34%), radial-gradient(circle at 22% 78%, var(--color-wash-lavender) 0, transparent 32%), radial-gradient(circle at 94% 64%, var(--color-wash-peach) 0, transparent 28%)",
-        }}
-      />
-      <div className="container-site relative grid gap-10 py-11 md:py-14 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:items-center lg:gap-14 lg:py-16">
-        <div>
-          <p className="eyebrow">{d.home.eyebrow}</p>
-          <h1 className="display mt-4 max-w-2xl [text-wrap:balance]">{d.home.title}</h1>
-          <p className="lead mt-5 max-w-xl">{d.home.intro}</p>
-          <p className="mt-4 max-w-xl text-base font-semibold leading-7 text-brand-700">{d.home.slogan}</p>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <TrackedLink
-              event="send_case_cta_clicked"
-              className="btn-primary"
-              href={localeHref(locale, "send-my-case")}
-            >
+  return (
+    <section className="border-b border-line bg-white">
+      <div className="container-site grid items-center gap-7 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14 lg:py-14">
+        <div className="max-w-[34rem]">
+          <p className="eyebrow">{d.home.eyebrow}</p>
+          <h1 className="display mt-2.5 [text-wrap:balance]">{d.home.title}</h1>
+          <p className="lead mt-4">{d.home.intro}</p>
+
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <TrackedLink event="send_case_cta_clicked" className="btn-primary" href={localeHref(locale, "send-my-case")}>
               {d.home.primaryAction}
-              <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
+              <ArrowRight size={17} aria-hidden="true" className="rtl:-scale-x-100" />
             </TrackedLink>
-            <Link
-              className="btn-secondary"
-              href="#journey-video"
-            >
-              <PlayCircle size={18} aria-hidden="true" />
-              {d.home.watchJourney}
-            </Link>
+            <Link className="btn-secondary" href="#how-it-works">{d.home.watchJourney}</Link>
           </div>
 
-          <ul className="mt-7 grid gap-2.5 border-t border-line-strong pt-6 sm:grid-cols-2">
-            {d.home.assurances.map((item) => (
-              <li key={item} className="flex items-start gap-3 text-[0.95rem] leading-6 text-ink-700">
-                <Check size={17} className="mt-0.5 text-accent-700" aria-hidden="true" />
-                {item}
-              </li>
-            ))}
-          </ul>
-
-          {/* Calm preliminary-review microcopy — legible, subordinate to the CTA, never an alert. */}
-          <p className="mt-6 max-w-xl text-sm leading-6 text-ink-500">{d.home.preliminaryNotice}</p>
+          <p className="mt-6 border-t border-line pt-5 text-[0.9rem] leading-6 text-ink-600">
+            <span className="font-semibold text-brand-800">{d.home.slogan}</span>{" "}
+            {d.home.preliminaryNotice}
+          </p>
         </div>
 
-        <aside className="overflow-hidden rounded-3xl border border-brand-200 bg-white/90 p-6 shadow-[0_30px_80px_-48px_rgba(41,69,77,.48)] backdrop-blur sm:p-8">
-          <p className="eyebrow">{d.home.heroCardTitle}</p>
-          <p className="mt-4 text-lg font-semibold leading-7 text-brand-900">{d.home.reassurance}</p>
+        <figure className="m-0">
+          <div className="overflow-hidden rounded-[14px] border border-line bg-mist">
+            <video className="block aspect-video w-full bg-mist" controls playsInline preload="metadata"
+                   poster={poster} aria-label={videoLabel}>
+              <source src={source} type="video/mp4" />
+              {arabic ? "متصفحك لا يدعم تشغيل الفيديو." : "Your browser does not support embedded video."}
+            </video>
+          </div>
 
-          <ul className="mt-7 grid gap-3">
-            {d.home.prepareItems.map((item, index) => {
-              const Icon = PREP_ICONS[index] ?? FileText;
-              return (
-                <li key={item} className="grid grid-cols-[2.75rem_1fr] items-center gap-3 rounded-2xl bg-brand-50 p-4">
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-white text-brand-700">
-                    <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
-                  </span>
-                  <span className="text-[0.95rem] font-semibold leading-6 text-ink-700">{item}</span>
+          {/* What a patient needs to begin: one line, three chips, no second headline. */}
+          <figcaption className="mt-4 rounded-[12px] bg-mist px-4 py-3.5">
+            <p className="text-[0.88rem] font-semibold text-brand-900">{d.home.heroCardTitle}</p>
+            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+              {d.home.prepareItems.map((item) => (
+                <li key={item} className="flex items-center gap-1.5 text-[0.85rem] leading-6 text-ink-600">
+                  <Check size={14} strokeWidth={2.4} className="flex-none text-accent-700" aria-hidden="true" />
+                  {item}
                 </li>
-              );
-            })}
-          </ul>
-
-          <p className="mt-6 border-t border-line pt-5 text-sm leading-6 text-ink-600">{d.home.heroCardNote}</p>
-        </aside>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-[0.82rem] leading-5 text-ink-500">{d.home.reassurance}</p>
+          </figcaption>
+        </figure>
       </div>
-      <div className="trust-strip relative">
-        <ul className="container-site grid grid-cols-2 gap-x-5 gap-y-4 py-5 lg:grid-cols-4">
-          {trust.map(([Icon, label]) => <li key={label} className="flex items-center gap-2.5 text-sm font-semibold text-ink-700"><Icon size={18} className="text-brand-600" aria-hidden />{label}</li>)}
+
+      <div className="border-t border-line bg-mist">
+        <ul className="container-site grid grid-cols-2 gap-x-6 gap-y-2.5 py-3.5 lg:grid-cols-4">
+          {trust.map(([Icon, label]) => (
+            <li key={label} className="flex items-center gap-2 text-[0.82rem] font-semibold text-ink-700">
+              <Icon size={16} strokeWidth={1.9} className="flex-none text-brand-600" aria-hidden="true" />
+              {label}
+            </li>
+          ))}
         </ul>
       </div>
     </section>

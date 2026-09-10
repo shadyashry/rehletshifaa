@@ -22,15 +22,19 @@ public final class JourneyDtos {
     public record TaskVersionRequest(@NotNull Long expectedVersion) {}
     public record CancelTaskRequest(@NotBlank @Size(max=500)String reason,@NotNull Long expectedVersion) {}
     public record ReassignTaskRequest(@Size(max=255)String ownerSubject,@NotBlank @Size(max=40)String ownerRole,@NotNull Long expectedVersion) {}
-    public record ClinicalReviewRequest(@Size(max=20000)String caseSummary,@Size(max=80)String suitability,@Size(max=20000)String missingInformation,@Size(max=20000)String recommendedInvestigations,@Size(max=20000)String recommendedTreatment,@Size(max=20000)String alternatives,@Size(max=20000)String risksAndLimitations,@Size(max=20000)String expectedSequence,@Size(max=200)String expectedDuration,@Size(max=20000)String followUpRecommendation) {}
+    // A draft the consultant can come back to: the same clinical fields plus the services already picked,
+    // so "save draft" preserves the whole review and never completes the consultant's work item.
+    public record ClinicalReviewRequest(@Size(max=20000)String caseSummary,@Size(max=80)String suitability,@Size(max=20000)String missingInformation,@Size(max=20000)String recommendedInvestigations,@Size(max=20000)String recommendedTreatment,@Size(max=20000)String alternatives,@Size(max=20000)String risksAndLimitations,@Size(max=20000)String expectedSequence,@Size(max=200)String expectedDuration,@Size(max=20000)String followUpRecommendation,@Size(max=50)List<@Valid CostEstimateItem>costEstimates,@Pattern(regexp="[A-Z]{3}")String proposalCurrency) {
+        public ClinicalReviewRequest(String caseSummary,String suitability,String missingInformation,String recommendedInvestigations,String recommendedTreatment,String alternatives,String risksAndLimitations,String expectedSequence,String expectedDuration,String followUpRecommendation){this(caseSummary,suitability,missingInformation,recommendedInvestigations,recommendedTreatment,alternatives,risksAndLimitations,expectedSequence,expectedDuration,followUpRecommendation,null,null);}
+    }
     public record ProposalItemRequest(@NotBlank String category,@NotBlank @Size(max=500)String description,@NotNull @DecimalMin("0.01")BigDecimal quantity,@NotNull @DecimalMin("0.00")BigDecimal unitPrice,boolean optional,Integer sortOrder) {}
-    public record ProposalDraftRequest(@NotNull UUID clinicalReviewId,@Pattern(regexp="en|ar")String language,@Size(max=30000)String operationalPlan,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,@Size(max=20000)String includedServices,@Size(max=20000)String excludedServices,@Size(max=20000)String paymentTerms,@Size(max=20000)String refundTerms,@Size(max=20000)String disclaimers,@NotNull @Future Instant validUntil,@NotEmpty List<@Valid ProposalItemRequest> items,@Size(max=20000)String coordinatorNotes) {}
+    public record ProposalDraftRequest(@NotNull UUID clinicalReviewId,@Pattern(regexp="en|ar")String language,@Size(max=30000)String operationalPlan,@Pattern(regexp="[A-Z]{3}")String currency,@Size(max=20000)String includedServices,@Size(max=20000)String excludedServices,@Size(max=20000)String paymentTerms,@Size(max=20000)String refundTerms,@Size(max=20000)String disclaimers,@NotNull @Future Instant validUntil,@NotEmpty List<@Valid ProposalItemRequest> items,@Size(max=20000)String coordinatorNotes) {}
     public record OperationsPlanRequest(@NotBlank @Size(max=30000)String plan) {}
     public record ProposalDecisionRequest(@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,List<UUID>selectedOptionalItemIds,@Size(max=10000)String comment) {}
     public record TravelPlanRequest(Instant plannedArrival,Instant confirmedArrival,@Size(max=80)String visaStatus,@Size(max=5000)String flightDetails,@Size(max=5000)String airportReception,@Size(max=5000)String accommodation,@Size(max=5000)String localTransport,@Size(max=5000)String companionDetails,@Size(max=300)String facility,@Size(max=5000)String exceptions,@NotBlank @Pattern(regexp="PLANNING|CONFIRMED|ARRIVED")String status) {}
     public record TreatmentRequest(@NotBlank @Size(max=300)String facility,UUID practitionerId,@NotNull Instant startAt,Instant endAt,@NotBlank @Pattern(regexp="PLANNED|IN_PROGRESS|COMPLETED")String status,@Size(max=20000)String plannedProcedures,@Size(max=20000)String actualProcedures,@Size(max=20000)String milestones,@Size(max=20000)String complications,boolean dischargeReady,UUID dischargeDocumentId) {}
     public record FinalAssessmentRequest(@Size(max=20000)String recommendedTreatment,@Size(max=20000)String risksAndLimitations,@Size(max=50)List<@Valid CostEstimateItem>costEstimates) {}
-    public record FinalQuoteRequest(@NotNull UUID clinicalReviewId,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,@Size(max=20000)String scopeChangeReason,@Size(max=20000)String excludedServices,@Size(max=20000)String paymentTerms,@Size(max=20000)String refundTerms,@Size(max=20000)String disclaimers,@NotNull @Future Instant validUntil,@Size(max=20000)String coordinatorNotes) {}
+    public record FinalQuoteRequest(@NotNull UUID clinicalReviewId,@Pattern(regexp="[A-Z]{3}")String currency,@Size(max=20000)String scopeChangeReason,@Size(max=20000)String excludedServices,@Size(max=20000)String paymentTerms,@Size(max=20000)String refundTerms,@Size(max=20000)String disclaimers,@NotNull @Future Instant validUntil,@Size(max=20000)String coordinatorNotes) {}
     public record ProcedureConsentRequest(@NotBlank @Size(max=20000)String exactText,@Pattern(regexp="en|ar")String language,@Size(max=40)String policyVersion,UUID relatedProposalVersionId,UUID evidenceDocumentId,@Size(max=300)String evidenceReference) {}
     public record EmergencyOverrideRequest(@NotBlank @Size(max=2000)String reason) {}
     public record FollowUpRequest(UUID treatmentEpisodeId,UUID practitionerId,@NotNull @Future Instant dueAt,@NotBlank @Pattern(regexp="VIDEO|PHONE|IN_PERSON")String mode,@Size(max=20000)String requiredTests,@Size(max=20000)String instructions) {}
@@ -40,36 +44,54 @@ public final class JourneyDtos {
     public record CredentialRequest(@NotBlank @Size(max=80)String credentialType,@NotBlank @Size(max=160)String referenceNumber,@NotBlank @Size(max=500)String source,UUID evidenceDocumentId,Instant issuedAt,Instant expiresAt) {}
     /** {@code waitingOn} answers "who must act next", which is deliberately not the same as the stage. */
     public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason) {}
-    public record StaffCaseCardView(CaseView caseSummary,UUID assignmentId,String assignmentStatus,long openTaskCount,long overdueTaskCount,long documentCount) {}
+    /**
+     * Operational signals for a case card. All derived read-only from open work items — the case itself
+     * carries no priority or attention status, so nothing here is persisted for the UI's benefit.
+     */
+    public record StaffCaseCardView(CaseView caseSummary,UUID assignmentId,String assignmentStatus,long openTaskCount,long overdueTaskCount,long documentCount,long blockingOverdueCount,long highPriorityCount,Instant nextDueAt,boolean patientResponsePending) {}
     public record StaffInviteRequest(@NotBlank @Size(max=160)String name,@NotBlank @Email @Size(max=254)String email,@NotBlank @Pattern(regexp="COORDINATOR|COORDINATOR_LEAD|OPERATIONS|OPERATIONS_LEAD|FINANCE|FINANCE_LEAD")String role,@Pattern(regexp="en|ar")String locale) {}
     // catalogServiceId set => the service was picked from the consultant's approved catalog (no Finance approval);
     // null => a manually entered service (Finance approval required before the quote can reach the patient).
     public record CostEstimateItem(@NotBlank @Size(max=500)String serviceDescription,@NotNull @DecimalMin("0.00")BigDecimal estimatedCost,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,UUID catalogServiceId) {
         public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency){this(serviceDescription,estimatedCost,currency,null);}
     }
-    public record ReviewDecisionRequest(@NotBlank @Pattern(regexp="INFO|NOT_SUITABLE|RETURN_TO_COORDINATOR|REASSIGN|ACCEPT")String decision,@Size(max=20000)String recommendedTreatment,@Size(max=20000)String risksAndLimitations,@Size(max=50)List<@Valid CostEstimateItem>costEstimates) {}
+    // proposalCurrency is the currency the consultant prepares the recommendation in; it becomes the
+    // patient proposal's currency downstream. Null means "unstated" and leaves the base currency in place.
+    public record ReviewDecisionRequest(@NotBlank @Pattern(regexp="INFO|NOT_SUITABLE|RETURN_TO_COORDINATOR|REASSIGN|ACCEPT")String decision,@Size(max=20000)String recommendedTreatment,@Size(max=20000)String risksAndLimitations,@Size(max=50)List<@Valid CostEstimateItem>costEstimates,@Pattern(regexp="[A-Z]{3}")String proposalCurrency) {
+        public ReviewDecisionRequest(String decision,String recommendedTreatment,String risksAndLimitations,List<CostEstimateItem>costEstimates){this(decision,recommendedTreatment,risksAndLimitations,costEstimates,null);}
+    }
     // Patient-facing proposal view. Never exposes provider net cost, margin rate, or profit.
-    public record PublicProposalView(String caseNumber,String patientName,String documentType,int versionNumber,String currency,List<ProposalItemView>items,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax,String assumptions,String includedServices,String excludedServices,String scopeChangeReason,String paymentTerms,String refundTerms,String disclaimers,Instant validUntil,boolean decided,String decisionState,String recommendedTreatment,String risksAndLimitations,String notes,BigDecimal depositDueDisplay,BigDecimal depositPaidDisplay) {}
+    public record PublicProposalView(String caseNumber,String patientName,String documentType,int versionNumber,String currency,List<ProposalItemView>items,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax,String assumptions,String includedServices,String excludedServices,String scopeChangeReason,String paymentTerms,String refundTerms,String disclaimers,Instant validUntil,boolean decided,String decisionState,String recommendedTreatment,String risksAndLimitations,String notes,BigDecimal depositDueDisplay,BigDecimal depositPaidDisplay,String consultantName) {}
     // channel is the currently-selected/default OTP channel; whatsappHint/emailHint are non-null only when
     // that channel is on file for the patient, so the UI can offer a switch without leaking real contacts.
     public record PublicProposalSummary(String caseNumber,String channel,String destinationHint,String whatsappHint,String emailHint) {}
     public record ProposalVerifyRequest(@NotBlank @Pattern(regexp="[0-9]{6}")String code) {}
     public record ProposalAccessGrant(String grant,Instant expiresAt,UUID versionId) {}
     public record ProposalViewRequest(@NotBlank @Size(max=256)String grant) {}
-    public record PublicProposalDecisionRequest(@NotBlank @Size(max=256)String grant,@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,@Size(max=10000)String comment) {}
+    // acknowledgementAccepted gates the continue path only: the patient must state it explicitly, and the
+    // service enforces it. Declining or asking for changes needs no acknowledgement, so it stays optional
+    // here and existing callers of those two decisions are unaffected.
+    public record PublicProposalDecisionRequest(@NotBlank @Size(max=256)String grant,@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,@Size(max=10000)String comment,Boolean acknowledgementAccepted) {
+        public PublicProposalDecisionRequest(String grant,String decision,String comment){this(grant,decision,comment,null);}
+    }
     public record ActivateAccountRequest(@NotBlank @Size(max=256)String activationToken) {}
-    public record TimelineEvent(String type,String label,Instant occurredAt,String status) {}
+    /** Adds the acting person and role so the journey reads as accountable history, not bare statuses. */
+    public record TimelineEvent(String type,String label,Instant occurredAt,String status,String actorName,String actorRole,String note) {}
     public record MessageView(UUID id,String threadType,String senderRole,String senderName,String direction,String body,String language,boolean internalOnly,boolean read,Instant createdAt) {}
     public record TaskView(UUID id,UUID caseId,String type,String title,String description,String ownerSubject,String ownerRole,String visibilityScope,String priority,String status,boolean blocking,boolean overdue,Instant dueAt,long version) {}
     public record StaffDirectoryView(String subject,String name,String role) {}
     public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason) {}
     public record ProposalItemView(UUID id,String category,String description,BigDecimal quantity,BigDecimal unitPrice,boolean optional) {}
-    public record AssignmentView(UUID id,String assigneeSubject,String assigneeRole,String assignmentType,String status,Instant assignedAt,long version) {}
+    /** {@code assigneeName} is resolved server-side so no interface ever renders an identity subject. */
+    public record AssignmentView(UUID id,String assigneeSubject,String assigneeName,String assigneeRole,String assignmentType,String status,Instant assignedAt,long version) {}
+
+    /** Accept or decline an assignment. Sent in the body so the decision is never a URL parameter. */
+    public record AssignmentDecisionRequest(boolean accept,@Size(max=500)String reason) {}
     public record VerifiedDoctorView(String subject,String displayName,String specialty,String subspecialty,String availabilityStatus,String careCategory) {}
     public record DoctorProfileView(String displayName,String specialty,String subspecialty,String careCategory,String availabilityStatus,String credentialingStatus) {}
     public record StaffProfileView(String displayName,String role) {}
     public record CareCategoryView(String slug,String nameEn,String nameAr) {}
-    public record ClinicalReviewView(UUID id,int versionNumber,String status,String suitability,String recommendedTreatment,String risksAndLimitations,Instant createdAt,List<CostEstimateItem>costEstimates) {}
+    public record ClinicalReviewView(UUID id,int versionNumber,String status,String suitability,String recommendedTreatment,String risksAndLimitations,Instant createdAt,List<CostEstimateItem>costEstimates,String proposalCurrency) {}
     // Backend-computed approval gates for the latest pre-release proposal; null once released or when no proposal exists.
     // The UI must drive Operations/Finance/Release from these, never infer requirements from proposal.status alone.
     public record ProposalGates(boolean operationsRequired,String operationsReason,boolean operationsCompleted,boolean financeRequired,List<String>financeReasons,boolean financeCompleted,boolean readyForRelease) {}

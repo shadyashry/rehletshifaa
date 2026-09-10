@@ -107,3 +107,44 @@ describe("CaseStatusAccess", () => {
     expect(await screen.findByText(/invalid or has expired/i)).toBeTruthy();
   });
 });
+
+describe("CaseStatusAccess journey", () => {
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  const consultantStatus = { caseNumber: "RS-10281", statusEn: "Under consultant review", statusAr: "قيد مراجعة الاستشاري",
+    phase: "consultant", actionRequired: false, action: null };
+
+  async function reachStatus(view: unknown) {
+    vi.stubGlobal("fetch", stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ grant: "grant-1" }),
+      "/view": () => json(view),
+      "tok-1": () => json(summary),
+    }));
+    render(<CaseStatusAccess locale="en" token="tok-1"/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+  }
+
+  it("explains where the case is and shows the journey phases", async () => {
+    await reachStatus(consultantStatus);
+    expect(await screen.findByRole("heading", { name: /a consultant is reviewing your case/i })).toBeTruthy();
+    expect(screen.getByText(/you will receive a recommendation/i)).toBeTruthy();
+    expect(screen.getByText(/no action is required from you right now/i)).toBeTruthy();
+
+    const tracker = screen.getByRole("list");
+    const labels = [...tracker.querySelectorAll("li")].map(li => (li.textContent ?? "").trim());
+    expect(labels).toEqual(["Case received", "Coordinator review", "Consultant review", "Your proposal", "Deposit", "Treatment", "Follow-up"]);
+    // The internal case status is never sent to this page, so it can never be rendered.
+    expect(screen.queryByText(/CONSULTANT_REVIEW/)).toBeNull();
+  });
+
+  it("leads with the request when the patient has something to do", async () => {
+    await reachStatus({ ...consultantStatus, phase: "coordinator", actionRequired: true, action });
+    expect(await screen.findByRole("heading", { name: /we need something from you/i })).toBeTruthy();
+    expect(screen.queryByText(/no action is required/i)).toBeNull();
+    expect(screen.getByLabelText(/current medication/i)).toBeTruthy();
+  });
+});

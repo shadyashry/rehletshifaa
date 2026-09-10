@@ -16,6 +16,7 @@ type Prefill = {
   nationality: string | null; countryOfResidence: string | null; preferredLanguage: string | null; sex: string | null;
   emailVerified: boolean; phoneVerified: boolean;
   requiredConsents: string[]; completedConsents: string[]; deposit: Deposit;
+  currentAction?: PatientAction; journeyStage?: JourneyStage; waitingOn?: string | null;
 };
 type FieldError = { field: string; message: string };
 type Form = {
@@ -45,15 +46,21 @@ const copy = {
     selectCountry: "Search country…", noCountry: "No matching country", selectOption: "Select…",
     male: "Male", female: "Female", other: "Other", undisclosed: "Prefer not to say",
     english: "English", arabic: "العربية",
-    activate: "Activate profile & continue", activating: "Activating…",
+    activate: "Complete my profile", activating: "Saving…",
     passportNote: "We don't need your passport or ID now. If your treatment needs a visa or travel booking, your coordinator will ask for it later.",
-    depositTitle: "Coordination deposit",
-    depositIntro: "This deposit starts your treatment coordination and is credited to your final balance.",
     amountDue: "Amount due", alreadyPaid: "Already received", balance: "Remaining",
-    depositHow: "How to pay",
-    depositOffline: "Your coordinator will share the payment details for your region and confirm your payment. Your journey continues automatically as soon as the payment is confirmed.",
-    depositPending: "We're waiting for your payment to be confirmed. You can safely close this page — nothing is lost.",
-    checkStatus: "Check payment status",
+    depositPending: "You can safely close this page — nothing is lost, and your case continues automatically once the deposit is recorded.",
+    refreshStatus: "Refresh status",
+    readyTitle: "Your profile is ready",
+    readyIntro: "Your patient profile is active. You can use your account to follow this case and any other case linked to your profile.",
+    nextStepLabel: "Next step",
+    nextDeposit: "Deposit for your accepted care estimate",
+    viewDeposit: "View deposit details",
+    nextDepositWho: "Your coordinator will arrange this with you.",
+    depositStageTitle: "Deposit arrangements",
+    depositArrangements: "Your coordinator will provide or arrange the payment instructions for your region and record the payment once it arrives.",
+    noActionNeeded: "No action is required from you right now.",
+    backToCase: "Go to my case",
     doneTitle: "Your treatment journey is now active",
     doneIntro: "Your RehletShifaa coordinator is starting the next stage of your treatment coordination and will contact you shortly.",
     stepProposal: "Proposal accepted", stepProfile: "Profile activated", stepDeposit: "Deposit received",
@@ -63,7 +70,7 @@ const copy = {
     viewJourney: "View my journey", opening: "Opening…",
     caseLabel: "Case",
     stepOf: "Step", of: "of",
-    steps: ["Verify", "Your details", "Deposit"],
+    steps: ["Verify", "Your details"],
     invalid: "This link is invalid or has expired. Please ask your coordinator for a new one.",
     error: "Something went wrong. Please try again.",
     tooMany: "Too many attempts. Please try again in a little while.",
@@ -93,15 +100,21 @@ const copy = {
     selectCountry: "ابحث عن الدولة…", noCountry: "لا توجد نتائج", selectOption: "اختر…",
     male: "ذكر", female: "أنثى", other: "أخرى", undisclosed: "أفضّل عدم الإفصاح",
     english: "English", arabic: "العربية",
-    activate: "تفعيل الملف والمتابعة", activating: "جارٍ التفعيل…",
+    activate: "استكمال ملفي", activating: "جارٍ الحفظ…",
     passportNote: "لا نحتاج جواز سفرك أو هويتك الآن. إذا احتاج علاجك تأشيرة أو حجز سفر، سيطلبها منسقك لاحقًا.",
-    depositTitle: "وديعة التنسيق",
-    depositIntro: "تبدأ هذه الوديعة تنسيق علاجك وتُخصم من رصيدك النهائي.",
     amountDue: "المبلغ المستحق", alreadyPaid: "المستلم بالفعل", balance: "المتبقي",
-    depositHow: "طريقة الدفع",
-    depositOffline: "سيشارك منسقك تفاصيل الدفع الخاصة بمنطقتك ويؤكد استلام دفعتك. تستكمل رحلتك تلقائيًا فور تأكيد الدفع.",
-    depositPending: "ننتظر تأكيد دفعتك. يمكنك إغلاق هذه الصفحة بأمان — لن يضيع شيء.",
-    checkStatus: "تحديث حالة الدفع",
+    depositPending: "يمكنك إغلاق هذه الصفحة بأمان — لن يضيع شيء، وتستكمل حالتك تلقائيًا فور تسجيل الوديعة.",
+    refreshStatus: "تحديث الحالة",
+    readyTitle: "ملفك جاهز",
+    readyIntro: "ملفك الطبي مُفعّل الآن. يمكنك استخدام حسابك لمتابعة هذه الحالة وأي حالة أخرى مرتبطة بملفك.",
+    nextStepLabel: "الخطوة التالية",
+    nextDeposit: "وديعة تقدير الرعاية الذي قبلته",
+    viewDeposit: "عرض تفاصيل الوديعة",
+    nextDepositWho: "سيرتّب منسّقك ذلك معك.",
+    depositStageTitle: "ترتيبات الوديعة",
+    depositArrangements: "سيوفّر منسّقك تعليمات الدفع الخاصة بمنطقتك أو يرتّبها، ويسجّل الدفعة فور وصولها.",
+    noActionNeeded: "لا يلزمك أي إجراء الآن.",
+    backToCase: "الذهاب إلى حالتي",
     doneTitle: "رحلتك العلاجية نشطة الآن",
     doneIntro: "بدأ منسق رحلة شفاء المرحلة التالية من تنسيق علاجك وسيتواصل معك قريبًا.",
     stepProposal: "تم قبول العرض", stepProfile: "تم تفعيل الملف", stepDeposit: "تم استلام الوديعة",
@@ -111,7 +124,7 @@ const copy = {
     viewJourney: "عرض رحلتي", opening: "جارٍ الفتح…",
     caseLabel: "الحالة",
     stepOf: "الخطوة", of: "من",
-    steps: ["التحقق", "بياناتك", "الوديعة"],
+    steps: ["التحقق", "بياناتك"],
     invalid: "هذا الرابط غير صالح أو انتهت صلاحيته. يرجى طلب رابط جديد من منسقك.",
     error: "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
     tooMany: "محاولات كثيرة. يرجى المحاولة بعد قليل.",
@@ -151,7 +164,27 @@ const CONSENT_TEXT: Record<string, { en: string; ar: string }> = {
   },
 };
 
-type Stage = "loading" | "verify" | "form" | "deposit" | "done" | "invalid";
+type PatientAction = "COMPLETE_PROFILE" | "NONE" | "CONTINUE_IN_PORTAL";
+type JourneyStage = "PROFILE" | "DEPOSIT" | "CARE_COORDINATION";
+/** "activated" is the moment the profile becomes ready — deliberately its own screen, before any money. */
+type Stage = "loading" | "verify" | "form" | "activated" | "deposit" | "done" | "invalid";
+
+/**
+   * Fall back to the profile step whenever the server has not named an action: stranding someone on a
+   * payment screen is the one wrong answer here, and an incomplete profile is the safe assumption.
+   */
+function resolveAction(data: { currentAction?: PatientAction; profileActive: boolean; deposit: Deposit }): PatientAction {
+  if (data.currentAction) return data.currentAction;
+  if (!data.profileActive) return "COMPLETE_PROFILE";
+  return data.deposit.satisfied ? "CONTINUE_IN_PORTAL" : "NONE";
+}
+
+/** Resume exactly where the server says the patient stands, so a reload never reopens a finished step. */
+function stageFor(action: PatientAction): Stage {
+  if (action === "COMPLETE_PROFILE") return "form";
+  if (action === "CONTINUE_IN_PORTAL") return "done";
+  return "deposit"; // nothing for the patient to do, but the deposit stage is what they should see
+}
 
 export function ProfileActivation({ locale, token }: { locale: Locale; token: string }) {
   const t = copy[locale];
@@ -164,6 +197,7 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
   const [grant, setGrant] = useState<string | null>(null);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [deposit, setDeposit] = useState<Deposit | null>(null);
+  const [action, setAction] = useState<PatientAction | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [consents, setConsents] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -237,8 +271,9 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
         sex: data.sex ?? "",
       });
       setConsents(previous => previous.length ? previous : data.completedConsents.filter(c => data.requiredConsents.includes(c)));
-      if (data.profileActive) setStage(data.deposit.satisfied ? "done" : "deposit");
-      else setStage("form");
+      const resolved = resolveAction(data);
+      setAction(resolved);
+      setStage(stageFor(resolved));
     } catch (e) { setNotice(describe(e)); } finally { setBusy(false); }
   }
 
@@ -268,9 +303,11 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
     if (Object.keys(local).length) { setFieldErrors(local); setNotice(t.fixFields); return; }
     setBusy(true); setNotice(null); setFieldErrors({});
     try {
-      const result: { profileActive: boolean; deposit: Deposit } = await call("/activate", { grant, profile: { ...form, consents } });
+      const result: { profileActive: boolean; deposit: Deposit; currentAction?: PatientAction } =
+        await call("/activate", { grant, profile: { ...form, consents } });
       setDeposit(result.deposit);
-      setStage(result.deposit.satisfied ? "done" : "deposit");
+      setAction(resolveAction(result));
+      setStage("activated");
     } catch (e) {
       const err = e as { errors?: FieldError[]; status?: number };
       if (err?.errors?.length) {
@@ -288,7 +325,7 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
     try {
       const data: Deposit = await call("/deposit", { grant });
       setDeposit(data);
-      if (data.satisfied) setStage("done");
+      if (data.satisfied) { setAction("CONTINUE_IN_PORTAL"); setStage("done"); }
     } catch { /* keep the current view; the patient can retry */ }
   }, [call, grant]);
 
@@ -449,11 +486,40 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
         </form>
       )}
 
+      {/* Profile completion has its own finish line. Money is named as the next task, never as part of it. */}
+      {stage === "activated" && (
+        <section className="card p-6 md:p-8">
+          <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-600 text-xl text-white">✓</span>
+          <h1 ref={headingRef} tabIndex={-1} className="headline mt-5 outline-none">{t.readyTitle}</h1>
+          <p className="lead mt-3">{t.readyIntro}</p>
+
+          {action === "CONTINUE_IN_PORTAL" || !deposit?.required ? (
+            <button type="button" className="btn-primary mt-7 w-full sm:w-auto" disabled={busy} onClick={() => void openPortal()}>
+              {busy ? t.opening : t.backToCase}
+            </button>
+          ) : (
+            <>
+              <div className="mt-7 border-t border-line pt-5">
+                <p className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.nextStepLabel}</p>
+                <p className="mt-1.5 font-semibold text-ink-900">{t.nextDeposit}</p>
+                <p className="mt-1 text-[0.88rem] leading-6 text-ink-600">{t.nextDepositWho}</p>
+              </div>
+              <button type="button" className="mt-5 text-[0.9rem] font-semibold text-brand-800 underline underline-offset-4"
+                      onClick={() => setStage("deposit")}>
+                {t.viewDeposit}
+              </button>
+            </>
+          )}
+        </section>
+      )}
+
+      {/* A status, not a task. Staff arrange the offline deposit, so this screen offers the patient no
+          action to take and no button that pretends otherwise — only a quiet way back to their case. */}
       {stage === "deposit" && deposit && (
         <section className="card p-6 md:p-8">
           <p className="eyebrow">{t.caseLabel} {prefill?.caseNumber}</p>
-          <h1 ref={headingRef} tabIndex={-1} className="headline mt-2 outline-none">{t.depositTitle}</h1>
-          <p className="lead mt-3">{t.depositIntro}</p>
+          <h1 ref={headingRef} tabIndex={-1} className="headline mt-2 outline-none">{t.depositStageTitle}</h1>
+          <p className="lead mt-3">{t.depositArrangements}</p>
 
           <dl className="mt-7 overflow-hidden rounded-xl border border-line">
             <Row label={t.amountDue} value={money(deposit.amountDue, deposit.currency, locale)} strong />
@@ -463,19 +529,18 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
             )}
           </dl>
 
-          <h2 className="title mt-8">{t.depositHow}</h2>
-          <p className="mt-2 leading-7 text-ink-600">{t.depositOffline}</p>
-          <p className="mt-4 rounded-xl bg-mist p-4 text-sm leading-6 text-ink-600" role="status">{t.depositPending}</p>
+          <p className="mt-6 rounded-xl bg-mist p-4 text-[0.92rem] font-semibold leading-6 text-ink-700" role="status">
+            {t.noActionNeeded}
+          </p>
+          <p className="mt-3 text-sm leading-6 text-ink-500">{t.depositPending}</p>
 
-          <h2 className="title mt-8">{t.portalTitle}</h2>
-          <p className="mt-2 leading-7 text-ink-600">{t.portalIntro}</p>
-          <p className="mt-2 text-sm leading-6 text-ink-500">{t.portalSignIn}</p>
-
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <button type="button" className="btn-primary w-full sm:w-auto" disabled={busy} onClick={() => void openPortal()}>
-              {busy ? t.opening : t.viewJourney}
+          <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line pt-6">
+            <button type="button" className="text-[0.9rem] font-semibold text-brand-800 underline underline-offset-4 disabled:opacity-50"
+                    disabled={busy} onClick={() => void openPortal()}>
+              {busy ? t.opening : t.backToCase}
             </button>
-            <button type="button" className="btn-secondary w-full sm:w-auto" disabled={busy} onClick={() => void refreshDeposit()}>{t.checkStatus}</button>
+            <button type="button" className="text-[0.88rem] font-semibold text-ink-500 underline underline-offset-4 disabled:opacity-50"
+                    disabled={busy} onClick={() => void refreshDeposit()}>{t.refreshStatus}</button>
           </div>
         </section>
       )}
@@ -628,6 +693,13 @@ function CountrySelect({ value, placeholder, empty, invalid, onChange }: {
 
 function money(amount: number | null, currency: string, locale: Locale) {
   if (amount == null) return "—";
-  try { return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount); }
+  // Decimals only when the amount has them, matching how the proposal states the same money.
+  const whole = Number.isInteger(amount);
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency", currency,
+      minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2,
+    }).format(amount);
+  }
   catch { return `${amount.toLocaleString(locale)} ${currency}`; }
 }

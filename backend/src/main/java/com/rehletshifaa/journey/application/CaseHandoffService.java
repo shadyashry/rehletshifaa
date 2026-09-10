@@ -23,6 +23,9 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class CaseHandoffService {
+    /** Staff work for arranging the offline coordination deposit with the patient. */
+    private static final String DEPOSIT_WORK = "DEPOSIT_ARRANGEMENT";
+
     private final JdbcClient jdbc;
     private final IntakeLifecycleService intake;
     private final StaffWorkService work;
@@ -32,6 +35,35 @@ public class CaseHandoffService {
     public CaseHandoffService(JdbcClient jdbc, IntakeLifecycleService intake, StaffWorkService work, Clock clock,
                               @Value("${app.mail.coordinator}") String coordinatorEmail) {
         this.jdbc = jdbc; this.intake = intake; this.work = work; this.clock = clock; this.coordinatorEmail = coordinatorEmail;
+    }
+
+    /**
+     * A deposit has been raised on an accepted case. With the current offline process the money cannot move
+     * until someone on our side sends the patient payment instructions and later records what arrived, so
+     * the deposit stage is owned by staff, not by the patient. This gives that ownership somewhere to live:
+     * real work in the coordinator queue, and a case that reads as waiting on us.
+     *
+     * <p>Not blocking: this is work to do, not a gate. Whether the deposit has actually been paid already
+     * gates non-cancellable commitments elsewhere, and marking it blocking would additionally stop
+     * legitimate downstream transitions such as travel planning. Idempotent:
+     * {@link StaffWorkService#openWorkItem} reuses an open item of the same type on the case.
+     *
+     * @return true when a work item was opened or reactivated
+     */
+    @Transactional
+    public boolean onDepositRequired(UUID caseId) {
+        Instant now = clock.instant();
+        String status = jdbc.sql("SELECT status FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
+        if (!"ACCEPTED".equals(status)) return false; // already past the deposit stage; nothing to arrange
+
+        String coordinator = currentCoordinator(caseId);
+        work.openWorkItem(new NewWorkItem(caseId, DEPOSIT_WORK, "Arrange the coordination deposit",
+                "The patient accepted their estimate and a coordination deposit is due. Send the payment instructions, then record the amount received.",
+                coordinator, "COORDINATOR", "HIGH", false, null, "SYSTEM", "DEPOSIT_REQUIRED",
+                "deposit-required:" + caseId, true));
+        if (coordinator == null) notifyTeamMailbox(caseId, now);
+        work.refreshWaitingOn(caseId, "STAFF", "Coordination deposit to be arranged with the patient");
+        return true;
     }
 
     /**
@@ -51,6 +83,7 @@ public class CaseHandoffService {
                 .query(String.class).optional().orElse(null);
         if (status == null) return false;
 
+        work.closeWorkItems(caseId, DEPOSIT_WORK, "Coordination deposit received");
         boolean moved = advanceToCoordination(caseId, status, now);
         String coordinator = restoreCoordinator(caseId, now);
         // One idempotent operation opens the work item, raises the in-app notification and sends the work
@@ -85,6 +118,12 @@ public class CaseHandoffService {
      * Prefer the coordinator already associated with the case. An ACTIVE assignment is kept as-is; the most
      * recent ended assignment is revived rather than handing the case to somebody new.
      */
+    /** Who owns the case right now. Unlike {@link #restoreCoordinator} this never reactivates anything. */
+    private String currentCoordinator(UUID caseId) {
+        return jdbc.sql("SELECT assignee_subject FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' ORDER BY assigned_at DESC LIMIT 1")
+                .param(caseId).query(String.class).optional().orElse(null);
+    }
+
     private String restoreCoordinator(UUID caseId, Instant now) {
         String active = jdbc.sql("SELECT assignee_subject FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' ORDER BY assigned_at DESC LIMIT 1")
                 .param(caseId).query(String.class).optional().orElse(null);

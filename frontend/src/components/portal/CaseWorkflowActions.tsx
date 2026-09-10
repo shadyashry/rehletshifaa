@@ -47,27 +47,63 @@ function CoordinatorFlow({caseId,status,version,careCategory,patientAction,docto
  // separate "save" step — the consultant list filters live off the selected care area above.
  const doAssign=async()=>{if(!consultant)return;if(categoryChanged){const saved=await mutate(`/coordinator/cases/${caseId}/care-category`,{careCategory:category,expectedVersion:version,reason:careCategory?"Coordinator corrected case care area":"Coordinator classified case care area"},"PUT");if(!saved)return;}await mutate(`/coordinator/cases/${caseId}/assignments`,{assigneeSubject:consultant,assigneeRole:"DOCTOR",assignmentType:"PRIMARY",pod:null,reason:reason||"Assigned to consultant"}).then(r=>{if(r)reset();});};
  const[infoDialog,setInfoDialog]=useState(false);
- return <>{canRequestInformation&&<div className="space-y-3 rounded-xl border border-line bg-mist p-4">
-   <h4 className="font-bold">{locale==="ar"?"معلومات من المريض":"Information from the patient"}</h4>
-   <p className="text-sm leading-6 text-ink-600">{locale==="ar"?"اطلب ما ينقص بالضبط، أو سجّل ما أرسله المريض عبر واتساب أو الهاتف.":"Ask for exactly what is missing, or record what the patient sent by WhatsApp or phone."}</p>
-   <div className="flex flex-wrap gap-2">
-     <button type="button" className="btn-primary" onClick={()=>setInfoDialog(true)}>{locale==="ar"?"طلب معلومات إضافية":"Request more information"}</button>
-     <RecordPatientResponse locale={locale} caseId={caseId} action={patientAction} mutate={mutate}/>
-   </div>
-   {infoDialog&&<RequestInformationDialog locale={locale} caseIds={[caseId]} busy={false} mutate={mutate} onClose={()=>setInfoDialog(false)}/>}
-  </div>}
-  {options.length>0&&<div className="space-y-3"><h4 className="font-bold">{t.transition}</h4>
-   <input aria-label={t.reasonOptional} className="field" value={reason} onChange={event=>setReason(event.target.value)} placeholder={t.reasonOptional}/>
-   <div className="flex flex-wrap gap-2">{options.map(s=><button key={s} type="button" className={s==="CANCELLED"?"rounded-xl border border-alert-200 bg-white px-4 py-2 font-bold text-alert-700 transition hover:border-alert-400 hover:bg-alert-50":"btn-secondary"} onClick={()=>{if(s!=="CANCELLED"||window.confirm(locale==="ar"?"هل تريد إلغاء هذه الحالة؟":"Cancel this case? This ends the current care request."))doTransition(s);}}>{stateLabel(s,locale)}</button>)}</div>
-  </div>}
-  {canAssign&&<div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50 p-4"><h4 className="font-bold text-brand-900">{t.assign}</h4><p className="text-sm leading-6 text-ink-600">{t.assignHelp}</p>
+ // Actions are grouped by how much they matter right now: the recommended workflow step first, patient
+ // communication next, state changes after that, and destructive administration last and quietest.
+ const workflowOptions=options.filter(s=>s!=="CANCELLED");
+ const adminOptions=options.filter(s=>s==="CANCELLED");
+ const teamAssign=["PROPOSAL_PREPARATION","ACCEPTED","TRAVEL_COORDINATION"].includes(status)&&teamRoles.length>0;
+ const g=locale==="ar"
+  ?{primary:"الإجراء الأساسي",secondary:"التواصل مع المريض",workflow:"إجراءات المسار",admin:"إجراءات إدارية",
+    infoTitle:"معلومات من المريض",infoHint:"اطلب ما ينقص بالضبط، أو سجّل ما أرسله المريض عبر واتساب أو الهاتف.",
+    infoConsequence:"يُرسل طلبًا آمنًا للمريض وينقل المسؤولية إلى «بانتظار: المريض». ستصلك مهمة جديدة عند رده.",
+    request:"طلب معلومات إضافية",teamTitle:"إسناد العمل للفريق"}
+  :{primary:"Primary action",secondary:"Patient communication",workflow:"Workflow",admin:"Administrative",
+    infoTitle:"Information from the patient",infoHint:"Ask for exactly what is missing, or record what the patient sent by WhatsApp or phone.",
+    infoConsequence:"This sends a secure request to the patient and moves the case to Waiting on: Patient. You get a new work item as soon as they respond.",
+    request:"Request more information",teamTitle:"Assign work to the team"};
+ return <div className="space-y-5">
+  {canAssign&&<ActionGroup label={g.primary} tone="primary" title={t.assign} hint={t.assignHelp}>
    <label className="block text-sm font-bold">{t.category}<select className="field mt-2" aria-label={t.category} value={category} onChange={event=>{setCategory(event.target.value);setConsultant("");}} required><option value="" disabled>{t.selectCategory}</option>{categories.map(cat=><option key={cat.slug} value={cat.slug}>{categoryName(cat)}</option>)}</select></label>
-   <label className="block text-sm font-bold">{t.selectConsultant}<select className="field mt-2" value={consultant} onChange={event=>setConsultant(event.target.value)} disabled={!category} required><option value="" disabled>{t.selectConsultant}</option>{consultants.map(doc=><option key={doc.subject} value={doc.subject}>{doc.displayName}{doc.subspecialty?` — ${doc.subspecialty}`:""}</option>)}</select></label>
+   <label className="block text-sm font-bold">{t.selectConsultant}<select className="field mt-2" value={consultant} onChange={event=>setConsultant(event.target.value)} disabled={!category} required><option value="" disabled>{t.selectConsultant}</option>{consultants.map(doc=><option key={doc.subject} value={doc.subject}>{doc.displayName}{doc.subspecialty?` · ${doc.subspecialty}`:doc.specialty?` · ${doc.specialty}`:""}</option>)}</select></label>
    {category&&consultants.length===0&&<p className="text-sm text-ink-500">{t.noDoctors}</p>}
    <button className="btn-primary" disabled={!consultant} onClick={doAssign}>{t.assignBtn}</button>
-  </div>}
-  {["PROPOSAL_PREPARATION","ACCEPTED","TRAVEL_COORDINATION"].includes(status)&&teamRoles.length>0&&<div className="space-y-3"><h4 className="font-bold">{locale==="ar"?"إسناد العمل للفريق":"Assign work to the team"}</h4><p className="text-sm leading-6 text-ink-500">{status==="PROPOSAL_PREPARATION"?(locale==="ar"?"هذه الحالة تحتاج موافقة داخلية قبل إرسال العرض للمريض. عيّن المسؤول لإكمالها.":"This case needs internal sign-off before the proposal can be sent to the patient. Assign who should complete it."):(locale==="ar"?"عيّن فريق العمليات لترتيب السفر والوصول.":"Assign Operations to arrange travel and arrival.")}</p>{teamRoles.map(role=><form key={role} className="space-y-2" onSubmit={event=>submit(event,data=>mutate(`/coordinator/cases/${caseId}/assignments`,{assigneeSubject:data.get("assignee"),assigneeRole:role,assignmentType:"PRIMARY",pod:null,reason:`Assigned to ${role.toLowerCase()}`}))}><label className="block text-sm font-semibold">{role==="OPERATIONS"?(locale==="ar"?"العمليات":"Operations"):(locale==="ar"?"المالية":"Finance")}<select name="assignee" className="field mt-2" required defaultValue=""><option value="">{locale==="ar"?"اختر عضو الفريق":"Select team member"}</option>{staff.filter(person=>person.role===role||person.role===role+"_LEAD").map(person=><option key={person.subject} value={person.subject}>{person.name}</option>)}</select></label><button className="btn-secondary">{locale==="ar"?"تعيين":"Assign"}</button></form>)}</div>}
- </>;
+  </ActionGroup>}
+
+  {teamAssign&&<ActionGroup label={g.primary} tone="primary" title={g.teamTitle} hint={status==="PROPOSAL_PREPARATION"?(locale==="ar"?"هذه الحالة تحتاج موافقة داخلية قبل إرسال العرض للمريض. عيّن المسؤول لإكمالها.":"This case needs internal sign-off before the proposal can be sent to the patient. Assign who should complete it."):(locale==="ar"?"عيّن فريق العمليات لترتيب السفر والوصول.":"Assign Operations to arrange travel and arrival.")}>
+   {teamRoles.map(role=><form key={role} className="space-y-2" onSubmit={event=>submit(event,data=>mutate(`/coordinator/cases/${caseId}/assignments`,{assigneeSubject:data.get("assignee"),assigneeRole:role,assignmentType:"PRIMARY",pod:null,reason:`Assigned to ${role.toLowerCase()}`}))}><label className="block text-sm font-semibold">{role==="OPERATIONS"?(locale==="ar"?"العمليات":"Operations"):(locale==="ar"?"المالية":"Finance")}<select name="assignee" className="field mt-2" required defaultValue=""><option value="">{locale==="ar"?"اختر عضو الفريق":"Select team member"}</option>{staff.filter(person=>person.role===role||person.role===role+"_LEAD").map(person=><option key={person.subject} value={person.subject}>{person.name}</option>)}</select></label><button className="btn-secondary">{locale==="ar"?"تعيين":"Assign"}</button></form>)}
+  </ActionGroup>}
+
+  {canRequestInformation&&<ActionGroup label={g.secondary} title={g.infoTitle} hint={g.infoHint}>
+   <div className="flex flex-wrap gap-2">
+    <button type="button" className={canAssign||teamAssign?"btn-secondary":"btn-primary"} onClick={()=>setInfoDialog(true)}>{g.request}</button>
+    <RecordPatientResponse locale={locale} caseId={caseId} action={patientAction} mutate={mutate}/>
+   </div>
+   <p className="rounded-lg bg-white/70 p-3 text-[0.82rem] leading-6 text-ink-600">{g.infoConsequence}</p>
+   {infoDialog&&<RequestInformationDialog locale={locale} caseIds={[caseId]} busy={false} mutate={mutate} onClose={()=>setInfoDialog(false)}/>}
+  </ActionGroup>}
+
+  {workflowOptions.length>0&&<ActionGroup label={g.workflow} title={t.transition}>
+   <input aria-label={t.reasonOptional} className="field" value={reason} onChange={event=>setReason(event.target.value)} placeholder={t.reasonOptional}/>
+   <div className="flex flex-wrap gap-2">{workflowOptions.map(s=><button key={s} type="button" className="btn-secondary" onClick={()=>doTransition(s)}>{stateLabel(s,locale)}</button>)}</div>
+  </ActionGroup>}
+
+  {adminOptions.length>0&&<details className="rounded-xl border border-line px-4 py-3">
+   <summary className="cursor-pointer text-[0.8rem] font-bold uppercase tracking-[0.08em] text-ink-500">{g.admin}</summary>
+   <div className="mt-3 flex flex-wrap gap-2">{adminOptions.map(s=><button key={s} type="button" className="rounded-xl border border-alert-200 bg-white px-4 py-2 text-[0.9rem] font-bold text-alert-700 transition hover:border-alert-400 hover:bg-alert-50" onClick={()=>{if(window.confirm(locale==="ar"?"هل تريد إلغاء الحالة؟":"Cancel this case?"))doTransition(s);}}>{stateLabel(s,locale)}</button>)}</div>
+  </details>}
+ </div>;
+}
+
+/** Consistent action grouping: a quiet group label, one heading, optional consequence copy, then controls. */
+function ActionGroup({label,title,hint,tone="default",children}:{label:string;title:string;hint?:string;tone?:"primary"|"default";children:React.ReactNode}){
+ return <section className={`space-y-3 rounded-xl border p-4 ${tone==="primary"?"border-brand-200 bg-brand-50":"border-line bg-mist"}`}>
+  <div>
+   <p className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-brand-700">{label}</p>
+   <h4 className={`mt-1 font-bold ${tone==="primary"?"text-brand-900":"text-ink-900"}`}>{title}</h4>
+   {hint&&<p className="mt-1 text-[0.85rem] leading-6 text-ink-600">{hint}</p>}
+  </div>
+  {children}
+ </section>;
 }
 function submit(event:FormEvent<HTMLFormElement>,action:(data:FormData)=>Promise<unknown>){event.preventDefault();const form=event.currentTarget;void action(new FormData(form)).then(result=>{if(result)form.reset();});}
 function date(value:FormDataEntryValue|null){return value?new Date(String(value)).toISOString():null;}

@@ -215,8 +215,9 @@ public class PatientActivationService {
         C c = jdbc.sql("SELECT case_number,status FROM medical_cases WHERE id=?").param(caseId)
                 .query((rs, n) -> new C(rs.getString("case_number"), rs.getString("status"))).single();
         String state = jdbc.sql("SELECT state FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1").param(caseId).query(String.class).optional().orElse(null);
+        DepositSummary deposit = depositSummary(caseId);
         return new ActivationResult("ACTIVE".equals(p.status()), accounts.linked(patientId), c.number(), c.status(),
-                state, depositSummary(caseId));
+                state, deposit, journeyStage(p.status(), deposit), currentAction(p.status(), deposit), waitingOn(caseId));
     }
 
     private OnboardingPrefill buildPrefill(UUID caseId, UUID patientId) {
@@ -228,13 +229,39 @@ public class PatientActivationService {
         List<String> required = readiness.requiredConsentTypes(subjectType(patientId));
         List<String> completed = jdbc.sql("SELECT DISTINCT consent_type FROM consent_records WHERE patient_id=? AND revoked_at IS NULL AND (case_id IS NULL OR case_id=?)")
                 .params(patientId, caseId).query(String.class).list();
+        DepositSummary deposit = depositSummary(caseId);
         return new OnboardingPrefill(c.number(), c.status(), state, "ACTIVE".equals(p.status()), accounts.linked(patientId),
                 p.fullName(), p.email(), p.phone(), p.dateOfBirth(), p.nationality(),
                 Countries.toCode(p.country()).orElse(null), p.language(), p.sex(),
-                p.emailVerified(), p.phoneVerified(), required, completed, depositSummary(caseId));
+                p.emailVerified(), p.phoneVerified(), required, completed, deposit,
+                journeyStage(p.status(), deposit), currentAction(p.status(), deposit), waitingOn(caseId));
     }
 
     /** Server-resolved deposit; the client never supplies or influences the amount or currency. */
+    /**
+     * Where the case stands. Deliberately not a statement about who acts — {@link #currentAction} answers
+     * that, and on the current offline deposit the two answers are different.
+     */
+    private JourneyStage journeyStage(String profileStatus, DepositSummary deposit) {
+        if (!"ACTIVE".equals(profileStatus)) return JourneyStage.PROFILE;
+        return deposit.satisfied() || !deposit.required() ? JourneyStage.CARE_COORDINATION : JourneyStage.DEPOSIT;
+    }
+
+    /**
+     * What the patient can do, which for the deposit stage is nothing: the money is arranged offline by a
+     * coordinator, so the honest answer is NONE rather than a payment action the platform cannot honour.
+     */
+    private PatientAction currentAction(String profileStatus, DepositSummary deposit) {
+        if (!"ACTIVE".equals(profileStatus)) return PatientAction.COMPLETE_PROFILE;
+        if (deposit.satisfied() || !deposit.required()) return PatientAction.CONTINUE_IN_PORTAL;
+        return PatientAction.NONE;
+    }
+
+    /** Who the case is waiting on, straight from the domain — never recomputed for the patient's benefit. */
+    private String waitingOn(UUID caseId) {
+        return jdbc.sql("SELECT waiting_on FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
+    }
+
     private DepositSummary depositSummary(UUID caseId) {
         var view = payment.depositForCase(caseId);
         boolean satisfied = payment.depositSatisfied(caseId);

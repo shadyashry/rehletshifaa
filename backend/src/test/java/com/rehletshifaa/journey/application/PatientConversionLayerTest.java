@@ -62,7 +62,7 @@ class PatientConversionLayerTest {
         var ctx = releasePreliminary();
         journey.requestProposalAccess(ctx.token, "EMAIL"); em.flush();
         var grant = journey.verifyProposalAccess(ctx.token, proposalCode("EMAIL"));
-        journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "ACKNOWLEDGED", null)); em.flush();
+        journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "ACKNOWLEDGED", null, true)); em.flush();
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull();
         authenticate("patient-subject-a", "PATIENT");
         journey.activateAccount(activationToken(ctx.caseId));
@@ -295,7 +295,7 @@ class PatientConversionLayerTest {
         seedDoctor(); seedStaff();
         var doctorAssignment = journey.assign(created.caseId(), new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "cardiac-pod", "Clinical review"));
         authenticate("doctor-subject", "DOCTOR");
-        journey.acceptDoctorAssignment(created.caseId(), doctorAssignment.id(), true);
+        journey.acceptDoctorAssignment(created.caseId(), doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review = journey.saveClinicalReview(created.caseId(), new ClinicalReviewRequest("Reviewed", "SUITABLE", null, "Imaging", "Recommended intervention", "Alt", "Risks", "Seq", "7 days", "Follow-up"));
         journey.approveClinicalReview(created.caseId(), review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",
@@ -304,8 +304,8 @@ class PatientConversionLayerTest {
         var proposal = journey.createProposal(created.caseId(), new ProposalDraftRequest(review.id(), "en", "Plan", "EGP", "Incl", "Excl", "Deposit", "Refund", "Not consent", Instant.now().plusSeconds(86400), List.of(new ProposalItemRequest("MEDICAL", "Treatment package", BigDecimal.ONE, new BigDecimal("1000.00"), false, 0)), null));
         var operationsAssignment = journey.assign(created.caseId(), new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", "cardiac-pod", "Ops"));
         var financeAssignment = journey.assign(created.caseId(), new AssignmentRequest("finance-subject", "FINANCE", "PRIMARY", "cardiac-pod", "Finance"));
-        authenticate("operations-subject", "OPERATIONS"); journey.decideAssignment(created.caseId(), operationsAssignment.id(), true, com.rehletshifaa.security.ActorRole.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
-        authenticate("finance-subject", "FINANCE"); journey.decideAssignment(created.caseId(), financeAssignment.id(), true, com.rehletshifaa.security.ActorRole.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
+        authenticate("operations-subject", "OPERATIONS"); journey.decideAssignment(created.caseId(), operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
+        authenticate("finance-subject", "FINANCE"); journey.decideAssignment(created.caseId(), financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
         authenticate("coordinator-subject", "COORDINATOR"); journey.releaseProposal(created.caseId(), proposal.versionId());
         em.flush();
         String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, "proposal-ready:" + proposal.versionId()));
@@ -317,7 +317,7 @@ class PatientConversionLayerTest {
     private void acknowledge(Ctx ctx) throws Exception {
         journey.requestProposalAccess(ctx.token, "WHATSAPP"); em.flush();
         var grant = journey.verifyProposalAccess(ctx.token, proposalCode("WHATSAPP"));
-        journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "ACKNOWLEDGED", null)); em.flush();
+        journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "ACKNOWLEDGED", null, true)); em.flush();
         SecurityContextHolder.clearContext();
     }
 
@@ -357,7 +357,7 @@ class PatientConversionLayerTest {
         journey.assign(ctx.caseId, new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", "cardiac-pod", "Ops"));
         UUID opsAssignment = jdbc.queryForObject("SELECT id FROM case_assignments WHERE case_id=? AND assignee_role='OPERATIONS' AND status='PENDING' ORDER BY assigned_at DESC LIMIT 1", UUID.class, ctx.caseId);
         authenticate("operations-subject", "OPERATIONS");
-        journey.decideAssignment(ctx.caseId, opsAssignment, true, com.rehletshifaa.security.ActorRole.OPERATIONS);
+        journey.decideAssignment(ctx.caseId, opsAssignment, new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS);
         journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "PLANNING"));
     }
 

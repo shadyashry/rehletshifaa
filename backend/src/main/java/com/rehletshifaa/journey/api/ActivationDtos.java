@@ -29,7 +29,8 @@ public final class ActivationDtos {
                                     String nationality, String countryOfResidence, String preferredLanguage, String sex,
                                     boolean emailVerified, boolean phoneVerified,
                                     List<String> requiredConsents, List<String> completedConsents,
-                                    DepositSummary deposit) {}
+                                    DepositSummary deposit,
+                                    JourneyStage journeyStage, PatientAction currentAction, String waitingOn) {}
 
     /**
      * Activation submission. Only these fields are ever written to the profile — there is no dynamic
@@ -49,9 +50,27 @@ public final class ActivationDtos {
     public record ActivateProfileRequest(@NotBlank @Size(max = 128) String grant,
                                          @jakarta.validation.Valid ProfileActivationRequest profile) {}
 
+    /**
+     * Where this case stands in the patient-facing journey. Independent of who has to act: a case sits at
+     * DEPOSIT whether the patient owes an action, our staff do, or everyone is waiting on a bank.
+     */
+    public enum JourneyStage { PROFILE, DEPOSIT, CARE_COORDINATION }
+
+    /**
+     * What this patient can actually do right now — nothing more.
+     *
+     * <p>{@code NONE} is a real answer, not a gap. The coordination deposit is arranged offline today, so
+     * there is no patient-side payment action to offer; inventing one would put a button on screen that
+     * cannot do anything. When the platform grows a real action the value follows it — an online provider
+     * would make this {@code PAY_DEPOSIT}, a transfer-evidence upload {@code SUBMIT_PAYMENT_DETAILS} —
+     * while {@link JourneyStage#DEPOSIT} stays exactly as it is.
+     */
+    public enum PatientAction { COMPLETE_PROFILE, NONE, CONTINUE_IN_PORTAL }
+
     /** Result of a successful (or already-completed) activation. */
     public record ActivationResult(boolean profileActive, boolean accountLinked, String caseNumber, String caseStatus,
-                                   String onboardingState, DepositSummary deposit) {}
+                                   String onboardingState, DepositSummary deposit,
+                                   JourneyStage journeyStage, PatientAction currentAction, String waitingOn) {}
 
     /**
      * Handoff from the case-scoped onboarding session into the normal authenticated portal. Carries a

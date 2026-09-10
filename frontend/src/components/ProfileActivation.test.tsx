@@ -93,19 +93,64 @@ describe("ProfileActivation", () => {
       }, false, 400),
     });
     await fillRequired();
-    fireEvent.click(screen.getByRole("button", { name: /activate profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /complete my profile/i }));
     expect(await screen.findByText(/date of birth cannot be in the future/i)).toBeTruthy();
     // The form is still populated — nothing the patient typed was lost.
     expect((screen.getByLabelText(/full name/i) as HTMLInputElement).value).toBe("Link Patient");
   });
 
-  it("moves to the deposit step with the backend-resolved amount after activation", async () => {
+  it("finishes profile completion on its own before mentioning any money", async () => {
     await reachForm();
     await fillRequired();
-    fireEvent.click(screen.getByRole("button", { name: /activate profile/i }));
-    expect(await screen.findByRole("heading", { name: /coordination deposit/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /complete my profile/i }));
+
+    // Completing the profile is its own outcome; the deposit is named as the next task, not this one.
+    expect(await screen.findByRole("heading", { name: /your profile is ready/i })).toBeTruthy();
+    expect(screen.getByText(/next step/i)).toBeTruthy();
+    expect(screen.queryByText(/3,000/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /view deposit details/i }));
+    expect(await screen.findByRole("heading", { name: /deposit arrangements/i })).toBeTruthy();
     // The amount is rendered from the server payload; the client never computes it.
     await waitFor(() => expect(screen.getByText(/3,000/)).toBeTruthy());
+  });
+
+  it("never shows a payment control while the profile is still incomplete", async () => {
+    await reachForm();
+    for (const gone of [/deposit/i, /pay/i, /payment status/i]) expect(screen.queryByRole("button", { name: gone })).toBeNull();
+    // And the only dominant action is the profile one.
+    expect(screen.getByRole("button", { name: /complete my profile/i })).toBeTruthy();
+  });
+
+  it("gives the patient no action at all while staff arrange the offline deposit", async () => {
+    await reachForm();
+    await fillRequired();
+    fireEvent.click(screen.getByRole("button", { name: /complete my profile/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /view deposit details/i }));
+
+    expect(screen.getByRole("heading", { name: /deposit arrangements/i })).toBeTruthy();
+    expect(screen.getByText(/no action is required from you right now/i)).toBeTruthy();
+    // Nothing here pretends to be a payment, and nothing here is a dominant CTA.
+    expect(screen.queryByRole("button", { name: /check payment status/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^pay/i })).toBeNull();
+    for (const control of screen.getAllByRole("button")) expect(control.className).not.toContain("btn-primary");
+    // Going back to the case is navigation, not a workflow action.
+    expect(screen.getByRole("button", { name: /go to my case/i }).className).not.toContain("btn-primary");
+  });
+
+  it("still asks nothing of the patient once a payment is mid-confirmation", async () => {
+    await reachForm({
+      "/activate": () => json({
+        profileActive: true, caseNumber: "RS-2026-000123", caseStatus: "ACCEPTED", onboardingState: "COMPLETED",
+        journeyStage: "DEPOSIT", currentAction: "NONE", waitingOn: "STAFF",
+        deposit: { ...deposit, status: "PARTIALLY_PAID", amountPaid: 1500, balance: 1500 },
+      }),
+    });
+    await fillRequired();
+    fireEvent.click(screen.getByRole("button", { name: /complete my profile/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /view deposit details/i }));
+    expect(screen.getByRole("heading", { name: /deposit arrangements/i })).toBeTruthy();
+    expect(screen.getByText(/no action is required from you right now/i)).toBeTruthy();
   });
 
   it("shows the journey handoff once the deposit is settled", async () => {
@@ -116,9 +161,9 @@ describe("ProfileActivation", () => {
       }),
     });
     await fillRequired();
-    fireEvent.click(screen.getByRole("button", { name: /activate profile/i }));
-    expect(await screen.findByRole("heading", { name: /journey is now active/i })).toBeTruthy();
-    expect(screen.getByText(/deposit received/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /complete my profile/i }));
+    expect(await screen.findByRole("heading", { name: /your profile is ready/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /view deposit details/i })).toBeNull();
   });
 
   it("hands the finished journey over to the authenticated portal in one step", async () => {
@@ -132,8 +177,8 @@ describe("ProfileActivation", () => {
       "/portal-access": () => json({ activationToken: "bind-123", alreadyLinked: false }),
     });
     await fillRequired();
-    fireEvent.click(screen.getByRole("button", { name: /activate profile/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /view my journey/i }));
+    fireEvent.click(screen.getByRole("button", { name: /complete my profile/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /go to my case/i }));
     // The account binding travels to the portal, which is where every authorized case becomes visible.
     await waitFor(() => expect(assign).toHaveBeenCalledWith("/en/portal?activate=bind-123"));
   });

@@ -111,7 +111,7 @@ class SecureJourneyCorrectionsTest {
         ProposalAccessGrant grant=journey.verifyProposalAccess(ctx.token,code);
         PublicProposalView full=journey.viewProposal(ctx.token,grant.grant());
         assertThat(full.recommendedTreatment()).isNotBlank();
-        var decision=journey.decideProposalPublic(ctx.token,grant.grant(),new PublicProposalDecisionRequest(grant.grant(),"ACCEPTED","Yes"));
+        var decision=journey.decideProposalPublic(ctx.token,grant.grant(),new PublicProposalDecisionRequest(grant.grant(), "ACCEPTED", "Yes", true));
         assertThat(decision.status()).isEqualTo("ACCEPTED");
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
         // Exactly one customer-facing message: the secure continuation link. The account-activation record is
@@ -127,7 +127,7 @@ class SecureJourneyCorrectionsTest {
         journey.requestProposalAccess(ctx.token); em.flush();
         String code=proposalAccessCode(ctx.caseId);
         var grant=journey.verifyProposalAccess(ctx.token,code);
-        journey.decideProposalPublic(ctx.token,grant.grant(),new PublicProposalDecisionRequest(grant.grant(),"ACCEPTED",null)); em.flush();
+        journey.decideProposalPublic(ctx.token,grant.grant(),new PublicProposalDecisionRequest(grant.grant(), "ACCEPTED", null, true)); em.flush();
         String activation=activationToken(ctx.caseId);
         authenticate("new-account-subject","PATIENT");
         var res=journey.activateAccount(activation);
@@ -229,7 +229,7 @@ class SecureJourneyCorrectionsTest {
         jdbc.update("UPDATE case_assignments SET status='PENDING',accepted_at=NULL WHERE id=?",assignment);
         jdbc.update("UPDATE medical_cases SET status='CONSULTANT_ASSIGNMENT_PENDING' WHERE id=?",ctx.caseId);
         authenticate("doctor-subject","DOCTOR");
-        journey.decideAssignment(ctx.caseId,assignment,false,com.rehletshifaa.security.ActorRole.DOCTOR);
+        journey.decideAssignment(ctx.caseId,assignment, new AssignmentDecisionRequest(false,null), com.rehletshifaa.security.ActorRole.DOCTOR);
         assertThat(status(ctx.caseId)).isEqualTo("READY_FOR_CONSULTANT");
         assertThat(jdbc.queryForObject("SELECT status FROM case_assignments WHERE id=?",String.class,assignment)).isEqualTo("DECLINED");
     }
@@ -278,6 +278,478 @@ class SecureJourneyCorrectionsTest {
         assertThat(approved.costEstimates().get(0).serviceDescription()).isEqualTo("Coronary angioplasty");
         assertThat(approved.costEstimates().get(0).estimatedCost()).isEqualByComparingTo("8500.00");
         assertThat(approved.costEstimates().get(0).currency()).isEqualTo("USD");
+    }
+
+    // ---- Consultant clinical review: catalogue authority, currency, and the automatic coordinator handoff ----
+
+    @Test void submitRecommendationCompletesConsultantWorkAndHandsTheCaseBackAutomatically() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("PACE-DUAL","Dual-chamber pacemaker implant","Procedure",new BigDecimal("390000.00"));
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation","Standard cardiac risks",
+            List.of(new CostEstimateItem("Dual-chamber pacemaker implant",new BigDecimal("390000.00"),"EGP",service))));
+        em.flush();
+
+        assertThat(status(ctx.caseId)).isEqualTo("CLINICAL_RECOMMENDATION_READY");
+        // The consultant's own work is done and they never had to press a second "return" button.
+        assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE case_id=? AND task_type='CLINICAL_REVIEW'",String.class,ctx.caseId)).isEqualTo("COMPLETED");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='PREPARE_PROPOSAL' AND owner_subject=? AND status='OPEN'",ctx.caseId,"coordinator-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='CONSULTANT_OUTCOME_RECORDED' AND read_at IS NULL","coordinator-subject")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?",String.class,ctx.caseId)).isEqualTo("STAFF");
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CONSULTANT_REVIEW_DECISION'",ctx.caseId)).isEqualTo(1);
+    }
+
+    @Test void aRetriedSubmissionIsRejectedAndDuplicatesNothing() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("PACE-DUAL","Dual-chamber pacemaker implant","Procedure",new BigDecimal("390000.00"));
+        authenticate("doctor-subject","DOCTOR");
+        var request=new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Dual-chamber pacemaker implant",new BigDecimal("390000.00"),"EGP",service)));
+        journey.reviewDecision(ctx.caseId,request); em.flush();
+        assertThatThrownBy(()->journey.reviewDecision(ctx.caseId,request)).isInstanceOf(ApiException.class);
+        em.flush();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='PREPARE_PROPOSAL'",ctx.caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='CONSULTANT_OUTCOME_RECORDED'","coordinator-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM clinical_review_cost_estimates")).isEqualTo(1);
+    }
+
+    @Test void aCatalogueServiceIsStoredAtItsApprovedPriceWhateverTheClientSends() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("PACE-DUAL","Dual-chamber pacemaker implant","Procedure",new BigDecimal("390000.00"));
+        authenticate("doctor-subject","DOCTOR");
+        // A display currency (or a tampered amount) must never redefine the consultant's approved price.
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Dual-chamber pacemaker implant",new BigDecimal("8240.00"),"USD",service))));
+        em.flush();
+        var row=jdbc.queryForMap("SELECT estimated_cost,currency,price_egp,requires_finance_approval FROM clinical_review_cost_estimates");
+        assertThat((BigDecimal)row.get("estimated_cost")).isEqualByComparingTo("390000.00");
+        assertThat(row.get("currency")).isEqualTo("EGP");
+        assertThat((BigDecimal)row.get("price_egp")).isEqualByComparingTo("390000.00");
+        assertThat(row.get("requires_finance_approval")).isEqualTo(false);
+    }
+
+    @Test void aServiceOutsideTheApprovedListStillRequiresFinanceApproval() throws Exception {
+        var ctx=assignedDoctorCase();
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Bespoke lead extraction",new BigDecimal("50000.00"),"EGP"))));
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT requires_finance_approval FROM clinical_review_cost_estimates",Boolean.class)).isTrue();
+    }
+
+    @Test void aCatalogueServiceBelongingToAnotherConsultantIsRejected() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID foreign=UUID.randomUUID();
+        UUID other=jdbc.queryForObject("SELECT id FROM practitioner_profiles WHERE external_subject=?",UUID.class,"doctor-subject");
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+            foreign,"other-doctor","Other Doctor","Other Doctor","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());
+        UUID service=UUID.randomUUID();
+        jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+            service,foreign,"FOREIGN-1","Somebody else's service","Procedure",new BigDecimal("1000.00"),true,"admin",Instant.now(),Instant.now());
+        assertThat(other).isNotEqualTo(foreign);
+        authenticate("doctor-subject","DOCTOR");
+        assertThatThrownBy(()->journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Somebody else's service",new BigDecimal("1000.00"),"EGP",service)))))
+            .isInstanceOf(ApiException.class).hasMessageContaining("active price list");
+    }
+
+    @Test void submittingWithoutAClinicalRecommendationIsRejected() throws Exception {
+        var ctx=assignedDoctorCase();
+        authenticate("doctor-subject","DOCTOR");
+        assertThatThrownBy(()->journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","  ",null,
+            List.of(new CostEstimateItem("Something",new BigDecimal("100.00"),"EGP")))))
+            .isInstanceOf(ApiException.class).hasMessageContaining("clinical recommendation");
+        assertThat(status(ctx.caseId)).isEqualTo("CONSULTANT_REVIEW");
+    }
+
+    @Test void anExceptionalOutcomeWithoutAReasonIsRejected() throws Exception {
+        var ctx=assignedDoctorCase();
+        authenticate("doctor-subject","DOCTOR");
+        assertThatThrownBy(()->journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("RETURN_TO_COORDINATOR",null,null,null)))
+            .isInstanceOf(ApiException.class).hasMessageContaining("reason");
+        assertThat(status(ctx.caseId)).isEqualTo("CONSULTANT_REVIEW");
+    }
+
+    @Test void aConsultantWhoDoesNotHoldTheCaseCannotSubmitARecommendation() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID id=UUID.randomUUID();
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+            id,"outsider-doctor","Outsider","Outsider","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());
+        authenticate("outsider-doctor","DOCTOR");
+        assertThatThrownBy(()->journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Something",new BigDecimal("100.00"),"EGP")))))
+            .isInstanceOf(ApiException.class);
+        assertThat(status(ctx.caseId)).isEqualTo("CONSULTANT_REVIEW");
+    }
+
+    @Test void requestingMoreInformationCreatesAPatientActionAndTellsTheCoordinator() throws Exception {
+        var ctx=assignedDoctorCase();
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("INFO",null,"Recent echocardiogram is missing",null));
+        em.flush();
+        assertThat(status(ctx.caseId)).isEqualTo("INFORMATION_REQUIRED");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND visibility_scope='PATIENT_ACTION' AND status='OPEN'",ctx.caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?",String.class,ctx.caseId)).isEqualTo("PATIENT");
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='CONSULTANT_REQUESTED_INFORMATION'","coordinator-subject")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE case_id=? AND task_type='CLINICAL_REVIEW'",String.class,ctx.caseId)).isEqualTo("COMPLETED");
+    }
+
+    @Test void aSecondOpinionRequestGivesTheCoordinatorActionableWork() throws Exception {
+        var ctx=assignedDoctorCase();
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("REASSIGN",null,"Electrophysiology opinion needed",null));
+        em.flush();
+        assertThat(status(ctx.caseId)).isEqualTo("READY_FOR_CONSULTANT");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='REASSIGN_CONSULTANT' AND owner_subject=? AND status='OPEN'",ctx.caseId,"coordinator-subject")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?",String.class,ctx.caseId)).isEqualTo("STAFF");
+    }
+
+    @Test void returningWithoutARecommendationHandsResponsibilityBackWithoutCancellingTheCase() throws Exception {
+        var ctx=assignedDoctorCase();
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("RETURN_TO_COORDINATOR",null,"Imaging predates the referral",null));
+        em.flush();
+        assertThat(status(ctx.caseId)).isEqualTo("INTAKE_REVIEW");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CLINICAL_OUTCOME_REVIEW' AND owner_subject=? AND status='OPEN'",ctx.caseId,"coordinator-subject")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?",String.class,ctx.caseId)).isEqualTo("STAFF");
+        // The reason survives on the case history, and the case itself is not cancelled.
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CONSULTANT_REVIEW_DECISION' AND reason=?",ctx.caseId,"Imaging predates the referral")).isEqualTo(1);
+    }
+
+    @Test void aClinicallyUnsuitableCaseNotifiesTheCoordinatorAndCannotBecomeAProposal() throws Exception {
+        var ctx=assignedDoctorCase();
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("NOT_SUITABLE",null,"Comorbidities preclude surgery",null));
+        em.flush();
+        assertThat(status(ctx.caseId)).isEqualTo("CLINICALLY_NOT_SUITABLE");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CLINICAL_OUTCOME_REVIEW' AND owner_subject=? AND status='OPEN'",ctx.caseId,"coordinator-subject")).isEqualTo(1);
+        // No approved recommendation exists, so the normal proposal path cannot continue behind it.
+        assertThat(count("SELECT count(*) FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'",ctx.caseId)).isZero();
+    }
+
+    @Test void savingADraftKeepsTheCaseAndTheConsultantsWorkOpen() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("PACE-DUAL","Dual-chamber pacemaker implant","Procedure",new BigDecimal("390000.00"));
+        authenticate("doctor-subject","DOCTOR");
+        journey.saveClinicalReview(ctx.caseId,new ClinicalReviewRequest(null,"SUITABLE",null,null,"Pacemaker implantation",null,"Frailty",null,null,null,
+            List.of(new CostEstimateItem("Dual-chamber pacemaker implant",new BigDecimal("390000.00"),"EGP",service)),null));
+        em.flush();
+
+        assertThat(status(ctx.caseId)).isEqualTo("CONSULTANT_REVIEW");
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?",String.class,ctx.caseId)).isEqualTo("CONSULTANT");
+        assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE case_id=? AND task_type='CLINICAL_REVIEW'",String.class,ctx.caseId)).isEqualTo("OPEN");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_role='COORDINATOR' AND status='OPEN'",ctx.caseId)).isZero();
+        // The draft is resumable: recommendation, considerations and the picked service all come back.
+        var draft=journey.workspace(ctx.caseId).clinicalReviews().stream().filter(r->"DRAFT".equals(r.status())).findFirst().orElseThrow();
+        assertThat(draft.recommendedTreatment()).isEqualTo("Pacemaker implantation");
+        assertThat(draft.risksAndLimitations()).isEqualTo("Frailty");
+        assertThat(draft.costEstimates()).hasSize(1);
+        assertThat(draft.costEstimates().get(0).catalogServiceId()).isEqualTo(service);
+        assertThat(draft.costEstimates().get(0).estimatedCost()).isEqualByComparingTo("390000.00");
+    }
+
+    // ---- The consultant's chosen proposal currency must survive all the way to the patient ----
+
+    @Test void theCurrencyTheConsultantSubmittedInIsTheCurrencyTheProposalIsIssuedIn() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("PACE-DUAL","Dual-chamber pacemaker implant","Procedure",new BigDecimal("390000.00"));
+        seedFxRate("USD",new BigDecimal("0.0200"));
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Dual-chamber pacemaker implant",new BigDecimal("390000.00"),"EGP",service)),"USD"));
+        em.flush();
+
+        assertThat(jdbc.queryForObject("SELECT proposal_currency FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'",String.class,ctx.caseId)).isEqualTo("USD");
+
+        // The coordinator states no currency: silence must inherit the clinical choice, never reset to EGP.
+        authenticate("coordinator-subject","COORDINATOR");
+        var proposal=journey.createProposal(ctx.caseId,draftRequest(approvedReview(ctx.caseId),null));
+        assertThat(proposal.currency()).isEqualTo("USD");
+        assertThat(proposal.items()).allSatisfy(item->assertThat(item.unitPrice()).isLessThan(new BigDecimal("100000")));
+        // 390000 EGP * 1.12 margin * 0.02 = 8736.00 — line and total agree in the same currency.
+        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("8736.00"));
+    }
+
+    @Test void anotherSupportedCurrencyPropagatesJustTheSame() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("ECHO","Echocardiogram","Diagnostic",new BigDecimal("8500.00"));
+        seedFxRate("AED",new BigDecimal("0.0760"));
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Echocardiography",null,
+            List.of(new CostEstimateItem("Echocardiogram",new BigDecimal("8500.00"),"EGP",service)),"AED"));
+        em.flush();
+        authenticate("coordinator-subject","COORDINATOR");
+        assertThat(journey.createProposal(ctx.caseId,draftRequest(approvedReview(ctx.caseId),null)).currency()).isEqualTo("AED");
+    }
+
+    @Test void theCatalogueKeepsItsEgpBasePriceWhateverCurrencyTheProposalUses() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("PACE-DUAL","Dual-chamber pacemaker implant","Procedure",new BigDecimal("390000.00"));
+        seedFxRate("USD",new BigDecimal("0.0200"));
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Dual-chamber pacemaker implant",new BigDecimal("390000.00"),"EGP",service)),"USD"));
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT price_egp FROM consultant_service_catalog WHERE id=?",BigDecimal.class,service)).isEqualByComparingTo("390000.00");
+        var row=jdbc.queryForMap("SELECT price_egp,currency FROM clinical_review_cost_estimates");
+        assertThat((BigDecimal)row.get("price_egp")).isEqualByComparingTo("390000.00");
+        assertThat(row.get("currency")).isEqualTo("EGP");
+    }
+
+    @Test void aDraftRemembersTheChosenProposalCurrency() throws Exception {
+        var ctx=assignedDoctorCase();
+        seedFxRate("AED",new BigDecimal("0.0760"));
+        authenticate("doctor-subject","DOCTOR");
+        journey.saveClinicalReview(ctx.caseId,new ClinicalReviewRequest(null,"SUITABLE",null,null,"Echocardiography",null,null,null,null,null,List.of(),"AED"));
+        em.flush();
+        var draft=journey.workspace(ctx.caseId).clinicalReviews().stream().filter(r->"DRAFT".equals(r.status())).findFirst().orElseThrow();
+        assertThat(draft.proposalCurrency()).isEqualTo("AED");
+    }
+
+    @Test void anUnsupportedCurrencyIsRejectedInsteadOfQuietlyBecomingEgp() throws Exception {
+        var ctx=assignedDoctorCase();
+        authenticate("doctor-subject","DOCTOR");
+        assertThatThrownBy(()->journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Something",new BigDecimal("100.00"),"EGP")),"XYZ")))
+            .isInstanceOf(ApiException.class);
+        assertThat(status(ctx.caseId)).isEqualTo("CONSULTANT_REVIEW");
+    }
+
+    @Test void aCurrencyWithNoAvailableRateFailsLoudlyRatherThanFallingBackToEgp() throws Exception {
+        var ctx=assignedDoctorCase();
+        jdbc.update("DELETE FROM fx_rates WHERE quote_currency='GBP'");
+        authenticate("doctor-subject","DOCTOR");
+        // GBP is a supported currency but has no rate seeded: the consultant must be told, not silently overridden.
+        assertThatThrownBy(()->journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Something",new BigDecimal("100.00"),"EGP")),"GBP")))
+            .isInstanceOf(ApiException.class);
+        assertThat(count("SELECT count(*) FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'",ctx.caseId)).isZero();
+    }
+
+    @Test void anIssuedProposalDoesNotRepriceItselfWhenTheRateLaterMoves() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("PACE-DUAL","Dual-chamber pacemaker implant","Procedure",new BigDecimal("390000.00"));
+        seedFxRate("USD",new BigDecimal("0.0200"));
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Dual-chamber pacemaker implant",new BigDecimal("390000.00"),"EGP",service)),"USD"));
+        em.flush();
+        authenticate("coordinator-subject","COORDINATOR");
+        var proposal=journey.createProposal(ctx.caseId,draftRequest(approvedReview(ctx.caseId),null));
+        UUID proposalVersion=proposal.versionId();
+        proposal=journey.releaseProposal(ctx.caseId,proposalVersion); em.flush();
+        BigDecimal frozen=proposal.items().get(0).unitPrice();
+
+        jdbc.update("UPDATE fx_rates SET rate=? WHERE quote_currency='USD'",new BigDecimal("0.0500"));
+        // The released line is frozen against the snapshotted rate, so the patient price cannot drift.
+        assertThat(jdbc.queryForObject("SELECT unit_price FROM proposal_items WHERE proposal_version_id=?",BigDecimal.class,proposalVersion)).isEqualByComparingTo(frozen);
+    }
+
+    @Test void aCoordinatorCanStillChooseADifferentCurrencyExplicitly() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("PACE-DUAL","Dual-chamber pacemaker implant","Procedure",new BigDecimal("390000.00"));
+        seedFxRate("USD",new BigDecimal("0.0200"));seedFxRate("AED",new BigDecimal("0.0760"));
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Dual-chamber pacemaker implant",new BigDecimal("390000.00"),"EGP",service)),"USD"));
+        em.flush();
+        authenticate("coordinator-subject","COORDINATOR");
+        assertThat(journey.createProposal(ctx.caseId,draftRequest(approvedReview(ctx.caseId),"AED")).currency()).isEqualTo("AED");
+    }
+
+    // ---- The patient's answer to a proposal must reach the coordinator ----
+
+    @Test void aPatientAskingForChangesGivesTheCoordinatorRealWork() throws Exception {
+        var ctx=releasedProposal();
+        journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"REVISION_REQUESTED","The estimated cost is higher than I expected"));
+        em.flush();
+
+        assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?",String.class,ctx.versionId)).isEqualTo("REVISION_REQUESTED");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='PROPOSAL_REVISION' AND owner_subject=? AND status='OPEN'",ctx.caseId,"coordinator-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='PATIENT_PROPOSAL_DECISION' AND read_at IS NULL","coordinator-subject")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?",String.class,ctx.caseId)).isEqualTo("STAFF");
+        // What the patient wrote is kept with the decision, not just in a notification.
+        assertThat(jdbc.queryForObject("SELECT comment FROM proposal_decisions WHERE proposal_version_id=?",String.class,ctx.versionId))
+            .contains("higher than I expected");
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='PROPOSAL_DECIDED'",ctx.caseId)).isEqualTo(1);
+    }
+
+    @Test void aDeclinedProposalIsHandedBackToTheCoordinatorWithoutTouchingTheRestOfTheCase() throws Exception {
+        var ctx=releasedProposal();
+        journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"DECLINED","Treating locally instead"));
+        em.flush();
+
+        assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?",String.class,ctx.versionId)).isEqualTo("DECLINED");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='PROPOSAL_DECLINED_REVIEW' AND owner_subject=? AND status='OPEN'",ctx.caseId,"coordinator-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='PATIENT_PROPOSAL_DECISION'","coordinator-subject")).isEqualTo(1);
+        // Declining answers the proposal; it must not delete or cancel the case behind it.
+        assertThat(count("SELECT count(*) FROM medical_cases WHERE id=?",ctx.caseId)).isEqualTo(1);
+        assertThat(status(ctx.caseId)).isNotEqualTo("CANCELLED");
+    }
+
+    @Test void aRepeatedDecisionOnTheSameProposalIsRejectedAndDuplicatesNothing() throws Exception {
+        var ctx=releasedProposal();
+        journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"DECLINED","Treating locally instead"));
+        em.flush();
+        // The grant is consumed with the decision, so a replay cannot even re-authorize.
+        assertThatThrownBy(()->journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"DECLINED","again")))
+            .isInstanceOf(ApiException.class);
+        em.flush();
+        assertThat(count("SELECT count(*) FROM proposal_decisions WHERE proposal_version_id=?",ctx.versionId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='PROPOSAL_DECLINED_REVIEW'",ctx.caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='PATIENT_PROPOSAL_DECISION'","coordinator-subject")).isEqualTo(1);
+    }
+
+    @Test void anExpiredProposalCannotBeDecided() throws Exception {
+        var ctx=releasedProposal();
+        jdbc.update("UPDATE proposal_versions SET valid_until=? WHERE id=?",Instant.now().minusSeconds(60),ctx.versionId);
+        assertThatThrownBy(()->journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"ACKNOWLEDGED",null,true)))
+            .isInstanceOf(ApiException.class);
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?",String.class,ctx.versionId)).isEqualTo("EXPIRED");
+        assertThat(count("SELECT count(*) FROM proposal_decisions WHERE proposal_version_id=?",ctx.versionId)).isZero();
+    }
+
+    @Test void theProposalTheProposalPageShowsIsIssuedInTheConsultantsCurrency() throws Exception {
+        var ctx=releasedProposal();
+        var view=journey.viewProposal(ctx.token,ctx.grant);
+        assertThat(view.currency()).isEqualTo("USD");
+        assertThat(view.items()).isNotEmpty();
+        assertThat(view.totalExpected()).isNotNull();
+        // No internal identifiers reach the patient payload.
+        assertThat(view.items()).allSatisfy(item->assertThat(item.description()).doesNotContain("-"));
+    }
+
+    // ---- The acknowledgement is a server-side precondition, not a checkbox ----
+
+    @Test void continuingWithoutTheAcknowledgementIsRefusedEvenWhenTheApiIsCalledDirectly() throws Exception {
+        var ctx=releasedProposal();
+        // Exactly what a caller bypassing the page would send: a valid grant and a valid decision, no acknowledgement.
+        assertThatThrownBy(()->journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"ACKNOWLEDGED",null)))
+            .isInstanceOf(ApiException.class).hasMessageContaining("acknowledgement");
+        assertThatThrownBy(()->journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"ACKNOWLEDGED",null,false)))
+            .isInstanceOf(ApiException.class).hasMessageContaining("acknowledgement");
+        em.flush();
+        // Nothing moved: not the version, not the case, not the decision record.
+        assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?",String.class,ctx.versionId)).isIn("RELEASED","VIEWED");
+        assertThat(count("SELECT count(*) FROM proposal_decisions WHERE proposal_version_id=?",ctx.versionId)).isZero();
+        assertThat(status(ctx.caseId)).isNotEqualTo("ACCEPTED");
+    }
+
+    @Test void anAcknowledgedContinuationSucceedsAndKeepsTheEvidenceAgainstThatVersion() throws Exception {
+        var ctx=releasedProposal();
+        journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"ACKNOWLEDGED",null,true));
+        em.flush();
+
+        var row=jdbc.queryForMap("SELECT proposal_version_id,decision,acknowledged,acknowledged_at,acknowledgement_version FROM proposal_decisions");
+        assertThat(row.get("proposal_version_id")).isEqualTo(ctx.versionId);
+        assertThat(row.get("decision")).isEqualTo("ACKNOWLEDGED");
+        assertThat(row.get("acknowledged")).isEqualTo(true);
+        assertThat(row.get("acknowledged_at")).isNotNull();
+        // The wording version is stamped by the server, so evidence cannot be shaped by the caller.
+        assertThat(row.get("acknowledgement_version")).isEqualTo("proposal-ack-2026-09");
+        assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
+    }
+
+    @Test void askingForChangesNeedsNoAcknowledgement() throws Exception {
+        var ctx=releasedProposal();
+        journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"REVISION_REQUESTED","Please review the cost"));
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?",String.class,ctx.versionId)).isEqualTo("REVISION_REQUESTED");
+        // Asking for changes commits the patient to nothing, so no acknowledgement is recorded.
+        assertThat(jdbc.queryForObject("SELECT acknowledged FROM proposal_decisions WHERE proposal_version_id=?",Boolean.class,ctx.versionId)).isNotEqualTo(true);
+    }
+
+    @Test void decliningNeedsNoAcknowledgement() throws Exception {
+        var ctx=releasedProposal();
+        journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"DECLINED",null));
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?",String.class,ctx.versionId)).isEqualTo("DECLINED");
+        assertThat(jdbc.queryForObject("SELECT acknowledged FROM proposal_decisions WHERE proposal_version_id=?",Boolean.class,ctx.versionId)).isNotEqualTo(true);
+    }
+
+    @Test void aSecondAcknowledgementOfTheSameProposalChangesNothing() throws Exception {
+        var ctx=releasedProposal();
+        var request=new PublicProposalDecisionRequest(ctx.grant,"ACKNOWLEDGED",null,true);
+        journey.decideProposalPublic(ctx.token,ctx.grant,request); em.flush();
+        assertThatThrownBy(()->journey.decideProposalPublic(ctx.token,ctx.grant,request)).isInstanceOf(ApiException.class);
+        em.flush();
+        assertThat(count("SELECT count(*) FROM proposal_decisions WHERE proposal_version_id=?",ctx.versionId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM proposal_decisions WHERE acknowledged=TRUE")).isEqualTo(1);
+    }
+
+    @Test void anExpiredProposalCannotBeAcknowledgedEvenWithTheAcknowledgementSet() throws Exception {
+        var ctx=releasedProposal();
+        jdbc.update("UPDATE proposal_versions SET valid_until=? WHERE id=?",Instant.now().minusSeconds(60),ctx.versionId);
+        assertThatThrownBy(()->journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"ACKNOWLEDGED",null,true)))
+            .isInstanceOf(ApiException.class);
+        em.flush();
+        assertThat(count("SELECT count(*) FROM proposal_decisions WHERE proposal_version_id=?",ctx.versionId)).isZero();
+    }
+
+    @Test void aSupersededProposalCannotBeAcknowledged() throws Exception {
+        var ctx=releasedProposal();
+        jdbc.update("UPDATE proposal_versions SET status='SUPERSEDED' WHERE id=?",ctx.versionId);
+        assertThatThrownBy(()->journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"ACKNOWLEDGED",null,true)))
+            .isInstanceOf(ApiException.class);
+        em.flush();
+        assertThat(count("SELECT count(*) FROM proposal_decisions WHERE proposal_version_id=?",ctx.versionId)).isZero();
+    }
+
+    @Test void thePatientSeesTheConsultantWhoActuallyReviewedTheCase() throws Exception {
+        var ctx=releasedProposal();
+        var view=journey.viewProposal(ctx.token,ctx.grant);
+        // Resolved through the proposal's clinical review, not supplied by any caller.
+        assertThat(view.consultantName()).isEqualTo("Doctor One");
+        // No internal identifiers travel with it.
+        assertThat(view.consultantName()).doesNotContain("-");
+    }
+
+    /** A released USD proposal on a case whose coordinator is "coordinator-subject", with a usable grant. */
+    private ProposalCtx releasedProposal() throws Exception {
+        var ctx=assignedDoctorCase();
+        UUID service=seedCatalogService("PACE-DUAL","Dual chamber pacemaker implant","Procedure",new BigDecimal("390000.00"));
+        seedFxRate("USD",new BigDecimal("0.0200"));
+        authenticate("doctor-subject","DOCTOR");
+        journey.reviewDecision(ctx.caseId,new ReviewDecisionRequest("ACCEPT","Pacemaker implantation",null,
+            List.of(new CostEstimateItem("Dual chamber pacemaker implant",new BigDecimal("390000.00"),"EGP",service)),"USD"));
+        authenticate("coordinator-subject","COORDINATOR");
+        var proposal=journey.createProposal(ctx.caseId,draftRequest(approvedReview(ctx.caseId),null));
+        UUID versionId=proposal.versionId();
+        jdbc.update("UPDATE proposal_versions SET requires_finance_approval=FALSE WHERE id=?",versionId);
+        journey.releaseProposal(ctx.caseId,versionId); em.flush();
+        String stored=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?",String.class,"proposal-ready:"+versionId));
+        String token=json.readValue(stored,new TypeReference<Map<String,String>>(){}).get("token");
+        SecurityContextHolder.clearContext();
+        journey.requestProposalAccess(token,"WHATSAPP");
+        String code=proposalAccessCode(ctx.caseId);
+        String grant=journey.verifyProposalAccess(token,code).grant();
+        return new ProposalCtx(ctx.caseId,versionId,token,grant);
+    }
+
+    private record ProposalCtx(UUID caseId,UUID versionId,String token,String grant){}
+
+    private UUID approvedReview(UUID caseId){
+        return jdbc.queryForObject("SELECT id FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'",UUID.class,caseId);
+    }
+
+    private ProposalDraftRequest draftRequest(UUID reviewId,String currency){
+        return new ProposalDraftRequest(reviewId,"en","Plan",currency,"Included","Excluded","Deposit","Refund","Consent",
+            Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Line",BigDecimal.ONE,new BigDecimal("1.00"),false,0)),null);
+    }
+
+    private void seedFxRate(String quoteCurrency,BigDecimal rate){
+        jdbc.update("DELETE FROM fx_rates WHERE quote_currency=? AND rate_date=?",quoteCurrency,java.time.LocalDate.now(java.time.ZoneOffset.UTC));
+        jdbc.update("INSERT INTO fx_rates(id,base_currency,quote_currency,rate,rate_date,source,fetched_at) VALUES(?,?,?,?,?,?,?)",
+            UUID.randomUUID(),"EGP",quoteCurrency,rate,java.time.LocalDate.now(java.time.ZoneOffset.UTC),"API",Instant.now());
+    }
+
+    private UUID seedCatalogService(String code,String name,String category,BigDecimal priceEgp){
+        UUID practitioner=jdbc.queryForObject("SELECT id FROM practitioner_profiles WHERE external_subject=?",UUID.class,"doctor-subject");
+        UUID id=UUID.randomUUID();
+        jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+            id,practitioner,code,name,category,priceEgp,true,"admin",Instant.now(),Instant.now());
+        return id;
     }
 
     // ---- No create-and-release shortcut at the transition level ----
@@ -340,7 +812,7 @@ class SecureJourneyCorrectionsTest {
         seedStaff();
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
         authenticate("doctor-subject","DOCTOR");
-        journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended intervention","Alt","Risks","Seq","7 days","Follow-up"));
         journey.approveClinicalReview(created.caseId(),review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultant treatment package",new BigDecimal("1000.00"),"EGP",0,new BigDecimal("1000.00"),true);
@@ -348,8 +820,8 @@ class SecureJourneyCorrectionsTest {
         var proposal=journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Plan","EGP","Incl","Excl","Deposit","Refund","Not consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Treatment package",BigDecimal.ONE,new BigDecimal("1000.00"),false,0)),null));
         var operationsAssignment=journey.assign(created.caseId(),new AssignmentRequest("operations-subject","OPERATIONS","PRIMARY","cardiac-pod","Ops"));
         var financeAssignment=journey.assign(created.caseId(),new AssignmentRequest("finance-subject","FINANCE","PRIMARY","cardiac-pod","Finance"));
-        authenticate("operations-subject","OPERATIONS");journey.decideAssignment(created.caseId(),operationsAssignment.id(),true,com.rehletshifaa.security.ActorRole.OPERATIONS);journey.completeOperations(created.caseId(),proposal.versionId(),"Ops plan");
-        authenticate("finance-subject","FINANCE");journey.decideAssignment(created.caseId(),financeAssignment.id(),true,com.rehletshifaa.security.ActorRole.FINANCE);journey.approveFinance(created.caseId(),proposal.versionId());
+        authenticate("operations-subject","OPERATIONS");journey.decideAssignment(created.caseId(),operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS);journey.completeOperations(created.caseId(),proposal.versionId(),"Ops plan");
+        authenticate("finance-subject","FINANCE");journey.decideAssignment(created.caseId(),financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.FINANCE);journey.approveFinance(created.caseId(),proposal.versionId());
         authenticate("coordinator-subject","COORDINATOR");journey.releaseProposal(created.caseId(),proposal.versionId());
         em.flush();
         String token=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?",String.class,"proposal-ready:"+proposal.versionId()));
@@ -366,7 +838,7 @@ class SecureJourneyCorrectionsTest {
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","ready",v));
         seedDoctor();
         var a=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","pod","review"));
-        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),a.id(),true);
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),a.id(), new AssignmentDecisionRequest(true,null));
         return new Ctx(created.caseId(),null,null,created.caseNumber());
     }
 

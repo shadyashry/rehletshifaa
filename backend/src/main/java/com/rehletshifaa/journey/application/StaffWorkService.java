@@ -89,6 +89,18 @@ public class StaffWorkService {
         return id;
     }
 
+    /**
+     * Close every open work item of a type on a case — the work is done, superseded or no longer owed.
+     * Used when an assignment is decided or reassigned so a stale item can never linger in someone's queue.
+     */
+    @Transactional
+    public int closeWorkItems(UUID caseId, String type, String reason) {
+        Instant now = clock.instant();
+        return jdbc.sql("UPDATE case_tasks SET status='COMPLETED',completed_at=?,completion_evidence=?,updated_at=?,version=version+1 "
+                        + "WHERE case_id=? AND task_type=? AND visibility_scope='INTERNAL' AND status IN ('OPEN','IN_PROGRESS')")
+                .params(timestamp(now), encrypt(reason), timestamp(now), caseId, type).update();
+    }
+
     private void notify(NewWorkItem item, UUID taskId, Instant now) {
         if (item.ownerSubject() == null) return; // unassigned work waits in the team queue; nobody to notify yet
         String key = item.idempotencyKey();
@@ -103,7 +115,9 @@ public class StaffWorkService {
         var actor = actors.require(ActorRole.COORDINATOR, ActorRole.COORDINATOR_LEAD, ActorRole.DOCTOR,
                 ActorRole.OPERATIONS, ActorRole.FINANCE, ActorRole.PATIENT);
         return jdbc.sql("SELECT t.id,t.case_id,t.task_type,t.title,t.description,t.priority,t.status,t.blocking,t.due_at,t.created_at,t.version,"
-                        + "c.case_number,c.status case_status,c.waiting_on,p.full_name patient_name "
+                        + "c.case_number,c.status case_status,c.waiting_on,c.care_category,p.full_name patient_name,"
+                        + "(SELECT count(*) FROM medical_documents d WHERE d.case_id=c.id AND d.status<>'REJECTED') document_count,"
+                        + "(SELECT a.assignee_subject FROM case_assignments a WHERE a.case_id=c.id AND a.assignee_role='COORDINATOR' AND a.status='ACTIVE' ORDER BY a.assigned_at DESC LIMIT 1) coordinator_subject "
                         + "FROM case_tasks t JOIN medical_cases c ON c.id=t.case_id LEFT JOIN patient_profiles p ON p.id=c.patient_id "
                         + "WHERE t.owner_subject=? AND t.status IN ('OPEN','IN_PROGRESS') "
                         + "ORDER BY CASE t.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END,t.due_at NULLS LAST,t.created_at")
@@ -116,7 +130,8 @@ public class StaffWorkService {
         Instant created = rs.getObject("created_at", java.time.OffsetDateTime.class).toInstant();
         return new WorkItemView(rs.getObject("id", UUID.class), rs.getObject("case_id", UUID.class),
                 rs.getString("case_number"), rs.getString("patient_name"), rs.getString("case_status"),
-                rs.getString("waiting_on"), rs.getString("task_type"), decrypt(rs.getString("title")),
+                rs.getString("waiting_on"), rs.getString("care_category"), staffDisplayName(rs.getString("coordinator_subject")), rs.getLong("document_count"),
+                rs.getString("task_type"), decrypt(rs.getString("title")),
                 decrypt(rs.getString("description")), rs.getString("priority"), rs.getString("status"),
                 rs.getBoolean("blocking"), due, due != null && due.isBefore(clock.instant()), created,
                 rs.getLong("version"));
@@ -257,6 +272,13 @@ public class StaffWorkService {
     }
 
     // ---------------- helpers ----------------
+
+    /** Coordinator names come from the staff directory; a subject is never handed to the interface. */
+    private String staffDisplayName(String subject) {
+        if (subject == null || subject.isBlank()) return null;
+        return jdbc.sql("SELECT display_name_encrypted FROM staff_members WHERE external_subject=?").param(subject)
+                .query(String.class).optional().map(crypto::decrypt).orElse(null);
+    }
 
     private String encrypt(String value) { return "enc:" + crypto.encrypt(value); }
     private String encryptNullable(String value) { return value == null || value.isBlank() ? null : "enc:" + crypto.encrypt(value.trim()); }

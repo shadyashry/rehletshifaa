@@ -1,49 +1,45 @@
-import { BedDouble, PackageCheck, Plane, PlaneLanding, Stamp } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import type { Dictionary } from "@/lib/dictionary";
-import { SectionHeader } from "@/components/SectionHeader";
-
-const ICONS = [Plane, BedDouble, Stamp, PlaneLanding] as const;
 
 /**
- * Optional but professionally run travel & stay: our own travel professionals
- * handle the whole journey — flight to airport reception — as a single package
- * shaped around each patient's needs, arranged only after the medical proposal.
+ * Travel told as one sequence, not four features of equal importance: the stops run across a single rule
+ * with the arrow doing the work four identical boxes used to do badly. The section stays lighter than the
+ * clinical sections above it, because that is its actual place in the journey.
  */
 export function TravelServices({ d }: { d: Dictionary }) {
   const t = d.home.travel;
+
   return (
-    <section className="section">
+    <section className="section bg-white">
       <div className="container-site">
-        <SectionHeader eyebrow={t.eyebrow} title={t.title} intro={t.intro} />
-
-        <div className="mt-10 overflow-hidden rounded-3xl border border-brand-200 bg-brand-50">
-          <div className="flex items-center gap-3 border-b border-brand-200 bg-brand-100 px-6 py-4">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-brand-700">
-              <PackageCheck size={20} strokeWidth={1.8} aria-hidden="true" />
-            </span>
-            <p className="text-[0.95rem] font-bold text-brand-900">{t.packageLabel}</p>
+        <div className="grid gap-x-14 gap-y-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-end">
+          <div>
+            <p className="eyebrow">{t.eyebrow}</p>
+            <h2 className="headline mt-2 max-w-[18ch] rtl:max-w-[26ch] [text-wrap:balance]">{t.title}</h2>
           </div>
-
-          <ul className="grid gap-px bg-brand-200 sm:grid-cols-2 lg:grid-cols-4">
-            {t.items.map((item, index) => {
-              const Icon = ICONS[index] ?? Plane;
-              return (
-                <li key={item.title} className="flex flex-col bg-brand-50 p-6">
-                  <span className="grid h-11 w-11 place-items-center rounded-lg bg-white text-brand-700">
-                    <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
-                  </span>
-                  <h3 className="title mt-5 text-[1.05rem]">{item.title}</h3>
-                  <p className="mt-2 text-[0.9rem] leading-6 text-ink-600">{item.body}</p>
-                </li>
-              );
-            })}
-          </ul>
+          <div>
+            <p className="text-[0.98rem] leading-7 text-ink-600">{t.intro}</p>
+            <p className="mt-3 text-[0.88rem] font-semibold leading-6 text-brand-800">{t.packageLabel}</p>
+          </div>
         </div>
 
-        <p className="mt-6 rounded-2xl border border-line bg-mist p-5 text-sm leading-6 text-ink-600">
-          {t.note}
-        </p>
+        <ol className="mt-8 grid border-t border-line-strong pt-6 sm:grid-cols-2 lg:grid-cols-4">
+          {t.items.map((item, index) => (
+            <li key={item.title} className="flex gap-3 py-3 lg:py-0 lg:pe-6">
+              {index > 0 && (
+                <ChevronRight aria-hidden size={16}
+                              className="mt-0.5 hidden flex-none text-brand-400 rtl:-scale-x-100 lg:block lg:-ms-5" />
+              )}
+              <div className="min-w-0">
+                <h3 className="text-[0.98rem] font-semibold leading-6 text-brand-900">{item.title}</h3>
+                <p className="mt-1 text-[0.86rem] leading-6 text-ink-600">{item.body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        <p className="mt-6 text-[0.85rem] leading-6 text-ink-500">{t.note}</p>
       </div>
     </section>
   );

@@ -16,14 +16,14 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   return (
     <header className="sticky top-0 z-50 isolate border-b border-line bg-white/95 shadow-[0_8px_30px_-28px_rgba(28,51,58,.65)] backdrop-blur-xl">
-      <div className="container-site flex min-h-[4.75rem] items-center justify-between gap-3 md:min-h-[5.25rem]">
+      <div className="container-site flex min-h-[4.25rem] items-center justify-between gap-3 md:min-h-[4.5rem]">
         <Link href={localeHref(locale)} aria-label={`${d.common.brand} — ${d.nav.home}`}>
           <Logo
             label={d.common.brand}
             accent={d.common.brandAccent}
             arabicLabel={d.common.brandArabic}
             arabicAccent={d.common.brandArabicAccent}
-            size={42}
+            size={36}
           />
         </Link>
 

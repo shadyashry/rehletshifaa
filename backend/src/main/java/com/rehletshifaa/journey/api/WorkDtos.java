@@ -17,7 +17,8 @@ public final class WorkDtos {
 
     /** An open action assigned to the signed-in staff member, with the context needed to act on it. */
     public record WorkItemView(UUID id, UUID caseId, String caseNumber, String patientName, String caseStatus,
-                               String waitingOn, String type, String title, String context, String priority,
+                               String waitingOn, String careCategory, String coordinatorName, long documentCount,
+                               String type, String title, String context, String priority,
                                String status, boolean blocking, Instant dueAt, boolean overdue, Instant createdAt,
                                long version) {}
 

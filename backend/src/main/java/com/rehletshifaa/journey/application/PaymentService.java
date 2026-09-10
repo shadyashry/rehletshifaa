@@ -66,6 +66,9 @@ public class PaymentService {
         UUID depositId = UUID.randomUUID(); java.time.Instant now = clock.instant();
         jdbc.sql("INSERT INTO deposits(id,case_id,proposal_version_id,currency,fx_rate,fx_rate_date,fx_source,policy_id,policy_version,total_egp,total_display,status,created_by,created_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
                 .params(depositId, caseId, versionId, fx.currency() == null ? "EGP" : fx.currency(), rate, fx.date(), fx.source(), policy.id(), policy.version(), totalEgp, totalDisplay, "REQUESTED", "SYSTEM", timestamp(now)).update();
+        // Raising the deposit is not the end of the story: with an offline process a person has to arrange
+        // it, so the case gains real staff work rather than sitting silently waiting for money to appear.
+        handoff.onDepositRequired(caseId);
         jdbc.sql("INSERT INTO deposit_components(id,deposit_id,beneficiary,purpose,amount_egp,refundability,cancellation_terms,credited_to_final,sort_order) VALUES(?,?,?,?,?,?,?,?,0)")
                 .params(UUID.randomUUID(), depositId, "PLATFORM", "Case coordination initiation", totalEgp, "NON_REFUNDABLE", "Refundable in full before case coordination begins; non-refundable once coordination has started.", true).update();
         appendEvent(caseId, depositId, "DEPOSIT_REQUESTED", totalEgp, totalDisplay, fx.currency(), null, "OFFLINE", null, "REQUESTED", "SYSTEM", null, "deposit-req:" + depositId);

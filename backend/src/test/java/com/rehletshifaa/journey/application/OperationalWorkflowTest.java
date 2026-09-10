@@ -295,6 +295,231 @@ class OperationalWorkflowTest {
         assertThat(work.myWork()).isEmpty();
     }
 
+
+    // ---------------- derived attention signals on the case cards ----------------
+
+    @Test void caseCardsCarryTheDerivedWorkSignalsTheQueueOrdersBy() throws Exception {
+        UUID caseId = ownedCase();
+        Instant overdue = Instant.now().minusSeconds(3600);
+        work.openWorkItem(new NewWorkItem(caseId, "REVIEW", "Blocking overdue work", null, "coordinator-subject",
+                "COORDINATOR", "URGENT", true, overdue, "SYSTEM", "WORK_ASSIGNED", "signal-1:" + caseId, false));
+        work.openWorkItem(new NewWorkItem(caseId, "REVIEW_PATIENT_RESPONSE", "Review information provided by the patient",
+                null, "coordinator-subject", "COORDINATOR", "HIGH", false, null, "SYSTEM", "WORK_ASSIGNED", "signal-2:" + caseId, false));
+        em.flush();
+
+        authenticate("coordinator-subject", "COORDINATOR");
+        var card = journey.coordinatorCaseCards().stream().filter(c -> c.caseSummary().id().equals(caseId)).findFirst().orElseThrow();
+        assertThat(card.openTaskCount()).isEqualTo(2);
+        assertThat(card.overdueTaskCount()).isEqualTo(1);
+        assertThat(card.blockingOverdueCount()).isEqualTo(1);
+        assertThat(card.highPriorityCount()).isEqualTo(2); // URGENT + HIGH
+        assertThat(card.patientResponsePending()).isTrue();
+        // The case itself gains no priority or attention column — these are read from the work items.
+        assertThat(count("SELECT count(*) FROM medical_cases WHERE id=?", caseId)).isEqualTo(1);
+    }
+
+    @Test void aQuietCaseReportsNoOutstandingSignals() throws Exception {
+        UUID caseId = ownedCase();
+        authenticate("coordinator-subject", "COORDINATOR");
+        var card = journey.coordinatorCaseCards().stream().filter(c -> c.caseSummary().id().equals(caseId)).findFirst().orElseThrow();
+        assertThat(card.openTaskCount()).isZero();
+        assertThat(card.blockingOverdueCount()).isZero();
+        assertThat(card.highPriorityCount()).isZero();
+        assertThat(card.nextDueAt()).isNull();
+        assertThat(card.patientResponsePending()).isFalse();
+    }
+
+
+    // ---------------- consultant assignment lifecycle ----------------
+
+    @Test void assigningAConsultantCreatesUnreadWorkNotificationAndEmail() throws Exception {
+        UUID caseId = readyForConsultant();
+        authenticate("coordinator-subject", "COORDINATOR");
+        journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review"));
+        em.flush();
+
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT' AND owner_subject=? AND status='OPEN'", caseId, "doctor-subject")).isEqualTo(1);
+        // The notification starts unread — nothing may set read_at at creation.
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='ASSIGNMENT_CREATED' AND read_at IS NULL", "doctor-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='STAFF_WORK'")).isEqualTo(1);
+        assertThat(waitingOn(caseId)).isEqualTo("CONSULTANT");
+    }
+
+    @Test void reassigningDoesNotLeaveTheOldConsultantWithStaleWork() throws Exception {
+        UUID caseId = readyForConsultant();
+        seedSecondDoctor();
+        authenticate("coordinator-subject", "COORDINATOR");
+        journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review"));
+        journey.assign(caseId, new AssignmentRequest("second-doctor", "DOCTOR", "PRIMARY", "pod", "Second opinion"));
+        em.flush();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT' AND status='OPEN'", caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT' AND status='OPEN'", String.class, caseId)).isEqualTo("second-doctor");
+    }
+
+    @Test void acceptingTurnsTheAssignmentIntoClinicalWorkAndIsIdempotent() throws Exception {
+        UUID caseId = readyForConsultant();
+        UUID assignment = assignConsultant(caseId);
+
+        authenticate("doctor-subject", "DOCTOR");
+        journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null)); em.flush();
+
+        assertThat(status(caseId)).isEqualTo("CONSULTANT_REVIEW");
+        assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT'", String.class, caseId)).isEqualTo("COMPLETED");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CLINICAL_REVIEW' AND owner_subject=? AND status='OPEN'", caseId, "doctor-subject")).isEqualTo(1);
+        assertThat(waitingOn(caseId)).isEqualTo("CONSULTANT");
+        // The accepted case is now clinical involvement, so it belongs to My Cases.
+        assertThat(journey.assignedCases(com.rehletshifaa.security.ActorRole.DOCTOR)).extracting(CaseView::id).contains(caseId);
+
+        journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null)); em.flush();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CLINICAL_REVIEW'", caseId)).isEqualTo(1);
+    }
+
+    @Test void aPendingAssignmentIsWorkNotYetOneOfMyCases() throws Exception {
+        UUID caseId = readyForConsultant();
+        assignConsultant(caseId);
+        authenticate("doctor-subject", "DOCTOR");
+        assertThat(journey.assignedCases(com.rehletshifaa.security.ActorRole.DOCTOR)).extracting(CaseView::id).doesNotContain(caseId);
+        assertThat(work.myWork()).extracting(WorkItemView::type).contains("CONSULTANT_ASSIGNMENT");
+    }
+
+    @Test void anotherConsultantCannotAcceptSomebodyElsesAssignment() throws Exception {
+        UUID caseId = readyForConsultant();
+        UUID assignment = assignConsultant(caseId);
+        seedSecondDoctor();
+        authenticate("second-doctor", "DOCTOR");
+        assertThatThrownBy(() -> journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null)))
+                .isInstanceOf(ApiException.class);
+        assertThat(status(caseId)).isEqualTo("CONSULTANT_ASSIGNMENT_PENDING");
+    }
+
+    @Test void decliningHandsTheCaseBackToTheCoordinatorWithRealWork() throws Exception {
+        UUID caseId = readyForConsultant();
+        UUID assignment = assignConsultant(caseId);
+        authenticate("doctor-subject", "DOCTOR");
+        journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(false, "Outside my subspecialty")); em.flush();
+
+        assertThat(status(caseId)).isEqualTo("READY_FOR_CONSULTANT");
+        assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT'", String.class, caseId)).isEqualTo("COMPLETED");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='REASSIGN_CONSULTANT' AND owner_subject=? AND status='OPEN'", caseId, "coordinator-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='ASSIGNMENT_DECLINED' AND read_at IS NULL", "coordinator-subject")).isEqualTo(1);
+        assertThat(waitingOn(caseId)).isEqualTo("STAFF");
+
+        // A repeated decline is safe and changes nothing.
+        journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(false, null)); em.flush();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='REASSIGN_CONSULTANT'", caseId)).isEqualTo(1);
+    }
+
+    @Test void theAssignmentViewNeverExposesAnIdentitySubject() throws Exception {
+        UUID caseId = readyForConsultant();
+        assignConsultant(caseId);
+        authenticate("doctor-subject", "DOCTOR");
+        var assignments = journey.workspace(caseId).assignments();
+        var consultant = assignments.stream().filter(a -> "DOCTOR".equals(a.assigneeRole())).findFirst().orElseThrow();
+        assertThat(consultant.assigneeName()).isEqualTo("Doctor One");
+        assertThat(consultant.assigneeName()).isNotEqualTo(consultant.assigneeSubject());
+    }
+
+
+    @Test void workItemsCarryTheCaseIdentityStaffNeedBeforeOpeningAnything() throws Exception {
+        UUID caseId = readyForConsultant();
+        assignConsultant(caseId); em.flush();
+        authenticate("doctor-subject", "DOCTOR");
+        var assignment = work.myWork().stream().filter(w -> "CONSULTANT_ASSIGNMENT".equals(w.type())).findFirst().orElseThrow();
+        assertThat(assignment.caseNumber()).isNotBlank();
+        assertThat(assignment.patientName()).isEqualTo("Consultant Patient");
+        assertThat(assignment.careCategory()).isEqualTo("cardiology");
+        assertThat(assignment.coordinatorName()).isEqualTo("Coordinator One");
+        assertThat(assignment.documentCount()).isZero();
+        // A subject never reaches the interface through a work item.
+        assertThat(assignment.coordinatorName()).isNotEqualTo("coordinator-subject");
+    }
+
+    // ---------------- notification read state ----------------
+
+    @Test void listingNotificationsNeverMarksThemRead() throws Exception {
+        UUID caseId = readyForConsultant();
+        assignConsultant(caseId); em.flush();
+        authenticate("doctor-subject", "DOCTOR");
+
+        assertThat(work.myNotifications().unread()).isEqualTo(1);
+        work.myNotifications(); work.myNotifications(); // polling must not mutate state
+        em.flush();
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND read_at IS NULL", "doctor-subject")).isEqualTo(1);
+        assertThat(work.myNotifications().unread()).isEqualTo(1);
+    }
+
+    @Test void acknowledgingOneNotificationMarksOnlyThatOne() throws Exception {
+        UUID first = readyForConsultant();
+        assignConsultant(first);
+        UUID second = readyForConsultant("+254700000041", "second@local.test");
+        assignConsultant(second); em.flush();
+
+        authenticate("doctor-subject", "DOCTOR");
+        var feed = work.myNotifications();
+        assertThat(feed.unread()).isEqualTo(2);
+        assertThat(work.markRead(feed.items().get(0).id())).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND read_at IS NULL", "doctor-subject")).isEqualTo(1);
+        // Reading a notification never completes the work it refers to.
+        assertThat(work.myWork()).extracting(WorkItemView::type).contains("CONSULTANT_ASSIGNMENT");
+    }
+
+    @Test void aRepeatedAssignmentEventDoesNotDuplicateTheNotification() throws Exception {
+        UUID caseId = readyForConsultant();
+        UUID assignment = assignConsultant(caseId);
+        // Same assignment id replayed through the work layer: the idempotency key holds.
+        work.openWorkItem(new NewWorkItem(caseId, "CONSULTANT_ASSIGNMENT", "New clinical assignment", null, "doctor-subject",
+                "DOCTOR", "HIGH", true, null, "coordinator-subject", "ASSIGNMENT_CREATED", "assignment:" + assignment, true));
+        em.flush();
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='ASSIGNMENT_CREATED'", "doctor-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT'", caseId)).isEqualTo(1);
+    }
+
+    // ---------------- consultant helpers ----------------
+    private UUID readyForConsultant() throws Exception { return readyForConsultant("+254700000040", "consultant@local.test"); }
+
+    private UUID readyForConsultant(String whatsapp, String email) throws Exception {
+        var created = cases.create(new CreateCaseRequest("Consultant Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
+        cases.submit(created.caseId()); em.flush(); em.clear();
+        seedDoctorProfile();seedCoordinatorProfile();
+        authenticate("coordinator-subject", "COORDINATOR");
+        journey.claimCoordinatorCase(created.caseId(), "pod");
+        long version = journey.workspace(created.caseId()).caseSummary().version();
+        journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "Ready", version));
+        em.flush(); SecurityContextHolder.clearContext();
+        return created.caseId();
+    }
+
+    private UUID assignConsultant(UUID caseId) {
+        authenticate("coordinator-subject", "COORDINATOR");
+        UUID id = journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review")).id();
+        em.flush(); SecurityContextHolder.clearContext();
+        return id;
+    }
+
+    private void seedCoordinatorProfile() {
+        if (count("SELECT count(*) FROM staff_members WHERE external_subject=?", "coordinator-subject") > 0) return;
+        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",
+                UUID.randomUUID(), "coordinator-subject", "COORDINATOR", crypto.encrypt("Coordinator One"), Instant.now(), Instant.now());
+    }
+
+    private void seedDoctorProfile() {
+        if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return;
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now());
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",
+                UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now());
+    }
+
+    private void seedSecondDoctor() {
+        if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "second-doctor") > 0) return;
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                id, "second-doctor", "Doctor Two", "Doctor Two", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now());
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",
+                UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now());
+    }
+
     // ================= helpers =================
     private UUID ownedCase() throws Exception { return ownedCase("+254700000031", "workflow@local.test"); }
 

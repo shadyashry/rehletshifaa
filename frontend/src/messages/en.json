@@ -4,7 +4,7 @@
     "cardiology": "Cardiology",
     "consultants": "Consultants",
     "how": "How It Works",
-    "send": "Send My Case",
+    "send": "Start my case",
     "language": "العربية",
     "languageAria": "Switch language to Arabic",
     "careAreas": "Care Areas",
@@ -14,9 +14,9 @@
   "common": {
     "brand": "RehletShifaa",
     "tagline": "A clearer path to specialist care",
-    "send": "Send My Case",
+    "send": "Start my case",
     "whatsapp": "Talk to a Patient Coordinator",
-    "explore": "Explore All Care Areas",
+    "explore": "View all care areas",
     "profile": "View Consultant Profile",
     "emergency": "Emergency symptoms? RehletShifaa is not an emergency service. Call your local emergency number or seek urgent care now.",
     "emergencyLabel": "Emergency",
@@ -32,25 +32,25 @@
     "brandArabicAccent": "شفاء"
   },
   "home": {
-    "eyebrow": "International patient care coordination",
-    "title": "Understand Your Care Options in Egypt—Before You Travel",
-    "intro": "Share the medical information you already have. RehletShifaa securely prepares your case for review by a credentialed consultant in the relevant specialty, then helps you understand the proposed next steps, initial cost estimate, and practical arrangements before you decide whether to travel.",
-    "primaryAction": "Request My Case Review",
-    "watchJourney": "See How It Works",
-    "reassurance": "You do not need a final diagnosis or procedure name to begin.",
+    "eyebrow": "Care in Egypt, coordinated for international patients",
+    "title": "Understand your treatment options before you travel",
+    "intro": "Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain what they recommend, what it is likely to cost, and what would happen next.",
+    "primaryAction": "Start my case",
+    "watchJourney": "See how it works",
+    "reassurance": "No final diagnosis is required.",
     "assurances": [
-      "Consultant review before you decide whether to travel",
-      "Reports handled through private, short-lived upload links",
-      "One bilingual coordinator from first contact through follow-up"
+      "A Consultant reviews your case before you decide anything",
+      "Reports are uploaded through private, short-lived links",
+      "One bilingual coordinator, from your first message onwards"
     ],
-    "preliminaryNotice": "Recommendations and cost estimates are preliminary and may change after an in-person clinical assessment.",
-    "heroCardTitle": "Begin with what you already have",
+    "preliminaryNotice": "Recommendations and cost estimates are preliminary and can change after an in-person assessment.",
+    "heroCardTitle": "You can start with what you already have",
     "prepareItems": [
-      "Your latest medical report or discharge summary",
-      "Available scans, test results, or medical images",
-      "A short note about what you need help with"
+      "A recent medical report or discharge summary",
+      "Test results, scans or images",
+      "A short note about your concern"
     ],
-    "heroCardNote": "Your coordinator will tell you what is missing before a consultant reviews your case.",
+    "heroCardNote": "If anything else is needed, your coordinator will tell you before the review.",
     "video": {
       "eyebrow": "Your journey, explained",
       "title": "See what happens after you start",
@@ -60,42 +60,42 @@
       "stepLabel": "Step",
       "steps": [
         {
-          "title": "Share what you already have",
-          "body": "Start with your latest report, available tests, and a short note. You do not need a complete file."
+          "title": "Share what you have",
+          "body": "A report, any tests, and a short note. A complete file is not required."
         },
         {
-          "title": "Your coordinator organizes it",
-          "body": "One person checks the information, explains what is missing, and stays in contact with you."
+          "title": "Your coordinator reviews it",
+          "body": "One person checks what you sent and tells you if anything is missing."
         },
         {
-          "title": "The right consultant reviews it",
-          "body": "Your case is directed by clinical need, so you do not have to choose a specialty yourself."
+          "title": "A Consultant assesses your case",
+          "body": "We route it by clinical need, so you do not have to choose a specialty."
         },
         {
-          "title": "You decide with clarity",
-          "body": "Understand the proposed next step and expected arrangements before deciding about treatment or travel."
+          "title": "You decide what happens next",
+          "body": "You will know the recommendation, the likely cost and the practical steps first."
         }
       ]
     },
     "areasEyebrow": "What we care for",
-    "areasTitle": "Three care areas, one coordinated journey",
+    "areasTitle": "Where we can help",
     "areas": [
       {
         "title": "Cardiology",
-        "body": "Consultant-led coronary, structural-heart and rhythm care — from angiography and stents to valve and device procedures."
+        "body": "Coronary, structural heart and rhythm care, from angiography and stents to valve and device procedures."
       },
       {
         "title": "Rehabilitation, Dysphagia & Physical Medicine",
-        "body": "Adult and pediatric dysphagia (swallowing) rehabilitation — a rare, focused service — with broader rehabilitation, physical medicine and rheumatology."
+        "body": "Adult and pediatric swallowing rehabilitation, a service few centres offer, with physical medicine and rheumatology."
       },
       {
         "title": "Orthopedics",
-        "body": "Joint replacement, sports injuries and arthroscopy, and spine and trauma evaluation — with a second opinion before surgery."
+        "body": "Joint replacement, sports injuries, arthroscopy, and spine and trauma assessment, including a second opinion before surgery."
       }
     ],
     "howEyebrow": "A clear process",
-    "howTitle": "How your journey works",
-    "howIntro": "Five steps, each with a named person responsible for it.",
+    "howTitle": "What happens after you send your case",
+    "howIntro": "Four steps. Someone is responsible at each one.",
     "steps": [
       "Send Your Case",
       "Your Coordinator Organizes It",
@@ -109,60 +109,60 @@
     "beforeBody": "Where medically possible, RehletShifaa helps you understand the proposed next steps and expected arrangements before deciding to travel.",
     "trustEyebrow": "Privacy and clinical governance",
     "trustTitle": "How your information is handled",
-    "trustIntro": "Coordinating your care means handling sensitive medical information. These are the rules the platform is built on.",
+    "trustIntro": "Coordinating care means handling sensitive medical information. These are the rules we work to.",
     "trust": [
       {
-        "title": "The consultant decides",
-        "body": "RehletShifaa coordinates your case. Diagnosis, procedure selection and clinical suitability remain decisions of the treating consultant after appropriate evaluation."
+        "title": "Consultants make clinical decisions",
+        "body": "We coordinate your case. Diagnosis, procedure choice and suitability stay with the treating Consultant."
       },
       {
         "title": "Private document handling",
-        "body": "Reports are uploaded straight to private storage through short-lived links. Files are not published, indexed, or listed anywhere public."
+        "body": "Reports go straight to private storage through short-lived links. Nothing is published or listed publicly."
       },
       {
-        "title": "Consent before review",
-        "body": "Your case is submitted only after you give explicit consent for your information to be processed for the purpose of coordinating your care."
+        "title": "Your consent comes first",
+        "body": "Your case is reviewed only after you allow your information to be used for coordinating your care."
       },
       {
-        "title": "Emergency comes first",
-        "body": "If your situation appears urgent, you will be advised to seek emergency care where you are rather than wait to travel."
+        "title": "Emergency care comes first",
+        "body": "If your situation looks urgent, we will tell you to seek care where you are rather than wait to travel."
       }
     ],
-    "finalTitle": "Start With Your Medical Case",
-    "finalBody": "You don't need to know the name of the specialty or procedure. Send what you have. We'll help with the next step.",
-    "finalNote": "Sending your case does not commit you to treatment or travel.",
-    "slogan": "Clear information. One dedicated coordinator. The decision remains yours.",
-    "areasIntro": "Start with the area closest to your need. Not sure? Send your case and your coordinator will help direct it.",
+    "finalTitle": "Start your medical case",
+    "finalBody": "Send what you already have. We will arrange the right review and stay with you through the next step.",
+    "finalNote": "Starting a case does not commit you to treatment or travel.",
+    "slogan": "You see the full picture first. The decision stays yours.",
+    "areasIntro": "Start with the area closest to your need. If you are not sure, send your case and your coordinator will direct it.",
     "areasAction": "View care area",
     "consultantsPromise": {
-      "eyebrow": "Consultants, not just specialists",
-      "title": "We choose consultants, not just specialists.",
-      "body": "Your case is reviewed by a responsible consultant who owns the clinical decision — chosen for senior experience and accountability, so a named person stands behind your care."
+      "eyebrow": "Senior clinical review",
+      "title": "Senior Consultants. Clear clinical responsibility.",
+      "body": "Your case is reviewed by a Consultant chosen for the clinical experience it calls for. That Consultant carries the decision, and you will know who they are."
     },
     "travel": {
-      "eyebrow": "Optional travel support",
-      "title": "Professional travel packages, tailored to your needs",
-      "intro": "When you choose to continue care in Egypt, our professionals can arrange an optional staycation journey around your needs — from your flight to a smooth airport reception and onward stay.",
+      "eyebrow": "Practical support",
+      "title": "Travel support built around your care",
+      "intro": "If you choose to continue your care in Egypt, our team can arrange the practical parts of the trip. It is optional, and it comes after the medical plan.",
       "items": [
         {
           "title": "Flights",
-          "body": "A professional travel plan and flight coordination shaped around your treatment dates and preferences."
+          "body": "Booking arranged around your treatment dates."
         },
         {
-          "title": "Hotel & stay",
-          "body": "Comfortable stay options for you and a companion, selected for access, comfort and recovery needs."
+          "title": "Accommodation",
+          "body": "A stay for you and a companion, chosen for comfort and access."
         },
         {
-          "title": "Visa assistance",
-          "body": "Practical guidance and documentation support for your medical-travel visa."
+          "title": "Visa support",
+          "body": "Guidance and documents for a medical visa."
         },
         {
-          "title": "Airport reception",
-          "body": "Personal airport reception and coordinated transfers, so your journey starts calmly from the moment you land."
+          "title": "Airport transfer",
+          "body": "Someone meets you when you land and takes you where you need to be."
         }
       ],
-      "note": "Packages are optional, personalised to your needs, and arranged after your medical proposal. Our travel professionals coordinate the journey from flight to airport reception and stay.",
-      "packageLabel": "One coordinated package — arranged end to end by our travel professionals"
+      "note": "Arranged after your medical proposal, and only if you want it.",
+      "packageLabel": "Arranged by our own team, not outsourced"
     }
   },
   "footer": {

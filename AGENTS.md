@@ -1,70 +1,162 @@
-# Codex Project Instructions
+# RehletShifaa — Codex Instructions
 
-## Start here (current work)
+## 1. Canonical project context
 
-The active epic is the proposal-to-patient **commercial workflow** on branch
-`codex/end-to-end-care-platform`. Before changing related code, read
-**[`docs/commercial-workflow-status.md`](docs/commercial-workflow-status.md)** — it is the
-handoff: what is implemented, the money model, migrations, tests, and the remaining backlog
-(the commercial workflow and the branded Keycloak login theme are done; optional Portal.tsx
-component extraction and a frontend test matrix remain). Behaviour is in
-[`docs/end-to-end-workflows.md`](docs/end-to-end-workflows.md); structure in
-[`docs/architecture.md`](docs/architecture.md).
+Use this file as the default project context. Do **not** re-discover architecture or re-read broad docs unless the task requires it.
 
-## Running the local stack (Docker Compose)
+Current working branch:
+- `codex/end-to-end-care-platform`
 
-The live local environment is served through Cloudflare quick tunnels (`*.trycloudflare.com`),
-whose URLs are baked into the containers by the **tunnel overlay** `docker-compose.tunnel.yml`.
+Current active epic:
+- Proposal-to-patient **commercial workflow**
+- Handoff/status: `docs/commercial-workflow-status.md`
+- Detailed workflows: `docs/end-to-end-workflows.md`
+- Architecture reference: `docs/architecture.md`
 
-- To (re)build or start the stack, ALWAYS include the overlay:
+Read `docs/commercial-workflow-status.md` only for commercial-workflow tasks. Read `docs/end-to-end-workflows.md` or `docs/architecture.md` only when the requested change genuinely depends on them.
 
-  ```bash
-  docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up --build -d
-  ```
+## 2. Stable development environment
 
-- NEVER run a bare `docker compose up` / `--build` (base file only): it recreates
-  keycloak/backend/frontend/minio with `localhost` config and rebuilds the frontend with
-  `localhost` API URLs baked in, breaking the tunnel-served portal. NEVER delete Docker volumes
-  (especially `keycloak-data`).
-- Ports: frontend 3000, backend 8080, keycloak 8180, minio 9000/9001, mailpit 8025.
-- `deploy/oracle/` is the separate public VM stack; do not run it locally.
+The local Docker stack is exposed through a **named Cloudflare Tunnel** (`rehletshifaa-dev`). Do not use or introduce `trycloudflare.com` URLs.
 
-## Build, test, migrations
+Permanent development URLs:
+- Frontend: `https://dev.rehletshifaa.com`
+- Backend API: `https://api-dev.rehletshifaa.com`
+- Keycloak: `https://auth-dev.rehletshifaa.com`
+- MinIO/files: `https://files-dev.rehletshifaa.com`
+- Mailpit: `https://mail-dev.rehletshifaa.com`
 
-- Backend is **offline Maven**: `cd backend && mvn -o -q test`. Do not add a dependency missing
-  from local `~/.m2` (breaks the offline build). Frontend gate: `cd frontend && pnpm typecheck`.
-- Flyway migrations are **additive and immutable** — never edit `V1`–`V15`; add `V16+`. Keep them
-  H2-safe (see the status doc: `TIMESTAMP WITH TIME ZONE`, no partial indexes, one `ADD COLUMN`
-  per `ALTER`, fixed seed UUIDs).
+Local ports:
+- Frontend `3000`
+- Backend `8080`
+- Keycloak `8180`
+- MinIO API `9000`
+- MinIO console `9001`
+- Mailpit `8025`
 
-## Token-efficient workflow
+Docker files:
+- Base: `docker-compose.yml`
+- Stable tunnel overlay: `docker-compose.tunnel.yml`
 
-Use a proportional verification strategy. Match investigation and testing effort to the risk and scope of the requested change.
+Always start/rebuild the development stack with:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build
+```
 
-For small, isolated, and low-risk changes:
+Never:
+- run a base-only rebuild for the tunnel-served environment;
+- delete Docker volumes unless explicitly requested;
+- replace stable domain URLs with localhost or temporary tunnel URLs;
+- expose tunnel secrets or copy `.env` credentials into source.
 
-- Inspect only files directly related to the request. Do not explore the entire repository unless the change requires it.
-- Reuse the project's existing patterns and components.
-- Do not create or update tests for cosmetic, copy, styling, or configuration-only changes unless behavior changes or the user requests tests.
-- Run only the smallest relevant test, type-check, lint command, or build check.
-- Do not run the full test suite, production build, end-to-end tests, or unrelated checks unless:
-  - the change affects shared infrastructure or multiple features;
-  - a focused check fails;
-  - there is a specific unresolved concern;
-  - or the user explicitly requests full verification.
-- Run each successful check once. Repeat it only if relevant code changes afterward.
-- Do not repeatedly review unchanged files.
-- Summarize command output and failures; do not reproduce long logs unless needed for diagnosis.
-- Keep progress updates and the final response concise.
+The `cloudflared` connector runs in Docker via the tunnel overlay and uses `CLOUDFLARE_TUNNEL_TOKEN` from local `.env`.
 
-## Verification levels
+Keycloak web client:
+- client id: `rehletshifaa-web`
+- redirect URI: `https://dev.rehletshifaa.com/*`
+- web origin: `https://dev.rehletshifaa.com`
+- localhost equivalents may remain for local browser testing.
 
-- Copy, color, spacing, and other visual-only edits: inspect the diff and, when useful, run targeted lint or a focused visual check.
-- Isolated component changes: run the component's focused test or the smallest relevant type-check.
-- Business-logic changes: run the directly related unit tests.
-- Shared APIs, authentication, database schema, dependencies, build configuration, or security-sensitive code: run broader impacted checks.
-- Before release or merge: run the project's required comprehensive CI checks once.
+MinIO browser uploads must allow:
+- `http://localhost:3000`
+- `https://dev.rehletshifaa.com`
 
-## User-request override
+## 3. Technology map
 
-If the user specifies a testing or verification level, follow that request. Clearly mention any important check that was skipped and why.
+Frontend:
+- Next.js
+- public runtime/build values use `NEXT_PUBLIC_*`
+- important: `NEXT_PUBLIC_*` changes require a frontend rebuild
+
+Backend:
+- Spring Boot
+- PostgreSQL
+- Flyway
+- Keycloak OIDC/JWT
+- MinIO S3-compatible storage
+- ClamAV document scanning
+- Mailpit SMTP in local/dev
+
+Identity:
+- Keycloak realm: `rehletshifaa`
+- realm source: `infrastructure/keycloak/realm-rehletshifaa.json`
+
+Deployment:
+- local/dev uses Docker Compose + named Cloudflare Tunnel
+- `deploy/oracle/` is a separate public VM deployment; do not use it for local tasks unless explicitly requested
+
+## 4. Token-efficient working rules
+
+Default behavior:
+1. Inspect only the files directly relevant to the request.
+2. Use targeted search for exact symbols, endpoints, configuration keys, or error messages.
+3. Do not scan the whole repository, all docs, all tests, or all logs unless necessary.
+4. Reuse known project facts from this file instead of re-deriving them.
+5. Reuse existing implementation patterns before creating new abstractions.
+6. Prefer the smallest correct patch.
+7. Do not re-open unchanged files repeatedly.
+8. Do not repeat already-successful commands unless code affecting them changed.
+9. Summarize long logs; inspect only the lines around the failure.
+10. Keep progress updates and final responses concise.
+
+For debugging, start from the failing boundary:
+- browser/network error -> inspect the called frontend code + endpoint only;
+- API `4xx/5xx` -> inspect the matching backend controller/service/security path;
+- auth failure -> inspect Keycloak/OIDC config and token path only;
+- upload failure -> inspect presign code + MinIO/CORS + exact request headers;
+- database failure -> inspect the relevant entity/repository/migration only.
+
+Do not perform broad architecture reviews during a bug fix unless evidence shows the issue is architectural.
+
+## 5. Verification strategy
+
+Use the smallest verification proportional to the change.
+
+Frontend:
+- focused component/type check first
+- general gate: `cd frontend && pnpm typecheck`
+
+Backend:
+- focused relevant test first
+- general local gate: `cd backend && mvn -o -q test`
+- Maven is offline; do not add dependencies that are absent from local `~/.m2`
+
+Run broader verification only when:
+- shared infrastructure/API/auth/database/security is changed;
+- a focused check fails;
+- multiple modules are affected;
+- release/merge verification is requested.
+
+Do not run full production builds or E2E suites for cosmetic/config-only changes unless required.
+
+## 6. Database rules
+
+Flyway migrations are additive and immutable.
+- Never edit existing `V1`–`V15`.
+- Add `V16+`.
+- Keep migrations H2-safe.
+- Use `TIMESTAMP WITH TIME ZONE`.
+- Avoid partial indexes.
+- Use one `ADD COLUMN` per `ALTER`.
+- Keep fixed seed UUIDs where existing patterns require them.
+
+## 7. Change discipline
+
+Before editing:
+- identify the minimum affected files;
+- state a short implementation plan only if the task is non-trivial.
+
+While editing:
+- preserve existing behavior outside task scope;
+- do not rewrite unrelated code;
+- do not change public contracts without need;
+- never commit secrets.
+
+After editing:
+- run the smallest relevant verification once;
+- report changed files, key behavior change, and verification result;
+- mention any important check intentionally skipped.
+
+## 8. User override
+
+If the user explicitly requests broader analysis, exhaustive verification, refactoring, or a different testing level, follow that request.

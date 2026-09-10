@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { FileUp, LockKeyhole, ShieldCheck, X } from "lucide-react";
 
+import { PatientJourneyTracker, phaseExplanation } from "@/components/PatientJourneyTracker";
+
 import type { Locale } from "@/lib/i18n";
 
 type Summary = { caseNumber: string; destinationHint: string };
 type ActionItem = { id: string; kind: "INFORMATION" | "DOCUMENT"; code: string; label: string; required: boolean; completed: boolean; response: string | null };
 type Action = { taskId: string; title: string; message: string | null; blocking: boolean; dueAt: string | null; items: ActionItem[] };
-type Status = { caseNumber: string; statusEn: string; statusAr: string; actionRequired: boolean; action: Action | null };
+type Status = { caseNumber: string; statusEn: string; statusAr: string; phase?: string | null; actionRequired: boolean; action: Action | null };
 type Presign = { documentId: string; uploadUrl: string; requiredHeaders: Record<string, string> };
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -18,7 +20,8 @@ const copy = {
     title: "Track your case securely", loading: "Checking your secure link…",
     send: "Send verification code", sent: "We sent a 6-digit code to", code: "Verification code", verify: "Verify and continue",
     private: "Your medical information is shown only after contact verification.",
-    status: "Current update", action: "Information required",
+    status: "Current update", action: "Information required", now: "What happens now", next: "Next",
+    noAction: "No action is required from you right now.", journey: "Your case",
     intro: "Your coordinator needs the following to continue your case.", noItems: "Add anything you would like your coordinator to know.",
     required: "Required", optional: "Optional", already: "Already provided",
     choose: "Choose a file", chosen: "file selected", replace: "Choose a different file", remove: "Remove",
@@ -32,7 +35,8 @@ const copy = {
     title: "متابعة حالتك بأمان", loading: "جارٍ التحقق من الرابط الآمن…",
     send: "إرسال رمز التحقق", sent: "أرسلنا رمزًا مكوّنًا من 6 أرقام إلى", code: "رمز التحقق", verify: "تحقق وتابع",
     private: "لا تظهر معلوماتك الطبية إلا بعد التحقق من جهة الاتصال.",
-    status: "آخر تحديث", action: "معلومات مطلوبة",
+    status: "آخر تحديث", action: "معلومات مطلوبة", now: "ما يحدث الآن", next: "الخطوة التالية",
+    noAction: "لا يلزم منك أي إجراء الآن.", journey: "مسار حالتك",
     intro: "يحتاج منسق حالتك إلى ما يلي لمتابعة حالتك.", noItems: "أضف أي معلومة تودّ أن يعرفها منسقك.",
     required: "مطلوب", optional: "اختياري", already: "تم تقديمه",
     choose: "اختيار ملف", chosen: "ملف محدد", replace: "اختيار ملف آخر", remove: "إزالة",
@@ -161,6 +165,7 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
   );
 
   const action = status?.action;
+  const explain = phaseExplanation(status?.phase, !!status?.actionRequired, locale);
   return (
     <Frame title={t.title}>
       {summary && <p className="mb-5 font-bold text-brand-800">{summary.caseNumber}</p>}
@@ -182,8 +187,26 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
       )}
 
       {phase === "view" && status && <>
-        <p className="text-sm font-bold text-brand-700">{t.status}</p>
-        <h2 className="mt-2 text-2xl font-bold text-brand-900">{locale === "ar" ? status.statusAr : status.statusEn}</h2>
+        {/* Where the case is, in the patient's own language, before anything is asked of them. */}
+        <section aria-labelledby="status-now" className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+          <p className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.now}</p>
+          <h2 id="status-now" className="mt-1 text-[1.05rem] font-bold leading-6 text-brand-900">{explain.title}</h2>
+          <p className="mt-1.5 leading-6 text-ink-700">{explain.body}</p>
+          {!status.actionRequired && <p className="mt-2 text-[0.9rem] font-semibold text-brand-800">{t.noAction}</p>}
+          {explain.next && (
+            <p className="mt-3 border-t border-brand-200 pt-3 text-[0.88rem] leading-6 text-ink-600">
+              <span className="font-bold text-ink-800">{t.next}:</span> {explain.next}
+            </p>
+          )}
+        </section>
+
+        <div className="mt-5">
+          <PatientJourneyTracker locale={locale} phase={status.phase} waitingOnPatient={status.actionRequired} label={t.journey}/>
+        </div>
+
+        <p className="mt-5 text-[0.82rem] text-ink-500">
+          {t.status}: <span className="font-semibold text-ink-700">{locale === "ar" ? status.statusAr : status.statusEn}</span>
+        </p>
 
         {status.actionRequired && (
           <form className="mt-8" onSubmit={submit} noValidate>

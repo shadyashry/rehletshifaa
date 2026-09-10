@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Locale } from "@/lib/i18n";
+import { ProposalDecisionDialog } from "@/components/ProposalDecisionDialog";
 
 type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean };
 type Summary = { caseNumber: string; channel: string; destinationHint: string; whatsappHint?: string | null; emailHint?: string | null };
@@ -13,74 +14,145 @@ type Proposal = {
   paymentTerms?: string; refundTerms?: string; disclaimers?: string;
   validUntil?: string; decided: boolean; decisionState?: string;
   recommendedTreatment?: string; risksAndLimitations?: string; notes?: string;
-  depositDueDisplay?: number; depositPaidDisplay?: number;
+  depositDueDisplay?: number; depositPaidDisplay?: number; consultantName?: string | null;
 };
+type Decision = "ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED";
+/** Terminal states the patient cannot act out of; each gets its own honest explanation, never a raw error. */
+type Blocked = "EXPIRED" | "SUPERSEDED" | "DECIDED" | null;
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 const copy = {
   en: {
-    greeting: "Prepared for", validUntil: "Valid until", servicesLabel: "Services included",
-    treatmentLabel: "Clinical recommendation", risksLabel: "Risks & limitations", notesLabel: "Notes from your coordinator",
+    greeting: "Prepared for", caseRef: "Case reference", versionLabel: "Version", validUntil: "Valid until",
+    servicesLabel: "Recommended services", treatmentLabel: "Your consultant's recommendation",
+    risksLabel: "Risks & limitations", notesLabel: "Notes from your coordinator",
     verifyTitle: "Verify it's you", verifyIntroWhatsapp: "To protect your information, we'll send a 6-digit code to your WhatsApp",
     verifyIntroEmail: "To protect your information, we'll send a 6-digit code to your email",
     emailInstead: "Use email instead", whatsappInstead: "Use WhatsApp instead",
     sendCode: "Send code", sending: "Sending…", codeSent: "We sent a code to", resend: "Resend code",
     codeLabel: "Enter the 6-digit code", codePlaceholder: "______", verify: "Verify", verifying: "Verifying…",
-    requestRevision: "Request changes", decline: "Decline", commentLabel: "Add a note (optional)", deciding: "Submitting…",
+    requestRevision: "Request changes", decline: "Decline estimate", moreOptions: "More options",
+    deciding: "Submitting…",
     invalid: "This proposal link is invalid or has expired.", error: "The request could not be completed.",
-    tooMany: "Too many requests. Please try again later.", loading: "Loading…", decidedAlready: "A decision has already been recorded for this document.",
-    // preliminary
-    prelimBadge: "Preliminary care estimate — not your final bill", prelimTitle: "Your preliminary care estimate",
+    tooMany: "Too many requests. Please try again later.", loading: "Loading…",
+    prelimBadge: "Preliminary care estimate", prelimTitle: "Your preliminary care estimate",
     assumptionsLabel: "Important assumptions", changeLabel: "What may change after your physical assessment",
-    excludedLabel: "Not included", rangeLabel: "Estimated coordinated-care package", expectedLabel: "Expected", rangeSep: "to",
+    includedLabel: "Included in this estimate", excludedLabel: "Not included",
+    excludedFallback: "Services not listed in this estimate are not included, and would be discussed with you before being added.",
+    rangeLabel: "Estimated coordinated-care package", expectedLabel: "Expected", rangeSep: "to",
+    servicesCount: (n: number) => `${n} service${n === 1 ? "" : "s"}`,
+    estimateBasis: "Based on the current recommendation and included services. The final treatment and price may change after an in-person assessment.",
     coordinationNote: "This package price includes RehletShifaa's case coordination, provider arrangements, scheduling and patient-support services.",
-    payNow: "What you pay now", payNowNote: "A coordination deposit to begin — credited to your final balance.", alreadyPaid: "Already paid (credited to this quote)",
-    ackStatement: "I understand that this estimate is based on remote review. The final treatment plan and price may increase or decrease after the treating doctor examines me. I will receive and decide on a final quote before non-emergency treatment.",
-    acknowledge: "Acknowledge estimate and continue",
-    // final
+    servicesTotal: "Estimated services total",
+    payNow: "What you pay now", payNowNote: "A coordination deposit to begin — credited to your final balance.",
+    alreadyPaid: "Already paid (credited to this quote)",
+    nextTitle: "What happens next",
+    nextPrelim: [
+      "You acknowledge this estimate to continue.",
+      "We send you a secure link to complete your profile.",
+      "You settle the coordination deposit, credited to your final balance.",
+      "Your coordinator arranges your treatment and travel.",
+      "After your in-person assessment you receive a final quote to decide on.",
+    ],
+    nextFinal: [
+      "You accept this treatment plan and quote.",
+      "Your coordinator confirms your schedule and arrangements.",
+      "Your treating doctor takes separate medical consent before treatment.",
+    ],
+    beforeTitle: "Before you continue",
+    ackShort: "I understand this is a preliminary estimate based on remote review.",
+    ackStatement: "The final treatment plan and price may increase or decrease after the treating doctor examines me. I will receive and decide on a final quote before non-emergency treatment.",
+    ackShortFinal: "I understand that accepting this quote is a financial agreement.",
+    finalConsentStatement: "Accepting covers the coordinated-care package and is not procedure-specific medical consent; my doctor will take separate informed consent before treatment.",
+    ackRequired: "Please confirm you understand before continuing.",
+    acknowledge: "Acknowledge & continue",
     finalBadge: "Final treatment plan and quote", finalTitle: "Your final treatment plan and quote",
-    assessmentLabel: "Physical-assessment summary", scopeLabel: "What changed since your estimate", confirmedLabel: "Confirmed services",
-    finalPriceLabel: "Final package price",
-    finalConsentStatement: "I understand that accepting this quote is a financial agreement for the coordinated-care package and is not procedure-specific medical consent; my doctor will take separate informed consent before treatment.",
-    acceptFinal: "Accept final treatment plan and quote",
-    // done
+    assessmentLabel: "Physical-assessment summary", scopeLabel: "What changed since your estimate",
+    confirmedLabel: "Confirmed services", finalPriceLabel: "Final package price", acceptFinal: "Accept & continue",
     ackDoneTitle: "Thank you — your estimate is acknowledged", ackDoneMsg: "We've sent an invitation to activate your account so we can begin coordinating your care.",
     acceptedTitle: "Thank you — you accepted your treatment plan", acceptedMsg: "Your coordinator will confirm the next steps with you.",
     declinedTitle: "Your response was recorded", declinedMsg: "You have declined. Your coordinator remains available if anything changes.",
     revisionTitle: "Your request was sent", revisionMsg: "Your coordinator will prepare a revised document and send you a new secure link.",
+    blockedExpired: "This estimate has expired. Your coordinator can prepare an updated one for you.",
+    blockedSuperseded: "A newer version of this document is available, so this one can no longer be used.",
+    blockedDecided: "A decision has already been recorded for this document.",
+    contactCoordinator: "Your coordinator will be in touch. You can reply to the message that brought you here.",
+    summaryHeading: "Estimate summary", scopeHeading: "What this estimate covers",
+    reviewedBy: "Reviewed by",
   },
   ar: {
-    greeting: "أُعدّ لصالح", validUntil: "صالح حتى", servicesLabel: "الخدمات المشمولة",
-    treatmentLabel: "التوصية السريرية", risksLabel: "المخاطر والقيود", notesLabel: "ملاحظات من منسّق حالتك",
+    greeting: "أُعدّ لصالح", caseRef: "رقم الحالة", versionLabel: "الإصدار", validUntil: "صالح حتى",
+    servicesLabel: "الخدمات الموصى بها", treatmentLabel: "توصية استشاريك",
+    risksLabel: "المخاطر والقيود", notesLabel: "ملاحظات من منسّق حالتك",
     verifyTitle: "لنتأكد أنه أنت", verifyIntroWhatsapp: "لحماية معلوماتك، سنرسل رمزًا من 6 أرقام إلى واتساب الخاص بك",
     verifyIntroEmail: "لحماية معلوماتك، سنرسل رمزًا من 6 أرقام إلى بريدك الإلكتروني",
     emailInstead: "استخدم البريد الإلكتروني بدلًا من ذلك", whatsappInstead: "استخدم واتساب بدلًا من ذلك",
     sendCode: "إرسال الرمز", sending: "جارٍ الإرسال…", codeSent: "أرسلنا رمزًا إلى", resend: "إعادة إرسال الرمز",
     codeLabel: "أدخل الرمز المكوّن من 6 أرقام", codePlaceholder: "______", verify: "تحقّق", verifying: "جارٍ التحقق…",
-    requestRevision: "طلب تعديلات", decline: "رفض", commentLabel: "أضف ملاحظة (اختياري)", deciding: "جارٍ الإرسال…",
+    requestRevision: "طلب تعديلات", decline: "رفض التقدير", moreOptions: "خيارات أخرى",
+    deciding: "جارٍ الإرسال…",
     invalid: "رابط العرض غير صالح أو منتهي الصلاحية.", error: "تعذر إكمال الطلب.",
-    tooMany: "طلبات كثيرة جدًا. يُرجى المحاولة لاحقًا.", loading: "جارٍ التحميل…", decidedAlready: "تم بالفعل تسجيل قرار لهذا المستند.",
-    prelimBadge: "تقدير مبدئي للرعاية — ليس فاتورتك النهائية", prelimTitle: "تقديرك المبدئي للرعاية",
+    tooMany: "طلبات كثيرة جدًا. يُرجى المحاولة لاحقًا.", loading: "جارٍ التحميل…",
+    prelimBadge: "تقدير مبدئي للرعاية", prelimTitle: "تقديرك المبدئي للرعاية",
     assumptionsLabel: "افتراضات مهمة", changeLabel: "ما قد يتغيّر بعد الفحص السريري",
-    excludedLabel: "غير مشمول", rangeLabel: "باقة الرعاية المنسّقة التقديرية", expectedLabel: "المتوقع", rangeSep: "إلى",
+    includedLabel: "المشمول في هذا التقدير", excludedLabel: "غير المشمول",
+    excludedFallback: "الخدمات غير المدرجة في هذا التقدير ليست مشمولة، وسيتم مناقشتها معك قبل إضافتها.",
+    rangeLabel: "باقة الرعاية المنسّقة التقديرية", expectedLabel: "المتوقع", rangeSep: "إلى",
+    servicesCount: (n: number) => `${n} خدمة`,
+    estimateBasis: "بناءً على التوصية الحالية والخدمات المشمولة. قد يتغيّر العلاج والسعر النهائي بعد الفحص الحضوري.",
     coordinationNote: "يشمل سعر الباقة تنسيق الحالة وترتيبات مقدّمي الخدمة والجدولة وخدمات دعم المريض من رحلة شفاء.",
-    payNow: "ما تدفعه الآن", payNowNote: "وديعة تنسيق للبدء — تُخصم من رصيدك النهائي.", alreadyPaid: "مدفوع مسبقًا (يُخصم من هذا العرض)",
-    ackStatement: "أفهم أن هذا التقدير يستند إلى مراجعة عن بُعد. قد ترتفع أو تنخفض خطة العلاج النهائية وسعرها بعد فحص الطبيب المعالج لي. سأستلم عرضًا نهائيًا وأقرّره قبل أي علاج غير طارئ.",
-    acknowledge: "الإقرار بالتقدير والمتابعة",
+    servicesTotal: "إجمالي الخدمات التقديري",
+    payNow: "ما تدفعه الآن", payNowNote: "وديعة تنسيق للبدء — تُخصم من رصيدك النهائي.",
+    alreadyPaid: "مدفوع مسبقًا (يُخصم من هذا العرض)",
+    nextTitle: "ما الذي يحدث بعد ذلك",
+    nextPrelim: [
+      "تُقرّ بهذا التقدير للمتابعة.",
+      "نرسل لك رابطًا آمنًا لاستكمال ملفك الشخصي.",
+      "تسدّد وديعة التنسيق، وتُخصم من رصيدك النهائي.",
+      "يرتّب منسّق حالتك علاجك وسفرك.",
+      "بعد فحصك الحضوري تستلم عرضًا نهائيًا لتقرّره.",
+    ],
+    nextFinal: [
+      "تقبل خطة العلاج والعرض النهائي.",
+      "يؤكد منسّق حالتك جدولك وترتيباتك.",
+      "يأخذ طبيبك المعالج موافقة طبية منفصلة قبل العلاج.",
+    ],
+    beforeTitle: "قبل أن تتابع",
+    ackShort: "أفهم أن هذا تقدير مبدئي يستند إلى مراجعة عن بُعد.",
+    ackStatement: "قد ترتفع أو تنخفض خطة العلاج النهائية وسعرها بعد فحص الطبيب المعالج لي. سأستلم عرضًا نهائيًا وأقرّره قبل أي علاج غير طارئ.",
+    ackShortFinal: "أفهم أن قبول هذا العرض اتفاق مالي.",
+    finalConsentStatement: "يشمل القبول باقة الرعاية المنسّقة وليس موافقة طبية خاصة بالإجراء؛ وسيأخذ طبيبي موافقة مستنيرة منفصلة قبل العلاج.",
+    ackRequired: "يرجى تأكيد فهمك قبل المتابعة.",
+    acknowledge: "الإقرار والمتابعة",
     finalBadge: "خطة العلاج والعرض النهائي", finalTitle: "خطة علاجك وعرضك النهائي",
-    assessmentLabel: "ملخّص الفحص السريري", scopeLabel: "ما الذي تغيّر منذ تقديرك", confirmedLabel: "الخدمات المؤكدة",
-    finalPriceLabel: "سعر الباقة النهائي",
-    finalConsentStatement: "أفهم أن قبول هذا العرض هو اتفاق مالي على باقة الرعاية المنسّقة وليس موافقة طبية خاصة بالإجراء؛ وسيأخذ طبيبي موافقة مستنيرة منفصلة قبل العلاج.",
-    acceptFinal: "قبول خطة العلاج والعرض النهائي",
+    assessmentLabel: "ملخّص الفحص السريري", scopeLabel: "ما الذي تغيّر منذ تقديرك",
+    confirmedLabel: "الخدمات المؤكدة", finalPriceLabel: "سعر الباقة النهائي", acceptFinal: "القبول والمتابعة",
     ackDoneTitle: "شكرًا لك — تم الإقرار بتقديرك", ackDoneMsg: "أرسلنا دعوة لتفعيل حسابك لنبدأ تنسيق رعايتك.",
     acceptedTitle: "شكرًا لك — لقد قبلت خطة علاجك", acceptedMsg: "سيؤكد منسّق حالتك الخطوات التالية معك.",
     declinedTitle: "تم تسجيل ردك", declinedMsg: "لقد رفضت. يبقى منسّق حالتك متاحًا إذا تغيّر أي شيء.",
     revisionTitle: "تم إرسال طلبك", revisionMsg: "سيقوم منسّق حالتك بإعداد مستند معدّل وإرسال رابط آمن جديد إليك.",
+    blockedExpired: "انتهت صلاحية هذا التقدير. يمكن لمنسّق حالتك إعداد تقدير محدّث لك.",
+    blockedSuperseded: "يتوفر إصدار أحدث من هذا المستند، لذا لم يعد بالإمكان استخدام هذا الإصدار.",
+    blockedDecided: "تم بالفعل تسجيل قرار لهذا المستند.",
+    contactCoordinator: "سيتواصل معك منسّق حالتك. يمكنك الرد على الرسالة التي وصلتك.",
+    summaryHeading: "ملخّص التقدير", scopeHeading: "ما يغطيه هذا التقدير",
+    reviewedBy: "راجعها",
   },
 };
 
 type Phase = "loading" | "invalid" | "intro" | "code" | "view" | "done";
+
+/** A titled block of the consultant's or coordinator's own words; absent when there is nothing to say. */
+function Prose({ label, text, id }: { label: string; text?: string; id?: string }) {
+  if (!text) return null;
+  return (
+    <section aria-labelledby={id} className="mt-7">
+      <h2 id={id} className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{label}</h2>
+      <p dir="auto" className="mt-2 whitespace-pre-line text-[1rem] leading-7 text-ink-800">{text}</p>
+    </section>
+  );
+}
 
 export function ProposalSign({ locale, token }: { locale: Locale; token: string }) {
   const t = copy[locale];
@@ -90,11 +162,16 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const [grant, setGrant] = useState("");
   const [channel, setChannel] = useState<"WHATSAPP" | "EMAIL">("WHATSAPP");
   const [code, setCode] = useState("");
-  const [comment, setComment] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
-  const [outcome, setOutcome] = useState<"ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED" | null>(null);
+  const [ackError, setAckError] = useState(false);
+  const [outcome, setOutcome] = useState<Decision | null>(null);
+  const [dialog, setDialog] = useState<"REVISION_REQUESTED" | "DECLINED" | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [blocked, setBlocked] = useState<Blocked>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const decisionRef = useRef<HTMLDivElement>(null);
+  const [decisionVisible, setDecisionVisible] = useState(true);
 
   useEffect(() => {
     void fetch(`${API}/api/v1/public/proposals/${token}`)
@@ -102,6 +179,15 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
       .then((s) => { setSummary(s); setChannel(s.channel === "EMAIL" ? "EMAIL" : "WHATSAPP"); setPhase("intro"); })
       .catch(() => setPhase("invalid"));
   }, [token]);
+
+  // The sticky bar exists to carry the decision while it is off screen — never alongside it.
+  useEffect(() => {
+    const node = decisionRef.current;
+    if (phase !== "view" || !node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setDecisionVisible(entry.isIntersecting), { rootMargin: "-80px 0px 0px 0px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [phase, proposal]);
 
   async function requestAccess(ch: "WHATSAPP" | "EMAIL" = channel) {
     setBusy(true); setError("");
@@ -124,42 +210,74 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
       const full = await fetch(`${API}/api/v1/public/proposals/${token}/view`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grant: g.grant }) })
         .then(async (r) => { if (!r.ok) throw new Error(t.error); return r.json() as Promise<Proposal>; });
       setProposal(full);
-      if (full.decided) setError(t.decidedAlready);
+      if (full.decided) setBlocked("DECIDED");
+      else if (full.validUntil && new Date(full.validUntil).getTime() <= Date.now()) setBlocked("EXPIRED");
       setPhase("view");
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   }
 
-  async function decide(decision: "ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED") {
+  /** One operation for every decision, whichever control invoked it. Backend status decides the outcome. */
+  async function decide(decision: Decision, comment?: string, acknowledgementAccepted?: boolean) {
     setBusy(true); setError("");
     try {
-      const r = await fetch(`${API}/api/v1/public/proposals/${token}/decision`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grant, decision, comment: comment || undefined }) });
-      if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { message?: string }).message ?? t.error);
+      const r = await fetch(`${API}/api/v1/public/proposals/${token}/decision`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grant, decision, comment: comment || undefined, acknowledgementAccepted }),
+      });
+      if (!r.ok) {
+        // A stale document must not look like a transient failure: say what happened and stop offering actions.
+        if (r.status === 410) { setBlocked("EXPIRED"); return; }
+        if (r.status === 409) { setBlocked("SUPERSEDED"); return; }
+        throw new Error(((await r.json().catch(() => ({}))) as { message?: string }).message ?? t.error);
+      }
       setOutcome(decision); setPhase("done");
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   }
 
+  function submitPrimary() {
+    if (!acknowledged) { setAckError(true); decisionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    setAckError(false);
+    void decide(isFinal ? "ACCEPTED" : "ACKNOWLEDGED", undefined, true);
+  }
+
   const isFinal = proposal?.documentType === "FINAL_TREATMENT_QUOTE";
-  const money = (n?: number) => n == null ? "—" : new Intl.NumberFormat(locale, { style: "currency", currency: proposal?.currency ?? "EGP" }).format(n);
-  const itemsTotal = proposal ? proposal.items.filter((i) => !i.optional).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0) : 0;
+  const currency = proposal?.currency ?? "EGP";
+  // Amounts are computed and rounded by the backend; this only formats them.
+  const money = (n?: number) => {
+    if (n == null) return "—";
+    const whole = Number.isInteger(n);
+    try { return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(n); }
+    catch { return `${currency} ${n.toLocaleString(locale)}`; }
+  };
+  const items = useMemo(() => proposal?.items.filter((i) => !i.optional) ?? [], [proposal]);
+  const itemsTotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
   const expected = proposal?.totalExpected ?? itemsTotal;
   const hasRange = proposal?.totalMin != null && proposal?.totalMax != null && proposal.totalMin !== proposal.totalMax;
-  const ackStatement = isFinal ? t.finalConsentStatement : t.ackStatement;
+  // Only group when the data genuinely carries more than one category — never invent clinical sections.
+  const groups = useMemo(() => {
+    const distinct = new Set(items.map((i) => i.category).filter(Boolean));
+    if (distinct.size < 2) return [{ category: null as string | null, rows: items }];
+    return [...distinct].map((category) => ({ category, rows: items.filter((i) => i.category === category) }));
+  }, [items]);
+
   const primaryLabel = isFinal ? t.acceptFinal : t.acknowledge;
+  const ackShort = isFinal ? t.ackShortFinal : t.ackShort;
+  const ackLong = isFinal ? t.finalConsentStatement : t.ackStatement;
+  const nextSteps = (isFinal ? t.nextFinal : t.nextPrelim)
+    .filter((_, index) => !(!isFinal && index === 2 && !(proposal?.depositDueDisplay && proposal.depositDueDisplay > 0)));
   const doneCopy = outcome === "DECLINED" ? { title: t.declinedTitle, msg: t.declinedMsg }
     : outcome === "REVISION_REQUESTED" ? { title: t.revisionTitle, msg: t.revisionMsg }
     : isFinal ? { title: t.acceptedTitle, msg: t.acceptedMsg } : { title: t.ackDoneTitle, msg: t.ackDoneMsg };
-
-  const Section = ({ label, text }: { label: string; text?: string }) => text
-    ? <div className="mt-4"><p className="text-sm font-bold text-brand-700">{label}</p><p className="mt-1 whitespace-pre-line text-ink-700">{text}</p></div> : null;
+  const blockedMessage = blocked === "EXPIRED" ? t.blockedExpired : blocked === "SUPERSEDED" ? t.blockedSuperseded : t.blockedDecided;
 
   return (
     <section className="section bg-mist">
-      <div className="container-site max-w-2xl">
+      <div className="container-site max-w-[1120px]">
         {phase === "loading" && <p className="card p-6" aria-live="polite">{t.loading}</p>}
         {phase === "invalid" && <p role="alert" className="card bg-alert-50 p-6 text-alert-800">{t.invalid}</p>}
 
         {(phase === "intro" || phase === "code") && summary && (
-          <div className="card p-6 sm:p-8">
+          <div className="card mx-auto max-w-xl p-6 sm:p-8">
             <p className="eyebrow">RehletShifaa · {summary.caseNumber}</p>
             <h1 className="headline mt-2">{t.verifyTitle}</h1>
             <p className="mt-3 text-ink-700">{channel === "WHATSAPP" ? t.verifyIntroWhatsapp : t.verifyIntroEmail} <strong dir="ltr">{(channel === "WHATSAPP" ? summary.whatsappHint : summary.emailHint) ?? summary.destinationHint}</strong>.</p>
@@ -190,75 +308,203 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
         )}
 
         {phase === "view" && proposal && (
-          <div className="card p-6 sm:p-8">
-            <span className="inline-block rounded-full px-3 py-1 text-xs font-bold" style={isFinal ? { background: "var(--brand-600, #0E6E5C)", color: "#fff" } : { background: "#F4E9CF", color: "#8a6620" }}>{isFinal ? t.finalBadge : t.prelimBadge}</span>
-            <h1 className="headline mt-3">{isFinal ? t.finalTitle : t.prelimTitle}</h1>
-            <p className="mt-2 text-ink-600">{t.greeting} <strong>{proposal.patientName}</strong> · {proposal.caseNumber}{proposal.versionNumber ? ` · v${proposal.versionNumber}` : ""}</p>
+          <>
+            {/* Identity of the document first: what it is, who it is for, and how long it stands. */}
+            <header className="rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(28,51,58,0.05)] sm:p-7">
+              <span className={`inline-block rounded-full px-3 py-1 text-[0.72rem] font-bold ${isFinal ? "bg-brand-600 text-white" : "bg-amber-50 text-amber-900 ring-1 ring-amber-200"}`}>
+                {isFinal ? t.finalBadge : t.prelimBadge}
+              </span>
+              <h1 className="mt-3 text-[1.6rem] font-bold leading-8 text-brand-900 sm:text-[1.9rem]">{isFinal ? t.finalTitle : t.prelimTitle}</h1>
+              <dl className="mt-5 grid gap-x-8 gap-y-3 border-t border-line pt-4 text-[0.9rem] sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.greeting}</dt>
+                  <dd dir="auto" className="mt-0.5 font-bold text-ink-900">{proposal.patientName}</dd>
+                </div>
+                <div>
+                  <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.caseRef}</dt>
+                  <dd className="mt-0.5 font-bold text-ink-900" dir="ltr">{proposal.caseNumber}</dd>
+                </div>
+                {proposal.versionNumber != null && (
+                  <div>
+                    <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.versionLabel}</dt>
+                    <dd className="mt-0.5 font-bold text-ink-900">{proposal.versionNumber}</dd>
+                  </div>
+                )}
+                {proposal.validUntil && (
+                  <div>
+                    <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.validUntil}</dt>
+                    <dd className="mt-0.5 font-bold text-ink-900">{new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(new Date(proposal.validUntil))}</dd>
+                  </div>
+                )}
+              </dl>
+            </header>
 
-            <Section label={isFinal ? t.assessmentLabel : t.treatmentLabel} text={proposal.recommendedTreatment} />
-            {isFinal && <Section label={t.scopeLabel} text={proposal.scopeChangeReason} />}
-            {!isFinal && <Section label={t.assumptionsLabel} text={proposal.assumptions} />}
-            <Section label={isFinal ? t.risksLabel : t.changeLabel} text={proposal.risksAndLimitations} />
+            {blocked && (
+              <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.92rem] leading-6 text-amber-900">
+                {blockedMessage} <span className="text-ink-700">{t.contactCoordinator}</span>
+              </p>
+            )}
 
-            <p className="mt-6 text-sm font-bold text-brand-700">{isFinal ? t.confirmedLabel : t.servicesLabel}</p>
-            <ul className="mt-2 divide-y divide-line">
-              {proposal.items.map((item) => (
-                <li key={item.id} className="flex justify-between gap-4 py-3">
-                  <span>{item.description}{item.optional ? " (optional)" : ""}</span>
-                  <span className="font-bold">{money(item.quantity * item.unitPrice)}</span>
-                </li>
-              ))}
-            </ul>
-            {proposal.excludedServices && <p className="mt-3 text-sm text-ink-500"><span className="font-bold">{t.excludedLabel}:</span> {proposal.excludedServices}</p>}
+            <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+              <div className="min-w-0 rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(28,51,58,0.05)] sm:p-7">
+                <Prose id="recommendation-heading" label={isFinal ? t.assessmentLabel : t.treatmentLabel} text={proposal.recommendedTreatment} />
+                {proposal.consultantName && (
+                  <p className="mt-2 text-[0.88rem] font-semibold text-brand-800">{t.reviewedBy} <span dir="auto">{proposal.consultantName}</span></p>
+                )}
+                {isFinal && <Prose id="scope-heading" label={t.scopeLabel} text={proposal.scopeChangeReason} />}
+                {!isFinal && <Prose id="assumptions-heading" label={t.assumptionsLabel} text={proposal.assumptions} />}
+                <Prose id="risks-heading" label={isFinal ? t.risksLabel : t.changeLabel} text={proposal.risksAndLimitations} />
 
-            <div className="mt-5 rounded-xl bg-brand-50 p-4">
-              <p className="text-sm font-bold text-brand-800">{isFinal ? t.finalPriceLabel : t.rangeLabel}</p>
-              {hasRange
-                ? <p className="mt-1 text-2xl font-bold text-ink-900">{money(proposal.totalMin)} <span className="text-base font-normal text-ink-500">{t.rangeSep}</span> {money(proposal.totalMax)}</p>
-                : <p className="mt-1 text-2xl font-bold text-ink-900">{money(expected)}</p>}
-              {hasRange && <p className="mt-1 text-sm text-ink-600">{t.expectedLabel}: <strong>{money(expected)}</strong></p>}
-              <p className="mt-2 text-xs leading-5 text-ink-600">{t.coordinationNote}</p>
+                {/* The price breakdown: names left, amounts aligned to the line end, one rhythm. */}
+                <section aria-labelledby="services-heading" className="mt-8">
+                  <h2 id="services-heading" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">
+                    {isFinal ? t.confirmedLabel : t.servicesLabel}
+                  </h2>
+                  {groups.map((group) => (
+                    <div key={group.category ?? "all"} className="mt-3">
+                      {group.category && <p className="border-b border-line pb-1.5 text-[0.8rem] font-bold text-ink-600">{group.category}</p>}
+                      <ul>
+                        {group.rows.map((item) => (
+                          <li key={item.id} className="flex items-baseline justify-between gap-6 border-b border-line py-3 last:border-0">
+                            <span dir="auto" className="min-w-0 text-[0.95rem] leading-6 text-ink-800">{item.description}</span>
+                            <span className="flex-none whitespace-nowrap text-[0.95rem] font-bold tabular-nums text-ink-900">{money(item.quantity * item.unitPrice)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                  <p className="mt-3 flex items-baseline justify-between gap-6 border-t-2 border-brand-200 pt-3">
+                    <span className="text-[0.95rem] font-bold text-ink-800">{t.servicesTotal}</span>
+                    <span className="whitespace-nowrap text-[1.05rem] font-bold tabular-nums text-brand-900">{money(expected)}</span>
+                  </p>
+                </section>
+
+                <section aria-labelledby="scope-of-cover" className="mt-8 grid gap-5 sm:grid-cols-2">
+                  <h2 id="scope-of-cover" className="sr-only">{t.scopeHeading}</h2>
+                  <div>
+                    <p className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.includedLabel}</p>
+                    <p dir="auto" className="mt-2 text-[0.92rem] leading-6 text-ink-700">{proposal.includedServices || items.map((i) => i.description).join(" · ")}</p>
+                    <p className="mt-2 text-[0.85rem] leading-6 text-ink-600">{t.coordinationNote}</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.excludedLabel}</p>
+                    <p dir="auto" className="mt-2 text-[0.92rem] leading-6 text-ink-700">{proposal.excludedServices?.trim() || t.excludedFallback}</p>
+                  </div>
+                </section>
+
+                <section aria-labelledby="next-heading" className="mt-8 rounded-xl bg-mist p-4 sm:p-5">
+                  <h2 id="next-heading" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.nextTitle}</h2>
+                  <ol className="mt-3 space-y-2.5">
+                    {nextSteps.map((step, index) => (
+                      <li key={step} className="flex gap-3 text-[0.92rem] leading-6 text-ink-800">
+                        <span aria-hidden className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-brand-100 text-[0.72rem] font-bold text-brand-800">{index + 1}</span>
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+
+                <Prose id="notes-heading" label={t.notesLabel} text={proposal.notes} />
+                {proposal.disclaimers && <p className="mt-6 border-t border-line pt-4 text-[0.78rem] leading-5 text-ink-500">{proposal.disclaimers}</p>}
+
+                {!blocked && (
+                  <div ref={decisionRef} className="mt-8 border-t border-line pt-6">
+                    <h2 className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.beforeTitle}</h2>
+                    <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white p-4 has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
+                      <input type="checkbox" className="mt-0.5 h-5 w-5 flex-none accent-brand-600" checked={acknowledged}
+                             aria-describedby="ack-detail" aria-invalid={ackError || undefined}
+                             onChange={(e) => { setAcknowledged(e.target.checked); if (e.target.checked) setAckError(false); }} />
+                      <span>
+                        <span className="block text-[0.95rem] font-semibold leading-6 text-ink-900">{ackShort}</span>
+                        <span id="ack-detail" className="mt-1 block text-[0.85rem] leading-6 text-ink-600">{ackLong}</span>
+                      </span>
+                    </label>
+                    {ackError && <p role="alert" className="mt-2 text-[0.85rem] font-semibold text-alert-700">{t.ackRequired}</p>}
+                    {error && <p role="alert" className="mt-3 rounded-xl bg-alert-50 p-3 text-[0.9rem] text-alert-800">{error}</p>}
+
+                    <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
+                      <button className="btn-primary min-h-11 px-6" disabled={busy} onClick={submitPrimary}>{busy ? t.deciding : primaryLabel}</button>
+                      <button type="button" className="min-h-11 text-[0.92rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
+                              disabled={busy} onClick={() => setDialog("REVISION_REQUESTED")}>{t.requestRevision}</button>
+                    </div>
+
+                    <details className="mt-4" open={moreOpen} onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}>
+                      <summary className="inline-block cursor-pointer text-[0.85rem] font-semibold text-ink-500 hover:text-ink-700">{t.moreOptions}</summary>
+                      <button type="button" className="mt-3 min-h-11 text-[0.9rem] font-semibold text-ink-600 underline underline-offset-4 hover:text-alert-700 disabled:opacity-50"
+                              disabled={busy} onClick={() => setDialog("DECLINED")}>{t.decline}</button>
+                    </details>
+                  </div>
+                )}
+              </div>
+
+              {/* The commercial answer, kept beside the reading rather than buried under it. */}
+              <aside aria-labelledby="summary-heading" className="order-first lg:order-none lg:sticky lg:top-6">
+                <div className="rounded-2xl border border-brand-200 bg-brand-50 p-5">
+                  <h2 id="summary-heading" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.summaryHeading}</h2>
+                  <p className="mt-3 text-[0.85rem] font-semibold text-ink-700">{isFinal ? t.finalPriceLabel : t.rangeLabel}</p>
+                  {hasRange ? (
+                    <>
+                      <p className="mt-1 text-[1.5rem] font-bold leading-8 text-brand-900">{money(proposal.totalMin)} <span className="text-[0.9rem] font-normal text-ink-500">{t.rangeSep}</span> {money(proposal.totalMax)}</p>
+                      <p className="mt-1 text-[0.88rem] text-ink-700">{t.expectedLabel}: <strong>{money(expected)}</strong></p>
+                    </>
+                  ) : (
+                    <p className="mt-1 text-[1.75rem] font-bold leading-9 text-brand-900">{money(expected)}</p>
+                  )}
+                  <p className="mt-3 border-t border-brand-200 pt-3 text-[0.82rem] leading-5 text-ink-600">{t.estimateBasis}</p>
+                  <dl className="mt-3 space-y-1.5 text-[0.85rem]">
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-ink-600">{t.servicesLabel}</dt>
+                      <dd className="font-semibold text-ink-800">{t.servicesCount(items.length)}</dd>
+                    </div>
+                    {proposal.validUntil && (
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-ink-600">{t.validUntil}</dt>
+                        <dd className="font-semibold text-ink-800">{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(proposal.validUntil))}</dd>
+                      </div>
+                    )}
+                  </dl>
+                  {!isFinal && proposal.depositDueDisplay != null && proposal.depositDueDisplay > 0 && (
+                    <div className="mt-4 rounded-xl bg-white p-3.5">
+                      <p className="text-[0.8rem] font-bold text-brand-800">{t.payNow}</p>
+                      <p className="mt-0.5 text-[1.15rem] font-bold text-ink-900">{money(proposal.depositDueDisplay)}</p>
+                      <p className="mt-1 text-[0.78rem] leading-5 text-ink-600">{t.payNowNote}</p>
+                    </div>
+                  )}
+                  {isFinal && proposal.depositPaidDisplay != null && proposal.depositPaidDisplay > 0 && (
+                    <p className="mt-4 text-[0.85rem] text-ink-700">{t.alreadyPaid}: <strong>{money(proposal.depositPaidDisplay)}</strong></p>
+                  )}
+                </div>
+              </aside>
             </div>
 
-            {!isFinal && proposal.depositDueDisplay != null && proposal.depositDueDisplay > 0 && (
-              <div className="mt-4 rounded-xl border border-brand-200 p-4">
-                <p className="text-sm font-bold text-brand-800">{t.payNow}</p>
-                <p className="mt-1 text-xl font-bold text-ink-900">{money(proposal.depositDueDisplay)}</p>
-                <p className="mt-1 text-xs text-ink-600">{t.payNowNote}</p>
+            {/* Carries the same two operations while the decision block is out of view; never a third choice. */}
+            {!blocked && !decisionVisible && (
+              <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-2px_12px_rgba(28,51,58,0.08)] backdrop-blur">
+                <div className="container-site flex max-w-[1120px] flex-wrap items-center justify-between gap-3 px-0">
+                  <div className="min-w-0">
+                    <p className="text-[1.05rem] font-bold leading-6 text-brand-900">{money(expected)}</p>
+                    <p className="text-[0.75rem] text-ink-600">{isFinal ? t.finalPriceLabel : t.rangeLabel}</p>
+                  </div>
+                  <div className="flex flex-1 flex-wrap items-center justify-end gap-3 sm:flex-none">
+                    <button type="button" className="min-h-11 text-[0.9rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
+                            disabled={busy} onClick={() => setDialog("REVISION_REQUESTED")}>{t.requestRevision}</button>
+                    <button className="btn-primary min-h-11 flex-1 justify-center px-5 sm:flex-none" disabled={busy} onClick={submitPrimary}>{busy ? t.deciding : primaryLabel}</button>
+                  </div>
+                </div>
               </div>
             )}
-            {isFinal && proposal.depositPaidDisplay != null && proposal.depositPaidDisplay > 0 && (
-              <p className="mt-4 text-sm text-ink-600">{t.alreadyPaid}: <strong>{money(proposal.depositPaidDisplay)}</strong></p>
-            )}
+            {!blocked && !decisionVisible && <div aria-hidden className="h-20" />}
 
-            <Section label={t.notesLabel} text={proposal.notes} />
-            {proposal.disclaimers && <p className="mt-4 text-xs text-ink-500">{proposal.disclaimers}</p>}
-            {proposal.validUntil && <p className="mt-2 text-sm text-ink-500">{t.validUntil} {new Intl.DateTimeFormat(locale).format(new Date(proposal.validUntil))}</p>}
-
-            {proposal.decided ? (
-              <p role="alert" className="mt-6 rounded-xl bg-mist p-4 text-ink-700">{t.decidedAlready}</p>
-            ) : (
-              <>
-                <label className="mt-8 flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white p-4">
-                  <input type="checkbox" className="mt-1 h-5 w-5 accent-brand-600" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
-                  <span className="text-sm leading-6 text-ink-700">{ackStatement}</span>
-                </label>
-                <label className="mt-4 block text-sm font-bold">{t.commentLabel}
-                  <textarea className="field mt-2" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
-                </label>
-                {error && <p role="alert" className="mt-4 rounded-xl bg-alert-50 p-3 text-alert-800">{error}</p>}
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <button className="btn-primary" disabled={busy || !acknowledged} onClick={() => void decide(isFinal ? "ACCEPTED" : "ACKNOWLEDGED")}>{busy ? t.deciding : primaryLabel}</button>
-                  <button className="btn-secondary" disabled={busy} onClick={() => void decide("REVISION_REQUESTED")}>{t.requestRevision}</button>
-                  <button className="btn-secondary" disabled={busy} onClick={() => void decide("DECLINED")}>{t.decline}</button>
-                </div>
-              </>
+            {dialog && (
+              <ProposalDecisionDialog locale={locale} kind={dialog} busy={busy}
+                                      onConfirm={(comment) => { setDialog(null); void decide(dialog, comment); }}
+                                      onClose={() => setDialog(null)} />
             )}
-          </div>
+          </>
         )}
 
         {phase === "done" && (
-          <div className="card p-8 text-center">
+          <div className="card mx-auto max-w-xl p-8 text-center">
             <h1 className="headline">{doneCopy.title}</h1>
             <p className="lead mt-4">{doneCopy.msg}</p>
           </div>

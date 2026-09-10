@@ -22,8 +22,8 @@ type Api = <T,>(path: string, init?: RequestInit) => Promise<T>;
 export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; api: Api; onOpenCase: (caseId: string) => void }) {
   const ar = locale === "ar";
   const t = ar
-    ? { label: "الإشعارات", unread: "غير مقروءة", empty: "لا توجد إشعارات بعد.", emptyHint: "سنُعلمك عندما يحتاج شيء إلى تدخلك.", markAll: "تعليم الكل كمقروء", open: "فتح الحالة", close: "إغلاق", now: "الآن", ago: "منذ" }
-    : { label: "Notifications", unread: "unread", empty: "No notifications yet.", emptyHint: "We'll tell you when something needs you.", markAll: "Mark all as read", open: "Open case", close: "Close", now: "Just now", ago: "ago" };
+    ? { label: "الإشعارات", unread: "غير مقروءة", empty: "لا توجد إشعارات بعد.", emptyHint: "سنُعلمك عندما يحتاج شيء إلى تدخلك.", markAll: "تعليم الكل كمقروء", markOne: "تعليم كمقروء", open: "فتح الحالة", close: "إغلاق", now: "الآن", ago: "منذ" }
+    : { label: "Notifications", unread: "unread", empty: "No notifications yet.", emptyHint: "We'll tell you when something needs you.", markAll: "Mark all as read", markOne: "Mark as read", open: "Open case", close: "Close", now: "Just now", ago: "ago" };
 
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const [feed, setFeed] = useState<Feed>({ unread: 0, items: [] });
@@ -116,7 +116,7 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
                     )}
                   </div>
                   {!item.read && (
-                    <button type="button" className="icon-button flex-none" aria-label={`${t.markAll}: ${item.title}`} onClick={() => void markRead(item.id)}>
+                    <button type="button" className="icon-button flex-none" aria-label={`${t.markOne}: ${item.title}`} onClick={() => void markRead(item.id)}>
                       <Check size={16}/>
                     </button>
                   )}

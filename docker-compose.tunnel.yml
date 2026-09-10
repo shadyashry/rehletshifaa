@@ -1,50 +1,82 @@
-# Cloudflare quick-tunnel override — throwaway public URLs (regenerate on restart).
-# Mailpit UI: https://principle-presence-samuel-preferred.trycloudflare.com
-# Usage: docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build frontend backend minio
-#   plus recreate keycloak so the realm re-imports with the public redirect URIs.
 services:
   keycloak:
     command:
-      - start-dev
-      - --import-realm
-      - --hostname=https://supreme-mean-with-longer.trycloudflare.com
-      - --proxy-headers=xforwarded
-
-  minio:
-    environment:
-      MINIO_API_CORS_ALLOW_ORIGIN: https://infrastructure-compared-require-sympathy.trycloudflare.com
-
+    - start-dev
+    - --import-realm
+    - --hostname=https://auth-dev.rehletshifaa.com
+    - --proxy-headers=xforwarded
   backend:
     environment:
-      FRONTEND_ALLOWED_ORIGINS: https://infrastructure-compared-require-sympathy.trycloudflare.com
-      APP_PUBLIC_BASE_URL: https://keen-entered-did-seas.trycloudflare.com
-      APP_WEB_BASE_URL: https://infrastructure-compared-require-sympathy.trycloudflare.com
-      OIDC_ISSUER_URI: https://supreme-mean-with-longer.trycloudflare.com/realms/rehletshifaa
-      S3_PUBLIC_ENDPOINT: https://lip-unto-johns-generally.trycloudflare.com
-      WHATSAPP_MODE: ${WHATSAPP_MODE:-noop}
-      WHATSAPP_META_GRAPH_VERSION: ${WHATSAPP_META_GRAPH_VERSION:-v23.0}
-      WHATSAPP_META_PHONE_NUMBER_ID: ${WHATSAPP_META_PHONE_NUMBER_ID:-}
-      WHATSAPP_META_ACCESS_TOKEN: ${WHATSAPP_META_ACCESS_TOKEN:-}
-      WHATSAPP_META_VERIFY_TOKEN: ${WHATSAPP_META_VERIFY_TOKEN:-}
-      WHATSAPP_META_APP_SECRET: ${WHATSAPP_META_APP_SECRET:-}
-      WHATSAPP_META_AUTH_TEMPLATE: ${WHATSAPP_META_AUTH_TEMPLATE:-}
-      WHATSAPP_META_AUTH_TEMPLATE_LANGUAGE: ${WHATSAPP_META_AUTH_TEMPLATE_LANGUAGE:-en_US}
-
+      SPRING_PROFILES_ACTIVE: local
+      DB_URL: jdbc:postgresql://postgres:5432/rehletshifaa
+      DB_USERNAME: rehletshifaa
+      DB_PASSWORD: rehletshifaa
+      APP_SECURITY_ENABLED: 'true'
+      OIDC_ISSUER_URI: https://auth-dev.rehletshifaa.com/realms/rehletshifaa
+      OIDC_JWK_SET_URI: http://keycloak:8080/realms/rehletshifaa/protocol/openid-connect/certs
+      CLAIM_TOKEN_PEPPER: local-only-claim-pepper-change-in-production
+      PII_ENCRYPTION_KEY: local-only-pii-key-change-in-production
+      STORAGE_MODE: s3
+      AWS_ACCESS_KEY_ID: rehletshifaa
+      AWS_SECRET_ACCESS_KEY: RehletShifaaLocal123!
+      AWS_REGION: us-east-1
+      S3_BUCKET: medical-documents
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: https://files-dev.rehletshifaa.com
+      S3_PATH_STYLE: 'true'
+      S3_SSE_ALGORITHM: NONE
+      DOCUMENT_SCANNING_MODE: clamav
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      NOTIFICATIONS_MODE: live
+      MAIL_MODE: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      COORDINATOR_EMAIL: coordinator@local.test
+      MAIL_FROM: no-reply@local.test
+      IDENTITY_ADMIN_BASE_URL: http://keycloak:8080
+      IDENTITY_ADMIN_CLIENT_ID: staff-identity-admin
+      IDENTITY_ADMIN_CLIENT_SECRET: local-only-staff-identity-secret-change-me
+      STAFF_INVITE_LIFESPAN_SECONDS: 43200
+      FRONTEND_ALLOWED_ORIGINS: https://dev.rehletshifaa.com
+      APP_PUBLIC_BASE_URL: https://api-dev.rehletshifaa.com
+      APP_WEB_BASE_URL: https://dev.rehletshifaa.com
+      OPENAPI_ENABLED: 'true'
   frontend:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_BASE_URL: https://keen-entered-did-seas.trycloudflare.com
-        NEXT_PUBLIC_SITE_URL: https://infrastructure-compared-require-sympathy.trycloudflare.com
-        NEXT_PUBLIC_STORAGE_ORIGIN: https://lip-unto-johns-generally.trycloudflare.com
-        NEXT_PUBLIC_WHATSAPP_NUMBER: "201010447898"
-        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ""
-        NEXT_PUBLIC_OIDC_AUTHORITY: https://supreme-mean-with-longer.trycloudflare.com/realms/rehletshifaa
+        NEXT_PUBLIC_API_BASE_URL: https://api-dev.rehletshifaa.com
+        NEXT_PUBLIC_SITE_URL: https://dev.rehletshifaa.com
+        NEXT_PUBLIC_STORAGE_ORIGIN: https://files-dev.rehletshifaa.com
+        NEXT_PUBLIC_WHATSAPP_NUMBER: '201010447898'
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ''
+        NEXT_PUBLIC_OIDC_AUTHORITY: https://auth-dev.rehletshifaa.com/realms/rehletshifaa
         NEXT_PUBLIC_OIDC_CLIENT_ID: rehletshifaa-web
     environment:
-      NEXT_PUBLIC_API_BASE_URL: https://keen-entered-did-seas.trycloudflare.com
-      NEXT_PUBLIC_SITE_URL: https://infrastructure-compared-require-sympathy.trycloudflare.com
-      NEXT_PUBLIC_STORAGE_ORIGIN: https://lip-unto-johns-generally.trycloudflare.com
-      NEXT_PUBLIC_WHATSAPP_NUMBER: "201010447898"
-      NEXT_PUBLIC_OIDC_AUTHORITY: https://supreme-mean-with-longer.trycloudflare.com/realms/rehletshifaa
+      NEXT_PUBLIC_API_BASE_URL: https://api-dev.rehletshifaa.com
+      NEXT_PUBLIC_SITE_URL: https://dev.rehletshifaa.com
+      NEXT_PUBLIC_STORAGE_ORIGIN: https://files-dev.rehletshifaa.com
+      NEXT_PUBLIC_WHATSAPP_NUMBER: '201010447898'
+      NEXT_PUBLIC_OIDC_AUTHORITY: https://auth-dev.rehletshifaa.com/realms/rehletshifaa
       NEXT_PUBLIC_OIDC_CLIENT_ID: rehletshifaa-web
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command:
+    - tunnel
+    - --no-autoupdate
+    - run
+    - --token
+    - ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+    - frontend
+    - backend
+    - keycloak
+    - minio
+    - mailpit
+  minio:
+    environment:
+      MINIO_ROOT_USER: rehletshifaa
+      MINIO_ROOT_PASSWORD: RehletShifaaLocal123!
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:3000,https://dev.rehletshifaa.com

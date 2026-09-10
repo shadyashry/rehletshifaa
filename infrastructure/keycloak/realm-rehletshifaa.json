@@ -4,41 +4,260 @@
   "displayName": "RehletShifaa Local",
   "loginTheme": "rehletshifaa",
   "internationalizationEnabled": true,
-  "supportedLocales": ["en", "ar"],
+  "supportedLocales": [
+    "en",
+    "ar"
+  ],
   "defaultLocale": "en",
   "verifyEmail": true,
-  "smtpServer": {"host":"mailpit","port":"1025","from":"no-reply@local.test","fromDisplayName":"RehletShifaa","auth":"false","starttls":"false"},
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "no-reply@local.test",
+    "fromDisplayName": "RehletShifaa",
+    "auth": "false",
+    "starttls": "false"
+  },
   "registrationAllowed": true,
   "resetPasswordAllowed": true,
   "loginWithEmailAllowed": true,
-  "defaultRoles": ["PATIENT"],
-  "roles": {"realm": [
-    {"name":"PATIENT"},{"name":"PATIENT_REPRESENTATIVE"},{"name":"COORDINATOR"},{"name":"COORDINATOR_LEAD"},
-    {"name":"DOCTOR"},{"name":"OPERATIONS"},{"name":"OPERATIONS_LEAD","composite":true,"composites":{"realm":["OPERATIONS"]}},{"name":"FINANCE"},{"name":"FINANCE_LEAD","composite":true,"composites":{"realm":["FINANCE"]}},{"name":"CREDENTIALING_ADMIN"},{"name":"SYSTEM_ADMIN"},{"name":"AUDITOR"},
-    {"name":"PATIENT_IDENTITY_REVIEWER","description":"Reviews patient legal-identity proofing (distinct from practitioner CREDENTIALING_ADMIN)"}
-  ]},
-  "clients": [{
-    "clientId": "rehletshifaa-web",
-    "name": "RehletShifaa Web",
-    "enabled": true,
-    "publicClient": true,
-    "standardFlowEnabled": true,
-    "directAccessGrantsEnabled": false,
-    "redirectUris": ["http://localhost:3000/*", "https://infrastructure-compared-require-sympathy.trycloudflare.com/*"],
-    "webOrigins": ["http://localhost:3000", "https://infrastructure-compared-require-sympathy.trycloudflare.com"],
-    "attributes": {"pkce.code.challenge.method":"S256"}
-  },{
-    "clientId":"staff-identity-admin","name":"Staff identity provisioning","enabled":true,"publicClient":false,
-    "secret":"local-only-staff-identity-secret-change-me","serviceAccountsEnabled":true,"standardFlowEnabled":false,"directAccessGrantsEnabled":false
-  }],
+  "defaultRoles": [
+    "PATIENT"
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "PATIENT"
+      },
+      {
+        "name": "PATIENT_REPRESENTATIVE"
+      },
+      {
+        "name": "COORDINATOR"
+      },
+      {
+        "name": "COORDINATOR_LEAD"
+      },
+      {
+        "name": "DOCTOR"
+      },
+      {
+        "name": "OPERATIONS"
+      },
+      {
+        "name": "OPERATIONS_LEAD",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "OPERATIONS"
+          ]
+        }
+      },
+      {
+        "name": "FINANCE"
+      },
+      {
+        "name": "FINANCE_LEAD",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "FINANCE"
+          ]
+        }
+      },
+      {
+        "name": "CREDENTIALING_ADMIN"
+      },
+      {
+        "name": "SYSTEM_ADMIN"
+      },
+      {
+        "name": "AUDITOR"
+      },
+      {
+        "name": "PATIENT_IDENTITY_REVIEWER",
+        "description": "Reviews patient legal-identity proofing (distinct from practitioner CREDENTIALING_ADMIN)"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "rehletshifaa-web",
+      "name": "RehletShifaa Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "https://dev.rehletshifaa.com/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "https://dev.rehletshifaa.com"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "staff-identity-admin",
+      "name": "Staff identity provisioning",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "local-only-staff-identity-secret-change-me",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
   "users": [
-    {"id":"00000000-0000-0000-0000-000000000101","username":"patient","email":"patient@local.test","firstName":"Nour","lastName":"Hassan","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Patient123!","temporary":false}],"realmRoles":["PATIENT"]},
-    {"id":"00000000-0000-0000-0000-000000000102","username":"coordinator","email":"coordinator@local.test","firstName":"Layla","lastName":"Hassan","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Coordinator123!","temporary":false}],"realmRoles":["COORDINATOR","COORDINATOR_LEAD"]},
-    {"id":"06d5980a-76fe-4e34-9900-89aef8a9d87a","username":"coordinator2","email":"coordinator2@local.test","firstName":"Omar","lastName":"Nasser","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Coordinator123!","temporary":false}],"realmRoles":["COORDINATOR"]},
-    {"id":"00000000-0000-0000-0000-000000000103","username":"doctor","email":"doctor@local.test","firstName":"Ahmed","lastName":"AlAshry","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Doctor123!","temporary":false}],"realmRoles":["DOCTOR"]},
-    {"id":"00000000-0000-0000-0000-000000000104","username":"operations","email":"operations@local.test","firstName":"Mariam","lastName":"Soliman","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Operations123!","temporary":false}],"realmRoles":["OPERATIONS"]},
-    {"id":"00000000-0000-0000-0000-000000000105","username":"finance","email":"finance@local.test","firstName":"Youssef","lastName":"Adel","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Finance123!","temporary":false}],"realmRoles":["FINANCE"]},
-    {"id":"00000000-0000-0000-0000-000000000106","username":"credential-admin","email":"credential-admin@local.test","firstName":"Maya","lastName":"Farid","enabled":true,"emailVerified":true,"credentials":[{"type":"password","value":"Admin123!","temporary":false}],"realmRoles":["CREDENTIALING_ADMIN","SYSTEM_ADMIN"]},
-    {"username":"service-account-staff-identity-admin","enabled":true,"serviceAccountClientId":"staff-identity-admin","clientRoles":{"realm-management":["manage-users","view-users","query-users"]}}
+    {
+      "id": "00000000-0000-0000-0000-000000000101",
+      "username": "patient",
+      "email": "patient@local.test",
+      "firstName": "Nour",
+      "lastName": "Hassan",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Patient123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "PATIENT"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000102",
+      "username": "coordinator",
+      "email": "coordinator@local.test",
+      "firstName": "Layla",
+      "lastName": "Hassan",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Coordinator123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "COORDINATOR",
+        "COORDINATOR_LEAD"
+      ]
+    },
+    {
+      "id": "06d5980a-76fe-4e34-9900-89aef8a9d87a",
+      "username": "coordinator2",
+      "email": "coordinator2@local.test",
+      "firstName": "Omar",
+      "lastName": "Nasser",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Coordinator123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "COORDINATOR"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000103",
+      "username": "doctor",
+      "email": "doctor@local.test",
+      "firstName": "Ahmed",
+      "lastName": "AlAshry",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Doctor123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "DOCTOR"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000104",
+      "username": "operations",
+      "email": "operations@local.test",
+      "firstName": "Mariam",
+      "lastName": "Soliman",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Operations123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "OPERATIONS"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000105",
+      "username": "finance",
+      "email": "finance@local.test",
+      "firstName": "Youssef",
+      "lastName": "Adel",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Finance123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "FINANCE"
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000106",
+      "username": "credential-admin",
+      "email": "credential-admin@local.test",
+      "firstName": "Maya",
+      "lastName": "Farid",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin123!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "CREDENTIALING_ADMIN",
+        "SYSTEM_ADMIN"
+      ]
+    },
+    {
+      "username": "service-account-staff-identity-admin",
+      "enabled": true,
+      "serviceAccountClientId": "staff-identity-admin",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-users",
+          "query-users"
+        ]
+      }
+    }
   ]
 }

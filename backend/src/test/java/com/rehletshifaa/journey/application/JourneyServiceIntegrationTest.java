@@ -43,7 +43,7 @@ class JourneyServiceIntegrationTest {
         jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"finance-subject","FINANCE",crypto.encrypt("Finance One"),Instant.now(),Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
 
-        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed records","SUITABLE",null,"Updated imaging","Recommended intervention","Medical management","Standard procedural risks","Assessment then intervention","7 days","Virtual follow-up"));
         journey.approveClinicalReview(created.caseId(),review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultant treatment package",new BigDecimal("1000.00"),"EGP",0,new BigDecimal("1000.00"),true);
@@ -52,8 +52,8 @@ class JourneyServiceIntegrationTest {
         assertThat(proposal.items()).singleElement().satisfies(item->assertThat(item.description()).isEqualTo("Consultant treatment package"));
         var operationsAssignment=journey.assign(created.caseId(),new AssignmentRequest("operations-subject","OPERATIONS","PRIMARY","cardiac-pod","Travel and hospital planning"));
         var financeAssignment=journey.assign(created.caseId(),new AssignmentRequest("finance-subject","FINANCE","PRIMARY","cardiac-pod","Commercial approval"));
-        authenticate("operations-subject","OPERATIONS");journey.decideAssignment(created.caseId(),operationsAssignment.id(),true,com.rehletshifaa.security.ActorRole.OPERATIONS);proposal=journey.completeOperations(created.caseId(),proposal.versionId(),"Operational plan confirmed");assertThat(proposal.status()).isEqualTo("OPERATIONS_COMPLETED");
-        authenticate("finance-subject","FINANCE");journey.decideAssignment(created.caseId(),financeAssignment.id(),true,com.rehletshifaa.security.ActorRole.FINANCE);proposal=journey.approveFinance(created.caseId(),proposal.versionId());assertThat(proposal.status()).isEqualTo("FINANCE_APPROVED");
+        authenticate("operations-subject","OPERATIONS");journey.decideAssignment(created.caseId(),operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS);proposal=journey.completeOperations(created.caseId(),proposal.versionId(),"Operational plan confirmed");assertThat(proposal.status()).isEqualTo("OPERATIONS_COMPLETED");
+        authenticate("finance-subject","FINANCE");journey.decideAssignment(created.caseId(),financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.FINANCE);proposal=journey.approveFinance(created.caseId(),proposal.versionId());assertThat(proposal.status()).isEqualTo("FINANCE_APPROVED");
         authenticate("coordinator-subject","COORDINATOR");proposal=journey.releaseProposal(created.caseId(),proposal.versionId());assertThat(proposal.status()).isEqualTo("RELEASED");
         authenticate("patient-subject","PATIENT");proposal=journey.decideProposal(created.caseId(),proposal.versionId(),new ProposalDecisionRequest("ACCEPTED",List.of(),"Approved"));assertThat(proposal.status()).isEqualTo("ACCEPTED");
         assertThat(journey.patientCases()).extracting(CaseView::status).contains("ACCEPTED");
@@ -73,7 +73,7 @@ class JourneyServiceIntegrationTest {
         UUID catalogId=UUID.randomUUID();
         jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",catalogId,practitionerId,"CARD-CONSULT","Diagnostic cardiology consultation","Consultation",new BigDecimal("3500.00"),true,"admin-subject",Instant.now(),Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
-        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended intervention","Alt","Risks","Seq","7 days","Follow-up"));
         journey.approveClinicalReview(created.caseId(),review.id());
         // Catalog-sourced estimate -> no finance approval required.
@@ -99,7 +99,7 @@ class JourneyServiceIntegrationTest {
         UUID catalogId=UUID.randomUUID();
         jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",catalogId,practitionerId,"CARD-CONSULT","Consultation","Consultation",new BigDecimal("3500.00"),true,"admin-subject",Instant.now(),Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
-        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended","Alt","Risks","Seq","7 days","Follow-up"));
         journey.approveClinicalReview(created.caseId(),review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,catalog_service_id,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultation",new BigDecimal("3500.00"),"EGP",0,catalogId,new BigDecimal("3500.00"),false);
@@ -139,7 +139,7 @@ class JourneyServiceIntegrationTest {
         UUID catalogId=UUID.randomUUID();
         jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",catalogId,practitionerId,"CARD-CONSULT","Consultation","Consultation",new BigDecimal("3500.00"),true,"admin-subject",Instant.now(),Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
-        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended","Alt","Risks","Seq","7 days","Follow-up"));
         journey.approveClinicalReview(created.caseId(),review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,catalog_service_id,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultation",new BigDecimal("3500.00"),"EGP",0,catalogId,new BigDecimal("3500.00"),false);
@@ -173,7 +173,7 @@ class JourneyServiceIntegrationTest {
         jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",catalogId,practitionerId,"CARD-CONSULT","Diagnostic cardiology consultation","Consultation",new BigDecimal("3500.00"),true,"admin-subject",Instant.now(),Instant.now());
         jdbc.update("INSERT INTO fx_rates(id,base_currency,quote_currency,rate,rate_date,source,fetched_at) VALUES(?,?,?,?,?,?,?)",UUID.randomUUID(),"EGP","USD",new BigDecimal("0.02"),LocalDate.now(java.time.ZoneOffset.UTC),"API",Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
-        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended intervention","Alt","Risks","Seq","7 days","Follow-up"));
         journey.approveClinicalReview(created.caseId(),review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,catalog_service_id,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultation",new BigDecimal("3500.00"),"EGP",0,catalogId,new BigDecimal("3500.00"),false);
@@ -199,7 +199,7 @@ class JourneyServiceIntegrationTest {
         jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),practitionerId,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());
         jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"finance-subject","FINANCE",crypto.encrypt("Finance One"),Instant.now(),Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
-        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended intervention","Alt","Risks","Seq","7 days","Follow-up"));
         journey.approveClinicalReview(created.caseId(),review.id());
         // MANUAL (non-catalog) estimate -> requires finance approval.
@@ -213,7 +213,7 @@ class JourneyServiceIntegrationTest {
         assertThat(ws.gates().readyForRelease()).isFalse();
         // Finance approves directly from CLINICALLY_APPROVED (no Operations step).
         var financeAssignment=journey.assign(created.caseId(),new AssignmentRequest("finance-subject","FINANCE","PRIMARY","cardiac-pod","Commercial approval"));
-        authenticate("finance-subject","FINANCE");journey.decideAssignment(created.caseId(),financeAssignment.id(),true,com.rehletshifaa.security.ActorRole.FINANCE);journey.approveFinance(created.caseId(),proposal.versionId());
+        authenticate("finance-subject","FINANCE");journey.decideAssignment(created.caseId(),financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.FINANCE);journey.approveFinance(created.caseId(),proposal.versionId());
         authenticate("coordinator-subject","COORDINATOR");ws=journey.workspace(created.caseId());
         assertThat(ws.gates().financeCompleted()).isTrue();
         assertThat(ws.gates().readyForRelease()).isTrue();
@@ -232,7 +232,7 @@ class JourneyServiceIntegrationTest {
         UUID catalogId=UUID.randomUUID();
         jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",catalogId,practitionerId,"CARD-CONSULT","Consultation","Consultation",new BigDecimal("10000.00"),true,"admin-subject",Instant.now(),Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
-        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended intervention","Alt","Risks","Seq","7 days","Follow-up"));
         journey.approveClinicalReview(created.caseId(),review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,catalog_service_id,price_egp,price_egp_min,price_egp_max,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultation",new BigDecimal("10000.00"),"EGP",0,catalogId,new BigDecimal("10000.00"),new BigDecimal("10000.00"),new BigDecimal("10000.00"),false);
@@ -295,7 +295,7 @@ class JourneyServiceIntegrationTest {
         jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",svc1,practitionerId,"CARD-CONSULT","Consultation","Consultation",new BigDecimal("10000.00"),true,"admin-subject",Instant.now(),Instant.now());
         jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",svc2,practitionerId,"CARD-ECHO","Echo","Diagnostics",new BigDecimal("5000.00"),true,"admin-subject",Instant.now(),Instant.now());
         var doctorAssignment=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","cardiac-pod","Clinical review"));
-        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(),true);
+        authenticate("doctor-subject","DOCTOR");journey.acceptDoctorAssignment(created.caseId(),doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review=journey.saveClinicalReview(created.caseId(),new ClinicalReviewRequest("Reviewed","SUITABLE",null,"Imaging","Recommended","Alt","Risks","Seq","7 days","Follow-up"));
         journey.approveClinicalReview(created.caseId(),review.id());
         // Preliminary scope: two catalog services (15000 provider -> 16800 inclusive at 12%).
