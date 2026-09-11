@@ -28,21 +28,23 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   return (
     <section className="border-b border-line bg-white">
-      <div className="container-site grid items-center gap-7 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14 lg:py-14">
+      <div className="container-site grid items-center gap-6 py-6 sm:py-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14 lg:py-14">
         <div className="max-w-[34rem]">
           <p className="eyebrow">{d.home.eyebrow}</p>
-          <h1 className="display mt-2.5 [text-wrap:balance]">{d.home.title}</h1>
-          <p className="lead mt-4">{d.home.intro}</p>
+          <h1 className="display mt-2 sm:mt-2.5 [text-wrap:balance]">{d.home.title}</h1>
+          <p className="lead mt-3 sm:mt-4">{d.home.intro}</p>
 
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+          {/* On a phone the secondary action is a quiet link beside the button — one primary control, one row. */}
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 sm:mt-7">
             <TrackedLink event="send_case_cta_clicked" className="btn-primary" href={localeHref(locale, "send-my-case")}>
               {d.home.primaryAction}
               <ArrowRight size={17} aria-hidden="true" className="rtl:-scale-x-100" />
             </TrackedLink>
-            <Link className="btn-secondary" href="#how-it-works">{d.home.watchJourney}</Link>
+            <Link className="link-cta text-[0.95rem] sm:hidden" href="#how-it-works">{d.home.watchJourney}</Link>
+            <Link className="btn-secondary hidden sm:inline-flex" href="#how-it-works">{d.home.watchJourney}</Link>
           </div>
 
-          <p className="mt-6 border-t border-line pt-5 text-[0.9rem] leading-6 text-ink-600">
+          <p className="mt-5 border-t border-line pt-4 text-[0.88rem] leading-6 text-ink-600 sm:mt-6 sm:pt-5 sm:text-[0.9rem]">
             <span className="font-semibold text-brand-800">{d.home.slogan}</span>{" "}
             {d.home.preliminaryNotice}
           </p>
@@ -58,25 +60,25 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
           </div>
 
           {/* What a patient needs to begin: one line, three chips, no second headline. */}
-          <figcaption className="mt-4 rounded-[12px] bg-mist px-4 py-3.5">
+          <figcaption className="mt-3 rounded-[12px] bg-mist px-3.5 py-3 sm:mt-4 sm:px-4 sm:py-3.5">
             <p className="text-[0.88rem] font-semibold text-brand-900">{d.home.heroCardTitle}</p>
-            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+            <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
               {d.home.prepareItems.map((item) => (
-                <li key={item} className="flex items-center gap-1.5 text-[0.85rem] leading-6 text-ink-600">
+                <li key={item} className="flex items-center gap-1.5 text-[0.875rem] leading-6 text-ink-600">
                   <Check size={14} strokeWidth={2.4} className="flex-none text-accent-700" aria-hidden="true" />
                   {item}
                 </li>
               ))}
             </ul>
-            <p className="mt-1.5 text-[0.82rem] leading-5 text-ink-500">{d.home.reassurance}</p>
+            <p className="mt-1.5 text-[0.875rem] leading-5 text-ink-500">{d.home.reassurance}</p>
           </figcaption>
         </figure>
       </div>
 
       <div className="border-t border-line bg-mist">
-        <ul className="container-site grid grid-cols-2 gap-x-6 gap-y-2.5 py-3.5 lg:grid-cols-4">
+        <ul className="container-site grid grid-cols-2 gap-x-5 gap-y-2 py-3 lg:grid-cols-4 lg:py-3.5">
           {trust.map(([Icon, label]) => (
-            <li key={label} className="flex items-center gap-2 text-[0.82rem] font-semibold text-ink-700">
+            <li key={label} className="flex items-center gap-2 text-[0.875rem] font-semibold leading-5 text-ink-700 sm:text-[0.82rem]">
               <Icon size={16} strokeWidth={1.9} className="flex-none text-brand-600" aria-hidden="true" />
               {label}
             </li>

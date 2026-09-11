@@ -64,6 +64,10 @@
   --color-alert-700: #8c2b28;
   --color-alert-800: #74201e;
 
+  /* The width at which every desktop navigation item, the language switch and the primary action fit on
+     one line with room to spare (English needs ~1000px). Below it the compact menu stays in charge. */
+  --breakpoint-nav: 68.75rem;
+
   --radius-card: 0.875rem;
   --shadow-card: 0 1px 2px rgba(28, 51, 58, 0.04), 0 16px 44px -34px rgba(28, 51, 58, 0.34);
 }
@@ -178,7 +182,9 @@
 
   .display {
     color: var(--color-brand-900);
-    font-size: clamp(2rem, 1.6rem + 1.5vw, 2.9rem);
+    /* 41px at 1024, ~45 at 1280, 47 at 1440, 48 from 1536: it leads the left column at every desktop
+       width and scales down through the narrow desktop range instead of forcing a fourth line. */
+    font-size: clamp(2rem, 1.6rem + 1.5vw, 3rem);
     line-height: 1.08;
     letter-spacing: -0.022em;
     font-weight: 700;
@@ -458,13 +464,41 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Phone composition
+   Not the desktop scale shrunk: a deliberate mobile scale (H1 32, H2 26→28, step
+   18, body 15) with tighter leading, section rhythm and touch controls sized
+   for a thumb rather than a cursor. Arabic steps down further because Cairo's
+   x-height makes the Latin sizes read a step larger than intended.
+--------------------------------------------------------------------------- */
 @media (max-width: 640px) {
   .container-site {
     width: min(100% - 1.5rem, 1200px);
   }
 
-  .section { padding-block: 2.5rem; }
-  .section-tight { padding-block: 1.75rem; }
+  .section { padding-block: 2rem; }
+  .section-tight { padding-block: 1.5rem; }
+
+  .eyebrow { font-size: 0.75rem; letter-spacing: 0.09em; }
+  .display { font-size: 2rem; line-height: 1.1; }
+  /* 26px on a 320 screen, 28px from ~390: headings introduce a section, they do not fill it. */
+  .headline { font-size: clamp(1.625rem, 1.054rem + 2.86vw, 1.75rem); line-height: 1.18; }
+  .title { font-size: 1.125rem; line-height: 1.35; }
+  .lead { font-size: 1rem; line-height: 1.55; }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-inverse {
+    min-height: 2.875rem;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.95rem;
+  }
+
+  [dir="rtl"] .display { font-size: 1.75rem; line-height: 1.3; }
+  [dir="rtl"] .headline { font-size: clamp(1.5rem, 1rem + 2.5vw, 1.625rem); line-height: 1.38; }
+  [dir="rtl"] .title { font-size: 1.1rem; }
+  [dir="rtl"] .lead { font-size: 0.98rem; line-height: 1.8; }
+  [dir="rtl"] .eyebrow { font-size: 0.8rem; letter-spacing: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

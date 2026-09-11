@@ -2,7 +2,10 @@ import { test } from "@playwright/test";
 
 /** Visual capture of the public homepage for design review at real viewports. */
 const SHOTS = [
+  { name: "320", width: 320, height: 568 },
+  { name: "375", width: 375, height: 812 },
   { name: "390", width: 390, height: 844 },
+  { name: "430", width: 430, height: 932 },
   { name: "768", width: 768, height: 1024 },
   { name: "1024", width: 1024, height: 768 },
   { name: "1440", width: 1440, height: 900 },

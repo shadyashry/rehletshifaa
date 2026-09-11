@@ -23,7 +23,7 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
             accent={d.common.brandAccent}
             arabicLabel={d.common.brandArabic}
             arabicAccent={d.common.brandArabicAccent}
-            size={36}
+            size={34}
           />
         </Link>
 
@@ -31,12 +31,12 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
           <PrimaryNav items={items} label={navLabel} />
         </HideOnPortal>
 
-        <HideOnPortal locale={locale}><div className="hidden items-center gap-2 lg:flex">
+        <HideOnPortal locale={locale}><div className="hidden items-center gap-2 nav:flex">
           <LocaleSwitch locale={locale} label={d.nav.language} ariaLabel={d.nav.languageAria} />
           <HideOnPortal locale={locale}>
             <TrackedLink
               event="send_case_cta_clicked"
-              className="btn-primary"
+              className="btn-primary whitespace-nowrap"
               href={localeHref(locale, "send-my-case")}
             >
               {d.nav.send}
