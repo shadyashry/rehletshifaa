@@ -61,14 +61,19 @@ export function RoleDashboardSummary({ locale, role, cases, tasks, selected = ""
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {cards.map(({ id, label, value, Icon, tone }) => {
           const pressed = selected === id;
+          // A zero tile is worth showing — "nothing is overdue" is the reassurance — but filtering by it
+          // can only produce an empty list, so it stays a read-out rather than an action.
+          const filterable = value > 0;
           return (
             <button
-              key={label} type="button" aria-pressed={pressed}
+              key={label} type="button" aria-pressed={filterable ? pressed : undefined} disabled={!filterable}
               onClick={() => onSelect?.(pressed ? "" : id)}
               className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-start transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
                 pressed
                   ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
-                  : "border-line bg-white hover:border-brand-300 hover:bg-brand-50/60"}`}
+                  : filterable
+                    ? "border-line bg-white hover:border-brand-300 hover:bg-brand-50/60"
+                    : "border-line bg-white"}`}
             >
               <span className={`grid h-9 w-9 flex-none place-items-center rounded-lg ${tone}`}>
                 <Icon size={17} aria-hidden/>

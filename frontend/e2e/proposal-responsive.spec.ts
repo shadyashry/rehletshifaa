@@ -1,12 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { API } from "./env";
+
 /**
  * Browser verification of the patient proposal at the viewports real patients use, in both
  * directions. The backend is mocked so the run is hermetic; what is being checked is layout,
  * direction and keyboard behaviour, not workflow.
  */
 const TOKEN = "responsive-token";
-const BASE = "http://localhost:8080/api/v1/public/proposals";
+const BASE = `${API}/public/proposals`;
 
 const VIEWPORTS = [
   { name: "320", width: 320, height: 720 },

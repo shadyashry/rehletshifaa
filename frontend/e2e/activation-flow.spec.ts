@@ -1,12 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { API } from "./env";
+
 /**
  * The patient journey as a patient sees it: complete profile, profile is ready, then — separately —
  * the case deposit. The backend is mocked so the run is hermetic; what is verified is that the two
  * concerns never share a screen or a button.
  */
 const TOKEN = "activation-token";
-const BASE = "http://localhost:8080/api/v1/public/onboarding";
+const BASE = `${API}/public/onboarding`;
 
 const deposit = { required: true, status: "REQUESTED", currency: "EGP", amountDue: 3000, amountPaid: 0, balance: 3000, satisfied: false };
 const prefill = {

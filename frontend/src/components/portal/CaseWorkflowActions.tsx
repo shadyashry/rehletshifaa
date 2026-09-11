@@ -1,109 +1,22 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
-import { RecordPatientResponse } from "@/components/portal/RecordPatientResponse";
+import type { FormEvent } from "react";
 import type { Locale } from "@/lib/i18n";
 
 type CaseSummary={id:string;status:string;version:number;careCategory?:string};
-type VerifiedDoctor={subject:string;displayName:string;specialty?:string;subspecialty?:string;availabilityStatus?:string;careCategory?:string};
-type CareCategory={slug:string;nameEn:string;nameAr:string};
-type StaffMember={subject:string;name:string;role:string};
 type CaseDocument={documentId:string;fileName:string;status:string};
 type Mutate=(path:string,body?:unknown,method?:string)=>Promise<unknown>;
-type PatientAction={items:{id:string;kind:string;label:string;required:boolean;completed:boolean}[]};
-const transitions:Record<string,string[]>={RECEIVED:["INTAKE_REVIEW","CANCELLED"],INTAKE_REVIEW:["INFORMATION_REQUIRED","READY_FOR_CONSULTANT","CANCELLED"],INFORMATION_REQUIRED:["INTAKE_REVIEW","READY_FOR_CONSULTANT","CANCELLED"],READY_FOR_CONSULTANT:["CANCELLED"]};
-const STATE_LABELS:Record<string,{en:string;ar:string}>={INTAKE_REVIEW:{en:"Move to intake review",ar:"مراجعة الاستقبال"},INFORMATION_REQUIRED:{en:"Request more information",ar:"طلب معلومات إضافية"},CANCELLED:{en:"Cancel case",ar:"إلغاء الحالة"},PROPOSAL_PREPARATION:{en:"Prepare proposal",ar:"تحضير المقترح"},TRAVEL_COORDINATION:{en:"Start travel coordination",ar:"بدء تنسيق السفر"},ARRIVAL_CONFIRMED:{en:"Confirm arrival",ar:"تأكيد الوصول"},CLOSED:{en:"Close case",ar:"إغلاق الحالة"}};
-const stateLabel=(target:string,locale:Locale)=>STATE_LABELS[target]?.[locale]??target.replaceAll("_"," ");
-const words={en:{title:"Workflow controls",transition:"Change case state",reason:"Reason",assign:"Assign care-team member",assignHelp:"Confirm or correct the case care area. Only matching available verified consultants will be shown.",subject:"OIDC account subject",selectDoctor:"Select a verified doctor",category:"Case care area",selectCategory:"Select a care area",selectConsultant:"Select a matching consultant",noDoctors:"No verified consultants are currently available for this care area.",saveCategory:"Save care area",categorySaved:"Saved care area",assignBtn:"Assign consultant",reasonOptional:"Reason (optional)",selectAction:"Select an action",travel:"Update travel plan",arrival:"Planned arrival",facility:"Facility",treatment:"Record treatment episode",procedures:"Procedures / milestones",follow:"Schedule follow-up",due:"Due date",instructions:"Instructions",save:"Save"},ar:{title:"إدارة مسار العمل",transition:"تغيير حالة الطلب",reason:"سبب التغيير",assign:"تعيين عضو في فريق الرعاية",assignHelp:"أكّد مجال رعاية الحالة أو صححه. سيظهر فقط الاستشاريون المعتمدون والمتاحون المطابقون للمجال.",subject:"معرّف حساب الهوية",selectDoctor:"اختر طبيبًا معتمدًا",category:"مجال رعاية الحالة",selectCategory:"اختر مجال الرعاية",selectConsultant:"اختر استشاريًا مطابقًا",noDoctors:"لا يوجد استشاريون معتمدون متاحون لهذا المجال حاليًا.",saveCategory:"حفظ مجال الرعاية",categorySaved:"مجال الرعاية المحفوظ",assignBtn:"تعيين الاستشاري",reasonOptional:"السبب (اختياري)",selectAction:"اختر إجراءً",travel:"تحديث خطة السفر",arrival:"موعد الوصول المخطط",facility:"المنشأة الطبية",treatment:"تسجيل مرحلة العلاج",procedures:"الإجراءات والمراحل",follow:"جدولة المتابعة",due:"موعد الاستحقاق",instructions:"التعليمات",save:"حفظ"}};
+const words={en:{travel:"Update travel plan",arrival:"Planned arrival",facility:"Facility",treatment:"Record treatment episode",procedures:"Procedures / milestones",follow:"Schedule follow-up",due:"Due date",instructions:"Instructions",save:"Save"},ar:{travel:"تحديث خطة السفر",arrival:"موعد الوصول المخطط",facility:"المنشأة الطبية",treatment:"تسجيل مرحلة العلاج",procedures:"الإجراءات والمراحل",follow:"جدولة المتابعة",due:"موعد الاستحقاق",instructions:"التعليمات",save:"حفظ"}};
 
-export function CaseWorkflowActions({locale,role,caseSummary,patientAction,mutate,doctors=[],categories=[],staff=[],documents=[],travelPackage=false,financeRequired=false}:{locale:Locale;role:string;caseSummary:CaseSummary;patientAction?:PatientAction|null;mutate:Mutate;doctors?:VerifiedDoctor[];categories?:CareCategory[];staff?:StaffMember[];documents?:CaseDocument[];travelPackage?:boolean;financeRequired?:boolean}){const t=words[locale];const guide=locale==="ar"?{title:"الخطوة التالية لهذه الحالة",intro:"اختر الإجراء التالي للحالة. تُراجع المتطلبات قبل حفظ التغييرات.",current:"المرحلة الحالية"}:{title:"Next step for this case",intro:"Choose the next action for this case. Required approvals are checked before changes are saved.",current:"Current stage"};const relevant=role==="coordinator"?["INTAKE_REVIEW","INFORMATION_REQUIRED","READY_FOR_CONSULTANT","PROPOSAL_PREPARATION","ACCEPTED","TRAVEL_COORDINATION"].includes(caseSummary.status):role==="operations"?["ACCEPTED","TRAVEL_COORDINATION"].includes(caseSummary.status):role==="doctor"?["ARRIVAL_CONFIRMED","TREATMENT_IN_PROGRESS","DISCHARGED"].includes(caseSummary.status):false;if(!relevant)return null;return <section className="card mt-6 overflow-hidden"><div className="border-b border-line bg-brand-50 p-5"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="title">{guide.title}</h3></div><p className="mt-2 max-w-3xl text-sm text-ink-600">{guide.intro}</p></div><div className="grid gap-6 p-5 lg:grid-cols-2">
- {role==="coordinator"&&<CoordinatorFlow caseId={caseSummary.id} status={caseSummary.status} version={caseSummary.version} careCategory={caseSummary.careCategory} patientAction={patientAction} doctors={doctors} categories={categories} staff={staff} travelPackage={travelPackage} financeRequired={financeRequired} locale={locale} t={t} mutate={mutate}/>}
+/**
+ * Stage forms for Operations (travel plan) and the consultant (treatment episode, follow-up). The
+ * coordinator's work is driven by the backend's current action and has no generic action panel here.
+ */
+export function CaseWorkflowActions({locale,role,caseSummary,mutate,documents=[]}:{locale:Locale;role:string;caseSummary:CaseSummary;patientAction?:unknown;mutate:Mutate;doctors?:unknown[];categories?:unknown[];staff?:unknown[];documents?:CaseDocument[];travelPackage?:boolean;financeRequired?:boolean}){const t=words[locale];const relevant=role==="operations"?["ACCEPTED","TRAVEL_COORDINATION"].includes(caseSummary.status):role==="doctor"?["ARRIVAL_CONFIRMED","TREATMENT_IN_PROGRESS","DISCHARGED"].includes(caseSummary.status):false;if(!relevant)return null;return <section className="card p-5"><div className="grid gap-6 lg:grid-cols-2">
  {role==="operations"&&["ACCEPTED","TRAVEL_COORDINATION"].includes(caseSummary.status)&&<form className="space-y-3" onSubmit={event=>submit(event,data=>mutate(`/operations/cases/${caseSummary.id}/travel`,{plannedArrival:date(data.get("arrival")),confirmedArrival:data.get("confirmedArrival")?date(data.get("confirmedArrival")):null,visaStatus:data.get("visaStatus"),flightDetails:data.get("flightDetails"),facility:data.get("facility"),status:data.get("status")},"PUT"))}><h4 className="font-bold">{t.travel}</h4><label className="block text-sm font-semibold">{t.arrival}<input className="field" name="arrival" type="datetime-local" aria-label={t.arrival}/></label><label className="block text-sm font-semibold">{locale==="ar"?"الوصول المؤكد":"Confirmed arrival"}<input className="field" name="confirmedArrival" type="datetime-local" aria-label="Confirmed arrival"/></label><label className="block text-sm font-semibold">{locale==="ar"?"حالة التأشيرة":"Visa status"}<input className="field" name="visaStatus" placeholder={locale==="ar"?"مثال: صادرة":"For example: issued"}/></label><label className="block text-sm font-semibold">{locale==="ar"?"تفاصيل الرحلة":"Flight details"}<input className="field" name="flightDetails" placeholder={locale==="ar"?"رقم الرحلة وموعدها":"Flight number and time"}/></label><label className="block text-sm font-semibold">{t.facility}<input className="field" name="facility" placeholder={t.facility}/></label><label className="block text-sm font-semibold">{locale==="ar"?"الحالة":"Status"}<select className="field" name="status"><option value="PLANNING">{locale==="ar"?"قيد التخطيط":"Planning"}</option><option value="CONFIRMED">{locale==="ar"?"حجز مؤكد":"Confirmed booking"}</option><option value="ARRIVED">{locale==="ar"?"تم الوصول":"Arrived"}</option></select></label><button className="btn-primary">{t.save}</button></form>}
  {role==="doctor"&&<>{["ARRIVAL_CONFIRMED","TREATMENT_IN_PROGRESS"].includes(caseSummary.status)&&<form className="space-y-3" onSubmit={event=>submit(event,data=>mutate(`/doctor/cases/${caseSummary.id}/treatment-episodes`,{facility:data.get("facility"),startAt:date(data.get("startAt")),endAt:data.get("endAt")?date(data.get("endAt")):null,status:data.get("status"),plannedProcedures:data.get("procedures"),actualProcedures:data.get("procedures"),milestones:data.get("milestones"),complications:data.get("complications"),dischargeReady:data.get("dischargeReady")==="on",dischargeDocumentId:data.get("dischargeDocumentId")||null}))}><h4 className="font-bold">{t.treatment}</h4><label className="block text-sm font-semibold">{t.facility}<input className="field" name="facility" placeholder={t.facility} required/></label><label className="block text-sm font-semibold">{locale==="ar"?"بداية العلاج":"Treatment starts"}<input className="field" name="startAt" type="datetime-local" required/></label><label className="block text-sm font-semibold">{locale==="ar"?"نهاية العلاج":"Treatment ends"}<input className="field" name="endAt" type="datetime-local"/></label><label className="block text-sm font-semibold">{locale==="ar"?"الحالة":"Status"}<select className="field" name="status"><option value="PLANNED">{locale==="ar"?"مخطط":"Planned"}</option><option value="IN_PROGRESS">{locale==="ar"?"قيد التنفيذ":"In progress"}</option><option value="COMPLETED">{locale==="ar"?"مكتمل":"Completed"}</option></select></label><label className="block text-sm font-semibold">{t.procedures}<textarea className="field" name="procedures" placeholder={t.procedures}/></label><label className="block text-sm font-semibold">{locale==="ar"?"مراحل العلاج":"Milestones"}<textarea className="field" name="milestones" /></label><label className="block text-sm font-semibold">{locale==="ar"?"المضاعفات":"Complications"}<textarea className="field" name="complications" /></label><select className="field" name="dischargeDocumentId"><option value="">{locale==="ar"?"اختر مستند الخروج عند إكمال العلاج":"Select discharge document when completing treatment"}</option>{documents.filter(document=>document.status==="CLEAN").map(document=><option key={document.documentId} value={document.documentId}>{document.fileName}</option>)}</select><label className="flex gap-2"><input name="dischargeReady" type="checkbox"/> {locale==="ar"?"جاهز للخروج":"Discharge ready"}</label><button className="btn-primary">{t.save}</button></form>}
  {caseSummary.status==="DISCHARGED"&&<form className="space-y-3" onSubmit={event=>submit(event,data=>mutate(`/doctor/cases/${caseSummary.id}/follow-ups`,{dueAt:date(data.get("dueAt")),mode:data.get("mode"),requiredTests:data.get("tests"),instructions:data.get("instructions")}))}><h4 className="font-bold">{t.follow}</h4><label className="block text-sm font-semibold">{t.due}<input className="field" name="dueAt" type="datetime-local" aria-label={t.due} required/></label><label className="block text-sm font-semibold">{locale==="ar"?"وسيلة المتابعة":"Follow-up method"}<select className="field" name="mode"><option value="VIDEO">{locale==="ar"?"فيديو":"Video"}</option><option value="PHONE">{locale==="ar"?"هاتف":"Phone"}</option><option value="IN_PERSON">{locale==="ar"?"حضوري":"In person"}</option></select></label><label className="block text-sm font-semibold">{locale==="ar"?"الفحوصات المطلوبة":"Required tests"}<textarea className="field" name="tests" /></label><label className="block text-sm font-semibold">{t.instructions}<textarea className="field" name="instructions" placeholder={t.instructions}/></label><button className="btn-primary">{t.save}</button></form>}</>}
  </div></section>}
 
-function CoordinatorFlow({caseId,status,version,careCategory,patientAction,doctors,categories,staff,travelPackage,financeRequired,locale,t,mutate}:{caseId:string;status:string;version:number;careCategory?:string;patientAction?:PatientAction|null;doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];travelPackage:boolean;financeRequired:boolean;locale:Locale;t:typeof words.en;mutate:Mutate}){
- // Only pull in the team members whose sign-off actually gates this case: Operations for a travel
- // package, Finance for manually-priced services. Nothing to assign otherwise.
- const teamRoles=status==="PROPOSAL_PREPARATION"?[...(travelPackage?["OPERATIONS"]:[]),...(financeRequired?["FINANCE"]:[])]:["OPERATIONS"];
- const[reason,setReason]=useState("");
- const[category,setCategory]=useState(careCategory??"");
- const[consultant,setConsultant]=useState("");
- const canAssign=["INTAKE_REVIEW","INFORMATION_REQUIRED","READY_FOR_CONSULTANT"].includes(status);
- const categoryChanged=category!==(careCategory??"");
- // "Request more information" is its own operation with its own dialog, never a bare status change.
- const options=(transitions[status]??[]).filter(s=>s!=="CONSULTANT_ASSIGNMENT_PENDING"&&s!=="READY_FOR_CONSULTANT"&&s!=="INFORMATION_REQUIRED");
- const canRequestInformation=!["CLOSED","CANCELLED","DECLINED","CLINICALLY_NOT_SUITABLE","EXPIRED","DRAFT"].includes(status);
- const consultants=doctors.filter(doc=>doc.careCategory===category);
- const categoryName=(cat:CareCategory)=>locale==="ar"?cat.nameAr:cat.nameEn;
- // Reset the editable selections when navigating to a different case or when the stored care area changes.
- const[syncKey,setSyncKey]=useState(`${caseId}|${careCategory??""}`);
- if(syncKey!==`${caseId}|${careCategory??""}`){setSyncKey(`${caseId}|${careCategory??""}`);setCategory(careCategory??"");setConsultant("");}
- const reset=()=>{setReason("");setConsultant("");};
- const doTransition=(target:string)=>{void mutate(`/coordinator/cases/${caseId}/transition`,{targetStatus:target,reason:reason||undefined,expectedVersion:version}).then(r=>{if(r)reset();});};
- // Persist a corrected care area (if changed) as part of assigning, so the coordinator never needs a
- // separate "save" step — the consultant list filters live off the selected care area above.
- const doAssign=async()=>{if(!consultant)return;if(categoryChanged){const saved=await mutate(`/coordinator/cases/${caseId}/care-category`,{careCategory:category,expectedVersion:version,reason:careCategory?"Coordinator corrected case care area":"Coordinator classified case care area"},"PUT");if(!saved)return;}await mutate(`/coordinator/cases/${caseId}/assignments`,{assigneeSubject:consultant,assigneeRole:"DOCTOR",assignmentType:"PRIMARY",pod:null,reason:reason||"Assigned to consultant"}).then(r=>{if(r)reset();});};
- const[infoDialog,setInfoDialog]=useState(false);
- // Actions are grouped by how much they matter right now: the recommended workflow step first, patient
- // communication next, state changes after that, and destructive administration last and quietest.
- const workflowOptions=options.filter(s=>s!=="CANCELLED");
- const adminOptions=options.filter(s=>s==="CANCELLED");
- const teamAssign=["PROPOSAL_PREPARATION","ACCEPTED","TRAVEL_COORDINATION"].includes(status)&&teamRoles.length>0;
- const g=locale==="ar"
-  ?{primary:"الإجراء الأساسي",secondary:"التواصل مع المريض",workflow:"إجراءات المسار",admin:"إجراءات إدارية",
-    infoTitle:"معلومات من المريض",infoHint:"اطلب ما ينقص بالضبط، أو سجّل ما أرسله المريض عبر واتساب أو الهاتف.",
-    infoConsequence:"يُرسل طلبًا آمنًا للمريض وينقل المسؤولية إلى «بانتظار: المريض». ستصلك مهمة جديدة عند رده.",
-    request:"طلب معلومات إضافية",teamTitle:"إسناد العمل للفريق"}
-  :{primary:"Primary action",secondary:"Patient communication",workflow:"Workflow",admin:"Administrative",
-    infoTitle:"Information from the patient",infoHint:"Ask for exactly what is missing, or record what the patient sent by WhatsApp or phone.",
-    infoConsequence:"This sends a secure request to the patient and moves the case to Waiting on: Patient. You get a new work item as soon as they respond.",
-    request:"Request more information",teamTitle:"Assign work to the team"};
- return <div className="space-y-5">
-  {canAssign&&<ActionGroup label={g.primary} tone="primary" title={t.assign} hint={t.assignHelp}>
-   <label className="block text-sm font-bold">{t.category}<select className="field mt-2" aria-label={t.category} value={category} onChange={event=>{setCategory(event.target.value);setConsultant("");}} required><option value="" disabled>{t.selectCategory}</option>{categories.map(cat=><option key={cat.slug} value={cat.slug}>{categoryName(cat)}</option>)}</select></label>
-   <label className="block text-sm font-bold">{t.selectConsultant}<select className="field mt-2" value={consultant} onChange={event=>setConsultant(event.target.value)} disabled={!category} required><option value="" disabled>{t.selectConsultant}</option>{consultants.map(doc=><option key={doc.subject} value={doc.subject}>{doc.displayName}{doc.subspecialty?` · ${doc.subspecialty}`:doc.specialty?` · ${doc.specialty}`:""}</option>)}</select></label>
-   {category&&consultants.length===0&&<p className="text-sm text-ink-500">{t.noDoctors}</p>}
-   <button className="btn-primary" disabled={!consultant} onClick={doAssign}>{t.assignBtn}</button>
-  </ActionGroup>}
-
-  {teamAssign&&<ActionGroup label={g.primary} tone="primary" title={g.teamTitle} hint={status==="PROPOSAL_PREPARATION"?(locale==="ar"?"هذه الحالة تحتاج موافقة داخلية قبل إرسال العرض للمريض. عيّن المسؤول لإكمالها.":"This case needs internal sign-off before the proposal can be sent to the patient. Assign who should complete it."):(locale==="ar"?"عيّن فريق العمليات لترتيب السفر والوصول.":"Assign Operations to arrange travel and arrival.")}>
-   {teamRoles.map(role=><form key={role} className="space-y-2" onSubmit={event=>submit(event,data=>mutate(`/coordinator/cases/${caseId}/assignments`,{assigneeSubject:data.get("assignee"),assigneeRole:role,assignmentType:"PRIMARY",pod:null,reason:`Assigned to ${role.toLowerCase()}`}))}><label className="block text-sm font-semibold">{role==="OPERATIONS"?(locale==="ar"?"العمليات":"Operations"):(locale==="ar"?"المالية":"Finance")}<select name="assignee" className="field mt-2" required defaultValue=""><option value="">{locale==="ar"?"اختر عضو الفريق":"Select team member"}</option>{staff.filter(person=>person.role===role||person.role===role+"_LEAD").map(person=><option key={person.subject} value={person.subject}>{person.name}</option>)}</select></label><button className="btn-secondary">{locale==="ar"?"تعيين":"Assign"}</button></form>)}
-  </ActionGroup>}
-
-  {canRequestInformation&&<ActionGroup label={g.secondary} title={g.infoTitle} hint={g.infoHint}>
-   <div className="flex flex-wrap gap-2">
-    <button type="button" className={canAssign||teamAssign?"btn-secondary":"btn-primary"} onClick={()=>setInfoDialog(true)}>{g.request}</button>
-    <RecordPatientResponse locale={locale} caseId={caseId} action={patientAction} mutate={mutate}/>
-   </div>
-   <p className="rounded-lg bg-white/70 p-3 text-[0.82rem] leading-6 text-ink-600">{g.infoConsequence}</p>
-   {infoDialog&&<RequestInformationDialog locale={locale} caseIds={[caseId]} busy={false} mutate={mutate} onClose={()=>setInfoDialog(false)}/>}
-  </ActionGroup>}
-
-  {workflowOptions.length>0&&<ActionGroup label={g.workflow} title={t.transition}>
-   <input aria-label={t.reasonOptional} className="field" value={reason} onChange={event=>setReason(event.target.value)} placeholder={t.reasonOptional}/>
-   <div className="flex flex-wrap gap-2">{workflowOptions.map(s=><button key={s} type="button" className="btn-secondary" onClick={()=>doTransition(s)}>{stateLabel(s,locale)}</button>)}</div>
-  </ActionGroup>}
-
-  {adminOptions.length>0&&<details className="rounded-xl border border-line px-4 py-3">
-   <summary className="cursor-pointer text-[0.8rem] font-bold uppercase tracking-[0.08em] text-ink-500">{g.admin}</summary>
-   <div className="mt-3 flex flex-wrap gap-2">{adminOptions.map(s=><button key={s} type="button" className="rounded-xl border border-alert-200 bg-white px-4 py-2 text-[0.9rem] font-bold text-alert-700 transition hover:border-alert-400 hover:bg-alert-50" onClick={()=>{if(window.confirm(locale==="ar"?"هل تريد إلغاء الحالة؟":"Cancel this case?"))doTransition(s);}}>{stateLabel(s,locale)}</button>)}</div>
-  </details>}
- </div>;
-}
-
-/** Consistent action grouping: a quiet group label, one heading, optional consequence copy, then controls. */
-function ActionGroup({label,title,hint,tone="default",children}:{label:string;title:string;hint?:string;tone?:"primary"|"default";children:React.ReactNode}){
- return <section className={`space-y-3 rounded-xl border p-4 ${tone==="primary"?"border-brand-200 bg-brand-50":"border-line bg-mist"}`}>
-  <div>
-   <p className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-brand-700">{label}</p>
-   <h4 className={`mt-1 font-bold ${tone==="primary"?"text-brand-900":"text-ink-900"}`}>{title}</h4>
-   {hint&&<p className="mt-1 text-[0.85rem] leading-6 text-ink-600">{hint}</p>}
-  </div>
-  {children}
- </section>;
-}
 function submit(event:FormEvent<HTMLFormElement>,action:(data:FormData)=>Promise<unknown>){event.preventDefault();const form=event.currentTarget;void action(new FormData(form)).then(result=>{if(result)form.reset();});}
 function date(value:FormDataEntryValue|null){return value?new Date(String(value)).toISOString():null;}

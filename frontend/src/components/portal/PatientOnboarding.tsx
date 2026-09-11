@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LockKeyhole } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
+import { apiUrl } from "@/lib/api";
 
 // Mirrors the backend-computed DTOs. Readiness is rendered verbatim — the UI never infers readiness
 // from unrelated case/proposal statuses. No provider cost, margin, profit or finance reason is exposed.
@@ -22,7 +23,6 @@ type Onboarding = {
   version: number; profile: PatientProfile; readiness: Readiness; identity: Identity; completedConsentTypes: string[]; requiredConsentTypes: string[];
 };
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 const copy = {
   en: {
@@ -73,7 +73,7 @@ export function PatientOnboarding({ caseId, locale }: { caseId: string; locale: 
 
   const api = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
     if (!user) throw new Error("AUTHENTICATION_REQUIRED");
-    const res = await fetch(`${API}/api/v1${path}`, { ...init, headers: { Authorization: `Bearer ${user.access_token}`, ...(init?.body ? { "Content-Type": "application/json" } : {}), ...init?.headers }, cache: "no-store" });
+    const res = await fetch(apiUrl(path), { ...init, headers: { Authorization: `Bearer ${user.access_token}`, ...(init?.body ? { "Content-Type": "application/json" } : {}), ...init?.headers }, cache: "no-store" });
     if (!res.ok) { const body = (await res.json().catch(() => ({}))) as { message?: string }; throw new Error(body.message ?? t.error); }
     return (res.status === 204 ? undefined : res.json()) as T;
   }, [user, t.error]);

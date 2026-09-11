@@ -5,6 +5,15 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/rehletshifaa}
     username: ${DB_USERNAME:rehletshifaa}
     password: ${DB_PASSWORD:rehletshifaa}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      ssl.enabled: ${REDIS_SSL:false}
+      timeout: ${REDIS_TIMEOUT:2s}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
   jpa:
     open-in-view: false
     hibernate:
@@ -46,6 +55,15 @@ springdoc:
   api-docs.enabled: ${OPENAPI_ENABLED:true}
   swagger-ui.enabled: ${OPENAPI_ENABLED:true}
 app:
+  # Redis-backed reference-data cache. Only the caches named in CacheNames exist; live workflow,
+  # payment and authorization state is never cached.
+  cache:
+    enabled: ${CACHE_ENABLED:true}
+    default-ttl: ${CACHE_DEFAULT_TTL:10m}
+    ttls:
+      fx-rates: ${CACHE_TTL_FX_RATES:15m}
+      care-categories: ${CACHE_TTL_CARE_CATEGORIES:1h}
+      commercial-policy: ${CACHE_TTL_COMMERCIAL_POLICY:10m}
   security.enabled: ${APP_SECURITY_ENABLED:false}
   claim:
     pepper: ${CLAIM_TOKEN_PEPPER:local-development-pepper-only}

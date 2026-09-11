@@ -9,7 +9,8 @@ type Item = { id: string; kind: string; label: string; required: boolean; comple
  * coordinator records it here and the value is stored as patient-reported, with the staff identity and
  * channel kept alongside it. It never looks like the patient typed it themselves.
  */
-export function RecordPatientResponse({ locale, caseId, action, mutate }: { locale: Locale; caseId: string; action?: { items: Item[] } | null; mutate: Mutate }) {
+/** Controlled when {@code open}/{@code onOpenChange} are given (the case page opens it from More actions); otherwise it carries its own button. */
+export function RecordPatientResponse({ locale, caseId, action, mutate, open: controlledOpen, onOpenChange, hideTrigger = false }: { locale: Locale; caseId: string; action?: { items: Item[] } | null; mutate: Mutate; open?: boolean; onOpenChange?: (open: boolean) => void; hideTrigger?: boolean }) {
   const ar = locale === "ar";
   const t = ar
     ? { open: "تسجيل رد المريض", title: "تسجيل ما قدّمه المريض", intro: "استخدم هذا عندما يرد المريض عبر واتساب أو الهاتف. سيُحفظ المصدر والقناة مع البيانات.",
@@ -21,7 +22,9 @@ export function RecordPatientResponse({ locale, caseId, action, mutate }: { loca
         save: "Save response", saving: "Saving…", cancel: "Cancel", close: "Close", none: "There is no open information request for this case.",
         loading: "Loading…", provenance: "Recorded as patient-reported, captured by you." };
   const dialog = useRef<HTMLDialogElement>(null);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean) => { setInternalOpen(next); onOpenChange?.(next); };
   const items = (action?.items ?? []).filter(item => !item.completed);
   const [values, setValues] = useState<Record<string, string>>({});
   const [channel, setChannel] = useState("WHATSAPP");
@@ -43,9 +46,9 @@ export function RecordPatientResponse({ locale, caseId, action, mutate }: { loca
     if (result) { setOpen(false); setValues({}); setNote(""); }
   }
   return <>
-    <button type="button" className="btn-secondary" onClick={() => setOpen(true)}>
+    {!hideTrigger && <button type="button" className="btn-secondary" onClick={() => setOpen(true)}>
       <MessageSquare size={16} className="me-1 inline" aria-hidden/>{t.open}
-    </button>
+    </button>}
     {open && (
       <dialog ref={dialog} className="account-dialog" aria-labelledby="on-behalf-heading" onClose={() => setOpen(false)}>
         <div className="flex items-start justify-between gap-4">

@@ -98,8 +98,17 @@ public final class JourneyDtos {
     // Secure-delivery status of the latest released proposal notification (masked; no raw contact or token).
     public record DeliveryStatus(String status,String channel,String destinationMasked,int attempts,Instant deliveredAt,Instant nextAttemptAt) {}
     /** {@code patientAction} is the open request to the patient, so staff can see and record exactly what was asked. */
-    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction) {}
-    public record IntakePreview(CaseView caseSummary,String intakeSummary) {}
+    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions) {}
+    public record IntakePreview(CaseView caseSummary,String intakeSummary,CaseActionsView actions) {}
+    // --- Backend-authoritative action contract for the case page ---
+    // The page renders what is true now and what the signed-in person can validly do now from this record
+    // alone. It is resolved fresh on every read (never cached) by CaseActionService; every action endpoint
+    // still re-validates independently, so this is a rendering contract, never an authorization decision.
+    /** {@code kind}: COMPLETE (finish the work item), FOCUS (open the form that does the work), CLAIM, ACCEPT, WAIT (somebody else's move), NONE. */
+    public record CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode) {}
+    /** {@code owner}: PATIENT, STAFF, or LATER (queued behind another blocker). {@code gating} is false for a step that must be done before a later commitment (identity before travel is confirmed) but does not hold the current stage. Labels are patient-safe, like {@link BlockingItem}. */
+    public record BlockerView(String code,String labelEn,String labelAr,String owner,boolean gating) {}
+    public record CaseActionsView(String journeyStage,String waitingOn,String waitingReason,CurrentActionView currentAction,List<BlockerView>blockers,List<String>availableActions) {}
     public record IdResponse(UUID id,String status) {}
     // --- Consultant price catalog, specialty templates, and FX (Phase 2) ---
     public record CatalogServiceView(UUID id,String serviceCode,String serviceName,String category,BigDecimal priceEgp,boolean active,LocalDate validUntil) {}

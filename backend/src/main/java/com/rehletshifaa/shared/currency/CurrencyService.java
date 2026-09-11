@@ -1,6 +1,9 @@
 package com.rehletshifaa.shared.currency;
 
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.cache.CacheNames;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -49,7 +52,14 @@ public class CurrencyService {
         return egp.multiply(effectiveRate(currency, date)).setScale(2, RoundingMode.HALF_UP);
     }
 
-    /** quote units per 1 EGP, effective on {@code date}. */
+    /**
+     * quote units per 1 EGP, effective on {@code date}.
+     *
+     * <p>Cached in Redis: a rate for a past day is immutable and today's is stable within the TTL,
+     * while proposal pricing calls this once per line item. An unavailable rate throws rather than
+     * returning null, so a missing rate is never cached as an answer.
+     */
+    @Cacheable(cacheNames = CacheNames.FX_RATES, key = "'rate:' + #currency + ':' + #date")
     public BigDecimal effectiveRate(String currency, LocalDate date) {
         if (BASE.equals(currency)) return BigDecimal.ONE;
         requireSupported(currency);
@@ -61,6 +71,7 @@ public class CurrencyService {
     }
 
     /** The effective rate rows (incl. EGP=1) for every supported currency on {@code date}. */
+    @Cacheable(cacheNames = CacheNames.FX_RATES, key = "'all:' + #date")
     public List<FxRate> effectiveRates(LocalDate date) {
         if (date.equals(LocalDate.now(clock))) ensureRatesFor(date);
         List<FxRate> out = new ArrayList<>();
@@ -73,7 +84,12 @@ public class CurrencyService {
         return out;
     }
 
-    /** Pin a manual rate (e.g. the CBE published figure) for a currency and day; wins over the API. */
+    /**
+     * Pin a manual rate (e.g. the CBE published figure) for a currency and day; wins over the API.
+     * Every cached rate is dropped rather than one key, because the day's aggregate row also changes
+     * and a stale published rate would price a real proposal.
+     */
+    @CacheEvict(cacheNames = CacheNames.FX_RATES, allEntries = true)
     @Transactional
     public void setOverride(String currency, BigDecimal rate, LocalDate date, String bySubject) {
         requireSupported(currency);

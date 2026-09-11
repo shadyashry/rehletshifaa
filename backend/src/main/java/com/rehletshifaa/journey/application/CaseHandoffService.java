@@ -3,6 +3,7 @@ package com.rehletshifaa.journey.application;
 import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,12 +15,14 @@ import java.util.UUID;
 import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
 /**
- * Hands an accepted, deposit-paid case back to its coordinator so the existing treatment journey continues.
+ * Hands an accepted, deposit-paid case back to its coordinator so the existing treatment journey continues,
+ * and is the only place that moves a case into TRAVEL_COORDINATION — under {@link CaseTransitionPolicy}.
  *
- * <p>Triggered only from the authoritative payment path — never from a browser callback. Every step is
- * guarded so a replayed confirmation (duplicate receipt, retried transaction) cannot double-transition the
- * case, resurrect a task or send a second notification. The case's <em>original</em> coordinator is always
- * preferred; assignment policy is left untouched when none exists so the normal queue picks the case up.
+ * <p>Driven by {@link CaseEvents} from the authoritative payment and readiness paths — never from a browser
+ * callback. Every step is guarded so a replayed confirmation (duplicate receipt, retried transaction,
+ * repeated readiness event) cannot double-transition the case, resurrect a task or send a second
+ * notification. The case's <em>original</em> coordinator is always preferred; assignment policy is left
+ * untouched when none exists so the normal queue picks the case up.
  */
 @Service
 public class CaseHandoffService {
@@ -29,12 +32,13 @@ public class CaseHandoffService {
     private final JdbcClient jdbc;
     private final IntakeLifecycleService intake;
     private final StaffWorkService work;
+    private final CaseTransitionPolicy policy;
     private final Clock clock;
     private final String coordinatorEmail;
 
-    public CaseHandoffService(JdbcClient jdbc, IntakeLifecycleService intake, StaffWorkService work, Clock clock,
+    public CaseHandoffService(JdbcClient jdbc, IntakeLifecycleService intake, StaffWorkService work, CaseTransitionPolicy policy, Clock clock,
                               @Value("${app.mail.coordinator}") String coordinatorEmail) {
-        this.jdbc = jdbc; this.intake = intake; this.work = work; this.clock = clock; this.coordinatorEmail = coordinatorEmail;
+        this.jdbc = jdbc; this.intake = intake; this.work = work; this.policy = policy; this.clock = clock; this.coordinatorEmail = coordinatorEmail;
     }
 
     /**
@@ -67,50 +71,77 @@ public class CaseHandoffService {
     }
 
     /**
-     * Continue the journey once the deposit is authoritatively settled. Safe to call repeatedly.
+     * Continue the journey once the deposit is authoritatively settled. Safe to call repeatedly: the
+     * handoff itself (work, notifications, email, audit) happens once, while the move into treatment
+     * coordination is attempted every time and only succeeds when {@link CaseTransitionPolicy} lets the
+     * case enter — a deposit settled before the patient activated their profile leaves the case in
+     * ACCEPTED until the profile is done, and the next event brings it across.
      *
      * @return true when this call performed the handoff (first authoritative confirmation)
      */
     @Transactional
     public boolean onDepositSettled(UUID caseId) {
         Instant now = clock.instant();
-        // One-shot marker: the audit ledger itself is the idempotency record, so no new table is needed.
-        Integer already = jdbc.sql("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_DEPOSIT_HANDOFF'")
-                .param(caseId).query(Integer.class).single();
-        if (already != null && already > 0) return false;
-
         String status = jdbc.sql("SELECT status FROM medical_cases WHERE id=? FOR UPDATE").param(caseId)
                 .query(String.class).optional().orElse(null);
         if (status == null) return false;
+        // One-shot marker: the audit ledger itself is the idempotency record, so no new table is needed.
+        Integer already = jdbc.sql("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_DEPOSIT_HANDOFF'")
+                .param(caseId).query(Integer.class).single();
+        boolean first = already == null || already == 0;
 
-        work.closeWorkItems(caseId, DEPOSIT_WORK, "Coordination deposit received");
+        if (first) {
+            work.closeWorkItems(caseId, DEPOSIT_WORK, "Coordination deposit received");
+            String coordinator = restoreCoordinator(caseId, now);
+            // One idempotent operation opens the work item, raises the in-app notification and sends the work
+            // email, so a duplicate confirmation cannot produce duplicate work or duplicate alerts.
+            work.openWorkItem(new NewWorkItem(caseId, "TRAVEL", "Start treatment coordination — deposit received",
+                    "The coordination deposit is confirmed. Begin the treatment journey for this case.",
+                    coordinator, "COORDINATOR", "HIGH", false, null, "SYSTEM", "DEPOSIT_SETTLED",
+                    "deposit-settled:" + caseId, true));
+            if (coordinator == null) notifyTeamMailbox(caseId, now); // unowned: the shared queue must still see it
+            notifyPatient(caseId, now);
+        }
         boolean moved = advanceToCoordination(caseId, status, now);
-        String coordinator = restoreCoordinator(caseId, now);
-        // One idempotent operation opens the work item, raises the in-app notification and sends the work
-        // email, so a duplicate confirmation cannot produce duplicate work or duplicate alerts.
-        work.openWorkItem(new NewWorkItem(caseId, "TRAVEL", "Start treatment coordination — deposit received",
-                "The coordination deposit is confirmed. Begin the treatment journey for this case.",
-                coordinator, "COORDINATOR", "HIGH", false, null, "SYSTEM", "DEPOSIT_SETTLED",
-                "deposit-settled:" + caseId, true));
-        if (coordinator == null) notifyTeamMailbox(caseId, now); // unowned: the shared queue must still see it
-        work.refreshWaitingOn(caseId, "STAFF", "Deposit received — coordinator to start the treatment journey");
-        notifyPatient(caseId, now);
-        audit(caseId, "CASE_DEPOSIT_HANDOFF", moved ? "Deposit settled; case returned to coordinator" : "Deposit settled; case already in coordination");
-        return true;
+        if (first || moved) work.refreshWaitingOn(caseId, "STAFF", "Deposit received — coordinator to start the treatment journey");
+        if (first) audit(caseId, "CASE_DEPOSIT_HANDOFF", moved ? "Deposit settled; case returned to coordinator"
+                : "ACCEPTED".equals(status) ? "Deposit settled; coordination starts once the patient completes their profile" : "Deposit settled; case already in coordination");
+        return first;
     }
 
     /**
-     * ACCEPTED is the only state the deposit can legitimately advance. Anything further along is already in
-     * the downstream journey and is deliberately left alone.
+     * A patient step (profile, contact, consents, onboarding) changed. If that was the last thing holding
+     * an accepted, deposit-settled case back, it moves into treatment coordination now. Otherwise nothing
+     * happens — this is never a place that opens work or sends anything.
+     */
+    @Transactional
+    public boolean onPatientReadinessChanged(UUID caseId) {
+        String status = jdbc.sql("SELECT status FROM medical_cases WHERE id=? FOR UPDATE").param(caseId)
+                .query(String.class).optional().orElse(null);
+        if (!"ACCEPTED".equals(status)) return false;
+        boolean moved = advanceToCoordination(caseId, status, clock.instant());
+        if (moved) work.refreshWaitingOn(caseId, "STAFF", "Patient ready and deposit settled — coordinator to start the treatment journey");
+        return moved;
+    }
+
+    @EventListener public void on(CaseEvents.DepositRequired event) { onDepositRequired(event.caseId()); }
+    @EventListener public void on(CaseEvents.DepositSettled event) { onDepositSettled(event.caseId()); }
+    @EventListener public void on(CaseEvents.PatientReadinessChanged event) { onPatientReadinessChanged(event.caseId()); }
+
+    /**
+     * ACCEPTED is the only state the deposit can legitimately advance, and only under the shared policy —
+     * the same invariants any other path into TRAVEL_COORDINATION must satisfy. Anything further along is
+     * already in the downstream journey and is deliberately left alone.
      */
     private boolean advanceToCoordination(UUID caseId, String status, Instant now) {
-        if (!"ACCEPTED".equals(status)) return false;
+        if (!"ACCEPTED".equals(status) || !policy.mayEnter(caseId, "ACCEPTED", "TRAVEL_COORDINATION")) return false;
         int changed = jdbc.sql("UPDATE medical_cases SET status='TRAVEL_COORDINATION',updated_at=?,version=version+1 WHERE id=? AND status='ACCEPTED'")
                 .params(timestamp(now), caseId).update();
         if (changed != 1) return false;
         jdbc.sql("INSERT INTO case_status_history(id,case_id,from_status,to_status,actor_subject,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?)")
                 .params(UUID.randomUUID(), caseId, "ACCEPTED", "TRAVEL_COORDINATION", "SYSTEM", "SYSTEM",
-                        "Coordination deposit settled", timestamp(now)).update();
+                        "Coordination deposit settled and patient ready", timestamp(now)).update();
+        audit(caseId, "CASE_STATUS_CHANGED", "ACCEPTED -> TRAVEL_COORDINATION: deposit settled and patient ready");
         return true;
     }
 

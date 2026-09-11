@@ -246,9 +246,12 @@ conditional branch, **NEG** = must be blocked.
 - **Pre:** `ACCEPTED`/`TRAVEL_COORDINATION` case that is NOT yet fully ready.
 - **Steps:** Do administrative travel planning (allowed) → attempt to confirm travel
   (non-cancellable).
-- **Expected:** Planning is allowed; confirmation is blocked until full readiness (identity,
-  consents, onboarding, deposit) with structured blocking reasons. Legacy cases with no
-  onboarding keep the deposit-only gate.
+- **Expected:** Planning is allowed and leaves the case stage untouched (an `ACCEPTED` case stays
+  `ACCEPTED`; recording an arrival there is refused with `INVALID_CASE_TRANSITION`); confirmation is
+  blocked until full readiness (identity, consents, onboarding, deposit) with structured blocking
+  reasons. Legacy cases with no onboarding keep the deposit-only gate. Automated over HTTP through the
+  gateway, with a self-built fixture:
+  `frontend/e2e/operations-gate-live.spec.ts`.
 
 ### UC-11 · Arrival → final assessment → final quote — FLOW · Doctor + Coordinator + Finance
 - **Pre:** `ARRIVAL_CONFIRMED`.

@@ -4,23 +4,27 @@ import { useState } from "react";
 import { ArrowRight, CalendarClock, CircleAlert, FileText, MessageSquareText } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
-import { waitingLabel } from "@/components/portal/MyWork";
 
-export type CurrentWork = { id: string; type?: string; title: string; description?: string; dueAt?: string | null; overdue?: boolean; version: number };
+/** The backend's resolution of what this person should do now — rendered, never re-derived here. */
+export type CurrentActionView = {
+  code: string; kind: "COMPLETE" | "FOCUS" | "CLAIM" | "ACCEPT" | "WAIT" | "NONE";
+  title?: string | null; context?: string | null; workItemId?: string | null; workItemVersion?: number | null;
+  workType?: string | null; dueAt?: string | null; overdue?: boolean; blockerCode?: string | null;
+};
+export type BlockerView = { code: string; labelEn: string; labelAr: string; owner: "PATIENT" | "STAFF" | "LATER"; gating: boolean };
+export type CaseActions = { journeyStage: string; waitingOn?: string | null; waitingReason?: string | null; currentAction: CurrentActionView; blockers: BlockerView[]; availableActions: string[] };
 export type ResponseContext = { message?: string | null; documentName?: string | null; receivedAt?: string | null };
 export type SecondaryAction = { label: string; onClick: () => void };
 
 /**
- * The single strongest element on a case page: where we are, who has the ball, and the one thing to do
- * next — labelled by its business outcome, never by the mechanics of the task ("complete task").
+ * The single strongest element on a case page: the one thing to do next, labelled by its business
+ * outcome. Who has the ball is stated once, in the case header; this panel explains why.
  *
- * <p>The action comes from the work item the domain actually opened; when nothing is assigned it falls
- * back to the stage the case is in. Future workflow steps are deliberately absent until this one is done.
+ * <p>Everything here comes from the backend's action contract. Future workflow steps are absent until
+ * they become the current action, and nothing is offered that the backend would refuse.
  */
-export function CurrentActionPanel({ locale, role, status, waitingOn, pendingAssignment, owned = true, work, response,
-                                     busy, secondary = [], onComplete, onFocusAction, onClaim, onAcceptAssignment, onDeclineAssignment, viewerRole }: {
-  locale: Locale; role: string; status: string; waitingOn?: string | null; pendingAssignment: boolean;
-  owned?: boolean; work?: CurrentWork | null; response?: ResponseContext | null; busy?: boolean; viewerRole?: string;
+export function CurrentActionPanel({ locale, role, action, response, busy, secondary = [], onComplete, onFocusAction, onClaim, onAcceptAssignment, onDeclineAssignment }: {
+  locale: Locale; role: string; action: CurrentActionView; response?: ResponseContext | null; busy?: boolean;
   secondary?: SecondaryAction[]; onComplete?: (evidence: string) => void; onFocusAction?: () => void; onClaim?: () => void;
   onAcceptAssignment?: () => void; onDeclineAssignment?: () => void;
 }) {
@@ -29,35 +33,29 @@ export function CurrentActionPanel({ locale, role, status, waitingOn, pendingAss
   const [note, setNote] = useState("");
   if (role === "patient") return null;
 
-  const primary = resolvePrimary({ role, status, waitingOn, pendingAssignment, owned, work, ar });
-  const guidance = pendingAssignment ? assignmentGuidance(role, ar) : work ? null : stageGuidance(role, status, waitingOn, owned, ar);
-  const title = pendingAssignment ? guidance!.title : (work?.title ?? guidance?.title ?? "");
-  const body = pendingAssignment ? guidance!.body : (work?.description ?? guidance?.body);
-  const showResponse = !pendingAssignment && !!response && (!!response.message || !!response.documentName);
+  const copy = describe(action, role, ar);
+  const primary = primaryFor(action, ar);
+  const showResponse = !!response && (!!response.message || !!response.documentName);
+  const waiting = action.kind === "WAIT" || action.kind === "NONE";
 
   return (
     <section id="current-action" aria-labelledby="current-action-title"
-             className="mt-4 rounded-xl border border-brand-200 bg-white p-4 shadow-[0_1px_2px_rgba(28,51,58,0.04)] sm:p-5">
+             className={`mt-4 rounded-xl border bg-white p-4 shadow-[0_1px_2px_rgba(28,51,58,0.04)] sm:p-5 ${waiting ? "border-line" : "border-brand-200"}`}>
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-brand-700">
           {ar ? "الإجراء الحالي" : "Current action"}
         </p>
-        {waitingOn && waitingOn !== "NONE" && waitingOn !== "STAFF" && (
-          <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[0.72rem] font-bold text-amber-900">
-            {ar ? "بانتظار" : "Waiting on"}: {waitingLabel(waitingOn, locale, viewerRole ?? role)}
-          </span>
-        )}
-        {work?.dueAt && (
-          <span className={`inline-flex items-center gap-1 text-[0.75rem] ${work.overdue ? "font-bold text-alert-700" : "text-ink-500"}`}>
-            {work.overdue ? <CircleAlert size={13} aria-hidden/> : <CalendarClock size={13} aria-hidden/>}
-            {work.overdue ? (ar ? "متأخر" : "Overdue") : (ar ? "الاستحقاق" : "Due")}{": "}
-            {new Date(work.dueAt).toLocaleDateString(locale, { day: "numeric", month: "short" })}
+        {action.dueAt && (
+          <span className={`inline-flex items-center gap-1 text-[0.75rem] ${action.overdue ? "font-bold text-alert-700" : "text-ink-500"}`}>
+            {action.overdue ? <CircleAlert size={13} aria-hidden/> : <CalendarClock size={13} aria-hidden/>}
+            {action.overdue ? (ar ? "متأخر" : "Overdue") : (ar ? "الاستحقاق" : "Due")}{": "}
+            {new Date(action.dueAt).toLocaleDateString(locale, { day: "numeric", month: "short" })}
           </span>
         )}
       </div>
 
-      <h2 id="current-action-title" className="mt-1.5 text-[1.1rem] font-bold leading-6 text-brand-900">{title}</h2>
-      {body && <p className="mt-1 max-w-2xl text-[0.88rem] leading-6 text-ink-600">{body}</p>}
+      <h2 id="current-action-title" className="mt-1.5 text-[1.1rem] font-bold leading-6 text-brand-900">{copy.title}</h2>
+      {copy.body && <p className="mt-1 max-w-2xl text-[0.88rem] leading-6 text-ink-600">{copy.body}</p>}
 
       {/* What the coordinator has to look at, inline — reviewing should not require navigating away. */}
       {showResponse && (
@@ -81,14 +79,14 @@ export function CurrentActionPanel({ locale, role, status, waitingOn, pendingAss
           <label className="block text-[0.8rem] font-bold text-ink-700">
             {ar ? "ملاحظة للسجل (اختياري)" : "Note for the record (optional)"}
             <input className="field mt-1.5" value={note} maxLength={2000} onChange={event => setNote(event.target.value)}
-                   placeholder={ar ? "ما الذي راجعته؟" : "What did you review?"} autoFocus/>
+                   placeholder={ar ? "ما الذي أنجزته؟" : "What did you do?"} autoFocus/>
           </label>
           <div className="mt-3 flex flex-wrap gap-2">
             <button className="btn-primary" disabled={busy}>{primary.label}</button>
             <button type="button" className="btn-secondary" onClick={() => setConfirming(false)}>{ar ? "إلغاء" : "Cancel"}</button>
           </div>
         </form>
-      ) : (
+      ) : (primary.kind !== "none" || secondary.length > 0) && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {primary.kind !== "none" && (
             <button type="button" className="btn-primary" disabled={busy}
@@ -99,8 +97,8 @@ export function CurrentActionPanel({ locale, role, status, waitingOn, pendingAss
           {primary.kind === "accept" && onDeclineAssignment && (
             <button type="button" className="btn-secondary" disabled={busy} onClick={onDeclineAssignment}>{ar ? "رفض" : "Decline"}</button>
           )}
-          {(primary.kind === "accept" ? [] : secondary).slice(0, 2).map(action => (
-            <button key={action.label} type="button" className="btn-secondary" disabled={busy} onClick={action.onClick}>{action.label}</button>
+          {(primary.kind === "accept" ? [] : secondary).slice(0, 2).map(item => (
+            <button key={item.label} type="button" className="btn-secondary" disabled={busy} onClick={item.onClick}>{item.label}</button>
           ))}
         </div>
       )}
@@ -110,106 +108,82 @@ export function CurrentActionPanel({ locale, role, status, waitingOn, pendingAss
 
 type Primary = { label: string; kind: "complete" | "focus" | "claim" | "accept" | "none" };
 
-/**
- * One action per state. A work item assigned to this person always wins — it is what the workflow is
- * actually waiting for — and its label names the outcome, not the mechanics.
- */
-function resolvePrimary({ role, status, waitingOn, pendingAssignment, owned, work, ar }: {
-  role: string; status: string; waitingOn?: string | null; pendingAssignment: boolean; owned: boolean;
-  work?: CurrentWork | null; ar: boolean;
-}): Primary {
-  if (pendingAssignment) return { label: ar ? "قبول التعيين" : "Accept assignment", kind: "accept" };
-  if (role === "coordinator" && !owned) {
-    return status === "RECEIVED"
-      ? { label: ar ? "استلام مسؤولية الحالة" : "Take ownership", kind: "claim" }
-      : { label: "", kind: "none" };
+/** One button per state, named for the outcome. Waiting states have none: offering a future step here is the premature action this panel exists to prevent. */
+function primaryFor(action: CurrentActionView, ar: boolean): Primary {
+  switch (action.kind) {
+    case "CLAIM": return { label: ar ? "استلام مسؤولية الحالة" : "Take ownership", kind: "claim" };
+    case "ACCEPT": return { label: ar ? "قبول التعيين" : "Accept assignment", kind: "accept" };
+    case "COMPLETE": case "FOCUS": {
+      const byWork = action.workType ? WORK_LABELS[action.workType] : undefined;
+      const label = byWork ?? ACTION_LABELS[action.code] ?? { en: "Mark done", ar: "تأكيد الإنجاز" };
+      return { label: ar ? label.ar : label.en, kind: action.kind === "COMPLETE" ? "complete" : "focus" };
+    }
+    default: return { label: "", kind: "none" };
   }
-  if (work) {
-    const label = WORK_LABELS[work.type ?? ""] ?? { en: "Mark reviewed", ar: "تأكيد المراجعة", kind: "complete" as const };
-    return { label: ar ? label.ar : label.en, kind: label.kind };
-  }
-  // Blocked on somebody else: offering the next workflow step here is exactly the premature action
-  // this panel exists to prevent. Secondary actions still let staff nudge or record a reply.
-  if (waitingOn && ["PATIENT", "CONSULTANT", "HOSPITAL", "EXTERNAL", "PAYMENT"].includes(waitingOn)) return { label: "", kind: "none" };
-  if (role === "coordinator") {
-    if (["INTAKE_REVIEW", "INFORMATION_REQUIRED", "READY_FOR_CONSULTANT"].includes(status))
-      return { label: ar ? "تعيين استشاري" : "Assign consultant", kind: "focus" };
-    if (["CLINICAL_RECOMMENDATION_READY", "PROPOSAL_PREPARATION", "REVISION_REQUESTED"].includes(status))
-      return { label: ar ? "تجهيز العرض" : "Prepare proposal", kind: "focus" };
-    if (["ACCEPTED", "TRAVEL_COORDINATION"].includes(status))
-      return { label: ar ? "بدء تنسيق العلاج" : "Start treatment coordination", kind: "focus" };
-    return { label: "", kind: "none" };
-  }
-  if (role === "doctor" && status === "CONSULTANT_REVIEW") return { label: ar ? "تسجيل القرار السريري" : "Record clinical decision", kind: "focus" };
-  if (role === "operations" && ["ACCEPTED", "TRAVEL_COORDINATION"].includes(status)) return { label: ar ? "استكمال الترتيبات" : "Complete arrangements", kind: "focus" };
-  if (role === "finance" && status === "PROPOSAL_PREPARATION") return { label: ar ? "اعتماد الشروط المالية" : "Approve commercial terms", kind: "focus" };
-  return { label: "", kind: "none" };
 }
 
-/**
- * Work-item types map to the business outcome of finishing them. Some are acknowledged here (the review
- * happened in this panel); others hand off to the form that does the real work, so the CTA focuses it
- * rather than pretending the item is done.
- */
-const WORK_LABELS: Record<string, { en: string; ar: string; kind: "complete" | "focus" }> = {
-  REVIEW_PATIENT_RESPONSE: { en: "Accept & continue", ar: "قبول ومتابعة", kind: "complete" },
-  CLINICAL_REVIEW: { en: "Start clinical review", ar: "بدء المراجعة السريرية", kind: "focus" },
-  PREPARE_PROPOSAL: { en: "Prepare proposal", ar: "تجهيز العرض", kind: "focus" },
-  PROPOSAL_REVISION: { en: "Revise proposal", ar: "تعديل العرض", kind: "focus" },
-  PROPOSAL_DECLINED_REVIEW: { en: "Acknowledge outcome", ar: "تأكيد الاطلاع", kind: "complete" },
-  CLINICAL_OUTCOME_REVIEW: { en: "Acknowledge outcome", ar: "تأكيد الاطلاع", kind: "complete" },
-  TRAVEL: { en: "Start treatment coordination", ar: "بدء تنسيق العلاج", kind: "focus" },
-  REASSIGN_CONSULTANT: { en: "Reassign consultant", ar: "إعادة تعيين استشاري", kind: "focus" },
-  REVIEW: { en: "Mark reviewed", ar: "تأكيد المراجعة", kind: "complete" },
-  INFORMATION_REQUEST: { en: "Mark handled", ar: "تأكيد المعالجة", kind: "complete" },
+/** Work-item types map to the business outcome of finishing them. */
+const WORK_LABELS: Record<string, { en: string; ar: string }> = {
+  REVIEW_PATIENT_RESPONSE: { en: "Accept & continue", ar: "قبول ومتابعة" },
+  CLINICAL_REVIEW: { en: "Start clinical review", ar: "بدء المراجعة السريرية" },
+  PREPARE_PROPOSAL: { en: "Prepare proposal", ar: "تجهيز العرض" },
+  PROPOSAL_REVISION: { en: "Revise proposal", ar: "تعديل العرض" },
+  PROPOSAL_DECLINED_REVIEW: { en: "Acknowledge outcome", ar: "تأكيد الاطلاع" },
+  CLINICAL_OUTCOME_REVIEW: { en: "Acknowledge outcome", ar: "تأكيد الاطلاع" },
+  DEPOSIT_ARRANGEMENT: { en: "Payment instructions sent", ar: "تم إرسال تعليمات الدفع" },
+  TRAVEL: { en: "Assign Operations", ar: "تعيين فريق العمليات" },
+  REASSIGN_CONSULTANT: { en: "Reassign consultant", ar: "إعادة تعيين استشاري" },
+  REVIEW: { en: "Mark reviewed", ar: "تأكيد المراجعة" },
+  INFORMATION_REQUEST: { en: "Mark handled", ar: "تأكيد المعالجة" },
 };
 
-/** When nothing is assigned, describe the stage — including the honest "nothing to do yet" cases. */
-function stageGuidance(role: string, status: string, waitingOn: string | null | undefined, owned: boolean, ar: boolean) {
-  if (role === "coordinator" && !owned) return status === "RECEIVED"
-    ? { title: ar ? "هذه الحالة بلا منسق" : "This case has no coordinator", body: ar ? "راجع بيانات الاستقبال ثم استلم الحالة لبدء العمل." : "Review the intake details, then take ownership to start work." }
-    : { title: ar ? "حالة يملكها منسق آخر" : "Owned by another coordinator", body: ar ? "لديك صلاحية العرض فقط." : "You have view-only access to this case." };
-  if (waitingOn === "PATIENT") return {
-    title: ar ? "بانتظار رد المريض" : "Waiting for the patient",
-    body: ar ? "لا يلزمك إجراء الآن. يمكنك التذكير أو تسجيل رده إن وصل عبر واتساب أو الهاتف." : "Nothing is needed from you right now. You can send a reminder, or record their reply if it arrives by WhatsApp or phone.",
-  };
-  if (waitingOn === "CONSULTANT") return {
-    title: ar ? "بانتظار الاستشاري" : "Waiting for the consultant",
-    body: ar ? "ستعود الحالة إليك فور تسجيل التوصية السريرية." : "The case returns to you as soon as the clinical recommendation is recorded.",
-  };
-  if (waitingOn === "PAYMENT") return {
-    title: ar ? "بانتظار وديعة التنسيق" : "Waiting for the coordination deposit",
-    body: ar ? "تستكمل الرحلة تلقائيًا فور تأكيد الدفع." : "The journey continues automatically once the payment is confirmed.",
-  };
-  if (role === "coordinator" && ["INTAKE_REVIEW", "INFORMATION_REQUIRED", "READY_FOR_CONSULTANT"].includes(status)) return {
-    title: ar ? "جهّز الحالة للاستشاري" : "Prepare the case for a consultant",
-    body: ar ? "أكمل ما ينقص ثم عيّن استشاريًا معتمدًا لمجال الرعاية." : "Complete anything missing, then assign a verified consultant for the care area.",
-  };
-  if (role === "coordinator" && ["CLINICAL_RECOMMENDATION_READY", "PROPOSAL_PREPARATION", "REVISION_REQUESTED"].includes(status)) return {
-    title: ar ? "جهّز عرض المريض" : "Prepare the patient proposal",
-    body: ar ? "راجع التوصية المعتمدة والمتطلبات الداخلية قبل الإصدار." : "Review the approved recommendation and internal requirements before releasing it.",
-  };
-  if (role === "coordinator" && ["ACCEPTED", "TRAVEL_COORDINATION"].includes(status)) return {
-    title: ar ? "ابدأ تنسيق العلاج" : "Start treatment coordination",
-    body: ar ? "تابع الترتيبات المطلوبة لبدء رحلة العلاج." : "Continue the arrangements needed to start the treatment journey.",
-  };
-  if (role === "doctor" && status === "CONSULTANT_REVIEW") return {
-    title: ar ? "سجّل قرارك السريري" : "Record your clinical decision",
-    body: ar ? "راجع ملخص الاستقبال والمستندات ثم سجّل التوصية." : "Review the intake summary and documents, then record your recommendation.",
-  };
-  return {
-    title: ar ? "لا يوجد إجراء مطلوب الآن" : "Nothing needs you right now",
-    body: ar ? "ستظهر الخطوة التالية هنا فور توفرها." : "The next step appears here as soon as it is due.",
-  };
+const ACTION_LABELS: Record<string, { en: string; ar: string }> = {
+  ASSIGN_CONSULTANT: { en: "Assign consultant", ar: "تعيين استشاري" },
+  PREPARE_PROPOSAL: { en: "Prepare proposal", ar: "تجهيز العرض" },
+  RELEASE_PROPOSAL: { en: "Review & release", ar: "مراجعة وإصدار" },
+  ASSIGN_OPERATIONS: { en: "Assign Operations", ar: "تعيين فريق العمليات" },
+  ASSIGN_FINANCE: { en: "Assign Finance", ar: "تعيين المالية" },
+  RECORD_CLINICAL_DECISION: { en: "Record clinical decision", ar: "تسجيل القرار السريري" },
+  UPDATE_TRAVEL_PLAN: { en: "Complete arrangements", ar: "استكمال الترتيبات" },
+  APPROVE_COMMERCIAL_TERMS: { en: "Approve commercial terms", ar: "اعتماد الشروط المالية" },
+};
+
+/** Title and explanation per resolved action. A work item speaks for itself; everything else is described here. */
+function describe(action: CurrentActionView, role: string, ar: boolean): { title: string; body?: string | null } {
+  if (action.code === "WORK_ITEM") return { title: action.title ?? "", body: action.context };
+  const t = (en: string, arabic: string) => (ar ? arabic : en);
+  switch (action.code) {
+    case "CLAIM_CASE": return { title: t("This case has no coordinator", "هذه الحالة بلا منسق"), body: t("Review the intake details, then take ownership to start work.", "راجع بيانات الاستقبال ثم استلم الحالة لبدء العمل.") };
+    case "VIEW_ONLY": return { title: t("Owned by another coordinator", "حالة يملكها منسق آخر"), body: t("You have view-only access to this case.", "لديك صلاحية العرض فقط.") };
+    case "ACCEPT_ASSIGNMENT": return role === "doctor"
+      ? { title: t("New clinical assignment", "تعيين سريري جديد"), body: t("Review the case summary and documents, then accept to begin your clinical review — or decline so the coordinator can reassign it.", "راجع ملخص الحالة والمستندات، ثم اقبل التعيين لبدء المراجعة السريرية أو ارفضه ليعيد المنسق تعيينه.") }
+      : { title: t("New assignment", "تعيين جديد"), body: t("Review the case, then accept the assignment or decline so the coordinator can reassign it.", "راجع الحالة ثم اقبل التعيين أو ارفضه ليعيد المنسق تعيينه.") };
+    case "WAIT_PATIENT_INFORMATION": return { title: t("Waiting for the patient's information", "بانتظار معلومات المريض"), body: t("Nothing is needed from you right now. If their reply arrives by WhatsApp or phone, record it from More actions.", "لا يلزمك إجراء الآن. إن وصل رد المريض عبر واتساب أو الهاتف، سجّله من «إجراءات إضافية».") };
+    case "WAIT_PATIENT_READINESS": return readinessWait(action.blockerCode, ar);
+    case "WAIT_CONSULTANT": return { title: t("Waiting for the consultant", "بانتظار الاستشاري"), body: t("The case returns to you as soon as the clinical recommendation is recorded.", "ستعود الحالة إليك فور تسجيل التوصية السريرية.") };
+    case "WAIT_PATIENT_DECISION": return { title: t("With the patient", "لدى المريض"), body: t("The proposal was delivered. The case returns to you when they decide.", "تم تسليم العرض. ستعود الحالة إليك عند قرار المريض.") };
+    case "WAIT_PAYMENT": return { title: t("Waiting for the coordination deposit", "بانتظار وديعة التنسيق"), body: t("Finance records the receipt; the journey continues automatically once it is confirmed.", "يسجّل قسم المالية الاستلام وتستكمل الرحلة تلقائيًا فور التأكيد.") };
+    case "WAIT_OPERATIONS": return { title: t("Operations is arranging travel and arrival", "فريق العمليات يرتّب السفر والوصول"), body: t("The case continues once the arrangements are confirmed.", "تستكمل الحالة فور تأكيد الترتيبات.") };
+    case "ASSIGN_CONSULTANT": return { title: t("Prepare the case for a consultant", "جهّز الحالة للاستشاري"), body: t("Complete anything missing, then assign a verified consultant for the care area.", "أكمل ما ينقص ثم عيّن استشاريًا معتمدًا لمجال الرعاية.") };
+    case "PREPARE_PROPOSAL": return { title: t("Prepare the patient proposal", "جهّز عرض المريض"), body: t("Review the approved recommendation and internal requirements before releasing it.", "راجع التوصية المعتمدة والمتطلبات الداخلية قبل الإصدار.") };
+    case "RELEASE_PROPOSAL": return { title: t("Release the proposal to the patient", "أصدر العرض للمريض"), body: t("Check the release requirements, then release the secure link.", "تحقق من متطلبات الإصدار ثم أرسل الرابط الآمن.") };
+    case "ASSIGN_OPERATIONS": return { title: t("Start treatment coordination", "ابدأ تنسيق العلاج"), body: t("The deposit is settled. Assign Operations to arrange travel and arrival.", "تم تسوية الوديعة. عيّن فريق العمليات لترتيب السفر والوصول.") };
+    case "ASSIGN_FINANCE": return { title: t("Finance must approve the commercial terms", "يلزم اعتماد المالية للشروط التجارية"), body: t("A manually priced service needs Finance sign-off before release. Assign who should approve it.", "خدمة مسعّرة يدويًا تحتاج إلى اعتماد المالية قبل الإصدار. عيّن من يعتمدها.") };
+    case "WAIT_INTERNAL_APPROVAL": return { title: t("Waiting for internal sign-off", "بانتظار الاعتماد الداخلي"), body: t("The assigned team completes their part; release unlocks once every requirement is met.", "يستكمل الفريق المعيّن دوره، ويُتاح الإصدار بعد استيفاء كل المتطلبات.") };
+    case "RECORD_CLINICAL_DECISION": return { title: t("Record your clinical decision", "سجّل قرارك السريري"), body: t("Review the intake summary and documents, then record your recommendation.", "راجع ملخص الاستقبال والمستندات ثم سجّل التوصية.") };
+    case "UPDATE_TRAVEL_PLAN": return { title: t("Arrange travel and arrival", "رتّب السفر والوصول"), body: t("Keep the travel plan current; confirm it once every requirement is met.", "حدّث خطة السفر وأكّدها عند استيفاء المتطلبات.") };
+    case "APPROVE_COMMERCIAL_TERMS": return { title: t("Approve the commercial terms", "اعتمد الشروط المالية"), body: t("Review the manually priced services before the proposal can be released.", "راجع الخدمات المسعّرة يدويًا قبل إصدار العرض.") };
+    default: return { title: t("Nothing needs you right now", "لا يوجد إجراء مطلوب الآن"), body: t("The next step appears here as soon as it is due.", "ستظهر الخطوة التالية هنا فور توفرها.") };
+  }
 }
 
-/** Before acceptance the page is an assignment decision, not clinical work. */
-function assignmentGuidance(role: string, ar: boolean) {
-  return role === "doctor"
-    ? { title: ar ? "تعيين سريري جديد" : "New clinical assignment",
-        body: ar ? "راجع ملخص الحالة والمستندات، ثم اقبل التعيين لبدء المراجعة السريرية أو ارفضه ليعيد المنسق تعيينه."
-                 : "Review the case summary and documents, then accept to begin your clinical review — or decline so the coordinator can reassign it." }
-    : { title: ar ? "تعيين جديد" : "New assignment",
-        body: ar ? "راجع الحالة ثم اقبل التعيين أو ارفضه ليعيد المنسق تعيينه."
-                 : "Review the case, then accept the assignment or decline so the coordinator can reassign it." };
+function readinessWait(code: string | null | undefined, ar: boolean): { title: string; body: string } {
+  const t = (en: string, arabic: string) => (ar ? arabic : en);
+  switch (code) {
+    case "CONTACT_NOT_VERIFIED": return { title: t("Waiting for contact verification", "بانتظار تأكيد وسيلة التواصل"), body: t("The patient verifies their contact channel through the secure link. The coordination deposit is arranged once that is done.", "يؤكد المريض وسيلة تواصله عبر الرابط الآمن، ثم تُرتَّب وديعة التنسيق.") };
+    case "CONSENTS_INCOMPLETE": return { title: t("Waiting for the patient's consents", "بانتظار موافقات المريض"), body: t("Required consents are captured through the secure profile link.", "تُسجَّل الموافقات المطلوبة عبر رابط الملف الآمن.") };
+    case "ONBOARDING_INCOMPLETE": return { title: t("Waiting for the patient to submit onboarding", "بانتظار إرسال المريض بيانات التسجيل"), body: t("The patient reviews and submits their onboarding through the secure link.", "يراجع المريض بيانات التسجيل ويرسلها عبر الرابط الآمن.") };
+    case "REPRESENTATIVE_AUTH_MISSING": return { title: t("Waiting for representative authorization", "بانتظار تفويض الممثّل"), body: t("A valid representative authorization is required before coordination continues.", "يلزم تفويض ممثّل ساري قبل متابعة التنسيق.") };
+    default: return { title: t("Waiting for the patient to activate their profile", "بانتظار تفعيل المريض لملفه"), body: t("The secure profile link was sent to the patient. The coordination deposit is arranged once the profile is active.", "أُرسل رابط الملف الآمن إلى المريض، وتُرتَّب وديعة التنسيق بعد تفعيل الملف.") };
+  }
 }

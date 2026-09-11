@@ -26,9 +26,9 @@ public class PublicCaseAccessService {
     private static final int MAX_ATTEMPTS=5;
     private static final int MAX_SENDS_PER_HOUR=5;
     private static final int MAX_RECOVERY_SENDS_PER_HOUR=3;
-    private final JdbcClient jdbc; private final IntakeLifecycleService intake; private final DocumentService documents; private final PatientActionService patientActions; private final Clock clock; private final SecureRandom random=new SecureRandom();
+    private final JdbcClient jdbc; private final IntakeLifecycleService intake; private final DocumentService documents; private final PatientActionService patientActions; private final Clock clock; private final org.springframework.context.ApplicationEventPublisher events; private final SecureRandom random=new SecureRandom();
 
-    public PublicCaseAccessService(JdbcClient jdbc,IntakeLifecycleService intake,DocumentService documents,PatientActionService patientActions,Clock clock){this.jdbc=jdbc;this.intake=intake;this.documents=documents;this.patientActions=patientActions;this.clock=clock;}
+    public PublicCaseAccessService(JdbcClient jdbc,IntakeLifecycleService intake,DocumentService documents,PatientActionService patientActions,Clock clock,org.springframework.context.ApplicationEventPublisher events){this.events=events;this.jdbc=jdbc;this.intake=intake;this.documents=documents;this.patientActions=patientActions;this.clock=clock;}
 
     @Transactional(readOnly=true) public CaseAccessSummary summary(String token){return summary(find(token));}
 
@@ -119,6 +119,20 @@ public class PublicCaseAccessService {
         return token;
     }
 
+    /**
+     * Coordinator-requested resend of the "complete your profile" link: every live ONBOARDING link is
+     * revoked first, a fresh token is minted and delivered to the patient's own on-file contact, and the
+     * resend is audited. Nothing about the case, proposal or deposit changes.
+     */
+    @Transactional public String reissueOnboardingLink(UUID caseId,String language){
+        Instant now=clock.instant();
+        jdbc.sql("UPDATE case_access_links SET revoked_at=? WHERE case_id=? AND purpose='ONBOARDING' AND revoked_at IS NULL").params(timestamp(now),caseId).update();
+        String token=issueOnboardingLink(caseId,language);
+        if(token==null)throw new ApiException(409,"ONBOARDING_LINK_UNAVAILABLE","The profile link could not be reissued for this case");
+        audit("PATIENT_ONBOARDING_LINK_RESENT",caseId,caseId.toString(),"RESEND");
+        return token;
+    }
+
     /** Resolve a verified ONBOARDING grant to its case/patient. Purpose-checked: a STATUS or
      *  INFORMATION_RESPONSE link can never be replayed against the onboarding endpoints. */
     @Transactional(readOnly=true) public OnboardingLinkContext requireOnboardingGrant(String token,String grant){
@@ -142,7 +156,7 @@ public class PublicCaseAccessService {
     private Challenge challenge(ResultSet rs,int n)throws SQLException{return new Challenge(rs.getObject("id",UUID.class),rs.getString("code_hash"),instant(rs,"expires_at"),rs.getInt("attempts"),rs.getInt("max_attempts"),instantNullable(rs,"consumed_at"),instantNullable(rs,"revoked_at"),rs.getString("delivery_channel"));}
     private String chooseChannel(String requested,String whatsapp,String email){if(requested==null||requested.isBlank())return hasText(whatsapp)?"WHATSAPP":"EMAIL";String c=requested.toUpperCase(Locale.ROOT);if(!"WHATSAPP".equals(c)&&!"EMAIL".equals(c))throw new ApiException(400,"INVALID_CONTACT_CHANNEL","Choose WhatsApp or email");String dest="WHATSAPP".equals(c)?whatsapp:email;if(!hasText(dest))throw new ApiException(409,"CONTACT_CHANNEL_UNAVAILABLE","That contact method is not on file for this case");return c;}
     /** Stamp ONLY the channel that carried the OTP: WhatsApp -> phone_verified_at, email -> email_verified_at. */
-    private void markContactVerified(UUID caseId,String channel,Instant now){String column="WHATSAPP".equals(channel)?"phone_verified_at":"EMAIL".equals(channel)?"email_verified_at":null;if(column==null)return;jdbc.sql("UPDATE patient_profiles SET "+column+"=?,updated_at=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)").params(timestamp(now),timestamp(now),caseId).update();}
+    private void markContactVerified(UUID caseId,String channel,Instant now){String column="WHATSAPP".equals(channel)?"phone_verified_at":"EMAIL".equals(channel)?"email_verified_at":null;if(column==null)return;jdbc.sql("UPDATE patient_profiles SET "+column+"=?,updated_at=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)").params(timestamp(now),timestamp(now),caseId).update();events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));}
     private ApiException invalid(){return new ApiException(400,"VERIFICATION_INVALID","The verification code is invalid or has expired");}
     private String randomToken(){return UUID.randomUUID().toString().replace("-","")+UUID.randomUUID().toString().replace("-","");}
     private boolean samePhone(String left,String right){return normalizePhone(left).equals(normalizePhone(right));}

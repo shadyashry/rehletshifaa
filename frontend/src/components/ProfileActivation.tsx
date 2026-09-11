@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import type { Locale } from "@/lib/i18n";
+import { apiUrl } from "@/lib/api";
 
 type Summary = { caseNumber: string; purpose: string; channel: string; destinationHint: string };
 type Deposit = {
@@ -24,7 +25,6 @@ type Form = {
   nationality: string; countryOfResidence: string; preferredLanguage: string; sex: string;
 };
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 const copy = {
   en: {
@@ -209,7 +209,7 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
   useEffect(() => { if (stage !== "loading") headingRef.current?.focus(); }, [stage]);
 
   const call = useCallback(async (path: string, body?: unknown) => {
-    const response = await fetch(`${API}/api/v1/public/onboarding/${encodeURIComponent(token)}${path}`, {
+    const response = await fetch(apiUrl(`/public/onboarding/${encodeURIComponent(token)}${path}`), {
       method: body === undefined ? "GET" : "POST",
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),

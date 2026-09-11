@@ -330,7 +330,9 @@
       "email": "Please enter a valid email address.",
       "consent": "Consent is required to coordinate your case.",
       "file": "Use PDF, JPG, JPEG or PNG files up to 15 MB each.",
-      "server": "We couldn't send your case right now. Please try again or contact us on WhatsApp."
+      "server": "We couldn't send your case right now. Please try again or contact us on WhatsApp.",
+      "upload": "We couldn't attach one of your files. Remove it and send your case, or try again — your details are saved.",
+      "submitAfterUpload": "Your details reached us but the case wasn't finished. Press Send My Case again — nothing will be duplicated."
     },
     "category": {
       "label": "Which care area is your case about?",

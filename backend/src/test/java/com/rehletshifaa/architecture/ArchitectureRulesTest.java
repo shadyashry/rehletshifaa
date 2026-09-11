@@ -78,6 +78,32 @@ class ArchitectureRulesTest {
     }
 
     /**
+     * Persistence goes through Spring's JdbcClient (or a Spring Data repository) — never a hand-managed
+     * connection. A raw Connection/Statement escapes the shared transaction and the parameter binding
+     * that keeps these queries injection-safe.
+     */
+    @Test
+    void nothingOpensItsOwnDatabaseConnection() {
+        ArchRule rule = noClasses().that().resideInAPackage("com.rehletshifaa..")
+                .should().dependOnClassesThat().haveNameMatching(
+                        "java[.]sql[.](Connection|Statement|PreparedStatement|CallableStatement|DriverManager)")
+                .because("a self-managed connection sits outside the transaction and the parameter binding");
+        rule.check(production);
+    }
+
+    /**
+     * One persistence API across the codebase. JdbcTemplate's string-first overloads are the easy place
+     * for a concatenated query to appear; JdbcClient makes named, bound parameters the default path.
+     */
+    @Test
+    void persistenceUsesOneClientApi() {
+        ArchRule rule = noClasses().that().resideInAPackage("com.rehletshifaa..")
+                .should().dependOnClassesThat().haveNameMatching(
+                        "org[.]springframework[.]jdbc[.]core[.](Named)?(Parameter)?JdbcTemplate")
+                .because("JdbcClient is the one persistence API in this codebase");
+        rule.check(production);
+    }
+    /**
      * The property that decides whether a module can ever be extracted: no cycles between modules.
      * Two modules that import each other have to move together, whatever the deployment diagram says.
      */

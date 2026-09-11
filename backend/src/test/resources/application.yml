@@ -8,6 +8,9 @@ spring:
     hibernate.ddl-auto: validate
   flyway.enabled: true
 app:
+  # No Redis in the test JVM. CacheCachingTest re-enables caching with a map cache manager to prove
+  # the @Cacheable/@CacheEvict wiring; every other test exercises the uncached, authoritative path.
+  cache.enabled: false
   security.enabled: false
   claim:
     pepper: test-only-claim-pepper

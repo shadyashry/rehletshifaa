@@ -1,8 +1,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/api";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(SITE_URL),
   title: { default: "RehletShifaa", template: "%s | RehletShifaa" },
   description: "Consultant-led international cardiac care coordination in Egypt.",
   verification: { google: process.env.NEXT_PUBLIC_SEARCH_CONSOLE_VERIFICATION },

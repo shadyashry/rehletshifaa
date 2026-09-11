@@ -9,6 +9,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 import { JourneyPulse, FullJourneyDialog, type TimelineEvent } from "./JourneySnapshot";
 import { CurrentActionPanel } from "./CurrentAction";
+import { CaseBlockers } from "./CaseBlockers";
+import { MoreActions } from "./CoordinatorActions";
 import { RoleDashboardSummary } from "./RoleDashboardSummary";
 import { CaseQueue, attentionRank, filterQueue, initialQueue, type QueueCase } from "./CaseQueue";
 import { MyWork, type WorkItem } from "./MyWork";
@@ -71,8 +73,8 @@ describe("CurrentActionPanel", () => {
 
   it("names the business outcome and never the task mechanics", () => {
     const onComplete = vi.fn();
-    render(<CurrentActionPanel locale="en" role="coordinator" status="INTAKE_REVIEW" waitingOn="STAFF" pendingAssignment={false}
-                               work={{ id: "w1", type: "REVIEW_PATIENT_RESPONSE", title: "Review information provided by the patient", version: 0 }}
+    render(<CurrentActionPanel locale="en" role="coordinator"
+                               action={{ code: "WORK_ITEM", kind: "COMPLETE", workItemId: "w1", workItemVersion: 0, workType: "REVIEW_PATIENT_RESPONSE", title: "Review information provided by the patient" }}
                                response={{ message: "Kindly find attached document", documentName: "Echo_Report.pdf" }}
                                secondary={[{ label: "Request information", onClick: vi.fn() }]} onComplete={onComplete}/>);
 
@@ -89,7 +91,7 @@ describe("CurrentActionPanel", () => {
   });
 
   it("offers one primary and at most two secondary actions", () => {
-    render(<CurrentActionPanel locale="en" role="coordinator" status="READY_FOR_CONSULTANT" waitingOn="STAFF" pendingAssignment={false}
+    render(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "ASSIGN_CONSULTANT", kind: "FOCUS" }}
                                onFocusAction={vi.fn()} secondary={[
                                  { label: "Request information", onClick: vi.fn() },
                                  { label: "Message patient", onClick: vi.fn() },
@@ -100,18 +102,84 @@ describe("CurrentActionPanel", () => {
   });
 
   it("shows no primary action while the ball is with the patient", () => {
-    render(<CurrentActionPanel locale="en" role="coordinator" status="INFORMATION_REQUIRED" waitingOn="PATIENT" pendingAssignment={false}
+    render(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "WAIT_PATIENT_INFORMATION", kind: "WAIT" }}
                                onFocusAction={vi.fn()} secondary={[{ label: "Record patient response", onClick: vi.fn() }]}/>);
     expect(screen.getByRole("heading", { name: /waiting for the patient/i })).toBeTruthy();
-    expect(screen.getByText(/Waiting on: the patient/i)).toBeTruthy();
     expect(screen.getAllByRole("button")).toHaveLength(1); // the secondary only
   });
 
+  // The acknowledged-proposal regression: at the deposit stage the patient's profile step is the current
+  // action, and neither "Prepare proposal" nor "Assign Operations" exists anywhere on the panel.
+  it("explains a patient readiness wait instead of offering future steps", () => {
+    render(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "CONTACT_NOT_VERIFIED" }}/>);
+    expect(screen.getByRole("heading", { name: /waiting for contact verification/i })).toBeTruthy();
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.queryByText(/prepare the proposal/i)).toBeNull();
+    expect(screen.queryByText(/assign operations/i)).toBeNull();
+  });
+
+  it("renders the deposit arrangement as staff work with its own outcome label", () => {
+    render(<CurrentActionPanel locale="en" role="coordinator" onComplete={vi.fn()}
+                               action={{ code: "WORK_ITEM", kind: "COMPLETE", workItemId: "w2", workItemVersion: 0, workType: "DEPOSIT_ARRANGEMENT", title: "Arrange the coordination deposit" }}/>);
+    expect(screen.getByRole("heading", { name: /arrange the coordination deposit/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /payment instructions sent/i })).toBeTruthy();
+  });
+
+  it("reads right-to-left with Arabic copy for the same contract", () => {
+    render(<CurrentActionPanel locale="ar" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "PROFILE_NOT_ACTIVATED" }}/>);
+    expect(screen.getByText("الإجراء الحالي")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /بانتظار تفعيل المريض لملفه/ })).toBeTruthy();
+  });
+
   it("shows nothing to patients", () => {
-    const { container } = render(<CurrentActionPanel locale="en" role="patient" status="ACCEPTED" pendingAssignment={false}/>);
+    const { container } = render(<CurrentActionPanel locale="en" role="patient" action={{ code: "NONE", kind: "NONE" }}/>);
     expect(container.firstChild).toBeNull();
   });
 });
+
+describe("CaseBlockers", () => {
+  afterEach(cleanup);
+  const deposit = { status: "REQUESTED", currency: "EGP", totalDisplay: 3000 };
+
+  it("is compact: a count, each blocker, and whose move it is", () => {
+    render(<CaseBlockers locale="en" deposit={deposit} blockers={[
+      { code: "CONTACT_NOT_VERIFIED", labelEn: "Contact channel verification", labelAr: "تأكيد وسيلة التواصل", owner: "PATIENT", gating: true },
+      { code: "DEPOSIT_UNPAID", labelEn: "Coordination deposit", labelAr: "وديعة التنسيق", owner: "LATER", gating: true }]}/>);
+    expect(screen.getByText("1 item needs attention")).toBeTruthy();
+    expect(screen.getByText("Contact channel verification")).toBeTruthy();
+    expect(screen.getByText("Waiting for patient")).toBeTruthy();
+    expect(screen.getByText(/Requested · .*3,000 · pending readiness/)).toBeTruthy();
+    // No workflow documentation prose, no metadata grid.
+    ["Safe next action", "Responsible", "Last update", "Current step"].forEach(label => expect(screen.queryByText(new RegExp(label))).toBeNull());
+  });
+
+  it("renders nothing when nothing is outstanding", () => {
+    const { container } = render(<CaseBlockers locale="en" blockers={[]} deposit={deposit}/>);
+    expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("MoreActions", () => {
+  afterEach(cleanup);
+
+  it("lists only what the backend offered, one control per business action", () => {
+    const mutate = vi.fn().mockResolvedValue({});
+    render(<MoreActions locale="en" caseId="c1" version={1} travelPackage={false} busy={false} mutate={mutate}
+                        available={["REQUEST_INFORMATION"]} onRequestInformation={vi.fn()} onRecordResponse={vi.fn()}/>);
+    const labels = screen.getAllByRole("button").map(b => b.textContent ?? "");
+    expect(labels.some(l => /request more information/i.test(l))).toBe(true);
+    expect(labels.some(l => /assign/i.test(l))).toBe(false);
+    expect(labels.some(l => /cancel case/i.test(l))).toBe(false);
+    expect(labels.some(l => /travel package/i.test(l))).toBe(false);
+  });
+
+  it("is honest when the state allows nothing extra", () => {
+    render(<MoreActions locale="en" caseId="c1" version={1} travelPackage={false} busy={false} mutate={vi.fn()}
+                        available={[]} onRequestInformation={vi.fn()} onRecordResponse={vi.fn()}/>);
+    expect(screen.getByText(/no additional actions/i)).toBeTruthy();
+  });
+});
+
 describe("RoleDashboardSummary", () => {
   afterEach(cleanup);
   const cases = [
@@ -237,8 +305,7 @@ describe("consultant workspace", () => {
 
   it("treats a pending assignment as one accept/decline decision, not clinical work", () => {
     const onAccept = vi.fn(), onDecline = vi.fn();
-    render(<CurrentActionPanel locale="en" role="doctor" status="CONSULTANT_ASSIGNMENT_PENDING" waitingOn="CONSULTANT"
-                               pendingAssignment={true} viewerRole="doctor"
+    render(<CurrentActionPanel locale="en" role="doctor" action={{ code: "ACCEPT_ASSIGNMENT", kind: "ACCEPT" }}
                                secondary={[{ label: "Messages", onClick: vi.fn() }]}
                                onAcceptAssignment={onAccept} onDeclineAssignment={onDecline}/>);
 
@@ -256,13 +323,12 @@ describe("consultant workspace", () => {
     expect(onDecline).not.toHaveBeenCalled();
   });
 
-  it("tells the consultant the case is waiting on them, not on 'the consultant'", () => {
-    render(<CurrentActionPanel locale="en" role="doctor" status="CONSULTANT_REVIEW" waitingOn="CONSULTANT"
-                               pendingAssignment={false} viewerRole="doctor"
-                               work={{ id: "w1", type: "CLINICAL_REVIEW", title: "Review case and provide clinical recommendation", version: 0 }}
+  it("turns the accepted assignment into the clinical work and drops the acceptance controls", () => {
+    render(<CurrentActionPanel locale="en" role="doctor"
+                               action={{ code: "WORK_ITEM", kind: "FOCUS", workItemId: "w1", workItemVersion: 0, workType: "CLINICAL_REVIEW", title: "Review case and provide clinical recommendation" }}
                                onFocusAction={vi.fn()}/>);
-    expect(screen.getByText(/waiting on: you/i)).toBeTruthy();
-    expect(screen.queryByText(/waiting on: the consultant/i)).toBeNull();
+    // Who has the ball is stated once, in the case header — never repeated inside the action panel.
+    expect(screen.queryByText(/waiting on/i)).toBeNull();
     // After acceptance the CTA is the clinical work, and acceptance controls are gone.
     expect(screen.getByRole("button", { name: /start clinical review/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /accept assignment/i })).toBeNull();
@@ -408,7 +474,8 @@ describe("PatientCaseView", () => {
     expect(screen.getByText("Dr Ahmed Alashry")).toBeTruthy();
     // Workflow vocabulary never reaches the patient.
     expect(screen.queryByText(/CONSULTANT_REVIEW/)).toBeNull();
-    expect(screen.queryByText(/waiting on: the consultant/i)).toBeNull();
+    // Who has the ball is stated once, in the case header — never repeated inside the action panel.
+    expect(screen.queryByText(/waiting on/i)).toBeNull();
   });
 
   it("shows the journey as patient-friendly phases with the current one marked", () => {

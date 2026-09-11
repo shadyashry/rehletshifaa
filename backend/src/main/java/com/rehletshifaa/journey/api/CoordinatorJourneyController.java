@@ -30,6 +30,8 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/proposals")public ProposalView proposal(@PathVariable UUID caseId,@Valid @RequestBody ProposalDraftRequest request){return service.createProposal(caseId,request);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/release")public ProposalView release(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.releaseProposal(caseId,versionId);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/resend")public IdResponse resend(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.resendProposalLink(caseId,versionId);}
+ /** Resend the secure profile-activation link; valid only while the profile is unactivated. */
+ @PostMapping("/cases/{caseId}/onboarding-link/resend")public IdResponse resendOnboardingLink(@PathVariable UUID caseId){return service.resendOnboardingLink(caseId);}
  @PostMapping("/cases/{caseId}/final-quotes")public ProposalView finalQuote(@PathVariable UUID caseId,@Valid @RequestBody FinalQuoteRequest request){return service.createFinalQuote(caseId,request);}
  @PostMapping("/cases/{caseId}/final-quotes/{versionId}/release")public ProposalView releaseFinalQuote(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.releaseFinalQuote(caseId,versionId);}
 }

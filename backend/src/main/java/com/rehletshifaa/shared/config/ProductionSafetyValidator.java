@@ -42,6 +42,13 @@ public class ProductionSafetyValidator implements ApplicationRunner {
             require(failures, "WHATSAPP_META_VERIFY_TOKEN", false);
             require(failures, "WHATSAPP_META_APP_SECRET", false);
         } else failures.add("WHATSAPP_MODE must resolve to webhook or meta");
+        // Redis is shared state across instances; a production deployment must not silently point at
+        // the localhost dev default, and the rate-limit and cache keys must not be readable by anyone
+        // who can reach the port.
+        if (environment.getProperty("app.cache.enabled", Boolean.class, true)) {
+            require(failures, "REDIS_HOST", true);
+            require(failures, "REDIS_PASSWORD", false);
+        }
         if (!"s3".equals(environment.getProperty("app.storage.mode"))) failures.add("STORAGE_MODE must resolve to s3");
         if (!"smtp".equals(environment.getProperty("app.mail.mode"))) failures.add("MAIL_MODE must resolve to smtp");
         if (!"live".equals(environment.getProperty("app.notifications.mode"))) failures.add("NOTIFICATIONS_MODE must resolve to live");

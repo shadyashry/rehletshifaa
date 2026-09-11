@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+import { API } from "./env";
+
 // Drives the secure proposal link: link summary -> send OTP -> verify -> view sensitive
 // detail -> accept. The backend is mocked so the test is hermetic.
 const TOKEN = "abc123token";
-const BASE = "http://localhost:8080/api/v1/public/proposals";
+const BASE = `${API}/public/proposals`;
 
 test("patient verifies with OTP before seeing pricing, then accepts", async ({ page }) => {
   const summary = { caseNumber: "RS-2026-000123", channel: "WHATSAPP", destinationHint: "***1234" };

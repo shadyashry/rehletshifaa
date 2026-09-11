@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Locale } from "@/lib/i18n";
 import { ProposalDecisionDialog } from "@/components/ProposalDecisionDialog";
+import { apiUrl } from "@/lib/api";
+import { scrollIntoView } from "@/lib/scroll";
 
 type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean };
 type Summary = { caseNumber: string; channel: string; destinationHint: string; whatsappHint?: string | null; emailHint?: string | null };
@@ -20,7 +22,6 @@ type Decision = "ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED";
 /** Terminal states the patient cannot act out of; each gets its own honest explanation, never a raw error. */
 type Blocked = "EXPIRED" | "SUPERSEDED" | "DECIDED" | null;
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 const copy = {
   en: {
@@ -174,7 +175,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const [decisionVisible, setDecisionVisible] = useState(true);
 
   useEffect(() => {
-    void fetch(`${API}/api/v1/public/proposals/${token}`)
+    void fetch(apiUrl(`/public/proposals/${token}`))
       .then(async (r) => { if (!r.ok) throw new Error(); return r.json() as Promise<Summary>; })
       .then((s) => { setSummary(s); setChannel(s.channel === "EMAIL" ? "EMAIL" : "WHATSAPP"); setPhase("intro"); })
       .catch(() => setPhase("invalid"));
@@ -192,7 +193,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   async function requestAccess(ch: "WHATSAPP" | "EMAIL" = channel) {
     setBusy(true); setError("");
     try {
-      const r = await fetch(`${API}/api/v1/public/proposals/${token}/request-access`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch }) });
+      const r = await fetch(apiUrl(`/public/proposals/${token}/request-access`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch }) });
       if (r.status === 429) throw new Error(t.tooMany);
       if (!r.ok) throw new Error(t.error);
       setSummary((await r.json()) as Summary);
@@ -204,10 +205,10 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
     if (code.trim().length !== 6) return;
     setBusy(true); setError("");
     try {
-      const g = await fetch(`${API}/api/v1/public/proposals/${token}/verify`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: code.trim() }) })
+      const g = await fetch(apiUrl(`/public/proposals/${token}/verify`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: code.trim() }) })
         .then(async (r) => { if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { message?: string }).message ?? t.error); return r.json() as Promise<{ grant: string }>; });
       setGrant(g.grant);
-      const full = await fetch(`${API}/api/v1/public/proposals/${token}/view`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grant: g.grant }) })
+      const full = await fetch(apiUrl(`/public/proposals/${token}/view`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grant: g.grant }) })
         .then(async (r) => { if (!r.ok) throw new Error(t.error); return r.json() as Promise<Proposal>; });
       setProposal(full);
       if (full.decided) setBlocked("DECIDED");
@@ -220,7 +221,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   async function decide(decision: Decision, comment?: string, acknowledgementAccepted?: boolean) {
     setBusy(true); setError("");
     try {
-      const r = await fetch(`${API}/api/v1/public/proposals/${token}/decision`, {
+      const r = await fetch(apiUrl(`/public/proposals/${token}/decision`), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ grant, decision, comment: comment || undefined, acknowledgementAccepted }),
       });
@@ -235,7 +236,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   }
 
   function submitPrimary() {
-    if (!acknowledged) { setAckError(true); decisionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    if (!acknowledged) { setAckError(true); scrollIntoView(decisionRef.current, { behavior: "smooth", block: "center" }); return; }
     setAckError(false);
     void decide(isFinal ? "ACCEPTED" : "ACKNOWLEDGED", undefined, true);
   }

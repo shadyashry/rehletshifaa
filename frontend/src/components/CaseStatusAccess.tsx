@@ -6,6 +6,7 @@ import { FileUp, LockKeyhole, ShieldCheck, X } from "lucide-react";
 import { PatientJourneyTracker, phaseExplanation } from "@/components/PatientJourneyTracker";
 
 import type { Locale } from "@/lib/i18n";
+import { apiUrl } from "@/lib/api";
 
 type Summary = { caseNumber: string; destinationHint: string };
 type ActionItem = { id: string; kind: "INFORMATION" | "DOCUMENT"; code: string; label: string; required: boolean; completed: boolean; response: string | null };
@@ -13,16 +14,15 @@ type Action = { taskId: string; title: string; message: string | null; blocking:
 type Status = { caseNumber: string; statusEn: string; statusAr: string; phase?: string | null; actionRequired: boolean; action: Action | null };
 type Presign = { documentId: string; uploadUrl: string; requiredHeaders: Record<string, string> };
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 const copy = {
   en: {
     title: "Track your case securely", loading: "Checking your secure link…",
     send: "Send verification code", sent: "We sent a 6-digit code to", code: "Verification code", verify: "Verify and continue",
     private: "Your medical information is shown only after contact verification.",
-    status: "Current update", action: "Information required", now: "What happens now", next: "Next",
+    status: "Current update", action: "Your response", now: "What happens now", next: "Next",
     noAction: "No action is required from you right now.", journey: "Your case",
-    intro: "Your coordinator needs the following to continue your case.", noItems: "Add anything you would like your coordinator to know.",
+    noItems: "Add anything you would like your coordinator to know.",
     required: "Required", optional: "Optional", already: "Already provided",
     choose: "Choose a file", chosen: "file selected", replace: "Choose a different file", remove: "Remove",
     note: "Anything else we should know?", submit: "Send information", sending: "Sending…",
@@ -35,9 +35,9 @@ const copy = {
     title: "متابعة حالتك بأمان", loading: "جارٍ التحقق من الرابط الآمن…",
     send: "إرسال رمز التحقق", sent: "أرسلنا رمزًا مكوّنًا من 6 أرقام إلى", code: "رمز التحقق", verify: "تحقق وتابع",
     private: "لا تظهر معلوماتك الطبية إلا بعد التحقق من جهة الاتصال.",
-    status: "آخر تحديث", action: "معلومات مطلوبة", now: "ما يحدث الآن", next: "الخطوة التالية",
+    status: "آخر تحديث", action: "ردّك", now: "ما يحدث الآن", next: "الخطوة التالية",
     noAction: "لا يلزم منك أي إجراء الآن.", journey: "مسار حالتك",
-    intro: "يحتاج منسق حالتك إلى ما يلي لمتابعة حالتك.", noItems: "أضف أي معلومة تودّ أن يعرفها منسقك.",
+    noItems: "أضف أي معلومة تودّ أن يعرفها منسقك.",
     required: "مطلوب", optional: "اختياري", already: "تم تقديمه",
     choose: "اختيار ملف", chosen: "ملف محدد", replace: "اختيار ملف آخر", remove: "إزالة",
     note: "هل من شيء آخر تودّ إخبارنا به؟", submit: "إرسال المعلومات", sending: "جارٍ الإرسال…",
@@ -70,7 +70,7 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`${API}/api/v1/public/cases/${token}`)
+    fetch(apiUrl(`/public/cases/${token}`))
       .then(async response => { if (!response.ok) throw new Error(); setSummary(await response.json() as Summary); setPhase("summary"); })
       .catch(() => setPhase("invalid"));
   }, [token]);
@@ -78,7 +78,7 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
   async function request() {
     setBusy(true); setError("");
     try {
-      const response = await fetch(`${API}/api/v1/public/cases/${token}/request-access`, { method: "POST" });
+      const response = await fetch(apiUrl(`/public/cases/${token}/request-access`), { method: "POST" });
       if (!response.ok) throw new Error(await apiError(response, t.error));
       setSummary(await response.json() as Summary); setPhase("code");
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
@@ -97,7 +97,7 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
   }
 
   async function post<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> {
-    const response = await fetch(`${API}/api/v1/public/cases/${token}${path}`, {
+    const response = await fetch(apiUrl(`/public/cases/${token}${path}`), {
       method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body),
     });
     if (!response.ok) {
@@ -211,7 +211,9 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
         {status.actionRequired && (
           <form className="mt-8" onSubmit={submit} noValidate>
             <h3 className="title">{t.action}</h3>
-            <p className="mt-2 leading-7 text-ink-600">{action?.message || t.intro}</p>
+            {/* Only the coordinator's own words go here. The generic fallback repeated, almost verbatim,
+                the explanation already shown above this form. */}
+            {action?.message && <p className="mt-2 leading-7 text-ink-600">{action.message}</p>}
             {action?.dueAt && <p className="mt-1 text-sm font-semibold text-ink-700">{t.due} {new Date(action.dueAt).toLocaleDateString(locale)}</p>}
 
             <div className="mt-6 space-y-5">

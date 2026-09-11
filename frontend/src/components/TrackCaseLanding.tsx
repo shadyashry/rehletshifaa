@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import type { Locale } from "@/lib/i18n";
 import { whatsappHref } from "@/lib/links";
+import { apiUrl } from "@/lib/api";
 
 const copy = {
   en: {
@@ -60,7 +61,6 @@ export function TrackCaseLanding({ locale }: { locale: Locale }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
   useEffect(() => {
     const saved = window.localStorage.getItem("rehletshifaa:last-status-path");
@@ -70,7 +70,7 @@ export function TrackCaseLanding({ locale }: { locale: Locale }) {
   async function recover(event: React.FormEvent) {
     event.preventDefault();setBusy(true);setNotice("");setError("");
     try {
-      const response=await fetch(`${apiBase}/api/v1/public/cases/recover`,{method:"POST",headers:{"Content-Type":"application/json","X-Request-ID":crypto.randomUUID()},body:JSON.stringify({caseNumber:caseNumber.trim(),whatsappNumber:whatsappNumber.trim(),language:locale})});
+      const response=await fetch(apiUrl(`/public/cases/recover`),{method:"POST",headers:{"Content-Type":"application/json","X-Request-ID":crypto.randomUUID()},body:JSON.stringify({caseNumber:caseNumber.trim(),whatsappNumber:whatsappNumber.trim(),language:locale})});
       if(!response.ok)throw new Error();
       setNotice(t.sent);
     } catch {setError(t.error);} finally {setBusy(false);}

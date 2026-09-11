@@ -4,6 +4,9 @@ import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.security.ActorContext;
 import com.rehletshifaa.security.ActorRole;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.cache.CacheNames;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +38,12 @@ public class CommercialPolicyService {
         this.jdbc = jdbc; this.actors = actors; this.clock = clock;
     }
 
-    /** Most specific active policy for a care area (care-area override, else platform default). */
+    /**
+     * Most specific active policy for a care area (care-area override, else platform default).
+     * Cached because every proposal build reads it and only Finance changes it — which evicts.
+     * A missing policy is not cached: it means "not configured yet", which must stay live.
+     */
+    @Cacheable(cacheNames = CacheNames.COMMERCIAL_POLICY, key = "#careCategory == null ? 'platform-default' : #careCategory", unless = "#result == null")
     public Policy activePolicyFor(String careCategory) {
         Policy p = careCategory == null ? null : jdbc.sql("SELECT id,name,care_category,margin_rate,version FROM commercial_policies WHERE active AND care_category=? ORDER BY version DESC LIMIT 1")
                 .param(careCategory).query(this::map).optional().orElse(null);
@@ -51,6 +59,7 @@ public class CommercialPolicyService {
     }
 
     /** Configure a new active policy version. Senior Finance only, with recent authentication. */
+    @CacheEvict(cacheNames = CacheNames.COMMERCIAL_POLICY, allEntries = true)
     @Transactional
     public CommercialPolicyView configure(CommercialPolicyRequest request) {
         var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.FINANCE, ActorRole.SYSTEM_ADMIN);

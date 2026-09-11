@@ -4,6 +4,7 @@ import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.security.ActorContext;
 import com.rehletshifaa.security.ActorRole;
 import com.rehletshifaa.shared.api.ApiException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,10 +30,10 @@ public class PaymentService {
     private final JdbcClient jdbc;
     private final ActorContext actors;
     private final Clock clock;
-    private final CaseHandoffService handoff;
+    private final ApplicationEventPublisher events;
 
-    public PaymentService(JdbcClient jdbc, ActorContext actors, Clock clock, CaseHandoffService handoff) {
-        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.handoff = handoff;
+    public PaymentService(JdbcClient jdbc, ActorContext actors, Clock clock, ApplicationEventPublisher events) {
+        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.events = events;
     }
 
     record DepositPolicy(UUID id, BigDecimal coordinationEgp, int version) {}
@@ -68,7 +69,7 @@ public class PaymentService {
                 .params(depositId, caseId, versionId, fx.currency() == null ? "EGP" : fx.currency(), rate, fx.date(), fx.source(), policy.id(), policy.version(), totalEgp, totalDisplay, "REQUESTED", "SYSTEM", timestamp(now)).update();
         // Raising the deposit is not the end of the story: with an offline process a person has to arrange
         // it, so the case gains real staff work rather than sitting silently waiting for money to appear.
-        handoff.onDepositRequired(caseId);
+        events.publishEvent(new CaseEvents.DepositRequired(caseId));
         jdbc.sql("INSERT INTO deposit_components(id,deposit_id,beneficiary,purpose,amount_egp,refundability,cancellation_terms,credited_to_final,sort_order) VALUES(?,?,?,?,?,?,?,?,0)")
                 .params(UUID.randomUUID(), depositId, "PLATFORM", "Case coordination initiation", totalEgp, "NON_REFUNDABLE", "Refundable in full before case coordination begins; non-refundable once coordination has started.", true).update();
         appendEvent(caseId, depositId, "DEPOSIT_REQUESTED", totalEgp, totalDisplay, fx.currency(), null, "OFFLINE", null, "REQUESTED", "SYSTEM", null, "deposit-req:" + depositId);
@@ -223,7 +224,7 @@ public class PaymentService {
                 .params(timestamp(clock.instant()), actor.subject(), reason.trim(), depositId).update();
         if (changed != 1) throw new ApiException(409, "DEPOSIT_NOT_WAIVABLE", "This deposit cannot be waived");
         audit(actor, caseId, "DEPOSIT_WAIVED", depositId, reason.trim());
-        handoff.onDepositSettled(caseId); // an authorized waiver settles the deposit just as a receipt does
+        events.publishEvent(new CaseEvents.DepositSettled(caseId)); // an authorized waiver settles the deposit just as a receipt does
         return depositForCase(caseId);
     }
 
@@ -248,7 +249,7 @@ public class PaymentService {
         String status = net.signum() <= 0 ? (paid.signum() > 0 ? "REFUNDED" : "REQUESTED") : net.compareTo(total) >= 0 ? "PAID" : "PARTIALLY_PAID";
         jdbc.sql("UPDATE deposits SET status=?,version=version+1 WHERE id=?").params(status, depositId).update();
         // Authoritative settlement is the ONLY trigger for continuing the journey; a browser never reaches here.
-        if ("PAID".equals(status) && !"PAID".equals(previous)) handoff.onDepositSettled(caseId);
+        if ("PAID".equals(status) && !"PAID".equals(previous)) events.publishEvent(new CaseEvents.DepositSettled(caseId));
     }
     private BigDecimal displayFor(UUID depositId, BigDecimal egp) {
         BigDecimal rate = jdbc.sql("SELECT fx_rate FROM deposits WHERE id=?").param(depositId).query(BigDecimal.class).optional().orElse(BigDecimal.ONE);

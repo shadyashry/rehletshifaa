@@ -352,12 +352,15 @@ class PatientConversionLayerTest {
         SecurityContextHolder.clearContext();
     }
 
+    /**
+     * Operations planning on a case that has not settled its deposit. The coordinator can no longer assign
+     * Operations at that point (the deposit gate), so the pre-existing assignment is seeded directly — this
+     * helper exercises the travel-confirmation gate, not assignment policy.
+     */
     private void driveToTravelCoordination(Ctx ctx) {
-        authenticate("coordinator-subject", "COORDINATOR");
-        journey.assign(ctx.caseId, new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", "cardiac-pod", "Ops"));
-        UUID opsAssignment = jdbc.queryForObject("SELECT id FROM case_assignments WHERE case_id=? AND assignee_role='OPERATIONS' AND status='PENDING' ORDER BY assigned_at DESC LIMIT 1", UUID.class, ctx.caseId);
+        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                UUID.randomUUID(), ctx.caseId, "operations-subject", "OPERATIONS", "PRIMARY", "ACTIVE", "Ops", "coordinator-subject", Instant.now(), Instant.now());
         authenticate("operations-subject", "OPERATIONS");
-        journey.decideAssignment(ctx.caseId, opsAssignment, new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS);
         journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "PLANNING"));
     }
 

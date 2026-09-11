@@ -2,12 +2,14 @@
 
 import { UserManager, WebStorageStateStore, type User } from "oidc-client-ts";
 
+import { OIDC_AUTHORITY, OIDC_CLIENT_ID } from "@/lib/api";
+
 let manager: UserManager | undefined;
 export function authManager() {
   if (typeof window === "undefined") throw new Error("OIDC is available only in the browser");
   manager ??= new UserManager({
-    authority: process.env.NEXT_PUBLIC_OIDC_AUTHORITY ?? "http://localhost:8180/realms/rehletshifaa",
-    client_id: process.env.NEXT_PUBLIC_OIDC_CLIENT_ID ?? "rehletshifaa-web",
+    authority: OIDC_AUTHORITY,
+    client_id: OIDC_CLIENT_ID,
     redirect_uri: `${window.location.origin}/auth/callback`,
     post_logout_redirect_uri: `${window.location.origin}/en/portal`,
     response_type: "code",

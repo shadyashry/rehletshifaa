@@ -8,6 +8,7 @@ import { buildCaseSchema, filesAreValid } from "@/lib/case-form-schema";
 import { track } from "@/lib/analytics";
 import { whatsappHref } from "@/lib/links";
 import { COUNTRIES, flagEmoji, type Country } from "@/lib/countries";
+import { apiUrl } from "@/lib/api";
 
 type FormValues = { fullName: string; country: string; whatsappNumber: string; email: string; conditionDescription: string; consent: boolean };
 type CareAreaKey = "" | "cardiology" | "rheumatology-rehabilitation" | "orthopedics";
@@ -22,6 +23,10 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const ar = locale === "ar";
   const [values, setValues] = useState<FormValues>({ fullName: "", country: "", whatsappNumber: "", email: "", conditionDescription: "", consent: false });
   const [country, setCountry] = useState<Country | null>(null);
+  // Survives a failed attempt so pressing send again continues the same case instead of starting a
+  // new one. Refs, not state: retry correctness must not depend on a re-render happening first.
+  const draftCase = useRef<CreateCaseResponse | null>(null);
+  const uploaded = useRef(new Set<string>());
   const [phoneLocal, setPhoneLocal] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [careArea, setCareArea] = useState<CareAreaKey>("");
@@ -34,7 +39,6 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const [statusToken, setStatusToken] = useState<string>();
   const [turnstileToken, setTurnstileToken] = useState<string>();
   const started = useRef(false);
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   const t = {
@@ -123,25 +127,39 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     const careLine = dictionaryKey ? `${d.form.category.summaryLabel}: ${d.form.category.options[dictionaryKey]}` : "";
     const describedCase = [careLine, result.data.conditionDescription].filter(Boolean).join("\n\n");
     try {
-      const createResponse = await fetch(`${apiBase}/api/v1/cases`, { method: "POST", headers: { "Content-Type": "application/json", "X-Request-ID": crypto.randomUUID() }, body: JSON.stringify({ ...result.data, conditionDescription: describedCase, preferredLanguage: locale, careArea: careArea || null, travelPackageRequested: travelPackage, turnstileToken }) });
-      if (!createResponse.ok) throw new Error("case_create_failed");
-      const created = await createResponse.json() as CreateCaseResponse;
+      // Reuse the draft from a previous attempt. Creating a case also creates the patient record, so
+      // retrying after a failed upload or submit used to leave a second case and a duplicate patient
+      // behind for the coordinator to untangle.
+      let created = draftCase.current;
+      if (!created) {
+        const createResponse = await fetch(apiUrl(`/cases`), { method: "POST", headers: { "Content-Type": "application/json", "X-Request-ID": crypto.randomUUID() }, body: JSON.stringify({ ...result.data, conditionDescription: describedCase, preferredLanguage: locale, careArea: careArea || null, travelPackageRequested: travelPackage, turnstileToken }) });
+        if (!createResponse.ok) throw new SubmitFailure("server");
+        created = await createResponse.json() as CreateCaseResponse;
+        draftCase.current = created;
+      }
       for (const file of files) {
-        const presignResponse = await fetch(`${apiBase}/api/v1/cases/${created.caseId}/documents/presign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ originalFileName: file.name, contentType: file.type, sizeBytes: file.size }) });
-        if (!presignResponse.ok) throw new Error("presign_failed");
+        if (uploaded.current.has(fileKey(file))) continue;
+        const presignResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/presign`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ originalFileName: file.name, contentType: file.type, sizeBytes: file.size }) });
+        if (!presignResponse.ok) throw new SubmitFailure("upload");
         const presigned = await presignResponse.json() as PresignResponse;
         const uploadResponse = await fetch(presigned.uploadUrl, { method: "PUT", headers: presigned.requiredHeaders, body: file });
-        if (!uploadResponse.ok) throw new Error("upload_failed");
-        const confirmResponse = await fetch(`${apiBase}/api/v1/cases/${created.caseId}/documents/confirm`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: presigned.documentId }) });
-        if (!confirmResponse.ok) throw new Error("confirm_failed");
+        if (!uploadResponse.ok) throw new SubmitFailure("upload");
+        const confirmResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/confirm`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: presigned.documentId }) });
+        if (!confirmResponse.ok) throw new SubmitFailure("upload");
+        uploaded.current.add(fileKey(file));
         track("medical_file_uploaded");
       }
-      const finalResponse = await fetch(`${apiBase}/api/v1/cases/${created.caseId}/submit`, { method: "POST" });
-      if (!finalResponse.ok) throw new Error("submit_failed");
+      const finalResponse = await fetch(apiUrl(`/cases/${created.caseId}/submit`), { method: "POST" });
+      if (!finalResponse.ok) throw new SubmitFailure("submitAfterUpload");
       const submitted = await finalResponse.json() as { caseNumber: string; statusToken: string };
       window.localStorage.setItem("rehletshifaa:last-status-path", `/${locale}/status/${submitted.statusToken}`);
+      draftCase.current = null; uploaded.current.clear();
       setCaseNumber(submitted.caseNumber); setStatusToken(submitted.statusToken); track("case_submitted");
-    } catch { setErrors({ server: d.form.errors.server }); }
+    } catch (failure) {
+      // Each stage fails for a different reason and needs a different next step from the patient;
+      // one "something went wrong" left them retrying a submit that a bad file was blocking.
+      setErrors({ server: d.form.errors[failure instanceof SubmitFailure ? failure.stage : "server"] });
+    }
     finally { setBusy(false); }
   }
 
@@ -227,6 +245,15 @@ function Field({ label, required, requiredMark, valid, error, hint, children }: 
     {error ? <span id={errorId} className="error-text mt-2 flex items-center gap-1"><X size={13} aria-hidden />{error}</span> : hint ? <span className="mt-2 block text-xs leading-5 text-ink-500">{hint}</span> : null}
   </label>;
 }
+
+/** Which step failed, so the patient is told what to do next rather than "something went wrong". */
+type FailureStage = "server" | "upload" | "submitAfterUpload";
+class SubmitFailure extends Error {
+  constructor(readonly stage: FailureStage) { super(stage); }
+}
+
+/** Identifies a chosen file well enough to skip re-uploading it on a retry. */
+const fileKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
 
 function CountrySelect({ value, placeholder, emptyLabel, clearLabel, invalid, onChange, onBlur, ...aria }: { locale: Locale; value: Country | null; placeholder: string; emptyLabel: string; clearLabel: string; invalid?: boolean; onChange: (c: Country | null) => void; onBlur?: () => void; "aria-invalid"?: boolean; "aria-describedby"?: string }) {
   const [open, setOpen] = useState(false);

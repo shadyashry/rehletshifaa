@@ -186,8 +186,12 @@ class PatientActivationJourneyTest {
         assertThat(jdbc.queryForObject("SELECT owner_role FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", String.class, ctx.caseId)).isEqualTo("COORDINATOR");
         // Work to do, not a gate: it must not stop travel planning or any other legitimate next step.
         assertThat(jdbc.queryForObject("SELECT blocking FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", Boolean.class, ctx.caseId)).isFalse();
-        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("STAFF");
+        // The ball is the patient's first — their profile is still unactivated — and only then our team's.
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("PATIENT");
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_REQUIRED'", "coordinator-subject")).isEqualTo(1);
+
+        activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("STAFF");
     }
 
     @Test void settlingTheDepositClosesTheArrangementWorkAndDoesNotDuplicateTheHandoff() throws Exception {

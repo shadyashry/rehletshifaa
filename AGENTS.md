@@ -33,6 +33,8 @@ Local ports:
 - MinIO API `9000`
 - MinIO console `9001`
 - Mailpit `8025`
+- Redis `6379`
+- API gateway `8081`
 
 Docker files:
 - Base: `docker-compose.yml`
@@ -61,6 +63,27 @@ MinIO browser uploads must allow:
 - `http://localhost:3000`
 - `https://dev.rehletshifaa.com`
 
+## 2a. API gateway and cache
+
+`api-gateway` (nginx, `infrastructure/api-gateway/`) is the business-API entry point: routing,
+request correlation, edge rate/size limits, upstream timeouts, security headers, access logging.
+It makes no business decision — the backend re-authorizes every request. The `api-dev.rehletshifaa.com`
+tunnel ingress points at `http://api-gateway:80`, so the gateway IS the live path; the frontend has one
+business API base (`NEXT_PUBLIC_API_BASE_URL`) and no direct-backend fallback, ever.
+
+Client identity at the gateway is Cloudflare's `CF-Connecting-IP` (realip module, trusted only from the
+private network the cloudflared connector sits on; forwarded to the backend as `X-Forwarded-For`, which
+the backend trusts under `RATE_LIMIT_TRUST_PROXY=true` in the tunnel overlay). Rate budgets are per real
+client: reads 300/min (burst 60), writes 60/min (burst 30), `/api/v1/public/` 30/min (burst 15);
+CORS preflights and health probes are never counted. Policy tests: `frontend/e2e/gateway.spec.ts`
+(`GATEWAY_TEST_URL=http://localhost:8081`, which simulates clients via `CF-Connecting-IP`).
+
+Redis is the shared cache. Only reference data is cached, declared in `CacheNames`:
+`fx-rates` (15m), `care-categories` (1h), `commercial-policy` (10m); TTLs are configured under
+`app.cache.*`. Live workflow, payment, authorization and clinical state is never cached. A Redis
+outage degrades to a database read (`CacheConfig.cacheErrorHandler`) rather than failing a request.
+`RequestRateLimiter` also counts in Redis so the write budget is shared across backend instances.
+
 ## 3. Technology map
 
 Frontend:
@@ -74,6 +97,7 @@ Backend:
 - Flyway
 - Keycloak OIDC/JWT
 - MinIO S3-compatible storage
+- Redis (Spring Cache; reference data only)
 - ClamAV document scanning
 - Mailpit SMTP in local/dev
 
@@ -120,6 +144,22 @@ Backend:
 - focused relevant test first
 - general local gate: `cd backend && mvn -o -q test`
 - Maven is offline; do not add dependencies that are absent from local `~/.m2`
+
+End-to-end (Playwright, Chromium) against the running tunnel stack — all three URLs must match how
+the frontend was built, or the specs’ route mocks never intercept:
+```bash
+cd frontend
+PLAYWRIGHT_EXTERNAL_SERVER=true PLAYWRIGHT_BASE_URL=https://dev.rehletshifaa.com PLAYWRIGHT_API_BASE_URL=https://api-dev.rehletshifaa.com PLAYWRIGHT_OIDC_AUTHORITY=https://auth-dev.rehletshifaa.com/realms/rehletshifaa pnpm test:e2e
+```
+Add `PORTAL_TEST_PASSWORD` to include `portal-live.spec.ts`, which signs in through real Keycloak, and
+`PORTAL_TEST_CASE=<acknowledged case number>` (optionally `PORTAL_TEST_CASE_2`) for
+`portal-gateway-live.spec.ts`: coordinator, consultant and patient journeys through the real
+gateway path, asserting zero 429s and zero failed business calls. `operations-gate-live.spec.ts`
+(needs `DOCTOR_TEST_PASSWORD`, `OPERATIONS_TEST_PASSWORD`, `FINANCE_TEST_PASSWORD` too) builds its
+own fixture over HTTP — intake → consultant → proposal → pre-release Operations step → release →
+patient acknowledgement via Mailpit-read secure links/OTPs — then proves the TRAVEL_COORDINATION gate.
+The seeded QA identities (`LocalDemoDataSeeder` registers operations/finance as staff) are all it needs;
+no data is seeded by hand.
 
 Run broader verification only when:
 - shared infrastructure/API/auth/database/security is changed;

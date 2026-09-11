@@ -232,16 +232,58 @@ public class StaffWorkService {
      */
     @Transactional
     public void refreshWaitingOn(UUID caseId, String fallback, String reason) {
-        String resolved = resolveWaitingOn(caseId, fallback);
+        String resolved = resolveWaitingOn(caseId, fallback, false);
         setWaitingOn(caseId, resolved, resolved.equals(fallback) ? reason : defaultReason(resolved));
     }
 
-    private String resolveWaitingOn(UUID caseId, String fallback) {
+    /**
+     * Re-derive responsibility from what is actually outstanding and persist it only when it changed —
+     * a read-time correction, so a stage the case entered through a public link or a work item that was
+     * completed without a transition can never leave "who has the ball" stale. {@code patientOwed} is the
+     * one input this table cannot answer on its own: an open customer-readiness step (profile, contact,
+     * consents) that only the patient can complete, which outranks everything except an explicit patient
+     * action. Returns the responsibility now on record.
+     */
+    @Transactional
+    public String reconcileWaitingOn(UUID caseId, String fallback, String reason, boolean patientOwed) {
+        String resolved = resolveWaitingOn(caseId, fallback, patientOwed);
+        String current = jdbc.sql("SELECT waiting_on FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
+        if (resolved.equals(current)) return resolved;
+        setWaitingOn(caseId, resolved, reason != null ? reason : defaultReason(resolved));
+        return resolved;
+    }
+
+    private String resolveWaitingOn(UUID caseId, String fallback, boolean patientOwed) {
         if (blockingWork(caseId, "visibility_scope='PATIENT_ACTION'")) return "PATIENT";
+        if (patientOwed) return "PATIENT";
         if (blockingWork(caseId, "visibility_scope='INTERNAL' AND owner_role='DOCTOR'")) return "CONSULTANT";
         if (STAGE_DECIDES.contains(fallback)) return fallback;
         if (blockingWork(caseId, "visibility_scope='INTERNAL'")) return "STAFF";
         return WAITING.contains(fallback) ? fallback : "STAFF";
+    }
+
+    /**
+     * The responsibility a stage answers on its own, before open work is considered. Shared by every
+     * transition and by the read-time reconciliation so there is exactly one stage-to-responsibility map.
+     */
+    public static String stageDefault(String status) {
+        return switch (status) {
+            case "INFORMATION_REQUIRED", "PATIENT_DECISION" -> "PATIENT";
+            case "CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW" -> "CONSULTANT";
+            case "ACCEPTED" -> "PAYMENT";
+            case "TRAVEL_COORDINATION" -> "TRAVEL_TEAM";
+            case "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS" -> "HOSPITAL";
+            case "CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE", "EXPIRED" -> "NONE";
+            default -> "STAFF";
+        };
+    }
+
+    /** True when an open internal work item is owned by the given staff role on this case. */
+    @Transactional(readOnly = true)
+    public boolean hasOpenWork(UUID caseId, String ownerRole) {
+        Integer open = jdbc.sql("SELECT count(*) FROM case_tasks WHERE case_id=? AND visibility_scope='INTERNAL' AND owner_role=? AND status IN ('OPEN','IN_PROGRESS')")
+                .params(caseId, ownerRole).query(Integer.class).single();
+        return open != null && open > 0;
     }
 
     private boolean blockingWork(UUID caseId, String predicate) {
@@ -283,6 +325,8 @@ public class StaffWorkService {
     private String encrypt(String value) { return "enc:" + crypto.encrypt(value); }
     private String encryptNullable(String value) { return value == null || value.isBlank() ? null : "enc:" + crypto.encrypt(value.trim()); }
     private String decrypt(String value) { return value == null ? null : value.startsWith("enc:") ? crypto.decrypt(value.substring(4)) : value; }
+    /** Work-item text as stored by this service (encrypted at rest, legacy rows plain). */
+    public String decryptText(String stored) { return decrypt(stored); }
     private static String json(String value) { return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\""); }
 
     private void audit(UUID caseId, String type, UUID entityId, String reason) {

@@ -46,7 +46,9 @@ async function reachAction(overrides: Record<string, () => Promise<Response>> = 
   const code = await screen.findByLabelText(/verification code/i);
   fireEvent.change(code, { target: { value: "123456" } });
   fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
-  await screen.findByRole("heading", { name: /information required/i });
+  // The situation is stated once above the form ("We need something from you"); this heading names
+  // the form itself, so the page no longer says the same thing twice.
+  await screen.findByRole("heading", { name: /your response/i });
   return fetchMock;
 }
 

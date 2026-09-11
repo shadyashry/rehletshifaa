@@ -24,14 +24,14 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class OnboardingService {
-    private final JdbcClient jdbc; private final ActorContext actors; private final Clock clock; private final CustomerReadinessService readiness; private final IdentityVerificationService identity;
+    private final JdbcClient jdbc; private final ActorContext actors; private final Clock clock; private final CustomerReadinessService readiness; private final IdentityVerificationService identity; private final org.springframework.context.ApplicationEventPublisher events;
     private static final Duration ONBOARDING_TTL = Duration.ofDays(45);
     private static final Set<String> ONBOARDING_CONSENTS = Set.of(
             "PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "MEDICAL_INFORMATION_SHARING", "TELECONSULTATION", "DEPOSIT_CANCELLATION_TERMS", "REPRESENTATIVE_AUTHORIZATION");
     private static final Set<String> PROGRESSED = Set.of("TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED");
 
-    public OnboardingService(JdbcClient jdbc, ActorContext actors, Clock clock, CustomerReadinessService readiness, IdentityVerificationService identity) {
-        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.readiness = readiness; this.identity = identity;
+    public OnboardingService(JdbcClient jdbc, ActorContext actors, Clock clock, CustomerReadinessService readiness, IdentityVerificationService identity, org.springframework.context.ApplicationEventPublisher events) {
+        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.readiness = readiness; this.identity = identity; this.events = events;
     }
 
     /**
@@ -103,6 +103,7 @@ public class OnboardingService {
                         request.exactText(), request.purpose() == null ? "Onboarding consent" : request.purpose(), request.scope() == null ? "Care coordination onboarding" : request.scope(),
                         "ONBOARDING_PORTAL", actor.subject(), timestamp(now), timestamp(now)).update();
         audit(caseId, "ONBOARDING_CONSENT_CAPTURED", id, request.consentType(), actor.subject(), actor.primaryRole());
+        events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));
         return buildView(caseId);
     }
 
@@ -123,6 +124,7 @@ public class OnboardingService {
                 .params(timestamp(now), timestamp(now), timestamp(now), ob.id(), request.expectedVersion()).update();
         if (changed != 1) throw new ApiException(409, "ONBOARDING_VERSION_CONFLICT", "Your onboarding was updated in another session");
         audit(caseId, "PATIENT_ONBOARDING_COMPLETED", ob.id(), null, actor.subject(), actor.primaryRole());
+        events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));
         return buildView(caseId);
     }
 

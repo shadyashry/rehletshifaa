@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Languages, LogOut, Settings, X, ExternalLink } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
+import { OIDC_AUTHORITY } from "@/lib/api";
 
 export type Preferences = { displayName: string | null; locale: Locale | null };
 type Api = <T,>(path: string, init?: RequestInit) => Promise<T>;
@@ -56,7 +57,7 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
         {error && <p role="alert" className="text-sm text-alert-800">{error}</p>}
         <button className="btn-primary w-full" disabled={busy}>{busy ? text.saving : text.save}</button>
       </form>
-      <a className="mt-5 flex items-center gap-2 text-sm font-semibold text-brand-700" href={`${process.env.NEXT_PUBLIC_OIDC_AUTHORITY ?? "http://localhost:8180/realms/rehletshifaa"}/account?ui_locales=${locale}`} target="_blank" rel="noreferrer">{text.security}<ExternalLink size={15}/></a>
+      <a className="mt-5 flex items-center gap-2 text-sm font-semibold text-brand-700" href={`${OIDC_AUTHORITY}/account?ui_locales=${locale}`} target="_blank" rel="noreferrer">{text.security}<ExternalLink size={15}/></a>
     </dialog>
   </>;
   return slot ? createPortal(content, slot) : <div className="flex justify-end">{content}</div>;

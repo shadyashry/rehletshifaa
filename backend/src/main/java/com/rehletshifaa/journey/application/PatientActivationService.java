@@ -42,13 +42,14 @@ public class PatientActivationService {
     private final CustomerReadinessService readiness;
     private final CaseHandoffService handoff;
     private final AccountActivationService accounts;
+    private final CaseActionService caseActions;
     private final Clock clock;
 
     public PatientActivationService(JdbcClient jdbc, PublicCaseAccessService access, PaymentService payment,
                                     CustomerReadinessService readiness, CaseHandoffService handoff,
-                                    AccountActivationService accounts, Clock clock) {
+                                    AccountActivationService accounts, CaseActionService caseActions, Clock clock) {
         this.jdbc = jdbc; this.access = access; this.payment = payment; this.readiness = readiness;
-        this.handoff = handoff; this.accounts = accounts; this.clock = clock;
+        this.handoff = handoff; this.accounts = accounts; this.caseActions = caseActions; this.clock = clock;
     }
 
     /**
@@ -116,6 +117,8 @@ public class PatientActivationService {
         audit(caseId, "PATIENT_PROFILE_ACTIVATED", patientId, "Profile activated from secure onboarding link");
         // When no deposit is due (policy amount zero, already paid, or waived) the journey continues now.
         if (payment.depositSatisfied(caseId)) handoff.onDepositSettled(caseId);
+        // Otherwise the patient has done their part and the offline deposit is now our team's move.
+        else { handoff.onDepositRequired(caseId); caseActions.reconcileWaitingOn(caseId); }
         return result(caseId, patientId);
     }
 
