@@ -35,20 +35,22 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
      * evidence cannot be shaped by whatever the caller claims it displayed. Bump it when the wording changes.
      */
     private static final String ACKNOWLEDGEMENT_VERSION="proposal-ack-2026-09";
-    private final PortalExperienceService portalExperience; private final KeycloakStaffIdentityService staffIdentity;
+    private final PortalExperienceService portalExperience; private final KeycloakStaffIdentityService staffIdentity; private final CaseContactResolver caseContacts; private final ProposalAccessService proposalAccess;
     private final SecureRandom random = new SecureRandom();
     // The case lifecycle and its entry invariants live in CaseTransitionPolicy — one copy, validated by every path that moves a case.
 
-    public JourneyService(JdbcClient jdbc,ActorContext actors,IntakeLifecycleService intake,Clock clock,com.rehletshifaa.shared.crypto.CryptoService crypto,PublicCaseAccessService publicCases,PricingCatalogService pricingCatalog,com.rehletshifaa.shared.currency.CurrencyService currency,CommercialPolicyService commercialPolicy,PaymentService payment,OnboardingService onboarding,CustomerReadinessService readiness,PatientActionService patientActions,StaffWorkService work,PortalExperienceService portalExperience,KeycloakStaffIdentityService staffIdentity,CareCategoryCatalog careCategories,CaseActionService caseActions,CaseTransitionPolicy transitions,org.springframework.context.ApplicationEventPublisher events){this.transitions=transitions;this.events=events;this.caseActions=caseActions;this.careCategories=careCategories;this.patientActions=patientActions;this.work=work;this.portalExperience=portalExperience;this.staffIdentity=staffIdentity;this.jdbc=jdbc;this.actors=actors;this.intake=intake;this.clock=clock;this.crypto=crypto;this.publicCases=publicCases;this.pricingCatalog=pricingCatalog;this.currency=currency;this.commercialPolicy=commercialPolicy;this.payment=payment;this.onboarding=onboarding;this.readiness=readiness;}
+    public JourneyService(JdbcClient jdbc,ActorContext actors,IntakeLifecycleService intake,Clock clock,com.rehletshifaa.shared.crypto.CryptoService crypto,PublicCaseAccessService publicCases,PricingCatalogService pricingCatalog,com.rehletshifaa.shared.currency.CurrencyService currency,CommercialPolicyService commercialPolicy,PaymentService payment,OnboardingService onboarding,CustomerReadinessService readiness,PatientActionService patientActions,StaffWorkService work,PortalExperienceService portalExperience,KeycloakStaffIdentityService staffIdentity,CareCategoryCatalog careCategories,CaseActionService caseActions,CaseTransitionPolicy transitions,CaseContactResolver caseContacts,ProposalAccessService proposalAccess,org.springframework.context.ApplicationEventPublisher events){this.transitions=transitions;this.caseContacts=caseContacts;this.proposalAccess=proposalAccess;this.events=events;this.caseActions=caseActions;this.careCategories=careCategories;this.patientActions=patientActions;this.work=work;this.portalExperience=portalExperience;this.staffIdentity=staffIdentity;this.jdbc=jdbc;this.actors=actors;this.intake=intake;this.clock=clock;this.crypto=crypto;this.publicCases=publicCases;this.pricingCatalog=pricingCatalog;this.currency=currency;this.commercialPolicy=commercialPolicy;this.payment=payment;this.onboarding=onboarding;this.readiness=readiness;}
     @Transactional(readOnly=true) public CustomerReadiness customerReadiness(UUID caseId){var actor=actors.current();authorizeRead(caseId,actor);return readiness.compute(caseId);}
     @Transactional(readOnly=true) public DepositView depositView(UUID caseId){var actor=actors.current();authorizeRead(caseId,actor);return payment.depositForCase(caseId);}
 
-    public List<CaseView> patientCases(){var actor=actors.require(ActorRole.PATIENT,ActorRole.PATIENT_REPRESENTATIVE);return withAssignments(jdbc.sql("SELECT c.* FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE p.external_subject=? OR EXISTS(SELECT 1 FROM patient_representatives r WHERE r.patient_id=p.id AND r.representative_subject=? AND r.revoked_at IS NULL AND (r.expires_at IS NULL OR r.expires_at>?)) ORDER BY c.updated_at DESC").params(actor.subject(),actor.subject(),timestamp(clock.instant())).query((rs,n)->mapCase(rs)).list());}
+    public List<CaseView> patientCases(){var actor=actors.require(ActorRole.PATIENT,ActorRole.PATIENT_REPRESENTATIVE);return withAssignments(jdbc.sql(CASE_SELECT+" WHERE p.external_subject=? OR EXISTS(SELECT 1 FROM patient_representatives r WHERE r.patient_id=p.id AND r.representative_subject=? AND r.revoked_at IS NULL AND (r.expires_at IS NULL OR r.expires_at>?)) ORDER BY c.updated_at DESC").params(actor.subject(),actor.subject(),timestamp(clock.instant())).query((rs,n)->mapCase(rs)).list()).stream().map(JourneyService::forPatient).toList();}
+    /** The patient sees the people on their case by name only: staff identity subjects are internal identifiers. */
+    private static CaseView forPatient(CaseView view){return new CaseView(view.id(),view.caseNumber(),view.status(),view.patientName(),view.country(),view.preferredLanguage(),view.careCategory(),view.createdAt(),view.updatedAt(),view.version(),null,null,view.coordinatorName(),view.doctorName(),view.travelPackageRequested(),view.waitingOn(),view.waitingReason());}
     public List<CaseView> coordinatorQueue(){
         var actor=actors.require(ActorRole.COORDINATOR,ActorRole.COORDINATOR_LEAD);
         Set<String> visible=new HashSet<>();visible.add(actor.subject());
         if(actor.has(ActorRole.COORDINATOR_LEAD))visible.addAll(portalExperience.reports(actor.subject()));
-        List<CaseView> rows=jdbc.sql("SELECT c.* FROM medical_cases c WHERE c.status <> 'DRAFT' AND ((c.status='RECEIVED' AND NOT EXISTS (SELECT 1 FROM case_assignments a WHERE a.case_id=c.id AND a.assignee_role='COORDINATOR' AND a.assignment_type='PRIMARY' AND a.status='ACTIVE')) OR EXISTS (SELECT 1 FROM case_assignments a WHERE a.case_id=c.id AND a.assignee_role='COORDINATOR' AND a.assignment_type='PRIMARY' AND a.status='ACTIVE' AND a.assignee_subject IN (:subjects))) ORDER BY c.updated_at DESC")
+        List<CaseView> rows=jdbc.sql(CASE_SELECT+" WHERE c.status <> 'DRAFT' AND ((c.status='RECEIVED' AND NOT EXISTS (SELECT 1 FROM case_assignments a WHERE a.case_id=c.id AND a.assignee_role='COORDINATOR' AND a.assignment_type='PRIMARY' AND a.status='ACTIVE')) OR EXISTS (SELECT 1 FROM case_assignments a WHERE a.case_id=c.id AND a.assignee_role='COORDINATOR' AND a.assignment_type='PRIMARY' AND a.status='ACTIVE' AND a.assignee_subject IN (:subjects))) ORDER BY c.updated_at DESC")
             .param("subjects",visible).query((rs,n)->mapCase(rs)).list();
         // Ownership identity is resolved after the rows are read, then withheld again for unowned cases.
         return withAssignments(rows).stream().map(view->view.coordinatorSubject()==null?routingSummary(view):view).toList();
@@ -67,7 +69,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         return new IntakePreview(routingSummary(view),summary,caseActions.resolve(caseId,actor));
     }
     /** My cases: accepted clinical involvement. A pending assignment is work, not yet a case (see My Work). */
-    public List<CaseView> assignedCases(ActorRole role){var actor=actors.require(role);Set<String>visible=new HashSet<>();visible.add(actor.subject());if((role==ActorRole.OPERATIONS&&actor.has(ActorRole.OPERATIONS_LEAD))||(role==ActorRole.FINANCE&&actor.has(ActorRole.FINANCE_LEAD)))visible.addAll(portalExperience.reports(actor.subject()));return withAssignments(jdbc.sql("SELECT c.* FROM medical_cases c WHERE EXISTS(SELECT 1 FROM case_assignments a WHERE a.case_id=c.id AND a.assignee_subject IN (:subjects) AND a.assignee_role=:role AND a.status='ACTIVE') ORDER BY c.updated_at ASC").param("subjects",visible).param("role",role.name()).query((rs,n)->mapCase(rs)).list());}
+    public List<CaseView> assignedCases(ActorRole role){var actor=actors.require(role);Set<String>visible=new HashSet<>();visible.add(actor.subject());if((role==ActorRole.OPERATIONS&&actor.has(ActorRole.OPERATIONS_LEAD))||(role==ActorRole.FINANCE&&actor.has(ActorRole.FINANCE_LEAD)))visible.addAll(portalExperience.reports(actor.subject()));return withAssignments(jdbc.sql(CASE_SELECT+" WHERE EXISTS(SELECT 1 FROM case_assignments a WHERE a.case_id=c.id AND a.assignee_subject IN (:subjects) AND a.assignee_role=:role AND a.status='ACTIVE') ORDER BY c.updated_at ASC").param("subjects",visible).param("role",role.name()).query((rs,n)->mapCase(rs)).list());}
     public List<StaffCaseCardView> coordinatorCaseCards(){actors.require(ActorRole.COORDINATOR,ActorRole.COORDINATOR_LEAD);return staffCaseCards(coordinatorQueue(),ActorRole.COORDINATOR);}
     public List<StaffCaseCardView> assignedCaseCards(ActorRole role){actors.require(role);return staffCaseCards(assignedCases(role),role);}
     /**
@@ -121,8 +123,9 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         // Resolved first and fresh: the current action, blockers and available actions the page renders from.
         // It closes work made obsolete by the stage and re-derives waiting-on, so every list below reads the repaired state.
         CaseActionsView actions=caseActions.resolve(caseId,actor);CaseView summary=caseView(caseId);
-        List<TimelineEvent>timeline=jdbc.sql("SELECT 'STATUS' type,to_status label,created_at,to_status status,actor_subject,actor_role,reason FROM case_status_history WHERE case_id=? ORDER BY created_at").param(caseId).query((rs,n)->new TimelineEvent(rs.getString("type"),rs.getString("label"),instant(rs,"created_at"),rs.getString("status"),actorDisplayName(rs.getString("actor_subject"),rs.getString("actor_role")),rs.getString("actor_role"),rs.getString("reason"))).list();
         boolean patientActor=actor.has(ActorRole.PATIENT)||actor.has(ActorRole.PATIENT_REPRESENTATIVE);
+        if(patientActor)summary=forPatient(summary);
+        List<TimelineEvent>timeline=jdbc.sql("SELECT 'STATUS' type,to_status label,created_at,to_status status,actor_subject,actor_role,reason FROM case_status_history WHERE case_id=? ORDER BY created_at").param(caseId).query((rs,n)->new TimelineEvent(rs.getString("type"),rs.getString("label"),instant(rs,"created_at"),rs.getString("status"),actorDisplayName(rs.getString("actor_subject"),rs.getString("actor_role")),rs.getString("actor_role"),rs.getString("reason"))).list();
         String taskRestriction=patientActor?" AND visibility_scope='PATIENT_ACTION'":"";
         List<TaskView>tasks=jdbc.sql("SELECT * FROM case_tasks WHERE case_id=?"+taskRestriction+" ORDER BY created_at").param(caseId).query((rs,n)->mapTask(rs)).list();
         Set<String>visibleThreads=allowedThreads(actor);
@@ -130,11 +133,28 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         List<AssignmentView>assignments=jdbc.sql("SELECT id,assignee_subject,assignee_role,assignment_type,status,assigned_at,version FROM case_assignments WHERE case_id=? AND status IN ('PENDING','ACTIVE') ORDER BY assigned_at").param(caseId).query((rs,n)->new AssignmentView(rs.getObject("id",UUID.class),rs.getString("assignee_subject"),actorDisplayName(rs.getString("assignee_subject"),rs.getString("assignee_role")),rs.getString("assignee_role"),rs.getString("assignment_type"),rs.getString("status"),instant(rs,"assigned_at"),rs.getLong("version"))).list();
         Map<UUID,List<CostEstimateItem>>estimatesByReview=new HashMap<>();
         jdbc.sql("SELECT e.clinical_review_id,e.service_description,e.estimated_cost,e.currency,e.catalog_service_id FROM clinical_review_cost_estimates e JOIN clinical_review_versions v ON v.id=e.clinical_review_id WHERE v.case_id=? ORDER BY e.sort_order").param(caseId).query((rs,n)->{estimatesByReview.computeIfAbsent(rs.getObject("clinical_review_id",UUID.class),k->new ArrayList<>()).add(new CostEstimateItem(rs.getString("service_description"),rs.getBigDecimal("estimated_cost"),rs.getString("currency"),rs.getObject("catalog_service_id",UUID.class)));return null;}).list();
-        List<ClinicalReviewView>reviews=jdbc.sql("SELECT id,version_number,status,suitability,recommended_treatment,risks_and_limitations,proposal_currency,created_at FROM clinical_review_versions WHERE case_id=? ORDER BY version_number DESC").param(caseId).query((rs,n)->{UUID reviewId=rs.getObject("id",UUID.class);return new ClinicalReviewView(reviewId,rs.getInt("version_number"),rs.getString("status"),rs.getString("suitability"),rs.getString("recommended_treatment"),rs.getString("risks_and_limitations"),instant(rs,"created_at"),estimatesByReview.getOrDefault(reviewId,List.of()),rs.getString("proposal_currency"));}).list();
+        List<ClinicalReviewView>reviews=jdbc.sql("SELECT id,version_number,status,suitability,recommended_treatment,risks_and_limitations,proposal_currency,created_at FROM clinical_review_versions WHERE case_id=? ORDER BY version_number DESC").param(caseId).query((rs,n)->{UUID reviewId=rs.getObject("id",UUID.class);return quoted(new ClinicalReviewView(reviewId,rs.getInt("version_number"),rs.getString("status"),rs.getString("suitability"),rs.getString("recommended_treatment"),rs.getString("risks_and_limitations"),instant(rs,"created_at"),estimatesByReview.getOrDefault(reviewId,List.of()),rs.getString("proposal_currency"),null,null,null));}).list();
         if(patientActor)reviews=reviews.stream().filter(r->"APPROVED".equals(r.status())).toList();
         ProposalView latest=latestProposal(caseId,actor);
         DeliveryStatus delivery=latest!=null&&Set.of("RELEASED","VIEWED","ACCEPTED","DECLINED","REVISION_REQUESTED").contains(latest.status())?deliveryStatus(latest.versionId()):null;
-        return new CaseWorkspace(summary,timeline,tasks,messages,assignments,reviews,latest,computeGates(caseId,latest),delivery,payment.depositForCase(caseId),jdbc.sql("SELECT condition_description FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null),patientActions.openAction(caseId),actions);
+        return new CaseWorkspace(summary,timeline,tasks,messages,assignments,reviews,latest,computeGates(caseId,latest),delivery,payment.depositForCase(caseId),jdbc.sql("SELECT condition_description FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null),patientActions.openAction(caseId),actions,proposalAccess.state(caseId));
+    }
+
+    /**
+     * The consultant's estimates as the patient will be quoted: every line and its total in the recommendation's
+     * proposal currency at today's effective rate — the same rate proposal creation will use. Held in the base
+     * currency the amounts stay as they are; when no rate exists the quoted amounts are absent rather than
+     * silently shown in EGP under a foreign-currency label.
+     */
+    private com.rehletshifaa.shared.currency.CurrencyService.FxRate quoteRate(String cur){try{return currency.effectiveRates(java.time.LocalDate.now(clock)).stream().filter(r->cur.equals(r.currency())).findFirst().orElse(null);}catch(RuntimeException unavailable){return null;}}
+    private ClinicalReviewView quoted(ClinicalReviewView review){
+        String cur=review.proposalCurrency();
+        if(!hasText(cur)||com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(cur))return review;
+        final com.rehletshifaa.shared.currency.CurrencyService.FxRate rate=quoteRate(cur);
+        if(rate==null)return review;
+        List<CostEstimateItem> lines=review.costEstimates().stream().map(e->new CostEstimateItem(e.serviceDescription(),e.estimatedCost(),e.currency(),e.catalogServiceId(),
+            com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(e.currency())?e.estimatedCost().multiply(rate.rate()).setScale(2,java.math.RoundingMode.HALF_UP):cur.equals(e.currency())?e.estimatedCost():null,cur)).toList();
+        return new ClinicalReviewView(review.id(),review.versionNumber(),review.status(),review.suitability(),review.recommendedTreatment(),review.risksAndLimitations(),review.createdAt(),lines,cur,rate.rate(),rate.rateDate(),rate.source());
     }
 
     @Transactional public CaseView transition(UUID caseId,TransitionRequest request){var actor=actors.require(ActorRole.COORDINATOR,ActorRole.COORDINATOR_LEAD,ActorRole.SYSTEM_ADMIN);authorizeWrite(caseId,actor);requireCoordinatorOwnership(caseId,actor);if(!Set.of("INTAKE_REVIEW","INFORMATION_REQUIRED","READY_FOR_CONSULTANT","CANCELLED").contains(request.targetStatus()))throw new ApiException(403,"DEDICATED_OPERATION_REQUIRED","This state can only be entered through its dedicated authorized operation");transitionInternal(caseId,request.targetStatus(),request.reason(),request.expectedVersion(),actor);if("INFORMATION_REQUIRED".equals(request.targetStatus()))requestPatientInformation(caseId,request.reason(),actor);return caseView(caseId);}
@@ -159,7 +179,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String caseNumber=jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse("");
         work.openWorkItem(new NewWorkItem(caseId,ASSIGNMENT_WORK,role==ActorRole.DOCTOR?"New clinical assignment":"New case assignment",
             "You have been assigned case "+caseNumber+" for "+(role==ActorRole.DOCTOR?"clinical review":"review")+". Accept it to start, or decline so the coordinator can reassign.",
-            request.assigneeSubject(),role.name(),"HIGH",false,null,actor.subject(),"ASSIGNMENT_CREATED","assignment:"+id,true));
+            request.assigneeSubject(),role.name(),false,null,actor.subject(),"ASSIGNMENT_CREATED","assignment:"+id,true));
         if(role==ActorRole.DOCTOR)work.refreshWaitingOn(caseId,"CONSULTANT","Awaiting the consultant to accept the assignment");
         audit("CASE_ASSIGNED",actor,caseId,"CaseAssignment",id.toString(),"ASSIGN","SUCCESS",request.reason());return new IdResponse(id,status);}
 
@@ -228,7 +248,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
             default->{type=CLINICAL_OUTCOME_WORK;title="Case returned without a clinical recommendation";
                 context=consultant+" returned the case without a recommendation"+detail;}
         }
-        work.openWorkItem(new NewWorkItem(caseId,type,title,context,coordinator,ActorRole.COORDINATOR.name(),"HIGH",false,null,
+        work.openWorkItem(new NewWorkItem(caseId,type,title,context,coordinator,ActorRole.COORDINATOR.name(),false,null,
             actor.subject(),"CONSULTANT_OUTCOME_RECORDED","consultant-outcome:"+decision+":"+caseId,true));
         // The clinical work item is closed by now, so responsibility genuinely sits with our team again —
         // except for a terminal clinical outcome, where the stage already decided nobody is waiting.
@@ -272,7 +292,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
             if(accept){
                 work.openWorkItem(new NewWorkItem(caseId,CLINICAL_WORK,"Review case and provide clinical recommendation",
                     "Review the intake summary and documents, then record your recommendation.",actor.subject(),ActorRole.DOCTOR.name(),
-                    "HIGH",false,null,actor.subject(),"CLINICAL_REVIEW_DUE","clinical-review:"+assignmentId,false));
+                    false,null,actor.subject(),"CLINICAL_REVIEW_DUE","clinical-review:"+assignmentId,false));
                 work.refreshWaitingOn(caseId,"CONSULTANT","Awaiting the clinical recommendation");
             } else {
                 returnToCoordinator(caseId,actor,request.reason());
@@ -288,7 +308,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String who=actorDisplayName(actor.subject(),actor.primaryRole());
         work.openWorkItem(new NewWorkItem(caseId,"REASSIGN_CONSULTANT","Assignment declined — reassign the case",
             (who==null?"The assignee":who)+" declined this assignment"+(hasText(reason)?": "+reason.trim():".")+" Choose another consultant.",
-            coordinator,ActorRole.COORDINATOR.name(),"HIGH",false,null,"SYSTEM","ASSIGNMENT_DECLINED","assignment-declined:"+caseId+":"+actor.subject(),true));
+            coordinator,ActorRole.COORDINATOR.name(),false,null,"SYSTEM","ASSIGNMENT_DECLINED","assignment-declined:"+caseId+":"+actor.subject(),true));
         work.refreshWaitingOn(caseId,"STAFF","Assignment declined — awaiting reassignment");
     }
 
@@ -323,6 +343,9 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         var actor=actors.require(ActorRole.COORDINATOR,ActorRole.COORDINATOR_LEAD,ActorRole.SYSTEM_ADMIN);
         authorizeWrite(caseId,actor);
         if(actor.has(ActorRole.COORDINATOR)||actor.has(ActorRole.COORDINATOR_LEAD))requireCoordinatorOwnership(caseId,actor);
+        // While the case is with the consultant, asking the patient for more is the consultant's call (their
+        // INFO outcome): a coordinator request here would pull responsibility back to the patient mid-review.
+        if(CaseActionService.CONSULTANT_OWNED.contains(state(caseId).status()))throw new ApiException(409,"CASE_WITH_CONSULTANT","The case is with the consultant; they request further information through their clinical decision");
         String language=hasText(command.language())?command.language():caseView(caseId).preferredLanguage();
         UUID id=patientActions.request(caseId,new InformationRequestCommand(command.message(),command.items(),command.blocking(),command.dueAt(),language),actor.subject(),actor.primaryRole());
         publicCases.issueInformationLink(caseId,language);
@@ -467,6 +490,8 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     private void markContactVerified(UUID caseId,String channel,Instant now){
         String column="WHATSAPP".equals(channel)?"phone_verified_at":"EMAIL".equals(channel)?"email_verified_at":null;
         if(column==null)return;
+        // A code delivered to the SUBMITTER's channel proves their possession, not the patient's: stamp nothing.
+        if(!caseContacts.resolve(caseId).patientOwns(channel)){onboarding.markContactVerified(caseId,now);events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));return;}
         jdbc.sql("UPDATE patient_profiles SET "+column+"=?,updated_at=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)").params(timestamp(now),timestamp(now),caseId).update();
         onboarding.markContactVerified(caseId,now);
         events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));
@@ -475,7 +500,11 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     /** Full sensitive view — only reachable with a valid link AND a valid grant from OTP verification. */
     @Transactional(readOnly=true) public PublicProposalView viewProposal(String token,String grant){ShareToken share=requireGrant(token,grant);ProposalView view=proposal(share.versionId());
         record M(String caseNumber,String patientName,String documentType,int versionNumber,String currency,Instant validUntil,String recommendedTreatment,String risks,String assumptions,String scopeChangeReason,String paymentTerms,String refundTerms,String disclaimers,String includedServices,String excludedServices,BigDecimal minEgp,BigDecimal expEgp,BigDecimal maxEgp,BigDecimal fxRate,String consultantName){}
-        M m=jdbc.sql("SELECT c.case_number,c.full_name,pv.document_type,pv.version_number,pv.currency,pv.valid_until,cr.recommended_treatment,cr.risks_and_limitations,pv.assumptions,pv.scope_change_reason,pv.payment_terms,pv.refund_terms,pv.disclaimers,pv.included_services,pv.excluded_services,pv.patient_total_min_egp,pv.patient_total_expected_egp,pv.patient_total_max_egp,pv.fx_rate,pp.display_name consultant_name FROM proposal_versions pv JOIN proposals pr ON pr.id=pv.proposal_id JOIN medical_cases c ON c.id=pr.case_id LEFT JOIN clinical_review_versions cr ON cr.id=pv.clinical_review_id LEFT JOIN practitioner_profiles pp ON pp.id=cr.practitioner_id WHERE pv.id=?").param(share.versionId()).query((rs,n)->new M(rs.getString("case_number"),rs.getString("full_name"),rs.getString("document_type"),rs.getInt("version_number"),rs.getString("currency"),instantNullable(rs,"valid_until"),rs.getString("recommended_treatment"),rs.getString("risks_and_limitations"),rs.getString("assumptions"),rs.getString("scope_change_reason"),rs.getString("payment_terms"),rs.getString("refund_terms"),rs.getString("disclaimers"),rs.getString("included_services"),rs.getString("excluded_services"),rs.getBigDecimal("patient_total_min_egp"),rs.getBigDecimal("patient_total_expected_egp"),rs.getBigDecimal("patient_total_max_egp"),rs.getBigDecimal("fx_rate"),rs.getString("consultant_name"))).single();
+        M m=jdbc.sql("SELECT c.case_number,(SELECT "+com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL+" FROM patient_profiles p WHERE p.id=c.patient_id) full_name,pv.document_type,pv.version_number,pv.currency,pv.valid_until,cr.recommended_treatment,cr.risks_and_limitations,pv.assumptions,pv.scope_change_reason,pv.payment_terms,pv.refund_terms,pv.disclaimers,pv.included_services,pv.excluded_services,pv.patient_total_min_egp,pv.patient_total_expected_egp,pv.patient_total_max_egp,pv.fx_rate,pp.display_name consultant_name FROM proposal_versions pv JOIN proposals pr ON pr.id=pv.proposal_id JOIN medical_cases c ON c.id=pr.case_id LEFT JOIN clinical_review_versions cr ON cr.id=pv.clinical_review_id LEFT JOIN practitioner_profiles pp ON pp.id=cr.practitioner_id WHERE pv.id=?").param(share.versionId()).query((rs,n)->new M(rs.getString("case_number"),rs.getString("full_name"),rs.getString("document_type"),rs.getInt("version_number"),rs.getString("currency"),instantNullable(rs,"valid_until"),rs.getString("recommended_treatment"),rs.getString("risks_and_limitations"),rs.getString("assumptions"),rs.getString("scope_change_reason"),rs.getString("payment_terms"),rs.getString("refund_terms"),rs.getString("disclaimers"),rs.getString("included_services"),rs.getString("excluded_services"),rs.getBigDecimal("patient_total_min_egp"),rs.getBigDecimal("patient_total_expected_egp"),rs.getBigDecimal("patient_total_max_egp"),rs.getBigDecimal("fx_rate"),rs.getString("consultant_name"))).single();
+        // Totals are the EGP package converted at the SNAPSHOT rate frozen at release. A base-currency proposal has
+        // rate 1; a foreign-currency one always carries its snapshot (release refuses otherwise), so a missing rate
+        // is a data fault to surface, never a reason to show EGP figures under a foreign-currency label.
+        if(m.fxRate()==null&&m.currency()!=null&&!com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(m.currency()))throw new ApiException(409,"PROPOSAL_FX_SNAPSHOT_MISSING","This proposal has no exchange-rate snapshot and cannot be shown");
         BigDecimal fx=m.fxRate()==null?BigDecimal.ONE:m.fxRate();java.util.function.Function<BigDecimal,BigDecimal> conv=egp->egp==null?null:egp.multiply(fx).setScale(2,java.math.RoundingMode.HALF_UP);
         boolean decided=!Set.of("RELEASED","VIEWED").contains(view.status());String decisionState=decided?view.status():null;
         boolean isFinal="FINAL_TREATMENT_QUOTE".equals(m.documentType());
@@ -509,13 +538,14 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         int bound=jdbc.sql("UPDATE patient_profiles SET external_subject=?,updated_at=?,version=version+1 WHERE id=? AND external_subject IS NULL").params(actor.subject(),timestamp(now),act.patientId()).update();if(bound!=1)throw new ApiException(409,"ALREADY_LINKED","This profile is already linked to another account");}int consumed=jdbc.sql("UPDATE account_activations SET consumed_at=?,activated_subject=? WHERE id=? AND consumed_at IS NULL").params(timestamp(now),actor.subject(),act.id()).update();if(consumed!=1)throw new ApiException(410,"ACTIVATION_USED","This one-time activation link has already been used");audit("ACCOUNT_ACTIVATED",actor,null,"PatientProfile",act.patientId().toString(),"ACTIVATE","SUCCESS",null);return new IdResponse(act.patientId(),"ACTIVATED");}
 
     private ShareToken requireGrant(String token,String grant){ShareToken share=findShareToken(token);Integer ok=jdbc.sql("SELECT count(*) FROM proposal_access_challenges WHERE share_token_id=? AND grant_hash=? AND grant_expires_at>? AND consumed_at IS NOT NULL AND revoked_at IS NULL").params(share.shareId(),intake.hash(grant),timestamp(clock.instant())).query(Integer.class).single();if(ok==null||ok==0)throw new ApiException(401,"VERIFICATION_REQUIRED","Please verify your identity to view this proposal");return share;}
-    private void onProposalAccepted(UUID caseId){Instant now=clock.instant();PatientContact pc=jdbc.sql("SELECT p.id patient_id,p.external_subject,p.whatsapp_number,p.email,p.preferred_language,c.case_number FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?").param(caseId).query((rs,n)->new PatientContact(rs.getObject("patient_id",UUID.class),rs.getString("external_subject"),rs.getString("whatsapp_number"),rs.getString("email"),rs.getString("preferred_language"),rs.getString("case_number"))).optional().orElse(null);if(pc==null)return;
+    private void onProposalAccepted(UUID caseId){Instant now=clock.instant();PatientContact pc=jdbc.sql("SELECT p.id patient_id,p.external_subject,COALESCE(p.whatsapp_number,sc.whatsapp_number) whatsapp_number,COALESCE(p.email,sc.email) email,p.preferred_language,c.case_number FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id LEFT JOIN case_submission_contacts sc ON sc.case_id=c.id WHERE c.id=?").param(caseId).query((rs,n)->new PatientContact(rs.getObject("patient_id",UUID.class),rs.getString("external_subject"),rs.getString("whatsapp_number"),rs.getString("email"),rs.getString("preferred_language"),rs.getString("case_number"))).optional().orElse(null);if(pc==null)return;
         // The accepted patient receives exactly ONE message: the secure onboarding link, which carries profile
         // completion, the deposit and account binding. The activation row below remains the internal record of
         // that invitation - its usable credential is minted by AccountActivationService at the end of onboarding
         // and handed straight to the patient's browser, so no second customer-facing activation message exists.
         publicCases.issueOnboardingLink(caseId,pc.preferredLanguage());if(pc.externalSubject()!=null)return;String channel=hasText(pc.whatsapp())?"WHATSAPP":"EMAIL";String destination=channel.equals("WHATSAPP")?pc.whatsapp():pc.email();if(!hasText(destination))return;Integer exists=jdbc.sql("SELECT count(*) FROM account_activations WHERE patient_id=?").param(pc.patientId()).query(Integer.class).single();if(exists!=null&&exists>0)return;jdbc.sql("INSERT INTO account_activations(id,patient_id,case_id,token_hash,delivery_channel,destination_hint,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),pc.patientId(),caseId,intake.hash(randomToken()),channel,maskContact(destination),timestamp(now.plus(Duration.ofDays(30))),timestamp(now)).update();auditPublic("ACCOUNT_ACTIVATION_INVITED",caseId,pc.patientId().toString(),"INVITE");}
-    private Contact proposalContact(UUID caseId){return jdbc.sql("SELECT c.case_number,p.whatsapp_number,p.email FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?").param(caseId).query((rs,n)->new Contact(rs.getString("case_number"),rs.getString("whatsapp_number"),rs.getString("email"))).single();}
+    /** The case's communication contact: the patient's own channels when present, else the submitter's. */
+    private Contact proposalContact(UUID caseId){var c=caseContacts.resolve(caseId);return new Contact(c.caseNumber(),c.whatsapp(),c.email());}
     private String randomToken(){return UUID.randomUUID().toString().replace("-","")+UUID.randomUUID().toString().replace("-","");}
     private boolean hasText(String value){return value!=null&&!value.isBlank();}
     /** Resolve the OTP channel from an optional patient choice, validating the destination is on file.
@@ -548,7 +578,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String context=(declined?"The patient declined this proposal.":"The patient asked for changes before continuing.")
             +(hasText(comment)?" They said: "+comment.trim():"");
         work.openWorkItem(new NewWorkItem(caseId,declined?"PROPOSAL_DECLINED_REVIEW":"PROPOSAL_REVISION",title,context,coordinator,
-            ActorRole.COORDINATOR.name(),"HIGH",false,null,"SYSTEM","PATIENT_PROPOSAL_DECISION","proposal-decision:"+decision+":"+versionId,true));
+            ActorRole.COORDINATOR.name(),false,null,"SYSTEM","PATIENT_PROPOSAL_DECISION","proposal-decision:"+decision+":"+versionId,true));
         work.refreshWaitingOn(caseId,"STAFF",title);
     }
 
@@ -582,11 +612,13 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         Instant now=clock.instant();
         // Snapshot the EGP->quote-currency rate and freeze every line to it, so the patient price is fixed and auditable.
         String snapCurrency=view.currency();BigDecimal fxRate;String fxSource;java.time.LocalDate fxDate=java.time.LocalDate.now(clock);
+        // A foreign-currency proposal is released only with a real snapshot rate. Without one the release fails
+        // (503 FX_RATE_UNAVAILABLE) rather than sending the patient base-currency amounts under a USD label.
         if(snapCurrency==null||com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(snapCurrency)){fxRate=BigDecimal.ONE;fxSource="BASE";}
-        else{try{fxRate=currency.effectiveRate(snapCurrency,fxDate);fxSource="SNAPSHOT";}catch(ApiException e){fxRate=null;fxSource=null;}}
-        if(fxRate!=null)jdbc.sql("UPDATE proposal_items SET unit_price=ROUND(unit_price_egp*?,2) WHERE proposal_version_id=? AND unit_price_egp IS NOT NULL").params(fxRate,versionId).update();
+        else{fxRate=currency.effectiveRate(snapCurrency,fxDate);fxSource="SNAPSHOT";}
+        jdbc.sql("UPDATE proposal_items SET unit_price=ROUND(unit_price_egp*?,2) WHERE proposal_version_id=? AND unit_price_egp IS NOT NULL").params(fxRate,versionId).update();
         String html=renderProposal(proposal(versionId));
-        int changed=jdbc.sql("UPDATE proposal_versions SET status='RELEASED',released_by=?,released_at=?,html_snapshot=?,fx_rate=?,fx_rate_date=?,fx_source=? WHERE id=? AND status IN ('CLINICALLY_APPROVED','OPERATIONS_COMPLETED','FINANCE_APPROVED')").params(actor.subject(),timestamp(now),html,fxRate,fxRate==null?null:fxDate,fxSource,versionId).update();if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal changed before release");
+        int changed=jdbc.sql("UPDATE proposal_versions SET status='RELEASED',released_by=?,released_at=?,html_snapshot=?,fx_rate=?,fx_rate_date=?,fx_source=? WHERE id=? AND status IN ('CLINICALLY_APPROVED','OPERATIONS_COMPLETED','FINANCE_APPROVED')").params(actor.subject(),timestamp(now),html,fxRate,fxDate,fxSource,versionId).update();if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal changed before release");
         // Releasing (and only releasing) mints the random, expiring, case-scoped secure link and
         // moves the case to PATIENT_DECISION. The delivered notification carries only the link.
         jdbc.sql("UPDATE proposal_share_tokens SET revoked_at=? WHERE case_id=? AND revoked_at IS NULL AND consumed_at IS NULL").params(timestamp(now),caseId).update();String token=randomToken();jdbc.sql("INSERT INTO proposal_share_tokens(id,proposal_version_id,case_id,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?)").params(UUID.randomUUID(),versionId,caseId,intake.hash(token),timestamp(now.plus(Duration.ofDays(14))),timestamp(now)).update();Contact contact=proposalContact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination=channel.equals("WHATSAPP")?contact.whatsapp():contact.email();if(hasText(destination))jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM notification_outbox WHERE idempotency_key=?)").params(UUID.randomUUID(),"PROPOSAL_READY",channel,destination,"proposal-ready",intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+view.language()+"\"}"),"PENDING",0,5,timestamp(now),"proposal-ready:"+versionId,timestamp(now),"proposal-ready:"+versionId).update();transitionWithoutVersion(caseId,"PATIENT_DECISION","Proposal released to patient",actor);audit("PROPOSAL_RELEASED",actor,caseId,"ProposalVersion",versionId.toString(),"RELEASE","SUCCESS",null);return proposal(versionId);}
@@ -647,11 +679,12 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         ProposalView view=proposal(versionId);if(!Set.of("CLINICALLY_APPROVED","FINANCE_APPROVED").contains(view.status()))throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Final quote is not ready for release");
         if(requiresFinanceApproval(versionId)&&!"FINANCE_APPROVED".equals(view.status()))throw new ApiException(409,"FINANCE_APPROVAL_REQUIRED","Finance must approve the manually-priced services before release");
         Instant now=clock.instant();String snapCurrency=view.currency();BigDecimal fxRate;String fxSource;java.time.LocalDate fxDate=java.time.LocalDate.now(clock);
+        // Same rule as the preliminary estimate: no snapshot rate, no release.
         if(snapCurrency==null||com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(snapCurrency)){fxRate=BigDecimal.ONE;fxSource="BASE";}
-        else{try{fxRate=currency.effectiveRate(snapCurrency,fxDate);fxSource="SNAPSHOT";}catch(ApiException e){fxRate=null;fxSource=null;}}
-        if(fxRate!=null)jdbc.sql("UPDATE proposal_items SET unit_price=ROUND(unit_price_egp*?,2) WHERE proposal_version_id=? AND unit_price_egp IS NOT NULL").params(fxRate,versionId).update();
+        else{fxRate=currency.effectiveRate(snapCurrency,fxDate);fxSource="SNAPSHOT";}
+        jdbc.sql("UPDATE proposal_items SET unit_price=ROUND(unit_price_egp*?,2) WHERE proposal_version_id=? AND unit_price_egp IS NOT NULL").params(fxRate,versionId).update();
         String html=renderProposal(proposal(versionId));
-        int changed=jdbc.sql("UPDATE proposal_versions SET status='RELEASED',released_by=?,released_at=?,html_snapshot=?,fx_rate=?,fx_rate_date=?,fx_source=? WHERE id=? AND status IN ('CLINICALLY_APPROVED','FINANCE_APPROVED')").params(actor.subject(),timestamp(now),html,fxRate,fxRate==null?null:fxDate,fxSource,versionId).update();
+        int changed=jdbc.sql("UPDATE proposal_versions SET status='RELEASED',released_by=?,released_at=?,html_snapshot=?,fx_rate=?,fx_rate_date=?,fx_source=? WHERE id=? AND status IN ('CLINICALLY_APPROVED','FINANCE_APPROVED')").params(actor.subject(),timestamp(now),html,fxRate,fxDate,fxSource,versionId).update();
         if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Final quote changed before release");
         mintShareAndNotify(caseId,versionId,view.language()==null?"en":view.language(),"final-quote-ready","FINAL_QUOTE_READY","final-quote-ready:"+versionId);
         // The macro case intentionally stays ARRIVAL_CONFIRMED; the final quote is a commercial sub-workflow.
@@ -716,14 +749,17 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     private void requireFinalQuoteAcceptedIfAny(UUID caseId){UUID latestFinal=jdbc.sql("SELECT pv.id FROM proposal_versions pv JOIN proposals p ON p.id=pv.proposal_id WHERE p.case_id=? AND pv.document_type='FINAL_TREATMENT_QUOTE' AND pv.status<>'SUPERSEDED' ORDER BY pv.version_number DESC LIMIT 1").param(caseId).query(UUID.class).optional().orElse(null);if(latestFinal==null)return;Integer accepted=jdbc.sql("SELECT count(*) FROM proposal_decisions WHERE proposal_version_id=? AND decision='ACCEPTED'").param(latestFinal).query(Integer.class).single();if(accepted==null||accepted==0)throw new ApiException(409,"FINAL_QUOTE_NOT_ACCEPTED","The final treatment quote must be accepted before treatment");}
     @Transactional public IdResponse followUp(UUID caseId,FollowUpRequest request){var actor=actors.require(ActorRole.DOCTOR);authorizeWrite(caseId,actor);requireActiveAssignment(caseId,actor,ActorRole.DOCTOR);requireState(caseId,"DISCHARGED");UUID actorPractitioner=practitionerId(actor.subject());if(request.practitionerId()!=null&&!request.practitionerId().equals(actorPractitioner))throw new ApiException(403,"PRACTITIONER_IDENTITY_MISMATCH","A doctor may only create follow-up under their own verified practitioner profile");if(request.treatmentEpisodeId()!=null){Integer episode=jdbc.sql("SELECT count(*) FROM treatment_episodes WHERE id=? AND case_id=?").params(request.treatmentEpisodeId(),caseId).query(Integer.class).single();if(episode==null||episode==0)throw new ApiException(409,"INVALID_TREATMENT_EPISODE","The treatment episode does not belong to this case");}UUID id=UUID.randomUUID();Instant now=clock.instant();jdbc.sql("INSERT INTO follow_up_plans(id,case_id,treatment_episode_id,practitioner_id,due_at,mode,required_tests,instructions,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)").params(id,caseId,request.treatmentEpisodeId(),actorPractitioner,timestamp(request.dueAt()),request.mode(),request.requiredTests(),request.instructions(),"PLANNED",timestamp(now),timestamp(now)).update();transitionWithoutVersion(caseId,"FOLLOW_UP","Follow-up plan created",actor);audit("FOLLOW_UP_CREATED",actor,caseId,"FollowUpPlan",id.toString(),"CREATE","SUCCESS",null);return new IdResponse(id,"PLANNED");}
 
-    private CaseView caseView(UUID caseId){CaseView row=jdbc.sql("SELECT * FROM medical_cases WHERE id=?").param(caseId).query((rs,n)->mapCase(rs)).optional().orElseThrow(()->new ApiException(404,"CASE_NOT_FOUND","Case was not found"));return withAssignments(List.of(row)).get(0);}
+    private CaseView caseView(UUID caseId){CaseView row=jdbc.sql(CASE_SELECT+" WHERE c.id=?").param(caseId).query((rs,n)->mapCase(rs)).optional().orElseThrow(()->new ApiException(404,"CASE_NOT_FOUND","Case was not found"));return withAssignments(List.of(row)).get(0);}
     /**
      * Pure row mapper: assignment identity is deliberately left null here and filled by
      * {@link #withAssignments(List)} in one batched pass. Querying per row inside a RowMapper opened a
      * second pooled connection while the outer ResultSet was still streaming, and cost five extra
      * round-trips for every case in a queue.
      */
-    private CaseView mapCase(ResultSet rs)throws SQLException{return new CaseView(rs.getObject("id",UUID.class),rs.getString("case_number"),rs.getString("status"),rs.getString("full_name"),rs.getString("country"),rs.getString("preferred_language"),rs.getString("care_category"),instant(rs,"created_at"),instant(rs,"updated_at"),rs.getLong("version"),null,null,null,null,rs.getBoolean("travel_package_requested"),rs.getString("waiting_on"),rs.getString("waiting_reason"));}
+    private CaseView mapCase(ResultSet rs)throws SQLException{return new CaseView(rs.getObject("id",UUID.class),rs.getString("case_number"),rs.getString("status"),patientName(rs),rs.getString("country"),rs.getString("preferred_language"),rs.getString("care_category"),instant(rs,"created_at"),instant(rs,"updated_at"),rs.getLong("version"),null,null,null,null,rs.getBoolean("travel_package_requested"),rs.getString("waiting_on"),rs.getString("waiting_reason"));}
+    /** Canonical patient display name (structured name, else preserved legacy full name); the case row's own full_name is only a snapshot. */
+    private static String patientName(ResultSet rs)throws SQLException{String canonical=rs.getString("patient_name");return canonical==null||canonical.isBlank()?rs.getString("full_name"):canonical;}
+    private static final String CASE_SELECT="SELECT c.*,"+com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL+" patient_name FROM medical_cases c LEFT JOIN patient_profiles p ON p.id=c.patient_id";
 
     /** Resolves coordinator/doctor subjects and their display names for a whole page of cases in three queries. */
     private List<CaseView> withAssignments(List<CaseView> cases){

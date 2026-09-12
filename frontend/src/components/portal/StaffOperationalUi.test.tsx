@@ -16,7 +16,7 @@ import { CaseQueue, attentionRank, filterQueue, initialQueue, type QueueCase } f
 import { MyWork, type WorkItem } from "./MyWork";
 import { NotificationBell } from "./NotificationBell";
 import { DeclineAssignmentDialog } from "./DeclineAssignmentDialog";
-import { PatientCaseView } from "./PatientCaseView";
+
 
 const item: WorkItem = {
   id: "w1", caseId: "c1", caseNumber: "RS-10281", patientName: "Mohamed Ahmed", caseStatus: "INTAKE_REVIEW",
@@ -452,67 +452,6 @@ describe("DeclineAssignmentDialog", () => {
     fireEvent.click(screen.getByRole("radio", { name: "خارج نطاق تخصصي السريري" }));
     fireEvent.click(screen.getByRole("button", { name: "رفض التعيين" }));
     expect(onConfirm).toHaveBeenCalledWith("Outside my clinical scope");
-  });
-});
-
-describe("PatientCaseView", () => {
-  afterEach(cleanup);
-
-  const base = {
-    id: "c1", caseNumber: "RS-2026-000030", status: "CONSULTANT_REVIEW", careCategory: "cardiology",
-    coordinatorName: "Layla Hassan", doctorName: "Dr Ahmed Alashry", waitingOn: "CONSULTANT",
-    updatedAt: new Date().toISOString(), travelPackageRequested: false,
-  };
-  const timeline = [{ status: "RECEIVED", occurredAt: "2026-09-08T09:00:00Z" }, { status: "CONSULTANT_REVIEW", occurredAt: "2026-09-09T09:00:00Z" }];
-
-  it("explains where the case is, who has it and that nothing is needed from the patient", () => {
-    render(<PatientCaseView locale="en" caseSummary={base} tasks={[]} documents={[]} timeline={timeline} hasProposal={false}/>);
-    expect(screen.getByRole("heading", { name: /your consultant is reviewing your case/i })).toBeTruthy();
-    expect(screen.getByText(/no action is required from you right now/i)).toBeTruthy();
-    expect(screen.getByText(/you will receive a recommendation/i)).toBeTruthy();
-    expect(screen.getByText("Layla Hassan")).toBeTruthy();
-    expect(screen.getByText("Dr Ahmed Alashry")).toBeTruthy();
-    // Workflow vocabulary never reaches the patient.
-    expect(screen.queryByText(/CONSULTANT_REVIEW/)).toBeNull();
-    // Who has the ball is stated once, in the case header — never repeated inside the action panel.
-    expect(screen.queryByText(/waiting on/i)).toBeNull();
-  });
-
-  it("shows the journey as patient-friendly phases with the current one marked", () => {
-    render(<PatientCaseView locale="en" caseSummary={base} tasks={[]} documents={[]} timeline={timeline} hasProposal={false}/>);
-    const tracker = screen.getByRole("list");
-    const labels = [...tracker.querySelectorAll("li")].map(li => (li.textContent ?? "").trim());
-    expect(labels).toEqual(["Case received", "Coordinator review", "Consultant review", "Your proposal", "Deposit", "Treatment", "Follow-up"]);
-    const current = [...tracker.querySelectorAll("li > span:last-child")].find(s => s.textContent === "Consultant review");
-    expect(current!.className).toContain("font-bold");
-  });
-
-  it("surfaces a required action instead of the calm state when one is open", () => {
-    render(<PatientCaseView locale="en" caseSummary={{ ...base, status: "INFORMATION_REQUIRED", waitingOn: "PATIENT" }}
-                            tasks={[{ id: "t1", title: "Upload your latest Echo report", status: "OPEN" }]}
-                            documents={[]} timeline={timeline} hasProposal={false}/>);
-    expect(screen.getByRole("heading", { name: /we need something from you/i })).toBeTruthy();
-    expect(screen.getByText("Upload your latest Echo report")).toBeTruthy();
-    expect(screen.getByText(/something is needed from you/i)).toBeTruthy();
-    expect(screen.queryByText(/no action is required/i)).toBeNull();
-  });
-
-  it("keeps travel support as a calm read-only preference, never a control", () => {
-    render(<PatientCaseView locale="en" caseSummary={{ ...base, travelPackageRequested: true }} tasks={[]} documents={[]} timeline={timeline} hasProposal={false}/>);
-    expect(screen.getByText("Travel support preference")).toBeTruthy();
-    expect(screen.getByText("Requested")).toBeTruthy();
-    expect(screen.queryByRole("switch")).toBeNull();
-    expect(screen.queryByRole("checkbox")).toBeNull();
-  });
-
-  it("offers patient-facing tabs and never a clinical one", () => {
-    render(<PatientCaseView locale="en" caseSummary={base} tasks={[]}
-                            documents={[{ documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", sizeBytes: 10, createdAt: new Date().toISOString() }]}
-                            timeline={timeline} hasProposal={false}/>);
-    ["Overview", "Documents", "Updates"].forEach(label => expect(screen.getByRole("tab", { name: new RegExp(label, "i") })).toBeTruthy());
-    expect(screen.queryByRole("tab", { name: /clinical/i })).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: /documents/i }));
-    expect(screen.getByText("Echo_Report.pdf")).toBeTruthy();
   });
 });
 

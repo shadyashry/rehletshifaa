@@ -155,6 +155,19 @@ function Prose({ label, text, id }: { label: string; text?: string; id?: string 
   );
 }
 
+/** The grant Check Case Status stored for this token, removed on first read so it cannot be replayed from storage. */
+function takeHandoffGrant(token: string): string | null {
+  try {
+    const key = `rs-proposal-grant:${token}`;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    sessionStorage.removeItem(key);
+    const parsed = JSON.parse(raw) as { grant?: string; expiresAt?: string };
+    if (!parsed.grant || (parsed.expiresAt && new Date(parsed.expiresAt).getTime() <= Date.now())) return null;
+    return parsed.grant;
+  } catch { return null; }
+}
+
 export function ProposalSign({ locale, token }: { locale: Locale; token: string }) {
   const t = copy[locale];
   const [phase, setPhase] = useState<Phase>("loading");
@@ -174,12 +187,33 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const decisionRef = useRef<HTMLDivElement>(null);
   const [decisionVisible, setDecisionVisible] = useState(true);
 
+  /** Loads the full proposal with a grant already proven elsewhere; false when the grant is no longer good. */
+  async function openWithGrant(g: string) {
+    const r = await fetch(apiUrl(`/public/proposals/${token}/view`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grant: g }) });
+    if (!r.ok) return false;
+    const full = (await r.json()) as Proposal;
+    setGrant(g); setProposal(full);
+    if (full.decided) setBlocked("DECIDED");
+    else if (full.validUntil && new Date(full.validUntil).getTime() <= Date.now()) setBlocked("EXPIRED");
+    setPhase("view");
+    return true;
+  }
+
   useEffect(() => {
     void fetch(apiUrl(`/public/proposals/${token}`))
       .then(async (r) => { if (!r.ok) throw new Error(); return r.json() as Promise<Summary>; })
-      .then((s) => { setSummary(s); setChannel(s.channel === "EMAIL" ? "EMAIL" : "WHATSAPP"); setPhase("intro"); })
+      .then(async (s) => {
+        setSummary(s); setChannel(s.channel === "EMAIL" ? "EMAIL" : "WHATSAPP");
+        // Arriving from a verified Check Case Status session: the grant minted there opens the proposal at
+        // once. It is single-use here and, if it has lapsed, the page simply falls back to its own code.
+        const handed = takeHandoffGrant(token);
+        if (handed && await openWithGrant(handed)) return;
+        setPhase("intro");
+      })
       .catch(() => setPhase("invalid"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
 
   // The sticky bar exists to carry the decision while it is off screen — never alongside it.
   useEffect(() => {

@@ -19,8 +19,8 @@
   --color-brand-500: #2f8f8a;
   --color-brand-600: #247c86; /* Healing Teal — primary action, links */
   --color-brand-700: #1f6b73; /* darker teal — hover / high-contrast text */
-  --color-brand-800: #29454d;
-  --color-brand-900: #29454d; /* Soft Ink — headings, wordmark */
+  --color-brand-800: #24404a;
+  --color-brand-900: #24404a; /* Soft Ink — headings, wordmark */
   --color-brand-950: #1c333a;
 
   /* Accent = teal signal family (checks, eyebrows, icon strokes) */
@@ -33,12 +33,12 @@
   --color-accent-800: #17565c;
 
   /* Neutral ink — all body values meet WCAG AA on white, cream and the washes */
-  --color-ink-900: #29454d;
-  --color-ink-800: #29454d;
-  --color-ink-700: #3c565e;
-  --color-ink-600: #47636b;
-  --color-ink-500: #526970; /* Body Text */
-  --color-ink-400: #6b828a;
+  --color-ink-900: #24404a;
+  --color-ink-800: #24404a;
+  --color-ink-700: #30474f;
+  --color-ink-600: #3a545d; /* body copy: deep blue-gray, ≥ 7:1 on every page surface */
+  --color-ink-500: #445c64; /* supporting copy */
+  --color-ink-400: #5e747a;
   --color-ink-300: #9fb0b6;
 
   /* Surfaces and rules */
@@ -52,6 +52,46 @@
   --color-wash-sky: #dcecf9;
   --color-wash-peach: #fdebe4;
   --color-wash-lavender: #eeeaf8;
+
+  /* Classical healthcare accent — muted sand / champagne. Used sparingly for rules, markers and one warm
+     detail per section; never as a surface for text-heavy content and never as the only carrier of meaning. */
+  --color-sand-50: #faf6ee;
+  --color-sand-100: #f2eadb;
+  --color-sand-200: #e5d9c0;
+  --color-sand-300: #d3c2a0;
+  --color-sand-700: #7c663d; /* AA on white and on the warm surfaces */
+
+  /* Semantic surfaces for the public pages — the "pearl healthcare canvas". One connected family of
+     very low tints (roughly 2–5% away from white) rather than distinct coloured bands: components use these
+     utilities (bg-surface-*, border-*, text-*) so every tint is defined once here; no raw hex values in components. */
+  --color-surface-default: #ffffff;
+  --color-surface-pearl: #fbfaf7; /* pearl white: the page canvas, slightly warm, never sterile */
+  --color-surface-clinical: #eff6f4; /* clinical mist: barely aqua, for the clinical-authority moments */
+  --color-surface-sage: #eef7f5; /* pale sage: used sparingly (featured surface, icon wells) */
+  --color-surface-ivory: #fff9f2; /* warm pearl: soft ivory, closure and support surfaces */
+  --color-surface-warm: #faf6ee; /* warm pearl, a step deeper: the hospitality canvas */
+  --color-surface-hospitality: #f6f0e4; /* soft champagne: hospitality/concierge context only */
+  --color-surface-elevated: #ffffff;
+  --color-accent-clinical: #65bdb5; /* = brand-400: the care-journey connector and clinical markers */
+  --color-accent-warm: #b59c6c; /* warm rules and the hospitality journey line: visible on champagne, never loud */
+  --color-accent-sand: #d3c2a0; /* legacy alias of accent-warm */
+  --color-border-subtle: #e6ebea; /* hairlines on pearl */
+  --color-border-card: #dce7e4; /* one soft gray-teal edge shared by the three care-area cards */
+  --color-card-cardiology: #f9fdfc; /* care-area undertones — every card lighter than the pearl canvas (#fbfaf7), ≈2% tint: teal-pearl, cool pearl, ivory-pearl */
+  --color-card-rehab: #fafcfd;
+  --color-card-ortho: #fdfbf8;
+  --color-card-cardiology-hover: #f4faf8; /* hover: one quiet step, never a colour change */
+  --color-card-rehab-hover: #f5f9fb;
+  --color-card-ortho-hover: #fbf8f3;
+  --color-well-cardiology: #e3f1ed; /* icon wells carry the specialty cue: pale teal, blue-gray, ivory-champagne */
+  --color-well-rehab: #e6eff3;
+  --color-well-ortho: #f3eee3;
+  --color-well-rehab-ring: #cfdde3;
+  --color-well-ortho-ring: #e6dcc6;
+  --color-border-clinical: #c9dfda; /* hairlines on the clinical mist */
+  --color-text-heading: #24404a; /* = brand-900 / ink-900 */
+  --color-text-body: #3a545d; /* = ink-600 */
+  --color-text-muted: #5e747a; /* = ink-400 */
 
   /* Gentle Coral — logo arrival dot only */
   --color-coral: #e98d78;
@@ -97,7 +137,7 @@
 
   body {
     margin: 0;
-    background: #ffffff;
+    background: var(--color-surface-pearl);
     color: var(--color-ink-800);
     font-family: var(--font-sans);
     font-size: clamp(1rem, 0.97rem + 0.14vw, 1.0625rem);
@@ -152,7 +192,8 @@
   }
 
   .section {
-    padding-block: clamp(2.25rem, 3.3vw, 4rem);
+    /* ~52px at 1024, 58px at 1280, 61px at 1440, 68px from 1800: spacious, never empty. */
+    padding-block: clamp(2.5rem, 2rem + 2vw, 4.25rem);
   }
 
   /* Compact band for supporting sections that must not consume a full viewport. */
@@ -173,9 +214,9 @@
 
   .eyebrow {
     color: var(--color-accent-700);
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     line-height: 1.4;
   }
@@ -193,9 +234,20 @@
 
   .headline {
     color: var(--color-brand-900);
-    font-size: clamp(1.6rem, 1.35rem + 0.95vw, 2.05rem);
-    line-height: 1.18;
-    letter-spacing: -0.018em;
+    /* 30px at 1024 → 34px at 1440: confident below the hero without competing with it. */
+    font-size: clamp(1.6rem, 1.2rem + 1.2vw, 2.125rem);
+    line-height: 1.16;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  /* Editorial supporting statement: larger than body, lighter than a heading. */
+  .statement {
+    color: var(--color-brand-900);
+    font-size: clamp(1.25rem, 1.05rem + 0.7vw, 1.75rem);
+    line-height: 1.32;
+    letter-spacing: -0.014em;
     font-weight: 600;
     text-wrap: balance;
   }
@@ -274,6 +326,83 @@
     border-color: var(--color-brand-50);
   }
 
+  /* Secondary account action (Sign in): a refined outline, never a second filled CTA. */
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.55rem 1.15rem;
+    border-radius: 0.7rem;
+    border: 1px solid var(--color-line-strong);
+    background: transparent;
+    color: var(--color-brand-700);
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  }
+
+  /* In the header the primary action sits beside the outlined Sign in as a pair of the same height. */
+  .site-header .btn-primary {
+    min-height: 2.75rem;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.95rem;
+    border-radius: 0.7rem;
+  }
+
+  .btn-outline:hover {
+    background: var(--color-brand-50);
+    border-color: var(--color-brand-300);
+    color: var(--color-brand-800);
+  }
+
+  /* The RehletShifaa care-journey motif: one thin flowing connector between numbered moments. Drawn
+     as an SVG in the components; these keep the stroke language consistent wherever it appears. */
+  .journey-path {
+    fill: none;
+    stroke: var(--color-brand-500);
+    stroke-width: 1.75;
+    stroke-linecap: round;
+  }
+
+  .journey-path-warm {
+    fill: none;
+    stroke: var(--color-accent-warm);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  .journey-marker {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    background: var(--color-surface-elevated);
+    color: var(--color-brand-800);
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    box-shadow: inset 0 0 0 1.75px var(--color-brand-600);
+  }
+
+  /* The warm variant for the hospitality journey: the same marker, sand-ringed. */
+  .journey-marker-warm {
+    color: var(--color-sand-700);
+    box-shadow: inset 0 0 0 2px var(--color-accent-warm);
+  }
+
+  /* Tonal section canvases: almost imperceptible blends into the pearl page, never coloured bands. */
+  .canvas-clinical {
+    background: linear-gradient(180deg, var(--color-surface-pearl) 0%, var(--color-surface-clinical) 18%, var(--color-surface-clinical) 82%, var(--color-surface-pearl) 100%);
+  }
+
+  .canvas-hospitality {
+    background: linear-gradient(180deg, var(--color-surface-pearl) 0%, var(--color-surface-warm) 14%, var(--color-surface-hospitality) 50%, var(--color-surface-warm) 86%, var(--color-surface-pearl) 100%);
+  }
+
   .link-cta {
     display: inline-flex;
     align-items: center;
@@ -293,7 +422,7 @@
   }
 
   .footer-link {
-    color: var(--color-ink-600);
+    color: var(--color-ink-700);
     transition: color 0.18s ease;
   }
 
@@ -476,7 +605,7 @@
     width: min(100% - 1.5rem, 1200px);
   }
 
-  .section { padding-block: 2rem; }
+  .section { padding-block: 2.5rem; }
   .section-tight { padding-block: 1.5rem; }
 
   .eyebrow { font-size: 0.75rem; letter-spacing: 0.09em; }

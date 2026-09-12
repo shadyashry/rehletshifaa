@@ -3,6 +3,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import { CaseStatusAccess } from "./CaseStatusAccess";
 
+// The page navigates to the proposal with the App Router; vitest has no router context, so it is a spy.
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
 /**
  * The patient's no-login action page: verify a one-time code, see only what was actually requested,
  * answer it, and nothing else. No sign-in or registration step exists in this flow.
@@ -148,5 +152,57 @@ describe("CaseStatusAccess journey", () => {
     expect(await screen.findByRole("heading", { name: /we need something from you/i })).toBeTruthy();
     expect(screen.queryByText(/no action is required/i)).toBeNull();
     expect(screen.getByLabelText(/current medication/i)).toBeTruthy();
+  });
+
+  // ---- the proposal, exactly as the backend says the patient may see it ----
+
+  it("offers no proposal action while the proposal is still being prepared", async () => {
+    await reachStatus({ ...consultantStatus, phase: "proposal", proposal: { state: "PREPARING", action: null, versionNumber: null, validUntil: null, decidedAt: null } });
+    expect(await screen.findByRole("heading", { name: /we are preparing your proposal/i })).toBeTruthy();
+    expect(screen.getAllByText(/your proposal is being prepared/i)).toHaveLength(1); // said once
+    expect(screen.queryByRole("button", { name: /review proposal/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /proposal/i })).toBeNull();
+  });
+
+  it("shows nothing about a proposal when there is none", async () => {
+    await reachStatus({ ...consultantStatus, proposal: { state: "NONE", action: null, versionNumber: null, validUntil: null, decidedAt: null } });
+    await screen.findByRole("heading", { name: /a consultant is reviewing your case/i });
+    expect(document.getElementById("status-proposal")).toBeNull(); // the journey tracker still names the phase; no proposal section exists
+  });
+
+  it("opens the released proposal through the verified session, without a second code", async () => {
+    push.mockClear();
+    const ready = { ...consultantStatus, phase: "proposal", proposal: { state: "READY", action: "REVIEW_PROPOSAL", versionNumber: 2, validUntil: "2026-12-31T00:00:00Z", decidedAt: null } };
+    const fetchMock = stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ grant: "grant-1" }),
+      "/view": () => json(ready),
+      "/proposal-access": () => json({ token: "share-9", grant: "pgrant-9", expiresAt: "2099-01-01T00:00:00Z" }),
+      "tok-1": () => json(summary),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<CaseStatusAccess locale="en" token="tok-1"/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+
+    expect(await screen.findByRole("heading", { name: /your proposal is ready to review/i })).toBeTruthy();
+    expect(screen.queryByText(/no action is required/i)).toBeNull(); // a decision is waiting
+    expect(screen.getByText(/version 2/i)).toBeTruthy();
+    const buttons = screen.getAllByRole("button", { name: /review proposal/i });
+    expect(buttons).toHaveLength(1); // one action for one business outcome
+    fireEvent.click(buttons[0]);
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith("/en/proposal/share-9"));
+    const access = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/proposal-access"));
+    expect(JSON.parse(String((access?.[1] as RequestInit).body))).toEqual({ grant: "grant-1" });
+    // The grant travels through session storage for this token only — never through the URL.
+    expect(JSON.parse(sessionStorage.getItem("rs-proposal-grant:share-9") ?? "{}").grant).toBe("pgrant-9");
+    expect(push.mock.calls[0][0]).not.toContain("pgrant-9");
+  });
+
+  it("tells the patient when an acknowledged proposal is read-only rather than faking a button", async () => {
+    await reachStatus({ ...consultantStatus, phase: "deposit", proposal: { state: "ACCEPTED", action: "VIEW_PROPOSAL", versionNumber: 1, validUntil: null, decidedAt: "2026-09-10T10:00:00Z" } });
+    expect(await screen.findByText(/you acknowledged your estimate/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /review proposal/i })).toBeNull();
   });
 });

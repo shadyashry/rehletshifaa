@@ -61,6 +61,10 @@ public class PaymentService {
         record Fx(String currency, BigDecimal rate, LocalDate date, String source) {}
         Fx fx = jdbc.sql("SELECT currency,fx_rate,fx_rate_date,fx_source FROM proposal_versions WHERE id=?").param(versionId)
                 .query((rs, n) -> new Fx(rs.getString("currency"), rs.getBigDecimal("fx_rate"), rs.getObject("fx_rate_date", LocalDate.class), rs.getString("fx_source"))).optional().orElse(new Fx("EGP", BigDecimal.ONE, null, "BASE"));
+        // The deposit is quoted in the proposal's currency at the proposal's own snapshot rate. A released
+        // foreign-currency proposal always carries one; the base currency is the only legitimate "rate 1".
+        if (fx.rate() == null && fx.currency() != null && !"EGP".equals(fx.currency()))
+            throw new ApiException(409, "PROPOSAL_FX_SNAPSHOT_MISSING", "The accepted proposal has no exchange-rate snapshot");
         BigDecimal rate = fx.rate() == null ? BigDecimal.ONE : fx.rate();
         BigDecimal totalEgp = policy.coordinationEgp();
         BigDecimal totalDisplay = totalEgp.multiply(rate).setScale(2, RoundingMode.HALF_UP);

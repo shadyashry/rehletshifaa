@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +39,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class StaffWorkService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StaffWorkService.class);
     private static final Set<String> OPEN = Set.of("OPEN", "IN_PROGRESS");
     /** Responsibility values a case can carry; kept in sync with the database check constraint. */
     private static final Set<String> WAITING = Set.of("STAFF", "PATIENT", "CONSULTANT", "HOSPITAL", "TRAVEL_TEAM", "PAYMENT", "EXTERNAL", "NONE");
@@ -81,7 +83,7 @@ public class StaffWorkService {
         jdbc.sql("INSERT INTO case_tasks(id,case_id,task_type,title,description,owner_subject,owner_role,visibility_scope,priority,status,blocking,due_at,created_by,created_at,updated_at,version) "
                         + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
                 .params(id, item.caseId(), item.type(), encrypt(item.title()), encryptNullable(item.context()),
-                        item.ownerSubject(), item.ownerRole(), "INTERNAL", item.priority(), "OPEN", item.blocking(),
+                        item.ownerSubject(), item.ownerRole(), "INTERNAL", derivePriority(item.blocking(), item.dueAt(), now), "OPEN", item.blocking(),
                         timestamp(item.dueAt()), item.createdBy(), timestamp(now), timestamp(now))
                 .update();
         audit(item.caseId(), "CASE_WORK_ITEM_OPENED", id, item.type());
@@ -101,12 +103,27 @@ public class StaffWorkService {
                 .params(timestamp(now), encrypt(reason), timestamp(now), caseId, type).update();
     }
 
+    /** Work due within this window is escalated: it needs attention today, not in the normal queue order. */
+    private static final Duration DUE_SOON = Duration.ofHours(24);
+
+    /**
+     * The only source of a work item's priority. It is a reading of real conditions, never a default:
+     * work that blocks the patient's journey, or work that is already overdue or due within a day, is HIGH;
+     * everything else — including brand-new assignments — is NORMAL. A person may still raise it
+     * explicitly through the task API; nothing here can.
+     */
+    public static String derivePriority(boolean blocking, Instant dueAt, Instant now) {
+        if (blocking) return "HIGH";
+        if (dueAt != null && !dueAt.isAfter(now.plus(DUE_SOON))) return "HIGH";
+        return "NORMAL";
+    }
+
     private void notify(NewWorkItem item, UUID taskId, Instant now) {
         if (item.ownerSubject() == null) return; // unassigned work waits in the team queue; nobody to notify yet
         String key = item.idempotencyKey();
         boolean fresh = insertNotification(item.ownerSubject(), item.caseId(), taskId, item.eventType(),
                 item.title(), item.context(), key, now);
-        if (fresh && item.email()) emailStaff(item.ownerSubject(), item.caseId(), item.title(), key, now);
+        if (fresh && item.email()) emailStaff(item.ownerSubject(), item.ownerRole(), item.caseId(), item.title(), key, now);
     }
 
     /** Work assigned to me right now, newest priority first, with the context needed to act. */
@@ -115,7 +132,7 @@ public class StaffWorkService {
         var actor = actors.require(ActorRole.COORDINATOR, ActorRole.COORDINATOR_LEAD, ActorRole.DOCTOR,
                 ActorRole.OPERATIONS, ActorRole.FINANCE, ActorRole.PATIENT);
         return jdbc.sql("SELECT t.id,t.case_id,t.task_type,t.title,t.description,t.priority,t.status,t.blocking,t.due_at,t.created_at,t.version,"
-                        + "c.case_number,c.status case_status,c.waiting_on,c.care_category,p.full_name patient_name,"
+                        + "c.case_number,c.status case_status,c.waiting_on,c.care_category," + com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL + " patient_name,"
                         + "(SELECT count(*) FROM medical_documents d WHERE d.case_id=c.id AND d.status<>'REJECTED') document_count,"
                         + "(SELECT a.assignee_subject FROM case_assignments a WHERE a.case_id=c.id AND a.assignee_role='COORDINATOR' AND a.status='ACTIVE' ORDER BY a.assigned_at DESC LIMIT 1) coordinator_subject "
                         + "FROM case_tasks t JOIN medical_cases c ON c.id=t.case_id LEFT JOIN patient_profiles p ON p.id=c.patient_id "
@@ -149,7 +166,7 @@ public class StaffWorkService {
         if (recipientSubject == null || recipientSubject.isBlank()) return;
         Instant now = clock.instant();
         if (insertNotification(recipientSubject, caseId, taskId, eventType, title, context, idempotencyKey, now) && email)
-            emailStaff(recipientSubject, caseId, title, idempotencyKey, now);
+            emailStaff(recipientSubject, null, caseId, title, idempotencyKey, now);
     }
 
     @Transactional(readOnly = true)
@@ -199,23 +216,53 @@ public class StaffWorkService {
     }
 
     /**
-     * Work email to the staff member's own address, falling back to the shared team mailbox for legacy
-     * accounts without a stored work email. Only the case reference travels by email — never patient PII.
+     * Work email to the person the work belongs to, in their own role's words. The recipient is resolved
+     * from the directory that holds their role — consultants live in {@code practitioner_profiles}, everyone
+     * else in {@code staff_members} — so a consultant's assignment can never be addressed to a coordinator.
+     *
+     * <p>Only coordinator work may fall back to the shared coordination mailbox (it is that team's inbox);
+     * a consultant, Operations or Finance member without a stored work address keeps the in-app
+     * notification and gets no email at all. Only the case reference travels by email — never patient PII.
      */
-    private void emailStaff(String subject, UUID caseId, String title, String key, Instant now) {
-        String address = jdbc.sql("SELECT email_encrypted FROM staff_members WHERE external_subject=?").param(subject)
-                .query(String.class).optional().map(crypto::decrypt).orElse(null);
-        if (address == null || address.isBlank()) address = teamMailbox;
-        if (address == null || address.isBlank()) return;
+    private void emailStaff(String subject, String roleHint, UUID caseId, String title, String key, Instant now) {
+        Recipient recipient = resolveRecipient(subject, roleHint);
+        String address = recipient.address();
+        boolean coordinator = recipient.role() != null && recipient.role().startsWith("COORDINATOR");
+        if ((address == null || address.isBlank()) && coordinator) address = teamMailbox;
+        if (address == null || address.isBlank()) {
+            log.warn("No work email on file for {} {}; in-app notification only for '{}'", recipient.role(), subject, title);
+            return;
+        }
         String caseNumber = caseId == null ? null : jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?")
                 .param(caseId).query(String.class).optional().orElse(null);
+        String template = "DOCTOR".equals(recipient.role()) ? "consultant-work-assigned"
+                : coordinator ? "coordinator-work-assigned" : "staff-work-assigned";
         jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) "
                         + "SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
-                .params(UUID.randomUUID(), "STAFF_WORK", "EMAIL", address, "staff-work-assigned",
-                        intake.encryptedJson("{\"title\":\"" + json(title) + "\",\"case\":\"" + json(caseNumber) + "\"}"),
+                .params(UUID.randomUUID(), "STAFF_WORK", "EMAIL", address, template,
+                        intake.encryptedJson("{\"title\":\"" + json(title) + "\",\"case\":\"" + json(caseNumber) + "\",\"role\":\"" + json(recipient.role()) + "\"}"),
                         "PENDING", 0, 5, timestamp(now), "work-email:" + key, timestamp(now), "work-email:" + key)
                 .update();
     }
+
+    private record Recipient(String address, String role) {}
+
+    /**
+     * Who a subject is, by role. A consultant is looked up in the practitioner directory and everyone else
+     * in the staff directory; with no hint, whichever directory knows the subject answers.
+     */
+    private Recipient resolveRecipient(String subject, String roleHint) {
+        boolean doctor = ActorRole.DOCTOR.name().equals(roleHint);
+        Recipient staff = doctor ? null : jdbc.sql("SELECT email_encrypted,staff_role FROM staff_members WHERE external_subject=?").param(subject)
+                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")), rs.getString("staff_role"))).optional().orElse(null);
+        if (staff != null) return staff;
+        Recipient practitioner = jdbc.sql("SELECT email_encrypted FROM practitioner_profiles WHERE external_subject=?").param(subject)
+                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")), ActorRole.DOCTOR.name())).optional().orElse(null);
+        if (practitioner != null) return practitioner;
+        return new Recipient(null, roleHint);
+    }
+
+    private String decryptNullable(String stored) { return stored == null || stored.isBlank() ? null : crypto.decrypt(stored); }
 
     // ---------------- waiting on ----------------
 

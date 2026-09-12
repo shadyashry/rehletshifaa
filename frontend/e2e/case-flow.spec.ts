@@ -9,8 +9,11 @@ import { API } from "./env";
  */
 
 async function fillContactStep(page: Page, name: string) {
-  await page.getByLabel("Full Name").fill(name);
-  await page.getByRole("combobox").fill("Kenya");
+  // Structured names: given name(s) + family name/surname — never a single "full name".
+  const [given, family] = name.split(" ");
+  await page.getByLabel("Given name(s)").fill(given);
+  await page.getByLabel(/^Family name \/ surname/).fill(family ?? "");
+  await page.getByRole("combobox", { name: /country/i }).fill("Kenya");
   await page.getByRole("option", { name: /Kenya/ }).click();
   await page.getByLabel("Phone number").fill("700000000");
   await page.getByRole("button", { name: "Continue" }).click();
@@ -44,7 +47,7 @@ test("patient submits a case through the wizard and receives a case number and s
 test("the wizard blocks an incomplete contact step instead of advancing", async ({ page }) => {
   await page.goto("/en/send-my-case");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByText("Please enter your full name.")).toBeVisible();
+  await expect(page.getByText("Please enter the given name(s).")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your Case Has Been Received" })).toHaveCount(0);
 });
 
@@ -98,4 +101,28 @@ test("the Arabic intake renders right-to-left without overflow", async ({ page }
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("a case for someone else records the representative separately and keeps email optional", async ({ page }) => {
+  let payload: Record<string, unknown> | undefined;
+  await page.route(`${API}/cases`, async route => { payload = route.request().postDataJSON(); await route.continue(); });
+  await page.goto("/en/send-my-case");
+  // The quiet existing-account entry sits above the form and is not a competing CTA.
+  await expect(page.getByRole("link", { name: /sign in to use your saved details/i })).toBeVisible();
+  await page.getByRole("radio", { name: /someone else/i }).check({ force: true });
+  await page.getByLabel("Given name(s)").fill("Layla");
+  await page.getByLabel(/^Family name \/ surname/).fill("Hassan");
+  await page.getByRole("combobox", { name: /country/i }).fill("Kenya");
+  await page.getByRole("option", { name: /Kenya/ }).click();
+  await page.getByLabel("Your name").fill("Omar Hassan");
+  await page.getByLabel(/relationship to the patient/i).selectOption("PARENT");
+  await page.getByLabel("Phone number").fill("700000006");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText("Submitted by")).toBeVisible();
+  await page.getByText("I consent to RehletShifaa").click();
+  await page.getByRole("button", { name: "Send My Case" }).click();
+  await expect(page.getByRole("heading", { name: "Your Case Has Been Received" })).toBeVisible();
+  expect(payload).toMatchObject({ caseFor: "SOMEONE_ELSE", givenName: "Layla", familyName: "Hassan", representative: { name: "Omar Hassan", relationship: "PARENT" }, email: null });
+  expect(payload).not.toHaveProperty("fullName");
 });

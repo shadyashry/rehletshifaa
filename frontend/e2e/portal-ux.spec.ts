@@ -106,3 +106,15 @@ for(const locale of ["en","ar"]){
     });
   }
 }
+
+// A pending assignment is reachable only from My Work, and the consultant decides on it there: the
+// patient's documents must load on that path exactly as they do for a queued case.
+test("a consultant opening a pending assignment from My Work sees the patient's documents",async({page})=>{
+  await setup(page,"DOCTOR",{pendingWork:true});await page.goto("/en/portal");
+  await page.getByRole("tab",{name:/My work/}).click();
+  await page.getByRole("button",{name:/Review assignment/}).first().click();
+  await expect(page.getByRole("heading",{name:/New clinical assignment/})).toBeVisible();
+  await expect(page.getByText("Clinical report.pdf")).toBeVisible();
+  await expect(page.getByText(/No documents were uploaded/)).toHaveCount(0);
+  await expect(page.getByRole("tab",{name:/Documents/})).toContainText("1");
+});

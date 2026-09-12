@@ -104,7 +104,7 @@ test("operations may draft before the gate, cannot advance the journey, and the 
   const finance = await signIn(browser, "finance");
 
   const created = await call<{ caseId: string; caseNumber: string }>(null, "POST", "/cases", {
-    fullName: "Playwright Ops Gate", country: "Kenya", whatsappNumber: whatsapp, conditionDescription: "Synthetic case for the Operations gate check.",
+    caseFor: "MYSELF", givenName: "Playwright", familyName: "Ops Gate", country: "Kenya", whatsappNumber: whatsapp, conditionDescription: "Synthetic case for the Operations gate check.",
     preferredLanguage: "en", consent: true, turnstileToken: null, email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: true,
   }, 201);
   const caseId = created.body.caseId;
@@ -193,7 +193,7 @@ test("operations may draft before the gate, cannot advance the journey, and the 
   const activationCode = await latestMail(request, "Your RehletShifaa verification code", activationOtpAt, email, /verification code is (\d{6})/);
   const activationGrant = (await call<{ grant: string }>(null, "POST", `/public/onboarding/${onboardingToken}/verify`, { code: activationCode }, 200)).body.grant;
   await call(null, "POST", `/public/onboarding/${onboardingToken}/activate`, { grant: activationGrant, profile: {
-    fullName: "Playwright Ops Gate", email, phone: whatsapp, dateOfBirth: "1990-01-01", nationality: "KE", countryOfResidence: "KE", preferredLanguage: "en", sex: "MALE",
+    givenName: "Playwright", familyName: "Ops Gate", email, phone: whatsapp, mobileOwner: "PATIENT", dateOfBirth: "1990-01-01", nationality: "KE", countryOfResidence: "KE", preferredLanguage: "en", sex: "MALE",
     consents: ["PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS"] } }, 200);
   ws = await workspace();
   expect(ws.caseSummary.status, "the profile alone does not open the gate").toBe("ACCEPTED");

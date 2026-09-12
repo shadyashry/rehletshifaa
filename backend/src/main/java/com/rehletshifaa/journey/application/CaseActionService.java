@@ -44,6 +44,12 @@ public class CaseActionService {
     private static final Set<String> PROPOSAL_WORK_STAGES = Set.of("CLINICAL_RECOMMENDATION_READY", "REVISION_REQUESTED", "EXPIRED");
     private static final Set<String> TERMINAL = Set.of("DRAFT", "CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE", "EXPIRED");
     private static final Set<String> CONSULTANT_ASSIGNABLE = Set.of("INTAKE_REVIEW", "INFORMATION_REQUIRED", "READY_FOR_CONSULTANT");
+    /**
+     * Stages where the case — and the next move — belongs to the consultant. The coordinator keeps the
+     * utilities (messages, documents, activity, the travel-package flag) but no workflow command that would
+     * take the case back or push it forward; the endpoints refuse those independently.
+     */
+    public static final Set<String> CONSULTANT_OWNED = Set.of("CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW");
     private static final Set<String> TRAVEL_PACKAGE_LOCKED = Set.of("PATIENT_DECISION", "ACCEPTED", "DECLINED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED");
     /** Readiness steps the onboarding link completes in one go; shown as a single "activate your profile" blocker. */
     private static final Set<String> PROFILE_CODES = Set.of("ACCOUNT_NOT_ACTIVATED", "CONSENTS_INCOMPLETE", "ONBOARDING_INCOMPLETE", "REPRESENTATIVE_AUTH_MISSING");
@@ -53,12 +59,13 @@ public class CaseActionService {
     private final PaymentService payment;
     private final StaffWorkService work;
     private final PatientActionService patientActions;
+    private final ProposalAccessService proposals;
     private final Clock clock;
 
     public CaseActionService(JdbcClient jdbc, CustomerReadinessService readiness, PaymentService payment,
-                             StaffWorkService work, PatientActionService patientActions, Clock clock) {
+                             StaffWorkService work, PatientActionService patientActions, ProposalAccessService proposals, Clock clock) {
         this.jdbc = jdbc; this.readiness = readiness; this.payment = payment; this.work = work;
-        this.patientActions = patientActions; this.clock = clock;
+        this.patientActions = patientActions; this.proposals = proposals; this.clock = clock;
     }
 
     // ---------------- the contract the page renders ----------------
@@ -75,13 +82,68 @@ public class CaseActionService {
         String waitingReason = jdbc.sql("SELECT waiting_reason FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
 
         boolean patient = actor.has(ActorRole.PATIENT) || actor.has(ActorRole.PATIENT_REPRESENTATIVE);
-        if (patient) return new CaseActionsView(f.status(), waitingOn, waitingReason, none(), List.of(), List.of());
+        if (patient) return patientView(caseId, f, waitingOn, waitingReason, patientAction, blockers);
 
         boolean coordinator = actor.has(ActorRole.COORDINATOR) || actor.has(ActorRole.COORDINATOR_LEAD);
         boolean owned = coordinator && actor.subject().equals(f.coordinatorSubject());
         CurrentActionView current = currentAction(caseId, f, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
         List<String> available = coordinator && owned ? availableActions(caseId, f, patientAction, blockers) : List.of();
         return new CaseActionsView(f.status(), waitingOn, waitingReason, current, blockers, available);
+    }
+
+    // ---------------- the patient's own answer ----------------
+
+    /** Journey stages, in the patient's coarse vocabulary, that map to one "we are waiting on our side" step each. */
+    private static final Set<String> COORDINATOR_STAGES = Set.of("RECEIVED", "INTAKE_REVIEW", "READY_FOR_CONSULTANT");
+    private static final Set<String> CONSULTANT_STAGES = Set.of("CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW", "CLINICAL_RECOMMENDATION_READY");
+    private static final Set<String> PROPOSAL_STAGES = Set.of("PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL", "REVISION_REQUESTED", "PATIENT_DECISION", "EXPIRED");
+    /** Readiness steps only the signed-in patient can finish, in the order they should be asked for. */
+    private static final List<String> PATIENT_STEPS = List.of("PROFILE_NOT_ACTIVATED", "CONTACT_NOT_VERIFIED", "REPRESENTATIVE_AUTH_MISSING", "CONSENTS_INCOMPLETE", "IDENTITY_NOT_VERIFIED");
+
+    /**
+     * What the patient sees as "the current step": one authoritative answer, resolved here and rendered by
+     * the portal — never inferred there from the stage, the proposal or the deposit.
+     *
+     * <p>A FOCUS action exists only when the patient genuinely owes something: an open information request,
+     * a proposal waiting for their decision, or a readiness step only they can complete. Everything else is
+     * a WAIT that names whose move it is (our team, the consultant, the deposit being arranged on our side,
+     * treatment) so the page can say "no action is required from you" with confidence. The deposit is
+     * arranged offline by staff today, so it is a WAIT and never a "pay" action; a future online step would
+     * be a new FOCUS code from this same resolver.
+     */
+    private CaseActionsView patientView(UUID caseId, Facts f, String waitingOn, String waitingReason, PatientActionView patientAction, List<BlockerView> blockers) {
+        List<BlockerView> mine = blockers.stream().filter(b -> "PATIENT".equals(b.owner())).toList();
+        List<String> available = new ArrayList<>();
+        if (!TERMINAL.contains(f.status()) && f.coordinatorSubject() != null) available.add("MESSAGE_COORDINATOR");
+        CurrentActionView current = patientCurrentAction(caseId, f.status(), patientAction, mine);
+        return new CaseActionsView(f.status(), waitingOn, waitingReason, current, mine, available);
+    }
+
+    private CurrentActionView patientCurrentAction(UUID caseId, String status, PatientActionView patientAction, List<BlockerView> mine) {
+        if (patientAction != null) {
+            boolean overdue = patientAction.dueAt() != null && patientAction.dueAt().isBefore(clock.instant());
+            return new CurrentActionView("PROVIDE_INFORMATION", "FOCUS", patientAction.title(), patientAction.message(), patientAction.taskId(), null, "INFORMATION_REQUEST", patientAction.dueAt(), overdue, null);
+        }
+        if ("REVIEW_PROPOSAL".equals(proposals.state(caseId).action())) return simple("REVIEW_PROPOSAL", "FOCUS");
+        for (String code : PATIENT_STEPS) {
+            Optional<BlockerView> step = mine.stream().filter(b -> code.equals(b.code())).findFirst();
+            if (step.isPresent()) return new CurrentActionView(code.equals("IDENTITY_NOT_VERIFIED") ? "VERIFY_IDENTITY" : "COMPLETE_PROFILE", "FOCUS", null, null, null, null, null, null, false, code);
+        }
+        if (TERMINAL.contains(status) && !"EXPIRED".equals(status)) return none(); // an expired estimate is re-prepared, not closed
+        if (COORDINATOR_STAGES.contains(status)) return simple("WAIT_COORDINATOR_REVIEW", "WAIT");
+        if ("INFORMATION_REQUIRED".equals(status)) return simple("WAIT_COORDINATOR_REVIEW", "WAIT"); // answered, or asked on another channel
+        if (CONSULTANT_STAGES.contains(status)) return simple("WAIT_CONSULTANT_REVIEW", "WAIT");
+        if (PROPOSAL_STAGES.contains(status)) return simple("WAIT_PROPOSAL", "WAIT");
+        if ("ACCEPTED".equals(status)) {
+            String deposit = payment.depositStatusFor(caseId);
+            if (Set.of("REQUESTED", "PARTIALLY_PAID", "REQUIRED").contains(deposit)) return simple("WAIT_DEPOSIT_ARRANGEMENT", "WAIT");
+            return simple("WAIT_COORDINATION", "WAIT");
+        }
+        if ("TRAVEL_COORDINATION".equals(status)) return simple("WAIT_COORDINATION", "WAIT");
+        if ("ARRIVAL_CONFIRMED".equals(status)) return simple("WAIT_TREATMENT", "WAIT");
+        if ("TREATMENT_IN_PROGRESS".equals(status)) return simple("IN_TREATMENT", "WAIT");
+        if (Set.of("DISCHARGED", "FOLLOW_UP").contains(status)) return simple("FOLLOW_UP", "WAIT");
+        return none();
     }
 
     private CurrentActionView currentAction(UUID caseId, Facts f, ActorContext.Actor actor, boolean coordinator, boolean owned,
@@ -147,7 +209,7 @@ public class CaseActionService {
         String s = f.status();
         if (patientAction != null) {
             if (patientAction.items().stream().anyMatch(i -> !i.completed())) actions.add("RECORD_PATIENT_RESPONSE");
-        } else if (!TERMINAL.contains(s)) actions.add("REQUEST_INFORMATION");
+        } else if (!TERMINAL.contains(s) && !CONSULTANT_OWNED.contains(s)) actions.add("REQUEST_INFORMATION");
         Proposal p = latestProposal(caseId);
         if (p != null && Set.of("RELEASED", "VIEWED").contains(p.status())) actions.add("RESEND_PROPOSAL_LINK");
         if (blockers.stream().anyMatch(b -> "PROFILE_NOT_ACTIVATED".equals(b.code()))) actions.add("RESEND_ONBOARDING_LINK");

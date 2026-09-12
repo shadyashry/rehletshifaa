@@ -3,7 +3,7 @@
 # ALREADY-PERSISTED realm.
 #
 # Why this exists: `--import-realm` only seeds a realm the first time; it does NOT
-# re-apply realm settings (loginTheme, i18n) once the realm exists in the
+# re-apply realm settings (loginTheme, emailTheme, no self-registration, i18n) once the realm exists in the
 # keycloak-data volume. Fresh imports pick the theme up from realm-*.json; existing
 # realms need this one-shot admin update. Running it repeatedly is safe — it sets
 # the same values every time and never deletes anything (the volume is untouched).
@@ -40,8 +40,10 @@ kcadm config credentials --server http://localhost:8080 \
 
 kcadm update "realms/$REALM" \
   -s "loginTheme=$THEME" \
+  -s "emailTheme=$THEME" \
+  -s "registrationAllowed=false" \
   -s "internationalizationEnabled=true" \
   -s 'supportedLocales=["en","ar"]' \
   -s "defaultLocale=en"
 
-echo "Applied loginTheme='$THEME' + EN/AR i18n to realm '$REALM'. Reload the login page (theme cache is off in dev)."
+echo "Applied loginTheme + emailTheme='$THEME' + EN/AR i18n to realm '$REALM'. Reload the login page (theme cache is off in dev)."

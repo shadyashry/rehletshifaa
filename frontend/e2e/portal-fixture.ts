@@ -11,7 +11,7 @@ const actionsFor=(c:{status:string;coordinatorSubject?:string},viewer:string)=>(
   currentAction:!c.coordinatorSubject?{code:"CLAIM_CASE",kind:"CLAIM"}:c.coordinatorSubject!==viewer?{code:"VIEW_ONLY",kind:"NONE"}:{code:"ASSIGN_CONSULTANT",kind:"FOCUS"},
   availableActions:c.coordinatorSubject===viewer?["REQUEST_INFORMATION","ASSIGN_CONSULTANT","SET_TRAVEL_PACKAGE","CANCEL_CASE"]:[]});
 export const portalAlerts=(page:Page)=>page.locator('[role="alert"]:not(#__next-route-announcer__)');
-export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean}={}){
+export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean;pendingWork?:boolean}={}){
   const roles=role==="COORDINATOR_LEAD"?["COORDINATOR",role]:[role];
   await page.addInitScript(({roles,subject,authority})=>{
     const value=JSON.stringify({access_token:"synthetic-test-token",token_type:"Bearer",scope:"openid profile email",profile:{sub:subject,name:"Layla Hassan",email:"layla@example.test",roles},expires_at:Math.floor(Date.now()/1000)+3600});
@@ -42,9 +42,14 @@ export async function setupPortal(page:Page, role="COORDINATOR", options:{docume
       cases=cases.map(c=>c.id==="unowned"?{...c,coordinatorSubject:subject,patientName:"New Patient",status:"INTAKE_REVIEW"}:c);
       return reply({id:"assignment",status:"ACTIVE"});
     }
+    if(api==="/patient/account/session")return reply({linked:true,currentCaseId:"owned",accountStatus:"ACTIVE",pendingLinkRequests:0});
+    if(api==="/patient/account/profile")return reply({givenName:"Maya",familyName:"Example",displayName:"Maya Example",country:"Kenya",preferredLanguage:"en",email:"maya@example.test",emailVerified:true,whatsappNumber:"+254700000000",phoneVerified:true,accountStatus:"ACTIVE"});
     if(api==="/tasks/mine")return reply([]);
+    // A pending consultant assignment is work, not yet one of "my cases": it is reachable only from My Work.
+    if(api==="/work/mine")return reply(options.pendingWork?[{id:"w-pending",caseId:"pending",caseNumber:"RS-2026-000009",patientName:"Nour Example",caseStatus:"CONSULTANT_ASSIGNMENT_PENDING",waitingOn:"CONSULTANT",careCategory:"cardiology",coordinatorName:"Layla Hassan",documentCount:1,type:"CONSULTANT_ASSIGNMENT",title:"New clinical assignment",context:"You have been assigned case RS-2026-000009 for clinical review.",priority:"NORMAL",status:"OPEN",blocking:false,dueAt:null,overdue:false,createdAt:stamp,version:0}]:[]);
+    if(api.endsWith("/cases/pending"))return reply({caseSummary:{...baseCase,id:"pending",caseNumber:"RS-2026-000009",patientName:"Nour Example",status:"CONSULTANT_ASSIGNMENT_PENDING",coordinatorSubject:"owner",coordinatorName:"Layla Hassan",waitingOn:"CONSULTANT"},actions:{journeyStage:"CONSULTANT_ASSIGNMENT_PENDING",waitingOn:"CONSULTANT",blockers:[],currentAction:{code:"ACCEPT_ASSIGNMENT",kind:"ACCEPT"},availableActions:[]},intakeSummary:"Cardiac reports submitted for review.",timeline:[{type:"STATUS",label:"Received",status:"RECEIVED",occurredAt:stamp}],tasks:[],messages:[],assignments:[{id:"a-pending",assigneeSubject:subject,assigneeName:"Dr Layla Hassan",assigneeRole:"DOCTOR",assignmentType:"PRIMARY",status:"PENDING",assignedAt:stamp,version:0}],clinicalReviews:[]});
     if(api.endsWith("/cases"))return reply(cases);
-    if(api.endsWith("/documents"))return options.documentsFail?reply({message:"Documents temporarily unavailable"},503):reply(options.reviews?[{documentId:"doc",fileName:"Clinical report.pdf",contentType:"application/pdf",sizeBytes:1024,status:"CLEAN",createdAt:stamp}]:[]);
+    if(api.endsWith("/documents"))return options.documentsFail?reply({message:"Documents temporarily unavailable"},503):reply(options.reviews||options.pendingWork?[{documentId:"doc",fileName:"Clinical report.pdf",contentType:"application/pdf",sizeBytes:1024,status:"CLEAN",createdAt:stamp}]:[]);
     if(/\/cases\/(owned|unowned|team)$/.test(api)){const c=cases.find(c=>api.endsWith(c.id))!;return reply({caseSummary:c,actions:actionsFor(c,subject),intakeSummary:"Cardiac reports submitted for review.",timeline:[{type:"STATUS",label:"Received",status:"RECEIVED",occurredAt:stamp}],tasks:[],messages:[],assignments:[],clinicalReviews:options.reviews?[{id:"review",versionNumber:1,status:"APPROVED",recommendedTreatment:"Review finding visible to the care team",createdAt:stamp}]:[]});}
     if(api.endsWith("/messages"))return options.saveFail?reply({message:"Unable to save changes"},500):reply({id:"message",status:"SENT"});
     if(api.endsWith("/me"))return reply({displayName:"Layla Hassan",specialty:"Cardiology"});

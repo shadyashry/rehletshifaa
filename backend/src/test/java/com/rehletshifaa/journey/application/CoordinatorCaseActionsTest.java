@@ -308,7 +308,7 @@ class CoordinatorCaseActionsTest {
 
     /** The consultant accepted the case through the decision path that hands "prepare the proposal" to the coordinator. */
     private Recommended recommended() throws Exception {
-        var created = cases.create(new CreateCaseRequest("Case Patient", "Kenya", "+254700000020", "Cardiac reports", "en", true, null, "link@local.test", "Africa/Nairobi", "cardiology"));
+        var created = cases.create(new CreateCaseRequest("Case", "Patient", "Kenya", "+254700000020", "Cardiac reports", "en", true, null, "link@local.test", "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject", "COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
@@ -347,7 +347,7 @@ class CoordinatorCaseActionsTest {
     }
 
     private ProfileActivationRequest request(String phone) {
-        return new ProfileActivationRequest("Case Patient", "link@local.test", phone, LocalDate.of(1990, 1, 1), "KE", "KE", "en", "MALE",
+        return new ProfileActivationRequest("Case", "Patient", null, null, "link@local.test", phone, "PATIENT", LocalDate.of(1990, 1, 1), "KE", "KE", "en", "MALE",
                 List.of("PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS"));
     }
 

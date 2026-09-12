@@ -20,6 +20,8 @@ public class PublicCaseController {
     @PostMapping("/{token}/request-access") public CaseAccessSummary requestAccess(@PathVariable String token,@RequestBody(required=false) @Valid com.rehletshifaa.journey.api.JourneyDtos.ProposalAccessRequest request){return service.requestAccess(token,request==null?null:request.channel());}
     @PostMapping("/{token}/verify") public CaseAccessGrant verify(@PathVariable String token,@Valid @RequestBody CaseAccessVerifyRequest request){return service.verify(token,request.code());}
     @PostMapping("/{token}/view") public PublicCaseStatus view(@PathVariable String token,@Valid @RequestBody CaseAccessRequest request){return service.view(token,request.grant());}
+    /** Opens the current patient-visible proposal from a verified status session (no second code). */
+    @PostMapping("/{token}/proposal-access") public com.rehletshifaa.journey.api.JourneyDtos.ProposalAccessHandoff proposalAccess(@PathVariable String token,@Valid @RequestBody CaseAccessRequest request){return service.proposalAccess(token,request.grant());}
     @PostMapping("/{token}/respond") public UUID respond(@PathVariable String token,@Valid @RequestBody InformationResponseRequest request){return service.respond(token,request);}
     @PostMapping("/{token}/documents/presign") public DocumentDtos.PresignResponse presign(@PathVariable String token,@RequestHeader("X-Case-Grant")String grant,@Valid @RequestBody DocumentDtos.PresignRequest request){return service.presign(token,grant,request);}
     @PostMapping("/{token}/documents/confirm") public DocumentDtos.ConfirmResponse confirm(@PathVariable String token,@RequestHeader("X-Case-Grant")String grant,@Valid @RequestBody DocumentDtos.ConfirmRequest request){return service.confirm(token,grant,request);}

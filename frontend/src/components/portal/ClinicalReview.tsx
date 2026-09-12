@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { scrollIntoView } from "@/lib/scroll";
 import { FileText } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
@@ -65,6 +66,10 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
   const [outcome, setOutcome] = useState<Outcome | "">("");
   const [outcomeReason, setOutcomeReason] = useState("");
   const [error, setError] = useState("");
+  // Field-level validation mirrors the server rule (CLINICAL_RECOMMENDATION_REQUIRED) so the consultant is
+  // told next to the field, before the round trip; the server still decides.
+  const [recommendationError, setRecommendationError] = useState("");
+  const recommendationRef = useRef<HTMLTextAreaElement>(null);
 
   const rate = proposalCurrency === BASE ? 1 : (fxRates.find(fx => fx.currency === proposalCurrency)?.rate ?? 1);
   const converted = proposalCurrency !== BASE && rate !== 1;
@@ -90,7 +95,14 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
   ];
 
   const submit = () => {
-    if (!canSubmit) { setError(recommendation.trim() ? t.errServices : t.errRecommendation); return; }
+    if (!recommendation.trim()) {
+      setRecommendationError(t.errRecommendation); setError("");
+      recommendationRef.current?.focus();
+      scrollIntoView(recommendationRef.current, { behavior: "smooth", block: "center" });
+      return;
+    }
+    setRecommendationError("");
+    if (!canSubmit) { setError(t.errServices); return; }
     setError("");
     void mutate(`/doctor/cases/${caseId}/review-decision`, {
       decision: "ACCEPT", recommendedTreatment: recommendation.trim(), proposalCurrency,
@@ -152,11 +164,18 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
       </section>
 
       <div className="mt-5">
-        <label htmlFor="clinical-recommendation" className="block text-[0.95rem] font-bold text-ink-900">{t.recommendation}</label>
-        <p id="clinical-recommendation-hint" className="mt-0.5 text-[0.85rem] leading-6 text-ink-600">{t.recommendationHint}</p>
-        <textarea id="clinical-recommendation" className="field mt-2 min-h-32" maxLength={20000} value={recommendation}
-                  aria-describedby="clinical-recommendation-hint" aria-required="true"
-                  onChange={event => setRecommendation(event.target.value)} placeholder={t.recommendationPlaceholder}/>
+        {/* The asterisk sits beside the label, not inside it: the accessible name stays clean and required-ness is carried by the attributes. */}
+        <div className="flex items-baseline gap-1">
+          <label htmlFor="clinical-recommendation" className="block text-[0.95rem] font-bold text-ink-900">{t.recommendation}</label>
+          <span className="text-alert-600" aria-hidden>*</span>
+        </div>
+        <p id="clinical-recommendation-hint" className="mt-0.5 text-[0.85rem] leading-6 text-ink-600">{t.recommendationHint} <span className="text-ink-500">{t.requiredLegend}</span></p>
+        <textarea id="clinical-recommendation" ref={recommendationRef} className={`field mt-2 min-h-32 ${recommendationError ? "field-error" : ""}`} maxLength={20000} value={recommendation}
+                  aria-describedby={recommendationError ? "clinical-recommendation-error clinical-recommendation-hint" : "clinical-recommendation-hint"}
+                  aria-required="true" required aria-invalid={recommendationError ? true : undefined}
+                  onChange={event => { setRecommendation(event.target.value); if (recommendationError && event.target.value.trim()) setRecommendationError(""); }}
+                  placeholder={t.recommendationPlaceholder}/>
+        {recommendationError && <p id="clinical-recommendation-error" role="alert" className="error-text mt-1">{recommendationError}</p>}
       </div>
 
       <section aria-labelledby="recommended-services" className="mt-5 rounded-xl border border-line p-4">
@@ -273,7 +292,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
         {error && <p role="alert" className="mt-3 rounded-lg border border-alert-200 bg-white px-3 py-2 text-[0.85rem] font-semibold text-alert-700">{error}</p>}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button type="button" className="btn-primary" disabled={busy || !canSubmit} onClick={submit}>{t.submit}</button>
+          <button type="button" className="btn-primary" disabled={busy} onClick={submit}>{t.submit}</button>
           <button type="button" className="btn-secondary" disabled={busy} onClick={saveDraft}>{t.saveDraft}</button>
         </div>
       </section>
@@ -330,6 +349,7 @@ function copy(ar: boolean) {
     scanning: "جارٍ الفحص الأمني", unavailable: "غير متاح",
     recommendation: "التوصية السريرية",
     recommendationHint: "لخّص العلاج أو الإجراء الذي توصي به لهذه الحالة.",
+    requiredLegend: "(* مطلوب قبل الإرسال)",
     recommendationPlaceholder: "مثال: زراعة منظم ضربات قلب ثنائي الحجرة",
     services: "الخدمات الموصى بها والتقدير",
     servicesHint: "اختر الخدمات التي توصي بها لهذه الحالة. الأسعار مأخوذة من قائمة خدماتك المعتمدة.",
@@ -379,6 +399,7 @@ function copy(ar: boolean) {
     scanning: "Security scan in progress", unavailable: "Unavailable",
     recommendation: "Clinical recommendation",
     recommendationHint: "Summarise the treatment or procedure you recommend for this case.",
+    requiredLegend: "(* Required before submitting)",
     recommendationPlaceholder: "For example: dual-chamber pacemaker implantation",
     services: "Recommended services & estimate",
     servicesHint: "Select the services you recommend for this case. Prices are taken from your approved service list.",

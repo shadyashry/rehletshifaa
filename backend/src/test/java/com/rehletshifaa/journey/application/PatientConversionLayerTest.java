@@ -285,7 +285,7 @@ class PatientConversionLayerTest {
 
     private Ctx releasePreliminary() throws Exception { return releasePreliminary("+254700000020", "link@local.test"); }
     private Ctx releasePreliminary(String whatsapp, String email) throws Exception {
-        var created = cases.create(new CreateCaseRequest("Link Patient", "Kenya", whatsapp, "Cardiac reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
+        var created = cases.create(new CreateCaseRequest("Link", "Patient", "Kenya", whatsapp, "Cardiac reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
         authenticate("coordinator-subject", "COORDINATOR");

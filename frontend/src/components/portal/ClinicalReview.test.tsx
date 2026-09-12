@@ -81,14 +81,30 @@ describe("ClinicalReviewPanel", () => {
     expect((screen.getByLabelText("Proposal currency") as HTMLSelectElement).value).toBe("USD");
   });
 
-  it("will not submit without a recommendation and at least one service", () => {
+  it("marks the clinical recommendation as required and explains a missing one next to the field", () => {
     const { mutate } = setup();
-    expect(screen.getByRole("button", { name: "Submit recommendation" }).hasAttribute("disabled")).toBe(true);
-    fireEvent.change(screen.getByLabelText("Clinical recommendation"), { target: { value: "Pacemaker implantation" } });
-    expect(screen.getByRole("button", { name: "Submit recommendation" }).hasAttribute("disabled")).toBe(true);
-    fireEvent.click(screen.getByRole("checkbox", { name: /Echocardiogram/ }));
-    expect(screen.getByRole("button", { name: "Submit recommendation" }).hasAttribute("disabled")).toBe(false);
+    const field = screen.getByLabelText("Clinical recommendation") as HTMLTextAreaElement;
+    // Required before submission, and said so accessibly — not only with an asterisk.
+    expect(field.required).toBe(true);
+    expect(field.getAttribute("aria-required")).toBe("true");
+    expect(screen.getByText("(* Required before submitting)")).toBeTruthy();
+    // Submitting empty explains at the field, moves focus there, and never reaches the API.
+    fireEvent.click(screen.getByRole("button", { name: "Submit recommendation" }));
+    const error = screen.getByRole("alert");
+    expect(error.textContent).toContain("Record your clinical recommendation before submitting.");
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toContain(error.id);
+    expect(document.activeElement).toBe(field);
     expect(mutate).not.toHaveBeenCalled();
+    // Typing clears the field error; a missing service is still reported, still without an API call.
+    fireEvent.change(field, { target: { value: "Pacemaker implantation" } });
+    expect(field.getAttribute("aria-invalid")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Submit recommendation" }));
+    expect(screen.getByRole("alert").textContent).toContain("Select at least one recommended service before submitting.");
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Echocardiogram/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit recommendation" }));
+    expect(mutate).toHaveBeenCalledTimes(1);
   });
 
   it("treats an off-list service as an exception that Finance must approve", () => {

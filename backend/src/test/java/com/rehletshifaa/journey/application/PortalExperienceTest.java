@@ -27,7 +27,7 @@ class PortalExperienceTest {
     @Autowired CaseService cases; @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear(){SecurityContextHolder.clearContext();}
     private void auth(String subject,String...roles){var jwt=Jwt.withTokenValue("test").header("alg","none").subject(subject).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,Arrays.stream(roles).map(r->new SimpleGrantedAuthority("ROLE_"+r)).toList()));}
-    private UUID intake(){var result=cases.create(new CreateCaseRequest("Private Patient","Kenya","+254700000023","Needs cardiac review","en",true,null,null,null,"cardiology"));cases.submit(result.caseId());em.flush();em.clear();return result.caseId();}
+    private UUID intake(){var result=cases.create(new CreateCaseRequest("Private", "Patient","Kenya","+254700000023","Needs cardiac review","en",true,null,null,null,"cardiology"));cases.submit(result.caseId());em.flush();em.clear();return result.caseId();}
     private void member(String subject,boolean lead){jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),subject,lead?"COORDINATOR_LEAD":"COORDINATOR",crypto.encrypt(subject),Instant.now(),Instant.now());}
     private void report(String person,String manager){auth("admin","SYSTEM_ADMIN");portal.updateReporting(person,new ReportingRequest(manager,"Team setup"));}
 

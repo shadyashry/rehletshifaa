@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, UserRound, X } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 import { localeHref, type NavItem } from "@/lib/links";
@@ -18,6 +18,8 @@ type MobileNavProps = {
     close: string;
     nav: string;
     send: string;
+    signIn: string;
+    signInHint: string;
     language: string;
     languageAria: string;
   };
@@ -58,30 +60,11 @@ export function MobileNav({ locale, items, labels }: MobileNavProps) {
 
       <div
         id={panelId}
-        className="absolute inset-x-0 top-full z-50 border-b border-line bg-white shadow-[0_18px_40px_-24px_rgba(8,38,59,0.45)]"
+        className="absolute inset-x-0 top-full z-50 border-b border-line bg-surface-pearl shadow-[0_18px_40px_-24px_rgba(8,38,59,0.35)]"
       >
         <div className="container-site py-3">
-          <nav aria-label={labels.nav} className="grid gap-1">
-            {items.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={close}
-                aria-current={pathname === item.href ? "page" : undefined}
-                className="relative z-10 block min-h-12 touch-manipulation rounded-md px-3 py-3 text-[1rem] font-medium text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="mt-2 grid gap-2.5 border-t border-line pt-3">
-            <LocaleSwitch
-              locale={locale}
-              label={labels.language}
-              ariaLabel={labels.languageAria}
-              className="justify-start"
-              onClick={close}
-            />
+          {/* Actions first — the primary conversion, then the outlined account action — then the destinations. */}
+          <div className="grid gap-2.5 pb-3">
             <TrackedLink
               event="send_case_cta_clicked"
               className="btn-primary w-full"
@@ -90,6 +73,37 @@ export function MobileNav({ locale, items, labels }: MobileNavProps) {
             >
               {labels.send}
             </TrackedLink>
+            <Link
+              href={localeHref(locale, "portal") + "?signin=1"}
+              onClick={close}
+              title={labels.signInHint}
+              className="btn-outline w-full min-h-12"
+            >
+              <UserRound size={17} strokeWidth={1.9} aria-hidden="true" />
+              {labels.signIn}
+            </Link>
+          </div>
+          <nav aria-label={labels.nav} className="grid gap-1 border-t border-line pt-2">
+            {items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={close}
+                aria-current={pathname === item.href ? "page" : undefined}
+                className="relative z-10 block min-h-12 touch-manipulation rounded-md px-3 py-3 text-[1rem] font-medium text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-800 aria-[current=page]:text-brand-900"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+          <div className="mt-1 border-t border-line pt-2">
+            <LocaleSwitch
+              locale={locale}
+              label={labels.language}
+              ariaLabel={labels.languageAria}
+              className="justify-start"
+              onClick={close}
+            />
           </div>
         </div>
       </div>

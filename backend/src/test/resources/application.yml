@@ -32,3 +32,6 @@ app:
   currency:
     enabled: false
     supported: EGP,USD,EUR,SAR,AED,GBP
+
+  identity-admin:
+    mode: simulator

@@ -3,6 +3,7 @@
   "enabled": true,
   "displayName": "RehletShifaa Local",
   "loginTheme": "rehletshifaa",
+  "emailTheme": "rehletshifaa",
   "internationalizationEnabled": true,
   "supportedLocales": [
     "en",
@@ -18,7 +19,7 @@
     "auth": "false",
     "starttls": "false"
   },
-  "registrationAllowed": true,
+  "registrationAllowed": false,
   "resetPasswordAllowed": true,
   "loginWithEmailAllowed": true,
   "defaultRoles": [
@@ -254,6 +255,7 @@
       "clientRoles": {
         "realm-management": [
           "manage-users",
+          "view-realm",
           "view-users",
           "query-users"
         ]

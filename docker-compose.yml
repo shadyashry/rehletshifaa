@@ -99,7 +99,7 @@ services:
       MAIL_MODE: smtp
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
-      COORDINATOR_EMAIL: coordinator@local.test
+      COORDINATOR_EMAIL: coordination-team@local.test
       MAIL_FROM: no-reply@local.test
       IDENTITY_ADMIN_BASE_URL: http://keycloak:8080
       IDENTITY_ADMIN_CLIENT_ID: staff-identity-admin

@@ -66,6 +66,15 @@ public class PublicOnboardingController {
         return activation.portalAccess(token, request.grant());
     }
 
+    /**
+     * "Send me a new account setup link." Resumes the existing identity account's setup (or re-sends the
+     * neutral continuation link when the address already belongs to an account). Never creates a second account.
+     */
+    @PostMapping("/{token}/resend-setup")
+    public AccountSetup resendSetup(@PathVariable String token, @Valid @RequestBody GrantRequest request) {
+        return activation.resendAccountSetup(token, request.grant());
+    }
+
     /** Authoritative deposit for this case — amount and currency are resolved server-side only. */
     @PostMapping("/{token}/deposit")
     public DepositSummary deposit(@PathVariable String token, @Valid @RequestBody GrantRequest request) {

@@ -74,7 +74,7 @@ public class PatientActionService {
             jdbc.sql("INSERT INTO case_tasks(id,case_id,task_type,title,description,owner_subject,owner_role,visibility_scope,priority,status,blocking,due_at,created_by,created_at,updated_at,version) "
                             + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
                     .params(taskId, caseId, TASK_TYPE, encrypt(title(language)), encryptNullable(message), null, "PATIENT",
-                            "PATIENT_ACTION", "HIGH", "OPEN", command.blocking(), timestamp(command.dueAt()),
+                            "PATIENT_ACTION", StaffWorkService.derivePriority(command.blocking(), command.dueAt(), now), "OPEN", command.blocking(), timestamp(command.dueAt()),
                             actorSubject, timestamp(now), timestamp(now))
                     .update();
         } else {
@@ -232,10 +232,10 @@ public class PatientActionService {
         restoreStage(caseId);
         String coordinator = jdbc.sql("SELECT assignee_subject FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' ORDER BY assigned_at DESC LIMIT 1")
                 .param(caseId).query(String.class).optional().orElse(null);
-        String patient = jdbc.sql("SELECT p.full_name FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?")
+        String patient = jdbc.sql("SELECT " + com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL + " FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?")
                 .param(caseId).query(String.class).optional().orElse(null);
         work.openWorkItem(new NewWorkItem(caseId, REVIEW_TYPE, "Review information provided by the patient",
-                summary(patient, note), coordinator, "COORDINATOR", "HIGH", false, null, "SYSTEM",
+                summary(patient, note), coordinator, "COORDINATOR", false, null, "SYSTEM",
                 "PATIENT_RESPONDED", "patient-response:" + taskId, true));
     }
 

@@ -27,7 +27,7 @@ class JourneyServiceIntegrationTest {
     @AfterEach void clearSecurity(){SecurityContextHolder.clearContext();}
 
     @Test void completesClaimAssignmentClinicalProposalAndDecisionFlow()throws Exception{
-        var created=cases.create(new CreateCaseRequest("Patient One","Kenya","+254700000001","Cardiac reports","en",true,null,"patient@local.test","Africa/Nairobi","cardiology"));
+        var created=cases.create(new CreateCaseRequest("Patient", "One","Kenya","+254700000001","Cardiac reports","en",true,null,"patient@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());
         entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
@@ -60,7 +60,7 @@ class JourneyServiceIntegrationTest {
     }
 
     @Test void fastLaneReleasesCatalogOnlyProposalWithoutOpsOrFinance()throws Exception{
-        var created=cases.create(new CreateCaseRequest("Fast Patient","Kenya","+254700000099","Cardiac reports","en",true,null,"fast@local.test","Africa/Nairobi","cardiology"));
+        var created=cases.create(new CreateCaseRequest("Fast", "Patient","Kenya","+254700000099","Cardiac reports","en",true,null,"fast@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         // travel_package_requested stays false -> Operations not required.
@@ -87,7 +87,7 @@ class JourneyServiceIntegrationTest {
     }
 
     @Test void acknowledgementCreatesDepositIdempotentAndAuthorizedPayments()throws Exception{
-        var created=cases.create(new CreateCaseRequest("Deposit Patient","Kenya","+254700000092","Cardiac reports","en",true,null,"dep@local.test","Africa/Nairobi","cardiology"));
+        var created=cases.create(new CreateCaseRequest("Deposit", "Patient","Kenya","+254700000092","Cardiac reports","en",true,null,"dep@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         authenticate("coordinator-subject","COORDINATOR");journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
@@ -127,7 +127,7 @@ class JourneyServiceIntegrationTest {
     }
 
     @Test void resendRefreshesLinkWithoutNewVersionOrTransition()throws Exception{
-        var created=cases.create(new CreateCaseRequest("Resend Patient","Kenya","+254700000091","Cardiac reports","en",true,null,"rs@local.test","Africa/Nairobi","cardiology"));
+        var created=cases.create(new CreateCaseRequest("Resend", "Patient","Kenya","+254700000091","Cardiac reports","en",true,null,"rs@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         authenticate("coordinator-subject","COORDINATOR");journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
@@ -160,7 +160,7 @@ class JourneyServiceIntegrationTest {
     }
 
     @Test void proposalConvertsEgpBaseToDisplayCurrencyAndFreezesAtRelease()throws Exception{
-        var created=cases.create(new CreateCaseRequest("FX Patient","Kuwait","+96500000010","Cardiac reports","en",true,null,"fx@local.test","Asia/Kuwait","cardiology"));
+        var created=cases.create(new CreateCaseRequest("FX", "Patient","Kuwait","+96500000010","Cardiac reports","en",true,null,"fx@local.test","Asia/Kuwait","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         authenticate("coordinator-subject","COORDINATOR");journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
@@ -187,7 +187,7 @@ class JourneyServiceIntegrationTest {
     }
 
     @Test void manualNoTravelRequiresFinanceFromClinicallyApprovedAndGatesReflectIt()throws Exception{
-        var created=cases.create(new CreateCaseRequest("Manual Patient","Kenya","+254700000055","Cardiac reports","en",true,null,"m@local.test","Africa/Nairobi","cardiology"));
+        var created=cases.create(new CreateCaseRequest("Manual", "Patient","Kenya","+254700000055","Cardiac reports","en",true,null,"m@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         // travel stays false -> Operations not required.
@@ -220,7 +220,7 @@ class JourneyServiceIntegrationTest {
     }
 
     @Test void appliesCentralMarginPolicyDeterministicallyAndSnapshotsIt()throws Exception{
-        var created=cases.create(new CreateCaseRequest("Margin Patient","Kenya","+254700000077","Cardiac reports","en",true,null,"mg@local.test","Africa/Nairobi","cardiology"));
+        var created=cases.create(new CreateCaseRequest("Margin", "Patient","Kenya","+254700000077","Cardiac reports","en",true,null,"mg@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         authenticate("coordinator-subject","COORDINATOR");journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
@@ -251,7 +251,7 @@ class JourneyServiceIntegrationTest {
     }
 
     private UUID arriveWithDoctor(String name,String phone,String email)throws Exception{
-        var created=cases.create(new CreateCaseRequest(name,"Kenya",phone,"Cardiac reports","en",true,null,email,"Africa/Nairobi","cardiology"));
+        var created=cases.create(new CreateCaseRequest(name,"Patient","Kenya",phone,"Cardiac reports","en",true,null,email,"Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         UUID practitionerId=UUID.randomUUID();
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",practitionerId,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());
@@ -282,7 +282,7 @@ class JourneyServiceIntegrationTest {
     }
 
     @Test void finalQuoteStaysAtArrivalConfirmedAndReducesWithScope()throws Exception{
-        var created=cases.create(new CreateCaseRequest("Final Patient","Kenya","+254700000090","Cardiac reports","en",true,null,"fq2@local.test","Africa/Nairobi","cardiology"));
+        var created=cases.create(new CreateCaseRequest("Final", "Patient","Kenya","+254700000090","Cardiac reports","en",true,null,"fq2@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         authenticate("coordinator-subject","COORDINATOR");journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");

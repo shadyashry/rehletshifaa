@@ -22,9 +22,13 @@ public final class WorkDtos {
                                String status, boolean blocking, Instant dueAt, boolean overdue, Instant createdAt,
                                long version) {}
 
-    /** Internal command for opening a work item; never bound from a request body. */
+    /**
+     * Internal command for opening a work item; never bound from a request body. It carries no priority:
+     * the work service derives it from real conditions (blocking, due date), so no caller can mark routine
+     * work "high" merely because it is new.
+     */
     public record NewWorkItem(UUID caseId, String type, String title, String context, String ownerSubject,
-                              String ownerRole, String priority, boolean blocking, Instant dueAt, String createdBy,
+                              String ownerRole, boolean blocking, Instant dueAt, String createdBy,
                               String eventType, String idempotencyKey, boolean email) {}
 
     public record NotificationView(UUID id, UUID caseId, String caseNumber, UUID taskId, String eventType,

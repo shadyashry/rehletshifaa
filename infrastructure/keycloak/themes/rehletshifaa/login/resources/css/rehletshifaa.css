@@ -192,6 +192,60 @@ html[dir="rtl"] .pf-c-button.pf-m-control {
   --pf-c-form-control--focus--BorderBottomColor: var(--rs-teal);
 }
 
+/* ---- Sign-in errors: one calm message, quiet fields ----
+   PatternFly's invalid state paints a red exclamation icon inside the field, thickens the bottom border
+   and pads the text away from it; against the rounded cream inputs above that read as a malformed field,
+   and in RTL the icon sat under the typed characters. The semantics stay (aria-invalid, aria-live); only
+   the presentation changes: a thin danger border, no icon, and one concise line of text beneath. */
+.pf-c-form-control[aria-invalid="true"],
+input.form-control[aria-invalid="true"] {
+  --pf-c-form-control--invalid--BackgroundUrl: none;
+  --pf-c-form-control--invalid--BorderBottomWidth: 1px;
+  --pf-c-form-control--invalid--PaddingRight: var(--pf-c-form-control--PaddingRight, 0.5rem);
+  --pf-c-form-control--invalid--PaddingBottom: var(--pf-c-form-control--PaddingBottom, 0.375rem);
+  border: 1px solid var(--rs-danger);
+  background-image: none;
+  box-shadow: 0 0 0 3px rgba(178, 58, 72, 0.12);
+}
+
+.pf-c-form-control[aria-invalid="true"]:focus,
+input.form-control[aria-invalid="true"]:focus {
+  border-color: var(--rs-danger);
+  background: var(--rs-surface);
+  box-shadow: 0 0 0 3px rgba(178, 58, 72, 0.2);
+}
+
+/* aria-invalid="" (no error) must look like a normal field: PatternFly only styles the "true" value. */
+.pf-c-form-control[aria-invalid=""] {
+  background-image: none;
+}
+
+/* The single sign-in error line rendered by the login form (id="input-error"). */
+#input-error,
+.pf-c-form__helper-text.pf-m-error,
+.kc-feedback-text.pf-m-error {
+  display: block;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--rs-danger);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* The "required" hook on the error span is a class name, not a marker: never paint an asterisk. */
+.pf-c-form__helper-text.required::before,
+.pf-c-form__helper-text.required::after {
+  content: none;
+}
+
+/* The classic theme's form group keeps a bottom margin; the error line must not double it. */
+#kc-form-login .form-group #input-error {
+  margin-bottom: 0;
+}
+
 /* Links */
 a,
 #kc-registration a,
@@ -266,6 +320,13 @@ html[dir="rtl"] .card-pf,
 html[dir="rtl"] input.form-control,
 html[dir="rtl"] .pf-c-form-control {
   text-align: right;
+}
+
+/* The username field is forced dir="ltr" by Keycloak while the page is RTL: keep the value off the border. */
+html[dir="rtl"] input.pf-c-form-control,
+html[dir="rtl"] input.form-control {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
 }
 
 html[dir="rtl"] #kc-locale {

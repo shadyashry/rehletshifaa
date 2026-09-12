@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { FileUp, LockKeyhole, ShieldCheck, X } from "lucide-react";
 
 import { PatientJourneyTracker, phaseExplanation } from "@/components/PatientJourneyTracker";
@@ -11,7 +12,11 @@ import { apiUrl } from "@/lib/api";
 type Summary = { caseNumber: string; destinationHint: string };
 type ActionItem = { id: string; kind: "INFORMATION" | "DOCUMENT"; code: string; label: string; required: boolean; completed: boolean; response: string | null };
 type Action = { taskId: string; title: string; message: string | null; blocking: boolean; dueAt: string | null; items: ActionItem[] };
-type Status = { caseNumber: string; statusEn: string; statusAr: string; phase?: string | null; actionRequired: boolean; action: Action | null };
+type ProposalState = { state: string; action: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionNumber: number | null; validUntil: string | null; decidedAt: string | null };
+type Status = { caseNumber: string; statusEn: string; statusAr: string; phase?: string | null; actionRequired: boolean; action: Action | null; proposal?: ProposalState | null };
+type ProposalHandoff = { token: string; grant: string; expiresAt: string };
+/** Hands the already-verified proposal grant to the proposal page in this browser session only — never through the URL. */
+export const PROPOSAL_HANDOFF_KEY = (token: string) => `rs-proposal-grant:${token}`;
 type Presign = { documentId: string; uploadUrl: string; requiredHeaders: Record<string, string> };
 
 
@@ -30,6 +35,17 @@ const copy = {
     invalid: "This secure link is invalid or has expired.", error: "The request could not be completed. Please try again.",
     fix: "Please complete the highlighted items.", missing: "Please provide this information.", missingFile: "Please upload the requested document.",
     due: "Needed by",
+    proposalTitle: "Your proposal",
+    proposalPreparing: "Your proposal is being prepared. We will send you a secure link as soon as it is ready.",
+    proposalReadyTitle: "Your proposal is ready to review", proposalReady: "Your treatment plan and its estimated cost are ready. Take the time you need — nothing happens until you decide.",
+    proposalReadyNext: "If you accept, we start arranging your care.", proposalPreparingTitle: "We are preparing your proposal", proposalPreparingNext: "You will receive a secure link to review it in your own time.",
+    proposalReview: "Review proposal", proposalOpening: "Opening…",
+    proposalAccepted: "You acknowledged your estimate. Your coordinator is arranging the next steps, and your proposal stays available in your secure portal.",
+    proposalDeclined: "You declined the proposal. Your coordinator remains available if anything changes.",
+    proposalRevision: "You asked for changes. Your coordinator is preparing a revised proposal and will send you a new secure link.",
+    proposalExpired: "This proposal has expired. Your coordinator can prepare an updated one for you.",
+    proposalVersion: (n: number) => `Version ${n}`, proposalValid: "Valid until",
+    proposalUnavailable: "This proposal is no longer available to review. Please refresh to see the latest status.",
   },
   ar: {
     title: "متابعة حالتك بأمان", loading: "جارٍ التحقق من الرابط الآمن…",
@@ -45,6 +61,17 @@ const copy = {
     invalid: "هذا الرابط الآمن غير صالح أو انتهت صلاحيته.", error: "تعذر إكمال الطلب. يرجى المحاولة مرة أخرى.",
     fix: "يرجى إكمال العناصر المحددة.", missing: "يرجى تقديم هذه المعلومة.", missingFile: "يرجى رفع المستند المطلوب.",
     due: "مطلوب قبل",
+    proposalTitle: "عرضك",
+    proposalPreparing: "يجري إعداد عرضك. سنرسل لك رابطًا آمنًا فور جاهزيته.",
+    proposalReadyTitle: "عرضك جاهز للمراجعة", proposalReady: "خطة علاجك وتكلفتها التقديرية جاهزة. خذ وقتك — لن يحدث شيء قبل أن تقرر.",
+    proposalReadyNext: "إذا وافقت، نبدأ ترتيب رعايتك.", proposalPreparingTitle: "نجهّز عرضك", proposalPreparingNext: "ستصلك رابطًا آمنًا لمراجعته في وقتك.",
+    proposalReview: "مراجعة العرض", proposalOpening: "جارٍ الفتح…",
+    proposalAccepted: "أقررت بتقديرك. يرتّب منسقك الخطوات التالية، ويبقى عرضك متاحًا في بوابتك الآمنة.",
+    proposalDeclined: "رفضت العرض. يبقى منسقك متاحًا إن تغيّر شيء.",
+    proposalRevision: "طلبت تعديلات. يجهّز منسقك عرضًا معدّلًا وسيرسل لك رابطًا آمنًا جديدًا.",
+    proposalExpired: "انتهت صلاحية هذا العرض. يمكن لمنسقك إعداد عرض محدّث لك.",
+    proposalVersion: (n: number) => `الإصدار ${n}`, proposalValid: "صالح حتى",
+    proposalUnavailable: "لم يعد هذا العرض متاحًا للمراجعة. يرجى التحديث للاطلاع على آخر حالة.",
   },
 };
 
@@ -57,6 +84,7 @@ const copy = {
  */
 export function CaseStatusAccess({ locale, token }: { locale: Locale; token: string }) {
   const t = copy[locale];
+  const router = useRouter();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [phase, setPhase] = useState<"loading" | "summary" | "code" | "view" | "done" | "invalid">("loading");
@@ -68,6 +96,24 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [opening, setOpening] = useState(false);
+
+  /**
+   * "Review proposal": the backend re-checks that a decidable version exists for THIS case and hands back a
+   * share token plus a view grant minted from the code just verified. The grant travels via sessionStorage,
+   * so the proposal page opens without a second code and no credential ever appears in a URL.
+   */
+  async function openProposal() {
+    setOpening(true); setError("");
+    try {
+      const handoff = await post<ProposalHandoff>(`/proposal-access`, { grant });
+      try { sessionStorage.setItem(PROPOSAL_HANDOFF_KEY(handoff.token), JSON.stringify({ grant: handoff.grant, expiresAt: handoff.expiresAt })); } catch {}
+      router.push(`/${locale}/proposal/${handoff.token}`);
+    } catch (e) {
+      setError(e instanceof Error && /available/i.test(e.message) ? t.proposalUnavailable : e instanceof Error ? e.message : t.error);
+      setOpening(false);
+    }
+  }
 
   useEffect(() => {
     fetch(apiUrl(`/public/cases/${token}`))
@@ -165,7 +211,12 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
   );
 
   const action = status?.action;
-  const explain = phaseExplanation(status?.phase, !!status?.actionRequired, locale);
+  // The proposal state refines the phase story so the page never says "being prepared, or ready" when the
+  // backend knows which — and never "no action is required" next to a decision that is waiting.
+  const proposalState = status?.actionRequired ? null : status?.proposal?.state ?? null;
+  const explain = proposalState === "READY" ? { title: t.proposalReadyTitle, body: t.proposalReady, next: t.proposalReadyNext }
+    : proposalState === "PREPARING" ? { title: t.proposalPreparingTitle, body: t.proposalPreparing, next: t.proposalPreparingNext }
+    : phaseExplanation(status?.phase, !!status?.actionRequired, locale);
   return (
     <Frame title={t.title}>
       {summary && <p className="mb-5 font-bold text-brand-800">{summary.caseNumber}</p>}
@@ -192,7 +243,7 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
           <p className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.now}</p>
           <h2 id="status-now" className="mt-1 text-[1.05rem] font-bold leading-6 text-brand-900">{explain.title}</h2>
           <p className="mt-1.5 leading-6 text-ink-700">{explain.body}</p>
-          {!status.actionRequired && <p className="mt-2 text-[0.9rem] font-semibold text-brand-800">{t.noAction}</p>}
+          {!status.actionRequired && proposalState !== "READY" && <p className="mt-2 text-[0.9rem] font-semibold text-brand-800">{t.noAction}</p>}
           {explain.next && (
             <p className="mt-3 border-t border-brand-200 pt-3 text-[0.88rem] leading-6 text-ink-600">
               <span className="font-bold text-ink-800">{t.next}:</span> {explain.next}
@@ -207,6 +258,27 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
         <p className="mt-5 text-[0.82rem] text-ink-500">
           {t.status}: <span className="font-semibold text-ink-700">{locale === "ar" ? status.statusAr : status.statusEn}</span>
         </p>
+
+        {/* The proposal, exactly as the backend says the patient may see it: one action when a version is
+            decidable, plain status otherwise — never a link that leads nowhere. "Being prepared" is told once,
+            in the box above, so no section is rendered for it. */}
+        {status.proposal && !["NONE", "PREPARING"].includes(status.proposal.state) && (
+          <section aria-labelledby="status-proposal" className="mt-5 rounded-xl border border-line p-4">
+            <p id="status-proposal" className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.proposalTitle}</p>
+            {status.proposal.state !== "READY" && <p className="mt-1 leading-6 text-ink-700">{proposalCopy(status.proposal.state, t)}</p>}
+            {status.proposal.versionNumber != null && status.proposal.state !== "REVISION_REQUESTED" && (
+              <p className="mt-1 text-[0.82rem] text-ink-500">
+                {t.proposalVersion(status.proposal.versionNumber)}
+                {status.proposal.validUntil && status.proposal.state === "READY" && <> · {t.proposalValid} {new Date(status.proposal.validUntil).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}</>}
+              </p>
+            )}
+            {status.proposal.action === "REVIEW_PROPOSAL" && (
+              <button type="button" className="btn-primary mt-4 w-full sm:w-auto" disabled={opening} onClick={() => void openProposal()}>
+                {opening ? t.proposalOpening : t.proposalReview}
+              </button>
+            )}
+          </section>
+        )}
 
         {status.actionRequired && (
           <form className="mt-8" onSubmit={submit} noValidate>
@@ -267,6 +339,17 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
       {error && <p role="alert" className="mt-5 rounded-xl bg-alert-50 p-4 text-alert-800">{error}</p>}
     </Frame>
   );
+}
+
+function proposalCopy(state: string, t: (typeof copy)["en"] | (typeof copy)["ar"]) {
+  switch (state) {
+    case "READY": return t.proposalReady;
+    case "ACCEPTED": return t.proposalAccepted;
+    case "DECLINED": return t.proposalDeclined;
+    case "REVISION_REQUESTED": return t.proposalRevision;
+    case "EXPIRED": return t.proposalExpired;
+    default: return t.proposalPreparing;
+  }
 }
 
 function Frame({ title, children }: { title: string; children: React.ReactNode }) {

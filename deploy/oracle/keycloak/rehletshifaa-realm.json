@@ -3,11 +3,12 @@
   "enabled": true,
   "displayName": "RehletShifaa",
   "loginTheme": "rehletshifaa",
+  "emailTheme": "rehletshifaa",
   "internationalizationEnabled": true,
   "supportedLocales": ["en", "ar"],
   "defaultLocale": "en",
   "sslRequired": "external",
-  "registrationAllowed": true,
+  "registrationAllowed": false,
   "registrationEmailAsUsername": true,
   "resetPasswordAllowed": true,
   "loginWithEmailAllowed": true,
@@ -86,7 +87,7 @@
       "username": "service-account-staff-identity-admin",
       "enabled": true,
       "serviceAccountClientId": "staff-identity-admin",
-      "clientRoles": {"realm-management": ["manage-users", "view-users", "query-users"]}
+      "clientRoles": {"realm-management": ["manage-users", "view-realm", "view-users", "query-users"]}
     }
   ]
 }

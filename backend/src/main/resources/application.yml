@@ -78,6 +78,9 @@ app:
     client-secret: ${IDENTITY_ADMIN_CLIENT_SECRET:}
     web-client-id: ${IDENTITY_ADMIN_WEB_CLIENT_ID:rehletshifaa-web}
     invite-lifespan-seconds: ${STAFF_INVITE_LIFESPAN_SECONDS:43200}
+    # keycloak | simulator | auto (real provider whenever a client secret is configured)
+    mode: ${IDENTITY_ADMIN_MODE:auto}
+    setup-lifespan-seconds: ${PATIENT_SETUP_LIFESPAN_SECONDS:86400}
   cors.allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000}
   crypto:
     pii-key: ${PII_ENCRYPTION_KEY:rehletshifaa-local-dev-only-change-me}

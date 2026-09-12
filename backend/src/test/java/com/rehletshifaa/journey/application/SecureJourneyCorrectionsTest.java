@@ -33,7 +33,7 @@ class SecureJourneyCorrectionsTest {
     // ---- Core product decision: OTP timing + verification does not change status ----
 
     @Test void statusAccessIsOnlyCreatedAfterSubmission() {
-        var created=cases.create(new CreateCaseRequest("Draft Patient","Kenya","+254700000010","Reports","en",true,null,"d@local.test","Africa/Nairobi"));
+        var created=cases.create(new CreateCaseRequest("Draft", "Patient","Kenya","+254700000010","Reports","en",true,null,"d@local.test","Africa/Nairobi"));
         em.flush();
         assertThat(count("SELECT count(*) FROM case_claim_challenges WHERE case_id=?",created.caseId())).isZero();
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE 'claim:%' AND destination=?","+254700000010")).isZero();
@@ -44,7 +44,7 @@ class SecureJourneyCorrectionsTest {
     }
 
     @Test void statusVerificationDoesNotAdvanceCaseStatus() throws Exception {
-        var created=cases.create(new CreateCaseRequest("Verify Patient","Kenya","+254700000011","Reports","en",true,null,null,null));
+        var created=cases.create(new CreateCaseRequest("Verify", "Patient","Kenya","+254700000011","Reports","en",true,null,null,null));
         var submitted=cases.submit(created.caseId()); em.flush(); em.clear();
         publicCases.requestAccess(submitted.statusToken());em.flush();
         String code=caseAccessCode("+254700000011");
@@ -55,7 +55,7 @@ class SecureJourneyCorrectionsTest {
     }
 
     @Test void patientCanRecoverStatusLinkWithoutCaseEnumeration() throws Exception {
-        var created=cases.create(new CreateCaseRequest("Recovery Patient","Egypt","+20 101 044 7898","Reports","en",true,null,null,null));
+        var created=cases.create(new CreateCaseRequest("Recovery", "Patient","Egypt","+20 101 044 7898","Reports","en",true,null,null,null));
         cases.submit(created.caseId());em.flush();
         int originalLinks=count("SELECT count(*) FROM case_access_links WHERE case_id=? AND purpose='STATUS'",created.caseId());
         publicCases.recoverStatusLink(new CaseLinkRecoveryRequest(created.caseNumber(),"+20 000 000 0000","en"));em.flush();
@@ -66,7 +66,7 @@ class SecureJourneyCorrectionsTest {
     }
 
     @Test void informationResponseIsPurposeScopedCompletesPatientActionAndReturnsToIntake() throws Exception {
-        var created=cases.create(new CreateCaseRequest("Action Patient","Kenya","+254700000012","Reports","en",true,null,null,null));
+        var created=cases.create(new CreateCaseRequest("Action", "Patient","Kenya","+254700000012","Reports","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject","COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(),"pod");
@@ -242,7 +242,7 @@ class SecureJourneyCorrectionsTest {
     }
 
     @Test void coordinatorLeadCanRebalanceOwnershipAndOldOwnerLosesAccess() {
-        var created=cases.create(new CreateCaseRequest("Rebalance Patient","Kenya","+254700000022","Reports","en",true,null,null,null));
+        var created=cases.create(new CreateCaseRequest("Rebalance", "Patient","Kenya","+254700000022","Reports","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject","COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(),"pod");
@@ -756,7 +756,7 @@ class SecureJourneyCorrectionsTest {
 
     @Test void proposalPreparationCannotJumpStraightToPatientDecision() throws Exception {
         var ctx=releaseProposalWithoutPatientAccount(); // ends at PATIENT_DECISION already; test the guard on a fresh prep
-        var created=cases.create(new CreateCaseRequest("Guard Patient","Kenya","+254700000030","Reports","en",true,null,null,null));
+        var created=cases.create(new CreateCaseRequest("Guard", "Patient","Kenya","+254700000030","Reports","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush();
         authenticate("coordinator-subject","COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(),"pod");
@@ -777,7 +777,7 @@ class SecureJourneyCorrectionsTest {
     private void seedStaffMember(String subject,String role){jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),subject,role,crypto.encrypt(role+" member"),Instant.now(),Instant.now());}
 
     @Test void coordinatorClassifiesCaseAndCanOnlyAssignAMatchingConsultant() {
-        var created=cases.create(new CreateCaseRequest("Category Patient","Kenya","+254700000031","Reports","en",true,null,null,null));
+        var created=cases.create(new CreateCaseRequest("Category", "Patient","Kenya","+254700000031","Reports","en",true,null,null,null));
         cases.submit(created.caseId());em.flush();em.clear();
         authenticate("coordinator-subject","COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(),"intake-pod");
@@ -801,7 +801,7 @@ class SecureJourneyCorrectionsTest {
     private record Ctx(UUID caseId,UUID versionId,String token,String caseNumber){}
 
     private Ctx releaseProposalWithoutPatientAccount() throws Exception {
-        var created=cases.create(new CreateCaseRequest("Link Patient","Kenya","+254700000020","Cardiac reports","en",true,null,"link@local.test","Africa/Nairobi","cardiology"));
+        var created=cases.create(new CreateCaseRequest("Link", "Patient","Kenya","+254700000020","Cardiac reports","en",true,null,"link@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?",created.caseId()); // exercises the Operations gate
         authenticate("coordinator-subject","COORDINATOR");
@@ -830,7 +830,7 @@ class SecureJourneyCorrectionsTest {
     }
 
     private Ctx assignedDoctorCase() throws Exception {
-        var created=cases.create(new CreateCaseRequest("Doc Patient","Kenya","+254700000021","Reports","en",true,null,null,null,"cardiology"));
+        var created=cases.create(new CreateCaseRequest("Doc", "Patient","Kenya","+254700000021","Reports","en",true,null,null,null,"cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject","COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(),"pod");

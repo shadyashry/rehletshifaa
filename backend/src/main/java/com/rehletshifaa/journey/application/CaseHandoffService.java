@@ -61,11 +61,12 @@ public class CaseHandoffService {
         if (!"ACCEPTED".equals(status)) return false; // already past the deposit stage; nothing to arrange
 
         String coordinator = currentCoordinator(caseId);
-        work.openWorkItem(new NewWorkItem(caseId, DEPOSIT_WORK, "Arrange the coordination deposit",
-                "The patient accepted their estimate and a coordination deposit is due. Send the payment instructions, then record the amount received.",
-                coordinator, "COORDINATOR", "HIGH", false, null, "SYSTEM", "DEPOSIT_REQUIRED",
+        work.openWorkItem(new NewWorkItem(caseId, DEPOSIT_WORK, "Patient acknowledged the estimate — arrange the coordination deposit",
+                "The patient acknowledged their preliminary estimate and a coordination deposit is now due. Send the payment instructions, then record the amount received.",
+                coordinator, "COORDINATOR", false, null, "SYSTEM", "DEPOSIT_REQUIRED",
                 "deposit-required:" + caseId, true));
-        if (coordinator == null) notifyTeamMailbox(caseId, now);
+        // Unowned: the shared queue must still learn about it — with the wording of THIS event, not the settlement's.
+        if (coordinator == null) notifyTeamMailbox(caseId, "deposit-required-coordinator", "deposit-required-team:" + caseId, now);
         work.refreshWaitingOn(caseId, "STAFF", "Coordination deposit to be arranged with the patient");
         return true;
     }
@@ -97,9 +98,9 @@ public class CaseHandoffService {
             // email, so a duplicate confirmation cannot produce duplicate work or duplicate alerts.
             work.openWorkItem(new NewWorkItem(caseId, "TRAVEL", "Start treatment coordination — deposit received",
                     "The coordination deposit is confirmed. Begin the treatment journey for this case.",
-                    coordinator, "COORDINATOR", "HIGH", false, null, "SYSTEM", "DEPOSIT_SETTLED",
+                    coordinator, "COORDINATOR", false, null, "SYSTEM", "DEPOSIT_SETTLED",
                     "deposit-settled:" + caseId, true));
-            if (coordinator == null) notifyTeamMailbox(caseId, now); // unowned: the shared queue must still see it
+            if (coordinator == null) notifyTeamMailbox(caseId, "deposit-settled-coordinator", "deposit-settled-team:" + caseId, now); // unowned: the shared queue must still see it
             notifyPatient(caseId, now);
         }
         boolean moved = advanceToCoordination(caseId, status, now);
@@ -171,12 +172,17 @@ public class CaseHandoffService {
         return prior.subject();
     }
 
-    /** Shared coordinator mailbox alert, used only when no coordinator owns the case yet. */
-    private void notifyTeamMailbox(UUID caseId, Instant now) {
-        String key = "deposit-settled-coordinator:" + caseId;
+    /**
+     * Shared coordination mailbox alert, used only when no coordinator owns the case yet. Each event has
+     * its own template and idempotency key: the "deposit required" and "deposit settled" alerts are
+     * different messages and must never suppress one another. Only the case reference travels.
+     */
+    private void notifyTeamMailbox(UUID caseId, String template, String key, Instant now) {
+        String caseNumber = jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse("");
         jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) "
                         + "SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
-                .params(UUID.randomUUID(), "DEPOSIT_SETTLED", "EMAIL", coordinatorEmail, "deposit-settled-coordinator", "{}",
+                .params(UUID.randomUUID(), "TEAM_WORK", "EMAIL", coordinatorEmail, template,
+                        intake.encryptedJson("{\"case\":\"" + caseNumber.replace("\"", "") + "\"}"),
                         "PENDING", 0, 5, timestamp(now), key, timestamp(now), key)
                 .update();
     }

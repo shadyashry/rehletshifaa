@@ -86,7 +86,8 @@ test("the phone composition is deliberate: header, scale, and a connected journe
     return {
       header: box("header").height, logo: box("header a[aria-label] > span").width, menu: Math.min(summary.width, summary.height),
       h1: px("h1"), h2: px("#how-it-works h2"), step: px("#how-it-works h3"), body: px("#how-it-works li p"),
-      how: box("#how-it-works").height, steps: document.querySelectorAll("#how-it-works ol > li").length,
+      how: box("#how-it-works ol").bottom - box("#how-it-works").top, steps: document.querySelectorAll("#how-it-works ol > li").length,
+      players: [...document.querySelectorAll("#how-it-works video")].filter((v) => v.getClientRects().length > 0).length,
       markers: document.querySelectorAll("#how-it-works ol > li > span[aria-hidden]:not([class*='absolute'])").length,
     };
   });
@@ -97,12 +98,22 @@ test("the phone composition is deliberate: header, scale, and a connected journe
   expect(m.h2).toBeGreaterThanOrEqual(26); expect(m.h2).toBeLessThanOrEqual(30);
   expect(m.step).toBeGreaterThanOrEqual(18); expect(m.step).toBeLessThanOrEqual(20);
   expect(m.body).toBeGreaterThanOrEqual(15); expect(m.body).toBeLessThanOrEqual(16);
-  // Heading, four connected steps and the action fit in roughly one phone screen.
+  // Heading and four connected steps fit in roughly one phone screen; the film follows as a compact poster
+  // card that opens a lightbox — never an embedded native player on a phone — and the action closes the section.
   expect(m.how).toBeLessThanOrEqual(760);
   expect(m.steps).toBe(4);
   expect(m.markers).toBe(4); // one numbered marker per step — never a circle plus a separate number
+  expect(m.players).toBe(0);
+  const watch = page.locator("#how-it-works").getByRole("button", { name: /Watch how it works/ });
+  await expect(watch).toBeVisible();
   const journeyCta = page.locator("#how-it-works").getByRole("link", { name: /^Start my case$/ });
   await expect(journeyCta).toBeVisible();
+  // The lightbox traps focus, closes on Escape and hands focus back to the poster card.
+  await watch.focus(); await page.keyboard.press("Enter");
+  await expect(page.locator("dialog[open] video")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(watch).toBeFocused();
   // The menu control is reachable and labelled; the language switch lives inside the menu on a phone.
   const menu = page.locator("header summary");
   await expect(menu).toHaveAttribute("aria-label", /menu/i);
@@ -136,4 +147,31 @@ test("the header switches to desktop navigation only when it fits on one line", 
     expect(m.header).toBeLessThanOrEqual(74);
     await expectNoOverflow(page);
   }
+});
+
+test("the homepage offers Sign in as a quiet entry, distinct from Check case status and Start my case", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/en");
+  const header = page.locator("header");
+  const signIn = header.getByRole("link", { name: /^Sign in$/ });
+  await expect(signIn).toBeVisible();
+  await expect(signIn).toHaveAttribute("href", /\/en\/portal\?signin=1$/);
+  // Three distinct destinations for three distinct situations.
+  await expect(header.getByRole("link", { name: /^Check case status$/ })).toHaveAttribute("href", /\/en\/track-case$/);
+  await expect(header.getByRole("link", { name: /^Start my case$/ })).toHaveAttribute("href", /\/en\/send-my-case$/);
+  // Sign in is not a second dominant CTA.
+  expect(await signIn.evaluate((el) => el.className.includes("btn-primary"))).toBe(false);
+  expect(await header.locator("a.btn-primary:visible").count()).toBe(1);
+});
+
+test("the mobile menu exposes Start my case, Sign in and Check case status with touch-sized targets", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/en");
+  await page.locator("header summary").first().click();
+  const menu = page.locator("header details[open]");
+  await expect(menu.getByRole("link", { name: /^Start my case$/ })).toBeVisible();
+  const signIn = menu.getByRole("link", { name: /Sign in/ });
+  await expect(signIn).toBeVisible();
+  expect((await signIn.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(menu.getByRole("link", { name: /^Check case status$/ })).toBeVisible();
 });

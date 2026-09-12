@@ -9,6 +9,8 @@
     "languageAria": "Switch language to Arabic",
     "careAreas": "Care Areas",
     "portal": "Check case status",
+    "signIn": "Sign in",
+    "signInHint": "For patients who already activated their account",
     "staff": "Staff sign in"
   },
   "common": {
@@ -34,20 +36,20 @@
   "home": {
     "eyebrow": "Care in Egypt, coordinated for international patients",
     "title": "Understand your treatment options before you travel",
-    "intro": "Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain what they recommend, what it is likely to cost, and what would happen next.",
+    "intro": "Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.",
     "primaryAction": "Start my case",
     "watchJourney": "See how it works",
-    "reassurance": "No final diagnosis is required.",
+    "reassurance": "No final diagnosis required.",
     "assurances": [
       "A Consultant reviews your case before you decide anything",
       "Reports are uploaded through private, short-lived links",
       "One bilingual coordinator, from your first message onwards"
     ],
     "preliminaryNotice": "Recommendations and cost estimates are preliminary and can change after an in-person assessment.",
-    "heroCardTitle": "You can start with what you already have",
+    "heroCardTitle": "Start with what you have",
     "prepareItems": [
-      "A recent medical report or discharge summary",
-      "Test results, scans or images",
+      "Medical report or discharge summary",
+      "Test results or scans",
       "A short note about your concern"
     ],
     "heroCardNote": "If anything else is needed, your coordinator will tell you before the review.",
@@ -55,9 +57,11 @@
       "eyebrow": "Your journey, explained",
       "title": "See what happens after you start",
       "intro": "Discover how RehletShifaa turns your medical reports into a consultant-led care journey, with one dedicated coordinator guiding every step from review to treatment and follow-up.",
-      "play": "Play guide",
-      "pause": "Pause guide",
-      "stepLabel": "Step",
+      "watch": "Watch how it works",
+      "duration": "53 sec",
+      "dialogTitle": "How it works",
+      "close": "Close video",
+      "label": "RehletShifaa patient journey from sharing medical reports to coordinated follow-up",
       "steps": [
         {
           "title": "Share what you have",
@@ -82,21 +86,22 @@
     "areas": [
       {
         "title": "Cardiology",
-        "body": "Coronary, structural heart and rhythm care, from angiography and stents to valve and device procedures."
+        "body": "Coronary, structural and rhythm care, from angiography and stents to valve procedures."
       },
       {
         "title": "Rehabilitation, Dysphagia & Physical Medicine",
-        "body": "Adult and pediatric swallowing rehabilitation, a service few centres offer, with physical medicine and rheumatology."
+        "body": "Adult and pediatric swallowing rehabilitation, with physical medicine and rheumatology."
       },
       {
         "title": "Orthopedics",
-        "body": "Joint replacement, sports injuries, arthroscopy, and spine and trauma assessment, including a second opinion before surgery."
+        "body": "Joint replacement, sports injuries, arthroscopy and spine assessment, including second opinions."
       }
     ],
     "howEyebrow": "A clear process",
     "howTitle": "What happens after you send your case",
     "howIntro": "Four steps. Someone is responsible at each one.",
     "howReady": "Ready when you are.",
+    "travelLead": "Your medical plan comes first.",
     "steps": [
       "Send Your Case",
       "Your Coordinator Organizes It",
@@ -110,64 +115,65 @@
     "beforeBody": "Where medically possible, RehletShifaa helps you understand the proposed next steps and expected arrangements before deciding to travel.",
     "trustEyebrow": "Privacy and clinical governance",
     "trustTitle": "How your information is handled",
-    "trustIntro": "Coordinating care means handling sensitive medical information. These are the rules we work to.",
+    "trustIntro": "A few clear rules guide every case.",
     "trust": [
       {
         "title": "Consultants make clinical decisions",
-        "body": "We coordinate your case. Diagnosis, procedure choice and suitability stay with the treating Consultant."
+        "body": "Diagnosis and treatment choices stay with the treating Consultant."
       },
       {
         "title": "Private document handling",
-        "body": "Reports go straight to private storage through short-lived links. Nothing is published or listed publicly."
+        "body": "Reports go to private storage through short-lived links. Nothing is public."
       },
       {
         "title": "Your consent comes first",
-        "body": "Your case is reviewed only after you allow your information to be used for coordinating your care."
+        "body": "Your case is reviewed only after you allow us to use your information."
       },
       {
         "title": "Emergency care comes first",
-        "body": "If your situation looks urgent, we will tell you to seek care where you are rather than wait to travel."
+        "body": "If your situation looks urgent, we will tell you to seek care where you are."
       }
     ],
     "finalTitle": "Start your medical case",
-    "finalBody": "Send what you already have. We will arrange the right review and stay with you through the next step.",
+    "finalBody": "Send what you already have. We'll guide you through the next step.",
     "finalNote": "Starting a case does not commit you to treatment or travel.",
     "slogan": "You see the full picture first. The decision stays yours.",
     "areasIntro": "Start with the area closest to your need. If you are not sure, send your case and your coordinator will direct it.",
     "areasAction": "View care area",
+    "cardiologyFacets": ["Coronary", "Structural heart", "Heart rhythm"],
     "consultantsPromise": {
       "eyebrow": "Senior clinical review",
       "title": "Senior Consultants. Clear clinical responsibility.",
-      "body": "Your case is reviewed by a Consultant chosen for the clinical experience it calls for. That Consultant carries the decision, and you will know who they are."
+      "body": "Your case is reviewed by a Consultant chosen for the clinical experience it calls for, and you will know who they are."
     },
     "travel": {
       "eyebrow": "Practical support",
       "title": "Travel support built around your care",
-      "intro": "If you choose to continue your care in Egypt, our team can arrange the practical parts of the trip. It is optional, and it comes after the medical plan.",
+      "intro": "If you choose to continue your care in Egypt, we arrange the practical parts of the trip around your medical plan.",
       "items": [
         {
           "title": "Flights",
-          "body": "Booking arranged around your treatment dates."
+          "body": "Around your confirmed treatment dates."
         },
         {
           "title": "Accommodation",
-          "body": "A stay for you and a companion, chosen for comfort and access."
+          "body": "For you and a companion, close to your care."
         },
         {
           "title": "Visa support",
-          "body": "Guidance and documents for a medical visa."
+          "body": "Guidance and documents for medical travel."
         },
         {
           "title": "Airport transfer",
-          "body": "Someone meets you when you land and takes you where you need to be."
+          "body": "Someone meets you when you land."
         }
       ],
       "note": "Arranged after your medical proposal, and only if you want it.",
-      "packageLabel": "Arranged by our own team, not outsourced"
+      "packageLabel": "Coordinated by our team"
     }
   },
   "footer": {
-    "description": "Consultant-led coordination of international cardiac care in Egypt, in Arabic and English.",
+    "description": "Consultant-led coordination of medical care in Egypt for international patients, in Arabic and English.",
     "explore": "Explore",
     "legal": "Legal",
     "contact": "Get in touch",
@@ -268,48 +274,167 @@
         "memberships": "To be verified"
       }
     ],
-    "finalTitle": "You Don't Need to Choose a Consultant",
-    "finalBody": "Not sure which consultant is right for your condition? Send your case and RehletShifaa will help direct it to the appropriate consultant."
+    "finalTitle": "You don't need to choose a Consultant",
+    "finalBody": "Send us your case. We match it to the appropriate Consultant based on clinical need."
   },
   "how": {
     "eyebrow": "From reports to follow-up",
     "title": "Your Care Journey, Clearly Coordinated",
-    "intro": "From your first medical reports to treatment coordination, RehletShifaa helps make the process simpler.",
-    "steps": [
+    "intro": "From the medical information you already have to treatment and follow-up, RehletShifaa helps you understand each step and coordinates what comes next.",
+    "preview": [
+      "Medical information",
+      "Clinical review",
+      "Your decision",
+      "Care in Egypt",
+      "Follow-up"
+    ],
+    "labels": {
+      "phase": "Phase",
+      "you": "You",
+      "next": "Next"
+    },
+    "phases": [
       {
-        "title": "Send Your Case",
-        "body": "Send the medical reports and investigations already available."
+        "title": "Understand your case"
       },
       {
-        "title": "Patient Coordinator",
-        "body": "Your dedicated coordinator organizes your information and helps identify missing documents."
+        "title": "Understand your options"
       },
       {
-        "title": "Consultant Review",
-        "body": "Your case is directed to the appropriate consultant."
+        "title": "Prepare your care in Egypt"
       },
       {
-        "title": "Understand Your Care Path",
-        "body": "Recommendations may include further investigation, medical treatment, a procedure or intervention, surgical evaluation, rehabilitation, or another appropriate pathway."
-      },
-      {
-        "title": "Treatment Coordination",
-        "body": "If you decide to proceed in Egypt, RehletShifaa coordinates the required next steps."
-      },
-      {
-        "title": "Treatment & Follow-Up",
-        "body": "Coordination continues through treatment and follow-up according to consultant recommendations."
+        "title": "Continue your care"
       }
-    ]
+    ],
+    "stages": [
+      {
+        "title": "Send your case",
+        "what": "Share the medical reports, tests, scans and information you already have.",
+        "you": "Share what you already have — a complete file is not required.",
+        "next": "Coordinator review."
+      },
+      {
+        "title": "Coordinator review",
+        "what": "Your Coordinator organizes the information and checks whether anything important is missing.",
+        "you": "Add information only if asked.",
+        "next": "Prepared for the right Consultant."
+      },
+      {
+        "title": "Consultant review",
+        "what": "An appropriate Consultant reviews the medical information relevant to your case.",
+        "you": "More reports or clarification only if clinically needed.",
+        "next": "Clinical recommendation."
+      },
+      {
+        "title": "Your recommendation & proposal",
+        "what": "You receive the Consultant's recommendation together with the care proposal and estimated costs — what is recommended, the expected next steps, and whether further investigation may still be needed.",
+        "you": "Review it with your Coordinator, in your own time.",
+        "next": "Your decision."
+      },
+      {
+        "title": "You decide what happens next",
+        "what": "Nothing is arranged automatically. You review your recommendation and proposal, then choose whether to continue.",
+        "you": "If you continue: profile and account setup, and any coordination deposit explained first.",
+        "next": "Coordination begins only after your decision."
+      },
+      {
+        "title": "Appointment & travel coordination",
+        "what": "If you decide to continue your care in Egypt, our Operations team coordinates the practical arrangements around your medical plan — appointment timing first, then travel support where required.",
+        "you": "Confirm the timing and the support you need.",
+        "next": "Everything is confirmed with you before you travel."
+      },
+      {
+        "title": "Treatment & follow-up",
+        "what": "You receive care from the treating Consultant and facility according to the agreed medical plan.",
+        "you": "Attend your appointments; keep your Coordinator informed.",
+        "next": "Coordination continues through the agreed follow-up."
+      }
+    ],
+    "caseVisual": {
+      "inputs": [
+        "Reports",
+        "Scans",
+        "Tests",
+        "Notes"
+      ],
+      "file": "Coordinated case",
+      "checks": [
+        "Received",
+        "Organized",
+        "More information only if needed"
+      ],
+      "review": "Consultant review",
+      "outcome": "Clinical recommendation",
+      "prepared": "Prepared case"
+    },
+    "proposalVisual": {
+      "recommendation": "Clinical recommendation",
+      "proposal": "Care proposal & estimate",
+      "options": "Your options",
+      "note": "Estimates are preliminary and can change after in-person assessment."
+    },
+    "control": {
+      "eyebrow": "You remain in control",
+      "statement": "Reviewing your recommendation does not commit you to treatment or travel. You decide whether to continue."
+    },
+    "gate": {
+      "decide": "You decide",
+      "yes": "Continue journey",
+      "yesSteps": [
+        "Profile & account ready",
+        "Any coordination deposit explained",
+        "Operational planning begins"
+      ],
+      "no": "Not now",
+      "noBody": "No treatment or travel commitment."
+    },
+    "plan": {
+      "conditional": "Travel coordination begins only if you choose to continue your care in Egypt.",
+      "center": "Medical plan",
+      "appointment": "Appointment timing",
+      "services": [
+        "Flights",
+        "Accommodation",
+        "Visa support",
+        "Airport transfer"
+      ],
+      "note": "Arranged as needed around your medical plan."
+    },
+    "roles": [
+      {
+        "role": "Coordinator",
+        "body": "Your main point of contact."
+      },
+      {
+        "role": "Consultant",
+        "body": "Responsible for the clinical recommendation."
+      },
+      {
+        "role": "Operations",
+        "body": "Coordinates appointments and practical travel arrangements."
+      }
+    ],
+    "loop": [
+      "Arrival & care",
+      "Treatment",
+      "Follow-up",
+      "Continued coordination"
+    ],
+    "cta": {
+      "title": "Start your medical case",
+      "body": "Send the information you already have. You do not need to know the exact specialty before you start."
+    }
   },
   "form": {
     "eyebrow": "A secure first step",
     "title": "Send Your Medical Case",
     "intro": "You don't need to know which specialty you need. Send what you already have and we'll help guide the next step.",
-    "name": "Full Name",
+    "name": "Given name(s)",
+    "familyName": "Family name / surname",
     "country": "Country",
-    "phone": "WhatsApp Number",
-    "email": "Email",
+    "phone": "WhatsApp / mobile number",
+    "email": "Contact email",
     "description": "Tell Us Briefly About Your Condition",
     "optional": "optional",
     "files": "Upload Medical Reports / Images",
@@ -326,7 +451,9 @@
     "secureNote": "Secure transmission. Medical decisions remain consultant-led.",
     "errors": {
       "required": "This field is required.",
-      "name": "Please enter your full name.",
+      "name": "Please enter the given name(s).",
+      "familyName": "Please enter the family name, or confirm a single legal name.",
+      "representative": "Please tell us who is submitting and their relationship to the patient.",
       "phone": "Please enter a valid WhatsApp number.",
       "email": "Please enter a valid email address.",
       "consent": "Consent is required to coordinate your case.",
@@ -357,7 +484,9 @@
   "careAreasPage": {
     "eyebrow": "Care areas",
     "title": "Choose the care area closest to your need",
-    "intro": "RehletShifaa coordinates consultant-led care across three areas. Not sure where your case fits? Send it and your coordinator will help direct it.",
+    "intro": "RehletShifaa coordinates Consultant-led care across three areas.",
+    "reassurance": "Not sure where your case fits? Send us your case and your coordinator will route it to the right Consultant.",
+    "ctaBody": "Send what you already have and we'll guide you to the right care area.",
     "tabsLabel": "Care areas",
     "tabs": {
       "cardiology": "Cardiology",

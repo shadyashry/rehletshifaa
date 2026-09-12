@@ -42,7 +42,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
       <div className="container-site py-10 md:py-14">
         <Link href={localeHref(locale, "consultants")} className="inline-flex items-center gap-2 text-sm font-bold text-brand-700"><BackIcon size={17} aria-hidden="true" />{ui.back}</Link>
         <div className="mt-8 grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-center">
-          <div className="overflow-hidden rounded-3xl border border-line bg-white"><ConsultantPortrait profile={profile} locale={locale} compact /></div>
+          <div className="flex justify-center rounded-3xl border border-line bg-white p-8"><ConsultantPortrait profile={profile} size="lg" /></div>
           <div>
             <p className="eyebrow">{profile.careAreaLabel}</p>
             <h1 className="display mt-4">{profile.name}</h1>

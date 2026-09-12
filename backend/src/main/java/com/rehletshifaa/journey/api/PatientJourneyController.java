@@ -1,9 +1,9 @@
 package com.rehletshifaa.journey.api;
-import com.rehletshifaa.journey.application.IdentityVerificationService;import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.OnboardingService;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
+import com.rehletshifaa.journey.application.IdentityVerificationService;import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.OnboardingService;import com.rehletshifaa.journey.application.PatientAccountService;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/patient") public class PatientJourneyController{
- private final JourneyService service;private final OnboardingService onboarding;private final IdentityVerificationService identity;
- public PatientJourneyController(JourneyService service,OnboardingService onboarding,IdentityVerificationService identity){this.service=service;this.onboarding=onboarding;this.identity=identity;}
+ private final JourneyService service;private final OnboardingService onboarding;private final IdentityVerificationService identity;private final PatientAccountService account;
+ public PatientJourneyController(JourneyService service,OnboardingService onboarding,IdentityVerificationService identity,PatientAccountService account){this.service=service;this.onboarding=onboarding;this.identity=identity;this.account=account;}
  @GetMapping("/cases")public List<CaseView>cases(){return service.patientCases();}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @GetMapping("/cases/{caseId}/deposit")public DepositView deposit(@PathVariable UUID caseId){return service.depositView(caseId);}
@@ -11,6 +11,15 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/messages/{messageId}/read")public IdResponse read(@PathVariable UUID caseId,@PathVariable UUID messageId){return service.markMessageRead(caseId,messageId);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/decision")public ProposalView decide(@PathVariable UUID caseId,@PathVariable UUID versionId,@Valid @RequestBody ProposalDecisionRequest request){return service.decideProposal(caseId,versionId,request);}
  @PostMapping("/account/activate")public IdResponse activate(@Valid @RequestBody ActivateAccountRequest request){return service.activateAccount(request.activationToken());}
+ /** Every authenticated portal entry: the first sign-in after identity-provider setup marks the account ACTIVE and says which case to open. */
+ @PostMapping("/account/session")public AccountSessionView session(){return account.session();}
+ /** Profile & Security: the patient's own account facts, separate from any case. */
+ @GetMapping("/account/profile")public PatientProfileView profile(){return account.myProfile();}
+ /** Returning patient: a new case under the SAME canonical patient — saved details reused, no re-registration. */
+ @PostMapping("/cases")public com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseResponse startCase(@Valid @RequestBody com.rehletshifaa.casemanagement.api.CaseDtos.NewCaseForPatientRequest request){return account.startNewCase(request);}
+ /** "Is this case for you?" — shown only to the signed-in owner of the address that received the continuation link. */
+ @GetMapping("/account/link-requests/{token}")public AccountLinkRequestView linkRequest(@PathVariable String token){return account.linkRequest(token);}
+ @PostMapping("/account/link-requests/{token}/resolve")public AccountLinkRequestView resolveLink(@PathVariable String token,@Valid @RequestBody AccountLinkResolution request){return account.resolveLinkRequest(token,request);}
  // ---- Onboarding sub-workflow (resumable; backend computes readiness) ----
  @GetMapping("/cases/{caseId}/onboarding")public OnboardingView onboarding(@PathVariable UUID caseId){return onboarding.myOnboarding(caseId);}
  @GetMapping("/cases/{caseId}/readiness")public CustomerReadiness readiness(@PathVariable UUID caseId){return service.customerReadiness(caseId);}

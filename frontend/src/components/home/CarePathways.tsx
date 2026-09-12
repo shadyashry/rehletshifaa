@@ -7,71 +7,85 @@ import { CARE_AREA_SLUGS } from "@/lib/care-areas";
 import { localeHref } from "@/lib/links";
 import { TrackedLink } from "@/components/TrackedLink";
 
+/**
+ * The care areas as an editorial portfolio, not three equal tiles: Cardiology — the platform's first and
+ * deepest area — holds the wider column on the clinical mist, its three approved sub-areas named under
+ * the title, and the other two stand beside it on the elevated surface at the same voice, the same action
+ * and the same restraint. Flat surfaces, hairline edges, one arrow per area. Phone: a stack, Cardiology
+ * first.
+ */
 const ICONS = [HeartPulse, Activity, Bone] as const;
 
-/**
- * Care areas as an editorial list rather than a rank of identical cards. On a phone all three are ruled
- * rows a thumb can scan in one screen — title, two lines, one tertiary action; from a desktop width the
- * first area leads on a tinted surface and the rest follow as rows. Every area stays one click away and
- * equally legible — only the visual weight differs, which is what keeps the section from reading as a
- * template.
- */
 export function CarePathways({ locale, d }: { locale: Locale; d: Dictionary }) {
-  const [lead, ...rest] = d.home.areas;
-  const LeadIcon = ICONS[0];
+  const arrow = <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100 transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />;
 
   return (
-    <section className="section bg-mist">
+    <section className="bg-surface-pearl pb-[clamp(2.5rem,2rem+2vw,4.25rem)] pt-[clamp(1.75rem,1.25rem+1.6vw,2.75rem)]">
       <div className="container-site">
-        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-2 sm:gap-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-1 sm:gap-y-3">
           <div className="max-w-xl">
             <p className="eyebrow">{d.home.areasEyebrow}</p>
-            <h2 className="headline mt-1.5 sm:mt-2">{d.home.areasTitle}</h2>
+            <h2 className="headline mt-2">{d.home.areasTitle}</h2>
           </div>
-          <TrackedLink event="send_case_cta_clicked" className="link-cta text-[0.92rem]" href={localeHref(locale, "care-areas")}>
+          <TrackedLink event="send_case_cta_clicked" className="link-cta text-[0.95rem]" href={localeHref(locale, "care-areas")}>
             {d.common.explore}
             <ArrowRight size={15} aria-hidden="true" className="rtl:-scale-x-100" />
           </TrackedLink>
         </div>
 
-        <div className="mt-5 sm:mt-7 lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
-          <div className="group relative border-t border-line py-4 lg:rounded-[14px] lg:border-0 lg:bg-white lg:p-7 lg:ring-1 lg:ring-line">
-            <div className="flex items-start gap-3.5 lg:block">
-              <LeadIcon size={20} strokeWidth={1.7} className="mt-0.5 flex-none text-brand-600 lg:mt-0 lg:h-[22px] lg:w-[22px]" aria-hidden="true" />
-              <div className="min-w-0">
-                <h3 className="text-[1.05rem] font-semibold leading-6 text-brand-900 lg:mt-4 lg:text-[1.3rem] lg:leading-[1.4] lg:tracking-[-0.008em]">{lead.title}</h3>
-                <p className="mt-1 text-[0.9rem] leading-6 text-ink-600 lg:mt-2 lg:max-w-[46ch] lg:text-[0.95rem] lg:leading-7">{lead.body}</p>
-                <Link href={localeHref(locale, CARE_AREA_SLUGS[0])}
-                      className="link-cta mt-1 min-h-0 text-[0.88rem] after:absolute after:inset-0 lg:mt-5 lg:min-h-11 lg:text-[0.9rem]">
-                  {d.home.areasAction}
-                  <ArrowRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />
-                </Link>
-              </div>
-            </div>
-          </div>
+        <ul className="mt-6 grid gap-4 sm:mt-8 lg:mt-9 lg:grid-cols-[minmax(0,55fr)_minmax(0,45fr)] lg:grid-rows-2 lg:gap-5">
+          {d.home.areas.map((area, index) => {
+            const Icon = ICONS[index] ?? HeartPulse;
+            const href = localeHref(locale, CARE_AREA_SLUGS[index]);
 
-          <ul className="grid content-start">
-            {rest.map((area, index) => {
-              const Icon = ICONS[index + 1] ?? HeartPulse;
+            if (index === 0) {
               return (
-                <li key={area.title} className="group relative border-t border-line py-4 last:border-b lg:py-5 lg:first:border-t-0 lg:first:pt-5 lg:last:border-b-0">
-                  <div className="flex items-start gap-3.5">
-                    <Icon size={20} strokeWidth={1.7} className="mt-0.5 flex-none text-brand-600" aria-hidden="true" />
-                    <div className="min-w-0">
-                      <h3 className="text-[1.05rem] font-semibold leading-6 text-brand-900">{area.title}</h3>
-                      <p className="mt-1 text-[0.9rem] leading-6 text-ink-600 lg:mt-1.5">{area.body}</p>
-                      <Link href={localeHref(locale, CARE_AREA_SLUGS[index + 1])}
-                            className="link-cta mt-1 min-h-0 text-[0.88rem] after:absolute after:inset-0 lg:mt-2.5 lg:min-h-11">
-                        {d.home.areasAction}
-                        <ArrowRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />
-                      </Link>
-                    </div>
+                <li key={area.title} className="group relative flex flex-col justify-center rounded-[14px] bg-surface-clinical p-6 ring-1 ring-border-clinical transition-shadow hover:ring-brand-300 sm:p-7 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:px-9 lg:py-8">
+                  <div className="flex items-center gap-4">
+                    <span aria-hidden className="grid h-11 w-11 flex-none place-items-center rounded-full bg-surface-elevated text-brand-700 ring-1 ring-border-clinical lg:h-12 lg:w-12">
+                      <Icon size={20} strokeWidth={1.7} />
+                    </span>
+                    <h3 className="text-[1.5rem] font-semibold leading-[1.2] tracking-[-0.015em] text-brand-900 sm:text-[1.75rem] lg:text-[1.875rem]">
+                      {area.title}
+                    </h3>
+                  </div>
+                  <div className="mt-4 lg:mt-5">
+                    {/* The area's approved sub-areas, as one quiet line of labels. */}
+                    <ul className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.8rem] font-semibold uppercase leading-5 tracking-[0.08em] text-brand-700 rtl:text-[0.9rem] rtl:normal-case rtl:tracking-normal">
+                      {d.home.cardiologyFacets.map((facet, i, all) => (
+                        <li key={facet} className="flex items-center gap-x-2.5">
+                          {facet}
+                          {i < all.length - 1 && <span aria-hidden className="h-1 w-1 rounded-full bg-brand-400" />}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-3 max-w-[52ch] text-[1rem] leading-7 text-ink-600 sm:text-[1.0625rem]">{area.body}</p>
+                    <Link href={href} className="link-cta mt-3 text-[0.95rem] after:absolute after:inset-0 sm:mt-4">
+                      {d.home.areasAction}
+                      {arrow}
+                    </Link>
                   </div>
                 </li>
               );
-            })}
-          </ul>
-        </div>
+            }
+
+            return (
+              <li key={area.title} className="group relative flex flex-col rounded-[12px] bg-surface-elevated p-6 ring-1 ring-border-subtle transition-shadow hover:ring-brand-300 lg:col-start-2">
+                <div className="flex items-center gap-3.5">
+                  <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-full bg-surface-sage text-brand-600">
+                    <Icon size={18} strokeWidth={1.7} />
+                  </span>
+                  <h3 className="text-[1.125rem] font-semibold leading-[1.3] text-brand-900 lg:text-[1.2rem] lg:tracking-[-0.008em]">{area.title}</h3>
+                </div>
+                <p className="mt-2.5 max-w-[56ch] text-[0.95rem] leading-6 text-ink-600 lg:text-[1rem] lg:leading-[1.6]">{area.body}</p>
+                <Link href={href} className="link-cta mt-auto min-h-11 pt-1 text-[0.95rem] after:absolute after:inset-0">
+                  {d.home.areasAction}
+                  {arrow}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );

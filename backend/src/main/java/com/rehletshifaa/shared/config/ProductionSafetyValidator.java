@@ -51,6 +51,9 @@ public class ProductionSafetyValidator implements ApplicationRunner {
         }
         if (!"s3".equals(environment.getProperty("app.storage.mode"))) failures.add("STORAGE_MODE must resolve to s3");
         if (!"smtp".equals(environment.getProperty("app.mail.mode"))) failures.add("MAIL_MODE must resolve to smtp");
+        // Patient account setup is delegated to the identity provider; production must never run on the in-memory simulator.
+        if ("simulator".equalsIgnoreCase(environment.getProperty("app.identity-admin.mode", "auto"))) failures.add("IDENTITY_ADMIN_MODE must not be simulator");
+        require(failures, "IDENTITY_ADMIN_CLIENT_SECRET", false);
         if (!"live".equals(environment.getProperty("app.notifications.mode"))) failures.add("NOTIFICATIONS_MODE must resolve to live");
         if (!environment.getProperty("app.security.enabled", Boolean.class, false)) failures.add("APP_SECURITY_ENABLED must resolve to true");
         if (!environment.getProperty("app.turnstile.enabled", Boolean.class, false)) failures.add("TURNSTILE_ENABLED must resolve to true");

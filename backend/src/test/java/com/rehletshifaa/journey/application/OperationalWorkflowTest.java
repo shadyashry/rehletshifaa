@@ -193,7 +193,7 @@ class OperationalWorkflowTest {
     @Test void blockingConsultantWorkPutsTheBallWithTheConsultant() throws Exception {
         UUID caseId = ownedCase();
         work.openWorkItem(new NewWorkItem(caseId, "CLINICAL_REVIEW", "Review the case", null, "doctor-subject",
-                "DOCTOR", "HIGH", true, null, "SYSTEM", "WORK_ASSIGNED", "clinical:" + caseId, false));
+                "DOCTOR", true, null, "SYSTEM", "WORK_ASSIGNED", "clinical:" + caseId, false));
         work.refreshWaitingOn(caseId, "STAFF", null); em.flush();
         assertThat(waitingOn(caseId)).isEqualTo("CONSULTANT");
         assertThat(status(caseId)).isEqualTo("INTAKE_REVIEW"); // stage untouched — the two are separate
@@ -202,7 +202,7 @@ class OperationalWorkflowTest {
     @Test void anInternalApprovalStaysCoarselyWithStaff() throws Exception {
         UUID caseId = ownedCase();
         work.openWorkItem(new NewWorkItem(caseId, "FINANCE_APPROVAL", "Approve commercial terms", null, "finance-subject",
-                "FINANCE", "HIGH", true, null, "SYSTEM", "WORK_ASSIGNED", "finance:" + caseId, false));
+                "FINANCE", true, null, "SYSTEM", "WORK_ASSIGNED", "finance:" + caseId, false));
         work.refreshWaitingOn(caseId, "STAFF", null); em.flush();
         // No per-department responsibility value: the work item names who owes it.
         assertThat(waitingOn(caseId)).isEqualTo("STAFF");
@@ -234,9 +234,9 @@ class OperationalWorkflowTest {
     @Test void myWorkShowsOnlyMyOwnOpenItemsWithTheContextNeededToAct() throws Exception {
         UUID caseId = ownedCase();
         work.openWorkItem(new NewWorkItem(caseId, "REVIEW", "Review patient information", "Context", "coordinator-subject",
-                "COORDINATOR", "HIGH", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, true));
+                "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, true));
         work.openWorkItem(new NewWorkItem(caseId, "OTHER_REVIEW", "Not mine", null, "another-coordinator",
-                "COORDINATOR", "NORMAL", false, null, "SYSTEM", "WORK_ASSIGNED", "work-2:" + caseId, false));
+                "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-2:" + caseId, false));
         em.flush();
 
         authenticate("coordinator-subject", "COORDINATOR");
@@ -245,13 +245,13 @@ class OperationalWorkflowTest {
         WorkItemView item = mine.stream().filter(w -> "REVIEW".equals(w.type())).findFirst().orElseThrow();
         assertThat(item.caseNumber()).isNotBlank();
         assertThat(item.patientName()).isEqualTo("Workflow Patient");
-        assertThat(item.priority()).isEqualTo("HIGH");
+        assertThat(item.priority()).isEqualTo("NORMAL"); // routine work is never "high" merely for being new
     }
 
     @Test void assignedWorkNotifiesTheOwnerAndReadingItDoesNotCompleteTheWork() throws Exception {
         UUID caseId = ownedCase();
         work.openWorkItem(new NewWorkItem(caseId, "REVIEW", "Review patient information", "Context", "coordinator-subject",
-                "COORDINATOR", "HIGH", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, true));
+                "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, true));
         em.flush();
         authenticate("coordinator-subject", "COORDINATOR");
         NotificationFeed feed = work.myNotifications();
@@ -269,7 +269,7 @@ class OperationalWorkflowTest {
     @Test void aRepeatedTriggerDoesNotDuplicateWorkOrNotifications() throws Exception {
         UUID caseId = ownedCase();
         var item = new NewWorkItem(caseId, "REVIEW", "Review patient information", null, "coordinator-subject",
-                "COORDINATOR", "HIGH", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, true);
+                "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, true);
         work.openWorkItem(item); work.openWorkItem(item); em.flush();
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='REVIEW'", caseId)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=?", "coordinator-subject")).isEqualTo(1);
@@ -288,7 +288,7 @@ class OperationalWorkflowTest {
     @Test void oneStaffMemberCannotReadAnotherInbox() throws Exception {
         UUID caseId = ownedCase();
         work.openWorkItem(new NewWorkItem(caseId, "REVIEW", "Private work", null, "coordinator-subject",
-                "COORDINATOR", "HIGH", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, false));
+                "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, false));
         em.flush();
         authenticate("other-coordinator", "COORDINATOR");
         assertThat(work.myNotifications().items()).isEmpty();
@@ -302,9 +302,9 @@ class OperationalWorkflowTest {
         UUID caseId = ownedCase();
         Instant overdue = Instant.now().minusSeconds(3600);
         work.openWorkItem(new NewWorkItem(caseId, "REVIEW", "Blocking overdue work", null, "coordinator-subject",
-                "COORDINATOR", "URGENT", true, overdue, "SYSTEM", "WORK_ASSIGNED", "signal-1:" + caseId, false));
+                "COORDINATOR", true, overdue, "SYSTEM", "WORK_ASSIGNED", "signal-1:" + caseId, false));
         work.openWorkItem(new NewWorkItem(caseId, "REVIEW_PATIENT_RESPONSE", "Review information provided by the patient",
-                null, "coordinator-subject", "COORDINATOR", "HIGH", false, null, "SYSTEM", "WORK_ASSIGNED", "signal-2:" + caseId, false));
+                null, "coordinator-subject", "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "signal-2:" + caseId, false));
         em.flush();
 
         authenticate("coordinator-subject", "COORDINATOR");
@@ -312,7 +312,7 @@ class OperationalWorkflowTest {
         assertThat(card.openTaskCount()).isEqualTo(2);
         assertThat(card.overdueTaskCount()).isEqualTo(1);
         assertThat(card.blockingOverdueCount()).isEqualTo(1);
-        assertThat(card.highPriorityCount()).isEqualTo(2); // URGENT + HIGH
+        assertThat(card.highPriorityCount()).isEqualTo(1); // only the blocking, overdue item is HIGH; a routine review is NORMAL
         assertThat(card.patientResponsePending()).isTrue();
         // The case itself gains no priority or attention column — these are read from the work items.
         assertThat(count("SELECT count(*) FROM medical_cases WHERE id=?", caseId)).isEqualTo(1);
@@ -334,6 +334,8 @@ class OperationalWorkflowTest {
 
     @Test void assigningAConsultantCreatesUnreadWorkNotificationAndEmail() throws Exception {
         UUID caseId = readyForConsultant();
+        // The work email goes to the consultant's own address, in the consultant's words — never to the coordination mailbox.
+        jdbc.update("UPDATE practitioner_profiles SET email_encrypted=? WHERE external_subject=?", crypto.encrypt("doctor.one@local.test"), "doctor-subject");
         authenticate("coordinator-subject", "COORDINATOR");
         journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review"));
         em.flush();
@@ -341,6 +343,7 @@ class OperationalWorkflowTest {
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT' AND owner_subject=? AND status='OPEN'", caseId, "doctor-subject")).isEqualTo(1);
         // The notification starts unread — nothing may set read_at at creation.
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='ASSIGNMENT_CREATED' AND read_at IS NULL", "doctor-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='STAFF_WORK' AND destination='doctor.one@local.test' AND template_key='consultant-work-assigned'")).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='STAFF_WORK'")).isEqualTo(1);
         assertThat(waitingOn(caseId)).isEqualTo("CONSULTANT");
     }
@@ -468,7 +471,7 @@ class OperationalWorkflowTest {
         UUID assignment = assignConsultant(caseId);
         // Same assignment id replayed through the work layer: the idempotency key holds.
         work.openWorkItem(new NewWorkItem(caseId, "CONSULTANT_ASSIGNMENT", "New clinical assignment", null, "doctor-subject",
-                "DOCTOR", "HIGH", true, null, "coordinator-subject", "ASSIGNMENT_CREATED", "assignment:" + assignment, true));
+                "DOCTOR", true, null, "coordinator-subject", "ASSIGNMENT_CREATED", "assignment:" + assignment, true));
         em.flush();
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='ASSIGNMENT_CREATED'", "doctor-subject")).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT'", caseId)).isEqualTo(1);
@@ -478,7 +481,7 @@ class OperationalWorkflowTest {
     private UUID readyForConsultant() throws Exception { return readyForConsultant("+254700000040", "consultant@local.test"); }
 
     private UUID readyForConsultant(String whatsapp, String email) throws Exception {
-        var created = cases.create(new CreateCaseRequest("Consultant Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
+        var created = cases.create(new CreateCaseRequest("Consultant", "Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         seedDoctorProfile();seedCoordinatorProfile();
         authenticate("coordinator-subject", "COORDINATOR");
@@ -524,7 +527,7 @@ class OperationalWorkflowTest {
     private UUID ownedCase() throws Exception { return ownedCase("+254700000031", "workflow@local.test"); }
 
     private UUID ownedCase(String whatsapp, String email) throws Exception {
-        var created = cases.create(new CreateCaseRequest("Workflow Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi"));
+        var created = cases.create(new CreateCaseRequest("Workflow", "Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject", "COORDINATOR");
         journey.claimCoordinatorCase(created.caseId(), "pod"); // claiming moves the case into INTAKE_REVIEW

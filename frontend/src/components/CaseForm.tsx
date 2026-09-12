@@ -1,27 +1,36 @@
 "use client";
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react";
 import Script from "next/script";
-import { ArrowLeft, ArrowRight, CheckCircle2, FileUp, FileText, LockKeyhole, ChevronDown, Search, Check, X, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, FileUp, FileText, LockKeyhole, ChevronDown, Search, Check, X, Trash2, Plus, UserRound, Users } from "lucide-react";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
-import { buildCaseSchema, filesAreValid } from "@/lib/case-form-schema";
+import { buildCaseSchema, filesAreValid, RELATIONSHIPS, type Relationship } from "@/lib/case-form-schema";
 import { track } from "@/lib/analytics";
 import { whatsappHref } from "@/lib/links";
 import { COUNTRIES, flagEmoji, type Country } from "@/lib/countries";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, apiFetchAs } from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
 
-type FormValues = { fullName: string; country: string; whatsappNumber: string; email: string; conditionDescription: string; consent: boolean };
+type CaseFor = "MYSELF" | "SOMEONE_ELSE";
+type FormValues = {
+  caseFor: CaseFor; givenName: string; familyName: string; singleLegalName: boolean;
+  representativeName: string; representativeRelationship: Relationship | "";
+  country: string; whatsappNumber: string; email: string; conditionDescription: string; consent: boolean;
+};
 type CareAreaKey = "" | "cardiology" | "rheumatology-rehabilitation" | "orthopedics";
 type FieldKey = keyof FormValues | "files" | "server";
 type Errors = Partial<Record<FieldKey, string>>;
 type CreateCaseResponse = { caseId: string; caseNumber: string; status: "DRAFT" };
 type PresignResponse = { documentId: string; uploadUrl: string; requiredHeaders: Record<string, string> };
+type Session = { linked: boolean; displayName: string | null; accountStatus: string; currentCaseId: string | null };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u;
 
 export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const ar = locale === "ar";
-  const [values, setValues] = useState<FormValues>({ fullName: "", country: "", whatsappNumber: "", email: "", conditionDescription: "", consent: false });
+  const { user, roles, loading: authLoading } = useAuth();
+  const [values, setValues] = useState<FormValues>({ caseFor: "MYSELF", givenName: "", familyName: "", singleLegalName: false, representativeName: "", representativeRelationship: "", country: "", whatsappNumber: "", email: "", conditionDescription: "", consent: false });
   const [country, setCountry] = useState<Country | null>(null);
   // Survives a failed attempt so pressing send again continues the same case instead of starting a
   // new one. Refs, not state: retry correctness must not depend on a re-render happening first.
@@ -38,25 +47,58 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const [caseNumber, setCaseNumber] = useState<string>();
   const [statusToken, setStatusToken] = useState<string>();
   const [turnstileToken, setTurnstileToken] = useState<string>();
+  const [session, setSession] = useState<Session | null>(null);
   const started = useRef(false);
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const isPatient = !!user && roles.includes("PATIENT");
+  const someoneElse = values.caseFor === "SOMEONE_ELSE";
 
   const t = {
     countryPlaceholder: ar ? "ابحث عن دولتك…" : "Search your country…",
     countryEmpty: ar ? "لا توجد نتائج مطابقة" : "No matching country",
-    selectCountryFirst: ar ? "اختر دولتك أولًا" : "Select your country first",
-    phoneHint: ar ? "نتواصل معك عبر واتساب على هذا الرقم." : "We'll contact you on WhatsApp using this number.",
+    selectCountryFirst: ar ? "اختر الدولة أولًا" : "Select the country first",
+    phoneHint: ar ? "نتواصل معك عبر واتساب على هذا الرقم. يمكن مشاركة الرقم مع أفراد العائلة." : "We'll contact you on WhatsApp using this number. A number shared with family is fine.",
+    emailHint: ar ? "للتواصل فقط في هذه المرحلة — لن يصبح بريد الدخول قبل التحقق منه لاحقًا." : "For contact only at this stage — it won't become your sign-in email until you verify it later.",
     localNumber: ar ? "رقم الهاتف" : "Phone number",
     requiredMark: ar ? "مطلوب" : "Required",
     reviewTitle: ar ? "أكمل الحقول المطلوبة للإرسال" : "Complete the required fields to send",
     clearCountry: ar ? "مسح الدولة" : "Clear country",
-    countryLabel: ar ? "الدولة" : d.form.country,
+    countryLabel: ar ? "دولة إقامة المريض" : "Patient's country of residence",
     progress: ar ? "تقدم إرسال الحالة" : "Case submission progress",
-    steps: ar ? ["التواصل", "الحالة والمستندات", "المراجعة والموافقة"] : ["Contact", "Case & documents", "Review & consent"],
+    steps: ar ? ["المريض والتواصل", "الحالة والمستندات", "المراجعة والموافقة"] : ["Patient & contact", "Case & documents", "Review & consent"],
     next: ar ? "التالي" : "Continue",
     back: ar ? "السابق" : "Back",
     review: ar ? "راجع البيانات قبل الإرسال" : "Review before sending",
     reviewHelp: ar ? "يمكنك الرجوع لتعديل أي معلومة. لن تُرسل البيانات قبل الضغط على زر الإرسال النهائي." : "You can go back to change anything. Nothing is submitted until you use the final send button.",
+    whoTitle: ar ? "لمن هذه الحالة؟" : "Who is this case for?",
+    myself: ar ? "لي أنا" : "Myself",
+    myselfHelp: ar ? "أنا المريض" : "I am the patient",
+    someoneElse: ar ? "لشخص آخر" : "Someone else",
+    someoneElseHelp: ar ? "أساعد أحد أفراد العائلة أو شخصًا أرعاه" : "I'm helping a family member or someone in my care",
+    patientSection: ar ? "بيانات المريض" : "About the patient",
+    patientSectionSelf: ar ? "بياناتك" : "About you",
+    namesHelp: ar ? "كما تُستخدم عادةً — لا نحتاج جواز السفر أو الهوية الآن." : "As usually written — we don't need passport or ID details now.",
+    singleName: ar ? "للمريض اسم قانوني واحد فقط (بدون اسم عائلة)" : "The patient has a single legal name (no family name)",
+    repSection: ar ? "بياناتك أنت (مقدّم الطلب)" : "About you (the person submitting)",
+    repName: ar ? "اسمك" : "Your name",
+    repRelationship: ar ? "صلتك بالمريض" : "Your relationship to the patient",
+    contactSection: ar ? "بيانات التواصل" : "Contact details",
+    contactSectionRep: ar ? "بيانات التواصل معك" : "How we reach you",
+    contactRepHint: ar ? "سنتواصل معك أنت بشأن هذه الحالة. تبقى هذه البيانات منفصلة عن هوية المريض." : "We'll coordinate with you about this case. These details stay separate from the patient's own identity.",
+    relationships: ar
+      ? { PARENT: "أحد الوالدين", CHILD: "ابن/ابنة", SPOUSE: "زوج/زوجة", SIBLING: "أخ/أخت", RELATIVE: "قريب", GUARDIAN: "وصي", OTHER: "أخرى" }
+      : { PARENT: "Parent", CHILD: "Child", SPOUSE: "Spouse", SIBLING: "Sibling", RELATIVE: "Relative", GUARDIAN: "Guardian", OTHER: "Other" },
+    selectOption: ar ? "اختر…" : "Select…",
+    haveAccount: ar ? "لديك حساب في رحلة شفاء؟" : "Already have a RehletShifaa account?",
+    signInSaved: ar ? "سجّل الدخول لاستخدام بياناتك المحفوظة." : "Sign in to use your saved details.",
+    signedInAs: ar ? "مسجّل الدخول باسم" : "Signed in as",
+    savedDetails: ar ? "سنستخدم بياناتك المحفوظة — أدخل فقط ما يخص هذه الحالة الجديدة." : "We'll use your saved details — only tell us about this new case.",
+    notYou: ar ? "ليس أنت؟" : "Not you?",
+    goToPortal: ar ? "الذهاب إلى حالتي" : "Go to my case",
+    startNew: ar ? "إرسال الحالة الجديدة" : "Send my new case",
+    successReturning: ar ? "أُضيفت حالتك الجديدة إلى ملفك." : "Your new case has been added to your profile.",
+    forName: ar ? "المريض" : "Patient",
+    submittedBy: ar ? "مقدّم الطلب" : "Submitted by",
   };
 
   useEffect(() => {
@@ -65,8 +107,17 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     return () => { delete target.onRehletShifaaTurnstile; };
   }, []);
 
+  // A signed-in patient never re-registers: the canonical patient is resolved server-side.
+  useEffect(() => {
+    if (!isPatient || !user) return;
+    let live = true;
+    apiFetchAs(user.access_token, "/patient/account/session", { method: "POST" })
+      .then(r => r.ok ? r.json() : null).then((data: Session | null) => { if (live) setSession(data); }).catch(() => { if (live) setSession(null); });
+    return () => { live = false; };
+  }, [isPatient, user]);
+
   function begin() { if (!started.current) { started.current = true; track("case_form_started"); } }
-  function update(name: keyof FormValues, value: string | boolean) { begin(); setValues(current => ({ ...current, [name]: value })); }
+  function update<K extends keyof FormValues>(name: K, value: FormValues[K]) { begin(); setValues(current => ({ ...current, [name]: value })); }
   function touch(name: FieldKey) { setTouched(current => ({ ...current, [name]: true })); }
   function onFiles(next: File[]) { begin(); setFiles(current => {const keys=new Set(current.map(file=>`${file.name}:${file.size}:${file.lastModified}`));return [...current,...next.filter(file=>!keys.has(`${file.name}:${file.size}:${file.lastModified}`))];}); }
 
@@ -75,18 +126,21 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const emailTrimmed = values.email.trim();
   // Live per-field validity — drives inline messages and the submit button's disabled state.
   const valid = useMemo(() => ({
-    fullName: values.fullName.trim().length >= 2,
+    givenName: NAME_RE.test(values.givenName.trim()),
+    familyName: values.singleLegalName ? values.familyName.trim() === "" || NAME_RE.test(values.familyName.trim()) : NAME_RE.test(values.familyName.trim()),
+    representativeName: !someoneElse || values.representativeName.trim().length >= 1,
+    representativeRelationship: !someoneElse || values.representativeRelationship !== "",
     country: !!country,
     whatsappNumber: !!country && digits.length >= 6 && digits.length <= 15,
     email: emailTrimmed === "" || EMAIL_RE.test(emailTrimmed),
     consent: values.consent === true,
     files: filesAreValid(files),
-  }), [values.fullName, country, digits.length, emailTrimmed, values.consent, files]);
-  const contactValid = valid.fullName && valid.country && valid.whatsappNumber && valid.email;
+  }), [values.givenName, values.familyName, values.singleLegalName, values.representativeName, values.representativeRelationship, someoneElse, country, digits.length, emailTrimmed, values.consent, files]);
+  const contactValid = valid.givenName && valid.familyName && valid.representativeName && valid.representativeRelationship && valid.country && valid.whatsappNumber && valid.email;
 
   function nextStep() {
     if (step === 1 && !contactValid) {
-      setTouched(current => ({ ...current, fullName: true, country: true, whatsappNumber: true, email: true }));
+      setTouched(current => ({ ...current, givenName: true, familyName: true, representativeName: true, representativeRelationship: true, country: true, whatsappNumber: true, email: true }));
       return;
     }
     setStep(current => Math.min(3, current + 1));
@@ -97,12 +151,14 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     setStep(current => Math.max(1, current - 1));
     window.requestAnimationFrame(() => document.getElementById("case-form-heading")?.focus());
   }
-  const allValid = valid.fullName && valid.country && valid.whatsappNumber && valid.email && valid.consent && valid.files;
+  const allValid = contactValid && valid.consent && valid.files;
 
   function fieldError(key: FieldKey): string | undefined {
     if (errors[key]) return errors[key];
     if (!touched[key]) return undefined;
-    if (key === "fullName" && !valid.fullName) return d.form.errors.name;
+    if (key === "givenName" && !valid.givenName) return d.form.errors.name;
+    if (key === "familyName" && !valid.familyName) return d.form.errors.familyName;
+    if ((key === "representativeName" && !valid.representativeName) || (key === "representativeRelationship" && !valid.representativeRelationship)) return d.form.errors.representative;
     if (key === "country" && !valid.country) return t.selectCountryFirst;
     if (key === "whatsappNumber" && !valid.whatsappNumber) return valid.country ? d.form.errors.phone : t.selectCountryFirst;
     if (key === "email" && !valid.email) return d.form.errors.email;
@@ -111,47 +167,63 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     return undefined;
   }
 
+  /** Attach the chosen files to a draft, then submit it. Shared by both the new-patient and returning-patient paths. */
+  async function uploadAndSubmit(created: CreateCaseResponse) {
+    for (const file of files) {
+      if (uploaded.current.has(fileKey(file))) continue;
+      const presignResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/presign`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ originalFileName: file.name, contentType: file.type, sizeBytes: file.size }) });
+      if (!presignResponse.ok) throw new SubmitFailure("upload");
+      const presigned = await presignResponse.json() as PresignResponse;
+      const uploadResponse = await fetch(presigned.uploadUrl, { method: "PUT", headers: presigned.requiredHeaders, body: file });
+      if (!uploadResponse.ok) throw new SubmitFailure("upload");
+      const confirmResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/confirm`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: presigned.documentId }) });
+      if (!confirmResponse.ok) throw new SubmitFailure("upload");
+      uploaded.current.add(fileKey(file));
+      track("medical_file_uploaded");
+    }
+    const finalResponse = await fetch(apiUrl(`/cases/${created.caseId}/submit`), { method: "POST" });
+    if (!finalResponse.ok) throw new SubmitFailure("submitAfterUpload");
+    return await finalResponse.json() as { caseNumber: string; statusToken: string };
+  }
+
+  function describedCase(conditionDescription: string | undefined) {
+    const dictionaryKey = careArea === "rheumatology-rehabilitation" ? "rheumatology" : careArea;
+    const careLine = dictionaryKey ? `${d.form.category.summaryLabel}: ${d.form.category.options[dictionaryKey]}` : "";
+    return [careLine, conditionDescription].filter(Boolean).join("\n\n");
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    setTouched({ fullName: true, country: true, whatsappNumber: true, email: true, consent: true, files: true });
+    setTouched({ givenName: true, familyName: true, representativeName: true, representativeRelationship: true, country: true, whatsappNumber: true, email: true, consent: true, files: true });
     setErrors({});
     const candidate: FormValues = { ...values, country: country?.name ?? "", whatsappNumber: fullPhone };
-    const result = buildCaseSchema(d.form.errors).safeParse(candidate);
+    const result = buildCaseSchema({ ...d.form.errors, representative: d.form.errors.representative }).safeParse(candidate);
     const nextErrors: Errors = {};
     if (!result.success) for (const issue of result.error.issues) nextErrors[issue.path[0] as FieldKey] = issue.message;
     if (!country) nextErrors.country = t.selectCountryFirst;
     if (!filesAreValid(files)) nextErrors.files = d.form.errors.file;
     if (Object.keys(nextErrors).length || !result.success) { setErrors(nextErrors); return; }
     setBusy(true);
-    const dictionaryKey = careArea === "rheumatology-rehabilitation" ? "rheumatology" : careArea;
-    const careLine = dictionaryKey ? `${d.form.category.summaryLabel}: ${d.form.category.options[dictionaryKey]}` : "";
-    const describedCase = [careLine, result.data.conditionDescription].filter(Boolean).join("\n\n");
     try {
       // Reuse the draft from a previous attempt. Creating a case also creates the patient record, so
       // retrying after a failed upload or submit used to leave a second case and a duplicate patient
       // behind for the coordinator to untangle.
       let created = draftCase.current;
       if (!created) {
-        const createResponse = await fetch(apiUrl(`/cases`), { method: "POST", headers: { "Content-Type": "application/json", "X-Request-ID": crypto.randomUUID() }, body: JSON.stringify({ ...result.data, conditionDescription: describedCase, preferredLanguage: locale, careArea: careArea || null, travelPackageRequested: travelPackage, turnstileToken }) });
+        const data = result.data;
+        const payload = {
+          caseFor: data.caseFor, givenName: data.givenName, familyName: data.familyName || null, singleLegalName: data.singleLegalName,
+          representative: data.caseFor === "SOMEONE_ELSE" ? { name: data.representativeName, relationship: data.representativeRelationship } : null,
+          country: data.country, whatsappNumber: data.whatsappNumber, email: data.email || null,
+          conditionDescription: describedCase(data.conditionDescription), preferredLanguage: locale, consent: true,
+          careArea: careArea || null, travelPackageRequested: travelPackage, turnstileToken,
+        };
+        const createResponse = await fetch(apiUrl(`/cases`), { method: "POST", headers: { "Content-Type": "application/json", "X-Request-ID": crypto.randomUUID() }, body: JSON.stringify(payload) });
         if (!createResponse.ok) throw new SubmitFailure("server");
         created = await createResponse.json() as CreateCaseResponse;
         draftCase.current = created;
       }
-      for (const file of files) {
-        if (uploaded.current.has(fileKey(file))) continue;
-        const presignResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/presign`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ originalFileName: file.name, contentType: file.type, sizeBytes: file.size }) });
-        if (!presignResponse.ok) throw new SubmitFailure("upload");
-        const presigned = await presignResponse.json() as PresignResponse;
-        const uploadResponse = await fetch(presigned.uploadUrl, { method: "PUT", headers: presigned.requiredHeaders, body: file });
-        if (!uploadResponse.ok) throw new SubmitFailure("upload");
-        const confirmResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/confirm`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: presigned.documentId }) });
-        if (!confirmResponse.ok) throw new SubmitFailure("upload");
-        uploaded.current.add(fileKey(file));
-        track("medical_file_uploaded");
-      }
-      const finalResponse = await fetch(apiUrl(`/cases/${created.caseId}/submit`), { method: "POST" });
-      if (!finalResponse.ok) throw new SubmitFailure("submitAfterUpload");
-      const submitted = await finalResponse.json() as { caseNumber: string; statusToken: string };
+      const submitted = await uploadAndSubmit(created);
       window.localStorage.setItem("rehletshifaa:last-status-path", `/${locale}/status/${submitted.statusToken}`);
       draftCase.current = null; uploaded.current.clear();
       setCaseNumber(submitted.caseNumber); setStatusToken(submitted.statusToken); track("case_submitted");
@@ -163,10 +235,69 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     finally { setBusy(false); }
   }
 
+  /** Returning patient: only the case is new. The server links it to the same canonical patient. */
+  async function submitReturning(event: React.FormEvent) {
+    event.preventDefault();
+    if (!user) return;
+    setTouched({ consent: true, files: true }); setErrors({});
+    if (!values.consent || !filesAreValid(files)) { setErrors({ ...(values.consent ? {} : { consent: d.form.errors.consent }), ...(filesAreValid(files) ? {} : { files: d.form.errors.file }) }); return; }
+    setBusy(true);
+    try {
+      let created = draftCase.current;
+      if (!created) {
+        const response = await apiFetchAs(user.access_token, "/patient/cases", { method: "POST", body: JSON.stringify({ conditionDescription: describedCase(values.conditionDescription.trim()), careArea: careArea || null, travelPackageRequested: travelPackage, consent: true }) });
+        if (!response.ok) throw new SubmitFailure("server");
+        created = await response.json() as CreateCaseResponse;
+        draftCase.current = created;
+      }
+      const submitted = await uploadAndSubmit(created);
+      draftCase.current = null; uploaded.current.clear();
+      setCaseNumber(submitted.caseNumber); track("case_submitted");
+    } catch (failure) { setErrors({ server: d.form.errors[failure instanceof SubmitFailure ? failure.stage : "server"] }); }
+    finally { setBusy(false); }
+  }
+
   if (caseNumber) {
     const message = `Hello RehletShifaa, I submitted my medical case. My Case ID is ${caseNumber}.`;
     const statusHref = statusToken ? `/${locale}/status/${statusToken}` : undefined;
-    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><div className="mt-7 flex flex-wrap gap-3">{statusHref && <a className="btn-primary" href={statusHref}>{ar ? "متابعة حالة الطلب" : "Track your case"}</a>}<a className="btn-secondary" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappHref(message)}>{d.form.continue}</a></div></section>;
+    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{isPatient && session?.linked ? t.successReturning : d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><div className="mt-7 flex flex-wrap gap-3">{isPatient && session?.linked ? <a className="btn-primary" href={`/${locale}/portal`}>{t.goToPortal}</a> : statusHref && <a className="btn-primary" href={statusHref}>{ar ? "متابعة حالة الطلب" : "Track your case"}</a>}<a className="btn-secondary" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappHref(message)}>{d.form.continue}</a></div></section>;
+  }
+
+  // ---- Returning, signed-in patient: saved details reused, only the new case is entered ----
+  if (isPatient && session?.linked) {
+    return <form className="card overflow-hidden" onSubmit={submitReturning} noValidate>
+      <div className="border-b border-line bg-brand-50/70 px-6 py-5 md:px-9">
+        <p className="text-sm text-ink-500">{t.signedInAs}</p>
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1"><strong className="text-lg text-brand-900">{session.displayName}</strong><a className="text-sm font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/portal`}>{t.goToPortal}</a></p>
+        <p className="mt-2 text-sm leading-6 text-ink-600">{t.savedDetails}</p>
+      </div>
+      <div className="p-6 md:p-9">
+        <fieldset className="min-w-0 border-0 p-0">
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{ar ? "عن حالتك الجديدة" : "About your new case"}</legend>
+          {caseFields()}
+        </fieldset>
+        {travelAndConsent()}
+        {errors.server && <p className="mt-6 rounded-md border border-alert-200 bg-alert-50 p-4 text-sm text-alert-800" role="alert">{errors.server}</p>}
+        <button className="btn-primary mt-6 w-full transition-opacity disabled:opacity-50 disabled:saturate-[.6] disabled:cursor-not-allowed" disabled={busy || !values.consent || !valid.files} type="submit">{busy ? d.form.sending : t.startNew}</button>
+        <p className="mt-4 flex items-center justify-center gap-2 text-xs text-ink-500"><LockKeyhole size={14} />{d.form.secureNote}</p>
+      </div>
+    </form>;
+  }
+
+  // Plain render helpers (not components): a component defined inside render remounts on every keystroke.
+  function caseFields() {
+    return <>
+      <div className="mt-4"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} <span className="font-normal text-ink-400">({d.form.optional})</span></span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option></select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
+      <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.description} <span className="font-normal text-ink-400">({d.form.optional})</span></span><textarea className="field min-h-28 resize-y" value={values.conditionDescription} maxLength={1900} onChange={e => update("conditionDescription", e.target.value)} /></label></div>
+      <div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><span className="block text-sm font-bold text-ink-800">{d.form.files} <span className="font-normal text-ink-400">({d.form.optional})</span></span>{files.length>0&&<span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800">{files.length} {d.form.selected}</span>}</div><div className="overflow-hidden rounded-2xl border border-line bg-white"><label className="flex cursor-pointer items-center gap-4 border-b border-dashed border-line-strong bg-brand-50 p-5 transition hover:border-brand-600 hover:bg-brand-100/60"><span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-white text-accent-700 shadow-sm"><FileUp /></span><span className="min-w-0 flex-1"><strong className="block text-brand-800">{d.form.choose}</strong><span className="mt-1 block text-sm text-ink-500">{d.form.uploadHelp}</span></span><Plus className="flex-none text-brand-700"/><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => { onFiles(Array.from(e.currentTarget.files ?? []));e.currentTarget.value="";touch("files"); }} /></label>{files.length>0&&<ul className="grid gap-2 p-3 sm:grid-cols-2">{files.map((file,index)=><li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-mist/50 p-3"><FileText className="flex-none text-brand-600" size={20}/><span className="min-w-0 flex-1"><strong className="block truncate text-sm" title={file.name}>{file.name}</strong><span className="text-xs text-ink-500">{(file.size/1024/1024).toFixed(file.size<1024*1024?2:1)} MB</span></span><button type="button" className="rounded-lg p-2 text-ink-500 hover:bg-alert-50 hover:text-alert-800" aria-label={`${ar?"حذف":"Remove"} ${file.name}`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><Trash2 size={17}/></button></li>)}</ul>}</div>{fieldError("files") && <p className="error-text mt-2">{fieldError("files")}</p>}</div>
+    </>;
+  }
+
+  function travelAndConsent() {
+    return <>
+      <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white p-4"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={travelPackage} onChange={e => { begin(); setTravelPackage(e.target.checked); }} /><span className="text-sm leading-6 text-ink-700"><strong className="block text-ink-900">{ar ? "أرغب في تنظيم باقة سفر وعلاج متكاملة" : "I'd like a full travel & treatment package"}</strong>{ar ? "إذا قُبلت حالتي من قبل الاستشاري، يتولى فريق رحلة شفاء ترتيب الطيران والتأشيرة والإقامة والتنقلات من وإلى المستشفى." : "If my case is accepted by the consultant, RehletShifaa will arrange your flights, visa, accommodation, and hospital transfers."}</span></label>
+      <label className="mt-4 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={values.consent} onChange={e => { update("consent", e.target.checked); touch("consent"); }} /><span className="text-sm leading-6 text-ink-700">{d.form.consent} <a className="font-bold text-brand-700 underline" href={`/${locale}/privacy`}>{d.common.privacy}</a></span></label>{fieldError("consent") && <p className="error-text mt-2">{fieldError("consent")}</p>}
+    </>;
   }
 
   return <>
@@ -179,44 +310,88 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
         </ol>
       </div>
       <div className="p-6 md:p-9">
-      {/* Section 1 — contact details */}
-      {step===1&&<fieldset className="min-w-0 border-0 p-0">
-        <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{ar ? "بيانات التواصل" : "Your contact details"}</legend>
-        <div className="mt-4 grid gap-6 sm:grid-cols-2">
-          <Field label={d.form.name} required requiredMark={t.requiredMark} valid={valid.fullName && !!values.fullName} error={fieldError("fullName")}>
-            <input className={`field ${fieldError("fullName") ? "field-error" : ""}`} autoComplete="name" value={values.fullName} onChange={e => update("fullName", e.target.value)} onBlur={() => touch("fullName")} />
-          </Field>
-          <Field label={t.countryLabel} required requiredMark={t.requiredMark} valid={valid.country} error={fieldError("country")}>
-            <CountrySelect locale={locale} value={country} placeholder={t.countryPlaceholder} emptyLabel={t.countryEmpty} clearLabel={t.clearCountry} invalid={!!fieldError("country")} onBlur={() => touch("country")} onChange={c => { begin(); setCountry(c); touch("country"); }} />
-          </Field>
-        </div>
-        <div className="mt-6 grid gap-6 sm:grid-cols-2">
-          <Field label={d.form.phone} required requiredMark={t.requiredMark} valid={valid.whatsappNumber} error={fieldError("whatsappNumber")} hint={t.phoneHint}>
-            <div className={`flex items-stretch overflow-hidden rounded-[0.55rem] border ${fieldError("whatsappNumber") ? "border-alert-700" : "border-line-strong focus-within:border-brand-600 focus-within:shadow-[0_0_0_3px_var(--color-brand-100)]"}`} dir="ltr">
-              <span className="flex flex-none items-center gap-1.5 border-e border-line bg-brand-50 px-3 text-sm font-bold text-ink-800" aria-hidden>
-                {country ? <><span className="text-base leading-none">{flagEmoji(country.iso2)}</span><span>{country.dial}</span></> : <span className="text-ink-400">+—</span>}
-              </span>
-              <input className="min-w-0 flex-1 bg-white px-3 py-2.5 text-ink-900 outline-none" inputMode="tel" autoComplete="tel-national" placeholder={country ? "100 000 0000" : t.selectCountryFirst} aria-label={t.localNumber} value={phoneLocal} onChange={e => { begin(); setPhoneLocal(e.target.value.replace(/[^\d\s()-]/g, "")); }} onBlur={() => touch("whatsappNumber")} />
-            </div>
-          </Field>
-          <Field label={`${d.form.email} (${d.form.optional})`} valid={valid.email && emailTrimmed !== ""} error={fieldError("email")}>
-            <input className={`field ${fieldError("email") ? "field-error" : ""}`} type="email" dir="ltr" inputMode="email" autoComplete="email" placeholder="name@example.com" value={values.email} onChange={e => update("email", e.target.value)} onBlur={() => touch("email")} />
-          </Field>
-        </div>
-      </fieldset>}
+      {/* Section 1 — who the case is for, the patient's name, and how to reach the submitter */}
+      {step===1&&<div className="min-w-0">
+        {/* Quiet existing-account entry: never a competing CTA, never a registration prompt. */}
+        {!authLoading && !isPatient && <p className="mb-5 rounded-xl bg-mist px-4 py-3 text-sm text-ink-600">{t.haveAccount} <a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/portal?signin=1&returnTo=${encodeURIComponent(`/${locale}/send-my-case`)}`}>{t.signInSaved}</a></p>}
+
+        <fieldset className="min-w-0 border-0 p-0">
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{t.whoTitle}</legend>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t.whoTitle}>
+            {([["MYSELF", t.myself, t.myselfHelp, UserRound], ["SOMEONE_ELSE", t.someoneElse, t.someoneElseHelp, Users]] as const).map(([key, label, help, Icon]) => {
+              const selected = values.caseFor === key;
+              return <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${selected ? "border-brand-600 bg-brand-50 shadow-[0_0_0_3px_var(--color-brand-100)]" : "border-line bg-white hover:border-brand-300"}`}>
+                <input type="radio" name="caseFor" className="sr-only" value={key} checked={selected} onChange={() => update("caseFor", key)} />
+                <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-lg ${selected ? "bg-brand-600 text-white" : "bg-mist text-brand-700"}`} aria-hidden><Icon size={20} /></span>
+                <span className="min-w-0"><strong className="block text-ink-900">{label}</strong><span className="mt-0.5 block text-sm leading-5 text-ink-500">{help}</span></span>
+                {selected && <Check size={18} className="ms-auto flex-none text-brand-600" aria-hidden />}
+              </label>;
+            })}
+          </div>
+        </fieldset>
+
+        <fieldset className="mt-8 min-w-0 border-0 p-0">
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.patientSection : t.patientSectionSelf}</legend>
+          <p className="mt-1 text-sm text-ink-500">{t.namesHelp}</p>
+          <div className="mt-4 grid gap-6 sm:grid-cols-2">
+            <Field label={d.form.name} required requiredMark={t.requiredMark} valid={valid.givenName && !!values.givenName} error={fieldError("givenName")}>
+              <input className={`field ${fieldError("givenName") ? "field-error" : ""}`} autoComplete={someoneElse ? "off" : "given-name"} value={values.givenName} onChange={e => update("givenName", e.target.value)} onBlur={() => touch("givenName")} />
+            </Field>
+            <Field label={values.singleLegalName ? `${d.form.familyName} (${d.form.optional})` : d.form.familyName} required={!values.singleLegalName} requiredMark={t.requiredMark} valid={valid.familyName && !!values.familyName} error={fieldError("familyName")}>
+              <input className={`field ${fieldError("familyName") ? "field-error" : ""}`} autoComplete={someoneElse ? "off" : "family-name"} value={values.familyName} onChange={e => update("familyName", e.target.value)} onBlur={() => touch("familyName")} />
+            </Field>
+          </div>
+          <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-ink-600"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={values.singleLegalName} onChange={e => update("singleLegalName", e.target.checked)} />{t.singleName}</label>
+          <div className="mt-6">
+            <Field label={t.countryLabel} required requiredMark={t.requiredMark} valid={valid.country} error={fieldError("country")}>
+              <CountrySelect locale={locale} value={country} placeholder={t.countryPlaceholder} emptyLabel={t.countryEmpty} clearLabel={t.clearCountry} invalid={!!fieldError("country")} onBlur={() => touch("country")} onChange={c => { begin(); setCountry(c); touch("country"); }} />
+            </Field>
+          </div>
+        </fieldset>
+
+        {someoneElse && <fieldset className="mt-8 min-w-0 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
+          <legend className="px-1 text-sm font-bold uppercase tracking-wide text-accent-700">{t.repSection}</legend>
+          <div className="mt-2 grid gap-6 sm:grid-cols-2">
+            <Field label={t.repName} required requiredMark={t.requiredMark} valid={valid.representativeName && !!values.representativeName} error={fieldError("representativeName")}>
+              <input className={`field ${fieldError("representativeName") ? "field-error" : ""}`} autoComplete="name" value={values.representativeName} onChange={e => update("representativeName", e.target.value)} onBlur={() => touch("representativeName")} />
+            </Field>
+            <Field label={t.repRelationship} required requiredMark={t.requiredMark} valid={valid.representativeRelationship && !!values.representativeRelationship} error={fieldError("representativeRelationship")}>
+              <select className={`field ${fieldError("representativeRelationship") ? "field-error" : ""}`} value={values.representativeRelationship} onChange={e => { update("representativeRelationship", e.target.value as Relationship | ""); touch("representativeRelationship"); }}>
+                <option value="">{t.selectOption}</option>
+                {RELATIONSHIPS.map(r => <option key={r} value={r}>{t.relationships[r]}</option>)}
+              </select>
+            </Field>
+          </div>
+        </fieldset>}
+
+        <fieldset className="mt-8 min-w-0 border-0 p-0">
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.contactSectionRep : t.contactSection}</legend>
+          {someoneElse && <p className="mt-1 text-sm text-ink-500">{t.contactRepHint}</p>}
+          <div className="mt-4 grid gap-6 sm:grid-cols-2">
+            <Field label={d.form.phone} required requiredMark={t.requiredMark} valid={valid.whatsappNumber} error={fieldError("whatsappNumber")} hint={t.phoneHint}>
+              <div className={`flex items-stretch overflow-hidden rounded-[0.55rem] border ${fieldError("whatsappNumber") ? "border-alert-700" : "border-line-strong focus-within:border-brand-600 focus-within:shadow-[0_0_0_3px_var(--color-brand-100)]"}`} dir="ltr">
+                <span className="flex flex-none items-center gap-1.5 border-e border-line bg-brand-50 px-3 text-sm font-bold text-ink-800" aria-hidden>
+                  {country ? <><span className="text-base leading-none">{flagEmoji(country.iso2)}</span><span>{country.dial}</span></> : <span className="text-ink-400">+—</span>}
+                </span>
+                <input className="min-w-0 flex-1 bg-white px-3 py-2.5 text-ink-900 outline-none" inputMode="tel" autoComplete="tel-national" placeholder={country ? "100 000 0000" : t.selectCountryFirst} aria-label={t.localNumber} value={phoneLocal} onChange={e => { begin(); setPhoneLocal(e.target.value.replace(/[^\d\s()-]/g, "")); }} onBlur={() => touch("whatsappNumber")} />
+              </div>
+            </Field>
+            <Field label={`${d.form.email} (${d.form.optional})`} valid={valid.email && emailTrimmed !== ""} error={fieldError("email")} hint={t.emailHint}>
+              <input className={`field ${fieldError("email") ? "field-error" : ""}`} type="email" dir="ltr" inputMode="email" autoComplete="email" placeholder="name@example.com" value={values.email} onChange={e => update("email", e.target.value)} onBlur={() => touch("email")} />
+            </Field>
+          </div>
+        </fieldset>
+      </div>}
 
       {/* Section 2 — the case */}
       {step===2&&<fieldset className="min-w-0 border-0 p-0">
-        <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{ar ? "عن حالتك" : "About your case"}</legend>
-        <div className="mt-4"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} <span className="font-normal text-ink-400">({d.form.optional})</span></span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option></select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
-        <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.description} <span className="font-normal text-ink-400">({d.form.optional})</span></span><textarea className="field min-h-28 resize-y" value={values.conditionDescription} maxLength={1900} onChange={e => update("conditionDescription", e.target.value)} /></label></div>
-        <div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><span className="block text-sm font-bold text-ink-800">{d.form.files} <span className="font-normal text-ink-400">({d.form.optional})</span></span>{files.length>0&&<span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800">{files.length} {d.form.selected}</span>}</div><div className="overflow-hidden rounded-2xl border border-line bg-white"><label className="flex cursor-pointer items-center gap-4 border-b border-dashed border-line-strong bg-brand-50 p-5 transition hover:border-brand-600 hover:bg-brand-100/60"><span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-white text-accent-700 shadow-sm"><FileUp /></span><span className="min-w-0 flex-1"><strong className="block text-brand-800">{d.form.choose}</strong><span className="mt-1 block text-sm text-ink-500">{d.form.uploadHelp}</span></span><Plus className="flex-none text-brand-700"/><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => { onFiles(Array.from(e.currentTarget.files ?? []));e.currentTarget.value="";touch("files"); }} /></label>{files.length>0&&<ul className="grid gap-2 p-3 sm:grid-cols-2">{files.map((file,index)=><li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-mist/50 p-3"><FileText className="flex-none text-brand-600" size={20}/><span className="min-w-0 flex-1"><strong className="block truncate text-sm" title={file.name}>{file.name}</strong><span className="text-xs text-ink-500">{(file.size/1024/1024).toFixed(file.size<1024*1024?2:1)} MB</span></span><button type="button" className="rounded-lg p-2 text-ink-500 hover:bg-alert-50 hover:text-alert-800" aria-label={`${ar?"حذف":"Remove"} ${file.name}`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><Trash2 size={17}/></button></li>)}</ul>}</div>{fieldError("files") && <p className="error-text mt-2">{fieldError("files")}</p>}</div>
+        <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? (ar ? "عن حالة المريض" : "About the patient's case") : (ar ? "عن حالتك" : "About your case")}</legend>
+        {caseFields()}
       </fieldset>}
 
-      {/* Section 3 — options & consent */}
-      {step===3&&<><div className="rounded-2xl border border-brand-200 bg-brand-50 p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{d.form.name}</dt><dd className="font-bold text-ink-900">{values.fullName}</dd></div><div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country?.name}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{d.form.files}</dt><dd className="font-bold text-ink-900">{files.length}</dd></div></dl></div>
-      <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white p-4"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={travelPackage} onChange={e => { begin(); setTravelPackage(e.target.checked); }} /><span className="text-sm leading-6 text-ink-700"><strong className="block text-ink-900">{ar ? "أرغب في تنظيم باقة سفر وعلاج متكاملة" : "I'd like a full travel & treatment package"}</strong>{ar ? "إذا قُبلت حالتي من قبل الاستشاري، يتولى فريق رحلة شفاء ترتيب الطيران والتأشيرة والإقامة والتنقلات من وإلى المستشفى." : "If my case is accepted by the consultant, RehletShifaa will arrange your flights, visa, accommodation, and hospital transfers."}</span></label>
-      <label className="mt-4 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={values.consent} onChange={e => { update("consent", e.target.checked); touch("consent"); }} /><span className="text-sm leading-6 text-ink-700">{d.form.consent} <a className="font-bold text-brand-700 underline" href={`/${locale}/privacy`}>{d.common.privacy}</a></span></label>{fieldError("consent") && <p className="error-text mt-2">{fieldError("consent")}</p>}
+      {/* Section 3 — review, options & consent */}
+      {step===3&&<><div className="rounded-2xl border border-brand-200 bg-brand-50 p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{t.forName}</dt><dd className="font-bold text-ink-900">{[values.givenName.trim(), values.familyName.trim()].filter(Boolean).join(" ")}</dd></div>{someoneElse && <div><dt className="text-ink-500">{t.submittedBy}</dt><dd className="font-bold text-ink-900">{values.representativeName.trim()} <span className="font-normal text-ink-500">({values.representativeRelationship ? t.relationships[values.representativeRelationship] : ""})</span></dd></div>}<div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country?.name}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{d.form.files}</dt><dd className="font-bold text-ink-900">{files.length}</dd></div></dl></div>
+      {travelAndConsent()}
 
       {siteKey && <div className="cf-turnstile mt-6" data-sitekey={siteKey} data-callback="onRehletShifaaTurnstile" />}
       {errors.server && <p className="mt-6 rounded-md border border-alert-200 bg-alert-50 p-4 text-sm text-alert-800" role="alert">{errors.server}</p>}

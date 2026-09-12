@@ -34,6 +34,27 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         seedConsultant(DOCTOR_SUBJECT,"Dr Ahmed Alashry","General and Interventional Cardiology","Interventional cardiology","cardiology",now);
         seedConsultant("00000000-0000-0000-0000-000000000201","Dr Hanan Elshoura","Rheumatology, Rehabilitation and Physical Medicine","Adult & pediatric dysphagia rehabilitation","rheumatology-rehabilitation",now);
         seedConsultant("00000000-0000-0000-0000-000000000202","Dr Hossam Kibba","Orthopedics, Trauma and Joint Replacement","Hip & knee replacement, lower-extremity","orthopedics",now);
+        // Work addresses of the QA identities (the realm's seeded logins), so work emails reach the person
+        // the work belongs to — a consultant's assignment must be visible under the consultant's address in
+        // Mailpit, never under the coordination team's. Only rows still without an address are touched.
+        seedStaffEmail(COORDINATOR_SUBJECT,"coordinator@local.test",now);
+        seedStaffEmail(SECOND_COORDINATOR_SUBJECT,"coordinator2@local.test",now);
+        seedStaffEmail(OPERATIONS_SUBJECT,"operations@local.test",now);
+        seedStaffEmail(FINANCE_SUBJECT,"finance@local.test",now);
+        seedPractitionerEmail(DOCTOR_SUBJECT,"doctor@local.test",now);
+    }
+    private void seedStaffEmail(String subject,String email,Instant now){
+        jdbc.sql("UPDATE staff_members SET email_encrypted=?,email_hash=?,updated_at=? WHERE external_subject=? AND email_hash IS NULL AND NOT EXISTS(SELECT 1 FROM staff_members s WHERE s.email_hash=?)")
+            .params(crypto.encrypt(email),emailHash(email),timestamp(now),subject,emailHash(email)).update();
+    }
+    private void seedPractitionerEmail(String subject,String email,Instant now){
+        jdbc.sql("UPDATE practitioner_profiles SET email_encrypted=?,email_hash=?,updated_at=? WHERE external_subject=? AND email_hash IS NULL AND NOT EXISTS(SELECT 1 FROM practitioner_profiles p WHERE p.email_hash=?)")
+            .params(crypto.encrypt(email),emailHash(email),timestamp(now),subject,emailHash(email)).update();
+    }
+    /** Same normalisation as the invite paths: SHA-256 of the lower-cased address. */
+    private static String emailHash(String email){
+        try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(email.trim().toLowerCase(java.util.Locale.ROOT).getBytes(java.nio.charset.StandardCharsets.UTF_8)));}
+        catch(Exception e){throw new IllegalStateException("Unable to hash seed email",e);}
     }
     private void seedStaff(String subject,String role,String name,Instant now){
         jdbc.sql("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0) ON CONFLICT (external_subject) DO UPDATE SET staff_role=EXCLUDED.staff_role,display_name_encrypted=EXCLUDED.display_name_encrypted,updated_at=EXCLUDED.updated_at")

@@ -52,8 +52,11 @@ public final class JourneyDtos {
     public record StaffInviteRequest(@NotBlank @Size(max=160)String name,@NotBlank @Email @Size(max=254)String email,@NotBlank @Pattern(regexp="COORDINATOR|COORDINATOR_LEAD|OPERATIONS|OPERATIONS_LEAD|FINANCE|FINANCE_LEAD")String role,@Pattern(regexp="en|ar")String locale) {}
     // catalogServiceId set => the service was picked from the consultant's approved catalog (no Finance approval);
     // null => a manually entered service (Finance approval required before the quote can reach the patient).
-    public record CostEstimateItem(@NotBlank @Size(max=500)String serviceDescription,@NotNull @DecimalMin("0.00")BigDecimal estimatedCost,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,UUID catalogServiceId) {
-        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency){this(serviceDescription,estimatedCost,currency,null);}
+    // quotedCost/quotedCurrency are read-side only: the same line expressed in the recommendation's proposal
+    // currency at today's effective rate (null when no rate is available — never a silent base-currency stand-in).
+    public record CostEstimateItem(@NotBlank @Size(max=500)String serviceDescription,@NotNull @DecimalMin("0.00")BigDecimal estimatedCost,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,UUID catalogServiceId,BigDecimal quotedCost,String quotedCurrency) {
+        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency){this(serviceDescription,estimatedCost,currency,null,null,null);}
+        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency,UUID catalogServiceId){this(serviceDescription,estimatedCost,currency,catalogServiceId,null,null);}
     }
     // proposalCurrency is the currency the consultant prepares the recommendation in; it becomes the
     // patient proposal's currency downstream. Null means "unstated" and leaves the base currency in place.
@@ -75,6 +78,14 @@ public final class JourneyDtos {
         public PublicProposalDecisionRequest(String grant,String decision,String comment){this(grant,decision,comment,null);}
     }
     public record ActivateAccountRequest(@NotBlank @Size(max=256)String activationToken) {}
+    /** Authenticated account state: which canonical patient this sign-in is, and where to send them. */
+    public record AccountSessionView(boolean linked,UUID patientId,String displayName,String accountStatus,UUID currentCaseId,int pendingLinkRequests) {}
+    /** The signed-in patient's reusable account facts (Profile & Security). Never carries case, clinical, proposal or deposit data. */
+    public record PatientProfileView(String givenName,String familyName,String displayName,String preferredName,LocalDate dateOfBirth,String country,String nationality,String preferredLanguage,String email,boolean emailVerified,String whatsappNumber,boolean phoneVerified,String accountStatus) {}
+    /** An "is this case for you?" question addressed to the owner of an already-registered email. */
+    public record AccountLinkRequestView(String caseNumber,String patientDisplayName,String origin,String submittedAs,String relationship,String resolution) {}
+    public record AccountLinkResolution(@NotBlank @Pattern(regexp="SAME_PATIENT|REPRESENTATIVE|DECLINED") String resolution,
+                                        @Pattern(regexp="PARENT|CHILD|SPOUSE|SIBLING|RELATIVE|GUARDIAN|OTHER") String relationship) {}
     /** Adds the acting person and role so the journey reads as accountable history, not bare statuses. */
     public record TimelineEvent(String type,String label,Instant occurredAt,String status,String actorName,String actorRole,String note) {}
     public record MessageView(UUID id,String threadType,String senderRole,String senderName,String direction,String body,String language,boolean internalOnly,boolean read,Instant createdAt) {}
@@ -91,14 +102,24 @@ public final class JourneyDtos {
     public record DoctorProfileView(String displayName,String specialty,String subspecialty,String careCategory,String availabilityStatus,String credentialingStatus) {}
     public record StaffProfileView(String displayName,String role) {}
     public record CareCategoryView(String slug,String nameEn,String nameAr) {}
-    public record ClinicalReviewView(UUID id,int versionNumber,String status,String suitability,String recommendedTreatment,String risksAndLimitations,Instant createdAt,List<CostEstimateItem>costEstimates,String proposalCurrency) {}
+    /** {@code quoteRate} is today's effective EGP->proposalCurrency rate the estimates were quoted with (null: base currency, or no rate available). */
+    public record ClinicalReviewView(UUID id,int versionNumber,String status,String suitability,String recommendedTreatment,String risksAndLimitations,Instant createdAt,List<CostEstimateItem>costEstimates,String proposalCurrency,BigDecimal quoteRate,LocalDate quoteRateDate,String quoteRateSource) {}
     // Backend-computed approval gates for the latest pre-release proposal; null once released or when no proposal exists.
     // The UI must drive Operations/Finance/Release from these, never infer requirements from proposal.status alone.
     public record ProposalGates(boolean operationsRequired,String operationsReason,boolean operationsCompleted,boolean financeRequired,List<String>financeReasons,boolean financeCompleted,boolean readyForRelease) {}
     // Secure-delivery status of the latest released proposal notification (masked; no raw contact or token).
     public record DeliveryStatus(String status,String channel,String destinationMasked,int attempts,Instant deliveredAt,Instant nextAttemptAt) {}
     /** {@code patientAction} is the open request to the patient, so staff can see and record exactly what was asked. */
-    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions) {}
+    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions,PatientProposalState patientProposal) {}
+    /**
+     * The ONE answer to "can the patient see a proposal right now, and which one?" — shared by the signed-in
+     * patient case page and the secure Check Case Status link. {@code state}: NONE, PREPARING, READY, ACCEPTED,
+     * DECLINED, REVISION_REQUESTED, EXPIRED. {@code action}: REVIEW_PROPOSAL (decidable), VIEW_PROPOSAL
+     * (acknowledged/accepted, read-only) or null. Version details are present only for a patient-visible version.
+     */
+    public record PatientProposalState(String state,String action,UUID versionId,Integer versionNumber,String documentType,String currency,Instant validUntil,Instant releasedAt,Instant decidedAt) {}
+    /** Credentials for opening the current proposal from a verified case-status session: a share token plus an already-verified view grant. */
+    public record ProposalAccessHandoff(String token,String grant,Instant expiresAt,UUID versionId) {}
     public record IntakePreview(CaseView caseSummary,String intakeSummary,CaseActionsView actions) {}
     // --- Backend-authoritative action contract for the case page ---
     // The page renders what is true now and what the signed-in person can validly do now from this record

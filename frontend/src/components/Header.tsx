@@ -15,7 +15,7 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
   const navLabel = locale === "ar" ? "التنقل الرئيسي" : "Primary navigation";
 
   return (
-    <header className="sticky top-0 z-50 isolate border-b border-line bg-white/95 shadow-[0_8px_30px_-28px_rgba(28,51,58,.65)] backdrop-blur-xl">
+    <header className="site-header sticky top-0 z-50 isolate border-b border-border-subtle bg-surface-pearl/95 backdrop-blur-xl">
       <div className="container-site flex min-h-[4.25rem] items-center justify-between gap-3 md:min-h-[4.5rem]">
         <Link href={localeHref(locale)} aria-label={`${d.common.brand} — ${d.nav.home}`}>
           <Logo
@@ -31,8 +31,13 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
           <PrimaryNav items={items} label={navLabel} />
         </HideOnPortal>
 
+        {/* Right group, in ascending weight: language (utility) · Sign in (secondary account action, outlined) ·
+            Start my case (the one primary conversion). Distinct from "Check case status" in the main navigation. */}
         <HideOnPortal locale={locale}><div className="hidden items-center gap-2 nav:flex">
           <LocaleSwitch locale={locale} label={d.nav.language} ariaLabel={d.nav.languageAria} />
+          <Link href={localeHref(locale, "portal") + "?signin=1"} title={d.nav.signInHint} className="btn-outline">
+            {d.nav.signIn}
+          </Link>
           <HideOnPortal locale={locale}>
             <TrackedLink
               event="send_case_cta_clicked"
@@ -43,6 +48,8 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
             </TrackedLink>
           </HideOnPortal>
         </div></HideOnPortal>
+        {/* Signed-in patient navigation (My Care · Documents · Messages) mounts here beside the account menu. */}
+        <div id="portal-nav-slot" className="flex flex-1 items-center justify-center empty:hidden" />
         <div id="portal-account-slot" className="flex items-center gap-2" />
 
         <HideOnPortal locale={locale}>
@@ -54,6 +61,8 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
               close: d.common.menuClose,
               nav: navLabel,
               send: d.nav.send,
+              signIn: d.nav.signIn,
+              signInHint: d.nav.signInHint,
               language: d.nav.language,
               languageAria: d.nav.languageAria,
             }}

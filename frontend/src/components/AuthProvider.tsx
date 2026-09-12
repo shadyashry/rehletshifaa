@@ -4,12 +4,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { User } from "oidc-client-ts";
 import { authManager, userRoles } from "@/lib/auth-client";
 
-type AuthValue={user:User|null;roles:string[];loading:boolean;signIn:(reauthenticate?:boolean)=>Promise<void>;signOut:()=>Promise<void>};
+type AuthValue={user:User|null;roles:string[];loading:boolean;signIn:(reauthenticate?:boolean,returnTo?:string)=>Promise<void>;signOut:()=>Promise<void>};
 const Context=createContext<AuthValue|null>(null);
 export function AuthProvider({children}:{children:React.ReactNode}){
   const [user,setUser]=useState<User|null>(null);const[loading,setLoading]=useState(true);
   useEffect(()=>{const manager=authManager();manager.getUser().then(value=>setUser(value?.expired?null:value)).finally(()=>setLoading(false));const loaded=(value:User)=>setUser(value);const unloaded=()=>setUser(null);manager.events.addUserLoaded(loaded);manager.events.addUserUnloaded(unloaded);return()=>{manager.events.removeUserLoaded(loaded);manager.events.removeUserUnloaded(unloaded);};},[]);
-  const signIn=useCallback(async(reauthenticate=false)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";return authManager().signinRedirect({state:{returnTo:`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[]);
+  // returnTo defaults to the current page; callers that arrive via a one-shot flag (?signin=1, ?continue=1) strip it first so a cancelled sign-in cannot loop.
+  const signIn=useCallback(async(reauthenticate=false,returnTo?:string)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[]);
   const signOut=useCallback(async()=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";await authManager().signoutRedirect({post_logout_redirect_uri:`${window.location.origin}/${locale}/portal`});},[]);
   const value=useMemo(()=>({user,roles:userRoles(user),loading,signIn,signOut}),[user,loading,signIn,signOut]);
   return <Context.Provider value={value}>{children}</Context.Provider>;

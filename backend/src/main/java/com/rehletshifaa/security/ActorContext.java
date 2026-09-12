@@ -37,6 +37,21 @@ public class ActorContext {
 
     private ActorRole role(String value) { try { return ActorRole.valueOf(value); } catch (IllegalArgumentException e) { return null; } }
 
+    /**
+     * The identity provider's view of the signed-in account's email: the address and whether the provider
+     * has verified it. Empty when the token carries no email claim. Read-only identity evidence; the patient
+     * domain still decides what to do with it.
+     */
+    public java.util.Optional<AccountEmail> accountEmail() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!(auth instanceof JwtAuthenticationToken jwt)) return java.util.Optional.empty();
+        String email = jwt.getToken().getClaimAsString("email");
+        if (email == null || email.isBlank()) return java.util.Optional.empty();
+        Boolean verified = jwt.getToken().getClaimAsBoolean("email_verified");
+        return java.util.Optional.of(new AccountEmail(email.trim().toLowerCase(java.util.Locale.ROOT), Boolean.TRUE.equals(verified)));
+    }
+    public record AccountEmail(String email, boolean verified) {}
+
     public Actor requireRecentAuthentication(Duration maximumAge,ActorRole... allowed){Actor actor=require(allowed);if(actor.authenticatedAt().equals(Instant.EPOCH)||actor.authenticatedAt().isBefore(Instant.now().minus(maximumAge)))throw new ApiException(401,"REAUTHENTICATION_REQUIRED","Please authenticate again before completing this sensitive action");return actor;}
 
     public record Actor(String subject, Set<ActorRole> roles, Instant authenticatedAt) {

@@ -13,7 +13,7 @@ export function PrimaryNav({ items, label }: { items: readonly NavItem[]; label:
   const pathname = usePathname();
 
   return (
-    <nav aria-label={label} className="hidden items-center gap-1.5 nav:flex">
+    <nav aria-label={label} className="hidden items-center gap-1 nav:flex">
       {items.map((item) => {
         const active = pathname === item.href;
         return (
@@ -21,10 +21,10 @@ export function PrimaryNav({ items, label }: { items: readonly NavItem[]; label:
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`whitespace-nowrap rounded-lg px-3 py-2 text-[0.9rem] font-medium transition-colors ${
+            className={`relative whitespace-nowrap rounded-lg px-2.5 py-2 text-[0.95rem] font-medium transition-colors ${
               active
-                ? "text-brand-900 bg-brand-50"
-                : "text-ink-600 hover:text-brand-700 hover:bg-brand-50"
+                ? "text-brand-900 after:absolute after:inset-x-2.5 after:-bottom-px after:h-0.5 after:rounded-full after:bg-brand-500"
+                : "text-ink-600 hover:text-brand-800 hover:bg-brand-50/70"
             }`}
           >
             {item.label}

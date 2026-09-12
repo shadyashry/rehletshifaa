@@ -194,6 +194,33 @@ describe("ProposalSign", () => {
     expect(screen.getByText("I understand this is a preliminary estimate based on remote review.")).toBeTruthy();
     expect(screen.getByText(/final treatment plan and price may increase or decrease/)).toBeTruthy();
   });
+
+  // ---- arriving from a verified Check Case Status session ----
+
+  it("opens straight to the proposal with the grant handed over from Check Case Status, once", async () => {
+    sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "handed-grant", expiresAt: "2099-01-01T00:00:00Z" }));
+    render(<ProposalSign locale="en" token="tok-1" />);
+    await screen.findByRole("heading", { name: "Your preliminary care estimate" });
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const paths = fetchMock.mock.calls.map(call => String(call[0]));
+    expect(paths.some(path => path.endsWith("/request-access") || path.endsWith("/verify"))).toBe(false); // no second code
+    const view = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/view"));
+    expect(JSON.parse(String((view?.[1] as RequestInit).body))).toEqual({ grant: "handed-grant" });
+    expect(sessionStorage.getItem("rs-proposal-grant:tok-1")).toBeNull(); // consumed on first use
+  });
+
+  it("falls back to its own verification when the handed-over grant is no longer good", async () => {
+    sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "stale-grant", expiresAt: "2099-01-01T00:00:00Z" }));
+    const fetchMock = vi.fn(async (url: string) => {
+      const path = String(url);
+      if (path.endsWith("/view")) return { ok: false, status: 401, json: async () => ({ message: "verify" }) } as Response;
+      return { ok: true, status: 200, json: async () => summary } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProposalSign locale="en" token="tok-1" />);
+    expect(await screen.findByRole("button", { name: "Send code" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Your preliminary care estimate" })).toBeNull();
+  });
 });
 
 describe("composeProposalComment", () => {

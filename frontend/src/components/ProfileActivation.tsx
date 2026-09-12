@@ -11,20 +11,24 @@ type Deposit = {
   required: boolean; status: string; currency: string;
   amountDue: number | null; amountPaid: number | null; balance: number | null; satisfied: boolean;
 };
+type AccountStatus = "NOT_PROVISIONED" | "SETUP_PENDING" | "ACTIVE";
+type Account = { status: AccountStatus; emailHint: string | null; awaitingEmail: boolean; emailSent: boolean };
 type Prefill = {
-  caseNumber: string; caseStatus: string; onboardingState: string | null; profileActive: boolean; accountLinked: boolean;
-  fullName: string | null; email: string | null; phone: string | null; dateOfBirth: string | null;
-  nationality: string | null; countryOfResidence: string | null; preferredLanguage: string | null; sex: string | null;
-  emailVerified: boolean; phoneVerified: boolean;
+  caseNumber: string; caseStatus: string; onboardingState: string | null; profileActive: boolean; accountLinked: boolean; account: Account;
+  givenName: string | null; familyName: string | null; preferredName: string | null; legacyFullName: string | null; nameConfirmationRequired: boolean;
+  candidateEmail: string | null; emailVerified: boolean;
+  knownMobile: string | null; mobileOwner: "PATIENT" | "REPRESENTATIVE" | null; phoneVerified: boolean;
+  dateOfBirth: string | null; nationality: string | null; countryOfResidence: string | null; preferredLanguage: string | null; sex: string | null;
+  submittedBy: "PATIENT" | "REPRESENTATIVE"; representativeName: string | null; representativeRelationship: string | null;
   requiredConsents: string[]; completedConsents: string[]; deposit: Deposit;
   currentAction?: PatientAction; journeyStage?: JourneyStage; waitingOn?: string | null;
 };
 type FieldError = { field: string; message: string };
 type Form = {
-  fullName: string; email: string; phone: string; dateOfBirth: string;
-  nationality: string; countryOfResidence: string; preferredLanguage: string; sex: string;
+  givenName: string; familyName: string; singleLegalName: boolean; preferredName: string;
+  email: string; emailChoice: "candidate" | "other"; phone: string; mobileOwner: "PATIENT" | "REPRESENTATIVE" | "";
+  dateOfBirth: string; nationality: string; countryOfResidence: string; preferredLanguage: string; sex: string;
 };
-
 
 const copy = {
   en: {
@@ -35,24 +39,46 @@ const copy = {
     codeLabel: "6-digit code", verify: "Continue", verifying: "Checking…",
     useEmail: "Send to email instead", useWhatsapp: "Send to WhatsApp instead",
     formTitle: "Complete your profile",
-    formIntro: "We've already filled in the information you gave us when you created your case. Please check it and add what's missing.",
+    formIntro: "We've filled in what you already shared. Please review it and complete what's missing.",
     prefilledNote: "Pre-filled from your case",
-    sectionAbout: "About the patient", sectionContact: "How we reach you", sectionAgreements: "Agreements",
-    fullName: "Full name", fullNameHelp: "As it appears on official documents.",
+    legacyNameTitle: "Please confirm your name",
+    legacyNameIntro: (n: string) => `We have your name as “${n}”. Please enter it as given name(s) and family name so it matches your records — we never split names automatically.`,
+    submittedByRep: (n: string, r: string) => `This case was submitted by ${n} (${r}). The details below are about the patient.`,
+    sectionAbout: "Personal details", sectionContact: "Contact", sectionAgreements: "Agreements",
+    givenName: "Given name(s)", familyName: "Family name / surname", singleName: "I have a single legal name (no family name)",
+    preferredName: "Preferred name", namesHelp: "As usually written — passport or ID details are not needed now.",
     dateOfBirth: "Date of birth", sex: "Sex", sexHelp: "Recorded for medical care.",
     nationality: "Nationality", residence: "Country of residence",
-    phone: "WhatsApp number", email: "Email", emailOptional: "optional", language: "Preferred language",
-    required: "Required",
+    accountEmail: "Account email", accountEmailHelp: "You'll use this email to sign in. We'll verify it before it becomes your account.",
+    haveEmail: "We already have this email from your case.", useThisEmail: "Use this email", useAnotherEmail: "Use another email",
+    emailVerifiedNote: "Verified", emailOther: "Email address",
+    phone: "WhatsApp / mobile", phoneOptional: "optional", phoneHelp: "Include the country code, for example +971 50 123 4567.",
+    belongsTo: "This number belongs to", ownerMe: "Me", ownerRep: "A family member / representative",
+    ownerRepHelp: "We'll keep it as a contact for your case. Add your own number below if you have one.",
+    ownerRepKnown: (n: string) => `The number on file (${n}) belongs to your representative and stays theirs.`,
+    yourOwnPhone: "Your own WhatsApp / mobile",
+    language: "Preferred language",
+    required: "Required", optional: "optional",
     selectCountry: "Search country…", noCountry: "No matching country", selectOption: "Select…",
     male: "Male", female: "Female", other: "Other", undisclosed: "Prefer not to say",
     english: "English", arabic: "العربية",
-    activate: "Complete my profile", activating: "Saving…",
+    activate: "Continue", activating: "Saving…",
     passportNote: "We don't need your passport or ID now. If your treatment needs a visa or travel booking, your coordinator will ask for it later.",
+    // account setup
+    accountTitle: "Your profile information is complete",
+    accountIntro: "One final step: create your password to securely access your RehletShifaa account.",
+    accountSent: "We sent a secure account setup link to",
+    accountNotSent: "We could not send the setup link just now. Press “Resend setup link” to receive it at",
+    accountSentHelp: "Open the link, create your password, and you'll come straight back to your case. This private link expires for your security.",
+    accountResend: "Resend setup link", accountResent: "A new setup link is on its way.", resending: "Sending…",
+    accountExpired: "This setup link has expired.", accountNewLink: "Send me a new link",
+    accountReady: "Your account is ready.", continueSignIn: "Continue to sign in",
+    accountCheckEmail: "Check your email to continue securely.",
     amountDue: "Amount due", alreadyPaid: "Already received", balance: "Remaining",
     depositPending: "You can safely close this page — nothing is lost, and your case continues automatically once the deposit is recorded.",
     refreshStatus: "Refresh status",
     readyTitle: "Your profile is ready",
-    readyIntro: "Your patient profile is active. You can use your account to follow this case and any other case linked to your profile.",
+    readyIntro: "Your patient profile is active and your account is set up. Sign in to follow this case and any other case linked to your profile.",
     nextStepLabel: "Next step",
     nextDeposit: "Deposit for your accepted care estimate",
     viewDeposit: "View deposit details",
@@ -63,22 +89,22 @@ const copy = {
     backToCase: "Go to my case",
     doneTitle: "Your treatment journey is now active",
     doneIntro: "Your RehletShifaa coordinator is starting the next stage of your treatment coordination and will contact you shortly.",
-    stepProposal: "Proposal accepted", stepProfile: "Profile activated", stepDeposit: "Deposit received",
-    portalTitle: "Your secure portal",
-    portalIntro: "Your profile is active. Continue to your secure portal to follow this case — and every other case you have with us — in one place.",
-    portalSignIn: "You'll set up or confirm your sign-in once. After that you sign in normally.",
-    viewJourney: "View my journey", opening: "Opening…",
+    stepProposal: "Proposal accepted", stepProfile: "Profile completed", stepAccount: "Account secured", stepDeposit: "Deposit received",
+    portalIntro: "Sign in with the password you created to follow this case — and every other case you have with us — in one place.",
+    viewJourney: "Sign in to my case", opening: "Opening…",
     caseLabel: "Case",
     stepOf: "Step", of: "of",
-    steps: ["Verify", "Your details"],
+    steps: ["Verify", "Your details", "Secure account"],
     invalid: "This link is invalid or has expired. Please ask your coordinator for a new one.",
     error: "Something went wrong. Please try again.",
     tooMany: "Too many attempts. Please try again in a little while.",
     fixFields: "Please check the highlighted fields.",
     sessionExpired: "Your secure session timed out. Please confirm the code again — nothing you entered was lost.",
-    errName: "Enter the full name.", errDob: "Enter the date of birth.", errDobFuture: "The date of birth cannot be in the future.",
+    errGiven: "Enter the given name(s).", errFamily: "Enter the family name, or confirm a single legal name.",
+    errDob: "Enter the date of birth.", errDobFuture: "The date of birth cannot be in the future.",
     errSelect: "Please choose an option.", errPhone: "Enter a valid international number, for example +971 50 123 4567.",
-    errEmail: "Enter a valid email address.", errConsents: "Please accept all required agreements to continue.",
+    errEmail: "Enter the email address you will use to sign in.", errOwner: "Tell us whether this number is yours or a family member's.",
+    errConsents: "Please accept all required agreements to continue.",
     loading: "Loading…",
   },
   ar: {
@@ -89,24 +115,45 @@ const copy = {
     codeLabel: "الرمز المكوّن من 6 أرقام", verify: "متابعة", verifying: "جارٍ التحقق…",
     useEmail: "أرسله إلى البريد بدلًا من ذلك", useWhatsapp: "أرسله إلى واتساب بدلًا من ذلك",
     formTitle: "أكمل ملفك الشخصي",
-    formIntro: "أدخلنا مسبقًا المعلومات التي زوّدتنا بها عند إنشاء حالتك. يرجى مراجعتها وإكمال الناقص.",
+    formIntro: "أدخلنا مسبقًا ما شاركته معنا. يرجى مراجعته وإكمال الناقص فقط.",
     prefilledNote: "معبأ مسبقًا من حالتك",
-    sectionAbout: "بيانات المريض", sectionContact: "وسيلة التواصل", sectionAgreements: "الموافقات",
-    fullName: "الاسم الكامل", fullNameHelp: "كما يظهر في المستندات الرسمية.",
+    legacyNameTitle: "يرجى تأكيد اسمك",
+    legacyNameIntro: (n: string) => `لدينا اسمك كالتالي: «${n}». يرجى إدخاله كاسم أول واسم عائلة ليطابق سجلاتك — لا نقسّم الأسماء تلقائيًا أبدًا.`,
+    submittedByRep: (n: string, r: string) => `قُدّمت هذه الحالة بواسطة ${n} (${r}). البيانات أدناه تخص المريض.`,
+    sectionAbout: "البيانات الشخصية", sectionContact: "التواصل", sectionAgreements: "الموافقات",
+    givenName: "الاسم الأول (الأسماء الشخصية)", familyName: "اسم العائلة / اللقب", singleName: "لديّ اسم قانوني واحد فقط (بدون اسم عائلة)",
+    preferredName: "الاسم المفضّل", namesHelp: "كما يُكتب عادةً — لا نحتاج بيانات جواز السفر أو الهوية الآن.",
     dateOfBirth: "تاريخ الميلاد", sex: "الجنس", sexHelp: "يُسجَّل لأغراض الرعاية الطبية.",
     nationality: "الجنسية", residence: "بلد الإقامة",
-    phone: "رقم واتساب", email: "البريد الإلكتروني", emailOptional: "اختياري", language: "لغة التواصل",
-    required: "مطلوب",
+    accountEmail: "بريد الحساب", accountEmailHelp: "ستستخدم هذا البريد لتسجيل الدخول. سنتحقق منه قبل أن يصبح حسابك.",
+    haveEmail: "لدينا هذا البريد بالفعل من حالتك.", useThisEmail: "استخدم هذا البريد", useAnotherEmail: "استخدم بريدًا آخر",
+    emailVerifiedNote: "مُتحقَّق منه", emailOther: "البريد الإلكتروني",
+    phone: "واتساب / الجوال", phoneOptional: "اختياري", phoneHelp: "أدخل رمز الدولة، مثال ‎+971 50 123 4567.",
+    belongsTo: "هذا الرقم يخص", ownerMe: "أنا", ownerRep: "أحد أفراد العائلة / ممثّل",
+    ownerRepHelp: "سنبقيه وسيلة تواصل لحالتك. أضف رقمك الخاص أدناه إن وُجد.",
+    ownerRepKnown: (n: string) => `الرقم المسجّل (${n}) يخص ممثّلك ويبقى له.`,
+    yourOwnPhone: "رقم واتساب / الجوال الخاص بك",
+    language: "لغة التواصل",
+    required: "مطلوب", optional: "اختياري",
     selectCountry: "ابحث عن الدولة…", noCountry: "لا توجد نتائج", selectOption: "اختر…",
     male: "ذكر", female: "أنثى", other: "أخرى", undisclosed: "أفضّل عدم الإفصاح",
     english: "English", arabic: "العربية",
-    activate: "استكمال ملفي", activating: "جارٍ الحفظ…",
+    activate: "متابعة", activating: "جارٍ الحفظ…",
     passportNote: "لا نحتاج جواز سفرك أو هويتك الآن. إذا احتاج علاجك تأشيرة أو حجز سفر، سيطلبها منسقك لاحقًا.",
+    accountTitle: "اكتملت معلومات ملفك",
+    accountIntro: "خطوة أخيرة: أنشئ كلمة مرورك للوصول الآمن إلى حساب رحلة شفاء الخاص بك.",
+    accountSent: "أرسلنا رابط إعداد الحساب الآمن إلى",
+    accountNotSent: "تعذّر إرسال رابط الإعداد الآن. اضغط «إعادة إرسال رابط الإعداد» لاستلامه على",
+    accountSentHelp: "افتح الرابط، أنشئ كلمة مرورك، وستعود مباشرة إلى حالتك. تنتهي صلاحية هذا الرابط الخاص لحمايتك.",
+    accountResend: "إعادة إرسال رابط الإعداد", accountResent: "رابط إعداد جديد في طريقه إليك.", resending: "جارٍ الإرسال…",
+    accountExpired: "انتهت صلاحية رابط الإعداد هذا.", accountNewLink: "أرسل لي رابطًا جديدًا",
+    accountReady: "حسابك جاهز.", continueSignIn: "متابعة إلى تسجيل الدخول",
+    accountCheckEmail: "تحقق من بريدك الإلكتروني للمتابعة بأمان.",
     amountDue: "المبلغ المستحق", alreadyPaid: "المستلم بالفعل", balance: "المتبقي",
     depositPending: "يمكنك إغلاق هذه الصفحة بأمان — لن يضيع شيء، وتستكمل حالتك تلقائيًا فور تسجيل الوديعة.",
     refreshStatus: "تحديث الحالة",
     readyTitle: "ملفك جاهز",
-    readyIntro: "ملفك الطبي مُفعّل الآن. يمكنك استخدام حسابك لمتابعة هذه الحالة وأي حالة أخرى مرتبطة بملفك.",
+    readyIntro: "ملفك الطبي مُفعّل وحسابك جاهز. سجّل الدخول لمتابعة هذه الحالة وأي حالة أخرى مرتبطة بملفك.",
     nextStepLabel: "الخطوة التالية",
     nextDeposit: "وديعة تقدير الرعاية الذي قبلته",
     viewDeposit: "عرض تفاصيل الوديعة",
@@ -117,24 +164,29 @@ const copy = {
     backToCase: "الذهاب إلى حالتي",
     doneTitle: "رحلتك العلاجية نشطة الآن",
     doneIntro: "بدأ منسق رحلة شفاء المرحلة التالية من تنسيق علاجك وسيتواصل معك قريبًا.",
-    stepProposal: "تم قبول العرض", stepProfile: "تم تفعيل الملف", stepDeposit: "تم استلام الوديعة",
-    portalTitle: "بوابتك الآمنة",
-    portalIntro: "ملفك مُفعَّل الآن. تابع إلى بوابتك الآمنة لمتابعة هذه الحالة — وكل حالاتك معنا — في مكان واحد.",
-    portalSignIn: "ستجهّز أو تؤكد بيانات الدخول مرة واحدة فقط، ثم تسجّل الدخول بشكل طبيعي بعد ذلك.",
-    viewJourney: "عرض رحلتي", opening: "جارٍ الفتح…",
+    stepProposal: "تم قبول العرض", stepProfile: "اكتمل الملف", stepAccount: "تم تأمين الحساب", stepDeposit: "تم استلام الوديعة",
+    portalIntro: "سجّل الدخول بكلمة المرور التي أنشأتها لمتابعة هذه الحالة — وكل حالاتك معنا — في مكان واحد.",
+    viewJourney: "تسجيل الدخول إلى حالتي", opening: "جارٍ الفتح…",
     caseLabel: "الحالة",
     stepOf: "الخطوة", of: "من",
-    steps: ["التحقق", "بياناتك"],
+    steps: ["التحقق", "بياناتك", "تأمين الحساب"],
     invalid: "هذا الرابط غير صالح أو انتهت صلاحيته. يرجى طلب رابط جديد من منسقك.",
     error: "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
     tooMany: "محاولات كثيرة. يرجى المحاولة بعد قليل.",
     fixFields: "يرجى مراجعة الحقول المحددة.",
     sessionExpired: "انتهت جلستك الآمنة. يرجى تأكيد الرمز مرة أخرى — لم يضِع ما أدخلته.",
-    errName: "أدخل الاسم الكامل.", errDob: "أدخل تاريخ الميلاد.", errDobFuture: "لا يمكن أن يكون تاريخ الميلاد في المستقبل.",
+    errGiven: "أدخل الاسم الأول.", errFamily: "أدخل اسم العائلة، أو أكّد أن اسمك القانوني مفرد.",
+    errDob: "أدخل تاريخ الميلاد.", errDobFuture: "لا يمكن أن يكون تاريخ الميلاد في المستقبل.",
     errSelect: "يرجى اختيار أحد الخيارات.", errPhone: "أدخل رقمًا دوليًا صحيحًا، مثال ‎+971 50 123 4567.",
-    errEmail: "أدخل بريدًا إلكترونيًا صحيحًا.", errConsents: "يرجى قبول جميع الموافقات المطلوبة للمتابعة.",
+    errEmail: "أدخل البريد الإلكتروني الذي ستستخدمه لتسجيل الدخول.", errOwner: "أخبرنا إن كان هذا الرقم لك أو لأحد أفراد العائلة.",
+    errConsents: "يرجى قبول جميع الموافقات المطلوبة للمتابعة.",
     loading: "جارٍ التحميل…",
   },
+};
+
+const RELATIONSHIP_LABEL: Record<string, { en: string; ar: string }> = {
+  PARENT: { en: "parent", ar: "أحد الوالدين" }, CHILD: { en: "child", ar: "ابن/ابنة" }, SPOUSE: { en: "spouse", ar: "زوج/زوجة" },
+  SIBLING: { en: "sibling", ar: "أخ/أخت" }, RELATIVE: { en: "relative", ar: "قريب" }, GUARDIAN: { en: "guardian", ar: "وصي" }, OTHER: { en: "representative", ar: "ممثّل" },
 };
 
 const CONSENT_TEXT: Record<string, { en: string; ar: string }> = {
@@ -164,24 +216,26 @@ const CONSENT_TEXT: Record<string, { en: string; ar: string }> = {
   },
 };
 
-type PatientAction = "COMPLETE_PROFILE" | "NONE" | "CONTINUE_IN_PORTAL";
-type JourneyStage = "PROFILE" | "DEPOSIT" | "CARE_COORDINATION";
-/** "activated" is the moment the profile becomes ready — deliberately its own screen, before any money. */
-type Stage = "loading" | "verify" | "form" | "activated" | "deposit" | "done" | "invalid";
+type PatientAction = "COMPLETE_PROFILE" | "SET_UP_ACCOUNT" | "NONE" | "CONTINUE_IN_PORTAL";
+type JourneyStage = "PROFILE" | "ACCOUNT_SETUP" | "DEPOSIT" | "CARE_COORDINATION";
+/** "account" is the setup-pending screen; "activated" is the moment everything is ready — before any money. */
+type Stage = "loading" | "verify" | "form" | "account" | "activated" | "deposit" | "done" | "invalid";
 
 /**
-   * Fall back to the profile step whenever the server has not named an action: stranding someone on a
-   * payment screen is the one wrong answer here, and an incomplete profile is the safe assumption.
-   */
-function resolveAction(data: { currentAction?: PatientAction; profileActive: boolean; deposit: Deposit }): PatientAction {
+ * Fall back to the profile step whenever the server has not named an action: stranding someone on a
+ * payment screen is the one wrong answer here, and an incomplete profile is the safe assumption.
+ */
+function resolveAction(data: { currentAction?: PatientAction; profileActive: boolean; deposit: Deposit; account?: Account }): PatientAction {
   if (data.currentAction) return data.currentAction;
   if (!data.profileActive) return "COMPLETE_PROFILE";
+  if (data.account && data.account.status !== "ACTIVE" && data.account.awaitingEmail) return "SET_UP_ACCOUNT";
   return data.deposit.satisfied ? "CONTINUE_IN_PORTAL" : "NONE";
 }
 
 /** Resume exactly where the server says the patient stands, so a reload never reopens a finished step. */
 function stageFor(action: PatientAction): Stage {
   if (action === "COMPLETE_PROFILE") return "form";
+  if (action === "SET_UP_ACCOUNT") return "account";
   if (action === "CONTINUE_IN_PORTAL") return "done";
   return "deposit"; // nothing for the patient to do, but the deposit stage is what they should see
 }
@@ -197,11 +251,13 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
   const [grant, setGrant] = useState<string | null>(null);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [deposit, setDeposit] = useState<Deposit | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
   const [action, setAction] = useState<PatientAction | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [consents, setConsents] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
   const [busy, setBusy] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -259,11 +315,18 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
       setGrant(granted.grant);
       setPrefill(data);
       setDeposit(data.deposit);
+      setAccount(data.account);
+      const repOwned = data.mobileOwner === "REPRESENTATIVE";
       // Keep anything already typed: re-verifying after a timeout must never discard the patient's work.
       setForm(previous => previous ?? {
-        fullName: data.fullName ?? "",
-        email: data.email ?? "",
-        phone: data.phone ?? "",
+        givenName: data.givenName ?? "",
+        familyName: data.familyName ?? "",
+        singleLegalName: !!data.givenName && !data.familyName,
+        preferredName: data.preferredName ?? "",
+        email: data.candidateEmail ?? "",
+        emailChoice: data.candidateEmail ? "candidate" : "other",
+        phone: repOwned ? "" : (data.knownMobile ?? ""),
+        mobileOwner: data.mobileOwner ?? "",
         dateOfBirth: data.dateOfBirth ?? "",
         nationality: data.nationality ?? "",
         countryOfResidence: data.countryOfResidence ?? "",
@@ -283,15 +346,18 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
    */
   function checkLocally(values: Form, agreed: string[], required: string[]): Record<string, string> {
     const e: Record<string, string> = {};
-    const name = values.fullName.trim();
-    if (name.length < 2) e.fullName = t.errName;
+    if (values.givenName.trim().length < 1) e.givenName = t.errGiven;
+    if (!values.familyName.trim() && !values.singleLegalName) e.familyName = t.errFamily;
     if (!values.dateOfBirth) e.dateOfBirth = t.errDob;
     else if (values.dateOfBirth > new Date().toISOString().slice(0, 10)) e.dateOfBirth = t.errDobFuture;
     if (!values.sex) e.sex = t.errSelect;
     if (!values.nationality) e.nationality = t.errSelect;
     if (!values.countryOfResidence) e.countryOfResidence = t.errSelect;
-    if (!/^\+[1-9]\d{6,14}$/.test(values.phone.replace(/[^\d+]/g, ""))) e.phone = t.errPhone;
-    if (values.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(values.email.trim())) e.email = t.errEmail;
+    if (!values.mobileOwner) e.mobileOwner = t.errOwner;
+    const phone = values.phone.replace(/[^\d+]/g, "");
+    if (values.mobileOwner === "PATIENT" && !/^\+[1-9]\d{6,14}$/.test(phone)) e.phone = t.errPhone;
+    if (values.mobileOwner === "REPRESENTATIVE" && phone && !/^\+[1-9]\d{6,14}$/.test(phone)) e.phone = t.errPhone;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(values.email.trim())) e.email = t.errEmail;
     if (required.some(type => !agreed.includes(type))) e.consents = t.errConsents;
     return e;
   }
@@ -303,11 +369,19 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
     if (Object.keys(local).length) { setFieldErrors(local); setNotice(t.fixFields); return; }
     setBusy(true); setNotice(null); setFieldErrors({});
     try {
-      const result: { profileActive: boolean; deposit: Deposit; currentAction?: PatientAction } =
-        await call("/activate", { grant, profile: { ...form, consents } });
+      const profile = {
+        givenName: form.givenName, familyName: form.familyName, singleLegalName: form.singleLegalName, preferredName: form.preferredName || null,
+        email: form.email, phone: form.phone || null, mobileOwner: form.mobileOwner || null,
+        dateOfBirth: form.dateOfBirth, nationality: form.nationality, countryOfResidence: form.countryOfResidence,
+        preferredLanguage: form.preferredLanguage, sex: form.sex, consents,
+      };
+      const result: { profileActive: boolean; deposit: Deposit; account: Account; currentAction?: PatientAction } = await call("/activate", { grant, profile });
       setDeposit(result.deposit);
-      setAction(resolveAction(result));
-      setStage("activated");
+      setAccount(result.account);
+      const resolved = resolveAction(result);
+      setAction(resolved);
+      // Profile complete → account setup is the very next screen. Only an already-active account skips it.
+      setStage(resolved === "SET_UP_ACCOUNT" ? "account" : "activated");
     } catch (e) {
       const err = e as { errors?: FieldError[]; status?: number };
       if (err?.errors?.length) {
@@ -320,6 +394,17 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
     } finally { setBusy(false); }
   }
 
+  async function resendSetup() {
+    if (busy || !grant) return;
+    setBusy(true); setNotice(null); setResent(false);
+    try {
+      const data: Account = await call("/resend-setup", { grant });
+      setAccount(data);
+      if (data.status === "ACTIVE") { setAction("CONTINUE_IN_PORTAL"); setStage("activated"); }
+      else setResent(true);
+    } catch (e) { setNotice(describe(e)); } finally { setBusy(false); }
+  }
+
   const refreshDeposit = useCallback(async () => {
     if (!grant) return;
     try {
@@ -330,21 +415,23 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
   }, [call, grant]);
 
   /**
-   * Continue into the normal authenticated portal. The backend hands over a single-use binding credential
-   * only after the profile is active; the portal consumes it once Keycloak has authenticated the patient.
-   * That binding — not this case-scoped link — is what makes every other authorized case visible.
+   * Continue into the normal authenticated portal. With provider-owned accounts the patient simply signs in
+   * with the password they created; the portal opens straight on this case. A legacy profile without any
+   * account receives the old one-time binding credential instead.
    */
   async function openPortal() {
     if (busy || !grant) return;
     setBusy(true); setNotice(null);
     try {
-      const handoff: { activationToken: string | null } = await call("/portal-access", { grant });
-      const portal = `/${locale}/portal`;
-      window.location.assign(handoff.activationToken ? `${portal}?activate=${encodeURIComponent(handoff.activationToken)}` : portal);
+      const handoff: { activationToken: string | null; alreadyLinked: boolean; account: Account; caseId: string } = await call("/portal-access", { grant });
+      setAccount(handoff.account);
+      if (!handoff.alreadyLinked && handoff.account.awaitingEmail) { setStage("account"); setBusy(false); return; }
+      const portal = `/${locale}/portal?case=${encodeURIComponent(handoff.caseId)}`;
+      window.location.assign(handoff.activationToken ? `${portal}&activate=${encodeURIComponent(handoff.activationToken)}` : `${portal}&signin=1`);
     } catch (e) { setNotice(describe(e)); setBusy(false); }
   }
 
-  const stepIndex = stage === "verify" ? 0 : stage === "form" ? 1 : stage === "deposit" ? 2 : 2;
+  const stepIndex = stage === "verify" ? 0 : stage === "form" ? 1 : 2;
 
   if (stage === "loading") return <Shell locale={locale}><p className="text-ink-500">{t.loading}</p></Shell>;
   if (stage === "invalid") return (
@@ -354,6 +441,9 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
       </div>
     </Shell>
   );
+
+  const repOwned = form?.mobileOwner === "REPRESENTATIVE";
+  const relationshipLabel = prefill?.representativeRelationship ? (RELATIONSHIP_LABEL[prefill.representativeRelationship]?.[locale] ?? prefill.representativeRelationship) : "";
 
   return (
     <Shell locale={locale}>
@@ -406,18 +496,40 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
           <p className="eyebrow">{t.caseLabel} {prefill.caseNumber}</p>
           <h1 ref={headingRef} tabIndex={-1} className="headline mt-2 outline-none">{t.formTitle}</h1>
           <p className="lead mt-3">{t.formIntro}</p>
+          {prefill.submittedBy === "REPRESENTATIVE" && prefill.representativeName && (
+            <p className="mt-4 rounded-xl bg-mist p-4 text-sm leading-6 text-ink-700">{t.submittedByRep(prefill.representativeName, relationshipLabel)}</p>
+          )}
+          {prefill.nameConfirmationRequired && prefill.legacyFullName && (
+            <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4">
+              <p className="font-semibold text-brand-900">{t.legacyNameTitle}</p>
+              <p className="mt-1 text-sm leading-6 text-ink-700">{t.legacyNameIntro(prefill.legacyFullName)}</p>
+            </div>
+          )}
 
           <Fieldset legend={t.sectionAbout}>
-            <Field label={t.fullName} required requiredLabel={t.required} help={t.fullNameHelp} error={fieldErrors.fullName}>
-              <input className={`field ${fieldErrors.fullName ? "field-error" : ""}`} autoComplete="name"
-                     value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} />
-            </Field>
             <div className="grid gap-5 sm:grid-cols-2">
+              <Field label={t.givenName} required requiredLabel={t.required} error={fieldErrors.givenName} hint={prefill.givenName ? t.prefilledNote : undefined}>
+                <input className={`field ${fieldErrors.givenName ? "field-error" : ""}`} autoComplete="given-name"
+                       value={form.givenName} onChange={e => setForm({ ...form, givenName: e.target.value })} />
+              </Field>
+              <Field label={form.singleLegalName ? `${t.familyName} (${t.optional})` : t.familyName} required={!form.singleLegalName} requiredLabel={t.required} error={fieldErrors.familyName} hint={prefill.familyName ? t.prefilledNote : undefined}>
+                <input className={`field ${fieldErrors.familyName ? "field-error" : ""}`} autoComplete="family-name"
+                       value={form.familyName} onChange={e => setForm({ ...form, familyName: e.target.value })} />
+              </Field>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-600"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={form.singleLegalName} onChange={e => setForm({ ...form, singleLegalName: e.target.checked })} />{t.singleName}</label>
+            <p className="text-xs leading-5 text-ink-500">{t.namesHelp}</p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label={`${t.preferredName} (${t.optional})`} error={fieldErrors.preferredName}>
+                <input className="field" autoComplete="nickname" value={form.preferredName} onChange={e => setForm({ ...form, preferredName: e.target.value })} />
+              </Field>
               <Field label={t.dateOfBirth} required requiredLabel={t.required} error={fieldErrors.dateOfBirth}>
                 <input type="date" dir="ltr" className={`field ${fieldErrors.dateOfBirth ? "field-error" : ""}`}
                        max={new Date().toISOString().slice(0, 10)} autoComplete="bday"
                        value={form.dateOfBirth} onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} />
               </Field>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2">
               <Field label={t.sex} required requiredLabel={t.required} help={t.sexHelp} error={fieldErrors.sex}>
                 <select className={`field ${fieldErrors.sex ? "field-error" : ""}`} value={form.sex}
                         onChange={e => setForm({ ...form, sex: e.target.value })}>
@@ -428,32 +540,77 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
                   <option value="UNDISCLOSED">{t.undisclosed}</option>
                 </select>
               </Field>
-            </div>
-            <div className="grid gap-5 sm:grid-cols-2">
               <Field label={t.nationality} required requiredLabel={t.required} error={fieldErrors.nationality}>
                 <CountrySelect value={form.nationality} placeholder={t.selectCountry} empty={t.noCountry}
                                invalid={!!fieldErrors.nationality} onChange={v => setForm({ ...form, nationality: v })} />
               </Field>
-              <Field label={t.residence} required requiredLabel={t.required} error={fieldErrors.countryOfResidence}>
-                <CountrySelect value={form.countryOfResidence} placeholder={t.selectCountry} empty={t.noCountry}
-                               invalid={!!fieldErrors.countryOfResidence} onChange={v => setForm({ ...form, countryOfResidence: v })} />
-              </Field>
             </div>
+            <Field label={t.residence} required requiredLabel={t.required} error={fieldErrors.countryOfResidence} hint={prefill.countryOfResidence ? t.prefilledNote : undefined}>
+              <CountrySelect value={form.countryOfResidence} placeholder={t.selectCountry} empty={t.noCountry}
+                             invalid={!!fieldErrors.countryOfResidence} onChange={v => setForm({ ...form, countryOfResidence: v })} />
+            </Field>
           </Fieldset>
 
           <Fieldset legend={t.sectionContact}>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t.phone} required requiredLabel={t.required} error={fieldErrors.phone}
-                     hint={prefill.phone ? t.prefilledNote : undefined}>
-                <input className={`field ${fieldErrors.phone ? "field-error" : ""}`} dir="ltr" inputMode="tel" autoComplete="tel"
-                       value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
-              </Field>
-              <Field label={`${t.email} (${t.emailOptional})`} error={fieldErrors.email}
-                     hint={prefill.email ? t.prefilledNote : undefined}>
-                <input className={`field ${fieldErrors.email ? "field-error" : ""}`} type="email" dir="ltr" inputMode="email"
-                       autoComplete="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-              </Field>
+            {/* Account email: mandatory, security-sensitive. A known address is offered, never assumed. */}
+            <div className="rounded-xl border border-line bg-white p-4">
+              <p className="text-sm font-bold text-ink-800">{t.accountEmail} <span className="text-alert-700" aria-hidden>*</span></p>
+              <p className="mt-1 text-xs leading-5 text-ink-500">{t.accountEmailHelp}</p>
+              {prefill.candidateEmail && (
+                <div className="mt-3 rounded-lg bg-brand-50 p-3">
+                  <p className="text-sm text-ink-700"><span dir="ltr" className="font-semibold text-ink-900">{maskEmail(prefill.candidateEmail)}</span>{prefill.emailVerified && <span className="ms-2 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-800">{t.emailVerifiedNote}</span>}</p>
+                  <p className="mt-1 text-xs text-ink-500">{t.haveEmail}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label={t.accountEmail}>
+                    <label className={`cursor-pointer rounded-lg border px-3 py-2 text-sm font-semibold ${form.emailChoice === "candidate" ? "border-brand-600 bg-white text-brand-800" : "border-line bg-white text-ink-600"}`}>
+                      <input type="radio" name="emailChoice" className="sr-only" checked={form.emailChoice === "candidate"} onChange={() => setForm({ ...form, emailChoice: "candidate", email: prefill.candidateEmail ?? "" })} />{t.useThisEmail}
+                    </label>
+                    <label className={`cursor-pointer rounded-lg border px-3 py-2 text-sm font-semibold ${form.emailChoice === "other" ? "border-brand-600 bg-white text-brand-800" : "border-line bg-white text-ink-600"}`}>
+                      <input type="radio" name="emailChoice" className="sr-only" checked={form.emailChoice === "other"} onChange={() => setForm({ ...form, emailChoice: "other", email: "" })} />{t.useAnotherEmail}
+                    </label>
+                  </div>
+                </div>
+              )}
+              {(!prefill.candidateEmail || form.emailChoice === "other") && (
+                <div className="mt-3">
+                  <Field label={t.emailOther} required requiredLabel={t.required} error={fieldErrors.email}>
+                    <input className={`field ${fieldErrors.email ? "field-error" : ""}`} type="email" dir="ltr" inputMode="email"
+                           autoComplete="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  </Field>
+                </div>
+              )}
+              {prefill.candidateEmail && form.emailChoice === "candidate" && fieldErrors.email && <p className="error-text mt-2">{fieldErrors.email}</p>}
             </div>
+
+            {/* Mobile: shown as known, ownership made explicit; never promoted to the patient by default. */}
+            <div className="rounded-xl border border-line bg-white p-4">
+              <p className="text-sm font-bold text-ink-800">{t.phone}</p>
+              {prefill.knownMobile && (
+                <>
+                  <p className="mt-1 text-sm text-ink-700"><span dir="ltr" className="font-semibold text-ink-900">{prefill.knownMobile}</span> <span className="text-xs text-ink-500">· {t.prefilledNote}</span></p>
+                  <p className="mt-3 text-sm font-semibold text-ink-800">{t.belongsTo}</p>
+                  <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label={t.belongsTo}>
+                    {([["PATIENT", t.ownerMe], ["REPRESENTATIVE", t.ownerRep]] as const).map(([key, label]) => (
+                      <label key={key} className={`cursor-pointer rounded-lg border px-3 py-2 text-sm font-semibold ${form.mobileOwner === key ? "border-brand-600 bg-brand-50 text-brand-800" : "border-line bg-white text-ink-600"}`}>
+                        <input type="radio" name="mobileOwner" className="sr-only" checked={form.mobileOwner === key}
+                               onChange={() => setForm({ ...form, mobileOwner: key, phone: key === "PATIENT" ? (prefill.knownMobile ?? "") : "" })} />{label}
+                      </label>
+                    ))}
+                  </div>
+                  {fieldErrors.mobileOwner && <p className="error-text mt-2">{fieldErrors.mobileOwner}</p>}
+                  {repOwned && <p className="mt-2 text-xs leading-5 text-ink-500">{t.ownerRepKnown(prefill.knownMobile)} {t.ownerRepHelp}</p>}
+                </>
+              )}
+              {(!prefill.knownMobile || repOwned) && (
+                <div className="mt-3">
+                  <Field label={repOwned ? `${t.yourOwnPhone} (${t.phoneOptional})` : t.phone} required={!repOwned} requiredLabel={t.required} help={t.phoneHelp} error={fieldErrors.phone}>
+                    <input className={`field ${fieldErrors.phone ? "field-error" : ""}`} dir="ltr" inputMode="tel" autoComplete="tel"
+                           value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value, mobileOwner: form.mobileOwner || "PATIENT" })} />
+                  </Field>
+                </div>
+              )}
+              {prefill.knownMobile && form.mobileOwner === "PATIENT" && fieldErrors.phone && <p className="error-text mt-2">{fieldErrors.phone}</p>}
+            </div>
+
             <Field label={t.language} error={fieldErrors.preferredLanguage}>
               <select className="field" value={form.preferredLanguage}
                       onChange={e => setForm({ ...form, preferredLanguage: e.target.value })}>
@@ -486,7 +643,24 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
         </form>
       )}
 
-      {/* Profile completion has its own finish line. Money is named as the next task, never as part of it. */}
+      {/* Account setup: the password is created inside the identity provider from a link in the inbox. */}
+      {stage === "account" && (
+        <section className="card p-6 md:p-8">
+          <p className="eyebrow">{t.caseLabel} {prefill?.caseNumber}</p>
+          <h1 ref={headingRef} tabIndex={-1} className="headline mt-2 outline-none">{t.accountTitle}</h1>
+          <p className="lead mt-3">{t.accountIntro}</p>
+          <div className="mt-6 rounded-xl border border-brand-200 bg-brand-50 p-5">
+            <p className="text-ink-800">{account?.emailSent === false ? t.accountNotSent : t.accountSent} <strong dir="ltr" className="text-ink-900">{account?.emailHint ?? "***"}</strong></p>
+            <p className="mt-2 text-sm leading-6 text-ink-600">{t.accountSentHelp}</p>
+          </div>
+          {resent && <p role="status" className="mt-4 text-sm font-semibold text-brand-800">{t.accountResent}</p>}
+          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <button type="button" className="btn-secondary" disabled={busy} onClick={() => void resendSetup()}>{busy ? t.resending : t.accountResend}</button>
+          </div>
+        </section>
+      )}
+
+      {/* Profile + account complete: its own finish line. Money is named as the next task, never as part of it. */}
       {stage === "activated" && (
         <section className="card p-6 md:p-8">
           <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-600 text-xl text-white">✓</span>
@@ -551,7 +725,7 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
           <h1 ref={headingRef} tabIndex={-1} className="headline mt-5 outline-none">{t.doneTitle}</h1>
           <p className="lead mt-3">{t.doneIntro}</p>
           <ul className="mt-7 space-y-3">
-            {[t.stepProposal, t.stepProfile, t.stepDeposit].map(step => (
+            {[t.stepProposal, t.stepProfile, t.stepAccount, t.stepDeposit].map(step => (
               <li key={step} className="flex items-center gap-3 text-ink-800">
                 <span aria-hidden className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">✓</span>
                 {step}
@@ -559,7 +733,6 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
             ))}
           </ul>
           <p className="mt-7 leading-7 text-ink-600">{t.portalIntro}</p>
-          <p className="mt-2 text-sm leading-6 text-ink-500">{t.portalSignIn}</p>
           <button type="button" className="btn-primary mt-6 w-full sm:w-auto" disabled={busy} onClick={() => void openPortal()}>
             {busy ? t.opening : t.viewJourney}
           </button>
@@ -567,6 +740,13 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
       )}
     </Shell>
   );
+}
+
+function maskEmail(value: string) {
+  const at = value.indexOf("@");
+  if (at <= 0) return value;
+  const user = value.slice(0, at);
+  return `${user.length <= 2 ? user[0] : user.slice(0, 2)}***${value.slice(at)}`;
 }
 
 // ---------- presentational helpers ----------

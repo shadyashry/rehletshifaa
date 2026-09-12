@@ -4,6 +4,7 @@ import com.rehletshifaa.journey.api.ActivationDtos.*;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.api.FieldValidationException;
 import com.rehletshifaa.shared.util.Countries;
+import com.rehletshifaa.shared.util.PatientNames;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,22 +19,25 @@ import java.util.regex.Pattern;
 import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
 /**
- * Profile activation for an existing patient continuing straight from proposal acceptance.
+ * "Complete your profile" — the continuation of Send My Case, never a second registration.
  *
- * <p>The same canonical {@code patient_profiles} row that owns the case is updated in place — no second
- * patient, profile or account is ever created. Authorization comes solely from a verified ONBOARDING grant
- * bound to one case/patient, so a token can only ever reach its own case. Activation is transactional and
- * idempotent: replaying it returns the current state instead of duplicating consents or audit events.
- * Legal-identity/passport evidence is deliberately NOT required here.
+ * <p>The SAME canonical {@code patient_profiles} row that owns the case is loaded, pre-filled and updated in
+ * place; no second patient, profile or account is ever created. Authorization comes solely from a verified
+ * ONBOARDING grant bound to one case/patient. Normal profile fields (names, country, language, date of birth)
+ * may be corrected freely before any legal-identity verification exists; security-sensitive channels (email,
+ * personal mobile) are stored here but only become <em>verified</em> through the identity provider / an OTP on
+ * that very channel. Case data (care area, clinical concern, documents, proposal) is never edited here.
+ *
+ * <p>Completing the profile flows straight into ACCOUNT SETUP ({@link PatientAccountService}): Keycloak owns
+ * the password; nothing here generates or sends one. Activation is transactional and idempotent.
  */
 @Service
 public class PatientActivationService {
-    /** Letters (any script incl. Arabic), marks, spaces and the punctuation real names use. */
-    private static final Pattern NAME = Pattern.compile("^[\\p{L}\\p{M}][\\p{L}\\p{M} .'\\-]*$", Pattern.UNICODE_CASE);
     private static final Pattern E164 = Pattern.compile("^\\+[1-9]\\d{6,14}$");
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[A-Za-z]{2,}$");
     private static final Set<String> SEXES = Set.of("MALE", "FEMALE", "OTHER", "UNDISCLOSED");
     private static final Set<String> LANGUAGES = Set.of("en", "ar");
+    private static final Set<String> OWNERS = Set.of("PATIENT", "REPRESENTATIVE");
     private static final int MAX_AGE_YEARS = 130;
 
     private final JdbcClient jdbc;
@@ -42,23 +46,25 @@ public class PatientActivationService {
     private final CustomerReadinessService readiness;
     private final CaseHandoffService handoff;
     private final AccountActivationService accounts;
+    private final PatientAccountService account;
     private final CaseActionService caseActions;
     private final Clock clock;
 
     public PatientActivationService(JdbcClient jdbc, PublicCaseAccessService access, PaymentService payment,
                                     CustomerReadinessService readiness, CaseHandoffService handoff,
-                                    AccountActivationService accounts, CaseActionService caseActions, Clock clock) {
+                                    AccountActivationService accounts, PatientAccountService account,
+                                    CaseActionService caseActions, Clock clock) {
         this.jdbc = jdbc; this.access = access; this.payment = payment; this.readiness = readiness;
-        this.handoff = handoff; this.accounts = accounts; this.caseActions = caseActions; this.clock = clock;
+        this.handoff = handoff; this.accounts = accounts; this.account = account; this.caseActions = caseActions; this.clock = clock;
     }
 
     /**
      * Hand the finished onboarding over to the normal authenticated portal.
      *
-     * <p>Same verified onboarding grant, and only once the profile is ACTIVE — so a case-scoped link can
-     * never be traded for an account binding before the patient has actually completed onboarding. The
-     * returned credential is single-use and binds this one patient; Keycloak still authenticates the person,
-     * and only after that binding does the portal show every case authorized for the canonical patient.
+     * <p>Same verified onboarding grant, and only once the profile is complete. A patient whose account was
+     * provisioned through the identity provider simply signs in ({@code alreadyLinked}); one whose setup is
+     * still in their inbox is told so. Only a legacy profile that predates provider-owned provisioning (no
+     * account at all) receives the old single-use binding credential.
      */
     @Transactional
     public PortalHandoff portalAccess(String token, String grant) {
@@ -66,8 +72,11 @@ public class PatientActivationService {
         Profile current = loadProfile(ctx.patientId());
         if (!"ACTIVE".equals(current.status()))
             throw new ApiException(409, "PROFILE_NOT_ACTIVE", "Please complete your profile before opening your portal");
+        AccountSetup state = account.state(ctx.patientId());
+        if (state.status() == AccountStatus.ACTIVE || current.subject() != null) return new PortalHandoff(null, true, state, ctx.caseId().toString());
+        if (state.awaitingEmail()) return new PortalHandoff(null, false, state, ctx.caseId().toString());
         String issued = accounts.issue(ctx.patientId(), ctx.caseId());
-        return new PortalHandoff(issued, issued == null);
+        return new PortalHandoff(issued, issued == null, state, ctx.caseId().toString());
     }
 
     /** Pre-filled onboarding state for a verified grant. Never exposes another patient's data. */
@@ -84,9 +93,20 @@ public class PatientActivationService {
         return depositSummary(ctx.caseId());
     }
 
+    /** Explicit "send me a new account setup link". Idempotent: never a second account. */
+    @Transactional
+    public AccountSetup resendAccountSetup(String token, String grant) {
+        var ctx = access.requireOnboardingGrant(token, grant);
+        Profile current = loadProfile(ctx.patientId());
+        if (!"ACTIVE".equals(current.status()))
+            throw new ApiException(409, "PROFILE_NOT_ACTIVE", "Please complete your profile first");
+        return account.resendSetup(ctx.patientId(), ctx.caseId(), current.language());
+    }
+
     /**
-     * Validate, persist and activate. Idempotent: an already-ACTIVE profile short-circuits to the current
-     * state so a double submit, refresh or retry cannot duplicate consents, audit rows or notifications.
+     * Validate, persist, activate the profile and continue into account setup. Idempotent: an already-ACTIVE
+     * profile short-circuits the profile write (no duplicate consents, audit rows or handoffs) but still resumes
+     * account setup, so a refresh or retry lands the patient in exactly the same place.
      */
     @Transactional
     public ActivationResult activate(String token, String grant, ProfileActivationRequest request) {
@@ -94,45 +114,71 @@ public class PatientActivationService {
         UUID caseId = ctx.caseId(), patientId = ctx.patientId();
 
         Profile current = loadProfileForUpdate(patientId);
-        if ("ACTIVE".equals(current.status())) return result(caseId, patientId); // already activated — no side effects
+        Submission sub = submission(caseId);
+        if ("ACTIVE".equals(current.status())) {
+            // Replay after completion: only the account side may still need resuming (never re-provisioned).
+            // A legacy profile (complete, but never given an account) may supply its account email now.
+            String email = normalizeEmail(request == null ? null : request.email());
+            if (email != null && current.subject() == null && EMAIL.matcher(email).matches() && !email.equals(normalizeEmail(current.email())))
+                jdbc.sql("UPDATE patient_profiles SET email=?,email_verified_at=NULL,updated_at=?,version=version+1 WHERE id=? AND external_subject IS NULL")
+                        .params(email, timestamp(clock.instant()), patientId).update();
+            AccountSetup state = account.ensureAccount(patientId, caseId, email != null && current.subject() == null ? email : current.email(), current.language());
+            return result(caseId, patientId, state);
+        }
 
         assertCaseStillActivatable(caseId);
-        Clean clean = validate(request, current);
+        Clean clean = validate(request, current, sub);
 
         Instant now = clock.instant();
-        // Correcting a contact voids only that channel's prior possession proof.
         boolean emailChanged = !Objects.equals(normalizeEmail(current.email()), clean.email());
         boolean phoneChanged = !Objects.equals(current.phone(), clean.phone());
-        jdbc.sql("UPDATE patient_profiles SET full_name=?,email=?,whatsapp_number=?,country=?,nationality=?,date_of_birth=?,sex=?,preferred_language=?,"
+        // A number that is another active account's VERIFIED personal mobile is never silently re-verified for
+        // a different patient: it stays an unverified contact here until resolved through a controlled path.
+        boolean phoneClaimedElsewhere = clean.phone() != null && verifiedElsewhere(patientId, clean.phone());
+        jdbc.sql("UPDATE patient_profiles SET given_name=?,family_name=?,preferred_name=?,name_source='STRUCTURED',full_name=?,email=?,whatsapp_number=?,mobile_owner=?,country=?,nationality=?,date_of_birth=?,sex=?,preferred_language=?,"
                         + "email_verified_at=CASE WHEN ? THEN NULL ELSE email_verified_at END,"
                         + "phone_verified_at=CASE WHEN ? THEN NULL ELSE phone_verified_at END,"
-                        + "profile_status='ACTIVE',activated_at=COALESCE(activated_at,?),updated_at=?,version=version+1 WHERE id=? AND profile_status<>'ACTIVE'")
-                .params(clean.fullName(), clean.email(), clean.phone(), clean.countryName(), clean.nationality(),
-                        clean.dateOfBirth(), clean.sex(), clean.language(), emailChanged, phoneChanged,
-                        timestamp(now), timestamp(now), patientId)
+                        + "profile_status='ACTIVE',profile_completed_at=COALESCE(profile_completed_at,?),activated_at=COALESCE(activated_at,?),updated_at=?,version=version+1 WHERE id=? AND profile_status<>'ACTIVE'")
+                .params(clean.givenName(), clean.familyName(), clean.preferredName(), PatientNames.display(clean.givenName(), clean.familyName(), current.fullName()),
+                        clean.email(), clean.phone(), clean.phone() == null ? null : "PATIENT", clean.countryName(), clean.nationality(),
+                        clean.dateOfBirth(), clean.sex(), clean.language(), emailChanged, phoneChanged || phoneClaimedElsewhere,
+                        timestamp(now), timestamp(now), timestamp(now), patientId)
                 .update();
+        // The intake number belonged to the person who submitted the case: keep it there, never on the patient.
+        if ("REPRESENTATIVE".equals(clean.mobileOwner()) && sub != null && "PATIENT".equals(sub.role()))
+            jdbc.sql("UPDATE case_submission_contacts SET contact_role='REPRESENTATIVE',contact_name=NULL WHERE case_id=? AND whatsapp_number IS NOT NULL AND whatsapp_number<>COALESCE(?, '')").params(caseId, clean.phone()).update();
 
         recordConsents(patientId, caseId, clean.consents(), clean.language(), now);
         completeOnboarding(caseId, now);
-        audit(caseId, "PATIENT_PROFILE_ACTIVATED", patientId, "Profile activated from secure onboarding link");
+        audit(caseId, "PATIENT_PROFILE_ACTIVATED", patientId, "Profile completed from secure onboarding link");
         // When no deposit is due (policy amount zero, already paid, or waived) the journey continues now.
         if (payment.depositSatisfied(caseId)) handoff.onDepositSettled(caseId);
         // Otherwise the patient has done their part and the offline deposit is now our team's move.
         else { handoff.onDepositRequired(caseId); caseActions.reconcileWaitingOn(caseId); }
-        return result(caseId, patientId);
+
+        // Straight into account setup: find or provision the identity account, no password ever generated here.
+        AccountSetup state = account.ensureAccount(patientId, caseId, clean.email(), clean.language());
+        return result(caseId, patientId, state);
     }
 
     // ---- validation ----
-    private record Clean(String fullName, String email, String phone, LocalDate dateOfBirth, String nationality,
-                         String countryName, String sex, String language, List<String> consents) {}
+    private record Clean(String givenName, String familyName, String preferredName, String email, String phone, String mobileOwner,
+                         LocalDate dateOfBirth, String nationality, String countryName, String sex, String language, List<String> consents) {}
 
-    private Clean validate(ProfileActivationRequest r, Profile current) {
+    private Clean validate(ProfileActivationRequest r, Profile current, Submission sub) {
         var errors = new FieldValidationException.Collector();
+        if (r == null) r = new ProfileActivationRequest(null, null, null, null, null, null, null, null, null, null, null, null, null);
 
-        String fullName = trimToNull(r.fullName());
-        if (fullName == null) errors.reject("fullName", "Enter the patient's full name as it appears on official documents.");
-        else if (fullName.length() < 2 || fullName.length() > 120) errors.reject("fullName", "The full name must be between 2 and 120 characters.");
-        else if (!NAME.matcher(fullName).matches()) errors.reject("fullName", "The full name contains characters that are not allowed.");
+        String given = PatientNames.clean(r.givenName());
+        if (given.isEmpty()) errors.reject("givenName", "Enter the patient's given name(s).");
+        else if (given.length() > 80) errors.reject("givenName", "The given name is too long.");
+        else if (!PatientNames.NAME_PART.matcher(given).matches()) errors.reject("givenName", "The given name contains characters that are not allowed.");
+        String family = PatientNames.clean(r.familyName());
+        if (family.isEmpty()) { if (!Boolean.TRUE.equals(r.singleLegalName())) errors.reject("familyName", "Enter the family name or surname, or confirm the patient has a single legal name."); }
+        else if (family.length() > 80) errors.reject("familyName", "The family name is too long.");
+        else if (!PatientNames.NAME_PART.matcher(family).matches()) errors.reject("familyName", "The family name contains characters that are not allowed.");
+        String preferred = PatientNames.clean(r.preferredName());
+        if (!preferred.isEmpty() && !PatientNames.NAME_PART.matcher(preferred).matches()) errors.reject("preferredName", "The preferred name contains characters that are not allowed.");
 
         LocalDate dob = r.dateOfBirth();
         LocalDate today = LocalDate.now(clock);
@@ -148,12 +194,21 @@ public class PatientActivationService {
         if (trimToNull(r.countryOfResidence()) == null) errors.reject("countryOfResidence", "Select the country of residence.");
         else if (residence == null) errors.reject("countryOfResidence", "Select a country from the list.");
 
+        // Who owns the mobile decides whether it is stored on the patient at all.
+        String owner = trimToNull(r.mobileOwner()) == null ? null : r.mobileOwner().trim().toUpperCase(Locale.ROOT);
+        String known = current.phone() != null ? current.phone() : sub == null ? null : sub.whatsapp();
+        if (owner == null) owner = current.mobileOwner() != null ? current.mobileOwner() : (sub != null && "REPRESENTATIVE".equals(sub.role())) ? "REPRESENTATIVE" : known == null ? "PATIENT" : null;
+        if (owner == null) errors.reject("mobileOwner", "Tell us whether this number is yours or a family member's.");
+        else if (!OWNERS.contains(owner)) errors.reject("mobileOwner", "Select a valid option.");
         String phone = normalizePhone(r.phone());
-        if (phone == null) errors.reject("phone", "Enter a WhatsApp number including its country code.");
-        else if (!E164.matcher(phone).matches()) errors.reject("phone", "Enter a valid international number, for example +971 50 123 4567.");
+        if (phone != null && !E164.matcher(phone).matches()) errors.reject("phone", "Enter a valid international number, for example +971 50 123 4567.");
+        if ("PATIENT".equals(owner) && phone == null) errors.reject("phone", "Enter a WhatsApp number including its country code.");
+        // A representative's number is never stored as the patient's own; a personal number is optional then.
+        if ("REPRESENTATIVE".equals(owner) && phone != null && known != null && normalizePhone(known).equals(phone)) phone = null;
 
         String email = normalizeEmail(r.email());
-        if (email != null && !EMAIL.matcher(email).matches()) errors.reject("email", "Enter a valid email address.");
+        if (email == null) errors.reject("email", "Enter the email address you will use to sign in.");
+        else if (!EMAIL.matcher(email).matches()) errors.reject("email", "Enter a valid email address.");
 
         String sex = trimToNull(r.sex()) == null ? null : r.sex().trim().toUpperCase(Locale.ROOT);
         if (sex == null) errors.reject("sex", "Select the patient's sex as recorded for medical care.");
@@ -163,15 +218,21 @@ public class PatientActivationService {
         if (language == null || !LANGUAGES.contains(language)) errors.reject("preferredLanguage", "Select a supported language.");
 
         List<String> required = readiness.requiredConsentTypes(subjectType(current.patientId()));
-        List<String> given = r.consents() == null ? List.<String>of()
-                : r.consents().stream().filter(Objects::nonNull).map(String::trim).toList();
+        List<String> given_ = r.consents() == null ? List.<String>of() : r.consents().stream().filter(Objects::nonNull).map(String::trim).toList();
         for (String type : required)
-            if (!given.contains(type) && !consentPresent(current.patientId(), type))
+            if (!given_.contains(type) && !consentPresent(current.patientId(), type))
                 errors.reject("consents", "Please accept all required agreements to continue.");
 
         errors.throwIfInvalid();
-        return new Clean(fullName, email, phone, dob, nationality, Countries.displayName(residence), sex, language,
-                given.stream().filter(required::contains).distinct().toList());
+        return new Clean(given, family.isEmpty() ? null : family, preferred.isEmpty() ? null : preferred, email, phone, owner, dob, nationality,
+                Countries.displayName(residence), sex, language, given_.stream().filter(required::contains).distinct().toList());
+    }
+
+    /** Is this number the verified personal mobile of a different patient who already has an account? */
+    private boolean verifiedElsewhere(UUID patientId, String phone) {
+        Integer n = jdbc.sql("SELECT count(*) FROM patient_profiles WHERE id<>? AND whatsapp_number=? AND phone_verified_at IS NOT NULL AND external_subject IS NOT NULL AND mobile_owner='PATIENT'")
+                .params(patientId, phone).query(Integer.class).single();
+        return n != null && n > 0;
     }
 
     /** A withdrawn/cancelled case must not be activatable — the journey no longer exists. */
@@ -212,50 +273,60 @@ public class PatientActivationService {
     }
 
     // ---- views ----
-    private ActivationResult result(UUID caseId, UUID patientId) {
+    private ActivationResult result(UUID caseId, UUID patientId, AccountSetup state) {
         Profile p = loadProfile(patientId);
         record C(String number, String status) {}
         C c = jdbc.sql("SELECT case_number,status FROM medical_cases WHERE id=?").param(caseId)
                 .query((rs, n) -> new C(rs.getString("case_number"), rs.getString("status"))).single();
-        String state = jdbc.sql("SELECT state FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1").param(caseId).query(String.class).optional().orElse(null);
+        String onboarding = jdbc.sql("SELECT state FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1").param(caseId).query(String.class).optional().orElse(null);
         DepositSummary deposit = depositSummary(caseId);
-        return new ActivationResult("ACTIVE".equals(p.status()), accounts.linked(patientId), c.number(), c.status(),
-                state, deposit, journeyStage(p.status(), deposit), currentAction(p.status(), deposit), waitingOn(caseId));
+        boolean active = "ACTIVE".equals(p.status());
+        return new ActivationResult(active, accounts.linked(patientId), state, c.number(), c.status(), onboarding, deposit,
+                journeyStage(active, state, deposit), currentAction(active, state, deposit), waitingOn(caseId));
     }
 
     private OnboardingPrefill buildPrefill(UUID caseId, UUID patientId) {
         Profile p = loadProfile(patientId);
+        Submission sub = submission(caseId);
         record C(String number, String status) {}
         C c = jdbc.sql("SELECT case_number,status FROM medical_cases WHERE id=?").param(caseId)
                 .query((rs, n) -> new C(rs.getString("case_number"), rs.getString("status"))).single();
-        String state = jdbc.sql("SELECT state FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1").param(caseId).query(String.class).optional().orElse(null);
+        String onboarding = jdbc.sql("SELECT state FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1").param(caseId).query(String.class).optional().orElse(null);
         List<String> required = readiness.requiredConsentTypes(subjectType(patientId));
         List<String> completed = jdbc.sql("SELECT DISTINCT consent_type FROM consent_records WHERE patient_id=? AND revoked_at IS NULL AND (case_id IS NULL OR case_id=?)")
                 .params(patientId, caseId).query(String.class).list();
         DepositSummary deposit = depositSummary(caseId);
-        return new OnboardingPrefill(c.number(), c.status(), state, "ACTIVE".equals(p.status()), accounts.linked(patientId),
-                p.fullName(), p.email(), p.phone(), p.dateOfBirth(), p.nationality(),
-                Countries.toCode(p.country()).orElse(null), p.language(), p.sex(),
-                p.emailVerified(), p.phoneVerified(), required, completed, deposit,
-                journeyStage(p.status(), deposit), currentAction(p.status(), deposit), waitingOn(caseId));
+        AccountSetup state = account.state(patientId);
+        boolean active = "ACTIVE".equals(p.status());
+        boolean submittedBySelf = sub == null || "PATIENT".equals(sub.role());
+        // Only the patient's OWN address is a candidate account email. A representative's is never offered.
+        String candidateEmail = p.email() != null ? p.email() : null;
+        // The number we hold: the patient's when they have one, otherwise the submitter's, with its owner.
+        String knownMobile = p.phone() != null ? p.phone() : sub == null ? null : sub.whatsapp();
+        String mobileOwner = p.phone() != null ? p.mobileOwner() : (sub != null && "REPRESENTATIVE".equals(sub.role())) ? "REPRESENTATIVE" : null;
+        boolean legacyName = "LEGACY_FULL_NAME".equals(p.nameSource()) || p.givenName() == null;
+        return new OnboardingPrefill(c.number(), c.status(), onboarding, active, accounts.linked(patientId), state,
+                p.givenName(), p.familyName(), p.preferredName(), legacyName ? p.fullName() : null, legacyName,
+                candidateEmail, p.emailVerified(), knownMobile, mobileOwner, p.phoneVerified() && p.phone() != null,
+                p.dateOfBirth(), p.nationality(), Countries.toCode(p.country()).orElse(null), p.language(), p.sex(),
+                submittedBySelf ? "PATIENT" : "REPRESENTATIVE", submittedBySelf ? null : sub.name(), submittedBySelf ? null : sub.relationship(),
+                required, completed, deposit, journeyStage(active, state, deposit), currentAction(active, state, deposit), waitingOn(caseId));
     }
 
-    /** Server-resolved deposit; the client never supplies or influences the amount or currency. */
-    /**
-     * Where the case stands. Deliberately not a statement about who acts — {@link #currentAction} answers
-     * that, and on the current offline deposit the two answers are different.
-     */
-    private JourneyStage journeyStage(String profileStatus, DepositSummary deposit) {
-        if (!"ACTIVE".equals(profileStatus)) return JourneyStage.PROFILE;
+    /** Where the case stands. Profile → account setup → deposit → coordination. */
+    private JourneyStage journeyStage(boolean profileActive, AccountSetup account, DepositSummary deposit) {
+        if (!profileActive) return JourneyStage.PROFILE;
+        if (account.status() != AccountStatus.ACTIVE && account.awaitingEmail()) return JourneyStage.ACCOUNT_SETUP;
         return deposit.satisfied() || !deposit.required() ? JourneyStage.CARE_COORDINATION : JourneyStage.DEPOSIT;
     }
 
     /**
-     * What the patient can do, which for the deposit stage is nothing: the money is arranged offline by a
-     * coordinator, so the honest answer is NONE rather than a payment action the platform cannot honour.
+     * What the patient can do right now. The deposit is arranged offline by a coordinator, so on the deposit
+     * stage the honest answer is NONE rather than a payment action the platform cannot honour.
      */
-    private PatientAction currentAction(String profileStatus, DepositSummary deposit) {
-        if (!"ACTIVE".equals(profileStatus)) return PatientAction.COMPLETE_PROFILE;
+    private PatientAction currentAction(boolean profileActive, AccountSetup account, DepositSummary deposit) {
+        if (!profileActive) return PatientAction.COMPLETE_PROFILE;
+        if (account.status() != AccountStatus.ACTIVE && account.awaitingEmail()) return PatientAction.SET_UP_ACCOUNT;
         if (deposit.satisfied() || !deposit.required()) return PatientAction.CONTINUE_IN_PORTAL;
         return PatientAction.NONE;
     }
@@ -280,12 +351,13 @@ public class PatientActivationService {
     }
 
     // ---- data access ----
-    private record Profile(UUID patientId, String status, String fullName, String email, String phone, String country,
-                           String nationality, LocalDate dateOfBirth, String sex, String language,
+    private record Profile(UUID patientId, String status, String subject, String fullName, String givenName, String familyName, String preferredName, String nameSource,
+                           String email, String phone, String mobileOwner, String country, String nationality, LocalDate dateOfBirth, String sex, String language,
                            boolean emailVerified, boolean phoneVerified) {}
+    private record Submission(String role, String name, String relationship, String email, String whatsapp) {}
 
     private static final String PROFILE_COLUMNS =
-            "id,profile_status,full_name,email,whatsapp_number,country,nationality,date_of_birth,sex,preferred_language,email_verified_at,phone_verified_at";
+            "id,profile_status,external_subject,full_name,given_name,family_name,preferred_name,name_source,email,whatsapp_number,mobile_owner,country,nationality,date_of_birth,sex,preferred_language,email_verified_at,phone_verified_at";
 
     private Profile loadProfile(UUID patientId) {
         return jdbc.sql("SELECT " + PROFILE_COLUMNS + " FROM patient_profiles WHERE id=?").param(patientId)
@@ -296,10 +368,16 @@ public class PatientActivationService {
                 .query(this::mapProfile).optional().orElseThrow(() -> new ApiException(404, "PATIENT_NOT_FOUND", "Patient profile was not found"));
     }
     private Profile mapProfile(ResultSet rs, int n) throws SQLException {
-        return new Profile(rs.getObject("id", UUID.class), rs.getString("profile_status"), rs.getString("full_name"),
-                rs.getString("email"), rs.getString("whatsapp_number"), rs.getString("country"), rs.getString("nationality"),
+        return new Profile(rs.getObject("id", UUID.class), rs.getString("profile_status"), rs.getString("external_subject"), rs.getString("full_name"),
+                rs.getString("given_name"), rs.getString("family_name"), rs.getString("preferred_name"), rs.getString("name_source"),
+                rs.getString("email"), rs.getString("whatsapp_number"), rs.getString("mobile_owner"), rs.getString("country"), rs.getString("nationality"),
                 rs.getObject("date_of_birth", LocalDate.class), rs.getString("sex"), rs.getString("preferred_language"),
                 rs.getObject("email_verified_at") != null, rs.getObject("phone_verified_at") != null);
+    }
+    private Submission submission(UUID caseId) {
+        return jdbc.sql("SELECT contact_role,contact_name,relationship_to_patient,email,whatsapp_number FROM case_submission_contacts WHERE case_id=?").param(caseId)
+                .query((rs, n) -> new Submission(rs.getString("contact_role"), rs.getString("contact_name"), rs.getString("relationship_to_patient"), rs.getString("email"), rs.getString("whatsapp_number")))
+                .optional().orElse(null);
     }
     private String subjectType(UUID patientId) {
         return jdbc.sql("SELECT subject_type FROM patient_onboardings WHERE patient_id=? ORDER BY created_at DESC LIMIT 1")

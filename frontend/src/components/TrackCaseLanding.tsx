@@ -23,7 +23,7 @@ const copy = {
     continue: "Continue with the link saved on this browser",
     contact: "Ask a patient coordinator",
     accountTitle: "Already activated your patient account?",
-    accountBody: "Sign in to the secure care portal to see your complete care journey.",
+    accountBody: "This page is for cases that have not set up an account yet. Once you completed your profile and created your password, sign in instead — your case opens directly.",
     signIn: "Sign in to the secure portal",
     privacy: "For your privacy, we never confirm publicly whether a Case ID or WhatsApp number exists. The tracking link still requires a new 6-digit verification code before any case information is shown.",
     findId: "Where can I find my Case ID?",
@@ -43,7 +43,7 @@ const copy = {
     continue: "المتابعة بالرابط المحفوظ على هذا المتصفح",
     contact: "تواصل مع منسق المرضى",
     accountTitle: "هل فعّلت حساب المريض بالفعل؟",
-    accountBody: "سجّل الدخول إلى بوابة الرعاية الآمنة لمشاهدة رحلة رعايتك كاملة.",
+    accountBody: "هذه الصفحة للحالات التي لم تُنشئ حسابًا بعد. بعد إكمال ملفك وإنشاء كلمة المرور، سجّل الدخول مباشرة — تُفتح حالتك فورًا.",
     signIn: "تسجيل الدخول إلى البوابة الآمنة",
     privacy: "لحماية خصوصيتك، لا نؤكد علنًا وجود رقم الحالة أو رقم واتساب. ويظل رابط المتابعة محميًا برمز تحقق جديد من 6 أرقام قبل عرض أي معلومات.",
     findId: "أين أجد رقم الحالة؟",
@@ -101,7 +101,7 @@ export function TrackCaseLanding({ locale }: { locale: Locale }) {
           <div className="mt-7 border-t border-line pt-7">
             <h2 className="title">{t.accountTitle}</h2>
             <p className="mt-2 text-ink-600">{t.accountBody}</p>
-            <Link className="btn-secondary mt-5" href={`/${locale}/portal`}>{t.signIn}</Link>
+            <Link className="btn-secondary mt-5" href={`/${locale}/portal?signin=1`}>{t.signIn}</Link>
           </div>
         </div>
       </div>

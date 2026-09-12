@@ -4,6 +4,7 @@ import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.domain.MedicalCase;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
+import com.rehletshifaa.shared.util.PatientNames;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -42,13 +43,46 @@ public class IntakeLifecycleService {
      */
     @Transactional public void createFoundation(MedicalCase medicalCase, CreateCaseRequest request) {
         Instant now=clock.instant(); UUID patientId=UUID.randomUUID();
-        jdbc.sql("INSERT INTO patient_profiles(id,full_name,country,whatsapp_number,email,preferred_language,time_zone,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,0)")
-            .params(patientId,request.fullName().trim(),request.country().trim(),request.whatsappNumber().trim(),blankToNull(request.email()),request.preferredLanguage(),blankToNull(request.timeZone()),timestamp(now),timestamp(now)).update();
+        String given=PatientNames.clean(request.givenName()), family=blankToNull(PatientNames.clean(request.familyName()));
+        String displayName=PatientNames.display(given,family,null);
+        boolean self=!request.forSomeoneElse();
+        // The submitter's channels are the PATIENT's only when the patient is submitting. A representative's
+        // email/WhatsApp is recorded on the submission contact and never promoted into the patient's identity.
+        // Email captured here is a candidate contact — unverified until the patient proves ownership later.
+        jdbc.sql("INSERT INTO patient_profiles(id,full_name,given_name,family_name,name_source,country,whatsapp_number,mobile_owner,email,preferred_language,time_zone,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
+            .params(patientId,displayName,given,family,"STRUCTURED",request.country().trim(),self?request.whatsappNumber().trim():null,self?"PATIENT":null,
+                    self?blankToNull(request.email()):null,request.preferredLanguage(),blankToNull(request.timeZone()),timestamp(now),timestamp(now)).update();
         jdbc.sql("UPDATE medical_cases SET patient_id=? WHERE id=?").params(patientId,medicalCase.getId()).update();
+        var rep=request.representative();
+        jdbc.sql("INSERT INTO case_submission_contacts(id,case_id,patient_id,contact_role,contact_name,relationship_to_patient,email,whatsapp_number,preferred_language,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)")
+            .params(UUID.randomUUID(),medicalCase.getId(),patientId,self?"PATIENT":"REPRESENTATIVE",self?displayName:PatientNames.clean(rep==null?null:rep.name()),
+                    self?null:(rep==null?null:rep.relationship()),blankToNull(request.email()),request.whatsappNumber().trim(),request.preferredLanguage(),timestamp(now)).update();
         String consentText="ar".equals(request.preferredLanguage()) ? "أوافق على معالجة المعلومات التي أقدمها لغرض تنسيق حالتي الطبية." : "I consent to processing the information I submit for the purpose of coordinating my medical case.";
         jdbc.sql("INSERT INTO consent_records(id,patient_id,case_id,consent_type,policy_version,language,exact_text,purpose,scope,channel,captured_by,effective_from,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
             .params(UUID.randomUUID(),patientId,medicalCase.getId(),"DATA_PROCESSING","intake-v1",request.preferredLanguage(),consentText,"Medical case coordination","Submitted case data","WEB","guest",timestamp(now),timestamp(now)).update();
         audit("CASE_INTAKE_CREATED","guest","GUEST",medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"CREATE","SUCCESS",null,now);
+    }
+
+    /**
+     * A returning, signed-in patient starting another case: the SAME canonical patient owns the new case.
+     * No patient row, submission contact or consent is duplicated beyond what this case needs.
+     */
+    @Transactional public void createFoundationForExistingPatient(MedicalCase medicalCase, UUID patientId, String consentLanguage) {
+        Instant now=clock.instant();
+        jdbc.sql("UPDATE medical_cases SET patient_id=? WHERE id=?").params(patientId,medicalCase.getId()).update();
+        jdbc.sql("INSERT INTO case_submission_contacts(id,case_id,patient_id,contact_role,contact_name,email,whatsapp_number,preferred_language,created_at) SELECT ?,?,p.id,'PATIENT',"+PatientNames.DISPLAY_SQL+",p.email,p.whatsapp_number,p.preferred_language,? FROM patient_profiles p WHERE p.id=?")
+            .params(UUID.randomUUID(),medicalCase.getId(),timestamp(now),patientId).update();
+        String consentText="ar".equals(consentLanguage) ? "أوافق على معالجة المعلومات التي أقدمها لغرض تنسيق حالتي الطبية." : "I consent to processing the information I submit for the purpose of coordinating my medical case.";
+        jdbc.sql("INSERT INTO consent_records(id,patient_id,case_id,consent_type,policy_version,language,exact_text,purpose,scope,channel,captured_by,effective_from,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            .params(UUID.randomUUID(),patientId,medicalCase.getId(),"DATA_PROCESSING","intake-v1",consentLanguage,consentText,"Medical case coordination","Submitted case data","WEB","patient",timestamp(now),timestamp(now)).update();
+        audit("CASE_INTAKE_CREATED","patient","PATIENT",medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"CREATE","SUCCESS","Returning patient",now);
+    }
+
+    public record PatientSnapshot(String displayName, String country, String whatsapp, String language) {}
+    /** What a new case needs from an existing canonical patient (display-name snapshot + contact defaults). */
+    public java.util.Optional<PatientSnapshot> patientSnapshot(UUID patientId) {
+        return jdbc.sql("SELECT "+PatientNames.DISPLAY_SQL+" display_name,p.country,COALESCE(p.whatsapp_number,(SELECT sc.whatsapp_number FROM case_submission_contacts sc WHERE sc.patient_id=p.id ORDER BY sc.created_at DESC LIMIT 1)) whatsapp_number,p.preferred_language FROM patient_profiles p WHERE p.id=? AND p.merged_into_patient_id IS NULL").param(patientId)
+            .query((rs,n)->new PatientSnapshot(rs.getString("display_name"),rs.getString("country"),rs.getString("whatsapp_number"),rs.getString("preferred_language"))).optional();
     }
 
     public void validateSubmittable(UUID caseId) {
@@ -75,7 +109,7 @@ public class IntakeLifecycleService {
         jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
             .params(UUID.randomUUID(),"CASE_STATUS_LINK","WHATSAPP",medicalCase.getWhatsappNumber(),"case-status-link",payload,"PENDING",0,5,timestamp(now),"case-status:"+linkId,timestamp(now),"case-status:"+linkId).update();
         jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
-            .params(UUID.randomUUID(),"NEW_CASE","EMAIL",coordinatorEmail,"new-case-received","{}","PENDING",0,5,timestamp(now),"case-submitted:"+medicalCase.getId(),timestamp(now),"case-submitted:"+medicalCase.getId()).update();
+            .params(UUID.randomUUID(),"NEW_CASE","EMAIL",coordinatorEmail,"new-case-received",encryptedJson("{\"case\":\""+medicalCase.getCaseNumber()+"\"}"),"PENDING",0,5,timestamp(now),"case-submitted:"+medicalCase.getId(),timestamp(now),"case-submitted:"+medicalCase.getId()).update();
         audit("CASE_SUBMITTED","guest","GUEST",medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"SUBMIT","SUCCESS",null,now);
         return linkToken;
     }

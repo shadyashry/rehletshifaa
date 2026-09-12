@@ -152,7 +152,7 @@ public class OnboardingService {
         Onboarding ob = requireOnboarding(caseId);
         String caseNumber = jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?").param(caseId).query(String.class).single();
         UUID patientId = jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(caseId).query(UUID.class).single();
-        PatientProfileSummary profile = jdbc.sql("SELECT full_name,country,whatsapp_number,email,phone_verified_at,email_verified_at FROM patient_profiles WHERE id=?").param(patientId)
+        PatientProfileSummary profile = jdbc.sql("SELECT " + com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL + " full_name,country,whatsapp_number,email,phone_verified_at,email_verified_at FROM patient_profiles p WHERE id=?").param(patientId)
                 .query((rs, n) -> new PatientProfileSummary(rs.getString("full_name"), rs.getString("country"), rs.getString("whatsapp_number"), rs.getString("email"), rs.getObject("phone_verified_at") != null, rs.getObject("email_verified_at") != null)).single();
         CustomerReadiness r = readiness.compute(caseId);
         IdentityVerificationView iv = identity.latestForPatient(patientId);
