@@ -9,7 +9,7 @@ Updated: 2026-09-13. **Phase 0 complete. Phase 1A has not started.**
 - Phase 0 starting HEAD: `458359895209eccfea011c76cd6a46bc38dc7bae` (canonical specification commit).
 - Pre-existing dirty files: none.
 - Scope: inventory, dependency preflight, persistent design and executable handoff only.
-- Phase commit: documentation verified; the Phase 0 artifact commit SHA will be recorded by the handoff follow-up commit.
+- Phase 0 artifact commit: `f1cc71c9f2d86d7ee59f183a39461bb2f831e31e` (`docs(platform): complete Phase 0 inventory and technical handoff`). A documentation-only follow-up records this SHA; no push was performed.
 
 ## Completed
 
