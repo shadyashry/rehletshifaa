@@ -161,4 +161,67 @@ class AccessGovernanceIntegrationTest {
         assertThat(new LegacyRoleCompatibilityAdapter().suggestedTemplates(Set.of(ActorRole.DOCTOR))).containsExactly("CONSULTANT");
         assertThat(new LegacyRoleCompatibilityAdapter().suggestedTemplates(Set.of(ActorRole.PATIENT_REPRESENTATIVE))).isEmpty();
     }
+
+    @Test void httpResourceIdsCannotSubstituteRoleParentOrganizationOrRelationshipSubject() throws Exception {
+        var first=create();var second=create();var v=first.versions().getFirst().version();
+        var owner=jwt().jwt(j->j.subject("governance-owner").claim("auth_time",clock.instant()));
+        mvc.perform(put("/api/v1/admin/access/roles/"+second.role().id()+"/versions/"+v.id()).with(owner)
+                .contentType("application/json").content("{\"revision\":0,\"grants\":[],\"reason\":\"Wrong parent\"}"))
+                .andExpect(status().isNotFound());
+        signIn("governance-owner");
+        var a=assignmentService.grant(new RoleAssignmentService.Grant("member",OWNER,ResourceContext.PLATFORM,ScopeType.PLATFORM,null,null,clock.instant(),null,"Review access"));
+        mvc.perform(post("/api/v1/admin/access/assignments/"+a.id()+"/revoke").with(owner)
+                .param("organization",UUID.randomUUID().toString()).contentType("application/json")
+                .content("{\"revision\":0,\"reason\":\"Wrong tenant\"}")).andExpect(status().isNotFound());
+        signIn("governance-owner");
+        UUID org=UUID.randomUUID();
+        var r=relationshipService.create(new ResourceRelationshipService.Create("manager",org,RelationshipType.MANAGES,"CLINICIAN","doctor",clock.instant(),null,"Pending manager"));
+        mvc.perform(post("/api/v1/admin/access/relationships/"+r.id()+"/revoke").with(owner)
+                .param("organization",org.toString()).param("subject","other").contentType("application/json")
+                .content("{\"revision\":0,\"reason\":\"Wrong subject\"}")).andExpect(status().isNotFound());
+        assertThat(roles.version(v.id()).orElseThrow().revision()).isZero();
+        assertThat(assignments.get(a.id(),ResourceContext.PLATFORM).status()).isEqualTo("ACTIVE");
+    }
+
+    @Test void newlyInsertedMembershipIsEffectiveAtTheInsertionInstant() {
+        // Databases store microseconds; upward rounding must not make an immediate grant fail.
+        Instant now=Instant.parse("2026-09-13T10:00:00.123456789Z");
+        assignments.lockSubject("precision-member");
+        assignments.membership("precision-member",ResourceContext.PLATFORM,"ACTIVE","governance-owner","Precision regression",now);
+        assertThat(assignments.activeMember("precision-member",ResourceContext.PLATFORM,now))
+                .as("stored membership %s at %s",assignments.membership("precision-member",ResourceContext.PLATFORM),now).isTrue();
+        var assignment=new RoleAssignment(UUID.randomUUID(),"precision-member",OWNER,ResourceContext.PLATFORM,ScopeType.PLATFORM,
+                null,null,now,null,"ACTIVE","TEST","governance-owner","Precision regression",0);
+        assignments.insert(assignment);
+        assertThat(assignments.get(assignment.id(),ResourceContext.PLATFORM).effectiveFrom()).isBeforeOrEqualTo(now);
+        roles.transition(OWNER,0,"PUBLISHED",now,null,"governance-owner");
+        assertThat(roles.version(OWNER).orElseThrow().effectiveFrom()).isBeforeOrEqualTo(now);
+    }
+
+    @Test void inactiveMembershipAndPermissionRemovalTakeEffectWithoutLegacyFallback() {
+        var d=create();UUID role=d.role().id(),v=d.versions().getFirst().version().id();
+        var grants=List.of(new RolePermissionGrant("access.role.view",ScopeType.PLATFORM,null),
+                new RolePermissionGrant("access.effective_access.view",ScopeType.PLATFORM,null));
+        service.edit(role,v,new RoleTemplateService.Edit(0,grants,"Access reviewers"));
+        service.validate(role,v,new RoleTemplateService.Change(1,"Validate"));
+        assignmentService.grant(new RoleAssignmentService.Grant("checker",OWNER,ResourceContext.PLATFORM,ScopeType.PLATFORM,null,null,clock.instant(),null,"Independent checker"));
+        signIn("checker");service.publish(role,v,new RoleTemplateService.Publish(2,"Publish",clock.instant()));
+        assignmentService.grant(new RoleAssignmentService.Grant("reader",v,ResourceContext.PLATFORM,ScopeType.PLATFORM,null,null,clock.instant(),null,"Read access"));
+        var reader=new AccessIdentity.Identity("reader",clock.instant());
+        assertThat(authorization.decide(reader,"access.effective_access.view",ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB).allowed()).isTrue();
+        jdbc.update("UPDATE access_memberships SET status='REVOKED' WHERE subject='reader'");
+        assertThat(authorization.decide(reader,"access.role.view",ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB).reason()).isEqualTo(AuthorizationDecision.Reason.INACTIVE_MEMBERSHIP);
+        jdbc.update("UPDATE access_memberships SET status='ACTIVE' WHERE subject='reader'");
+        var next=service.draft(role,v,"Remove sensitive inspection").versions().getFirst().version();
+        service.edit(role,next.id(),new RoleTemplateService.Edit(0,List.of(grants.getFirst()),"Remove inspection"));
+        service.validate(role,next.id(),new RoleTemplateService.Change(1,"Validate removal"));
+        signIn("governance-owner");service.publish(role,next.id(),new RoleTemplateService.Publish(2,"Approve removal",clock.instant()));
+        // Published versions are pinned: publishing v2 never silently changes v1 assignments.
+        assertThat(authorization.decide(reader,"access.effective_access.view",ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB).allowed()).isTrue();
+        service.retire(role,v,new RoleTemplateService.Change(3,"Revoke old policy"));
+        assignmentService.grant(new RoleAssignmentService.Grant("reader",next.id(),ResourceContext.PLATFORM,ScopeType.PLATFORM,null,null,clock.instant(),null,"Use reduced version"));
+        assertThat(authorization.decide(reader,"access.effective_access.view",ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB).allowed()).isFalse();
+        assertThat(authorization.decide(reader,"access.role.view",ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB).allowed()).isTrue();
+        assertThat(jdbc.queryForList("SELECT action FROM audit_events WHERE event_type='ACCESS_GOVERNANCE' AND entity_id=?",String.class,next.id().toString())).contains("PERMISSION_REMOVED");
+    }
 }

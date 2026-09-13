@@ -23,8 +23,9 @@ public class RoleAssignmentRepository {
         jdbc.sql("SELECT subject FROM access_subjects WHERE subject=? FOR UPDATE").param(subject).query(String.class).single();
     }
     public void membership(String subject, UUID org, String status, String actor, String reason, Instant now) {
+        // Match DB microsecond precision without rounding an immediate start into the future.
         jdbc.sql("INSERT INTO access_memberships(subject,organization_id,status,effective_from,revision,created_by,reason) SELECT ?,?,?,?,0,?,? WHERE NOT EXISTS (SELECT 1 FROM access_memberships WHERE subject=? AND organization_id=?)")
-                .params(subject,org,status,timestamp(now),actor,reason,subject,org).update();
+                .params(subject,org,status,timestamp(now.truncatedTo(java.time.temporal.ChronoUnit.MICROS)),actor,reason,subject,org).update();
     }
     public boolean activeMember(String subject, UUID organization, Instant now) {
         return jdbc.sql("SELECT COUNT(*) FROM access_memberships m JOIN access_subjects s ON s.subject=m.subject WHERE m.subject=? AND m.organization_id=? AND s.active=TRUE AND m.status='ACTIVE' AND m.effective_from<=? AND (m.effective_to IS NULL OR m.effective_to>?)")
@@ -49,9 +50,10 @@ public class RoleAssignmentRepository {
                 .orElseThrow(()->new ApiException(404,"ASSIGNMENT_NOT_FOUND","Access assignment not found"));
     }
     public void insert(RoleAssignment a) {
+        // The same precision rule applies to bootstrap and immediately effective assignments.
         jdbc.sql("INSERT INTO role_assignments(id,subject,version_id,organization_id,scope_type,target_type,target_id,effective_from,effective_to,status,source,assigned_by,reason,revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
                 .params(a.id(),a.subject(),a.versionId(),a.organizationId(),a.scope().name(),a.targetType(),a.targetId(),
-                        timestamp(a.effectiveFrom()),timestamp(a.effectiveTo()),a.status(),a.source(),a.assignedBy(),a.reason()).update();
+                        timestamp(a.effectiveFrom().truncatedTo(java.time.temporal.ChronoUnit.MICROS)),timestamp(a.effectiveTo()),a.status(),a.source(),a.assignedBy(),a.reason()).update();
     }
     public void revoke(UUID id, long revision, Instant now) {
         if(jdbc.sql("UPDATE role_assignments SET status='REVOKED',revoked_at=?,revision=revision+1 WHERE id=? AND revision=? AND status<>'REVOKED'")

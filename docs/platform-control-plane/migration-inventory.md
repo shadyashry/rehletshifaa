@@ -66,7 +66,7 @@ Backend entry points: `journey/api/AdminJourneyController.java` under `/api/v1/a
 
 ## Migration numbering and phased file plan
 
-Latest: **V30__patient_identity_and_account_setup.sql**. V1–V30 remain immutable. Next currently available: **V31**. No migration was added in Phase 0.
+Latest: **V31__access_governance_foundation.sql**. V1–V30 remain immutable. Next currently available for an authorized Phase 2 change: **V32**.
 
 | Phase | Exact integration roots / planned additions | Verification boundary |
 |---|---|---|
@@ -79,7 +79,7 @@ Latest: **V30__patient_identity_and_account_setup.sql**. V1–V30 remain immutab
 | 6A–B | Journey designer and coordination components within same subtree; frontend/package.json only when adding React Flow | Keyboard/non-drag editing, simulation/publish, routing explanation, RTL |
 | 7–8 | Indexed authorization sites and existing workflow services; current portal action components | Controlled cutover followed by matrix-based security and commercial regression |
 
-New paths are plans, not files already created. Continue with the ordered Phase 1A actions in implementation-status.md, not this entire epic at once.
+Phase 1 access paths and V31 now exist; later-phase paths in this table remain plans. Continue only from the Phase 2 NEXT EXACT ACTIONS in implementation-status.md when that phase is explicitly authorized.
 
 ## Phase 1 actual migration and cutover status — 2026-09-13
 

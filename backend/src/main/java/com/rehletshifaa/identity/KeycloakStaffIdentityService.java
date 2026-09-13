@@ -17,13 +17,14 @@ import java.util.*;
 
 /** Least-privilege Keycloak integration for staff lifecycle; passwords never pass through this application. */
 @Service
-public class KeycloakStaffIdentityService {
+public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
     private static final List<String> INVITE_ACTIONS=List.of("VERIFY_EMAIL","UPDATE_PASSWORD");
-    private final RestClient http=RestClient.create();
+    private final RestClient http;
     private final ObjectMapper json;
     private final String baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl;
     private final int inviteLifespan;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public KeycloakStaffIdentityService(ObjectMapper json,
         @Value("${app.identity-admin.base-url:http://localhost:8180}") String baseUrl,
         @Value("${app.identity-admin.realm:rehletshifaa}") String realm,
@@ -32,10 +33,21 @@ public class KeycloakStaffIdentityService {
         @Value("${app.identity-admin.web-client-id:rehletshifaa-web}") String webClientId,
         @Value("${app.web-base-url:http://localhost:3000}") String webBaseUrl,
         @Value("${app.identity-admin.invite-lifespan-seconds:43200}") int inviteLifespan) {
-        this.json=json;this.baseUrl=stripSlash(baseUrl);this.realm=realm;this.clientId=clientId;this.clientSecret=clientSecret;
+        this(RestClient.create(),json,baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl,inviteLifespan);
+    }
+
+    KeycloakStaffIdentityService(RestClient http,ObjectMapper json,String baseUrl,String realm,String clientId,
+            String clientSecret,String webClientId,String webBaseUrl,int inviteLifespan) {
+        this.http=http;this.json=json;this.baseUrl=stripSlash(baseUrl);this.realm=realm;this.clientId=clientId;this.clientSecret=clientSecret;
         this.webClientId=webClientId;this.webBaseUrl=stripSlash(webBaseUrl);this.inviteLifespan=inviteLifespan;
     }
 
+    @Override
+    public IdentityAccount invite(String name,String email,String locale) {
+        return invite(name,email,null,locale);
+    }
+
+    /** Legacy staff compatibility only; new business services use IdentityProvisioningPort. */
     public IdentityAccount invite(String name,String email,String role,String locale) {
         requireConfigured();
         String normalized=email.trim().toLowerCase(Locale.ROOT);
@@ -47,7 +59,7 @@ public class KeycloakStaffIdentityService {
         try {
             ResponseEntity<Void> response=http.post().uri(admin("/users")).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(user).retrieve().toBodilessEntity();
             String subject=subjectFrom(response.getHeaders().getLocation());
-            try {replaceStaffRole(subject,role);sendInvite(subject,locale);}
+            try {if(role!=null)replaceStaffRole(subject,role);sendInvite(subject,locale);}
             catch(RuntimeException failure){deleteQuietly(subject);throw failure;}
             return new IdentityAccount(subject,normalized,"INVITED",Instant.now());
         } catch(RestClientResponseException e) {throw identityFailure(e,"Unable to create the staff identity account");}
@@ -107,5 +119,4 @@ public class KeycloakStaffIdentityService {
     private String subjectFrom(URI location){if(location==null)throw new ApiException(502,"IDENTITY_PROVIDER_ERROR","Identity provider returned no account identifier");String path=location.getPath();return path.substring(path.lastIndexOf('/')+1);}
     private static String stripSlash(String value){return value.endsWith("/")?value.substring(0,value.length()-1):value;}
     private static String encode(String value){return java.net.URLEncoder.encode(value,java.nio.charset.StandardCharsets.UTF_8);}
-    public record IdentityAccount(String subject,String email,String status,Instant invitedAt){}
 }

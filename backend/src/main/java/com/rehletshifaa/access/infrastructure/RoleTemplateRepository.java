@@ -56,8 +56,9 @@ public class RoleTemplateRepository {
                 .params(version,grant.permission(),grant.scope().name(),grant.relationship()==null?null:grant.relationship().name()).update();
     }
     public void transition(UUID id, long revision, String status, Instant effective, Instant retired, String publisher) {
+        // Do not round an immediately published version's start forward at the JDBC boundary.
         int changed = jdbc.sql("UPDATE role_template_versions SET status=?,effective_from=?,retired_at=?,published_by=?,revision=revision+1 WHERE id=? AND revision=?")
-                .params(status,timestamp(effective),timestamp(retired),publisher,id,revision).update();
+                .params(status,timestamp(effective==null?null:effective.truncatedTo(java.time.temporal.ChronoUnit.MICROS)),timestamp(retired),publisher,id,revision).update();
         if (changed != 1) throw new ApiException(409,"STALE_VERSION","This role changed. Reload before saving.");
     }
     private RoleTemplate template(ResultSet r, int n) throws SQLException {

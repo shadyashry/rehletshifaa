@@ -1,6 +1,6 @@
 # Platform Control Plane — verification status
 
-Updated 2026-09-13. Phase 1 results from the preserved working branch; no Phase 2 work.
+Updated 2026-09-14. Phase 1 results from the preserved working branch; no Phase 2 work.
 
 | Check | Result | Evidence / boundary |
 |---|---|---|
@@ -8,12 +8,13 @@ Updated 2026-09-13. Phase 1 results from the preserved working branch; no Phase 
 | Recovered prior access reports | Historical | 14 passed, one concurrency failure; handoff still said Phase 0. The working-tree seed-date fix postdated the failed report |
 | Focused concurrency rerun | PASS | Current interrupted source already fixed fixture effective dates; one successful grant/edit under races; subsequent audit-rollback assertion also passed |
 | Focused access + Flyway + architecture | PASS | `mvn -o -q '-Dtest=Access*Test,AuthorizationServiceTest,PermissionCatalogTest,FlywayMigrationTest,ArchitectureRulesTest' test`; 17 access tests, 1 migration test, 8 architecture tests |
-| Full offline backend | PASS | `mvn -o -q test`; 278 tests in 25 suites, zero failures/errors/skips; `backend/target/phase1-full-backend.log` and Surefire XML |
+| Final reconciliation focus | PASS | `mvn -o -q '-Dtest=IdentityProvisioningPortTest,AccessGovernanceIntegrationTest,AuthorizationServiceTest,PermissionCatalogTest,AccessConcurrencyTest,JourneyServiceIntegrationTest,SecureJourneyCorrectionsTest,SecurityIntegrationTest,CorsIntegrationTest,FlywayMigrationTest,ArchitectureRulesTest' test`; identity boundary, IDOR/SoD/default-deny, immediate-effective timestamps, independent credential review, V31 and architecture all passed |
+| Full offline backend | PASS | `mvn -o -q test`; 286 tests in 26 suites, zero failures/errors/skips; Surefire XML |
 | Frontend typecheck | PASS | `pnpm typecheck`, including access UI, assignment form and new browser spec |
 | Access UI / impacted portal roles | PASS | `pnpm test src/components/platform-control-center src/lib/portal-role-access.test.ts`; 9 tests in 3 files |
 | Focused Chromium browser | PASS | `pnpm test:e2e e2e/access-governance.spec.ts --workers=1`; 2 EN/AR tests, desktop/mobile, eleven steps, validate, saved-draft simulation ID, independent publication contract, no horizontal overflow |
 | Screenshots | PASS | Four screenshots under `frontend/test-results/access-governance-*/access-{en,ar}-{desktop,mobile}.png`; reviewed at page top with instant scrolling to avoid a full-page capture offset of the global sticky header |
-| Whitespace | PASS before staging | `git diff --check`; final staged gate recorded at commit |
+| Whitespace / staged scope | PASS | `git diff --cached --check` passed on the final 12-file reconciliation; the staged stat matched the intended identity, access, journey-test and handoff scope |
 
 ## Security and acceptance evidence
 

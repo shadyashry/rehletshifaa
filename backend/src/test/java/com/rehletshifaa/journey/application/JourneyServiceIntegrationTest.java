@@ -26,6 +26,24 @@ class JourneyServiceIntegrationTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto; @Autowired EntityManager entityManager; @Autowired PaymentService payment;
     @AfterEach void clearSecurity(){SecurityContextHolder.clearContext();}
 
+    @Test void credentialDecisionRequiresIndependentReviewerEvenForLegacyAdministrators() {
+        UUID practitioner=UUID.randomUUID(), credential=UUID.randomUUID();
+        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                practitioner,"self-reviewer","Reviewer","Reviewer","UNDER_REVIEW","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",
+                credential,practitioner,"LICENSE","UNDER_REVIEW",Instant.now().plusSeconds(86400),Instant.now());
+        for(String role:List.of("SYSTEM_ADMIN","CREDENTIALING_ADMIN")) {
+            authenticate("self-reviewer",role);
+            for(boolean approved:List.of(true,false))
+                assertThatThrownBy(()->journey.verifyPractitioner(practitioner,approved,"Review decision"))
+                        .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("Another authorized reviewer");
+        }
+        assertThat(jdbc.queryForObject("SELECT status FROM practitioner_credentials WHERE id=?",String.class,credential)).isEqualTo("UNDER_REVIEW");
+        authenticate("independent-reviewer","CREDENTIALING_ADMIN");
+        assertThat(journey.verifyPractitioner(practitioner,true,"Independent review").status()).isEqualTo("VERIFIED");
+        assertThat(jdbc.queryForObject("SELECT verified_by FROM practitioner_credentials WHERE id=?",String.class,credential)).isEqualTo("independent-reviewer");
+    }
+
     @Test void completesClaimAssignmentClinicalProposalAndDecisionFlow()throws Exception{
         var created=cases.create(new CreateCaseRequest("Patient", "One","Kenya","+254700000001","Cardiac reports","en",true,null,"patient@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());

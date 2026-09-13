@@ -1,6 +1,6 @@
 # Platform Control Plane — technical decisions
 
-Phase 0, 2026-09-13. These are implementation decisions, not implemented features.
+Phase 0 plans followed by implemented Phase 1 decisions (§10) and final reconciliation (§11), 2026-09-13.
 Canonical product requirements: [blueprint](blueprint.md), [master spec](master-implementation-spec.md).
 
 ## 1. Branch and source of truth
@@ -101,7 +101,7 @@ Before Phase 4B: perform a policy-authorized one-time bootstrap of the pinned pr
 
 Extend the existing localized portal and its API client. Introduce a control-center component subtree in Phase 5; do not rewrite Portal.tsx in Phase 1. Preserve OIDC/PKCE and the gateway base URL. Use backend effective permissions to render navigation and actions only after corresponding APIs exist. Keep EN/AR and keyboard/non-drag React Flow editing for Phase 6; no frontend dependency additions now.
 
-Implementation sequence and exact entry files: [migration inventory](migration-inventory.md). The next session must follow [NEXT EXACT ACTIONS](implementation-status.md#next-exact-actions--phase-1a-not-authorized-in-phase-0).
+Implementation sequence and exact entry files: [migration inventory](migration-inventory.md). The next session must follow the Phase 2 NEXT EXACT ACTIONS in [implementation status](implementation-status.md).
 
 ## 10. Phase 1 implemented decisions (supersedes the Phase 0 plans above)
 
@@ -117,3 +117,29 @@ Implementation sequence and exact entry files: [migration inventory](migration-i
 - Successful audit writes share the mutation transaction; denied operations use a separate transaction so rejection rollback cannot erase the event. No clinical payloads or secret token claims are logged.
 - Simulation can reference a saved draft version; evaluation includes current membership, registry constraints and combined assignment conflicts but evaluates the proposed grant instead of silently falling back to the user's existing grants. It never writes policy, assignments or relationships. Unresolved resources deny; other subjects have unknown recent authentication and therefore cannot appear recently authenticated by borrowing the reviewer's session.
 - UI and API use the existing gateway client and OIDC flow. EN/AR UI is included now at the user's request; no React Flow/provider/designer work was introduced.
+
+## 11. Final identity/authorization reconciliation
+
+**Keycloak is authoritative for authentication and identity-session concerns. RehletShifaa is authoritative for dynamic business authorization, organization membership, roles, permissions, scopes and relationships.**
+
+Keycloak owns OIDC Authorization Code + PKCE, passwords, MFA, login/session management, stable identity subjects and security account enable/disable/lifecycle. The browser remains a public S256 PKCE client. Realm/client roles retained on existing routes are coarse technical/legacy compatibility information, not configurable business policy. Never create resource-specific realm roles/groups (such as a role per doctor/manager/coordinator), synchronize dynamic DB roles into Keycloak, or fall back to ActorRole after a new-policy denial.
+
+`access_subjects.active` is a local business-access suspension, not a second authentication account or a replacement for Keycloak's enabled state. Revoking an organization membership must not disable a person's identity in other organizations. Cached/display invitation status is not authorization evidence. Existing JWT session validation remains unchanged; account/session invalidation and application grant revocation are distinct operations.
+
+### Identity provisioning boundary for Phase 2
+
+`identity/IdentityProvisioningPort` exposes role-free `invite(name,email,locale)`, `resend(subject,locale)`, `setEnabled(subject,enabled)` and display `status(subject,storedStatus)`. Its `IdentityAccount` returns the stable external subject. The existing `KeycloakStaffIdentityService` implements this port, reusing the existing backend credentials, HTTP integration and invitation actions. No duplicate identity adapter or frontend Admin API exists. The four-argument invitation method remains exclusively for legacy staff/doctor realm-role compatibility; new provider business services inject the port and do not pass business roles to Keycloak.
+
+The role-free invitation creates an enabled identity requiring email verification/password setup and sends Keycloak's action email. It performs no role lookup/mapping; realm defaults remain identity-provider configuration and confer no new business access. Invitation failure retains the existing best-effort identity cleanup. `status` may return stored display status if Keycloak is unavailable; it must never authorize membership or activation.
+
+Phase 2 business orchestration must authorize the operator and resolve the organization first, call this backend port, store the returned subject with the existing person/profile identity, and persist organization membership, pinned role assignment, credential lifecycle and relationships in RehletShifaa. Keycloak and the application DB do not share an atomic transaction: implement durable retry/reconciliation for partial provisioning and DB failures, never link an existing identity solely from an unverified client email/subject, and activate business access only after required checks. Do not globally disable an identity merely to remove one organization membership. Provider orchestration is not implemented in this reconciliation.
+
+### Security corrections and effective-access semantics
+
+- The existing `JourneyService.verifyPractitioner` now rejects both approval and rejection of one's own credentials by resolving the profile's stored external subject, including for SYSTEM_ADMIN. The new evaluator's existing self-verification guard remains. Full provider credential lifecycle/activation remains Phase 2.
+- Membership, assignment and published-version start timestamps normalize to DB microsecond precision, avoiding upward JDBC rounding that could transiently deny immediate grants/bootstrap. A fixed nanosecond regression reproduced the issue before correction. No migration or global timestamp behavior changed.
+- Published assignments pin immutable versions. Removing a permission in v2 does not silently rewrite v1: revoke/replace v1 assignments or retire v1 to withdraw its permissions. The evaluator reads current DB state without an authorization cache; revocation/retirement denies subsequent decisions.
+- Platform governance capabilities explicitly authorize central access administration/inspection. They do not imply provider/clinical access. `ASSIGNED_ORGANIZATIONS` uses an explicit assignment and active membership for each organization; PLATFORM is currently confined to the governance sentinel. Broader provider capabilities require reviewed resolver/envelope implementation in Phase 2, not a wildcard bypass.
+- Effective-access responses explain assignment/version, permission, organization, scope, relationship type and allow/deny reason. Provider resource simulation remains unresolved/default-deny until its owning resolver exists. Denial reasons do not claim that a grant exists.
+
+Final reconciliation accepts the Phase 1 foundation after the focused checks in test-status.md; it is not a live deployment certification. Provider, Journey and Coordinator routing execution remain unstarted.
