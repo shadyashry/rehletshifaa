@@ -1,60 +1,54 @@
 # Platform Control Plane — implementation status
 
-Updated: 2026-09-13. **Phase 0 complete. Phase 1A has not started.**
+Updated 2026-09-13. **Phase 1 complete. Phase 2 not started.**
 
-## Checkout and scope
+## Checkout and recovered state
 
-- Current/intended feature branch: `codex/platform-control-plane`.
-- Branch already created before this session from `codex/2026-healthcare-ux`, base SHA `1fa84e41e9cce73818adfe11d335e4763c12eafa`, confirmed by reflog. Retained the intended branch rather than creating a duplicate.
-- Phase 0 starting HEAD: `458359895209eccfea011c76cd6a46bc38dc7bae` (canonical specification commit).
-- Pre-existing dirty files: none.
-- Scope: inventory, dependency preflight, persistent design and executable handoff only.
-- Phase 0 artifact commit: `f1cc71c9f2d86d7ee59f183a39461bb2f831e31e` (`docs(platform): complete Phase 0 inventory and technical handoff`). A documentation-only follow-up records this SHA; no push was performed.
+- Branch: `codex/platform-control-plane`; resumed HEAD `3a184b0`. No branch switch/reset/stash/cleanup.
+- Previous session stopped before a coherent commit/handoff, with unstaged SecurityConfig/portal changes and untracked access backend, V31, tests and UI. All preserved and completed in place.
+- Its status files still described Phase 0. Recovered test reports showed 14 passing access tests and one concurrency failure. The current concurrency file already contained a seed-date fix newer than that report; its fresh run passed.
+- Phase 0 artifacts remain in history (`f1cc71c`, `3a184b0`); approved specs remain unchanged.
 
-## Completed
+## Implemented Phase 1
 
-- Read AGENTS.md, CLAUDE.md, the supplied blueprint/master/playbook, commercial handoff and relevant current workflow/architecture sections.
-- Persisted byte-identical canonical copies under `blueprint.md` and `master-implementation-spec.md`; originals and acceptance matrix remain in `specs/`.
-- Inventoried legacy roles/checks, clinician/staff/credential data, catalog, availability, coordinator ownership, work/current actions, transitions, audit/outbox and admin surfaces.
-- Saved a source-location index: 306 matched lines across 34 production source files; classifications distinguish identity, business, workflow/resource, supervisory and browser concerns.
-- Confirmed latest Flyway migration is V30; V31 is currently next, subject to recheck.
-- Selected the documented Flowable 7.2.0 process-starter pin, inspected local cache, and recorded the offline prerequisite. Added no dependency.
-- Reconciled repository specifics: JdbcClient repositories for new modules; legacy role adapter; existing case_tasks projections; separate provider tenants; no inherited unrestricted admin grant; immutable proposal pricing.
+- Engineering permission catalog: 71 registered capabilities, metadata/dependencies/conflicts, actor/channel/scope envelopes. Only 10 `access.*` capabilities execute in Phase 1. Future provider/clinical/finance/journey capabilities remain unavailable in the new decision path.
+- Nineteen stable default role templates; configurable custom roles; pinned, immutable published versions; draft save/resume/validation; effective publication and retirement; optimistic revision checks and serialized changes; independent publisher, including prohibition on any prior editor publishing.
+- Explicit scope and relationship primitives; subject state, effective tenant memberships, assignment/revocation history and overlap/SoD checks. Unknown provider organizations and relationships remain PENDING with no activation API.
+- Authoritative default-deny AuthorizationService checks account/membership, tenant, version, scope, relationship, workflow authority, registered envelope and recent authentication. No authorization cache or legacy-role fallback.
+- Effective Access includes membership/account state, assignment source, role/version, scopes, relationships and reasoned decisions. Saved-draft simulation uses the same evaluator with a hypothetical grant and never changes live assignments or policy. Target-user recent authentication is not borrowed from the administrator.
+- Protected `/api/v1/admin/access/*` APIs. Authenticated identities without an ActorRole can use explicitly assigned governance access. Existing business routes, ActorContext, JwtRoleConverter and Keycloak realm remain intact.
+- Transactional successful-change audit, permission diffs, effective-access/simulation events; independent denial audit survives rollback. One-shot explicit deployment bootstrap never infers an owner from SYSTEM_ADMIN and never resurrects revoked access.
+- EN/AR `/[locale]/portal/access` UI: role/catalog pages, 11-step wizard, scope/relationship/risk preview, before/after grant diff, immutable version history, save/validate/simulate/publish/retire, effective-access/membership explanations, assignment/revocation forms, audit history and backend-driven navigation.
 
-## Files changed
+## Files and schema
 
-Only documentation under `docs/platform-control-plane/`:
+- New `backend/src/main/java/com/rehletshifaa/access/{domain,application,infrastructure,api}`.
+- New `backend/src/main/resources/db/migration/V31__access_governance_foundation.sql`; nine tables and default catalog/role seeds. V1–V30 unchanged; no additional migration needed during this continuation.
+- Four access test classes under `backend/src/test/java/com/rehletshifaa/access`.
+- New `frontend/src/components/platform-control-center`, localized access route, `frontend/e2e/access-governance.spec.ts`.
+- Existing integration edits limited to SecurityConfig and localized portal page.
+- Updated these persistent docs. No dependency, realm, commercial-flow or deployment configuration changes.
 
-- `blueprint.md`
-- `master-implementation-spec.md`
-- `technical-decisions.md`
-- `migration-inventory.md`
-- `implementation-status.md`
-- `test-status.md`
-- `phase-notes/phase-0-role-checks.tsv`
+## Verification
 
-Migrations added: **none**. API contracts added/changed: **none**. Application/security/realm/config/dependency changes: **none**. No runtime cutover, Docker rebuild or deployment.
+- Full offline backend: **278 tests / 25 suites, 0 failures/errors/skips**. Includes 17 focused access tests, Flyway through V31, architecture, and existing clinical/commercial/payment/patient/security tests.
+- Frontend typecheck passed; 9 component/portal-role tests passed.
+- Chromium EN/AR desktop/mobile draft simulation/publication checks: 2 passed; screenshots reviewed. See test-status.md for scope.
+- No live database migration, Docker rebuild, production build, live Keycloak test or tunnel deployment. Browser verification uses synthetic HTTP fixtures and a separate local test server.
 
-## Verification and blockers
+## Cutover boundary
 
-See [test-status.md](test-status.md) for commands and scope. Offline Maven validate passed outside the sandbox after an environment-only cache-path failure. Documentation integrity checks are recorded there. No application test suite was needed for documentation-only Phase 0; previous handoff counts are historical, not a fresh test result.
+Only the new Access Governance route family uses the new policy. Existing coordinator/doctor/operations/finance/patient/secure-link/OTP/pricing/payment behavior is intentionally still protected by its existing authoritative services. Provider business execution, credential activation and active provider membership cutover are Phase 2 or later. Read migration-inventory.md and technical-decisions.md §10 before deployment or expansion.
 
-**DEPENDENCY-01:** Flowable artifacts are absent from the normal local cache. Repository policy prohibits adding uncached dependencies. This is a future Phase 4B engine integration prerequisite, not a blocker to Phase 1A. No runtime compatibility smoke test has passed yet. See technical-decisions.md §8 for evidence and resolution steps. No other Phase 0 blocker remains.
+## NEXT EXACT ACTIONS — Phase 2 (future authorization required)
 
-## Compatibility notes
+Phase 1 is complete and ready for the completion commit `feat(access): complete Phase 1 access governance foundation`. No remaining Phase 1 implementation or verification work. Commit only; do not push or merge.
 
-Keep existing identity subjects/seed IDs, ActorRole/realm composites, accepted-assignment requirements, lead reporting scope, patient delegation, credential expiry, proposal snapshots, money/FX gates, secure links, patient identity/account setup, payment ledger, case_tasks and notification semantics. Use the actual CaseTransitionPolicy map, not stale prose, for V1 parity. Keep all live authorization and workflow facts uncached.
+Stop after the Phase 1 commit. On future Phase 2 authorization:
 
-## NEXT EXACT ACTIONS — Phase 1A (not authorized in Phase 0)
-
-Only execute these when the user authorizes the next phase. Read this handoff and technical-decisions.md, then master §5.1–5.6, §11, §14 Phase 1 and playbook §5. Do not reread the repository broadly.
-
-1. Confirm current branch and working tree; inspect migration filenames for conflicts. Keep `codex/platform-control-plane` and preserve any new unrelated work. Next expected migration is V31.
-2. Create typed records/enums in `backend/src/main/java/com/rehletshifaa/access/domain/`: `PermissionDefinition.java`, `PermissionRisk.java`, `ScopeType.java`, `ActorType.java`, `ChannelEntitlement.java`, `RoleTemplate.java`, `RoleTemplateVersion.java`, `RolePermissionGrant.java`, `RoleAssignment.java`, `ResourceRelationship.java`, `RelationshipType.java`. Explicit actor types are distinct from configurable template keys. Use a typed scope target, effective dates and optimistic version fields.
-3. Add `access/application/PermissionCatalog.java` for registered keys/metadata/dependencies/conflicts. Derive action keys from migration-inventory.md and master §5.3; mark future capabilities unavailable for execution until implemented. No arbitrary runtime-created keys, wildcard all-access grant, or Keycloak role expansion.
-4. Add `backend/src/main/resources/db/migration/V31__access_governance_foundation.sql` (renumber if necessary) for the six planned tables and indexes/FKs/checks in technical-decisions.md §4. Seed the 19 default templates with stable UUIDs and least-privilege metadata/grants. No blanket role assignments. Use explicit unresolved organization targets only as inactive foundation data until provider verification exists; no provider access can be enabled in this phase.
-5. Implement `access/infrastructure/PermissionCatalogRepository.java`, `RoleTemplateRepository.java`, `RoleAssignmentRepository.java`, `ResourceRelationshipRepository.java`, `AccessAuditRepository.java` using bound JdbcClient parameters and SqlValues. Repositories own SQL; services own transactions. Preserve module acyclicity and existing audit storage.
-6. Add `access/application/RoleTemplateService.java`, `RoleAssignmentService.java`, `ResourceRelationshipService.java` for catalog validation, draft/version lifecycle, immutable published grants, assignment effective/revocation periods, scope validation, no self-relationship where invalid, and duplicate/overlap rejection. Serialize concurrent edits/assignments on a stable parent key and audit actual changes. These are internal persistence services; do not expose unauthenticated or partially authorized endpoints.
-7. Add focused tests under `backend/src/test/java/com/rehletshifaa/access/`: `PermissionCatalogTest.java`, `AccessPersistenceTest.java`, `RoleTemplateLifecycleTest.java`, `RoleAssignmentScopeTest.java`. Prove unknown permissions, dependencies/conflicts, unique versions, published immutability, effective expiry/revocation, tenant separation in repository queries, concurrent duplicate prevention, rollback/audit and stale-version behavior. Fixtures use local subjects and deterministic clock, not real Keycloak accounts.
-8. Run the focused access tests, then `FlywayMigrationTest` and `ArchitectureRulesTest` offline. Since schema is shared, run the normal `mvn -o -q test` gate once after focused tests pass. Inspect failures before expanding scope. No frontend/E2E run unless frontend/API behavior is changed contrary to this phase boundary.
-9. Update these status/decision/inventory/test docs with actual filenames, migration number, checks and commit SHA; commit only coherent Phase 1A files. Stop before Phase 1B authorization enforcement/APIs, provider implementation, Flowable integration or frontend UI.
+1. Read AGENTS.md, CLAUDE.md, this status, technical-decisions.md §5/§10, migration-inventory.md cutover section and test-status.md. Confirm this branch/status without discarding work.
+2. Read only master spec §6.1–6.6 and provider acceptance matrix for Phase 2A. Recheck migrations; V31 is the baseline, next expected V32.
+3. Add verified provider organizations and membership resolution, preserving practitioner/subject IDs. Do not treat the platform sentinel UUID or pending arbitrary IDs as verified providers.
+4. Use reviewed deterministic solo-practice mappings for legacy practitioners; preserve credential history. Validate/backfill pending access organization targets before adding provider FKs or enabling memberships/relationships. No automatic activation.
+5. Add no-self-verification and independent clinician/Associate Doctor verification using the existing credential lifecycle before provider execution cutover. Retain the expiry job and patient delegation boundary.
+6. Run focused provider/security/migration tests and update the persistent handoff. Pricing/scheduling follow only under the authorized Phase 2 scope. Flowable remains a later Phase 4B dependency prerequisite.

@@ -80,3 +80,14 @@ Latest: **V30__patient_identity_and_account_setup.sql**. V1–V30 remain immutab
 | 7–8 | Indexed authorization sites and existing workflow services; current portal action components | Controlled cutover followed by matrix-based security and commercial regression |
 
 New paths are plans, not files already created. Continue with the ordered Phase 1A actions in implementation-status.md, not this entire epic at once.
+
+## Phase 1 actual migration and cutover status — 2026-09-13
+
+- V31 is the actual additive baseline extension. V1–V30 and all existing workflow tables/data are unchanged. V31 creates permission_definitions, role_templates, role_template_versions, role_permission_grants, access_subjects, access_memberships, role_assignments, resource_relationships and access_bootstrap; seeds 19 templates and the registered catalog, with no user assignments.
+- H2 PostgreSQL-mode migration and full backend suite passed through V31. The development PostgreSQL database has NOT been migrated or inspected for Phase 1 deployment; no Docker rebuild was requested/performed.
+- Authoritative new-policy cutover: `/api/v1/admin/access/*` only. Capability checks execute inside the application services after identity authentication. Legacy admin does not inherit governance access. All existing business routes remain on their existing role/resource/workflow policy.
+- Opt-in initial owner: supply an explicitly reviewed Keycloak subject through `APP_ACCESS_BOOTSTRAP_SUBJECT` to the backend deployment. The property is intentionally absent from committed Compose/realm configuration. Migrate/rebuild with the tunnel overlay per AGENTS.md when deployment is separately undertaken. Never edit applied migrations or hand-seed patient/workflow data.
+- Bootstrap commits one platform membership/assignment and durable completion marker. Remove the deployment property after success. Restart will not undo revocation. Use the protected assignment UI/API for a second reviewer and subsequent access changes; no blanket existing-role backfill.
+- Unverified provider UUIDs, memberships, assignments and all new relationships remain PENDING. Provider clinical/finance/journey capabilities cannot execute through the new evaluator. No implicit migration of patient representatives, case ownership, work assignments or staff reporting.
+- Phase 2: next expected Flyway V32. Add real provider organization ownership and verified membership resolution, then validate/backfill pending organization targets through explicit reviewed mappings before activation. Retain historical assignment/version IDs and audit. Do not activate pending rows based solely on role labels or arbitrary organization identifiers.
+- Rollback boundary: retain additive schema/history and remove access grants or stop exposing the new UI/route. Do not drop tables/volumes, restore old migration files, or introduce a legacy-role fallback to bypass new-policy denials.
