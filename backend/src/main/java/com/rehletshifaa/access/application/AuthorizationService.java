@@ -24,10 +24,17 @@ public class AuthorizationService {
         this.identity=identity; this.audit=audit; this.clock=clock;
     }
     public AccessIdentity.Identity require(String permission) {
+        return require(permission,ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB);
+    }
+    public AccessIdentity.Identity require(String permission, ResourceContext resource, ChannelEntitlement... channels) {
         var actor=identity.current();
-        var decision=decide(actor,permission,ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB);
+        AuthorizationDecision decision=null;
+        for(var channel:channels) {
+            decision=decide(actor,permission,resource,channel);
+            if(decision.allowed()) return actor;
+        }
         if (!decision.allowed()) {
-            audit.denied(actor.subject(),ResourceContext.PLATFORM.toString(),permission,decision.reason().name());
+            audit.denied(actor.subject(),resource.resourceId(),permission,decision.reason().name());
             throw new ApiException(decision.reason()==RECENT_AUTHENTICATION_REQUIRED?401:403,
                     decision.reason()==RECENT_AUTHENTICATION_REQUIRED?"REAUTHENTICATION_REQUIRED":"ACCESS_DENIED",
                     decision.reason()==RECENT_AUTHENTICATION_REQUIRED?"Sign in again to confirm this sensitive change":"This action is not allowed");

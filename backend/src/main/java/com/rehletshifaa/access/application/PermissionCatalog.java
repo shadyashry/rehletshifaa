@@ -19,6 +19,7 @@ public class PermissionCatalog {
         register("provider.member.deactivate", "Deactivate member provider", "provider", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
         register("provider.clinician.invite", "Invite clinician provider", "provider", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
         register("provider.practice_staff.manage", "Manage practice staff provider", "provider", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
+        register("provider.relationship.manage", "Manage provider relationships", "provider", PermissionRisk.HIGH, Set.of(), Set.of(), true, false, false);
         register("credential.submit", "Submit credential", "credential", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
         register("credential.view", "View credential", "credential", PermissionRisk.LOW, Set.of(), Set.of(), false, false, false);
         register("credential.review", "Review credential", "credential", PermissionRisk.LOW, Set.of(), Set.of(), false, false, false);
@@ -84,16 +85,22 @@ public class PermissionCatalog {
     }
     private void register(String key, String label, String family, PermissionRisk risk, Set<String> dependencies,
             Set<String> conflicts, boolean executable, boolean workflow, boolean recent) {
-        Set<ActorType> actors = family.equals("access") ? Set.of(ActorType.GOVERNANCE)
+        Set<ActorType> actors = family.equals("access") || key.equals("provider.create") || key.equals("provider.suspend") ? Set.of(ActorType.GOVERNANCE)
+                : key.equals("provider.relationship.manage") ? Set.of(ActorType.GOVERNANCE,ActorType.PRACTICE_OPERATIONS,ActorType.CONSULTANT)
+                : family.equals("provider") && !key.equals("provider.view") ? Set.of(ActorType.GOVERNANCE,ActorType.PRACTICE_OPERATIONS)
                 : key.equals("clinical.recommendation.submit") || key.equals("clinical.outcome.record")
                 ? Set.of(ActorType.CONSULTANT) : family.equals("integration") ? Set.of(ActorType.SERVICE)
                 : EnumSet.complementOf(EnumSet.of(ActorType.SERVICE, ActorType.PATIENT, ActorType.REPRESENTATIVE));
         Set<ScopeType> scopes = family.equals("access") ? Set.of(ScopeType.PLATFORM)
+                : key.equals("provider.create") ? Set.of(ScopeType.PLATFORM,ScopeType.ORGANIZATION,ScopeType.ASSIGNED_ORGANIZATIONS)
                 : EnumSet.complementOf(EnumSet.of(ScopeType.PLATFORM));
+        boolean phase2AExecutable = Set.of("provider.view","provider.create","provider.update","provider.suspend",
+                "provider.member.invite","provider.member.deactivate","provider.clinician.invite",
+                "provider.practice_staff.manage","provider.relationship.manage").contains(key);
         definitions.put(key, new PermissionDefinition(key, label, label + " within the approved data scope.",
                 family, risk, scopes, actors, family.equals("access") ? Set.of(ChannelEntitlement.ADMIN_WEB, ChannelEntitlement.API)
                 : EnumSet.allOf(ChannelEntitlement.class), family.equals("clinical") ? "CLINICAL" :
-                family.equals("finance") ? "FINANCIAL" : "BUSINESS", dependencies, conflicts, true, executable, workflow, recent));
+                family.equals("finance") ? "FINANCIAL" : "BUSINESS", dependencies, conflicts, true, executable || phase2AExecutable, workflow, recent));
     }
     public List<PermissionDefinition> all() { return List.copyOf(definitions.values()); }
     public Optional<PermissionDefinition> find(String key) { return Optional.ofNullable(definitions.get(key)); }

@@ -1,6 +1,6 @@
 # Platform Control Plane — verification status
 
-Updated 2026-09-14. Phase 1 results from the preserved working branch; no Phase 2 work.
+Updated 2026-09-14. Phase 1 remains green; Phase 2A provider foundation is complete.
 
 | Check | Result | Evidence / boundary |
 |---|---|---|
@@ -15,6 +15,9 @@ Updated 2026-09-14. Phase 1 results from the preserved working branch; no Phase 
 | Focused Chromium browser | PASS | `pnpm test:e2e e2e/access-governance.spec.ts --workers=1`; 2 EN/AR tests, desktop/mobile, eleven steps, validate, saved-draft simulation ID, independent publication contract, no horizontal overflow |
 | Screenshots | PASS | Four screenshots under `frontend/test-results/access-governance-*/access-{en,ar}-{desktop,mobile}.png`; reviewed at page top with instant scrolling to avoid a full-page capture offset of the global sticky header |
 | Whitespace / staged scope | PASS | `git diff --cached --check` passed on the final 12-file reconciliation; the staged stat matched the intended identity, access, journey-test and handoff scope |
+| Phase 2A focused provider/access/migration | PASS | `mvn -o -q '-Dtest=ProviderOrganizationIntegrationTest,PermissionCatalogTest,AuthorizationServiceTest,FlywayMigrationTest' test`; 13 tests, zero failures/errors/skips |
+| Phase 2A compatibility focus | PASS | Provider + catalog + authorization + Flyway + architecture + identity provisioning + security + JourneyService focused set passed after final IDOR validation |
+| Phase 2A full offline backend | PASS | `mvn -o -q test`; **291 tests in 27 suites**, zero failures/errors/skips; Flyway V33, all prior access/clinical/commercial/payment/patient/security regressions included |
 
 ## Security and acceptance evidence
 
@@ -27,15 +30,19 @@ Updated 2026-09-14. Phase 1 results from the preserved working branch; no Phase 
 - AG-009: MockMvc exercises authenticated capability authorization independent of browser visibility, including anonymous/unassigned callers, stale recent-auth claims, and explicit governance grants with no recognized realm roles.
 - Audit/concurrency: successful mutation/audit rollback together; authorization denial survives failed service transaction. Duplicate concurrent grants and stale concurrent edits serialize. Bootstrap revocation is not resurrected on reinitialization. Pending provider assignments/relationships cannot activate from request UUIDs.
 - UI: backend-derived navigation fails closed; readable capability labels, hidden technical keys, eleven keyboard-operable steps, RTL, denial messages, recoverable errors, pinned assignment and revision-checked revocation.
+- PM-001/PM-002: platform-scoped provider creation grants the creator only the created tenant; guessed cross-tenant detail is denied and one subject can hold active memberships in multiple organizations.
+- PM-004/PM-005/PM-006: Associate Doctor is a reused licensed practitioner type with explicit SUPERVISES; Practice Manager cannot self-promote to Owner; Assistant is linked only through ASSISTS and has no Consultant submission grant.
+- Phase 2A identity/audit: role-free invitation stores the stable external subject and a PENDING membership/pinned role; durable identity-operation state supports reconciliation. Provider creation, membership, identity and relationship changes write audit events.
+- Migration compatibility: repeat-safe V33 mapping produces distinct deterministic solo-practice IDs, PENDING_REVIEW/PENDING state, one unchanged practitioner row and no duplicate mapping.
 
 ## Environment observations and intentionally unrun checks
 
 - Initial sandbox Maven run could not read an existing Log4j dependency; Vitest/esbuild could not read the parent configuration path. Both passed outside the sandbox using existing dependencies. No downloads or dependency additions.
 - The initial UI fixture returned a fresh auth object/function on every render, retriggering refresh and causing three failures; stabilized the fixture to match AuthProvider. Subsequent UI checks passed.
 - Browser tests use synthetic identity/API responses with a separate Next.js server on port 3100 and the stable development authority/API configuration. They do not exercise real Keycloak, gateway, PostgreSQL or patient records. Existing development CSP emits a development-only React eval warning; no security header was weakened.
-- No Docker rebuild/tunnel deployment or live PostgreSQL migration was performed. H2 migration tests validate V31; PostgreSQL deployment validation and an explicit initial governance subject remain operational rollout steps.
-- No production build, entire Playwright suite, Flowable bootstrap or Phase 2 provider tests. These are outside this Phase 1 implementation boundary. Full offline backend regression was run because the schema/security matcher is shared.
+- No Docker rebuild/tunnel deployment or live PostgreSQL migration was performed. H2 migration tests validate V33; PostgreSQL inventory review/migration and explicit review of legacy mappings remain operational rollout steps.
+- No production build, frontend checks, live Keycloak invitation, Playwright, Flowable bootstrap, Phase 2B credential/readiness or Phase 2C pricing/availability tests. No frontend changed. Full offline backend regression was run because schema/security/catalog are shared.
 
 ## Completion gate
 
-Implementation, screenshot inspection and verification complete. Commit Phase 1 after the staged whitespace/scope gate, without push/merge. Do not start Phase 2.
+Phase 2A implementation and backend verification are complete. Commit Phase 2A after the whitespace/scope gate, without push/merge. Do not start Phase 2B.

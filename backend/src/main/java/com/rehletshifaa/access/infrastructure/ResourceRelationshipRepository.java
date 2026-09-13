@@ -27,7 +27,7 @@ public class ResourceRelationshipRepository {
     }
     public void insert(ResourceRelationship r) {
         jdbc.sql("INSERT INTO resource_relationships(id,subject,organization_id,relationship_type,target_type,target_id,effective_from,effective_to,status,created_by,reason,revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)")
-                .params(r.id(),r.subject(),r.organizationId(),r.type().name(),r.targetType(),r.targetId(),timestamp(r.effectiveFrom()),timestamp(r.effectiveTo()),r.status(),r.createdBy(),r.reason()).update();
+                .params(r.id(),r.subject(),r.organizationId(),r.type().name(),r.targetType(),r.targetId(),timestamp(r.effectiveFrom().truncatedTo(java.time.temporal.ChronoUnit.MICROS)),timestamp(r.effectiveTo()),r.status(),r.createdBy(),r.reason()).update();
     }
     public void revoke(UUID id, UUID org, long revision, Instant now) {
         if(jdbc.sql("UPDATE resource_relationships SET status='REVOKED',revoked_at=?,revision=revision+1 WHERE id=? AND organization_id=? AND revision=? AND status<>'REVOKED'")

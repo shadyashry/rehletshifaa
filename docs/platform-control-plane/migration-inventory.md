@@ -66,7 +66,7 @@ Backend entry points: `journey/api/AdminJourneyController.java` under `/api/v1/a
 
 ## Migration numbering and phased file plan
 
-Latest: **V31__access_governance_foundation.sql**. V1–V30 remain immutable. Next currently available for an authorized Phase 2 change: **V32**.
+Latest: **V33__map_legacy_practitioners_to_provider_organizations.java**. V1–V31 remain immutable. V32 is the provider schema/capability foundation and V33 is the deterministic legacy mapping. Next available migration: **V34**.
 
 | Phase | Exact integration roots / planned additions | Verification boundary |
 |---|---|---|
@@ -91,3 +91,12 @@ Phase 1 access paths and V31 now exist; later-phase paths in this table remain p
 - Unverified provider UUIDs, memberships, assignments and all new relationships remain PENDING. Provider clinical/finance/journey capabilities cannot execute through the new evaluator. No implicit migration of patient representatives, case ownership, work assignments or staff reporting.
 - Phase 2: next expected Flyway V32. Add real provider organization ownership and verified membership resolution, then validate/backfill pending organization targets through explicit reviewed mappings before activation. Retain historical assignment/version IDs and audit. Do not activate pending rows based solely on role labels or arbitrary organization identifiers.
 - Rollback boundary: retain additive schema/history and remove access grants or stop exposing the new UI/route. Do not drop tables/volumes, restore old migration files, or introduce a legacy-role fallback to bypass new-policy denials.
+
+## Phase 2A migration and cutover status — 2026-09-14
+
+- V32 adds `provider_organizations`, `provider_membership_details`, `provider_identity_operations`, invitation/activation metadata on `access_memberships`, and Associate Doctor as an allowed existing practitioner type. It adds `provider.relationship.manage`, marks only Phase 2A provider capabilities executable, and publishes provider-role v2 records without editing V31.
+- V33 deterministically creates one distinct DRAFT solo-practice organization per existing subject-linked practitioner, with `legacy_mapping_status=PENDING_REVIEW`, a PENDING canonical membership, provider detail linkage and PENDING pinned Consultant assignment. It is repeat-safe and preserves every practitioner ID and existing credential/case/catalog/proposal reference.
+- H2 PostgreSQL-mode migration passed through V33 and the full backend regression passed. The development PostgreSQL database has not been migrated or inspected; Docker/tunnel deployment was not performed.
+- New-policy cutover now includes `/api/v1/admin/providers/**`. Provider organization IDs and clinician targets are resolved from database records before `AuthorizationService`; cross-organization membership and relationship scope are enforced server-side. Existing business routes retain their Phase 1 compatibility boundary.
+- Before deployment, review the deterministic V33 mappings against the real practitioner inventory. Do not manually edit V32/V33, auto-activate PENDING mappings, or treat legacy VERIFIED as provider readiness. Phase 2B must provide explicit review/readiness activation.
+- Rollback remains additive: revoke provider memberships/assignments or stop exposing the provider route. Do not drop provider/access history or disable a shared Keycloak identity to remove one organization membership.

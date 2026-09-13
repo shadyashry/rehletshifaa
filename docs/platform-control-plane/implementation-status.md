@@ -1,6 +1,6 @@
 # Platform Control Plane — implementation status
 
-Updated 2026-09-14. **Phase 1 accepted after final reconciliation. Phase 2 not started.**
+Updated 2026-09-14. **Phase 1 remains accepted. Phase 2A Provider Organization, Membership and Clinician Relationship Foundation is complete. Phase 2B has not started.**
 
 Keycloak is authoritative for authentication and identity-session concerns. RehletShifaa is authoritative for dynamic business authorization, organization membership, roles, permissions, scopes and relationships.
 
@@ -10,6 +10,18 @@ Keycloak is authoritative for authentication and identity-session concerns. Rehl
 - Previous session stopped before a coherent commit/handoff, with unstaged SecurityConfig/portal changes and untracked access backend, V31, tests and UI. All preserved and completed in place.
 - Its status files still described Phase 0. Recovered test reports showed 14 passing access tests and one concurrency failure. The current concurrency file already contained a seed-date fix newer than that report; its fresh run passed.
 - Phase 0 artifacts remain in history (`f1cc71c`, `3a184b0`); approved specs remain unchanged.
+
+## Implemented Phase 2A
+
+- Added real `provider_organizations` tenants with stable UUIDs, legal/business/display identity, extensible provider type, controlled lifecycle, audit metadata and optimistic versioning. Phase 2A allows DRAFT/ONBOARDING/SUSPENDED/OFFBOARDED changes; READINESS_REVIEW/ACTIVE are explicitly blocked until Phase 2B readiness exists.
+- `access_memberships` remains the authoritative user-to-organization membership. Provider-specific linkage extends it through `provider_membership_details`; pinned Phase 1 role assignments remain the business-role truth and allow one subject to belong to multiple organizations and hold multiple organization roles.
+- Reused `practitioner_profiles` for Consultants and Associate Doctors and `staff_members` only for already-known platform staff. New clinicians retain stable Keycloak subjects and receive a practitioner profile; Practice Managers/Assistants do not become fake internal staff or clinicians.
+- Reused `resource_relationships` for active/pending `MANAGES`, `ASSISTS` and `SUPERVISES` facts. The provider service validates source role, target clinician role, tenant and effective membership before insertion. Assistant/Associate templates still lack final Consultant authority.
+- Added `/api/v1/admin/providers` create/list/detail/update, membership link/invite/activate/deactivate, relationship and identity-reconciliation APIs. Every operation resolves the organization/profile from the database and uses `AuthorizationService`; no endpoint authorizes by realm-role name.
+- Made only Phase 2A provider capabilities executable, added `provider.relationship.manage`, and published additive v2 default provider-role versions. `provider.activate`, credential, pricing, availability, clinical, finance, journey and assignment capabilities remain unavailable unless previously executable Access Governance capabilities.
+- Provider creation requires a platform-scoped `provider.create` grant and gives the creator access only to the newly created organization. Provider Operations Managers do not receive universal provider access. Organization Owner/Practice Manager cannot assign platform roles or bypass credential/readiness controls.
+- Provider invitations call role-free `IdentityProvisioningPort`. Encrypted operation records preserve REQUESTED/IDENTITY_CREATED/COMPLETED/FAILED reconciliation state around the non-atomic Keycloak/database boundary; the stable external subject is stored. Existing identities are reused only from a trusted stored practitioner/staff email/subject link.
+- V33 deterministically maps every existing subject-linked practitioner to a distinct solo-practice organization and pinned Consultant assignment while preserving practitioner IDs and all case/pricing/proposal/availability/credential references. Mappings and memberships remain PENDING_REVIEW/PENDING and never auto-activate.
 
 ## Implemented Phase 1
 
@@ -25,7 +37,8 @@ Keycloak is authoritative for authentication and identity-session concerns. Rehl
 ## Files and schema
 
 - New `backend/src/main/java/com/rehletshifaa/access/{domain,application,infrastructure,api}`.
-- New `backend/src/main/resources/db/migration/V31__access_governance_foundation.sql`; nine tables and default catalog/role seeds. V1–V30 unchanged; no additional migration needed during this continuation.
+- V31 remains immutable. V32 adds provider organizations, provider membership detail, invitation/reconciliation state, provider capability cutover and provider role v2 records. Java Flyway V33 performs the deterministic legacy-practitioner mapping. V1–V31 are unchanged.
+- New `backend/src/main/java/com/rehletshifaa/provider/{application,api}` and focused provider integration tests.
 - Four access test classes under `backend/src/test/java/com/rehletshifaa/access`.
 - New `frontend/src/components/platform-control-center`, localized access route, `frontend/e2e/access-governance.spec.ts`.
 - Existing integration edits limited to SecurityConfig and localized portal page.
@@ -33,14 +46,14 @@ Keycloak is authoritative for authentication and identity-session concerns. Rehl
 
 ## Verification
 
-- Full offline backend: **286 tests / 26 suites, 0 failures/errors/skips**. Includes the access, identity-provisioning, Flyway-through-V31, architecture, and existing clinical/commercial/payment/patient/security tests.
+- Full offline backend: **291 tests / 27 suites, 0 failures/errors/skips**. Includes focused provider/access/identity, Flyway-through-V33, architecture, and all existing clinical/commercial/payment/patient/security tests.
 - Frontend typecheck passed; 9 component/portal-role tests passed.
 - Chromium EN/AR desktop/mobile draft simulation/publication checks: 2 passed; screenshots reviewed. See test-status.md for scope.
-- No live database migration, Docker rebuild, production build, live Keycloak test or tunnel deployment. Browser verification uses synthetic HTTP fixtures and a separate local test server.
+- No live PostgreSQL migration, Docker rebuild, production build, live Keycloak invitation or tunnel deployment. No frontend changed in Phase 2A.
 
 ## Cutover boundary
 
-Only the new Access Governance route family uses the new policy. Existing coordinator/doctor/operations/finance/patient/secure-link/OTP/pricing/payment behavior is intentionally still protected by its existing authoritative services. Provider business execution, credential activation and active provider membership cutover are Phase 2 or later. Read migration-inventory.md and technical-decisions.md §10 before deployment or expansion.
+The Access Governance and `/api/v1/admin/providers/**` route families use the new policy. Existing coordinator/doctor/operations/finance/patient/secure-link/OTP/pricing/payment behavior remains protected by its existing authoritative services. Provider credential/readiness activation is Phase 2B; pricing/availability is Phase 2C. Read migration-inventory.md and technical-decisions.md §10–§12 before deployment or expansion.
 
 ## Remaining compatibility debt
 
@@ -48,19 +61,17 @@ Only the new Access Governance route family uses the new policy. Existing coordi
 - Phase 2 and later cutovers must replace each indexed legacy business-role decision only after an equivalent capability, authoritative resource resolver and parity/tenant-isolation test exist. A new-policy denial must never fall back to a legacy role.
 - Existing staff/doctor invitation paths still use the legacy role-aware Keycloak overload. New Provider Management orchestration must use `IdentityProvisioningPort` and keep all organization membership and business-role data in RehletShifaa.
 
-## NEXT EXACT ACTIONS — Phase 2 (future authorization required)
+## NEXT EXACT ACTIONS — Phase 2B (future authorization required)
 
-Phase 1 implementation is committed at `daf7e20`. Final reconciliation reviewed that commit/diff and its Phase 0/spec history from a clean `codex/platform-control-plane` checkout. Commit the reconciliation only; do not push or merge.
+Stop after the Phase 2A commit. Do not start these actions without explicit Phase 2B authorization:
 
-Stop after the Phase 1 commit. On future Phase 2 authorization:
-
-1. Read AGENTS.md, CLAUDE.md, this status, technical-decisions.md §5/§10/§11, migration-inventory.md cutover section and test-status.md. Confirm this branch/status without discarding work.
-2. Read only master spec §6.1–6.6 and provider acceptance matrix for Phase 2A. Recheck migrations; V31 is the baseline, next expected V32.
-3. Add verified provider organizations and membership resolution, preserving practitioner/subject IDs. Do not treat the platform sentinel UUID or pending arbitrary IDs as verified providers.
-4. Use reviewed deterministic solo-practice mappings for legacy practitioners; preserve credential history. Validate/backfill pending access organization targets before adding provider FKs or enabling memberships/relationships. No automatic activation.
-5. Implement the authorized Provider Management business service against `IdentityProvisioningPort`: resolve/authorize the operator and organization, invite via Keycloak, store the stable subject, and create DB membership/profile/pinned role assignment/relationships. Reuse the existing adapter; add durable retry/reconciliation across identity/DB partial failures. Do not create dynamic realm roles or call Admin APIs from clients.
-6. Extend independent clinician/Associate Doctor credential verification and provider evidence/readiness before activation, retaining the now-enforced legacy self-verification guard, expiry job and patient delegation boundary. Define the provider permission/delegation envelope and authoritative resource resolvers before making individual capabilities executable. Prove multi-organization and relationship isolation; never bulk-enable the future catalog.
-7. Run focused provider/security/migration tests and update the persistent handoff. Pricing/scheduling follow only under the authorized Phase 2 scope. Journey Management and Coordinator routing remain later phases. Flowable remains a later Phase 4B prerequisite.
+1. Reconfirm branch/status and V33 baseline; read only master spec §6.4–6.5, Provider Management PM-003/PM-004/PM-007–PM-010 and Credentialing CR-001–CR-005.
+2. Add provider-owned secure credential evidence without fabricating patient cases; preserve existing `practitioner_credentials`, document scanning/storage boundaries, IDs and history.
+3. Add explicit immutable verification decisions and required-credential policy for Consultant and Associate Doctor, including more-information/reject/suspend/expiry states, recent authentication, independent reviewer and existing self-verification prohibition.
+4. Implement backend-computed provider/clinician readiness with structured blockers. Review and explicitly activate V33 PENDING_REVIEW mappings; never infer readiness from legacy VERIFIED alone.
+5. Make `provider.activate` and only the required credential capabilities executable after authoritative resource resolvers and delegation envelopes exist. Activation must be optimistic/idempotent/audited and reject incomplete readiness.
+6. Extend provider APIs/tests for credential submission/review queues, readiness and activation. Preserve legacy JourneyService contracts until parity/cutover tests prove replacement; do not start pricing, availability, Journey Management or routing.
+7. Run focused credential/provider/security/migration tests, then the full offline backend suite; update all persistent status files and commit Phase 2B without push/merge.
 
 ## Final acceptance/reconciliation — 2026-09-13
 
