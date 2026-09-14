@@ -66,7 +66,7 @@ Backend entry points: `journey/api/AdminJourneyController.java` under `/api/v1/a
 
 ## Migration numbering and phased file plan
 
-Latest: **V33__map_legacy_practitioners_to_provider_organizations.java**. V1–V31 remain immutable. V32 is the provider schema/capability foundation and V33 is the deterministic legacy mapping. Next available migration: **V34**.
+Current repository baseline: **V37__journey_domain_foundation.sql**. V1–V36 remain immutable, including Java V33. Next available migration: **V38**. The table below is the original phased plan; dated actual-state sections supersede it.
 
 | Phase | Exact integration roots / planned additions | Verification boundary |
 |---|---|---|
@@ -125,3 +125,11 @@ Phase 1 access paths and V31 now exist; later-phase paths in this table remain p
 - Routing defaults to per-case SHADOW. V36 does not bind or adopt existing cases, migrate legacy owners, globally enable LIVE, or remove the legacy claim/reassign path. LIVE adoption requires a fresh matching shadow decision and explicit authorized reason.
 - Fresh H2 PostgreSQL-mode validation passed through all 36 migrations. Focused/impacted verification passed 128 tests and the full offline backend passed 322 tests in 32 suites with no failures/errors/skips. The development PostgreSQL database was not migrated or inspected; no Docker/tunnel, Keycloak or browser validation was performed.
 - Deployment remains additive: back up and inspect PostgreSQL, apply V34–V36 through the standard Compose+tunnel stack, assign reviewed V36 envelopes per provider, validate SHADOW first, and adopt only explicitly approved cases. Roll back behavior by revoking coordination grants or leaving cases in SHADOW; never edit/drop V36 or erase decisions, assignments, tasks, audit or outbox history.
+
+## Phase 4A migration and cutover status — 2026-09-14
+
+- Actual baseline at start was V36; V37 is the new additive Journey foundation. V1–V36 (including Java V33) are unchanged. V37 adds journey_definitions, journey_versions, journey_nodes, journey_edges and journey_version_editors. Published content has an immutable canonical snapshot/hash; no engine-specific or case-binding fields are introduced.
+- V37 enables only Journey administration permissions, with PLATFORM/GOVERNANCE and ADMIN_WEB/API envelopes. New Journey Manager/Approver v2 role versions have explicit cutover records. Existing pinned grants remain dormant; no users receive new assignments automatically. `journey.instance_migrate` remains unavailable.
+- Definition creation is explicit; the migration seeds neither a published graph nor International Care Journey v1 parity. Domain publication returns NOT_DEPLOYED and cannot affect any existing or future case's current runtime selection.
+- Fresh H2 PostgreSQL-mode migration passed V1–V37; full offline backend verification passed 344 tests / 35 suites with zero failures/errors/skips. No live PostgreSQL migration, Docker/tunnel rebuild, Keycloak changes or cutover was performed. Review real mappings/backups and use the standard tunnel overlay before deployment; assign separate governed Manager/Approver users explicitly.
+- Roll back feature access by revoking grants or removing route exposure. Preserve additive graph/version/editor/audit history; never edit historical migrations, drop volumes or migrate active cases implicitly.

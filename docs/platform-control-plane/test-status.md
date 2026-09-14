@@ -1,7 +1,17 @@
 # Platform Control Plane — verification status
 
-Updated 2026-09-14. Phases 1–2C remain green; Phase 3 is complete at the offline backend verification boundary.
+Updated 2026-09-14. Phases 1–3 remain green; Phase 4A is complete and accepted at the offline backend verification boundary. Phase 4B remains unstarted.
 
+## Phase 4A verification — 2026-09-14
+
+- Focused offline gate: `mvn -o -q '-Dtest=JourneyGraphTest,JourneyDefinitionIntegrationTest,JourneyDefinitionConcurrencyTest,FlywayMigrationTest' test` passed **22 tests, zero failures/errors/skips**. The initial run caught a missing-actor null dereference (fixed); HTTP context and tenant FK fixture corrections were verified in the final focused run.
+- Final full offline gate: `mvn -o -q test` passed **344 tests / 35 suites, zero failures/errors/skips**. This includes the subsequently added API-channel grant and audit-history assertions. Final Phase 4A classes contribute 22 tests: graph 14, lifecycle/security integration 7 and database concurrency 1.
+- Graph coverage: valid linear and conditional routes, missing/unsupported actor/action, incompatible stage/action, unreachable nodes, dangling transitions, no completion, invalid terminal nodes, rejected cycles, incomplete branches, invalid conditions and SLA/timer settings. Deterministic true/false branch selection and missing-fact/wait behavior are verified.
+- Lifecycle/security coverage: explicit canonical definition and initial draft creation, validation/simulation/submission, independent publish, immutable published snapshots, cloning/version numbers, retirement, stale draft conflicts, edit invalidation of saved evidence, manager/publisher separation, former-editor rejection after role replacement, dormant cutovers, recent authentication, ADMIN_WEB/API grants, no-role JWT HTTP authorization, mismatched definition/version and tenant-scoped grant denial.
+- Concurrency/audit: two writers produce exactly one successful revision; two simultaneous clones produce one draft; a rolled-back edit leaves both graph revision and successful audit count unchanged. Published events and authorized history retrieval are checked; production case/task/assignment/outbox counts remain unchanged by simulation. The simulator has only a pure graph-validator dependency and cannot invoke production projections or external services.
+- Impacted/full suites include all existing Access Governance, provider credential/readiness/pricing, Phase 3 assignment/concurrency, current case transitions and patient/commercial/payment flows, WorkItem/WaitingOn behavior, outbox, security/CORS and architecture checks. No existing authoritative case/runtime implementation was modified.
+- Flyway validates and applies all 37 additive migrations on fresh H2 PostgreSQL-mode schemas. Canonical specs and V1–V36 are unchanged. No frontend changes; frontend/E2E, live PostgreSQL, Docker/tunnel, Keycloak, external delivery and Flowable checks were intentionally not run. Domain publication always reports NOT_DEPLOYED and is not a deployment certification.
+- The normal sandbox resolved Maven to inaccessible `C:\.m2\repository`; authorized offline execution reused `C:\Users\hp\.m2` successfully. No dependencies were added/downloaded.
 ## Phase 3 verification — 2026-09-14
 
 - Recovered reports: `CoordinatorScoringTest` 3/3, `CoordinationConcurrencyTest` 1/1 and `FlywayMigrationTest` 1/1 passed; the integration report had 11 passes and one effective-period boundary error. The working-tree microsecond normalization postdated that report and the fresh rerun passed.

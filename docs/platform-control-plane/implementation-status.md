@@ -1,7 +1,18 @@
 # Platform Control Plane — implementation status
 
-Updated 2026-09-14. **Phases 1, 2A, 2B and 2C remain accepted. Phase 3 Care Coordination / Assignment Engine is implemented and accepted at the offline backend verification boundary. Phase 4 has not started.**
+Updated 2026-09-14. **Phases 1, 2A, 2B and 2C remain accepted. Phase 3 Care Coordination / Assignment Engine is implemented and accepted at the offline backend verification boundary. Phase 4A Journey domain foundation is implemented and accepted at the offline backend verification boundary. Phase 4B has not started.**
 
+## Implemented Phase 4A — Journey foundation
+
+- Resumed clean `codex/platform-control-plane` at `4f6620c` (accepted Phase 3), with actual repository Flyway baseline V36. Added V37 only; all historical migrations and canonical specifications remain unchanged.
+- One centrally owned INTERNATIONAL_CARE definition, versioned normalized nodes/edges, canonical sorted JSON graph snapshots and SHA-256 hashes. Draft creation, graph editing, cloning, validation, simulation, submission, independent publication, retirement and audit/history APIs live under `/api/v1/admin/journeys`.
+- Lifecycle is DRAFT → VALIDATED → SIMULATED → PENDING_APPROVAL → PUBLISHED → RETIRED. Edits invalidate evidence; pending approval must return to draft first. Published/retired graph content is immutable; clones create a new numbered draft. Expected revisions and database definition locks protect edits, lifecycle changes and concurrent clones.
+- Engineering catalog registers existing actions with actor/stage compatibility and source contracts. Actor types follow canonical semantic names. The metadata endpoint exposes stage/actor/fact choices and size/loop limits. No arbitrary handlers, scripts, SQL, expressions or external URLs execute.
+- Authoritative validation returns readable errors for starts, references, reachability, completion, cycles, actor/action compatibility, decision completeness, conditions and timer/SLA validity. Conditional branches are complementary boolean outcomes; optional stages use explicit branches. Phase 4A rejects cycles pending governed recovery semantics in 4B.
+- Pure deterministic simulation returns conceptual route, actor/action, waits, blockers and completion. It does not call current runtime/projection services or create cases, WorkItems, notifications or assignments. Only summary outcomes are persisted; supplied test facts are not audited/stored.
+- Phase 1 authorization governs every operation, using PLATFORM scope, GOVERNANCE grant actor, approved version cutovers and ADMIN_WEB/API channels. Manager/Approver grants are separate; publication rejects the creator and all prior editors even after access replacement. Approve/publish/retire require recent authentication. Safe successful governance audit shares the transaction; denial audit survives rejection.
+- WorkRequirement is a future integration contract only, with semantic actor and registered action/SLA. No recipient identifiers, duplicate Case/WorkItem/PatientAction models, Flowable dependency, runtime binding, parity seed, production cutover or visual designer were added. Every version explicitly returns `runtimeDeployment=NOT_DEPLOYED`.
+- Verification: focused 22-test set passed, followed by the final full offline backend gate: **344 tests / 35 suites, zero failures/errors/skips**. This includes the final API-channel/history assertions and all existing case/provider/coordination/security regressions. Live deployment checks remain outside this implementation boundary. **PHASE 4A ACCEPTED: YES. PHASE 4B READY: YES (domain handoff; DEPENDENCY-01 preflight remains required).**
 ## Phase 3 resumed state and completion
 
 - Resumed `codex/platform-control-plane` at Phase 2C HEAD `80ae466` with the interrupted V36 coordination module, access/provider/Journey integration and focused tests still unstaged/untracked. No branch switch, reset, clean, stash, discard or canonical-specification edit was performed.
@@ -113,12 +124,14 @@ The Access Governance and `/api/v1/admin/providers/**` route families use the ne
 - Phase 2 and later cutovers must replace each indexed legacy business-role decision only after an equivalent capability, authoritative resource resolver and parity/tenant-isolation test exist. A new-policy denial must never fall back to a legacy role.
 - Existing staff/doctor invitation paths still use the legacy role-aware Keycloak overload. New Provider Management orchestration must use `IdentityProvisioningPort` and keep all organization membership and business-role data in RehletShifaa.
 
-## NEXT EXACT ACTIONS — Phase 4A (not started)
+## NEXT EXACT ACTIONS — Phase 4B (not started)
 
-1. Before any deployment, review real PostgreSQL V33 mappings, back up the database, and apply V34–V36 only with the standard Compose+tunnel stack. Do not edit migration history, auto-activate legacy mappings or globally enable LIVE routing.
-2. Explicitly review and assign the V35 provider roles and V36 Care Coordination Manager/Coordinator envelopes per provider. Run live API checks for team/policy/preference isolation, SHADOW comparison, explicit single-case LIVE adoption, queue notification and legacy denial on that adopted case.
-3. Under separate Phase 4A authorization, freeze the Journey graph/version/stage-registry architecture from the canonical specifications and current status. Implement validation/simulation first; do not cut over Journey runtime or alter Phase 3 Case Owner semantics.
-4. Preserve the Phase 3 assignment boundary: Journey stages select actor type; the Assignment Engine selects the actual eligible person/team. Do not embed routing policy in Journey definitions or begin Phase 4B/runtime migration during Phase 4A.
+1. Read this handoff, technical-decisions.md §16, test-status.md and migration-inventory.md. Confirm clean Phase 4A commit and actual migration baseline before changes. Keep canonical specifications read-only.
+2. Resolve DEPENDENCY-01 through a policy-authorized one-time bootstrap of the pinned Flowable 7.2.0 process starter and inspect its transitive dependencies under the actual Boot BOM; return to offline builds. No engine or compiler has been added in 4A.
+3. Implement a Journey runtime/compiler port and Flowable adapter with engine-owned schema separation. Verify deploy/start/complete/timer/restart and atomic rollback on H2 and PostgreSQL before runtime activation. Phase 4A PUBLISHED is domain approval only, always NOT_DEPLOYED; never treat it as an active runtime deployment.
+4. Model International Care Journey v1 from the unchanged CaseTransitionPolicy and dedicated domain gates, including recovery paths. Explicitly design safe bounded recovery semantics beyond the 4A acyclic policy. Prove existing happy/recovery/terminal, proposal/payment/identity and WorkItem/PatientAction/currentAction/WaitingOn parity before any cutover.
+5. Keep the Phase 3 boundary: Journey emits semantic actor work requirements; Assignment Engine chooses the eligible person/team. Implement any future version binding and controlled adoption only under the separately approved Phase 4B/cutover scope; do not silently migrate existing cases.
+6. Before live deployment, back up/review real PostgreSQL mappings and apply pending migrations through the standard Compose+tunnel stack. Explicitly assign reviewed V37 Journey Manager/Approver PLATFORM envelopes; no default user assignment or production journey seed exists. Designer/UI remains later work.
 
 ## Final acceptance/reconciliation — 2026-09-13
 

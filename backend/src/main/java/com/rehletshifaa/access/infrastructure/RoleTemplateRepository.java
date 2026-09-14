@@ -38,10 +38,13 @@ public class RoleTemplateRepository {
                         : RelationshipType.valueOf(r.getString("relationship_type")))).list();
     }
     public boolean cutoverApproved(UUID version,String permission) {
-        if(!permission.startsWith("assignment.")&&!permission.startsWith("credential.")&&!permission.equals("provider.activate")&&!permission.startsWith("price_list.")
+        if(!permission.startsWith("journey.")&&!permission.startsWith("assignment.")&&!permission.startsWith("credential.")&&!permission.equals("provider.activate")&&!permission.startsWith("price_list.")
                 &&!permission.startsWith("service_catalog.")&&!permission.startsWith("availability.")) return true;
         return jdbc.sql("SELECT COUNT(*) FROM permission_version_cutovers WHERE role_version_id=? AND permission_key=?")
                 .params(version,permission).query(Long.class).single()>0;
+    }
+    public void approveJourneyCutover(UUID version,String actor) {
+        jdbc.sql("INSERT INTO permission_version_cutovers(permission_key,role_version_id,approved_by,approved_at) SELECT permission_key,version_id,?,CURRENT_TIMESTAMP FROM role_permission_grants WHERE version_id=? AND permission_key LIKE 'journey.%' AND permission_key<>'journey.instance_migrate'").params(actor,version).update();
     }
     public UUID create(String key, String name, String description, String purpose, String family, UUID org, String actor, Instant now) {
         UUID id = UUID.randomUUID();

@@ -45,7 +45,7 @@ public class RoleAssignmentService {
             if(ResourceContext.PLATFORM.equals(command.organizationId()) || !providerAuthority.verifiedOrganization(command.organizationId()))
                 invalid("Choose a verified provider organization");
             if(!providerAuthority.trustedSubject(command.subject())) invalid("Choose an existing active identity");
-        } else for(var g:grants) if(catalog.require(g.permission()).executable() && roles.cutoverApproved(command.versionId(),g.permission())) authorization.require(g.permission());
+        } else if(!(command.scope()==ScopeType.PLATFORM && ResourceContext.PLATFORM.equals(command.organizationId()) && !grants.isEmpty() && grants.stream().allMatch(g->g.scope()==ScopeType.PLATFORM && catalog.journeyDelegable(g.permission())))) for(var g:grants) if(catalog.require(g.permission()).executable() && roles.cutoverApproved(command.versionId(),g.permission())) authorization.require(g.permission());
         // Validate trusted external ownership before this lock can register an ordinary assignment subject.
         assignments.lockSubject(command.subject());
         var candidates=assignments.allForSubject(command.subject()).stream()
