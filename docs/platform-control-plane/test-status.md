@@ -1,6 +1,15 @@
 # Platform Control Plane — verification status
 
-Updated 2026-09-14. Phase 1 remains green; Phase 2A provider foundation is complete.
+Updated 2026-09-14. Phases 1, 2A and 2B remain green; Phase 2C is complete at the offline backend verification boundary.
+
+## Phase 2C verification — 2026-09-14
+
+- Focused `ProviderOperationalSetupIntegrationTest` passed 6 tests covering organization/Consultant/Associate inheritance, effective resolution, legacy catalogue synchronization, history, overlap/currency/stale-write validation, weekly timezone resolution, leave/blocked/extra exceptions, exception update/removal, Practice Manager exact scope, cross-tenant denial, Finance separation, Consultant self-management opt-in and real readiness facts.
+- Focused Flyway, Permission Catalog, Authorization Service, Role Assignment, Access Governance, architecture, Phase 2B credential/readiness and legacy `PricingCatalogService` regressions passed after the capability cutover was made explicit.
+- Full offline backend: **306 tests / 29 suites, 0 failures/errors/skips**. Fresh H2 PostgreSQL-mode migration validated and applied V1 through V35.
+- Existing commercial regression coverage verifies frozen proposal currency/FX/margin snapshots and all proposal/payment flows remained green. Phase 2C publication updates only `consultant_service_catalog` for future selections and never updates proposal tables.
+- `git diff --check` passed. Canonical specification diff is empty.
+- No frontend files changed. Frontend, live PostgreSQL, Docker/tunnel, Keycloak, MinIO/ClamAV and browser checks were intentionally not run.
 
 ## Phase 2B verification — 2026-09-14
 

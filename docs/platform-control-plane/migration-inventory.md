@@ -108,3 +108,11 @@ Phase 1 access paths and V31 now exist; later-phase paths in this table remain p
 - Dormant credential/provider-activation permissions execute only for explicitly approved V34 role versions. Existing pinned versions are not mass-repinned and no verifier assignment is bootstrapped.
 - Fresh H2 PostgreSQL-mode Flyway validation passed through all 34 migrations, and the full 300-test backend regression passed. No live PostgreSQL migration, Docker rebuild or tunnel deployment was performed.
 - Deployment is additive. Review V33 mappings, back up PostgreSQL, apply V34 with the normal Compose+tunnel command, create explicit tenant verifier assignments, and retain operational activation blockers until Phase 2C supplies authoritative setup facts. Roll back capability by revoking assignments or removing route exposure; never edit/drop V34 or erase credential/audit history.
+
+## Phase 2C migration and cutover status — 2026-09-14
+
+- V35 is the additive pricing/availability migration and the actual current baseline. It creates `provider_price_versions`, `clinician_availability_slots` and `clinician_availability_exceptions`; V1–V34 and the Java V33 migration remain immutable.
+- Existing `consultant_service_catalog` rows and all proposal/catalog foreign keys are preserved. They remain the supported Consultant fallback. Publishing a Phase 2C Consultant version synchronizes its future effective EGP catalogue value through `PricingCatalogService`; no proposal or payment row is migrated or recalculated.
+- V35 enables the registered price/service/availability capabilities and publishes reviewed Practice Manager v3 plus Consultant/Associate v4 versions. `permission_version_cutovers` keeps older pinned grants dormant; explicit Access Governance replacement is required.
+- Fresh H2 PostgreSQL-mode Flyway validation passed through V35 and the full 306-test backend regression passed. The development PostgreSQL database has not been migrated or inspected; no Docker/tunnel deployment was performed.
+- Deployment rollback remains additive: revoke/replace V35 role assignments or stop exposing the new provider operational endpoints. Never drop V35 tables, alter applied V35 text, or rewrite historical catalogue/proposal data.

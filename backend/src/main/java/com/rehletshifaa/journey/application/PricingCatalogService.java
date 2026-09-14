@@ -7,12 +7,15 @@ import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.currency.CurrencyService;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.identity.KeycloakStaffIdentityService;
+import com.rehletshifaa.provider.application.ProviderPricingCatalogPort;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,7 +27,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  * so a price change reflects on the doctor's page immediately.
  */
 @Service
-public class PricingCatalogService {
+public class PricingCatalogService implements ProviderPricingCatalogPort {
     private final JdbcClient jdbc;
     private final ActorContext actors;
     private final Clock clock;
@@ -51,6 +54,30 @@ public class PricingCatalogService {
         return jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order,active FROM service_template_items WHERE template_id=? ORDER BY active DESC,sort_order,service_name")
                 .param(templateId)
                 .query((rs, n) -> templateItem(rs)).list();
+    }
+
+    /**
+     * Phase 2C bridge into the established proposal catalogue. The provider service
+     * performs Access Governance and version publication before calling this method.
+     * Released proposals remain immutable because they already snapshot unit price,
+     * currency, FX and margin data; only future catalogue selections see this value.
+     */
+    @Transactional
+    @Override public UUID applyPublishedProviderPrice(UUID practitionerId,String serviceCode,String serviceName,String category,
+            BigDecimal priceEgp,String changedBy,Instant effectiveFrom,Instant effectiveTo) {
+        requirePractitioner(practitionerId);
+        UUID existing=jdbc.sql("SELECT id FROM consultant_service_catalog WHERE practitioner_id=? AND service_code=?")
+                .params(practitionerId,serviceCode).query(UUID.class).optional().orElse(null);
+        LocalDate validUntil=effectiveTo==null?null:effectiveTo.atZone(java.time.ZoneOffset.UTC).toLocalDate();
+        if(existing==null){existing=UUID.randomUUID();jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,valid_until,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)")
+                .params(existing,practitionerId,serviceCode,serviceName,category,priceEgp,true,validUntil,changedBy,timestamp(clock.instant()),timestamp(clock.instant())).update();}
+        else jdbc.sql("UPDATE consultant_service_catalog SET service_name=?,category=?,price_egp=?,active=TRUE,valid_until=?,updated_at=?,version=version+1 WHERE id=?")
+                .params(serviceName,category,priceEgp,validUntil,timestamp(clock.instant()),existing).update();
+        return existing;
+    }
+    @Override @Transactional public void retirePublishedProviderPrice(UUID legacyCatalogId,String changedBy) {
+        jdbc.sql("UPDATE consultant_service_catalog SET active=FALSE,updated_at=?,version=version+1 WHERE id=?")
+                .params(timestamp(clock.instant()),legacyCatalogId).update();
     }
 
     @Transactional public ServiceTemplateView updateTemplate(UUID id,ServiceTemplateUpdateRequest request){var actor=actors.require(ActorRole.SYSTEM_ADMIN);int changed=jdbc.sql("UPDATE service_templates SET name=?,reference_standard=?,guidance_note=?,updated_at=? WHERE id=? AND active").params(request.name().trim(),request.referenceStandard(),request.guidanceNote(),timestamp(clock.instant()),id).update();if(changed!=1)throw new ApiException(404,"TEMPLATE_NOT_FOUND","The care-area template was not found");audit(actor,"SERVICE_TEMPLATE_UPDATED",id.toString());return templateById(id);}

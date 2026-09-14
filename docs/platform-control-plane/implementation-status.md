@@ -1,6 +1,17 @@
 # Platform Control Plane — implementation status
 
-Updated 2026-09-14. **Phase 1 and Phase 2A remain accepted. Phase 2B Provider Credentialing, Readiness and Activation is implemented and accepted at the offline backend verification boundary. Phase 2C has not started.**
+Updated 2026-09-14. **Phase 1, Phase 2A and Phase 2B remain accepted. Phase 2C Pricing Ownership/Inheritance, Clinician Availability and Provider Readiness Integration is implemented and accepted at the offline backend verification boundary. Phase 3 has not started.**
+
+## Implemented Phase 2C
+
+- V35 adds immutable, effective-dated provider price versions at organization, Consultant and permitted Associate Doctor scope. Draft/change/publish/retire history is optimistic and audited; overlap, money, currency, period and clinician-scope validation fail closed.
+- `ProviderOperationalSetupService` resolves clinician override before organization default and then the existing supported Consultant catalogue fallback. Resolution returns amount, currency, source level, source/version and effective period; no client-calculated price is trusted.
+- Published Consultant prices cross a narrow provider-to-commercial port into the existing `PricingCatalogService` and `consultant_service_catalog`. Non-EGP provider amounts use the existing FX authority to derive the EGP catalogue value. Existing proposal item/version money, FX, margin and released HTML/PDF snapshots are never rewritten.
+- V35 adds recurring weekly clinician slots with IANA timezone, effective dates, optional service/mode/location, plus leave, blocked time, clinic closure, extra availability and special-clinic exceptions. Effective queries apply an active exception before recurring schedule and validate overlapping slots/exceptions.
+- Production provider APIs cover price list/history, draft/version changes, clinician approval, publish/retire and effective resolution; schedule read/update, exception add/update/remove and effective availability. Controllers expose DTO records only and delegate to the application service.
+- Phase 1 Access Governance is authoritative. Reviewed V35 Practice Manager grants use exact `MANAGES` clinician scope; Consultant/Associate default versions are view-only, and self-management requires an explicit approved grant. Finance receives no catalogue authority. Old pinned role versions stay dormant for Phase 2C capabilities until explicitly replaced.
+- The Phase 2B `OperationalSetupReadinessPort` now has a real implementation. Pricing and availability readiness use current database facts and emit business-language blockers. Provider/clinician activation therefore consumes real Phase 2C state; routing and commercial/legal acceptance remain explicit blockers rather than being fabricated before their owning phase.
+- Canonical files under `docs/platform-control-plane/specs/` remain byte-unchanged.
 
 Phase 2B design review completed against clean Phase 2A HEAD `a28ed7b` on `codex/platform-control-plane`. Implementation decisions are frozen in technical-decisions.md §13. Architecture is retained; required corrections cover identity recovery, immutable scanned evidence, verifier delegation/independence, legacy eligibility cutover and readiness prerequisites. This was documentation-only; no Phase 2B/2C code or live changes. Full operational activation must remain blocked wherever later-phase setup is unavailable.
 
@@ -82,13 +93,13 @@ The Access Governance and `/api/v1/admin/providers/**` route families use the ne
 - Phase 2 and later cutovers must replace each indexed legacy business-role decision only after an equivalent capability, authoritative resource resolver and parity/tenant-isolation test exist. A new-policy denial must never fall back to a legacy role.
 - Existing staff/doctor invitation paths still use the legacy role-aware Keycloak overload. New Provider Management orchestration must use `IdentityProvisioningPort` and keep all organization membership and business-role data in RehletShifaa.
 
-## NEXT EXACT ACTIONS — post-Phase 2B operational cutover
+## NEXT EXACT ACTIONS — Phase 3 (not started)
 
-1. Before deployment, inspect real PostgreSQL V33 legacy mappings and take the normal database backup; apply V34 through the standard tunnel-overlay stack only after that review. Do not hand-edit mappings or migration history.
-2. In the development environment, exercise Keycloak operation-marker recovery for timeout, zero-match and ambiguous-match outcomes, then confirm no duplicate identity or membership is created.
-3. Exercise MinIO plus ClamAV with an actual browser upload: mutate the staging object after scanning begins and confirm the sealed object retains exactly the inspected digest; verify cross-tenant view issuance is denied.
-4. Assign the first independent credential officer through central Access Governance for each reviewed provider tenant; do not repin dormant legacy grants or give Provider Operations verifier authority.
-5. Keep provider/clinician activation blocked until authoritative Phase 2C operational setup inputs exist. Start Phase 2C only under separate authorization; no Phase 2C work is included in this checkpoint.
+1. Before deployment, review real PostgreSQL V33 mappings, back up the database, and apply V34/V35 only through the standard Compose+tunnel stack. Do not edit migration history or auto-activate legacy mappings.
+2. Explicitly replace reviewed Practice Manager/Consultant/Associate assignments with the applicable V35 versions; never mass-repin dormant grants. Confirm each Practice Manager's `MANAGES` graph before enabling operational writes.
+3. Run live browser/API smoke checks for a managed and unmanaged clinician, cross-tenant IDs, non-EGP publication using real FX data, and timezone/DST availability boundaries. No live PostgreSQL, Keycloak, Docker/tunnel or browser checks are claimed by this checkpoint.
+4. Start Phase 3 only under separate authorization: implement Coordinator Teams and assignment/routing using the existing assignment/work-item boundaries, then supply authoritative routing readiness instead of the current explicit routing blocker.
+5. Preserve Phase 2C price/availability APIs and the readiness port; do not create a second service catalogue, availability source, appointment workflow or Journey Runtime while implementing Phase 3.
 
 ## Final acceptance/reconciliation — 2026-09-13
 

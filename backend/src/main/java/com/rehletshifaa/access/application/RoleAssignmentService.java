@@ -45,7 +45,7 @@ public class RoleAssignmentService {
             if(ResourceContext.PLATFORM.equals(command.organizationId()) || !providerAuthority.verifiedOrganization(command.organizationId()))
                 invalid("Choose a verified provider organization");
             if(!providerAuthority.trustedSubject(command.subject())) invalid("Choose an existing active identity");
-        } else for(var g:grants) if(catalog.require(g.permission()).executable()) authorization.require(g.permission());
+        } else for(var g:grants) if(catalog.require(g.permission()).executable() && roles.cutoverApproved(command.versionId(),g.permission())) authorization.require(g.permission());
         // Validate trusted external ownership before this lock can register an ordinary assignment subject.
         assignments.lockSubject(command.subject());
         var candidates=assignments.allForSubject(command.subject()).stream()
@@ -60,7 +60,8 @@ public class RoleAssignmentService {
         });
         if(authorization.prohibited(keys,actors)) invalid("These assignments conflict with separation of responsibilities");
         String status=ResourceContext.PLATFORM.equals(command.organizationId())||credentialVerifierBundle?"ACTIVE":"PENDING";
-        if(status.equals("ACTIVE") && grants.stream().anyMatch(g->!catalog.require(g.permission()).executable()))
+        if(status.equals("ACTIVE") && grants.stream().anyMatch(g->!catalog.require(g.permission()).executable()
+                || !roles.cutoverApproved(command.versionId(),g.permission())))
             invalid("This role requires a verified provider organization in a later phase");
         if(credentialVerifierBundle) assignments.activateGovernanceMembership(command.subject(),command.organizationId(),actor.subject(),command.reason(),clock.instant());
         else assignments.membership(command.subject(),command.organizationId(),status,actor.subject(),command.reason(),clock.instant());

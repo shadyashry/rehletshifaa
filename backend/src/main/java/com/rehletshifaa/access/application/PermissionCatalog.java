@@ -28,18 +28,18 @@ public class PermissionCatalog {
         register("credential.verify", "Verify credential", "credential", PermissionRisk.CRITICAL, Set.of("credential.view", "credential.review"), Set.of(), true, false, true);
         register("credential.reject", "Reject credential", "credential", PermissionRisk.HIGH, Set.of("credential.view", "credential.review"), Set.of(), true, false, true);
         register("credential.suspend", "Suspend credential", "credential", PermissionRisk.HIGH, Set.of("credential.view", "credential.review"), Set.of(), true, false, true);
-        register("availability.view", "View availability", "availability", PermissionRisk.LOW, Set.of(), Set.of(), false, false, false);
-        register("availability.manage", "Manage availability", "availability", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
-        register("availability.manage_self", "Manage self availability", "availability", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
+        register("availability.view", "View availability", "availability", PermissionRisk.LOW, Set.of(), Set.of(), true, false, false);
+        register("availability.manage", "Manage availability", "availability", PermissionRisk.HIGH, Set.of(), Set.of(), true, false, false);
+        register("availability.manage_self", "Manage self availability", "availability", PermissionRisk.HIGH, Set.of(), Set.of(), true, false, false);
         register("appointment.view", "View appointment", "appointment", PermissionRisk.LOW, Set.of(), Set.of(), false, false, false);
         register("appointment.schedule", "Schedule appointment", "appointment", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
         register("appointment.reschedule", "Reschedule appointment", "appointment", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
         register("appointment.cancel", "Cancel appointment", "appointment", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
-        register("service_catalog.view", "View service catalog", "service_catalog", PermissionRisk.LOW, Set.of(), Set.of(), false, false, false);
-        register("service_catalog.manage", "Manage service catalog", "service_catalog", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
-        register("price_list.view", "View price list", "price_list", PermissionRisk.LOW, Set.of(), Set.of(), false, false, false);
-        register("price_list.manage", "Manage price list", "price_list", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
-        register("price_list.publish", "Publish price list", "price_list", PermissionRisk.CRITICAL, Set.of(), Set.of(), false, false, false);
+        register("service_catalog.view", "View service catalog", "service_catalog", PermissionRisk.LOW, Set.of(), Set.of(), true, false, false);
+        register("service_catalog.manage", "Manage service catalog", "service_catalog", PermissionRisk.HIGH, Set.of(), Set.of(), true, false, false);
+        register("price_list.view", "View price list", "price_list", PermissionRisk.LOW, Set.of(), Set.of(), true, false, false);
+        register("price_list.manage", "Manage price list", "price_list", PermissionRisk.HIGH, Set.of(), Set.of(), true, false, false);
+        register("price_list.publish", "Publish price list", "price_list", PermissionRisk.CRITICAL, Set.of("price_list.view","price_list.manage"), Set.of(), true, false, false);
         register("clinical.case.view", "View case clinical", "clinical", PermissionRisk.LOW, Set.of(), Set.of(), false, true, false);
         register("clinical.document.view", "View document clinical", "clinical", PermissionRisk.LOW, Set.of(), Set.of(), false, true, false);
         register("clinical.recommendation.draft", "Draft recommendation clinical", "clinical", PermissionRisk.HIGH, Set.of(), Set.of(), false, true, false);
@@ -89,6 +89,7 @@ public class PermissionCatalog {
         Set<ActorType> actors = family.equals("access") || key.equals("provider.create") || key.equals("provider.suspend") ? Set.of(ActorType.GOVERNANCE)
                 : family.equals("credential") && !Set.of("credential.submit","credential.view").contains(key) ? Set.of(ActorType.GOVERNANCE)
                 : family.equals("credential") ? Set.of(ActorType.GOVERNANCE,ActorType.PRACTICE_OPERATIONS,ActorType.CONSULTANT,ActorType.ASSOCIATE_DOCTOR)
+                : Set.of("availability","service_catalog","price_list").contains(family) ? Set.of(ActorType.PRACTICE_OPERATIONS,ActorType.CONSULTANT,ActorType.ASSOCIATE_DOCTOR)
                 : key.equals("provider.relationship.manage") ? Set.of(ActorType.GOVERNANCE,ActorType.PRACTICE_OPERATIONS,ActorType.CONSULTANT)
                 : key.equals("provider.update") ? Set.of(ActorType.GOVERNANCE,ActorType.PRACTICE_OPERATIONS,ActorType.CONSULTANT,ActorType.ASSOCIATE_DOCTOR)
                 : family.equals("provider") && !key.equals("provider.view") ? Set.of(ActorType.GOVERNANCE,ActorType.PRACTICE_OPERATIONS)

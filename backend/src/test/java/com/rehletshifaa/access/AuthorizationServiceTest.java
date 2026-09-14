@@ -26,6 +26,7 @@ class AuthorizationServiceTest {
         when(assignments.activeMember("manager",org,now)).thenReturn(true);
         when(roles.version(version)).thenReturn(Optional.of(new RoleTemplateVersion(version,template,1,RoleTemplateVersion.Status.PUBLISHED,0,
                 ActorType.PRACTICE_OPERATIONS,ChannelEntitlement.STAFF_WEB,now.minusSeconds(1),null,"maker","checker")));
+        when(roles.cutoverApproved(version,key)).thenReturn(true);
         grant(key,ScopeType.MANAGED_CLINICIANS,"ACTIVE",now.minusSeconds(1),null);
         service=new AuthorizationService(catalog,assignments,roles,relationships,mock(AccessIdentity.class),mock(AccessAuditRepository.class),Clock.fixed(now,ZoneOffset.UTC));
     }

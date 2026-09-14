@@ -37,7 +37,8 @@ public class RoleTemplateRepository {
                         : RelationshipType.valueOf(r.getString("relationship_type")))).list();
     }
     public boolean cutoverApproved(UUID version,String permission) {
-        if(!permission.startsWith("credential.")&&!permission.equals("provider.activate")) return true;
+        if(!permission.startsWith("credential.")&&!permission.equals("provider.activate")&&!permission.startsWith("price_list.")
+                &&!permission.startsWith("service_catalog.")&&!permission.startsWith("availability.")) return true;
         return jdbc.sql("SELECT COUNT(*) FROM permission_version_cutovers WHERE role_version_id=? AND permission_key=?")
                 .params(version,permission).query(Long.class).single()>0;
     }

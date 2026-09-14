@@ -79,7 +79,7 @@ public class AuthorizationService {
             if(optional.isEmpty()) continue;
             var version=optional.get();
             if((draft==null && !published(version)) || !permission.actors().contains(version.actorType()) || version.channel()!=channel || !permission.channels().contains(channel)) continue;
-            if(draft==null && (key.startsWith("credential.")||key.equals("provider.activate")) && !roles.cutoverApproved(version.id(),key)) { reason=INVALID_CONFIGURATION; continue; }
+            if(draft==null && requiresApprovedCutover(key) && !roles.cutoverApproved(version.id(),key)) { reason=INVALID_CONFIGURATION; continue; }
             for(var grant:draft==null?roles.grants(version.id()):draftGrants) {
                 if(!grant.permission().equals(key) || grant.scope()!=assignment.scope() || !permission.scopes().contains(grant.scope())) continue;
                 if(!scopeMatches(actor.subject(),assignment,resource)) { reason=SCOPE_MISMATCH; continue; }
@@ -89,6 +89,10 @@ public class AuthorizationService {
             }
         }
         return AuthorizationDecision.deny(reason,key,org);
+    }
+    private boolean requiresApprovedCutover(String key) {
+        return key.startsWith("credential.") || key.equals("provider.activate") || key.startsWith("price_list.")
+                || key.startsWith("service_catalog.") || key.startsWith("availability.");
     }
     public boolean active(RoleAssignment a) {
         return a.status().equals("ACTIVE") && !a.effectiveFrom().isAfter(clock.instant())

@@ -34,7 +34,7 @@ class ProviderCredentialIntegrationTest {
     @Autowired ProviderCredentialService credentials; @Autowired JdbcTemplate jdbc; @Autowired AuthorizationService authorization;
     @Autowired ProviderCredentialEligibility eligibility;
     @Autowired com.rehletshifaa.journey.application.CredentialExpiryService expiry; @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
-    @MockBean LocalStorageAdapter storage; @MockBean DocumentInspectionPort inspector; @MockBean OperationalSetupReadinessPort operational;
+    @MockBean LocalStorageAdapter storage; @MockBean DocumentInspectionPort inspector; @MockBean ProviderOperationalSetupService operational;
     Instant now=Instant.now().minusSeconds(5); UUID org; UUID clinician;
 
     @BeforeEach void setup(){org=organization("Credential Clinic");clinician=clinician(org,"doctor-a","CONSULTANT",CONSULTANT);member(org,"provider-ops",OPS,"ORGANIZATION");member(org,"verifier",VERIFIER,"ORGANIZATION");member(org,"owner",OWNER,"ORGANIZATION");
