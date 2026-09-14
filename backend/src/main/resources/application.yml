@@ -110,6 +110,8 @@ app:
   notifications:
     mode: ${NOTIFICATIONS_MODE:noop}
     poll-milliseconds: ${NOTIFICATION_POLL_MILLISECONDS:5000}
+  credentials:
+    reminder-days: ${CREDENTIAL_REMINDER_DAYS:30,7,1}
   whatsapp:
     mode: ${WHATSAPP_MODE:noop}
     webhook-url: ${WHATSAPP_WEBHOOK_URL:}

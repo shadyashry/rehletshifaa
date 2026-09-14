@@ -36,6 +36,13 @@ public class RoleAssignmentRepository {
                 .params(subject,organization).query((r,n)->new Membership(r.getObject("organization_id",UUID.class),
                         r.getString("status"),r.getBoolean("active"),instant(r,"effective_from"),instant(r,"effective_to"))).optional();
     }
+    public void activateGovernanceMembership(String subject,UUID organization,String actor,String reason,Instant now){
+        var current=membership(subject,organization);
+        if(current.isPresent()&&current.get().status().equals("REVOKED"))throw new ApiException(409,"MEMBERSHIP_REVOKED","A revoked membership requires explicit reinstatement review");
+        if(current.isEmpty())membership(subject,organization,"ACTIVE",actor,reason,now);
+        else jdbc.sql("UPDATE access_memberships SET status='ACTIVE',effective_from=?,effective_to=NULL,revision=revision+1,reason=? WHERE subject=? AND organization_id=? AND status<>'ACTIVE'")
+                .params(timestamp(now.truncatedTo(java.time.temporal.ChronoUnit.MICROS)),reason,subject,organization).update();
+    }
     public record Membership(UUID organizationId,String status,boolean accountActive,Instant effectiveFrom,Instant effectiveTo) {}
     public List<RoleAssignment> assignments(String subject, UUID org) {
         return jdbc.sql("SELECT * FROM role_assignments WHERE subject=? AND organization_id=? ORDER BY effective_from,id")

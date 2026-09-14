@@ -4,6 +4,8 @@ public interface StoragePort {
     PresignedUpload presign(String objectKey, String contentType, long sizeBytes);
     StoredObject verify(String objectKey);
     byte[] read(String objectKey, long maximumBytes);
+    /** Writes immutable, already-inspected bytes to a server-only key. */
+    void seal(String objectKey, byte[] content, String contentType);
     PresignedDownload presignDownload(String objectKey, String safeFileName);
     PresignedDownload presignView(String objectKey, String safeFileName);
     void markClean(String objectKey);

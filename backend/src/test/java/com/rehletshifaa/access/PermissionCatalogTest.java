@@ -12,10 +12,12 @@ class PermissionCatalogTest {
     @Test void registeredMetadataAndFutureExecutionBoundary() {
         assertThat(catalog.all()).hasSizeGreaterThan(65);
         assertThat(catalog.all()).allSatisfy(p->{assertThat(p.name()).isNotBlank();assertThat(p.scopes()).isNotEmpty();assertThat(p.actors()).isNotEmpty();});
-        assertThat(catalog.all().stream().filter(PermissionDefinition::executable)).allMatch(p->Set.of("access","provider").contains(p.family()));
+        assertThat(catalog.all().stream().filter(PermissionDefinition::executable)).allMatch(p->Set.of("access","provider","credential").contains(p.family()));
         assertThat(catalog.require("provider.view").executable()).isTrue();
-        assertThat(catalog.require("provider.activate").executable()).isFalse();
-        assertThat(catalog.require("credential.verify").executable()).isFalse();
+        assertThat(catalog.require("provider.activate").executable()).isTrue();
+        assertThat(catalog.require("provider.activate").recentAuthentication()).isTrue();
+        assertThat(catalog.require("credential.verify").executable()).isTrue();
+        assertThat(catalog.require("credential.verify").recentAuthentication()).isTrue();
         assertThatThrownBy(()->catalog.require("custom.god_mode")).hasMessageContaining("registered");
     }
     @Test void validatesDependenciesAndClinicalActorEnvelope() {

@@ -104,6 +104,27 @@ class AccessGovernanceIntegrationTest {
         assertThatThrownBy(()->relationshipService.create(new ResourceRelationshipService.Create("practice",organization,RelationshipType.VERIFIES,"SUBJECT","practice",clock.instant(),null,"Self review"))).hasMessageContaining("Self");
         assertThat(assignments.activeMember("practice",organization,clock.instant())).isFalse();
     }
+    @Test void centralGovernanceCanDelegateOnlyTheRegisteredVerifierBundleToATrustedProviderSubject() {
+        UUID organization=UUID.randomUUID();
+        jdbc.update("INSERT INTO provider_organizations(id,legal_name,display_name,organization_type,status,country_code,time_zone,default_currency,created_by,updated_by,created_at,updated_at,version) VALUES(?,?,?,'CLINIC','DRAFT','AE','Asia/Dubai','AED','governance-owner','governance-owner',?,?,0)",
+                organization,"Verifier Test Provider","Verifier Test Provider",clock.instant(),clock.instant());
+        UUID verifierVersion=UUID.fromString("34000001-0000-0000-0000-000000000005");
+        assignments.lockSubject("credential-officer");
+
+        var delegated=assignmentService.grant(new RoleAssignmentService.Grant("credential-officer",verifierVersion,
+                organization,ScopeType.ORGANIZATION,null,null,clock.instant(),null,"Independent credential review"));
+
+        assertThat(delegated.status()).isEqualTo("ACTIVE");
+        assertThat(assignments.activeMember("credential-officer",organization,clock.instant())).isTrue();
+        var provider=new ResourceContext(organization,true,"PROVIDER",organization.toString(),"clinician-subject",false);
+        assertThat(authorization.decide(new AccessIdentity.Identity("credential-officer",clock.instant()),
+                "credential.verify",provider,ChannelEntitlement.ADMIN_WEB).allowed()).isTrue();
+        assertThat(queries.effective("credential-officer",organization).decisions())
+                .anyMatch(d->d.permission().equals("credential.verify")&&d.reason()==AuthorizationDecision.Reason.RECENT_AUTHENTICATION_REQUIRED);
+        assertThatThrownBy(()->assignmentService.grant(new RoleAssignmentService.Grant("unknown-officer",verifierVersion,
+                organization,ScopeType.ORGANIZATION,null,null,clock.instant(),null,"Untrusted identity")))
+                .hasMessageContaining("existing active identity");
+    }
     @Test void effectiveExplanationAndUnresolvedSimulation() {
         var effective=queries.effective("governance-owner",ResourceContext.PLATFORM);
         assertThat(effective.sources()).singleElement().satisfies(s->{

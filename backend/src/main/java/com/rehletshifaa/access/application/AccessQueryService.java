@@ -15,9 +15,11 @@ public class AccessQueryService {
     private final RoleTemplateRepository roles;
     private final ResourceRelationshipRepository relationships;
     private final AccessAuditRepository audit;
+    private final ProviderOrganizationAuthorityPort providerAuthority;
     public AccessQueryService(AuthorizationService authorization,AccessIdentity identity,PermissionCatalog catalog,
-            RoleAssignmentRepository assignments,RoleTemplateRepository roles,ResourceRelationshipRepository relationships,AccessAuditRepository audit) {
-        this.authorization=authorization;this.identity=identity;this.catalog=catalog;this.assignments=assignments;this.roles=roles;this.relationships=relationships;this.audit=audit;
+            RoleAssignmentRepository assignments,RoleTemplateRepository roles,ResourceRelationshipRepository relationships,AccessAuditRepository audit,
+            ProviderOrganizationAuthorityPort providerAuthority) {
+        this.authorization=authorization;this.identity=identity;this.catalog=catalog;this.assignments=assignments;this.roles=roles;this.relationships=relationships;this.audit=audit;this.providerAuthority=providerAuthority;
     }
     public List<AuthorizationDecision> mine() {
         var actor=identity.current();
@@ -33,7 +35,7 @@ public class AccessQueryService {
             return new Source(a,role.name(),v,roles.grants(v.id()));
         }).toList();
         // The target user's recent-auth claim is unknown; never borrow the administrator's authentication.
-        var context=ResourceContext.PLATFORM.equals(organization)?ResourceContext.platform():null;
+        var context=ResourceContext.PLATFORM.equals(organization)?ResourceContext.platform():providerContext(organization);
         var decisions=catalog.all().stream().map(p->authorization.decide(new AccessIdentity.Identity(subject,Instant.EPOCH),
                 p.key(),context,ChannelEntitlement.ADMIN_WEB)).toList();
         audit.record(actor.subject(),organization.toString(),"EFFECTIVE_ACCESS_REVIEWED","SUCCESS","Subject access inspected");
@@ -54,6 +56,10 @@ public class AccessQueryService {
                 }
             } catch(IllegalArgumentException ignored) { /* Unknown resource remains denied. */ }
         }
+        if("PROVIDER".equals(input.resourceType())) {
+            try { context=providerContext(UUID.fromString(input.resourceId())); }
+            catch(IllegalArgumentException ignored) { /* Unknown resource remains denied. */ }
+        }
         var target=actor.subject().equals(input.subject())?actor:new AccessIdentity.Identity(input.subject(),Instant.EPOCH);
         AuthorizationDecision decision;
         if(input.draftVersionId()!=null) {
@@ -67,6 +73,10 @@ public class AccessQueryService {
         return decision;
     }
     public List<AccessAuditRepository.Entry> audit(int offset) { authorization.require("access.audit.view");return audit.list(offset); }
+    private ResourceContext providerContext(UUID organization) {
+        return providerAuthority.verifiedOrganization(organization)
+                ? new ResourceContext(organization,true,"PROVIDER",organization.toString(),null,false) : null;
+    }
     public record Source(RoleAssignment assignment,String roleName,RoleTemplateVersion version,List<RolePermissionGrant> grants) {}
     public record EffectiveAccess(String subject,UUID organizationId,RoleAssignmentRepository.Membership membership,List<Source> sources,List<ResourceRelationship> relationships,List<AuthorizationDecision> decisions) {}
     public record Simulation(String subject,String permission,String resourceType,String resourceId,UUID draftVersionId) {

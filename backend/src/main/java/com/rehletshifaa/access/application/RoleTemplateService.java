@@ -92,7 +92,7 @@ public class RoleTemplateService {
         if(command.effectiveFrom()==null || command.effectiveFrom().isBefore(clock.instant().minusSeconds(60))) invalid("Choose a current or future effective date");
         var grants=roles.grants(id);
         if(!catalog.validate(grants,v.actorType(),v.channel()).valid()) invalid("Resolve capability dependencies and conflicts");
-        for(var grant:grants) if(catalog.require(grant.permission()).executable()) authorization.require(grant.permission());
+        for(var grant:grants) if(catalog.require(grant.permission()).executable()&&!catalog.centrallyDelegable(grant.permission())) authorization.require(grant.permission());
         roles.transition(id,v.revision(),"PUBLISHED",command.effectiveFrom(),null,actor.subject());
         audit.record(actor.subject(),id.toString(),"ROLE_PUBLISHED","SUCCESS","effective="+command.effectiveFrom()+"; "+command.reason());
         return new VersionDetail(roles.version(id).orElseThrow(),grants);

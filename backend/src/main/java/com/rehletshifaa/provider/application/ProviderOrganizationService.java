@@ -21,11 +21,11 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 @Service
 public class ProviderOrganizationService {
     private static final Map<String,UUID> ROLE_VERSIONS=Map.of(
-            "PROVIDER_OPERATIONS_MANAGER",uuid("32000001-0000-0000-0000-000000000004"),
+            "PROVIDER_OPERATIONS_MANAGER",uuid("34000001-0000-0000-0000-000000000004"),
             "ORGANIZATION_OWNER",uuid("32000001-0000-0000-0000-000000000011"),
             "PRACTICE_MANAGER",uuid("32000001-0000-0000-0000-000000000012"),
-            "CONSULTANT",uuid("32000001-0000-0000-0000-000000000013"),
-            "ASSOCIATE_DOCTOR",uuid("32000001-0000-0000-0000-000000000014"),
+            "CONSULTANT",uuid("34000001-0000-0000-0000-000000000013"),
+            "ASSOCIATE_DOCTOR",uuid("34000001-0000-0000-0000-000000000014"),
             "CONSULTANT_ASSISTANT",uuid("32000001-0000-0000-0000-000000000015"));
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;
@@ -109,11 +109,14 @@ public class ProviderOrganizationService {
             link(organizationId,new Membership(existing.get().subject(),command.role(),clock.instant(),null,command.reason()));
             return new IdentityOperation(null,organizationId,existing.get().subject(),"COMPLETED",command.role());
         }
+        var pending=jdbc.sql("SELECT id FROM provider_identity_operations WHERE organization_id=? AND email_hash=? AND requested_role=? AND status<>'COMPLETED' ORDER BY created_at DESC LIMIT 1")
+                .params(organizationId,hash,command.role()).query(UUID.class).optional();
+        if(pending.isPresent()) return reconcile(organizationId,pending.get(),command.reason());
         UUID operation=UUID.randomUUID();Instant now=clock.instant();
         transactions.executeWithoutResult(status->jdbc.sql("INSERT INTO provider_identity_operations(id,organization_id,requested_role,member_kind,display_name_encrypted,email_encrypted,email_hash,locale,status,requested_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,'REQUESTED',?,?,?,0)")
                 .params(operation,organizationId,command.role(),kind(command.role()),crypto.encrypt(command.name().trim()),crypto.encrypt(email),hash,locale,actor.subject(),timestamp(now),timestamp(now)).update());
         try {
-            var identity=identities.invite(command.name().trim(),email,locale);
+            var identity=identities.inviteTracked(command.name().trim(),email,locale,operation.toString());
             transactions.executeWithoutResult(status->jdbc.sql("UPDATE provider_identity_operations SET external_subject=?,status='IDENTITY_CREATED',updated_at=?,version=version+1 WHERE id=? AND status='REQUESTED'")
                     .params(identity.subject(),timestamp(clock.instant()),operation).update());
             finalizeInvitation(operation,command.reason());
@@ -126,21 +129,24 @@ public class ProviderOrganizationService {
     }
 
     public IdentityOperation reconcile(UUID organizationId,UUID operationId,String reason) {
-        OrganizationView organization=organization(organizationId);authorize("provider.member.invite",context(organization));text(reason,500,"reason");
+        OrganizationView organization=organization(organizationId);text(reason,500,"reason");
         if(!operation(operationId).organizationId().equals(organizationId)) throw new ApiException(404,"IDENTITY_OPERATION_NOT_FOUND","Identity operation not found");
+        IdentityOperation existing=operation(operationId);authorize(membershipPermission(existing.role()),context(organization));
+        if((existing.status().equals("REQUESTED")||existing.status().equals("FAILED"))&&existing.subject()==null)identities.recover(operationId.toString()).ifPresent(account->transactions.executeWithoutResult(status->jdbc.sql("UPDATE provider_identity_operations SET external_subject=?,status='IDENTITY_CREATED',failure_reason=NULL,updated_at=?,version=version+1 WHERE id=? AND external_subject IS NULL").params(account.subject(),timestamp(clock.instant()),operationId).update()));
         finalizeInvitation(operationId,reason);return operation(operationId);
     }
 
     public MemberView activate(UUID organizationId,String subject,long revision,String reason) {
-        var actor=authorize("provider.member.invite",context(organization(organizationId)));text(reason,500,"reason");
+        OrganizationView organization=organization(organizationId);MemberView existing=member(subject,organizationId);
+        String permission=existing.roles().stream().map(ProviderOrganizationService::membershipPermission).distinct().reduce((left,right)->left.equals(right)?left:"provider.member.invite").orElse("provider.member.invite");
+        var actor=authorize(permission,context(organization));text(reason,500,"reason");
         return transactions.execute(status->{
             assignments.lockSubject(subject);Instant now=clock.instant();
             int changed=jdbc.sql("UPDATE access_memberships SET status='ACTIVE',invitation_status='ACTIVE',activated_at=?,activated_by=?,deactivated_at=NULL,deactivated_by=NULL,revision=revision+1 WHERE subject=? AND organization_id=? AND revision=? AND status<>'REVOKED'")
                     .params(timestamp(now),actor.subject(),subject,organizationId,revision).update();
             if(changed!=1) throw new ApiException(409,"STALE_MEMBERSHIP","Membership changed; reload before saving");
             jdbc.sql("UPDATE role_assignments SET status='ACTIVE',revision=revision+1 WHERE subject=? AND organization_id=? AND status='PENDING'").params(subject,organizationId).update();
-            jdbc.sql("UPDATE resource_relationships SET status='ACTIVE',revision=revision+1 WHERE organization_id=? AND status='PENDING' AND (subject=? OR target_id=(SELECT CAST(practitioner_id AS VARCHAR) FROM provider_membership_details WHERE subject=? AND organization_id=?))")
-                    .params(organizationId,subject,subject,organizationId).update();
+            activateEligiblePendingRelationships(organizationId,subject,now);
             audit.record(actor.subject(),organizationId.toString(),"PROVIDER_MEMBER_ACTIVATED","SUCCESS","subject="+subject+"; "+reason);
             return member(subject,organizationId);
         });
@@ -163,7 +169,8 @@ public class ProviderOrganizationService {
 
     public RelationshipView relate(UUID organizationId,Relationship command) {
         var actor=authorize("provider.relationship.manage",context(organization(organizationId)));text(command.subject(),255,"subject");text(command.reason(),500,"reason");period(command.effectiveFrom(),command.effectiveTo());
-        if(command.subject().equals(command.targetPractitionerId().toString())) invalid("Self relationships are prohibited");
+        String targetSubject=jdbc.sql("SELECT external_subject FROM practitioner_profiles WHERE id=?").param(command.targetPractitionerId()).query(String.class).optional().orElseThrow(()->new ApiException(404,"CLINICIAN_NOT_FOUND","Clinician not found"));
+        if(command.subject().equals(targetSubject)) invalid("Self relationships are prohibited");
         String sourceRole=switch(command.type()) {case MANAGES->"PRACTICE_MANAGER";case ASSISTS->"CONSULTANT_ASSISTANT";case SUPERVISES->"CONSULTANT";default->throw new ApiException(400,"INVALID_PROVIDER_RELATIONSHIP","Use MANAGES, ASSISTS or SUPERVISES");};
         String targetRole=command.type()==RelationshipType.SUPERVISES?"ASSOCIATE_DOCTOR":"CONSULTANT";
         if(!hasRole(command.subject(),organizationId,sourceRole) || !targetHasRole(command.targetPractitionerId(),organizationId,targetRole))
@@ -181,29 +188,43 @@ public class ProviderOrganizationService {
 
     private void finalizeInvitation(UUID operationId,String reason) {
         transactions.executeWithoutResult(status->{
-            var operation=operation(operationId);
-            if(operation.status().equals("COMPLETED")) return;
-            if(!operation.status().equals("IDENTITY_CREATED")||operation.subject()==null) throw new ApiException(409,"IDENTITY_RECONCILIATION_NOT_READY","The identity operation is not ready for reconciliation");
-            var row=jdbc.sql("SELECT requested_role,member_kind,display_name_encrypted,email_encrypted,email_hash,requested_by FROM provider_identity_operations WHERE id=? FOR UPDATE").param(operationId).query((r,n)->new OperationData(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6))).single();
+            var row=jdbc.sql("SELECT organization_id,external_subject,status,requested_role,member_kind,display_name_encrypted,email_encrypted,email_hash,requested_by FROM provider_identity_operations WHERE id=? FOR UPDATE").param(operationId).query((r,n)->new OperationData(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7),r.getString(8),r.getString(9))).optional().orElseThrow(()->new ApiException(404,"IDENTITY_OPERATION_NOT_FOUND","Identity operation not found"));
+            if(row.status().equals("COMPLETED")) return;
+            if(!row.status().equals("IDENTITY_CREATED")||row.subject()==null) throw new ApiException(409,"IDENTITY_RECONCILIATION_NOT_READY","The identity operation is not ready for reconciliation");
+            var finalizer=authorize(membershipPermission(row.role()),context(organization(row.organizationId())));
             UUID practitioner=null;Instant now=clock.instant();
             if(row.kind().equals("CLINICIAN")) {
                 practitioner=UUID.randomUUID();String name=crypto.decrypt(row.name());
                 jdbc.sql("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,email_encrypted,email_hash,account_status,invited_at,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,'INVITED',?,?,?,0)")
-                        .params(practitioner,operation.subject(),name,name,"UNDER_REVIEW",row.role(),"UNAVAILABLE",row.email(),row.emailHash(),timestamp(now),timestamp(now),timestamp(now)).update();
+                        .params(practitioner,row.subject(),name,name,"UNDER_REVIEW",row.role(),"UNAVAILABLE",row.email(),row.emailHash(),timestamp(now),timestamp(now),timestamp(now)).update();
             }
-            ensureMembership(operation.subject(),operation.organizationId(),row.kind(),practitioner,row.role(),"PENDING",now,null,row.requestedBy(),reason);
+            ensureMembership(row.subject(),row.organizationId(),row.kind(),practitioner,row.role(),"PENDING",now,null,row.requestedBy(),reason);
             jdbc.sql("UPDATE provider_identity_operations SET status='COMPLETED',failure_reason=NULL,updated_at=?,version=version+1 WHERE id=?").params(timestamp(now),operationId).update();
-            audit.record(row.requestedBy(),operation.organizationId().toString(),"PROVIDER_IDENTITY_LINKED","SUCCESS","subject="+operation.subject()+"; role="+row.role());
+            audit.record(finalizer.subject(),row.organizationId().toString(),"PROVIDER_IDENTITY_LINKED","SUCCESS","subject="+row.subject()+"; role="+row.role());
         });
     }
 
+    private void activateEligiblePendingRelationships(UUID organization,String changedSubject,Instant now) {
+        var pending=jdbc.sql("SELECT id,subject,relationship_type,target_id,effective_from,effective_to FROM resource_relationships WHERE organization_id=? AND status='PENDING' AND (subject=? OR target_id=(SELECT CAST(practitioner_id AS VARCHAR) FROM provider_membership_details WHERE subject=? AND organization_id=?)) FOR UPDATE")
+                .params(organization,changedSubject,changedSubject,organization).query((r,n)->new PendingRelationship(r.getObject(1,UUID.class),r.getString(2),RelationshipType.valueOf(r.getString(3)),UUID.fromString(r.getString(4)),instant(r,"effective_from"),instant(r,"effective_to"))).list();
+        for(var relationship:pending) {
+            String sourceRole=switch(relationship.type()){case MANAGES->"PRACTICE_MANAGER";case ASSISTS->"CONSULTANT_ASSISTANT";case SUPERVISES->"CONSULTANT";default->null;};
+            String targetRole=relationship.type()==RelationshipType.SUPERVISES?"ASSOCIATE_DOCTOR":"CONSULTANT";
+            boolean inWindow=!relationship.from().isAfter(now)&&(relationship.to()==null||relationship.to().isAfter(now));
+            if(inWindow&&assignments.activeMember(relationship.subject(),organization,now)&&targetActive(relationship.target(),organization)&&hasRole(relationship.subject(),organization,sourceRole)&&targetHasRole(relationship.target(),organization,targetRole))
+                jdbc.sql("UPDATE resource_relationships SET status='ACTIVE',revision=revision+1 WHERE id=? AND status='PENDING'").param(relationship.id()).update();
+        }
+    }
+
     private void ensureMembership(String subject,UUID organization,String kind,UUID practitioner,String role,String state,Instant from,Instant to,String actor,String reason) {
-        assignments.lockSubject(subject);Instant effective=from==null?clock.instant():from;
+        assignments.lockSubject(subject);Instant effective=(from==null?clock.instant():from).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         if(assignments.membership(subject,organization).isEmpty()) jdbc.sql("INSERT INTO access_memberships(subject,organization_id,status,effective_from,effective_to,revision,created_by,reason,invitation_status,invited_at,activated_at,activated_by) VALUES(?,?,?,?,?,0,?,?,?, ?,?,?)")
                 .params(subject,organization,state,timestamp(effective),timestamp(to),actor,reason,state.equals("ACTIVE")?"ACTIVE":"INVITED",timestamp(clock.instant()),state.equals("ACTIVE")?timestamp(clock.instant()):null,state.equals("ACTIVE")?actor:null).update();
         else if(assignments.membership(subject,organization).orElseThrow().status().equals("REVOKED")) throw new ApiException(409,"MEMBERSHIP_REVOKED","A revoked membership requires an explicit reinstatement process");
         jdbc.sql("INSERT INTO provider_membership_details(subject,organization_id,member_kind,practitioner_id,staff_member_id,created_at,updated_at,version) SELECT ?,?,?,?,?,?,?,0 WHERE NOT EXISTS(SELECT 1 FROM provider_membership_details WHERE subject=? AND organization_id=?)")
                 .params(subject,organization,kind,practitioner,staffId(subject),timestamp(clock.instant()),timestamp(clock.instant()),subject,organization).update();
+        if("CLINICIAN".equals(kind)) jdbc.sql("INSERT INTO clinician_onboardings(organization_id,practitioner_id,clinician_type,status,jurisdiction,credential_policy_cutover_at,created_by,updated_by,created_at,updated_at,version) SELECT ?,?,practitioner_type,?,o.country_code,CASE WHEN o.legacy_mapping_status IS NULL THEN ? ELSE NULL END,?,?,?,?,0 FROM practitioner_profiles CROSS JOIN provider_organizations o WHERE practitioner_profiles.id=? AND o.id=? AND NOT EXISTS(SELECT 1 FROM clinician_onboardings WHERE organization_id=? AND practitioner_id=?)")
+                .params(organization,practitioner,state.equals("ACTIVE")?"PROFILE_INCOMPLETE":"INVITED",timestamp(clock.instant()),actor,actor,timestamp(clock.instant()),timestamp(clock.instant()),practitioner,organization,organization,practitioner).update();
         UUID version=ROLE_VERSIONS.get(role);
         for(var scope:roles.grants(version).stream().map(RolePermissionGrant::scope).distinct().toList()) {
             if(scope==ScopeType.PLATFORM) continue;
@@ -273,5 +294,6 @@ public class ProviderOrganizationService {
     public record ProviderDetail(OrganizationView organization,List<MemberView> members,List<RelationshipView> relationships){}
     public record IdentityOperation(UUID id,UUID organizationId,String subject,String status,String role){}
     private record ExistingPerson(String subject,String kind,UUID practitionerId){}
-    private record OperationData(String role,String kind,String name,String email,String emailHash,String requestedBy){}
+    private record OperationData(UUID organizationId,String subject,String status,String role,String kind,String name,String email,String emailHash,String requestedBy){}
+    private record PendingRelationship(UUID id,String subject,RelationshipType type,UUID target,Instant from,Instant to){}
 }

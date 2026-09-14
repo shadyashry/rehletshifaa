@@ -44,18 +44,24 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
 
     @Override
     public IdentityAccount invite(String name,String email,String locale) {
-        return invite(name,email,null,locale);
+        return invite(name,email,null,locale,null);
     }
+
+    @Override public IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker){return invite(name,email,null,locale,operationMarker);}
 
     /** Legacy staff compatibility only; new business services use IdentityProvisioningPort. */
     public IdentityAccount invite(String name,String email,String role,String locale) {
+        return invite(name,email,role,locale,null);
+    }
+    private IdentityAccount invite(String name,String email,String role,String locale,String operationMarker) {
         requireConfigured();
         String normalized=email.trim().toLowerCase(Locale.ROOT);
         if(!findByEmail(normalized).isEmpty())throw new ApiException(409,"STAFF_EMAIL_EXISTS","An identity account already uses this email address");
         Map<String,Object> user=new LinkedHashMap<>();
         user.put("username",normalized);user.put("email",normalized);user.put("firstName",name.trim());
         user.put("enabled",true);user.put("emailVerified",false);user.put("requiredActions",INVITE_ACTIONS);
-        user.put("attributes",Map.of("locale",List.of("ar".equals(locale)?"ar":"en")));
+        Map<String,List<String>> attributes=new LinkedHashMap<>();attributes.put("locale",List.of("ar".equals(locale)?"ar":"en"));
+        if(operationMarker!=null&&!operationMarker.isBlank())attributes.put("rehletshifaaProvisioningOperation",List.of(operationMarker));user.put("attributes",attributes);
         try {
             ResponseEntity<Void> response=http.post().uri(admin("/users")).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(user).retrieve().toBodilessEntity();
             String subject=subjectFrom(response.getHeaders().getLocation());
@@ -64,6 +70,8 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
             return new IdentityAccount(subject,normalized,"INVITED",Instant.now());
         } catch(RestClientResponseException e) {throw identityFailure(e,"Unable to create the staff identity account");}
     }
+
+    @Override public Optional<IdentityAccount> recover(String operationMarker){requireConfigured();URI uri=UriComponentsBuilder.fromUriString(admin("/users")).queryParam("q","rehletshifaaProvisioningOperation:"+operationMarker).build().encode().toUri();try{List<Map<String,Object>> found=http.get().uri(uri).header("Authorization",bearer()).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});if(found==null||found.isEmpty())return Optional.empty();if(found.size()!=1)throw new ApiException(409,"AMBIGUOUS_IDENTITY_RECOVERY","Identity recovery returned more than one account");Map<String,Object> user=found.get(0);return Optional.of(new IdentityAccount(String.valueOf(user.get("id")),String.valueOf(user.get("email")),"INVITED",Instant.now()));}catch(RestClientResponseException e){throw identityFailure(e,"Unable to reconcile the identity account");}}
 
     public void resend(String subject,String locale){requireConfigured();sendInvite(subject,locale);}
 

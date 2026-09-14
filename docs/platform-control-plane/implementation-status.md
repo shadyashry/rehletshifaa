@@ -1,8 +1,29 @@
 # Platform Control Plane — implementation status
 
-Updated 2026-09-14. **Phase 1 remains accepted. Phase 2A Provider Organization, Membership and Clinician Relationship Foundation is complete. Phase 2B has not started.**
+Updated 2026-09-14. **Phase 1 and Phase 2A remain accepted. Phase 2B Provider Credentialing, Readiness and Activation is implemented and accepted at the offline backend verification boundary. Phase 2C has not started.**
+
+Phase 2B design review completed against clean Phase 2A HEAD `a28ed7b` on `codex/platform-control-plane`. Implementation decisions are frozen in technical-decisions.md §13. Architecture is retained; required corrections cover identity recovery, immutable scanned evidence, verifier delegation/independence, legacy eligibility cutover and readiness prerequisites. This was documentation-only; no Phase 2B/2C code or live changes. Full operational activation must remain blocked wherever later-phase setup is unavailable.
 
 Keycloak is authoritative for authentication and identity-session concerns. RehletShifaa is authoritative for dynamic business authorization, organization membership, roles, permissions, scopes and relationships.
+
+## Phase 2B resumed state and completion
+
+- Resumed `codex/platform-control-plane` at Phase 2A HEAD `a28ed7b` with an unstaged/untracked interrupted Phase 2B implementation. No branch switch, reset, clean, stash or overwrite was performed.
+- Already present but unverified: V34 credential/onboarding schema, provider credential API/service, versioned evidence and decisions, readiness/activation, identity operation markers, storage sealing and initial focused tests.
+- Partially present: identity finalization serialization, reviewer segregation, lifecycle transitions, expiry/outbox, legacy eligibility and compatibility. The first focused run exposed two fixture assertions; later review exposed real defects in membership timestamp precision, reviewer decision state mapping, scanner-failure rollback, verifier delegation, supervisor eligibility and multi-provider legacy resolution. These were corrected in place.
+- Canonical specifications under `docs/platform-control-plane/specs/` remain unchanged. Frozen decisions in technical-decisions.md §13 were preserved; no replacement decision was required.
+
+## Implemented Phase 2B
+
+- Durable role-free identity invitation/linkage uses a server-managed operation marker, exact-subject recovery, requested-role reauthorization, serialized finalization and idempotent completed replay. Existing stored identities link by stable subject; display name, phone and unverified email never merge identities.
+- Per-tenant clinician onboarding separates membership, authentication, credential verification, credential readiness, operational readiness and explicit activation. Clients cannot patch lifecycle state. Consultant, Associate Doctor, Assistant, Practice Manager, Organization Owner and Provider Operations boundaries remain distinct.
+- V34 adds clinician enrollments, immutable credential policy versions and requirements, tenant dossiers, submission revisions, sealed evidence metadata, exact-revision evidence links, immutable decisions, command idempotency, domain-event deduplication and legacy-adoption markers. V1–V33 were not edited and no historical verifier facts were fabricated.
+- Provider evidence reuses the existing storage and inspection ports. Browser uploads target random staging keys; the service verifies metadata, reads and scans bounded bytes, seals those same bytes to a new server-only key, stores digest/scan facts and authorizes each short-lived view URL by stored tenant ownership.
+- Credential submission, correction, rejection, independent verification, suspension/restoration and renewal preserve revision/decision history. Self-review and submitter-review are denied; verify/reject/suspend/activation require recent authentication. Provider Operations and provider-local managers receive no verifier bypass.
+- Central Access Governance can delegate only the published registered credential-verifier envelope to a verified provider and trusted active subject. This creates/reviews the canonical provider membership without creating a fake practitioner/staff record; the central administrator does not gain evidence access.
+- Readiness is server-authoritative and returns structured business blockers. Associate readiness requires a same-tenant, effective, credential-ready Consultant supervisor. Missing Phase 2C services/pricing/availability/routing facts remain explicitly blocking through `OperationalSetupReadinessPort`; no Phase 2C state was fabricated.
+- Provider and clinician activation are permission-controlled, optimistic, readiness-gated, idempotent and audited. Credential expiry is evaluated synchronously for readiness, scheduled reconciliation appends deduplicated expiry events without mutating approvals, and configurable reminders use the existing notification outbox.
+- Legacy credential writes remain available before explicit adoption. After adoption they are rejected, Journey consultant eligibility uses all mandatory current provider credentials, and ambiguous multi-organization enrollment fails closed rather than selecting any passing tenant.
 
 ## Checkout and recovered state
 
@@ -61,17 +82,13 @@ The Access Governance and `/api/v1/admin/providers/**` route families use the ne
 - Phase 2 and later cutovers must replace each indexed legacy business-role decision only after an equivalent capability, authoritative resource resolver and parity/tenant-isolation test exist. A new-policy denial must never fall back to a legacy role.
 - Existing staff/doctor invitation paths still use the legacy role-aware Keycloak overload. New Provider Management orchestration must use `IdentityProvisioningPort` and keep all organization membership and business-role data in RehletShifaa.
 
-## NEXT EXACT ACTIONS — Phase 2B (future authorization required)
+## NEXT EXACT ACTIONS — post-Phase 2B operational cutover
 
-Stop after the Phase 2A commit. Do not start these actions without explicit Phase 2B authorization:
-
-1. Reconfirm branch/status and V33 baseline; read only master spec §6.4–6.5, Provider Management PM-003/PM-004/PM-007–PM-010 and Credentialing CR-001–CR-005.
-2. Add provider-owned secure credential evidence without fabricating patient cases; preserve existing `practitioner_credentials`, document scanning/storage boundaries, IDs and history.
-3. Add explicit immutable verification decisions and required-credential policy for Consultant and Associate Doctor, including more-information/reject/suspend/expiry states, recent authentication, independent reviewer and existing self-verification prohibition.
-4. Implement backend-computed provider/clinician readiness with structured blockers. Review and explicitly activate V33 PENDING_REVIEW mappings; never infer readiness from legacy VERIFIED alone.
-5. Make `provider.activate` and only the required credential capabilities executable after authoritative resource resolvers and delegation envelopes exist. Activation must be optimistic/idempotent/audited and reject incomplete readiness.
-6. Extend provider APIs/tests for credential submission/review queues, readiness and activation. Preserve legacy JourneyService contracts until parity/cutover tests prove replacement; do not start pricing, availability, Journey Management or routing.
-7. Run focused credential/provider/security/migration tests, then the full offline backend suite; update all persistent status files and commit Phase 2B without push/merge.
+1. Before deployment, inspect real PostgreSQL V33 legacy mappings and take the normal database backup; apply V34 through the standard tunnel-overlay stack only after that review. Do not hand-edit mappings or migration history.
+2. In the development environment, exercise Keycloak operation-marker recovery for timeout, zero-match and ambiguous-match outcomes, then confirm no duplicate identity or membership is created.
+3. Exercise MinIO plus ClamAV with an actual browser upload: mutate the staging object after scanning begins and confirm the sealed object retains exactly the inspected digest; verify cross-tenant view issuance is denied.
+4. Assign the first independent credential officer through central Access Governance for each reviewed provider tenant; do not repin dormant legacy grants or give Provider Operations verifier authority.
+5. Keep provider/clinician activation blocked until authoritative Phase 2C operational setup inputs exist. Start Phase 2C only under separate authorization; no Phase 2C work is included in this checkpoint.
 
 ## Final acceptance/reconciliation — 2026-09-13
 

@@ -2,6 +2,14 @@
 
 Updated 2026-09-14. Phase 1 remains green; Phase 2A provider foundation is complete.
 
+## Phase 2B verification — 2026-09-14
+
+- Focused Phase 2B suites passed: `AccessGovernanceIntegrationTest`, `ProviderOrganizationIntegrationTest` and `ProviderCredentialIntegrationTest`. They cover tracked identity recovery/retry, trusted verifier delegation, onboarding boundaries, immutable sealed evidence, correction/rejection/renewal, self/submitting-reviewer denial, Provider Operations separation, Associate supervision, evidence IDOR, readiness, activation replay, expiry events/reminders and ambiguous multi-provider legacy compatibility.
+- Impacted security/integration set passed: provider/access catalog and authorization, Flyway, architecture, Journey compatibility, secure journey corrections, HTTP security and notification delivery.
+- Full offline backend passed after the implementation changes: **300 tests in 28 suites, zero failures/errors/skips**. Flyway validated and migrated a fresh H2 PostgreSQL-mode schema through V34.
+- Focused reruns also caught and verified fixes for immediate membership precision, invalid decision-state persistence, rejected-scan rollback, untrusted verifier subject registration, effective-access provider resolution and immutable expiry reconciliation.
+- No frontend files changed, so frontend/build/browser suites were not rerun. Live PostgreSQL, Keycloak, MinIO/ClamAV, Docker/tunnel and deployment checks remain intentionally unrun and are not implied by mocked/H2 integration tests.
+
 | Check | Result | Evidence / boundary |
 |---|---|---|
 | Branch/status/log at resume | PASS | `codex/platform-control-plane`, HEAD `3a184b0`; unstaged and untracked interrupted work preserved, no index changes initially |

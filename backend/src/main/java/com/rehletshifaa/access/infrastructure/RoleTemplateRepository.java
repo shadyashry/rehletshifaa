@@ -36,6 +36,11 @@ public class RoleTemplateRepository {
                         ScopeType.valueOf(r.getString("scope_type")), r.getString("relationship_type") == null ? null
                         : RelationshipType.valueOf(r.getString("relationship_type")))).list();
     }
+    public boolean cutoverApproved(UUID version,String permission) {
+        if(!permission.startsWith("credential.")&&!permission.equals("provider.activate")) return true;
+        return jdbc.sql("SELECT COUNT(*) FROM permission_version_cutovers WHERE role_version_id=? AND permission_key=?")
+                .params(version,permission).query(Long.class).single()>0;
+    }
     public UUID create(String key, String name, String description, String purpose, String family, UUID org, String actor, Instant now) {
         UUID id = UUID.randomUUID();
         jdbc.sql("INSERT INTO role_templates(id,template_key,display_name,description,purpose,family,system_template,organization_id,status,revision,created_by,created_at) VALUES(?,?,?,?,?,?,FALSE,?,'ACTIVE',0,?,?)")

@@ -15,11 +15,12 @@ public class RoleAssignmentService {
     private final RoleTemplateRepository roles;
     private final PermissionCatalog catalog;
     private final AuthorizationService authorization;
+    private final ProviderOrganizationAuthorityPort providerAuthority;
     private final AccessAuditRepository audit;
     private final Clock clock;
     public RoleAssignmentService(RoleAssignmentRepository assignments, RoleTemplateRepository roles, PermissionCatalog catalog,
-            AuthorizationService authorization, AccessAuditRepository audit, Clock clock) {
-        this.assignments=assignments;this.roles=roles;this.catalog=catalog;this.authorization=authorization;this.audit=audit;this.clock=clock;
+            AuthorizationService authorization, ProviderOrganizationAuthorityPort providerAuthority, AccessAuditRepository audit, Clock clock) {
+        this.assignments=assignments;this.roles=roles;this.catalog=catalog;this.authorization=authorization;this.providerAuthority=providerAuthority;this.audit=audit;this.clock=clock;
     }
     @Transactional
     public RoleAssignment grant(Grant command) {
@@ -30,15 +31,23 @@ public class RoleAssignmentService {
         if(command.scope()==ScopeType.PLATFORM && !ResourceContext.PLATFORM.equals(command.organizationId())) invalid("Platform scope requires platform ownership");
         if(command.scope()==ScopeType.SPECIFIC_RESOURCE) { text(command.targetType(),60);text(command.targetId(),255); }
         else if(command.targetType()!=null || command.targetId()!=null) invalid("Resource targets apply only to specific-resource scope");
-        // Shared parent lock precedes template locks throughout assignment/relationship operations.
-        assignments.lockSubject(command.subject());
         var version=roles.version(command.versionId()).orElseThrow(()->new ApiException(404,"ROLE_NOT_FOUND","Role not found"));
-        roles.get(version.templateId(),ResourceContext.PLATFORM,true);
+        var role=roles.get(version.templateId(),ResourceContext.PLATFORM,true);
         version=roles.version(command.versionId()).orElseThrow();
         if(version.status()!=RoleTemplateVersion.Status.PUBLISHED) invalid("Assign a published role version");
         var grants=roles.grants(command.versionId());
         if(grants.stream().noneMatch(g->g.scope()==command.scope())) invalid("Scope is not granted by this version");
-        for(var g:grants) if(catalog.require(g.permission()).executable()) authorization.require(g.permission());
+        boolean credentialVerifierBundle=role.key().equals("CREDENTIAL_VERIFIER")
+                && command.scope()==ScopeType.ORGANIZATION
+                && grants.stream().anyMatch(g->catalog.centrallyDelegable(g.permission()))
+                && grants.stream().allMatch(g->g.scope()==ScopeType.ORGANIZATION && catalog.centrallyDelegable(g.permission()));
+        if(credentialVerifierBundle) {
+            if(ResourceContext.PLATFORM.equals(command.organizationId()) || !providerAuthority.verifiedOrganization(command.organizationId()))
+                invalid("Choose a verified provider organization");
+            if(!providerAuthority.trustedSubject(command.subject())) invalid("Choose an existing active identity");
+        } else for(var g:grants) if(catalog.require(g.permission()).executable()) authorization.require(g.permission());
+        // Validate trusted external ownership before this lock can register an ordinary assignment subject.
+        assignments.lockSubject(command.subject());
         var candidates=assignments.allForSubject(command.subject()).stream()
                 .filter(a->overlaps(command.effectiveFrom(),command.effectiveTo(),a.effectiveFrom(),a.effectiveTo())).toList();
         if(candidates.stream().anyMatch(a->a.versionId().equals(command.versionId()) && a.organizationId().equals(command.organizationId())
@@ -50,11 +59,11 @@ public class RoleAssignmentService {
             actors.add(v.actorType());roles.grants(v.id()).forEach(g->keys.add(g.permission()));
         });
         if(authorization.prohibited(keys,actors)) invalid("These assignments conflict with separation of responsibilities");
-        // No provider UUID can activate access before Phase 2 supplies verified organizations/memberships.
-        String status=ResourceContext.PLATFORM.equals(command.organizationId())?"ACTIVE":"PENDING";
+        String status=ResourceContext.PLATFORM.equals(command.organizationId())||credentialVerifierBundle?"ACTIVE":"PENDING";
         if(status.equals("ACTIVE") && grants.stream().anyMatch(g->!catalog.require(g.permission()).executable()))
             invalid("This role requires a verified provider organization in a later phase");
-        assignments.membership(command.subject(),command.organizationId(),status,actor.subject(),command.reason(),clock.instant());
+        if(credentialVerifierBundle) assignments.activateGovernanceMembership(command.subject(),command.organizationId(),actor.subject(),command.reason(),clock.instant());
+        else assignments.membership(command.subject(),command.organizationId(),status,actor.subject(),command.reason(),clock.instant());
         if(status.equals("ACTIVE") && !assignments.activeMember(command.subject(),command.organizationId(),clock.instant()))
             invalid("The account membership is inactive");
         var assignment=new RoleAssignment(UUID.randomUUID(),command.subject(),command.versionId(),command.organizationId(),command.scope(),

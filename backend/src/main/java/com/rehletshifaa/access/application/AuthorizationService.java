@@ -79,6 +79,7 @@ public class AuthorizationService {
             if(optional.isEmpty()) continue;
             var version=optional.get();
             if((draft==null && !published(version)) || !permission.actors().contains(version.actorType()) || version.channel()!=channel || !permission.channels().contains(channel)) continue;
+            if(draft==null && (key.startsWith("credential.")||key.equals("provider.activate")) && !roles.cutoverApproved(version.id(),key)) { reason=INVALID_CONFIGURATION; continue; }
             for(var grant:draft==null?roles.grants(version.id()):draftGrants) {
                 if(!grant.permission().equals(key) || grant.scope()!=assignment.scope() || !permission.scopes().contains(grant.scope())) continue;
                 if(!scopeMatches(actor.subject(),assignment,resource)) { reason=SCOPE_MISMATCH; continue; }

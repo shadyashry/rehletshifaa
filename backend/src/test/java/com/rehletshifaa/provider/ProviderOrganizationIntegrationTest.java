@@ -6,6 +6,7 @@ import com.rehletshifaa.access.infrastructure.ResourceRelationshipRepository;
 import com.rehletshifaa.identity.IdentityProvisioningPort;
 import com.rehletshifaa.identity.KeycloakStaffIdentityService;
 import com.rehletshifaa.provider.application.ProviderOrganizationService;
+import com.rehletshifaa.shared.api.ApiException;
 import db.migration.V33__map_legacy_practitioners_to_provider_organizations;
 import org.flywaydb.core.api.migration.Context;
 import org.junit.jupiter.api.*;
@@ -92,12 +93,25 @@ class ProviderOrganizationIntegrationTest {
 
     @Test void invitationUsesRoleFreeIdentityBoundaryAndStoresStableSubjectForReconciliation(){
         var org=create("Invite Practice");
-        when(identities.invite("Dr Invite","invite@example.test","en")).thenReturn(new IdentityProvisioningPort.IdentityAccount("kc-stable-subject","invite@example.test","INVITED",now));
+        var permission=authorization.decide(new AccessIdentity.Identity("provider-ops",now),"provider.clinician.invite",new ResourceContext(org.id(),true,"PROVIDER_ORGANIZATION",org.id().toString(),null,false),ChannelEntitlement.ADMIN_WEB);
+        assertThat(permission.allowed()).as(permission.toString()).isTrue();
+        when(identities.inviteTracked(eq("Dr Invite"),eq("invite@example.test"),eq("en"),anyString())).thenReturn(new IdentityProvisioningPort.IdentityAccount("kc-stable-subject","invite@example.test","INVITED",now));
         var operation=providers.invite(org.id(),new ProviderOrganizationService.InviteMember("Dr Invite","invite@example.test","ASSOCIATE_DOCTOR","en","New associate"));
-        verify(identities).invite("Dr Invite","invite@example.test","en");
+        verify(identities).inviteTracked(eq("Dr Invite"),eq("invite@example.test"),eq("en"),anyString());
         assertThat(operation.status()).isEqualTo("COMPLETED");assertThat(operation.subject()).isEqualTo("kc-stable-subject");
         assertThat(jdbc.queryForObject("SELECT external_subject FROM practitioner_profiles WHERE email_hash IS NOT NULL AND external_subject='kc-stable-subject'",String.class)).isEqualTo("kc-stable-subject");
         assertThat(providers.detail(org.id()).members()).anySatisfy(m->{assertThat(m.subject()).isEqualTo("kc-stable-subject");assertThat(m.status()).isEqualTo("PENDING");assertThat(m.roles()).contains("ASSOCIATE_DOCTOR");});
+    }
+
+    @Test void invitationTimeoutRecoversByOperationMarkerWithoutCreatingAgain(){
+        var org=create("Recovery Practice");
+        when(identities.inviteTracked(eq("Dr Recovery"),eq("recover@example.test"),eq("en"),anyString())).thenThrow(new ApiException(502,"IDENTITY_TIMEOUT","Unknown create result"));
+        assertThatThrownBy(()->providers.invite(org.id(),new ProviderOrganizationService.InviteMember("Dr Recovery","recover@example.test","CONSULTANT","en","Initial invitation"))).isInstanceOf(ApiException.class);
+        UUID operation=jdbc.queryForObject("SELECT id FROM provider_identity_operations WHERE organization_id=? AND email_hash IS NOT NULL",UUID.class,org.id());
+        when(identities.recover(operation.toString())).thenReturn(Optional.of(new IdentityProvisioningPort.IdentityAccount("recovered-subject","recover@example.test","INVITED",now)));
+        var recovered=providers.reconcile(org.id(),operation,"Recover timed-out identity creation");
+        assertThat(recovered.status()).isEqualTo("COMPLETED");assertThat(recovered.subject()).isEqualTo("recovered-subject");
+        verify(identities,times(1)).inviteTracked(eq("Dr Recovery"),eq("recover@example.test"),eq("en"),eq(operation.toString()));
     }
 
     @Test void legacyMigrationCreatesDeterministicReviewPendingMappingWithoutChangingPractitioner() throws Exception {
