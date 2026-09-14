@@ -11,6 +11,7 @@ public class PermissionCatalog {
     private static final Set<String> CENTRAL_PROVIDER_DELEGATION=Set.of("credential.view","credential.review","credential.request_information","credential.verify","credential.reject","credential.suspend");
     private final Map<String, PermissionDefinition> definitions = new LinkedHashMap<>();
     public PermissionCatalog() {
+        for(String key : List.of("assignment.receive","assignment.preference.manage","assignment.queue.manage")) register(key,key,"assignment",PermissionRisk.HIGH,Set.of(),Set.of(),true,false,false);
         register("provider.view", "View provider", "provider", PermissionRisk.LOW, Set.of(), Set.of(), false, false, false);
         register("provider.create", "Create provider", "provider", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
         register("provider.update", "Update provider", "provider", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
@@ -86,7 +87,7 @@ public class PermissionCatalog {
     }
     private void register(String key, String label, String family, PermissionRisk risk, Set<String> dependencies,
             Set<String> conflicts, boolean executable, boolean workflow, boolean recent) {
-        Set<ActorType> actors = family.equals("access") || key.equals("provider.create") || key.equals("provider.suspend") ? Set.of(ActorType.GOVERNANCE)
+        Set<ActorType> actors = family.equals("assignment") ? Set.of(ActorType.COORDINATOR) : family.equals("access") || key.equals("provider.create") || key.equals("provider.suspend") ? Set.of(ActorType.GOVERNANCE)
                 : family.equals("credential") && !Set.of("credential.submit","credential.view").contains(key) ? Set.of(ActorType.GOVERNANCE)
                 : family.equals("credential") ? Set.of(ActorType.GOVERNANCE,ActorType.PRACTICE_OPERATIONS,ActorType.CONSULTANT,ActorType.ASSOCIATE_DOCTOR)
                 : Set.of("availability","service_catalog","price_list").contains(family) ? Set.of(ActorType.PRACTICE_OPERATIONS,ActorType.CONSULTANT,ActorType.ASSOCIATE_DOCTOR)
@@ -96,7 +97,7 @@ public class PermissionCatalog {
                 : key.equals("clinical.recommendation.submit") || key.equals("clinical.outcome.record")
                 ? Set.of(ActorType.CONSULTANT) : family.equals("integration") ? Set.of(ActorType.SERVICE)
                 : EnumSet.complementOf(EnumSet.of(ActorType.SERVICE, ActorType.PATIENT, ActorType.REPRESENTATIVE));
-        Set<ScopeType> scopes = family.equals("access") ? Set.of(ScopeType.PLATFORM)
+        Set<ScopeType> scopes = family.equals("assignment") ? Set.of(ScopeType.ORGANIZATION,ScopeType.ASSIGNED_ORGANIZATIONS,ScopeType.SPECIFIC_RESOURCE) : family.equals("access") ? Set.of(ScopeType.PLATFORM)
                 : key.equals("provider.create") ? Set.of(ScopeType.PLATFORM,ScopeType.ORGANIZATION,ScopeType.ASSIGNED_ORGANIZATIONS)
                 : family.equals("credential") && !Set.of("credential.submit","credential.view").contains(key) ? Set.of(ScopeType.ORGANIZATION,ScopeType.ASSIGNED_ORGANIZATIONS,ScopeType.SPECIFIC_RESOURCE)
                 : EnumSet.complementOf(EnumSet.of(ScopeType.PLATFORM));
@@ -104,12 +105,12 @@ public class PermissionCatalog {
                 "provider.member.invite","provider.member.deactivate","provider.clinician.invite",
                 "provider.practice_staff.manage","provider.relationship.manage").contains(key);
         definitions.put(key, new PermissionDefinition(key, label, label + " within the approved data scope.",
-                family, risk, scopes, actors, family.equals("access") || (family.equals("credential")&&!Set.of("credential.submit","credential.view").contains(key)) ? Set.of(ChannelEntitlement.ADMIN_WEB, ChannelEntitlement.API)
+                family, risk, scopes, actors, family.equals("assignment") || family.equals("access") || (family.equals("credential")&&!Set.of("credential.submit","credential.view").contains(key)) ? Set.of(ChannelEntitlement.ADMIN_WEB, ChannelEntitlement.API)
                 : EnumSet.allOf(ChannelEntitlement.class), family.equals("clinical") ? "CLINICAL" :
-                family.equals("finance") ? "FINANCIAL" : "BUSINESS", dependencies, conflicts, true, executable || phase2AExecutable, workflow, recent));
+                family.equals("finance") ? "FINANCIAL" : "BUSINESS", dependencies, conflicts, true, executable || phase2AExecutable || family.equals("assignment"), workflow, recent));
     }
     public List<PermissionDefinition> all() { return List.copyOf(definitions.values()); }
-    public boolean centrallyDelegable(String key){return CENTRAL_PROVIDER_DELEGATION.contains(key);}
+    public boolean centrallyDelegable(String key){return CENTRAL_PROVIDER_DELEGATION.contains(key) || key.startsWith("assignment.");}
     public Optional<PermissionDefinition> find(String key) { return Optional.ofNullable(definitions.get(key)); }
     public PermissionDefinition require(String key) {
         return find(key).orElseThrow(() -> new ApiException(400, "UNKNOWN_PERMISSION", "Select a registered capability"));

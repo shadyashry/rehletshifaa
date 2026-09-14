@@ -19,6 +19,7 @@ public class RoleTemplateRepository {
                 .params(organization, offset).query(this::template).list();
     }
     public RoleTemplate get(UUID id, UUID organization, boolean lock) {
+        if(lock) jdbc.sql("SELECT id FROM access_bootstrap WHERE id=1 FOR UPDATE").query(Integer.class).single();
         return jdbc.sql("SELECT * FROM role_templates WHERE id=? AND organization_id=?" + (lock ? " FOR UPDATE" : ""))
                 .params(id, organization).query(this::template).optional()
                 .orElseThrow(() -> new ApiException(404, "ROLE_NOT_FOUND", "Role not found"));
@@ -37,7 +38,7 @@ public class RoleTemplateRepository {
                         : RelationshipType.valueOf(r.getString("relationship_type")))).list();
     }
     public boolean cutoverApproved(UUID version,String permission) {
-        if(!permission.startsWith("credential.")&&!permission.equals("provider.activate")&&!permission.startsWith("price_list.")
+        if(!permission.startsWith("assignment.")&&!permission.startsWith("credential.")&&!permission.equals("provider.activate")&&!permission.startsWith("price_list.")
                 &&!permission.startsWith("service_catalog.")&&!permission.startsWith("availability.")) return true;
         return jdbc.sql("SELECT COUNT(*) FROM permission_version_cutovers WHERE role_version_id=? AND permission_key=?")
                 .params(version,permission).query(Long.class).single()>0;

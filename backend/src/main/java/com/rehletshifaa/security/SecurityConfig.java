@@ -18,6 +18,7 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/identity-review/**").hasAnyRole("PATIENT_IDENTITY_REVIEWER","SYSTEM_ADMIN")
         .requestMatchers("/api/v1/account/preferences").authenticated()
         .requestMatchers("/api/v1/tasks/**","/api/v1/work/**","/api/v1/notifications/**","/api/v1/notifications").authenticated()
+        .requestMatchers("/api/v1/admin/coordination/**").authenticated()
         .requestMatchers("/api/v1/admin/access/**").authenticated()
         .requestMatchers("/api/v1/admin/providers/**","/api/v1/admin/providers").authenticated()
         .requestMatchers("/api/v1/admin/**").hasAnyRole("CREDENTIALING_ADMIN","SYSTEM_ADMIN","AUDITOR")

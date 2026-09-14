@@ -1,6 +1,15 @@
 # Platform Control Plane — verification status
 
-Updated 2026-09-14. Phases 1, 2A and 2B remain green; Phase 2C is complete at the offline backend verification boundary.
+Updated 2026-09-14. Phases 1–2C remain green; Phase 3 is complete at the offline backend verification boundary.
+
+## Phase 3 verification — 2026-09-14
+
+- Recovered reports: `CoordinatorScoringTest` 3/3, `CoordinationConcurrencyTest` 1/1 and `FlywayMigrationTest` 1/1 passed; the integration report had 11 passes and one effective-period boundary error. The working-tree microsecond normalization postdated that report and the fresh rerun passed.
+- Focused final Phase 3 set: **17 tests, 0 failures/errors/skips** across scoring, routing integration, database concurrency and Flyway V1–V36.
+- Impacted access/provider/Journey/WorkItem/outbox/security/architecture set: **128 tests, 0 failures/errors/skips**. This includes access cutover/default-deny, provider tenant/readiness, Case Owner versus WorkItem preservation, legacy Journey compatibility, outbox delivery, CORS/authenticated route exposure and architecture rules.
+- Full offline backend: **322 tests / 32 suites, 0 failures/errors/skips**. Fresh H2 PostgreSQL-mode schemas validate and migrate through V36.
+- Phase 3 coverage includes eligible continuity; preferred Coordinator success and inactive/unavailable/over-capacity fallback; preferred/team and weighted scoring paths; deterministic tie-break under shuffled input; no-candidate queue/escalation; manual assign/reassign and mandatory reason; invalid/missing staff, dormant grants, revoked membership and cross-tenant/provider denial; durable replay/conflict; concurrent duplicate/stale/manual-vs-auto/global-capacity races; recorded policy/algorithm/candidate explanations; shadow matching/adoption and legacy comparison; queue resolution audit; notification deduplication; and preservation of non-Coordinator tasks and case status.
+- `git diff --check` and canonical-specification diff are clean after final reconciliation. No frontend files changed. Live PostgreSQL, Docker/tunnel, Keycloak, browser and delivery-provider validation remain intentionally unrun deployment checks.
 
 ## Phase 2C verification — 2026-09-14
 
@@ -62,4 +71,4 @@ Updated 2026-09-14. Phases 1, 2A and 2B remain green; Phase 2C is complete at th
 
 ## Completion gate
 
-Phase 2A implementation and backend verification are complete. Commit Phase 2A after the whitespace/scope gate, without push/merge. Do not start Phase 2B.
+Phase 3 implementation and offline backend verification are complete. The default remains SHADOW and no production/global routing cutover is claimed. Phase 4A may begin only under separate authorization; do not start Phase 4B or Journey runtime cutover.

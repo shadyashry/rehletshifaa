@@ -91,7 +91,7 @@ public class AuthorizationService {
         return AuthorizationDecision.deny(reason,key,org);
     }
     private boolean requiresApprovedCutover(String key) {
-        return key.startsWith("credential.") || key.equals("provider.activate") || key.startsWith("price_list.")
+        return key.startsWith("assignment.") || key.startsWith("credential.") || key.equals("provider.activate") || key.startsWith("price_list.")
                 || key.startsWith("service_catalog.") || key.startsWith("availability.");
     }
     public boolean active(RoleAssignment a) {

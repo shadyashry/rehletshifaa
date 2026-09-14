@@ -37,7 +37,7 @@ public class RoleAssignmentService {
         if(version.status()!=RoleTemplateVersion.Status.PUBLISHED) invalid("Assign a published role version");
         var grants=roles.grants(command.versionId());
         if(grants.stream().noneMatch(g->g.scope()==command.scope())) invalid("Scope is not granted by this version");
-        boolean credentialVerifierBundle=role.key().equals("CREDENTIAL_VERIFIER")
+        boolean credentialVerifierBundle=Set.of("CREDENTIAL_VERIFIER","CARE_COORDINATION_MANAGER","COORDINATOR").contains(role.key())
                 && command.scope()==ScopeType.ORGANIZATION
                 && grants.stream().anyMatch(g->catalog.centrallyDelegable(g.permission()))
                 && grants.stream().allMatch(g->g.scope()==ScopeType.ORGANIZATION && catalog.centrallyDelegable(g.permission()));

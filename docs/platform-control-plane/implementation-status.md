@@ -1,6 +1,26 @@
 # Platform Control Plane — implementation status
 
-Updated 2026-09-14. **Phase 1, Phase 2A and Phase 2B remain accepted. Phase 2C Pricing Ownership/Inheritance, Clinician Availability and Provider Readiness Integration is implemented and accepted at the offline backend verification boundary. Phase 3 has not started.**
+Updated 2026-09-14. **Phases 1, 2A, 2B and 2C remain accepted. Phase 3 Care Coordination / Assignment Engine is implemented and accepted at the offline backend verification boundary. Phase 4 has not started.**
+
+## Phase 3 resumed state and completion
+
+- Resumed `codex/platform-control-plane` at Phase 2C HEAD `80ae466` with the interrupted V36 coordination module, access/provider/Journey integration and focused tests still unstaged/untracked. No branch switch, reset, clean, stash, discard or canonical-specification edit was performed.
+- Already implemented when resumed: Coordinator Teams, effective membership and capacity configuration; immutable policy/preference versions; separate eligibility/scoring; deterministic precedence/tie-break; shadow/LIVE commands; assignment decisions; queue/manual commands; legacy hooks; readiness integration; V36; and initial focused tests.
+- The recovered reports showed 3 scoring tests and the concurrency test passing, Flyway passing through V36, and 11 of 12 integration tests passing. The effective-period precision correction in the working tree postdated that report; a fresh run confirmed it.
+- Completion review closed a remaining fail-open eligibility edge by requiring an active Coordinator/Coordinator Lead staff record, and added explicit queue-resolution audit coverage. Focused, impacted and full offline backend verification now pass.
+
+## Implemented Phase 3
+
+- V36 adds provider-owned Coordinator Teams, effective/revisioned membership, centralized per-provider capacity/on-duty/skill-language metadata, immutable routing-policy and Consultant-preference versions, per-case SHADOW/LIVE routing scope, durable decision/idempotency records and coordination queue metadata on existing `case_tasks`.
+- Access Governance is authoritative for all coordination reads/mutations and recipient eligibility. V36 publishes explicit Coordination Manager and Coordinator recipient envelopes with cutover records; older pinned assignment grants remain dormant. Provider membership, case provenance and target staff identity are database-resolved and cross-tenant targets fail closed.
+- Eligibility is evaluated before scoring: active identity/provider membership and approved `assignment.receive`, enabled Coordinator staff record, active effective team membership, care-area/language/on-duty requirements and remaining global capacity. Preferences never bypass hard eligibility.
+- Routing preserves eligible continuity, then preferred Coordinator, preferred/provider/care-area/default/fallback teams, then the eligible scored pool. Capacity and language use the frozen normalized weights and scale; ties use normalized workload, oldest automatic assignment (null first), then lexical subject.
+- Every decision persists policy/version, preference, algorithm, full candidates/exclusions, factor scores, path, previous/new Case Owner, source, reason and evaluation time. Identical command replay returns the same decision; changed payload conflicts.
+- Default routing is SHADOW. LIVE adoption requires a current matching shadow result and reason. Legacy claim/reassign remains authoritative for SHADOW/unresolved cases, records comparisons when provenance/configuration exists, and is denied after per-case LIVE adoption.
+- LIVE automatic/manual assignment updates only the primary Coordinator owner history and Coordinator/unassigned tasks following the previous owner. Operations, Finance, Consultant and other WorkItem ownership plus medical-case status/currentAction/WaitingOn semantics are preserved.
+- No eligible Coordinator creates a durable `COORDINATION_ROUTING` WorkItem with team, reason, queued/due timestamps and authorized manager notification. Manual queue placement/resolution and scheduled opt-in retry reuse the same task/outbox infrastructure and are audited.
+- Global database serialization plus provider/case locks, optimistic routing revisions and the unique durable command key protect duplicate delivery, concurrent routing, automatic/manual races, global-capacity contention, duplicate owner history and duplicate domain notifications. No in-memory routing lock was introduced.
+- The Phase 2 operational-readiness adapter now consumes an effective policy plus active configured team. Commercial/legal acceptance remains its separate blocker. Canonical specifications remain unchanged; no frozen Phase 3 decision required replacement.
 
 ## Implemented Phase 2C
 
@@ -93,13 +113,12 @@ The Access Governance and `/api/v1/admin/providers/**` route families use the ne
 - Phase 2 and later cutovers must replace each indexed legacy business-role decision only after an equivalent capability, authoritative resource resolver and parity/tenant-isolation test exist. A new-policy denial must never fall back to a legacy role.
 - Existing staff/doctor invitation paths still use the legacy role-aware Keycloak overload. New Provider Management orchestration must use `IdentityProvisioningPort` and keep all organization membership and business-role data in RehletShifaa.
 
-## NEXT EXACT ACTIONS — Phase 3 (not started)
+## NEXT EXACT ACTIONS — Phase 4A (not started)
 
-1. Before deployment, review real PostgreSQL V33 mappings, back up the database, and apply V34/V35 only through the standard Compose+tunnel stack. Do not edit migration history or auto-activate legacy mappings.
-2. Explicitly replace reviewed Practice Manager/Consultant/Associate assignments with the applicable V35 versions; never mass-repin dormant grants. Confirm each Practice Manager's `MANAGES` graph before enabling operational writes.
-3. Run live browser/API smoke checks for a managed and unmanaged clinician, cross-tenant IDs, non-EGP publication using real FX data, and timezone/DST availability boundaries. No live PostgreSQL, Keycloak, Docker/tunnel or browser checks are claimed by this checkpoint.
-4. Start Phase 3 only under separate authorization: implement Coordinator Teams and assignment/routing using the existing assignment/work-item boundaries, then supply authoritative routing readiness instead of the current explicit routing blocker.
-5. Preserve Phase 2C price/availability APIs and the readiness port; do not create a second service catalogue, availability source, appointment workflow or Journey Runtime while implementing Phase 3.
+1. Before any deployment, review real PostgreSQL V33 mappings, back up the database, and apply V34–V36 only with the standard Compose+tunnel stack. Do not edit migration history, auto-activate legacy mappings or globally enable LIVE routing.
+2. Explicitly review and assign the V35 provider roles and V36 Care Coordination Manager/Coordinator envelopes per provider. Run live API checks for team/policy/preference isolation, SHADOW comparison, explicit single-case LIVE adoption, queue notification and legacy denial on that adopted case.
+3. Under separate Phase 4A authorization, freeze the Journey graph/version/stage-registry architecture from the canonical specifications and current status. Implement validation/simulation first; do not cut over Journey runtime or alter Phase 3 Case Owner semantics.
+4. Preserve the Phase 3 assignment boundary: Journey stages select actor type; the Assignment Engine selects the actual eligible person/team. Do not embed routing policy in Journey definitions or begin Phase 4B/runtime migration during Phase 4A.
 
 ## Final acceptance/reconciliation — 2026-09-13
 
