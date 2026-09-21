@@ -20,7 +20,34 @@ class JourneyGraphTest {
  @Test void missingActor(){errors(replace(node("review",StageType.STAFF_TASK,null,"RECORD_CLINICAL_DECISION")),"ACTOR_REQUIRED");}
  @Test void unsupportedAction(){errors(replace(node("review",StageType.STAFF_TASK,"CONSULTANT","java.lang.Runtime.exec")),"UNSUPPORTED_ACTION");}
  @Test void noCompletion(){errors(new Graph(linear().nodes().subList(0,2),List.of(edge("start","review"))),"NO_COMPLETION");}
- @Test void cycle(){var e=new ArrayList<>(linear().edges());e.add(edge("review","start"));errors(new Graph(linear().nodes(),e),"CYCLE");}
+ // A back-edge from a non-Decision stage straight to an ancestor is an ungated (automatic) loop — rejected
+ // regardless of the bounded recovery-cycle policy (technical-decisions.md §22), which only ever permits a
+ // loop that branches from an explicit Decision stage.
+ @Test void cycleFromNonDecisionStageIsUngated(){var e=new ArrayList<>(linear().edges());e.add(edge("review","start"));errors(new Graph(linear().nodes(),e),"CYCLE_UNGATED");}
+ @Test void cycleSelfLoopRejected(){var e=new ArrayList<>(linear().edges());e.add(edge("review","review"));errors(new Graph(linear().nodes(),e),"CYCLE_SELF_LOOP");}
+ // A Decision-gated loop whose cycle contains no Staff/Patient action at all could spin without any human
+ // input ever occurring — rejected even though the back-edge itself is properly gated.
+ @Test void cycleWithNoHumanActionRejected(){
+  var nodes=List.of(node("start",StageType.START,"SYSTEM",null),node("gate1",StageType.DECISION,"SYSTEM",null),
+      node("gate2",StageType.DECISION,"SYSTEM",null),node("end",StageType.END,"SYSTEM",null));
+  var edges=List.of(edge("start","gate1"),
+      new Edge("g1_end","gate1","end",new Condition("PROPOSAL_ACCEPTED",true)),
+      new Edge("g1_g2","gate1","gate2",new Condition("PROPOSAL_ACCEPTED",false)),
+      new Edge("g2_end","gate2","end",new Condition("CONSULTANT_ACCEPTED",true)),
+      new Edge("g2_g1","gate2","gate1",new Condition("CONSULTANT_ACCEPTED",false)));
+  errors(new Graph(nodes,edges),"CYCLE_NO_HUMAN_ACTION");
+ }
+ // A well-formed bounded recovery loop — gated by a Decision, containing a real staff action, with an
+ // existing exit to End — must validate successfully; Phase 4A's blanket cycle rejection no longer applies.
+ static Graph boundedCycle(){
+  return new Graph(List.of(node("start",StageType.START,"SYSTEM",null),
+      node("task",StageType.STAFF_TASK,"CONSULTANT","RECORD_CLINICAL_DECISION"),
+      node("gate",StageType.DECISION,"SYSTEM",null),node("end",StageType.END,"SYSTEM",null)),
+    List.of(edge("start","task"),edge("task","gate"),
+      new Edge("gate_yes","gate","end",new Condition("PROPOSAL_ACCEPTED",true)),
+      new Edge("gate_no","gate","task",new Condition("PROPOSAL_ACCEPTED",false))));
+ }
+ @Test void validBoundedRecoveryCycle(){assertThat(validator.validate(boundedCycle()).valid()).isTrue();}
  @Test void invalidTerminal(){var e=new ArrayList<>(linear().edges());e.add(edge("end","review"));errors(new Graph(linear().nodes(),e),"END_OUTGOING");}
  @Test void incompatibleActor(){errors(replace(node("review",StageType.STAFF_TASK,"PATIENT","RECORD_CLINICAL_DECISION")),"ACTION_COMPATIBILITY");}
  @Test void timerSla(){errors(replace(new Node("review","Review",StageType.TIMER,"SYSTEM",null,null,null,new Sla(30L,40L,20L),-1L,true)),"INVALID_TIMER");errors(replace(new Node("review","Review",StageType.STAFF_TASK,"CONSULTANT","RECORD_CLINICAL_DECISION",null,null,new Sla(30L,40L,20L),null,true)),"INVALID_SLA");}

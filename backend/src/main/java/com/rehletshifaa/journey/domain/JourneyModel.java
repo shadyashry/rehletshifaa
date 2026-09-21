@@ -9,7 +9,8 @@ public final class JourneyModel {
     public enum ActorType { PATIENT, REPRESENTATIVE, COORDINATOR, CONSULTANT, ASSOCIATE_DOCTOR, PRACTICE_STAFF, OPERATIONS, FINANCE, PLATFORM_STAFF, SYSTEM }
     public enum StageType { START, STAFF_TASK, PATIENT_ACTION, DECISION, SYSTEM_ACTION, WAIT, TIMER, NOTIFICATION, END }
     public enum Status { DRAFT, VALIDATED, SIMULATED, PENDING_APPROVAL, PUBLISHED, RETIRED }
-    public enum Fact { PROPOSAL_ACCEPTED, DEPOSIT_SATISFIED, PROFILE_COMPLETE, INFORMATION_COMPLETE }
+    public enum Fact { PROPOSAL_ACCEPTED, DEPOSIT_SATISFIED, PROFILE_COMPLETE, INFORMATION_COMPLETE, CONSULTANT_ACCEPTED,
+        CLINICAL_ACCEPTED, PROPOSAL_NEEDS_REWORK }
     public record Condition(String fact, Boolean equalsValue) {}
     public record Sla(Long dueMinutes, Long reminderMinutes, Long escalationMinutes) {}
     public record Node(String key, String label, StageType type, String actorType, String action,

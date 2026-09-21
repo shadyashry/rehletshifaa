@@ -72,9 +72,17 @@ class ArchitectureRulesTest {
     @Test
     void businessModulesDoNotDependOnVendorSdks() {
         ArchRule rule = noClasses().that().resideInAPackage("..application..")
-                .should().dependOnClassesThat().resideInAnyPackage("software.amazon..", "org.springframework.mail..")
+                        .should().dependOnClassesThat().resideInAnyPackage("software.amazon..", "org.springframework.mail..", "org.flowable..")
                 .because("providers belong behind the ports in ..infrastructure.., so they can be swapped or extracted");
         rule.check(production);
+    }
+
+    @Test
+    void flowableRemainsInsideJourneyInfrastructure() {
+        noClasses().that().resideOutsideOfPackage("com.rehletshifaa.journey.infrastructure..")
+                .should().dependOnClassesThat().resideInAPackage("org.flowable..")
+                .because("the Journey domain and application depend on JourneyRuntimePort")
+                .check(production);
     }
 
     /**

@@ -12,7 +12,7 @@ class PermissionCatalogTest {
     @Test void registeredMetadataAndFutureExecutionBoundary() {
         assertThat(catalog.all()).hasSizeGreaterThan(65);
         assertThat(catalog.all()).allSatisfy(p->{assertThat(p.name()).isNotBlank();assertThat(p.scopes()).isNotEmpty();assertThat(p.actors()).isNotEmpty();});
-        assertThat(catalog.all().stream().filter(PermissionDefinition::executable)).allMatch(p->Set.of("access","provider","credential","availability","service_catalog","price_list","assignment","journey").contains(p.family()));
+        assertThat(catalog.all().stream().filter(PermissionDefinition::executable)).allMatch(p->Set.of("access","provider","credential","availability","service_catalog","price_list","assignment","journey","journey_work").contains(p.family()));
         assertThat(catalog.require("journey.publish").executable()).isTrue();
         assertThat(catalog.require("journey.instance_migrate").executable()).isFalse();
         assertThat(catalog.require("journey.publish").scopes()).containsExactly(ScopeType.PLATFORM);

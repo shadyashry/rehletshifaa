@@ -2,6 +2,8 @@ package com.rehletshifaa.journey.api;
 
 import com.rehletshifaa.journey.application.PatientActivationService;
 import com.rehletshifaa.journey.application.PublicCaseAccessService;
+import com.rehletshifaa.journey.application.CompleteProfileActionHandler;
+import com.rehletshifaa.journey.application.JourneyProjectionService;
 import static com.rehletshifaa.journey.api.PublicCaseDtos.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.ProposalAccessRequest;
 import static com.rehletshifaa.journey.api.JourneyDtos.ProposalVerifyRequest;
@@ -21,9 +23,10 @@ import static com.rehletshifaa.journey.api.ActivationDtos.*;
 public class PublicOnboardingController {
     private final PatientActivationService activation;
     private final PublicCaseAccessService access;
+    private final JourneyProjectionService journey;
 
-    public PublicOnboardingController(PatientActivationService activation, PublicCaseAccessService access) {
-        this.activation = activation; this.access = access;
+    public PublicOnboardingController(PatientActivationService activation, PublicCaseAccessService access, JourneyProjectionService journey) {
+        this.activation = activation; this.access = access; this.journey = journey;
     }
 
     /** Non-sensitive summary for a valid link (case number + masked contact hint only). */
@@ -54,6 +57,16 @@ public class PublicOnboardingController {
     @PostMapping("/{token}/activate")
     public ActivationResult activate(@PathVariable String token, @Valid @RequestBody ActivateProfileRequest request) {
         return activation.activate(token, request.grant(), request.profile());
+    }
+
+    /** Journey-bound profile completion against the projected business PatientAction. */
+    @PostMapping("/{token}/actions/{actionId}/activate")
+    public com.rehletshifaa.journey.api.JourneyDtos.IdResponse activateJourney(@PathVariable String token,
+            @PathVariable java.util.UUID actionId, @Valid @RequestBody ActivateProfileRequest request) {
+        journey.completeSecureProfileAction(token, request.grant(), actionId,
+                new CompleteProfileActionHandler.SecureProfile(token, request.grant(), request.profile()),
+                java.util.Map.of("PROFILE_COMPLETE", true));
+        return new com.rehletshifaa.journey.api.JourneyDtos.IdResponse(actionId, "COMPLETED");
     }
 
     /**

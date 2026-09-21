@@ -18,7 +18,15 @@ public class JourneySimulator {
         Map<String,Node> nodes=new HashMap<>();graph.nodes().forEach(n->nodes.put(n.key(),n));
         Node current=graph.nodes().stream().filter(n->n.type()==StageType.START).findFirst().orElseThrow();
         List<Step> steps=new ArrayList<>();
+        // A validated graph may now contain a bounded recovery cycle (technical-decisions.md §22). This
+        // evaluator supplies one static fact set for the whole dry run, so a loop-back branch that the
+        // supplied facts satisfy is retaken identically forever — the real runtime differs because a fact
+        // like CONSULTANT_ACCEPTED is explicitly reset and re-signaled between passes. Cap total steps well
+        // above any legitimate acyclic or once-around-the-loop path so an admin's synthetic fact choice can
+        // never hang the server; report it as a distinct, honest outcome rather than a silent BLOCKED.
+        int loopGuard=graph.nodes().size()*3+50;
         while(true) {
+            if(steps.size()>loopGuard)return finish("LOOP_LIMIT_EXCEEDED",current,steps,validation);
             if(!matches(current.entry(),inputs))return finish("BLOCKED",current,steps,validation);
             if(current.type()==StageType.TIMER) steps.add(step(current,"WAITING_TIMER:"+current.timerMinutes()+"m"));
             else if(current.type()==StageType.WAIT) steps.add(step(current,"WAITING"));

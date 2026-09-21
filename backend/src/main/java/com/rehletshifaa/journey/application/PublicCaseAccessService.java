@@ -109,8 +109,17 @@ public class PublicCaseAccessService {
     @Transactional public String issueStatusLink(UUID caseId,String language,String template,String idempotencyKey){Instant now=clock.instant();UUID patientId=jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(caseId).query(UUID.class).single();String token=randomToken();UUID id=UUID.randomUUID();jdbc.sql("INSERT INTO case_access_links(id,case_id,patient_id,purpose,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?,?)").params(id,caseId,patientId,"STATUS",intake.hash(token),timestamp(now.plus(Duration.ofDays(30))),timestamp(now)).update();Contact contact=contact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();if(hasText(destination))jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),"SECURE_MESSAGE",channel,destination,template,intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+("ar".equals(language)?"ar":"en")+"\"}"),"PENDING",0,5,timestamp(now),idempotencyKey,timestamp(now)).update();audit("CASE_STATUS_LINK_CREATED",caseId,id.toString(),"CREATE");return token;}
 
     // ---- Onboarding continuation (profile activation) ----
+    /** Case + patient a verified INFORMATION_RESPONSE grant is bound to. */
+    public record InformationLinkContext(UUID caseId, UUID patientId) {}
     /** Case + patient a verified ONBOARDING grant is bound to. */
     public record OnboardingLinkContext(UUID caseId, UUID patientId) {}
+
+    /** Resolve a verified information-response grant without exposing the link's internal id. */
+    @Transactional(readOnly=true) public InformationLinkContext requireInformationGrant(String token,String grant){
+        Link link=requireGrant(token,grant);
+        if(!"INFORMATION_RESPONSE".equals(link.purpose()))throw new ApiException(403,"LINK_PURPOSE_MISMATCH","This link cannot be used for that action");
+        return new InformationLinkContext(link.caseId(),link.patientId());
+    }
 
     /**
      * Issue the secure "complete your profile" continuation link after the patient accepts a proposal.

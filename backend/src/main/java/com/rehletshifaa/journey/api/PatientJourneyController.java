@@ -1,15 +1,22 @@
 package com.rehletshifaa.journey.api;
-import com.rehletshifaa.journey.application.IdentityVerificationService;import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.OnboardingService;import com.rehletshifaa.journey.application.PatientAccountService;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
+import com.rehletshifaa.journey.application.IdentityVerificationService;import com.rehletshifaa.journey.application.JourneyProjectionService;import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.OnboardingService;import com.rehletshifaa.journey.application.PatientAccountService;import com.rehletshifaa.journey.application.ReviewProposalActionHandler;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
+import static com.rehletshifaa.journey.api.PatientJourneyActionDtos.*;
 @RestController @RequestMapping("/api/v1/patient") public class PatientJourneyController{
- private final JourneyService service;private final OnboardingService onboarding;private final IdentityVerificationService identity;private final PatientAccountService account;
- public PatientJourneyController(JourneyService service,OnboardingService onboarding,IdentityVerificationService identity,PatientAccountService account){this.service=service;this.onboarding=onboarding;this.identity=identity;this.account=account;}
+ private final JourneyService service;private final OnboardingService onboarding;private final IdentityVerificationService identity;private final PatientAccountService account;private final JourneyProjectionService journey;
+ public PatientJourneyController(JourneyService service,OnboardingService onboarding,IdentityVerificationService identity,PatientAccountService account,JourneyProjectionService journey){this.service=service;this.onboarding=onboarding;this.identity=identity;this.account=account;this.journey=journey;}
  @GetMapping("/cases")public List<CaseView>cases(){return service.patientCases();}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
  @GetMapping("/cases/{caseId}/deposit")public DepositView deposit(@PathVariable UUID caseId){return service.depositView(caseId);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
  @PostMapping("/cases/{caseId}/messages/{messageId}/read")public IdResponse read(@PathVariable UUID caseId,@PathVariable UUID messageId){return service.markMessageRead(caseId,messageId);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/decision")public ProposalView decide(@PathVariable UUID caseId,@PathVariable UUID versionId,@Valid @RequestBody ProposalDecisionRequest request){return service.decideProposal(caseId,versionId,request);}
+ /** Journey-bound equivalent: the patient completes the existing business PatientAction, never a runtime node id. */
+ @PostMapping("/cases/{caseId}/actions/{actionId}/proposal-decision")public IdResponse decideJourney(@PathVariable UUID caseId,@PathVariable UUID actionId,@Valid @RequestBody ProposalActionRequest request){
+  boolean accepted=Set.of("ACCEPTED","ACKNOWLEDGED").contains(request.decision().decision());
+  journey.completeAuthenticatedPatientAction(caseId,actionId,new ReviewProposalActionHandler.AuthenticatedDecision(request.proposalVersionId(),request.decision()),Map.of("PROPOSAL_ACCEPTED",accepted));
+  return new IdResponse(actionId,"COMPLETED");
+ }
  @PostMapping("/account/activate")public IdResponse activate(@Valid @RequestBody ActivateAccountRequest request){return service.activateAccount(request.activationToken());}
  /** Every authenticated portal entry: the first sign-in after identity-provider setup marks the account ACTIVE and says which case to open. */
  @PostMapping("/account/session")public AccountSessionView session(){return account.session();}

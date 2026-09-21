@@ -532,6 +532,14 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         if(!acceptish)notifyCoordinatorOfPatientDecision(share.caseId(),share.versionId(),decision,request.comment());
         auditPublic("PROPOSAL_DECIDED",share.caseId(),share.versionId().toString(),decision);return new IdResponse(share.versionId(),decision);}
 
+    public record ProposalGrantContext(UUID caseId, UUID patientId, UUID versionId) {}
+    /** Resolves an already-verified proposal grant to its canonical patient/case without exposing token internals. */
+    @Transactional(readOnly=true) public ProposalGrantContext requireProposalGrant(String token,String grant){
+        ShareToken share=requireGrant(token,grant);
+        UUID patientId=jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(share.caseId()).query(UUID.class).single();
+        return new ProposalGrantContext(share.caseId(),patientId,share.versionId());
+    }
+
     /** Links the existing provisional patient profile (and all its cases) to the authenticated account. */
     @Transactional public IdResponse activateAccount(String activationToken){var actor=actors.require(ActorRole.PATIENT);Instant now=clock.instant();Activation act=jdbc.sql("SELECT id,patient_id,expires_at,consumed_at FROM account_activations WHERE token_hash=?").param(intake.hash(activationToken)).query((rs,n)->new Activation(rs.getObject("id",UUID.class),rs.getObject("patient_id",UUID.class),instant(rs,"expires_at"),instantNullable(rs,"consumed_at"))).optional().orElseThrow(()->new ApiException(404,"ACTIVATION_INVALID","This activation link is invalid or has expired"));if(act.consumedAt()!=null)throw new ApiException(410,"ACTIVATION_USED","This one-time activation link has already been used");if(!act.expiresAt().isAfter(now))throw new ApiException(410,"ACTIVATION_EXPIRED","This activation link has expired");String existing=jdbc.sql("SELECT external_subject FROM patient_profiles WHERE id=?").param(act.patientId()).query(String.class).optional().orElse(null);if(existing!=null&&!existing.equals(actor.subject()))throw new ApiException(409,"ALREADY_LINKED","This profile is already linked to another account");if(existing==null){
         // Account activation ONLY links the Keycloak subject and consumes the one-time token. It is NOT

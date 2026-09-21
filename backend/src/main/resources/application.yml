@@ -55,6 +55,9 @@ springdoc:
   api-docs.enabled: ${OPENAPI_ENABLED:true}
   swagger-ui.enabled: ${OPENAPI_ENABLED:true}
 app:
+  # No case cutover is implied. Keep off until the complete Phase 4B parity gate passes.
+  journey.runtime.enabled: ${JOURNEY_RUNTIME_ENABLED:false}
+  journey.runtime.schema-update: ${JOURNEY_RUNTIME_SCHEMA_UPDATE:false}
   # Redis-backed reference-data cache. Only the caches named in CacheNames exist; live workflow,
   # payment and authorization state is never cached.
   cache:

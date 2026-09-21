@@ -14,7 +14,8 @@ import static com.rehletshifaa.journey.domain.JourneyModel.*;
 public class JourneyDefinitionService {
     private final JourneyDefinitionRepository repository;private final AuthorizationService authorization;
     private final AccessAuditRepository audit;private final JourneyGraphValidator validator;private final JourneySimulator simulator;private final JourneyStageRegistry registry;
-    public JourneyDefinitionService(JourneyDefinitionRepository repository,AuthorizationService authorization,AccessAuditRepository audit,JourneyGraphValidator validator,JourneySimulator simulator,JourneyStageRegistry registry){this.repository=repository;this.authorization=authorization;this.audit=audit;this.validator=validator;this.simulator=simulator;this.registry=registry;}
+    private final JourneyDeploymentService deployment;
+    public JourneyDefinitionService(JourneyDefinitionRepository repository,AuthorizationService authorization,AccessAuditRepository audit,JourneyGraphValidator validator,JourneySimulator simulator,JourneyStageRegistry registry,JourneyDeploymentService deployment){this.repository=repository;this.authorization=authorization;this.audit=audit;this.validator=validator;this.simulator=simulator;this.registry=registry;this.deployment=deployment;}
     public List<HistoryEntry> history(UUID definition,int offset){authorize("journey.view");repository.definition(definition,false);if(offset<0)invalid("Offset must be nonnegative.");return repository.history(definition,offset).stream().map(e->new HistoryEntry(e.actor(),e.entity(),e.action(),e.outcome(),e.reason(),e.occurredAt())).toList();}
     public List<Definition> list(){authorize("journey.view");return repository.definitions();}
     public Detail detail(UUID definition){authorize("journey.view");return new Detail(repository.definition(definition,false),repository.versions(definition));}
@@ -60,7 +61,10 @@ public class JourneyDefinitionService {
             audit.denied(actor.subject(),id.toString(),"journey.publish","VALIDATION_AND_SIMULATION_REQUIRED");invalid("Submit a validated, successfully simulated version before publication.");
         }
         if(repository.edited(id,actor.subject())){audit.denied(actor.subject(),id.toString(),"journey.publish","INDEPENDENT_REVIEW_REQUIRED");throw new ApiException(403,"INDEPENDENT_REVIEW_REQUIRED","Another authorized reviewer must publish this journey.");}
-        repository.transition(v,Status.PUBLISHED,v.validationSummary(),v.simulationSummary());audit.record(actor.subject(),id.toString(),"JOURNEY_PUBLISHED","SUCCESS","graph="+v.graphHash()+"; runtime=NOT_DEPLOYED");return repository.version(definition,id);
+        deployment.deployOnPublish(v);
+        repository.transition(v,Status.PUBLISHED,v.validationSummary(),v.simulationSummary());
+        Version published=repository.version(definition,id);
+        audit.record(actor.subject(),id.toString(),"JOURNEY_PUBLISHED","SUCCESS","graph="+v.graphHash()+"; runtime="+published.runtimeDeployment());return published;
     }
     @Transactional public Version retire(UUID definition,UUID id,Change change){
         var actor=authorize("journey.retire");Version v=locked(definition,id,change);if(v.status()!=Status.PUBLISHED)invalid("Only a published journey version can be retired.");repository.transition(v,Status.RETIRED,v.validationSummary(),v.simulationSummary());audit.record(actor.subject(),id.toString(),"JOURNEY_RETIRED","SUCCESS","graph="+v.graphHash());return repository.version(definition,id);

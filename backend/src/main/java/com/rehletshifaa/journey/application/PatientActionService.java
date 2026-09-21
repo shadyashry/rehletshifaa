@@ -129,6 +129,35 @@ public class PatientActionService {
 
     // ---------------- patient: see and answer only what was asked ----------------
 
+    /** Opens a non-information Journey PatientAction without inventing a second patient-task model. */
+    @Transactional
+    public UUID openJourneyAction(UUID caseId, String nodeKey, String label, boolean blocking, String actorSubject) {
+        String type = "JOURNEY:" + nodeKey;
+        UUID existing = jdbc.sql("SELECT id FROM case_tasks WHERE case_id=? AND task_type=? AND visibility_scope='PATIENT_ACTION' AND status IN ('OPEN','IN_PROGRESS') ORDER BY created_at DESC LIMIT 1")
+                .params(caseId, type).query(UUID.class).optional().orElse(null);
+        if (existing != null) return existing;
+        String status = jdbc.sql("SELECT status FROM medical_cases WHERE id=?").param(caseId).query(String.class)
+                .optional().orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
+        if (TERMINAL.contains(status)) throw new ApiException(409, "CASE_NOT_ACTIONABLE", "This patient action is no longer available");
+        Instant now = clock.instant();
+        UUID id = UUID.randomUUID();
+        jdbc.sql("INSERT INTO case_tasks(id,case_id,task_type,title,description,owner_subject,owner_role,visibility_scope,priority,status,blocking,created_by,created_at,updated_at,version) VALUES(?,?,?,?,NULL,NULL,'PATIENT','PATIENT_ACTION',?,'OPEN',?,?,?, ?,0)")
+                .params(id, caseId, type, encrypt(label), StaffWorkService.derivePriority(blocking, null, now), blocking,
+                        actorSubject, timestamp(now), timestamp(now)).update();
+        work.setWaitingOn(caseId, "PATIENT", "Waiting for the patient's current Journey action");
+        audit(caseId, "JOURNEY_PATIENT_ACTION_OPENED", actorSubject, "SYSTEM", id, type);
+        return id;
+    }
+
+    /** Completes the exact projected PatientAction. Ownership/Journey authorization is enforced by the caller. */
+    @Transactional
+    public void completeJourneyAction(UUID caseId, UUID taskId, String evidence) {
+        Instant now = clock.instant();
+        int changed = jdbc.sql("UPDATE case_tasks SET status='COMPLETED',completed_at=?,completion_evidence=?,updated_at=?,version=version+1 WHERE id=? AND case_id=? AND visibility_scope='PATIENT_ACTION' AND status IN ('OPEN','IN_PROGRESS')")
+                .params(timestamp(now), encrypt(evidence), timestamp(now), taskId, caseId).update();
+        if (changed != 1) throw new ApiException(409, "PATIENT_ACTION_STALE", "This patient action is no longer active");
+    }
+
     /** The open request for this case, or null. Labels only — internal notes are never exposed. */
     @Transactional(readOnly = true)
     public PatientActionView openAction(UUID caseId) {

@@ -65,10 +65,52 @@ public class JourneyGraphValidator {
         Set<String> completable=new HashSet<>();nodes.values().stream().filter(n->n.type()==StageType.END).forEach(n->completable.add(n.key()));
         boolean changed;do {changed=false;for(Edge e:graph.edges()) if(completable.contains(e.to())) changed|=completable.add(e.from());}while(changed);
         for(Node n:nodes.values()) if(!completable.contains(n.key())) error(errors,"NO_COMPLETION",n.key(),label(n)+" has no path to completion.");
-        Set<String> visited=new HashSet<>(),active=new HashSet<>();
-        for(String k:nodes.keySet()) if(cycle(k,outgoing,visited,active)) {error(errors,"CYCLE",k,"This journey contains a loop. Phase 4A requires acyclic paths; recovery loops need a governed runtime policy.");break;}
+        if(starts.size()==1) validateCycles(starts.getFirst().key(),outgoing,nodes,errors);
         warnings.add(new Issue("RUNTIME_NOT_DEPLOYED",null,"This configuration is a dry-run domain model; existing cases continue using the current journey."));
         return new Validation(List.copyOf(errors),List.copyOf(warnings));
+    }
+    /**
+     * Bounded recovery-cycle policy (technical-decisions.md §22). Phase 4A rejected every cycle outright; a
+     * governed loop is now allowed only when it is an explicit, human-gated, escapable business recovery —
+     * never a general scripting/looping construct. A back-edge (one whose target is still on the current
+     * depth-first path, i.e. an ancestor of the node it is drawn from) is REJECTED unless all of:
+     * <ul>
+     * <li>it is not a self-loop (its source and target differ) — {@code CYCLE_SELF_LOOP};</li>
+     * <li>it originates from a Decision stage on a supported business fact, so re-entry is an explicit
+     * branch decided by an already-validated condition, never an unconditional/automatic transition —
+     * {@code CYCLE_UNGATED};</li>
+     * <li>the cycle (every node between the back-edge's target and its source, inclusive) contains at
+     * least one Staff or Patient action, so a human business step is required before the loop can be
+     * traversed again — a Decision-only or System-only loop could spin without any external input —
+     * {@code CYCLE_NO_HUMAN_ACTION}.</li>
+     * </ul>
+     * A cycle that passes all three still needs an escape: that is already guaranteed by the existing
+     * {@code NO_COMPLETION} backward-reachability check above, which requires every node (cycle members
+     * included) to have a path to an End stage — a trap with no exit is rejected there, not here.
+     */
+    private void validateCycles(String start,Map<String,List<Edge>> outgoing,Map<String,Node> nodes,List<Issue> errors){
+        Deque<String> stack=new ArrayDeque<>();Set<String> onStack=new HashSet<>(),visited=new HashSet<>();
+        walkCycles(start,outgoing,nodes,stack,onStack,visited,errors);
+    }
+    private void walkCycles(String k,Map<String,List<Edge>> outgoing,Map<String,Node> nodes,
+            Deque<String> stack,Set<String> onStack,Set<String> visited,List<Issue> errors){
+        stack.push(k);onStack.add(k);visited.add(k);
+        for(Edge e:outgoing.getOrDefault(k,List.of())){
+            if(!nodes.containsKey(e.to()))continue;
+            if(onStack.contains(e.to())) validateBackEdge(e,nodes,stack,errors);
+            else if(!visited.contains(e.to())) walkCycles(e.to(),outgoing,nodes,stack,onStack,visited,errors);
+        }
+        stack.pop();onStack.remove(k);
+    }
+    private void validateBackEdge(Edge e,Map<String,Node> nodes,Deque<String> stack,List<Issue> errors){
+        if(e.from().equals(e.to())) {error(errors,"CYCLE_SELF_LOOP",e.from(),label(nodes.get(e.from()))+" cannot transition back to itself.");return;}
+        Node source=nodes.get(e.from());
+        if(source.type()!=StageType.DECISION) {error(errors,"CYCLE_UNGATED",e.from(),"A recovery loop must branch from a Decision stage on a supported business fact; "+label(source)+" cannot re-enter an earlier stage directly.");return;}
+        List<String> path=new ArrayList<>(stack);
+        int toIndex=path.indexOf(e.to());
+        boolean human=false;
+        for(int i=0;i<=toIndex;i++){StageType t=nodes.get(path.get(i)).type();if(t==StageType.STAFF_TASK||t==StageType.PATIENT_ACTION){human=true;break;}}
+        if(!human) error(errors,"CYCLE_NO_HUMAN_ACTION",e.from(),"A recovery loop must include at least one staff or patient action; an automatic loop between system/decision stages alone is not permitted.");
     }
     private boolean complementary(List<Edge> edges){
         if(edges.size()!=2 || edges.get(0).condition()==null || edges.get(1).condition()==null)return false;
@@ -81,9 +123,4 @@ public class JourneyGraphValidator {
     private static String label(Node n){return n.label()==null?"Stage":n.label();}
     private static void error(List<Issue> errors,String code,String node,String message){errors.add(new Issue(code,node,message));}
     private void walk(String k,Map<String,List<Edge>> edges,Set<String> seen){if(!seen.add(k))return;for(Edge e:edges.getOrDefault(k,List.of()))walk(e.to(),edges,seen);}
-    private boolean cycle(String k,Map<String,List<Edge>> edges,Set<String> visited,Set<String> active){
-        if(active.contains(k))return true;if(!visited.add(k))return false;active.add(k);
-        for(Edge e:edges.getOrDefault(k,List.of()))if(cycle(e.to(),edges,visited,active))return true;
-        active.remove(k);return false;
-    }
 }

@@ -25,7 +25,12 @@ public class JourneyDefinitionRepository {
         UUID id=UUID.randomUUID();jdbc.sql("INSERT INTO journey_definitions VALUES(?,'INTERNATIONAL_CARE','International Care Journey',?)").params(id,timestamp(clock.instant())).update();return id;
     }
     public List<Version> versions(UUID definition){return jdbc.sql("SELECT id FROM journey_versions WHERE definition_id=? ORDER BY version_number DESC").param(definition).query(UUID.class).list().stream().map(id->version(definition,id)).toList();}
-    public Version version(UUID definition,UUID id){return jdbc.sql("SELECT * FROM journey_versions WHERE definition_id=? AND id=?").params(definition,id).query((r,n)->new Version(id,definition,r.getInt("version_number"),Status.valueOf(r.getString("status")),r.getLong("revision"),r.getString("created_by"),read(r.getString("graph_snapshot"),Graph.class),r.getString("graph_hash"),r.getString("validation_summary"),r.getString("simulation_summary"),instant(r.getTimestamp("published_at")),instant(r.getTimestamp("retired_at")),"NOT_DEPLOYED")).optional().orElseThrow(JourneyDefinitionRepository::notFound);}
+    /** Resolves the owning definition first; for callers (Journey runtime projections) that only hold a version id. */
+    public Version version(UUID id){
+        UUID definition=jdbc.sql("SELECT definition_id FROM journey_versions WHERE id=?").param(id).query(UUID.class).optional().orElseThrow(JourneyDefinitionRepository::notFound);
+        return version(definition,id);
+    }
+    public Version version(UUID definition,UUID id){return jdbc.sql("SELECT v.*,d.journey_version_id AS deployed_version FROM journey_versions v LEFT JOIN journey_deployments d ON d.journey_version_id=v.id WHERE v.definition_id=? AND v.id=?").params(definition,id).query((r,n)->new Version(id,definition,r.getInt("version_number"),Status.valueOf(r.getString("status")),r.getLong("revision"),r.getString("created_by"),read(r.getString("graph_snapshot"),Graph.class),r.getString("graph_hash"),r.getString("validation_summary"),r.getString("simulation_summary"),instant(r.getTimestamp("published_at")),instant(r.getTimestamp("retired_at")),r.getObject("deployed_version")==null?"NOT_DEPLOYED":"DEPLOYED")).optional().orElseThrow(JourneyDefinitionRepository::notFound);}
     public Version draft(UUID definition,Graph graph,String actor){
         if(versions(definition).stream().anyMatch(v->v.status()!=Status.PUBLISHED && v.status()!=Status.RETIRED))throw new ApiException(409,"DRAFT_EXISTS","Finish or reuse the existing draft before creating another version.");
         int number=jdbc.sql("SELECT COALESCE(MAX(version_number),0)+1 FROM journey_versions WHERE definition_id=?").param(definition).query(Integer.class).single();

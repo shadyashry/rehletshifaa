@@ -84,10 +84,13 @@ public class PermissionCatalog {
         register("support.account.view", "View account support", "support", PermissionRisk.LOW, Set.of(), Set.of("clinical.export"), false, false, false);
         register("support.invitation.resend", "Resend invitation support", "support", PermissionRisk.HIGH, Set.of(), Set.of("clinical.export"), false, false, false);
         register("integration.invoke", "Invoke integration", "integration", PermissionRisk.HIGH, Set.of(), Set.of(), false, false, false);
+        register("journey.work.execute", "Execute Journey work", "journey_work", PermissionRisk.HIGH, Set.of(), Set.of(), true, false, false);
     }
     private void register(String key, String label, String family, PermissionRisk risk, Set<String> dependencies,
             Set<String> conflicts, boolean executable, boolean workflow, boolean recent) {
-        Set<ActorType> actors = family.equals("assignment") ? Set.of(ActorType.COORDINATOR) : family.equals("access") || family.equals("journey") || key.equals("provider.create") || key.equals("provider.suspend") ? Set.of(ActorType.GOVERNANCE)
+        Set<ActorType> actors = family.equals("assignment") ? Set.of(ActorType.COORDINATOR)
+                : family.equals("journey_work") ? Set.of(ActorType.COORDINATOR, ActorType.CONSULTANT, ActorType.FINANCE, ActorType.OPERATIONS) // Journey-projected business work: COORDINATOR (staff routing), CONSULTANT (RECORD_CLINICAL_DECISION), FINANCE (APPROVE_COMMERCIAL_TERMS) and OPERATIONS (UPDATE_TRAVEL_PLAN)
+                : family.equals("access") || family.equals("journey") || key.equals("provider.create") || key.equals("provider.suspend") ? Set.of(ActorType.GOVERNANCE)
                 : family.equals("credential") && !Set.of("credential.submit","credential.view").contains(key) ? Set.of(ActorType.GOVERNANCE)
                 : family.equals("credential") ? Set.of(ActorType.GOVERNANCE,ActorType.PRACTICE_OPERATIONS,ActorType.CONSULTANT,ActorType.ASSOCIATE_DOCTOR)
                 : Set.of("availability","service_catalog","price_list").contains(family) ? Set.of(ActorType.PRACTICE_OPERATIONS,ActorType.CONSULTANT,ActorType.ASSOCIATE_DOCTOR)
@@ -97,7 +100,8 @@ public class PermissionCatalog {
                 : key.equals("clinical.recommendation.submit") || key.equals("clinical.outcome.record")
                 ? Set.of(ActorType.CONSULTANT) : family.equals("integration") ? Set.of(ActorType.SERVICE)
                 : EnumSet.complementOf(EnumSet.of(ActorType.SERVICE, ActorType.PATIENT, ActorType.REPRESENTATIVE));
-        Set<ScopeType> scopes = family.equals("assignment") ? Set.of(ScopeType.ORGANIZATION,ScopeType.ASSIGNED_ORGANIZATIONS,ScopeType.SPECIFIC_RESOURCE) : (family.equals("access") || family.equals("journey")) ? Set.of(ScopeType.PLATFORM)
+        Set<ScopeType> scopes = family.equals("assignment") ? Set.of(ScopeType.ORGANIZATION,ScopeType.ASSIGNED_ORGANIZATIONS,ScopeType.SPECIFIC_RESOURCE)
+                : family.equals("journey_work") ? Set.of(ScopeType.PLATFORM,ScopeType.ORGANIZATION) : (family.equals("access") || family.equals("journey")) ? Set.of(ScopeType.PLATFORM)
                 : key.equals("provider.create") ? Set.of(ScopeType.PLATFORM,ScopeType.ORGANIZATION,ScopeType.ASSIGNED_ORGANIZATIONS)
                 : family.equals("credential") && !Set.of("credential.submit","credential.view").contains(key) ? Set.of(ScopeType.ORGANIZATION,ScopeType.ASSIGNED_ORGANIZATIONS,ScopeType.SPECIFIC_RESOURCE)
                 : EnumSet.complementOf(EnumSet.of(ScopeType.PLATFORM));
@@ -105,7 +109,7 @@ public class PermissionCatalog {
                 "provider.member.invite","provider.member.deactivate","provider.clinician.invite",
                 "provider.practice_staff.manage","provider.relationship.manage").contains(key);
         definitions.put(key, new PermissionDefinition(key, label, label + " within the approved data scope.",
-                family, risk, scopes, actors, family.equals("assignment") || family.equals("access") || family.equals("journey") || (family.equals("credential")&&!Set.of("credential.submit","credential.view").contains(key)) ? Set.of(ChannelEntitlement.ADMIN_WEB, ChannelEntitlement.API)
+                family, risk, scopes, actors, family.equals("assignment") || family.equals("journey_work") || family.equals("access") || family.equals("journey") || (family.equals("credential")&&!Set.of("credential.submit","credential.view").contains(key)) ? Set.of(ChannelEntitlement.ADMIN_WEB, ChannelEntitlement.API)
                 : EnumSet.allOf(ChannelEntitlement.class), family.equals("clinical") ? "CLINICAL" :
                 family.equals("finance") ? "FINANCIAL" : "BUSINESS", dependencies, conflicts, true, executable || phase2AExecutable || family.equals("assignment") || (family.equals("journey") && !key.equals("journey.instance_migrate")), workflow, recent || Set.of("journey.approve","journey.publish","journey.retire").contains(key)));
     }

@@ -16,6 +16,7 @@ import static com.rehletshifaa.coordination.application.CoordinationConfiguratio
 
 @Service
 public class AssignmentEngine implements CoordinatorRoutingPort {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AssignmentEngine.class);
     private final CoordinationRepository repo; private final CoordinationConfigurationService config;
     private final CoordinatorEligibilityService eligibility; private final CoordinatorScoringService scoring;
     private final AuthorizationService auth; private final AccessAuditRepository audit; private final StaffWorkService work; private final Clock clock;
@@ -71,5 +72,25 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
         // Called inside the locked legacy transaction. Unconfigured or unresolved cases stay legacy.
         if(!repo.bound(id)){var provenance=repo.provenance(id);if(provenance.size()!=1)return;UUID org=provenance.getFirst()[0];if(!repo.organization(org,false)||repo.policies(org).stream().noneMatch(p->effective(p.effectiveFrom(),p.effectiveTo(),clock.instant())))return;repo.bind(id,org,provenance.getFirst()[1]);}
         CaseFacts c=repo.facts(id);if(!c.mode().equals("SHADOW")||!repo.organization(c.organizationId(),false))return;Instant now=clock.instant();var policies=repo.policies(c.organizationId()).stream().filter(p->effective(p.effectiveFrom(),p.effectiveTo(),now)).toList();if(policies.isEmpty())return;Policy p=policies.getFirst();Preference pref=config.effectivePreference(c.organizationId(),c.consultantId(),now);List<Candidate> candidates=eligibility.evaluate(c,p,now);Command command=new Command(key,c.revision(),"SHADOW",null,null,null,"LEGACY_ASSIGNMENT");String payload=repo.encode(command);if(repo.replay(id,"SYSTEM",key,payload).isPresent())return;persist(c,p,pref,candidates,choose(c,p,pref,candidates),command,"SYSTEM",payload,now,"SHADOW");
+    }
+    /**
+     * Journey integration boundary (Phase 4B item B). Reuses {@link #retryQueued} — the existing
+     * SYSTEM-triggered, already-idempotent LIVE queue retry — unchanged, then reads whatever owner Phase 3
+     * already decided. Never mutates routing state itself and never throws: a case that is not yet
+     * provider-bound, not yet adopted into LIVE routing, or any internal Assignment Engine error all
+     * safely resolve to no result so Journey projection can fall back to its own unassigned/queued state.
+     */
+    @Override public Optional<String> routeCoordinatorWork(UUID caseId){
+        try {
+            retryQueued(caseId);
+            return repo.bound(caseId)?Optional.ofNullable(repo.owner(caseId)):Optional.empty();
+        } catch(RuntimeException e){
+            log.warn("Journey coordinator routing unavailable for case {} ({}); leaving work unassigned",caseId,e.getMessage());
+            return Optional.empty();
+        }
+    }
+    @Override public Optional<UUID> resolveOrganization(UUID caseId){
+        var provenance=repo.provenance(caseId);
+        return provenance.size()==1?Optional.of(provenance.getFirst()[0]):Optional.empty();
     }
 }

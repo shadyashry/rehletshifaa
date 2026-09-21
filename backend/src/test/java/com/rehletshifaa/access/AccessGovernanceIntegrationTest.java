@@ -56,7 +56,7 @@ class AccessGovernanceIntegrationTest {
     }
     @Test void catalogSeedsAndDatabaseOnlyIdentityAreUsable() {
         assertThat(catalogRepository.registeredKeys()).containsExactlyInAnyOrderElementsOf(catalog.all().stream().map(PermissionDefinition::key).toList());
-        assertThat(service.list(0)).hasSize(19);
+        assertThat(service.list(0)).hasSize(27); // +2 V42 Coordinator, +2 V43 Consultant, +2 V44 Finance, +2 V45 Operations Journey Work templates
         assertThat(queries.mine()).anyMatch(AuthorizationDecision::allowed);
         assertThatThrownBy(legacy::current).hasMessageContaining("platform role");
     }
