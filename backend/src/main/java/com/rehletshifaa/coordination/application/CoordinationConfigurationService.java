@@ -13,10 +13,15 @@ import java.util.*;
 
 @Service
 public class CoordinationConfigurationService {
-    private final CoordinationRepository repo; private final AuthorizationService auth;
+    /** Any of these makes an organization worth showing in the Care Coordination org picker — deliberately not provider.view, since a Care Coordination Manager typically holds none of the provider.* family. */
+    private static final List<String> VIEW_PERMISSIONS=List.of("assignment.team.view","assignment.policy.view","assignment.queue.manage","assignment.audit.view","assignment.simulate");
+    private final CoordinationRepository repo; private final AuthorizationService auth; private final AccessIdentity identity;
     private final RoleAssignmentRepository access; private final AccessAuditRepository audit; private final Clock clock;
-    public CoordinationConfigurationService(CoordinationRepository repo,AuthorizationService auth,RoleAssignmentRepository access,AccessAuditRepository audit,Clock clock){this.repo=repo;this.auth=auth;this.access=access;this.audit=audit;this.clock=clock;}
+    public CoordinationConfigurationService(CoordinationRepository repo,AuthorizationService auth,AccessIdentity identity,RoleAssignmentRepository access,AccessAuditRepository audit,Clock clock){this.repo=repo;this.auth=auth;this.identity=identity;this.access=access;this.audit=audit;this.clock=clock;}
     public AccessIdentity.Identity authorize(UUID org,String permission){if(!repo.organization(org,false))throw new ApiException(404,"PROVIDER_NOT_FOUND","Provider was not found or is suspended");return auth.require(permission,context(org),ChannelEntitlement.ADMIN_WEB,ChannelEntitlement.API);}
+    /** Organizations where the caller holds an active membership and at least one coordination view/manage capability. */
+    public List<OrganizationSummary> organizations(){String subject=identity.current().subject();return repo.organizationsFor(subject).stream().filter(o->visible(subject,o.id())).toList();}
+    private boolean visible(String subject,UUID org){var ctx=context(org);for(String p:VIEW_PERMISSIONS)for(ChannelEntitlement ch:List.of(ChannelEntitlement.ADMIN_WEB,ChannelEntitlement.API))if(auth.decide(new AccessIdentity.Identity(subject,null),p,ctx,ch).allowed())return true;return false;}
     public static ResourceContext context(UUID org){return new ResourceContext(org,true,"ORGANIZATION",org.toString(),null,false);}
     private AccessIdentity.Identity begin(UUID org,String permission){repo.lock();if(!repo.organization(org,true))bad("Provider was not found or is suspended");return authorize(org,permission);}
     public List<Team> teams(UUID org){authorize(org,"assignment.team.view");return repo.teams(org);}

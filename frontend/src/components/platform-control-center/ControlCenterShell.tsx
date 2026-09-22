@@ -7,10 +7,11 @@ import type { Locale } from "@/lib/i18n";
 import { ccCopy } from "./control-center-copy";
 import { AccessGovernanceNav } from "./AccessGovernanceNav";
 import { JourneyManagementNav } from "./JourneyManagementNav";
+import { CareCoordinationNav } from "./CareCoordinationNav";
 import "./control-center.css";
 
 export type Crumb = { label: string; href?: string };
-type Section = "providers" | "operations" | "journeys";
+type Section = "providers" | "operations" | "journeys" | "coordination";
 
 /**
  * Shared shell for the Provider Control Center: sidebar navigation, breadcrumb and page header.
@@ -42,6 +43,7 @@ export function ControlCenterShell({locale,active,crumbs,title,intro,actions,chi
             </Link></li>
           </ul>
           <JourneyManagementNav locale={locale} active={active === "journeys"} />
+          <CareCoordinationNav locale={locale} active={active === "coordination"} />
           <AccessGovernanceNav locale={locale} />
           <Link className="cc-secondary" style={{ marginTop: 20, display: "inline-flex" }} href={`/${locale}/portal`}>
             <Back size={16} aria-hidden /> {t.back}

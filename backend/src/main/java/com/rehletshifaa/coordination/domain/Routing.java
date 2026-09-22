@@ -29,4 +29,8 @@ public final class Routing {
                            Instant evaluatedAt, long revision, boolean legacyMatches, String algorithm) {}
     public record Command(String key, long revision, String action, String target, UUID team, String reason, String source) {}
     public record QueueItem(UUID caseId, UUID taskId, UUID team, String reason, Instant queuedAt, Instant dueAt, long revision) {}
+    /** Ephemeral what-if evaluation: same eligibility/scoring services as a real decision, never persisted. */
+    public record SimulationResult(UUID policyId, int policyVersion, String algorithm, List<Candidate> candidates, Selection selection) {}
+    /** Org picker for the Care Coordination UI — visible to any assignment.*-view-capable subject, not just provider.view holders. */
+    public record OrganizationSummary(UUID id, String displayName, String type, String status) {}
 }

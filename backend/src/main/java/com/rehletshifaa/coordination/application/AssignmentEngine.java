@@ -23,6 +23,23 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
     public AssignmentEngine(CoordinationRepository repo,CoordinationConfigurationService config,CoordinatorEligibilityService eligibility,CoordinatorScoringService scoring,AuthorizationService auth,AccessAuditRepository audit,StaffWorkService work,Clock clock){this.repo=repo;this.config=config;this.eligibility=eligibility;this.scoring=scoring;this.auth=auth;this.audit=audit;this.work=work;this.clock=clock;}
     public List<Decision> history(UUID org,UUID id){config.authorize(org,"assignment.audit.view");checked(org,id);return repo.history(org,id);}
     public List<QueueItem> queue(UUID org){config.authorize(org,"assignment.queue.manage");return repo.queue(org);}
+    /** Current routing status (mode/owner/revision) for a case an admin looked up directly, outside the queue. */
+    public CaseFacts status(UUID org,UUID id){config.authorize(org,"assignment.audit.view");return checked(org,id);}
+    /**
+     * Ephemeral what-if evaluation for Routing Simulation (master-implementation-spec.md §9.15): reuses the
+     * exact eligibility/scoring services a real decision uses, against a synthetic, never-persisted CaseFacts.
+     * Never opens a WorkItem, never touches Case Owner/case_assignments, never notifies, never writes a
+     * coordination_decisions/audit row — unlike the real per-case SHADOW command (which intentionally is
+     * audited, since it compares against a real case). No candidate/case state is mutated by this call.
+     */
+    public SimulationResult simulate(UUID org,UUID consultantId,String careArea,String language,String preferredCoordinator,UUID preferredTeam){
+        config.authorize(org,"assignment.simulate");Instant now=clock.instant();Policy p=config.effectivePolicy(org,now);
+        CaseFacts synthetic=new CaseFacts(UUID.randomUUID(),org,consultantId,careArea,language,null,"SHADOW",0,"SUBMITTED");
+        Preference preference=consultantId==null?null:config.effectivePreference(org,consultantId,now);
+        if(preference==null&&(preferredCoordinator!=null||preferredTeam!=null))preference=new Preference(null,org,consultantId,0,null,null,preferredCoordinator,preferredTeam,null);
+        List<Candidate> candidates=eligibility.evaluate(synthetic,p,now);Selection selection=choose(synthetic,p,preference,candidates);
+        return new SimulationResult(p.id(),p.version(),CoordinatorScoringService.ALGORITHM,candidates,selection);
+    }
     @Transactional public Decision execute(UUID org,UUID id,Command command){
         text(command.key(),150);text(command.source(),100);String action=command.action();if(action==null||!Set.of("SHADOW","ACTIVATE","AUTO","ASSIGN","REASSIGN","QUEUE").contains(action))bad("Choose a registered routing command");
         repo.lock();if(!repo.organization(org,true))bad("Provider was not found or is suspended");

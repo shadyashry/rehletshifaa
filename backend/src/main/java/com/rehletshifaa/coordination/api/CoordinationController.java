@@ -25,10 +25,13 @@ public class CoordinationController {
     @PostMapping("/consultants/{id}/preferences") public Preference preference(@PathVariable UUID org,@PathVariable UUID id,@RequestBody PreferenceCommand x){return config.savePreference(org,id,x.expectedVersion(),x.from(),x.to(),x.coordinator(),x.team(),x.fallbackTeam(),x.reason());}
     @PostMapping("/cases/{id}/commands") public Decision command(@PathVariable UUID org,@PathVariable UUID id,@RequestBody Command command){return engine.execute(org,id,command);}
     @GetMapping("/cases/{id}/history") public List<Decision> history(@PathVariable UUID org,@PathVariable UUID id){return engine.history(org,id);}
+    @GetMapping("/cases/{id}") public CaseFacts status(@PathVariable UUID org,@PathVariable UUID id){return engine.status(org,id);}
     @GetMapping("/queue") public List<QueueItem> queue(@PathVariable UUID org){return engine.queue(org);}
+    @PostMapping("/simulate") public SimulationResult simulate(@PathVariable UUID org,@RequestBody SimulateCommand x){return engine.simulate(org,x.consultantId(),x.careArea(),x.language(),x.preferredCoordinator(),x.preferredTeam());}
     public record TeamCommand(String name,TeamConfig configuration,long revision,String reason) {}
     public record MemberCommand(Member member,String reason) {}
     public record CapacityCommand(Capacity capacity,String reason) {}
     public record PolicyCommand(int expectedVersion,Instant from,Instant to,PolicyConfig configuration,String reason) {}
     public record PreferenceCommand(int expectedVersion,Instant from,Instant to,String coordinator,UUID team,UUID fallbackTeam,String reason) {}
+    public record SimulateCommand(UUID consultantId,String careArea,String language,String preferredCoordinator,UUID preferredTeam) {}
 }

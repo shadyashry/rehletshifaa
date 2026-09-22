@@ -1493,6 +1493,7 @@ Deliver:
 - documentation;
 - final defect report;
 - no unresolved Blocker/Critical/High defect in the feature before handover.
+- **Deferred from Phase 6A**: populated live EN/AR desktop/mobile visual verification of Journey Designer, Validation, Simulation and Publish (list/version workspace, palette, node inspector, transitions, bounded recovery loops, validation focus-to-node, simulation path, version diff, publish/maker-checker, stale-version conflict) — carried here because the isolated interactive browser harness cannot complete an authenticated Keycloak session without manual credential entry, not because of a product defect. Close it via a human-driven session or the non-interactive `PORTAL_TEST_PASSWORD` Playwright path (AGENTS.md §5). See `implementation-status.md`/`test-status.md` Phase 6A closure entries for the full evidence trail.
 
 ---
 
