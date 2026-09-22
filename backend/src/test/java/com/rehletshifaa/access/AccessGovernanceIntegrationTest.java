@@ -135,6 +135,18 @@ class AccessGovernanceIntegrationTest {
         assertThat(effective.membership().status()).isEqualTo("ACTIVE");
         assertThat(queries.simulate(new AccessQueryService.Simulation("governance-owner","access.role.view","PROVIDER",UUID.randomUUID().toString())).allowed()).isFalse();
     }
+    @Test void effectiveAccessSelfReviewUsesTheCallersOwnRecentAuthenticationLikeSimulateAlreadyDoes() {
+        // governance-owner is freshly signed in (setup()); self-review must see that real, current authentication,
+        // exactly like simulate() already does when actor.subject().equals(input.subject()).
+        var selfReview=queries.effective("governance-owner",ResourceContext.PLATFORM);
+        assertThat(selfReview.decisions()).anyMatch(d->d.permission().equals("access.assignment.manage") && d.allowed());
+        // Reviewing a different subject must still never borrow the caller's authentication (existing behavior,
+        // also covered by centralGovernanceCanDelegateOnlyTheRegisteredVerifierBundleToATrustedProviderSubject).
+        assignmentService.grant(new RoleAssignmentService.Grant("other-subject",OWNER,ResourceContext.PLATFORM,ScopeType.PLATFORM,null,null,clock.instant(),null,"Distinct reviewed subject"));
+        var reviewOfSomeoneElse=queries.effective("other-subject",ResourceContext.PLATFORM);
+        assertThat(reviewOfSomeoneElse.decisions()).anyMatch(d->d.permission().equals("access.assignment.manage")
+                && d.reason()==AuthorizationDecision.Reason.RECENT_AUTHENTICATION_REQUIRED);
+    }
     @Test void draftSimulationUsesProposedGrantsWithoutChangingLiveAssignments() {
         var d=create();var v=d.versions().getFirst().version();
         var request=new AccessQueryService.Simulation("governance-owner","access.role.view","PLATFORM",ResourceContext.PLATFORM.toString(),v.id());

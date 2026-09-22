@@ -1,5 +1,14 @@
 # Platform Control Plane — verification status
 
+## Phase 5B correctness/reliability verification — 2026-09-22 (Claude Code)
+
+- Focused backend: `mvn -o -q -Dmaven.repo.local=<local .m2> -Dtest=AccessGovernanceIntegrationTest test` — **14/14 passed** (was 13), including the new `effectiveAccessSelfReviewUsesTheCallersOwnRecentAuthenticationLikeSimulateAlreadyDoes`.
+- Full offline backend regression (required — this session changed shared authorization code): `mvn -o -q -Dmaven.repo.local=<local .m2> test` — **409 tests / 43 suites, zero failures/errors, 1 intentional skip** (unchanged opt-in PostgreSQL preflight). Flyway still validates V1–V46; no migration added this session (the `AccessQueryService.effective()` fix is a pure application-layer change, no schema impact).
+- `cd frontend && pnpm typecheck` — clean, whole tree, after the silent-token-renewal fix and the temporal access display addition.
+- `pnpm test src/components/platform-control-center/AccessGovernance.test.tsx` — **7/7 passed** (was 5): the 5 pre-existing tests unchanged, plus the silent-renewal regression test and the effective-from/expiry display test.
+- `pnpm test` (full frontend suite) — **164/164 passed**, zero regressions anywhere in the tree.
+- **Not run this session:** the disposable PostgreSQL preflight, Playwright/E2E, and a populated live visual/RTL/mobile pass of Access Governance screens (last performed and accepted in Phase 2B; no layout-affecting change was made this session — see implementation-status.md for the full reasoning on why Phase 5B's remaining checklist items are satisfied by the existing, previously-visually-reviewed Phase 1 UI rather than rebuilt).
+
 ## Phase 5A-3 verification and Phase 5A closure — 2026-09-22 (Claude Code)
 
 - `cd frontend && pnpm typecheck` — clean, whole tree, no errors, after the Pricing/Availability management additions and the `FocusTrapDialog` closure.

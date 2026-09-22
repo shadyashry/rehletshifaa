@@ -34,9 +34,11 @@ public class AccessQueryService {
             var role=roles.get(v.templateId(),ResourceContext.PLATFORM,false);
             return new Source(a,role.name(),v,roles.grants(v.id()));
         }).toList();
-        // The target user's recent-auth claim is unknown; never borrow the administrator's authentication.
+        // A reviewed subject's recent-auth claim is unknown and never borrows the administrator's authentication,
+        // except when the caller is reviewing their own access: their real, current authentication is already known.
         var context=ResourceContext.PLATFORM.equals(organization)?ResourceContext.platform():providerContext(organization);
-        var decisions=catalog.all().stream().map(p->authorization.decide(new AccessIdentity.Identity(subject,Instant.EPOCH),
+        var target=actor.subject().equals(subject)?actor:new AccessIdentity.Identity(subject,Instant.EPOCH);
+        var decisions=catalog.all().stream().map(p->authorization.decide(target,
                 p.key(),context,ChannelEntitlement.ADMIN_WEB)).toList();
         audit.record(actor.subject(),organization.toString(),"EFFECTIVE_ACCESS_REVIEWED","SUCCESS","Subject access inspected");
         return new EffectiveAccess(subject,organization,assignments.membership(subject,organization).orElse(null),sources,relationships.list(subject,organization),decisions);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ShieldCheck, ArrowLeft, Check, Minus, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
@@ -17,7 +17,7 @@ type Version={id:string;number:number;status:string;revision:number;actorType:st
 type VersionDetail={version:Version;grants:Grant[]};
 type Detail={role:Role;versions:VersionDetail[]};
 type Decision={allowed:boolean;reason:string;permission:string;roleVersionId:string|null;scope:string|null;relationship:string|null};
-type Assignment={id:string;subject:string;organizationId:string;status:string;scope:string;source:string;revision:number};
+type Assignment={id:string;subject:string;organizationId:string;status:string;scope:string;source:string;revision:number;effectiveFrom:string;effectiveTo:string|null};
 type Effective={subject:string;organizationId:string;membership?:{status:string;accountActive:boolean}|null;sources:{assignment:Assignment;roleName:string;version:Version;grants:Grant[]}[];decisions:Decision[];relationships:{id:string;type:string;targetId:string;status:string}[]};
 type Audit={actor:string;entity:string;action:string;outcome:string;reason:string;occurredAt:string};
 const platform="00000000-0000-0000-0000-000000000001";
@@ -51,16 +51,24 @@ export function AccessGovernance({locale}:{locale:Locale}) {
     const text=await response.text();return text?JSON.parse(text):undefined as T;
   },[user,t,signIn,locale]);
   const run=async(work:()=>Promise<void>)=>{setBusy(true);setError("");setNotice("");try{await work();}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}};
+  // oidc-client's automaticSilentRenew (auth-client.ts) issues a fresh `user` object with every renewed
+  // access token, on the same subject, every few minutes. apiRef always calls through to the latest `api`
+  // (so every request still carries the current token) without making that renewal itself a reason to
+  // re-run the full refresh below and discard whatever the admin is mid-way through (open wizard, in-progress
+  // assignment form, selected tab) — see docs/platform-control-plane/implementation-status.md Phase 5B.
+  const apiRef=useRef(api);
+  useEffect(()=>{apiRef.current=api;},[api]);
+  const hasUser=!!user;
   const refresh=useCallback(async()=>{
-    if(!user){setLoading(false);return;}
+    if(!hasUser){setLoading(false);return;}
     setLoading(true);setError("");setMine([]);setRoles([]);setPermissions([]);setEffective(null);setDetail(null);setWizard(false);
     try {
-      const decisions=await api<Decision[]>("/me");setMine(decisions);
+      const decisions=await apiRef.current<Decision[]>("/me");setMine(decisions);
       if(decisions.some(d=>d.permission==="access.role.view"&&d.allowed)) {
-        const [r,p]=await Promise.all([api<Role[]>("/roles?offset="+page*100),api<Permission[]>("/permissions")]);setRoles(r);setPermissions(p);
+        const [r,p]=await Promise.all([apiRef.current<Role[]>("/roles?offset="+page*100),apiRef.current<Permission[]>("/permissions")]);setRoles(r);setPermissions(p);
       }
     }catch(e){setError(e instanceof Error?e.message:t.error);}finally{setLoading(false);}
-  },[api,user,page,t.error]);
+  },[hasUser,user?.profile.sub,page,t.error]);
   useEffect(()=>{void refresh();},[refresh]);
   const loadRole=async(id:string,versionId?:string)=>{
     const d=await api<Detail>("/roles/"+id);setDetail(d);setSelectedVersion(versionId??d.versions[0]?.version.id??"");return d;
@@ -98,6 +106,8 @@ export function AccessGovernance({locale}:{locale:Locale}) {
     setNotice(result.valid?t.valid:t.invalid);await loadRole(detail.role.id,current.version.id);
   };
   const dirty=!!current&&JSON.stringify(current.grants)!==JSON.stringify(grants);
+  const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const when=(iso:string)=>new Date(iso).toLocaleString(locale==="ar"?"ar-AE":"en-GB")+" ("+zone+")";
   const decisionList=(decisions:Decision[])=><ul className="ag-decisions">{decisions.map(d=><li key={d.permission}><span className={d.allowed?"ag-allow":"ag-deny"}>{d.allowed?<Check size={16}/>:<Minus size={16}/>} {d.allowed?t.allowed:t.deniedAction}</span><div><strong>{label(d.permission)}</strong><p>{businessLabel(d.reason,locale)}{d.scope?" · "+businessLabel(d.scope,locale):""}</p></div></li>)}</ul>;
   const preview=<section className="ag-preview" aria-label={t.preview}><h3>{t.preview}</h3><p><Check size={16} aria-hidden/> {t.can}</p><ul>{grants.map((g,i)=><li key={i}>{label(g.permission)} · {businessLabel(g.scope,locale)}{g.relationship?" · "+businessLabel(g.relationship,locale):""}</li>)}</ul>{!grants.length&&<p>{t.noGrants}</p>}<p><Minus size={16} aria-hidden/> {t.cannot}</p><p>{t.futureHint}</p></section>;
   if(authLoading||loading)return <main className="ag" dir={locale==="ar"?"rtl":"ltr"}><p role="status">{t.loading}</p></main>;
@@ -151,7 +161,7 @@ export function AccessGovernance({locale}:{locale:Locale}) {
       </section>}
       {tab==="permissions"&&<section><p>{t.futureHint}</p>{Object.entries(Object.groupBy(permissions,p=>p.family)).map(([family,items])=><section key={family}><h2>{familyLabel(family,locale)}</h2><ul className="ag-capabilities">{items?.map(p=><li key={p.key}><div><strong>{permissionLabel(p,locale)}</strong><p>{p.scopes.map(s=>businessLabel(s,locale)).join(" · ")}</p><details><summary>{t.advanced}</summary><p>{t.technical}: <code dir="ltr">{p.key}</code></p><p>{p.dependencies.map(label).join(" · ")}</p></details></div><span className="ag-badge">{businessLabel(p.risk,locale)}{!p.executable&&<small>{t.future}</small>}</span></li>)}</ul></section>)}</section>}
       {tab==="effective"&&<section><h2>{t.effective}</h2><p>{t.accessRead}</p><p>{t.recent}</p><form className="ag-effective-form" onSubmit={e=>{e.preventDefault();void run(async()=>{setEffective(null);setEffective(await api<Effective>("/effective-access?subject="+encodeURIComponent(subject)+"&organization="+encodeURIComponent(organization)));});}}><label>{t.subject}<input required maxLength={255} value={subject} onChange={e=>setSubject(e.target.value)}/></label><label>{t.organization}<input required dir="ltr" value={organization} onChange={e=>setOrganization(e.target.value)}/></label><button disabled={busy}>{t.inspect}</button></form>
-        {effective&&<>{effective.membership&&<p>{businessLabel(effective.membership.status,locale)} · {effective.membership.accountActive?(locale==="ar"?"الحساب نشط":"Account active"):(locale==="ar"?"الحساب غير نشط":"Account inactive")}</p>}<h3>{t.source}</h3>{!effective.sources.length&&<p>{t.noAccess}</p>}<ul className="ag-capabilities">{effective.sources.map(s=><li key={s.assignment.id}><div><strong>{s.roleName} · {t.version} {s.version.number}</strong><p>{businessLabel(s.assignment.status,locale)} · {businessLabel(s.assignment.scope,locale)} · {businessLabel(s.assignment.source,locale)}</p></div></li>)}</ul><h3>{t.relationship}</h3><ul>{effective.relationships.map(r=><li key={r.id}>{businessLabel(r.type,locale)} · <bdi>{r.targetId}</bdi> · {businessLabel(r.status,locale)}</li>)}</ul>{decisionList(effective.decisions)}{can("access.assignment.manage")&&<AccessAssignments key={effective.subject+effective.organizationId} locale={locale} subject={effective.subject} organization={effective.organizationId} roles={roles} sources={effective.sources} api={api} reload={async()=>setEffective(await api<Effective>("/effective-access?subject="+encodeURIComponent(effective.subject)+"&organization="+encodeURIComponent(effective.organizationId)))}/>}</>}
+        {effective&&<>{effective.membership&&<p>{businessLabel(effective.membership.status,locale)} · {effective.membership.accountActive?(locale==="ar"?"الحساب نشط":"Account active"):(locale==="ar"?"الحساب غير نشط":"Account inactive")}</p>}<h3>{t.source}</h3>{!effective.sources.length&&<p>{t.noAccess}</p>}<ul className="ag-capabilities">{effective.sources.map(s=><li key={s.assignment.id}><div><strong>{s.roleName} · {t.version} {s.version.number}</strong><p>{businessLabel(s.assignment.status,locale)} · {businessLabel(s.assignment.scope,locale)} · {businessLabel(s.assignment.source,locale)}</p><p>{(locale==="ar"?"يبدأ في ":"Starts at ")+when(s.assignment.effectiveFrom)}</p><p>{s.assignment.effectiveTo?(locale==="ar"?"ينتهي في ":"Expires at ")+when(s.assignment.effectiveTo):(locale==="ar"?"بلا تاريخ انتهاء":"No expiry")}</p></div></li>)}</ul><h3>{t.relationship}</h3><ul>{effective.relationships.map(r=><li key={r.id}>{businessLabel(r.type,locale)} · <bdi>{r.targetId}</bdi> · {businessLabel(r.status,locale)}</li>)}</ul>{decisionList(effective.decisions)}{can("access.assignment.manage")&&<AccessAssignments key={effective.subject+effective.organizationId} locale={locale} subject={effective.subject} organization={effective.organizationId} roles={roles} sources={effective.sources} api={api} reload={async()=>setEffective(await api<Effective>("/effective-access?subject="+encodeURIComponent(effective.subject)+"&organization="+encodeURIComponent(effective.organizationId)))}/>}</>}
       </section>}
       {tab==="audit"&&<section><h2>{t.audit}</h2>{!audits.length&&<p>{t.empty}</p>}<ol className="ag-audit">{audits.map((a,i)=><li key={i}><time>{new Date(a.occurredAt).toLocaleString(locale==="ar"?"ar-AE":"en-GB")}</time><strong>{locale==="ar"?"حدث حوكمة الوصول":a.action.toLowerCase().replaceAll("_"," ")}</strong><span>{a.outcome==="DENY"?t.deniedAction:t.allowed}</span><details><summary>{t.advanced}</summary><p><bdi>{a.actor}</bdi> · <bdi>{a.entity}</bdi></p><p>{a.reason}</p></details></li>)}</ol>{audits.length>=100&&<button disabled={busy} onClick={()=>void run(async()=>setAudits([...audits,...await api<Audit[]>("/audit?offset="+audits.length)]))}>{t.next}</button>}</section>}
     </>}
