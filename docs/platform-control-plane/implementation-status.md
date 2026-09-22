@@ -1,5 +1,49 @@
 # Platform Control Plane — implementation status
 
+## Phase 7 cutover inventory session — 2026-09-23 (Claude Code)
+
+First Phase 7 work session, started immediately after the readiness authorization below. Per the Phase 7 brief's own §4 ("FIRST TASK — BUILD THE CUTOVER INVENTORY... before changing code"), this session built the evidence-based inventory first rather than writing runtime-cutover code blind. See `migration-inventory.md`'s new "Phase 7 cutover inventory" section for the full evidence table.
+
+**Central finding, established by reading source, not docs:** the Journey/Flowable runtime has never been wired to a real production case. `JourneyCaseVerificationService` is explicit in its own class comment that it is an opt-in fixture-only entry point with no HTTP route and no automatic intake hook; `JOURNEY_RUNTIME_ENABLED`, `JOURNEY_RUNTIME_SCHEMA_UPDATE` and `app.journey.runtime.case-verification-enabled` are all `false` by default and nothing in the codebase flips them for real traffic. This means the brief's "new eligible cases bind to Journey, existing cases stay legacy" cutover (§9–§10) is not yet an operational switch to flip safely inside one session — it is a real-intake-hook design task (transactional integrity across `CaseService.create` + Journey admission, every §24 failure mode, shadow parity before authority) that deserves the same dedicated per-sub-phase session this repository has given every other Phase 1–6B slice, rather than being improvised here.
+
+**What this session found and recorded, with exact evidence:**
+- Server-authoritative `availableActions`/`currentAction` (brief §5/§6) **already exists** and is not new work: `CaseActionService.resolve` (`journey/application/CaseActionService.java`) is a real, non-cached, per-request resolver embedded in `CaseWorkspace`/`IntakePreview`, already consumed by `CurrentAction.tsx`/`MyCare.tsx` — whose own doc comment states "rendered, never re-derived here."
+- One concrete, narrow frontend gap found (brief §7's "migrate remaining client-derived logic"): `Portal.tsx`'s Finance "approve commercial terms" button (`RoleActions`, ~line 725) recombines four `ProposalGates` booleans client-side instead of reading the single already-computed fact `CaseActionService` exposes for the same condition. **Not fixed this session** — verifying whether this button is genuinely redundant with (or the only affordance ahead of) any Finance `case_tasks` WorkItem completion path needs source-level confirmation before touching a live commercial-approval control; recorded as the first concrete NEXT EXACT ACTIONS item rather than an unreviewed edit.
+- `CaseWorkflowActions.tsx` (Operations travel-plan form, consultant treatment-episode/follow-up forms) gates on raw case status, not `availableActions` — classified **D, defer**: those downstream-lifecycle stages (arrival/treatment/discharge/follow-up) are outside the frozen 11-action Journey catalog and outside `CaseActionService`'s current model, so migrating this component is backend scope expansion, not a Phase 7 frontend cutover, and out of bounds per the brief's own §19.
+- The dual legacy-`ActorRole` + `journey.work.execute` authorization branches inside `JourneyService`'s business methods, and the `role==="coordinator"`/`"finance"`/etc. string branches in `Portal.tsx` that select which portal view renders, are both classified **E — do not remove**: the former is deliberate dual gating already required by technical-decisions.md §19 and the brief's own §16; the latter is UI routing, not an authorization decision (every mutating endpoint those screens call re-authorizes independently).
+- Command-endpoint independent revalidation (brief §8): already evidenced by `CaseActionService`'s own doc comment ("every action endpoint still validates independently; `assertOperationsAssignable` is the one policy both the resolver and the assignment endpoint share") and by every Journey handler's dual-gate pattern above. No gap found; no new test was needed to prove an already-documented, already-tested invariant.
+- Shadow/parity mechanism (brief §12/§33): `JourneyParityHarness`/`JourneyHappyPathParityTest` and Phase 3's own per-case `SHADOW` coordination mode already satisfy this; reused as-is, no new harness built.
+
+**No production code was changed this session** — this was a documentation/evidence session only, per the brief's own sequencing (inventory before code). `git diff --check` clean; no migration, no test run required (AGENTS.md: broader verification only when shared infra/API/auth/DB/security actually changed, which it did not here).
+
+### PHASE 7 ACCEPTED: NO — this session delivers the mandatory cutover inventory only
+
+Evaluated against the brief's own §38 gate: the inventory is current and evidence-based (done); the server-authoritative available-actions model is confirmed already in place for in-catalog stages (done, pre-existing); frontend/command-endpoint audits are done with one concrete, deliberately-unfixed finding recorded. Not yet done, and each requiring its own dedicated session per this repository's established multi-session-per-phase pattern: any actual new-case Journey runtime cutover mechanism (none exists to switch on yet — no intake hook exists at all), the Finance-button fix above (needs verification first), full backend/frontend regression (not run — no code changed), and every §32 test-matrix row that depends on a real cutover existing. Carrying no false completion claim forward.
+
+### NEXT EXACT ACTIONS — Phase 7 continuation
+
+1. **Design and implement the real Journey intake hook**, as its own dedicated session with room for the transactional-integrity and failure-mode work the brief's §24–§27 require: extend `JourneyCaseVerificationService`'s pattern (or a new service reusing its exact checks — version PUBLISHED, deployment graph-hash match, idempotent replay) behind an explicit, additive, default-off cutover flag scoped to new cases only, wired to the real `CaseService.create` intake path, with an HTTP route and real authorization (not `journey.simulate`). This is the actual "controlled cutover" the brief describes; nothing before this point is a production switch.
+2. **Verify and, if confirmed safe, fix** `Portal.tsx`'s Finance-approve button (~line 725) and Operations-complete button (~line 724) to read a single `CaseActionService`-derived fact instead of recombining `ProposalGates` booleans — first confirm via `StaffWorkService`/`case_tasks` whether a Finance/Operations WorkItem already covers this so the fix is a true simplification and not a functional change.
+3. Only after (1) exists: implement the actual new-case/existing-case cutover-scope policy, observability/metrics, shadow-vs-live comparison for real (non-synthetic) cases, and the full §32 test matrix — none of which can be built honestly before the intake hook they all depend on exists.
+
+## Phase 7 readiness authorization — 2026-09-23 (Claude Code)
+
+The prior session (Phase 6B closure, below) left Phase 7 explicitly out of bounds pending an explicit readiness decision — no doc stated "PHASE 7 READY". The user has now explicitly reviewed that gap and authorized Phase 7 readiness directly, without first spending a session closing the deferred visual-review debt.
+
+### PHASE 7 READY: YES
+
+**Basis (user-authorized, recorded verbatim as decided):**
+- Phase 6A ACCEPTED = YES (see Phase 6A section below).
+- Phase 6B ACCEPTED = YES (see Phase 6B section below).
+- The deferred populated EN/AR desktop/mobile live visual reviews (Phase 6A Journey Designer/Validation/Simulation/Publish, and Phase 6B Care Coordination) are already carried into the Phase 8 hardening checklist (`master-implementation-spec.md` §14 "Phase 8", line ~1496) and are treated as non-blocking for Phase 7 runtime-cutover work.
+- The remaining Phase 6B UI-placement/discoverability debt (`RoutingPreferenceEditor` not linked from `RoleManagement.tsx` Consultant rows; no org-wide "recent routing decisions" feed; no manual "retry queue now" HTTP action) is non-blocking for runtime cutover and remains documented backlog, unless Phase 7 implementation discovers a concrete dependency on one of these items — in which case that specific workstream stops and the dependency is reported rather than silently broadening scope.
+
+**Explicitly recorded:**
+- Phase 7 (controlled cutover) has now been requested and is no longer out of bounds.
+- Phase 8 (hardening/full E2E/final visual-review closure) remains out of bounds and must not be started as part of Phase 7.
+- No deferred visual-review debt (Phase 6A or Phase 6B) is deleted, silently closed, or reclassified by this authorization — it remains open Phase 8 debt, tracked in this document and in `master-implementation-spec.md` §14.
+- Phase 6B scope (Care Coordination UI) is not being expanded to manufacture Phase 7 readiness; the two named debt items are accepted as-is.
+
 ## Phase 6B — Care Coordination Management UI — 2026-09-22 (Claude Code)
 
 Started per the prior session's own NEXT EXACT ACTIONS, scoped exactly to Phase 6B: Coordinator Teams, membership/capacity, Consultant routing preferences, routing policy display/publish, routing simulation, unassigned/fallback queue, manual assignment/reassignment, and assignment audit/history. No Phase 7 cutover, no Journey Designer architecture change, no second Assignment Engine. Read `technical-decisions.md` §23 (Phase 6 boundary) before starting, per the prior session's instruction.
