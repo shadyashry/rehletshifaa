@@ -58,18 +58,19 @@ public class JourneyProjectionService {
     private final AuthorizationService authorization;
     private final PatientJourneyAuthorizationService patientAuthorization;
     private final AccessAuditRepository audit;
+    private final JourneyLiveShadowService liveShadow;
     private final boolean enabled;
 
     public JourneyProjectionService(JourneyCaseBindingRepository bindings, JourneyDefinitionRepository definitions,
             JourneyStageProjectionRepository projections, ObjectProvider<JourneyRuntimePort> runtimes,
             JourneyActionDispatcher dispatcher, CoordinatorRoutingPort routing, AuthorizationService authorization,
-            PatientJourneyAuthorizationService patientAuthorization, AccessAuditRepository audit,
+            PatientJourneyAuthorizationService patientAuthorization, AccessAuditRepository audit, JourneyLiveShadowService liveShadow,
             @Value("${app.journey.runtime.case-verification-enabled:false}") boolean verificationEnabled,
             @Value("${app.journey.runtime.production-intake-enabled:false}") boolean productionIntakeEnabled) {
         this.bindings = bindings; this.definitions = definitions; this.projections = projections; this.runtimes = runtimes;
         this.dispatcher = dispatcher; this.routing = routing; this.authorization = authorization;
         this.patientAuthorization = patientAuthorization;
-        this.audit = audit;
+        this.audit = audit; this.liveShadow = liveShadow;
         // Two independent callers now reach syncInternal: the journey.simulate verification harness and the
         // real production intake hook (JourneyProductionIntakeService, Phase 7A). Either flag is sufficient to
         // let the shared projection machinery run; neither caller grants the other any extra authority — this
@@ -237,9 +238,10 @@ public class JourneyProjectionService {
 
     private void project(UUID caseId, UUID versionId, Node node, String subject, String engineTaskReference) {
         UUID caseTaskId = dispatcher.open(node.action(), new JourneyActionHandler.OpenContext(caseId, versionId, node, subject));
-        projections.insert(caseId, versionId, node.key(), node.actorType(), node.type().name(), caseTaskId, engineTaskReference);
+        UUID projectionId = projections.insert(caseId, versionId, node.key(), node.actorType(), node.type().name(), caseTaskId, engineTaskReference);
         audit.record(subject, caseId.toString(), node.type() == StageType.STAFF_TASK ? "JOURNEY_WORK_ITEM_OPENED" : "JOURNEY_PATIENT_ACTION_OPENED",
                 "SUCCESS", "node=" + node.key() + "; action=" + node.action());
+        liveShadow.compare(caseId, projectionId, versionId, caseTaskId, node);
     }
 
     private static Node node(Version version, String nodeKey) {

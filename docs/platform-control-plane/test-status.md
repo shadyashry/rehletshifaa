@@ -1,6 +1,16 @@
 # Platform Control Plane — verification status
 
+## Phase 7C acceptance verification — 2026-09-23 (Codex)
+
+- Frontend: `pnpm typecheck` passed; `pnpm test` passed **223 tests / 37 files, 0 failures**. Five focused authority tests prove Finance and Operations render from `availableActions` without local gate reconstruction, unavailable controls stay hidden, the supported `CaseWorkflowActions` subset is authoritative, deferred downstream actions are unchanged, and stale/direct rejection refreshes queue plus workspace.
+- Backend focused coverage: comparator `MATCH`, stable mismatch, acceptable difference, not comparable; real admitted-case comparison; repeat comparison non-mutation; aggregate observability; Finance unavailable direct POST rejection and stale repeat rejection.
+- Backend full offline regression: **443 tests / 48 suites, 0 failures, 0 errors, 1 intentional skip**. This includes the existing authorization/security suites for unauthorized action/status reads, guessed/cross-case/cross-patient access, actor/tenant constraints, dual authorization, race handling, and all six frozen-V1 parity paths.
+- Flyway: **49 migrations validated and applied, schema V49**. No PostgreSQL/Docker/live-stack run was needed or performed; the full H2 migration and application regression is the acceptance evidence for this additive slice.
+- Final result: **PHASE 7C COMPLETE = YES; PHASE 7 ACCEPTED = YES; PHASE 8 READY = YES**. No environment was enabled and Phase 8 was not started.
+
 ## Phase 7B verification — controlled cutover policy — 2026-09-23 (Claude Code)
+
+Commit: `d08653c34b0c4295d0652ec52ad3f8c803a7c079`
 
 - Focused: `mvn -o -q -Dtest='JourneyCutover*Test,JourneyProductionIntake*Test,CaseServiceTest' test` — all green.
 - `JourneyCutoverPolicyTest` (6, new, unit): no policy matches nothing; category policy matches only enabled categories (disabled/uncategorized/other → none); `ALL_NEW_CASES` covers uncategorized; overlap rejected (`OVERLAP:<category>`, `OVERLAP:ALL_NEW_CASES`), disabled duplicates are not overlap; malformed id/duplicate id/missing scope/empty or unexpected categories/invalid slug rejected; revision is content-addressed, order-independent, and changes with master flag or enablement.

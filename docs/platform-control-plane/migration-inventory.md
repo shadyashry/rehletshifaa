@@ -1,6 +1,16 @@
 # Platform Control Plane — migration inventory
 
+## Phase 7C live-shadow and cutover acceptance — 2026-09-23 (Codex)
+
+- V49 (additive, H2-safe SQL) adds `journey_live_shadow_comparisons`, one immutable structured result per projected stage (`UNIQUE projection_id`) with case, pinned Journey version, policy revision, result/category, legacy/Journey outcomes, explanation, and timestamp. V1–V48 are untouched.
+- Population is only real `JOURNEY` decisions from `journey_case_admissions`; verification/synthetic bindings and LEGACY decisions are ignored. Evaluation reads the already-shared case/task projection and pinned node and cannot execute business actions or create WorkItems/PatientActions.
+- Existing cutover status aggregates comparison totals/result/category/version/revision. No write endpoint, alternate engine, BI dashboard, environment flag change, or active-case migration was added.
+- Finance and Operations action rendering now consumes `CaseWorkspace.availableActions`; the backend command endpoints continue to revalidate state, role, prerequisites, and concurrency independently.
+- **Cutover status:** Phase 7 accepted; first real enablement remains deliberately unexecuted and must use the operator checklist and rollback runbook in `implementation-status.md`. Rollback requires configuration change plus backend restart; it affects new admissions only and never rewrites bound cases.
+
 ## Phase 7B cutover status — 2026-09-23 (Claude Code)
+
+Commit: `d08653c34b0c4295d0652ec52ad3f8c803a7c079`
 
 - V48 (additive SQL) adds `journey_case_admissions`: immutable per-case admission evidence (`decision` LEGACY|JOURNEY, `reason`, `policy_id`, `policy_revision`, `journey_version_id`, `care_category` snapshot, `evaluated_at`), PK `case_id`. Written only while the master switch is on. V1–V47 unchanged.
 - Cutover control is configuration: master `app.journey.runtime.production-intake-enabled` + `app.journey.cutover.policies[n]` (`id`, `enabled`, `scope` = `CARE_CATEGORY`|`ALL_NEW_CASES`, `care-categories`). Default: master off, no policies → legacy, nothing recorded. Overlapping enabled policies → whole set invalid → legacy `POLICY_CONFLICT`.

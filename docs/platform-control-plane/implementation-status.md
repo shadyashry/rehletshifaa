@@ -1,6 +1,55 @@
 # Platform Control Plane — implementation status
 
+## Phase 7C — live shadow, frontend authority closure, acceptance — 2026-09-23 (Codex)
+
+Scope stayed inside Phase 7C: no Journey catalog expansion, legacy deletion, flag enablement, environment change, or Phase 8 work.
+
+- **Real-case shadow:** every newly opened projection for an actually `JOURNEY`-admitted production-intake case is compared once against the shared legacy case/WorkItem projection. The comparator evaluates business state, available action intent, actor, WaitingOn, WorkItem/PatientAction intent, and terminal equivalence; it never starts or advances a runtime and never invokes an action handler. V49 stores immutable structured evidence per projection: `MATCH`, `ACCEPTABLE_DIFFERENCE`, `MISMATCH`, or `NOT_COMPARABLE`, a stable mismatch category, both outcomes, explanation, pinned Journey version, policy revision, and timestamp. Real `CaseService.submit` integration proves a matching result and unchanged case state/version, task count, assignment count, and outbox count after reevaluation.
+- **Observability:** the existing read-only cutover status now includes compared-case totals, all four result counts, mismatch-category counts, Journey-version counts, and policy-revision counts. Each comparison also emits `journey.shadow.comparison{result,category}` and `JOURNEY_LIVE_SHADOW_COMPARED`. Existing `journey.view` PLATFORM authorization remains the gate.
+- **Frontend authority:** Finance `APPROVE_COMMERCIAL_TERMS` and Operations `UPDATE_TRAVEL_PLAN` controls now render from `CaseWorkspace.availableActions`, not locally recombined proposal/status booleans. `CaseActionService.resolve` was tightened so these actions have the same prerequisites as their command endpoints. The frozen-V1 Operations subset in `CaseWorkflowActions` also requires the authoritative action; downstream treatment/follow-up compatibility UI remains unchanged and explicitly deferred.
+- **Stale/direct POST closure:** a command shown as available becomes stale after the first successful transition; a repeated Finance POST is rejected with `CASE_STATE_CONFLICT`. A premature direct Finance POST, absent from `availableActions`, is independently rejected with `OPERATIONS_REQUIRED_FIRST`. Failed frontend mutations refresh both the queue and current workspace before retaining the error. Authorization, actor, case/patient relationship, and concurrency checks remain server-side.
+- **Parity:** all six required frozen-V1 paths pass in the full regression: happy path through `COMPLETE_PROFILE`, manual commercial path, patient decline, Consultant return-to-Coordinator, proposal revision/rework, and proposal expiry/recovery. Assignment Engine routing and Case Owner versus WorkItem ownership remain unchanged.
+- **Verification:** frontend typecheck passed; frontend full suite **223 tests / 37 files, 0 failures**. Backend full suite **443 tests / 48 suites, 0 failures, 0 errors, 1 intentional skip**. Flyway validates and applies **V1–V49**.
+
+### First narrow enablement checklist (operator-gated; not executed)
+
+1. Confirm a real `INTERNATIONAL_CARE` Journey version is `PUBLISHED`.
+2. Confirm its runtime deployment exists.
+3. Confirm the stored graph hash equals the deployment graph hash.
+4. Confirm cutover status reports readiness `READY`.
+5. Confirm `configurationValid=true` and review the exact policy revision.
+6. Confirm admission/binding anomaly counters, runtime-start failures, and shadow `MISMATCH` count are zero.
+7. Configure exactly one enabled, narrow `CARE_CATEGORY` policy; do not use `ALL_NEW_CASES` for the first enablement.
+8. Enable the master production-intake switch only after steps 1–7 pass, then restart the backend so its immutable configuration snapshot takes effect.
+9. Monitor admission decisions, shadow-result/category metrics, runtime starts/failures, pinned versions, and the first per-case evidence.
+10. Prepare and peer-check the rollback configuration before admitting the first case.
+
+### Exact rollback runbook
+
+1. Disable the narrow policy or the master production-intake switch in deployment configuration.
+2. Reload by restarting/rebuilding the backend with the canonical tunnel stack command: `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`.
+3. Submit a new eligible case and verify it remains legacy-controlled (policy-disabled with master on records a LEGACY decision; master off performs the documented no-op).
+4. Inspect an already Journey-bound case and verify its immutable binding, pinned version, and Journey authority are unchanged.
+5. Confirm admission/binding anomaly counters remain zero and shadow mismatch categories have not increased unexpectedly.
+6. Monitor `journey.runtime.start{outcome=failure}` and failure audits. Do not edit Journey/admission rows or perform database surgery.
+
+Remaining compatibility/debt: downstream arrival/treatment/discharge/follow-up UI is outside frozen V1 and stays status-compatible; malformed non-UUID path ids still map to generic 500 application-wide and are explicitly Phase 8 hardening debt; the first real environment enablement and live monitoring remain an operator action. No material cutover-safety defect remains.
+
+### PHASE 7C COMPLETE: YES
+
+### PHASE 7 ACCEPTED: YES
+
+### PHASE 8 READY: YES
+
+### NEXT EXACT ACTIONS — operator enablement or separately authorized Phase 8
+
+1. Do not start Phase 8 or enable any environment implicitly. If an operator authorizes the first real enablement, execute the ten-step checklist above for one narrow care category and retain the status/metric evidence.
+2. If rollback is required, execute the six-step runbook above; new cases return to legacy while existing Journey-bound cases remain pinned and Journey-controlled.
+3. In a separately authorized Phase 8 session only: close the recorded malformed-UUID handling, populated EN/AR desktop/mobile visual reviews, accessibility/E2E and operational-polish debt without reopening the accepted cutover architecture or frozen V1 catalog.
+
 ## Phase 7B — controlled cutover policy, observability, concurrency closure — 2026-09-23 (Claude Code)
+
+Commit: `d08653c34b0c4295d0652ec52ad3f8c803a7c079`
 
 Scoped to Phase 7B only. No Phase 7C live shadow comparison, no `Portal.tsx`/`CaseWorkflowActions.tsx` work, no frontend change at all, no Phase 8.
 

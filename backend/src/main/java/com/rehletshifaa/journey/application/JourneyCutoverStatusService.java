@@ -8,6 +8,7 @@ import com.rehletshifaa.journey.api.JourneyDtos.CareCategoryView;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyLiveShadowRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -36,7 +37,7 @@ public class JourneyCutoverStatusService {
     public record Status(boolean productionIntakeEnabled, boolean runtimeEnabled, boolean configurationValid, List<String> configurationProblems,
                          List<String> unknownCareCategories, String policyRevision, List<PolicyView> policies, ReadinessView readiness,
                          Map<String, Long> admissions, long journeyAdmitted, long legacyAdmitted, long runtimeStartFailures,
-                         List<String> observedRevisions, Anomalies anomalies) {}
+                         List<String> observedRevisions, Anomalies anomalies, JourneyLiveShadowRepository.Aggregate shadowComparison) {}
     public record AdmissionView(String decision, String reason, String policyId, String policyRevision, UUID journeyVersionId,
                                 String careCategory, Instant evaluatedAt) {}
     public record BindingView(UUID journeyDefinitionId, UUID journeyVersionId, Integer versionNumber, String admissionMode,
@@ -54,12 +55,14 @@ public class JourneyCutoverStatusService {
     private final AuthorizationService authorization;
     private final AccessAuditRepository audit;
     private final JdbcClient jdbc;
+    private final JourneyLiveShadowRepository shadow;
 
     public JourneyCutoverStatusService(JourneyCutoverPolicy policy, JourneyDeploymentService readiness, JourneyCaseAdmissionRepository admissions,
             JourneyCaseBindingRepository bindings, JourneyDefinitionRepository definitions, ObjectProvider<JourneyRuntimePort> runtimes,
-            CareCategoryCatalog categories, AuthorizationService authorization, AccessAuditRepository audit, JdbcClient jdbc) {
+            CareCategoryCatalog categories, AuthorizationService authorization, AccessAuditRepository audit, JdbcClient jdbc,
+            JourneyLiveShadowRepository shadow) {
         this.policy = policy; this.readiness = readiness; this.admissions = admissions; this.bindings = bindings; this.definitions = definitions;
-        this.runtimes = runtimes; this.categories = categories; this.authorization = authorization; this.audit = audit; this.jdbc = jdbc;
+        this.runtimes = runtimes; this.categories = categories; this.authorization = authorization; this.audit = audit; this.jdbc = jdbc; this.shadow = shadow;
     }
 
     @Transactional(readOnly = true)
@@ -75,7 +78,7 @@ public class JourneyCutoverStatusService {
                 policy.rules().stream().map(r -> new PolicyView(r.id(), r.enabled(), r.scope() == null ? null : r.scope().name(), r.careCategories())).toList(),
                 new ReadinessView(ready.category(), ready.version().map(v -> v.id()).orElse(null), ready.version().map(v -> v.number()).orElse(null)),
                 counts, journey, legacy, admissions.failureCount(), admissions.distinctRevisions(),
-                new Anomalies(admissions.journeyAdmissionsWithoutStartedBinding(), admissions.productionBindingsWithoutJourneyAdmission()));
+                new Anomalies(admissions.journeyAdmissionsWithoutStartedBinding(), admissions.productionBindingsWithoutJourneyAdmission()), shadow.aggregate());
     }
 
     @Transactional(readOnly = true)

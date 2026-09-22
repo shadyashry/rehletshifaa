@@ -87,7 +87,8 @@ public class CaseActionService {
         boolean coordinator = actor.has(ActorRole.COORDINATOR) || actor.has(ActorRole.COORDINATOR_LEAD);
         boolean owned = coordinator && actor.subject().equals(f.coordinatorSubject());
         CurrentActionView current = currentAction(caseId, f, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
-        List<String> available = coordinator && owned ? availableActions(caseId, f, patientAction, blockers) : List.of();
+        List<String> available = coordinator && owned ? availableActions(caseId, f, patientAction, blockers)
+                : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of();
         return new CaseActionsView(f.status(), waitingOn, waitingReason, current, blockers, available);
     }
 
@@ -179,8 +180,16 @@ public class CaseActionService {
             return none();
         }
         if (actor.has(ActorRole.DOCTOR) && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
-        if (actor.has(ActorRole.OPERATIONS) && Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
-        if (actor.has(ActorRole.FINANCE) && "PROPOSAL_PREPARATION".equals(s)) return simple("APPROVE_COMMERCIAL_TERMS", "FOCUS");
+        Proposal proposal = latestProposal(caseId);
+        if (actor.has(ActorRole.OPERATIONS)) {
+            if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
+            if ("PROPOSAL_PREPARATION".equals(s) && f.travelPackage() && proposal != null && !proposal.operationsDone()
+                    && "CLINICALLY_APPROVED".equals(proposal.status())) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
+        }
+        if (actor.has(ActorRole.FINANCE) && "PROPOSAL_PREPARATION".equals(s) && proposal != null && proposal.requiresFinance()
+                && !proposal.financeDone() && (!f.travelPackage() || proposal.operationsDone())
+                && Set.of("CLINICALLY_APPROVED", "OPERATIONS_COMPLETED").contains(proposal.status()))
+            return simple("APPROVE_COMMERCIAL_TERMS", "FOCUS");
         return none();
     }
 

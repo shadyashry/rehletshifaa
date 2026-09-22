@@ -7,7 +7,9 @@ import com.rehletshifaa.shared.crypto.CryptoService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -19,11 +21,15 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties="spring.task.scheduling.enabled=false")
+@AutoConfigureMockMvc
 @Transactional
 class JourneyServiceIntegrationTest {
-    @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto; @Autowired EntityManager entityManager; @Autowired PaymentService payment;
+    @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto; @Autowired EntityManager entityManager; @Autowired PaymentService payment; @Autowired MockMvc mvc;
     @AfterEach void clearSecurity(){SecurityContextHolder.clearContext();}
 
     @Test void credentialDecisionRequiresIndependentReviewerEvenForLegacyAdministrators() {
@@ -67,11 +73,27 @@ class JourneyServiceIntegrationTest {
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultant treatment package",new BigDecimal("1000.00"),"EGP",0,new BigDecimal("1000.00"),true);
 
         authenticate("coordinator-subject","COORDINATOR");var proposal=journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Hospital and travel plan","EGP","Clinical review and treatment","Complications and extra nights","Deposit before travel","Provider refund policy","Not procedure-specific consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Treatment package",BigDecimal.ONE,new BigDecimal("1000.00"),false,0)),"Coordinator note"));
+        UUID proposalVersionId=proposal.versionId();
         assertThat(proposal.items()).singleElement().satisfies(item->assertThat(item.description()).isEqualTo("Consultant treatment package"));
         var operationsAssignment=journey.assign(created.caseId(),new AssignmentRequest("operations-subject","OPERATIONS","PRIMARY","cardiac-pod","Travel and hospital planning"));
         var financeAssignment=journey.assign(created.caseId(),new AssignmentRequest("finance-subject","FINANCE","PRIMARY","cardiac-pod","Commercial approval"));
-        authenticate("operations-subject","OPERATIONS");journey.decideAssignment(created.caseId(),operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS);proposal=journey.completeOperations(created.caseId(),proposal.versionId(),"Operational plan confirmed");assertThat(proposal.status()).isEqualTo("OPERATIONS_COMPLETED");
-        authenticate("finance-subject","FINANCE");journey.decideAssignment(created.caseId(),financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.FINANCE);proposal=journey.approveFinance(created.caseId(),proposal.versionId());assertThat(proposal.status()).isEqualTo("FINANCE_APPROVED");
+        authenticate("operations-subject","OPERATIONS");journey.decideAssignment(created.caseId(),operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS);
+        assertThat(journey.workspace(created.caseId()).actions().availableActions()).contains("UPDATE_TRAVEL_PLAN");
+        authenticate("finance-subject","FINANCE");journey.decideAssignment(created.caseId(),financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.FINANCE);
+        // Direct POST cannot bypass the same current business preconditions that kept the action absent.
+        assertThat(journey.workspace(created.caseId()).actions().availableActions()).doesNotContain("APPROVE_COMMERCIAL_TERMS");
+        mvc.perform(post("/api/v1/finance/cases/{caseId}/proposals/{versionId}/approve", created.caseId(), proposalVersionId)
+                        .with(jwt().jwt(token -> token.subject("finance-subject").claim("auth_time", Instant.now().getEpochSecond()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_FINANCE"))))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("OPERATIONS_REQUIRED_FIRST"));
+        authenticate("operations-subject","OPERATIONS");proposal=journey.completeOperations(created.caseId(),proposal.versionId(),"Operational plan confirmed");assertThat(proposal.status()).isEqualTo("OPERATIONS_COMPLETED");
+        authenticate("finance-subject","FINANCE");assertThat(journey.workspace(created.caseId()).actions().availableActions()).contains("APPROVE_COMMERCIAL_TERMS");
+        UUID approvedVersionId=proposal.versionId();proposal=journey.approveFinance(created.caseId(),approvedVersionId);assertThat(proposal.status()).isEqualTo("FINANCE_APPROVED");
+        // A once-valid action is stale after the transition; the endpoint revalidates and rejects it.
+        mvc.perform(post("/api/v1/finance/cases/{caseId}/proposals/{versionId}/approve", created.caseId(), approvedVersionId)
+                        .with(jwt().jwt(token -> token.subject("finance-subject").claim("auth_time", Instant.now().getEpochSecond()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_FINANCE"))))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CASE_STATE_CONFLICT"));
         authenticate("coordinator-subject","COORDINATOR");proposal=journey.releaseProposal(created.caseId(),proposal.versionId());assertThat(proposal.status()).isEqualTo("RELEASED");
         authenticate("patient-subject","PATIENT");proposal=journey.decideProposal(created.caseId(),proposal.versionId(),new ProposalDecisionRequest("ACCEPTED",List.of(),"Approved"));assertThat(proposal.status()).isEqualTo("ACCEPTED");
         assertThat(journey.patientCases()).extracting(CaseView::status).contains("ACCEPTED");

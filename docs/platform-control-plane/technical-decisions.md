@@ -3,6 +3,14 @@
 Phase 0 plans, implemented Phase 1 (§10–§11) and Phase 2A (§12), and frozen Phase 2B design review (§13), 2026-09-14.
 Canonical product requirements: [blueprint](blueprint.md), [master spec](master-implementation-spec.md).
 
+## 27. Phase 7C — evaluation-only live shadow and action authority — 2026-09-23 (Codex)
+
+- Live shadow is an immutable comparison projection, not a second executor: after the shared WorkItem/PatientAction is opened for a real Journey admission, it reads that business projection and the pinned Journey node, classifies their external business equivalence, and records evidence. It never completes a task, dispatches an action, changes the case, assigns staff, notifies, charges, activates a patient, or starts a runtime.
+- Comparisons are stage-level and idempotent by projection id. This permits bounded recovery-loop visits to be assessed independently while preserving the exact version/policy evidence under which each visit was admitted.
+- `availableActions` is the UI authority for Finance approval and Operations proposal work. The command service remains the security and consistency authority and independently rechecks actor, state, prerequisites, and optimistic/concurrency conditions; frontend refresh-on-rejection is recovery UX, not authorization.
+- `CaseService.submit` flushes RECEIVED before the synchronous intake listener reads through JDBC. This closes a real JPA/JDBC visibility gap discovered by the real-admission comparator while retaining one transaction: a later Journey failure still rolls the entire submission back.
+- V1 does not acquire downstream lifecycle vocabulary during cutover closure. Existing doctor treatment/follow-up compatibility forms remain explicitly deferred rather than being mislabeled as Journey parity defects.
+
 ## 1. Branch and source of truth
 
 Retain `codex/platform-control-plane`: it is already the intended feature branch, with the canonical specifications committed at `458359895209eccfea011c76cd6a46bc38dc7bae`. The reflog records its creation from `codex/2026-healthcare-ux` at `1fa84e4`; no new redundant branch is needed. Phase 0 began with a clean tree. The older branch name in AGENTS.md and the commercial handoff is historical; the actual checkout wins.

@@ -1,6 +1,16 @@
 # Phase 4B Journey parity status
 
+## Phase 7C live admitted-case parity — 2026-09-23 (Codex)
+
+- Real production-intake integration now admits through the Phase 7 policy path, starts the pinned deployed Journey, opens the shared projection, and records a structured `MATCH`; comparison is evaluation-only and a repeat evaluation leaves case status/version, WorkItems, assignments, and outbox unchanged.
+- Result vocabulary: `MATCH`, `ACCEPTABLE_DIFFERENCE`, `MISMATCH`, `NOT_COMPARABLE`. Categories: `ACTION_SET_MISMATCH`, `ACTOR_MISMATCH`, `STATE_MAPPING_MISMATCH`, `WAITING_STATE_MISMATCH`, `PROJECTION_INTENT_MISMATCH`, `TERMINAL_STATE_MISMATCH`, `EXPECTED_LEGACY_DIFFERENCE`, `OUT_OF_FROZEN_V1_SCOPE`.
+- Frozen-V1 regression remains green for happy path through `COMPLETE_PROFILE`, manual commercial handling, patient decline, Consultant return-to-Coordinator, proposal revision/rework, and expiry/recovery. Differences explicitly outside frozen V1 become `NOT_COMPARABLE`, not false defects.
+- Finance and Operations controls use backend-resolved `availableActions`; the compatible Operations V1 subset in `CaseWorkflowActions` migrated, while downstream arrival/treatment/discharge/follow-up compatibility behavior remains deferred without expanding the catalog.
+- Phase 7 parity gate: **PASS**. Phase 7 accepted; no real environment was enabled.
+
 ## Phase 7B note — 2026-09-23 (Claude Code)
+
+Commit: `d08653c34b0c4295d0652ec52ad3f8c803a7c079`
 
 No parity result changed. Phase 7B added the admission policy and evidence (`journey_case_admissions`) that Phase 7C's live shadow comparison will use to select its real-case population and attribute each case to a policy revision. The legacy-vs-Journey business-outcome comparison for real cases is still not built (Phase 7C).
 
