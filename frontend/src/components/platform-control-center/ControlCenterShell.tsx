@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Building2, ClipboardCheck, Menu, ShieldCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { ccCopy } from "./control-center-copy";
+import { AccessGovernanceNav } from "./AccessGovernanceNav";
 import "./control-center.css";
 
 export type Crumb = { label: string; href?: string };
@@ -39,6 +40,7 @@ export function ControlCenterShell({locale,active,crumbs,title,intro,actions,chi
               <ClipboardCheck size={16} aria-hidden /> {t.credentialQueue}
             </Link></li>
           </ul>
+          <AccessGovernanceNav locale={locale} />
           <Link className="cc-secondary" style={{ marginTop: 20, display: "inline-flex" }} href={`/${locale}/portal`}>
             <Back size={16} aria-hidden /> {t.back}
           </Link>

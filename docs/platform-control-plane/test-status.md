@@ -1,5 +1,19 @@
 # Platform Control Plane — verification status
 
+## Phase 5B closure verification — unified navigation + live review — 2026-09-22 (Claude Code)
+
+- `cd frontend && pnpm typecheck` — clean, whole tree, after `AccessGovernanceNav.tsx`, the `ControlCenterShell.tsx` wiring, and the `initialTab` deep-link plumbing.
+- `pnpm test src/components/platform-control-center` — **36/36 passed** (9 files): all prior tests unchanged (including the 7 in `AccessGovernance.test.tsx` from the prior session), plus 2 new in `AccessGovernanceNav.test.tsx` (deep-links render only with `access.role.view`; render nothing without it) and 1 new in `AccessGovernance.test.tsx` (`initialTab` selects the right tab and auto-loads its data).
+- `pnpm test` (full frontend suite) — **167/167 passed**, zero regressions.
+- No backend file changed this session; the prior session's full backend gate (409 tests / 43 suites, 0 failures/errors, Flyway V1–V46) stands and was not rerun, per AGENTS.md (`run broader verification only when... shared infrastructure/API/auth/database/security is changed`).
+- **Live review, performed against the real dev stack** (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build backend frontend`, signed in as the live DB's real `RehletShifaa Owner` bootstrap subject `credential-admin` via the actual Keycloak flow):
+  - Unified navigation: verified desktop + mobile, EN + AR. Screenshots taken at each step confirmed the "ACCESS & GOVERNANCE"/"الوصول والحوكمة" sidebar section, correct deep-linking into `Role catalogue`/`Capabilities`/`Effective access`/`Access history` with real seeded data (27 role templates), and mobile sidebar collapse/expand with `document.documentElement.scrollWidth === clientWidth` (no horizontal overflow) confirmed via direct JS execution.
+  - Effective Access self-review fix: live-confirmed `access.role.publish`/`access.assignment.manage`/`access.role.simulate` show **Allowed** for a genuinely fresh sign-in reviewing itself; a different subject still correctly shows the recent-auth-required denial.
+  - Temporal display: live-confirmed in English and Arabic RTL, real dates from the real bootstrap assignment.
+  - Assignment reliability: form state (role/version/scope/reason) survived a **directly observed real `automaticSilentRenew` firing** (`sessionStorage`'s `oidc.user...expires_at` advanced by 230s between two checks while the tab sat idle). Submission produced a real backend round trip both times — a correctly-rejected invalid combination (400, `RoleAssignmentService`'s own "verified provider organization" guard, confirmed via the `api-gateway` access log) and a correctly-accepted valid one (200), the latter triggering an automatic Effective Access re-fetch/re-render with no manual refresh. Test assignment was created and then revoked through the UI itself; confirmed `REVOKED` in the database afterward — no direct DB mutation, no authorization bypass.
+  - Console: no application errors (only pre-existing, unrelated Cloudflare Insights CSP blocks).
+- **Not run this session:** the disposable PostgreSQL preflight, Playwright/E2E, and live execution of the Simulation/Publish steps (unchanged Phase 1 functionality, already covered by `AccessGovernanceIntegrationTest` and Phase 2B's own recorded live pass below).
+
 ## Phase 5B correctness/reliability verification — 2026-09-22 (Claude Code)
 
 - Focused backend: `mvn -o -q -Dmaven.repo.local=<local .m2> -Dtest=AccessGovernanceIntegrationTest test` — **14/14 passed** (was 13), including the new `effectiveAccessSelfReviewUsesTheCallersOwnRecentAuthenticationLikeSimulateAlreadyDoes`.

@@ -84,6 +84,17 @@ describe("Access governance business interface",()=>{
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(screen.getByRole("button",{name:"Refresh"})).toBeEnabled();
   });
+  it("honors initialTab (from the Control Center's deep-linking sidebar) and auto-loads that tab's own data",async()=>{
+    vi.mocked(apiFetchAs).mockImplementation(async(_token,path)=>{
+      if(path.endsWith("/me")) return new Response(JSON.stringify(capabilities.map(permission=>({permission,allowed:true,reason:"ALLOWED"}))),{status:200});
+      if(path.includes("/permissions")) return new Response(JSON.stringify([permission]),{status:200});
+      if(path.includes("/audit")) return new Response(JSON.stringify([{actor:"owner",entity:"role-1",action:"ROLE_PUBLISHED",outcome:"SUCCESS",reason:"Initial publication",occurredAt:"2026-01-01T00:00:00Z"}]),{status:200});
+      return new Response(JSON.stringify([role]),{status:200});
+    });
+    render(<AccessGovernance locale="en" initialTab="audit"/>);
+    expect(await screen.findByRole("button",{name:"Access history"})).toHaveAttribute("aria-current","page");
+    expect(await screen.findByText("role published")).toBeVisible();
+  });
   it("keeps the open Effective Access panel when the access token silently renews (same subject, new object)",async()=>{
     const {rerender}=render(<AccessGovernance locale="en"/>);
     await screen.findByRole("button",{name:/Practice Manager/});

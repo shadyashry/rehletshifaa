@@ -26,9 +26,9 @@ const channels=["ADMIN_WEB","STAFF_WEB","CONSULTANT_WEB","CONSULTANT_MOBILE","PR
 const relationships=["MANAGES","ASSISTS","SUPERVISES","COORDINATES","ASSIGNED_TO","VERIFIES"];
 const identity=(g:Grant)=>JSON.stringify(g);
 
-export function AccessGovernance({locale}:{locale:Locale}) {
+export function AccessGovernance({locale,initialTab}:{locale:Locale;initialTab?:"roles"|"permissions"|"effective"|"audit"}) {
   const t=accessCopy[locale];const {user,loading:authLoading,signIn}=useAuth();
-  const [tab,setTab]=useState<"roles"|"permissions"|"effective"|"audit">("roles");
+  const [tab,setTab]=useState<"roles"|"permissions"|"effective"|"audit">(initialTab??"roles");
   const [roles,setRoles]=useState<Role[]>([]);const [permissions,setPermissions]=useState<Permission[]>([]);const [mine,setMine]=useState<Decision[]>([]);
   const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
   const [detail,setDetail]=useState<Detail|null>(null);const [selectedVersion,setSelectedVersion]=useState("");const [query,setQuery]=useState("");
@@ -70,6 +70,11 @@ export function AccessGovernance({locale}:{locale:Locale}) {
     }catch(e){setError(e instanceof Error?e.message:t.error);}finally{setLoading(false);}
   },[hasUser,user?.profile.sub,page,t.error]);
   useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{
+    if(initialTab==="audit"&&mine.some(d=>d.permission==="access.audit.view"&&d.allowed))
+      void run(async()=>setAudits(await apiRef.current<Audit[]>("/audit")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once, when the deep-linked audit tab's own permission first becomes known
+  },[initialTab,mine]);
   const loadRole=async(id:string,versionId?:string)=>{
     const d=await api<Detail>("/roles/"+id);setDetail(d);setSelectedVersion(versionId??d.versions[0]?.version.id??"");return d;
   };
