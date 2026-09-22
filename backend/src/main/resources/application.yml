@@ -62,6 +62,11 @@ app:
   # AND this flag both true. A real published+deployed JourneyVersion must also exist, or intake stays on
   # legacy authority. Existing cases are never rebound. Keep off outside an explicit, reviewed cutover.
   journey.runtime.production-intake-enabled: ${JOURNEY_RUNTIME_PRODUCTION_INTAKE_ENABLED:false}
+  # Phase 7B: with the master switch above on, a new case enters Journey only if exactly one ENABLED policy
+  # covers it (JourneyCutoverPolicy); none are configured by default, so every new case stays legacy. Example:
+  #   app.journey.cutover.policies[0]: {id: cardiology-pilot, enabled: true, scope: CARE_CATEGORY, care-categories: [cardiology]}
+  # Overlapping enabled policies invalidate the whole set (all legacy, POLICY_CONFLICT). Changes need a restart
+  # and never affect already-bound cases. Read-only status: GET /api/v1/admin/journey-cutover (journey.view).
   # Redis-backed reference-data cache. Only the caches named in CacheNames exist; live workflow,
   # payment and authorization state is never cached.
   cache:

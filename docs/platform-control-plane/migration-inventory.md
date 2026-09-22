@@ -1,5 +1,16 @@
 # Platform Control Plane — migration inventory
 
+## Phase 7B cutover status — 2026-09-23 (Claude Code)
+
+- V48 (additive SQL) adds `journey_case_admissions`: immutable per-case admission evidence (`decision` LEGACY|JOURNEY, `reason`, `policy_id`, `policy_revision`, `journey_version_id`, `care_category` snapshot, `evaluated_at`), PK `case_id`. Written only while the master switch is on. V1–V47 unchanged.
+- Cutover control is configuration: master `app.journey.runtime.production-intake-enabled` + `app.journey.cutover.policies[n]` (`id`, `enabled`, `scope` = `CARE_CATEGORY`|`ALL_NEW_CASES`, `care-categories`). Default: master off, no policies → legacy, nothing recorded. Overlapping enabled policies → whole set invalid → legacy `POLICY_CONFLICT`.
+- Only dimension: care category at intake (the one catalog-validated intake attribute). Tenant/provider are not known at intake and were not invented.
+- Rollback: disable the policy (or the master switch) and restart. New cases return to legacy; already-bound cases keep their binding, pinned version and runtime instance, and their admission evidence is never rewritten (tested).
+- Real enablement status: **no real deployment has the master switch on**; no production case has been admitted to Journey outside test suites.
+- Operator read surface: `GET /api/v1/admin/journey-cutover` and `/cases/{caseId}` (`journey.view`, PLATFORM).
+- Concurrency: `CaseService.submit` now takes a row lock (`findForSubmission`, PESSIMISTIC_WRITE); racing submits serialize to one RECEIVED + one 409 `CASE_NOT_DRAFT`.
+- Phase 7C (live legacy-vs-Journey shadow comparison) and the frontend `availableActions` slice remain open.
+
 ## Phase 7A migration and cutover status — 2026-09-23 (Claude Code)
 
 - V47 is the additive migration: widens `journey_case_bindings.admission_mode`'s CHECK constraint from `'VERIFICATION'`-only to `IN ('VERIFICATION','PRODUCTION')` (Java migration, portable-constraint-name lookup, same technique as V33/V46). No other schema change. V1–V46 remain immutable.

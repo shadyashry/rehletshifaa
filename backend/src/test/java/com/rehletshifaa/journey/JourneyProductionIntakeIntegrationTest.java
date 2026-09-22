@@ -34,6 +34,8 @@ import static com.rehletshifaa.journey.JourneyGraphTest.*;
  */
 @SpringBootTest(properties={"spring.task.scheduling.enabled=false","app.journey.runtime.enabled=true",
         "app.journey.runtime.schema-update=true","app.journey.runtime.production-intake-enabled=true",
+        // Phase 7B: master on alone admits nothing; this whole-population policy keeps the 7A contract under test.
+        "app.journey.cutover.policies[0].id=all-new-cases","app.journey.cutover.policies[0].enabled=true","app.journey.cutover.policies[0].scope=ALL_NEW_CASES",
         "spring.datasource.url=jdbc:h2:mem:journey-production-intake;MODE=LEGACY;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class JourneyProductionIntakeIntegrationTest {
@@ -52,6 +54,10 @@ class JourneyProductionIntakeIntegrationTest {
     @Autowired Clock clock;
     @Autowired PlatformTransactionManager manager;
     @Autowired ProcessEngine engine;
+    @Autowired JourneyAdmissionDecisionService decisions;
+    @Autowired com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository admissions;
+    @Autowired org.springframework.jdbc.core.simple.JdbcClient jdbcClient;
+    @Autowired io.micrometer.core.instrument.MeterRegistry meters;
     Version version;
     JourneyDefinitionIntegrationTest fixture;
     static final UUID JOURNEY_WORK_PLATFORM = UUID.fromString("42000001-0000-0000-0000-000000000001");
@@ -158,7 +164,8 @@ class JourneyProductionIntakeIntegrationTest {
     @Test void disablingTheIntakeFlagNeverTouchesAnAlreadyBoundCase() {
         UUID caseId = submitRealCase();
         var before = bindings.findByCase(caseId).orElseThrow();
-        var offInstance = new JourneyProductionIntakeService(definitionRepo, deploymentRepo, bindings, runtimes, projections, audit, false);
+        var offInstance = new JourneyProductionIntakeService(decisions, JourneyCutoverPolicy.of(false, List.of()), deploymentRepo, bindings,
+                admissions, runtimes, projections, audit, jdbcClient, manager, meters);
 
         offInstance.onCaseSubmitted(new IntakeEvents.CaseSubmitted(caseId));
 

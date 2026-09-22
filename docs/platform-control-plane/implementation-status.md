@@ -1,5 +1,54 @@
 # Platform Control Plane — implementation status
 
+## Phase 7B — controlled cutover policy, observability, concurrency closure — 2026-09-23 (Claude Code)
+
+Scoped to Phase 7B only. No Phase 7C live shadow comparison, no `Portal.tsx`/`CaseWorkflowActions.tsx` work, no frontend change at all, no Phase 8.
+
+**1. Intake dimensions (read from `CaseService.create/submit`, `MedicalCase`, `CaseDtos`).**
+- AVAILABLE AT INTAKE and used: `care_category` — optional, validated at the request boundary (`cardiology|rheumatology-rehabilitation|orthopedics`) and backed by the managed `care_categories` catalog; snapshotted on the admission row because coordinators may change it later (`JourneyService.updateCareCategory`).
+- AVAILABLE but NOT USED: `country` (free text, 80 chars — not normalized), `preferred_language` (patient preference, mutable, not a rollout concern), `travel_package_requested` (a commercial option, not a population), new-vs-returning patient (`createForExistingPatient` — not persisted as a stable case attribute).
+- NOT AVAILABLE AT INTAKE: tenant/provider organization (cases have no provider FK; provenance exists only after Consultant assignment — technical-decisions.md §15), specialty beyond care category, channel/case source (not recorded), multiple Journey definitions (exactly one exists by construction).
+- UNSAFE FOR CUTOVER: anything caller-supplied that is not catalog-validated; percentage/hash bucketing (not in the canonical design, not reproducible from the case alone).
+
+**2. Policy model** ([JourneyCutoverPolicy.java](../../backend/src/main/java/com/rehletshifaa/journey/application/JourneyCutoverPolicy.java), [JourneyCutoverProperties.java](../../backend/src/main/java/com/rehletshifaa/journey/application/JourneyCutoverProperties.java)). The existing `app.journey.runtime.production-intake-enabled` stays the master switch. Policies are a list under `app.journey.cutover.policies[n]` with `id`, `enabled`, `scope` (`CARE_CATEGORY` with a non-empty `care-categories` list, or `ALL_NEW_CASES` with none). No expressions, no deny rules, no percentages. Validated once at startup into an immutable snapshot with a SHA-256 content `revision` (master flag + sorted normalized rules).
+
+**3. Persistence/control: configuration-controlled (option A).** Every other `app.journey.runtime.*` switch is deployment configuration and the canonical docs define no business-admin cutover console, so no policy table and no write API was built. Operating procedure: change the properties in the deployment environment, restart, confirm via the status endpoint (`policyRevision`, `configurationValid`). Durable evidence is what the brief actually requires: V48 `journey_case_admissions` (one immutable row per evaluated case: decision, reason, policy id, policy revision, selected version, care-category snapshot, evaluation time) plus a `JOURNEY_CUTOVER_POLICY_CHANGED` audit written at startup whenever the effective revision differs from the last recorded one.
+
+**4. Precedence** ([JourneyAdmissionDecisionService.java](../../backend/src/main/java/com/rehletshifaa/journey/application/JourneyAdmissionDecisionService.java), first match wins): master off → no-op, nothing recorded (legacy exactly as before 7A) · already admitted or bound → no-op · engine bean absent → LEGACY `RUNTIME_DISABLED` · case row missing → `CONTEXT_INCOMPLETE` (not stored — no FK target) · invalid config → LEGACY `POLICY_CONFLICT` · no enabled policy covers the case → LEGACY `POLICY_NO_MATCH` · policy matches but no ready version → LEGACY `NO_DEFINITION|NOT_PUBLISHED|NOT_DEPLOYED|GRAPH_MISMATCH` (matched policy id still recorded) · otherwise JOURNEY `POLICY_MATCHED`. **Overlap is rejected, not resolved:** two enabled policies covering the same category, or an enabled `ALL_NEW_CASES` alongside any other enabled policy, invalidates the whole set (fail closed to legacy); a disabled policy never overlaps. Malformed ids, duplicate ids, missing scope, empty/unexpected categories are also rejected. Unknown-but-well-formed category slugs are surfaced by status (`unknownCareCategories`) and simply never match.
+
+**5. Default-safe behavior.** Default config: master off, zero policies → nothing evaluated, nothing written. Master on with no policy → every new case LEGACY. LEGACY never fails a submission. A JOURNEY decision is taken once, before any binding; if bind/start/projection then fails, the Phase 7A contract holds — the whole `submit()` rolls back (case back to DRAFT, no admission/binding/instance) and the same submission is never re-routed to legacy. The failure is recorded in a separate `REQUIRES_NEW` transaction as `JOURNEY_RUNTIME_START_FAILED` (`category=RUNTIME_START_FAILED|BINDING_CONFLICT`, version, revision — never the exception text) so it survives the rollback. A retry re-evaluates as a fresh attempt (no authority was ever persisted).
+
+**6. Readiness reused, not duplicated.** Phase 7A's eligible-version rule moved verbatim into `JourneyDeploymentService.admissionReadiness()` (Phase 4B's deployment owner) and now also reports the not-ready category; the decision service and the status read both call it. `pinnedReadiness(version)` reports DEPLOYED/GRAPH_MISMATCH/NOT_DEPLOYED for an already-bound case's pinned version.
+
+**7. One decision per attempt / in-flight change.** The policy snapshot is immutable for the process lifetime (no refresh scope); `admitIfEligible` evaluates exactly once and acts only on that `Decision`. A policy change is a restart, so no request can observe two policy states.
+
+**8. Racing submits — closed with a real defect fix.** Phase 7A's `submit()` read the case without a lock, so two concurrent submits could both pass the DRAFT check (the loser would fail later on an optimistic-lock flush or the binding PK, i.e. an unmapped 500 after half the work). `CaseService.submit` now loads the case via `MedicalCaseRepository.findForSubmission` (`PESSIMISTIC_WRITE`, `SELECT … FOR UPDATE`): the second submit waits, then sees RECEIVED and gets the existing 409 `CASE_NOT_DRAFT`. Proven with two real threads on the real service for both a Journey-admitted and a legacy-admitted case: one RECEIVED, one 409, one admission row, ≤1 binding, ≤1 Flowable instance, one `JOURNEY:review` WorkItem, one selection audit, zero failure audits. `journey_case_admissions.case_id` (PK) remains the durable backstop.
+
+**9. Observability (read-only)** — [JourneyCutoverController.java](../../backend/src/main/java/com/rehletshifaa/journey/api/JourneyCutoverController.java), [JourneyCutoverStatusService.java](../../backend/src/main/java/com/rehletshifaa/journey/application/JourneyCutoverStatusService.java):
+- `GET /api/v1/admin/journey-cutover` — master/runtime state, config validity + problems, unknown categories, current revision, policies, current readiness (category, version id/number), admission counts by `decision:reason`, Journey/legacy totals, runtime-start failure count, revisions observed in admissions, anomaly counters (JOURNEY admissions without a started binding; PRODUCTION bindings without a JOURNEY admission — both must be 0).
+- `GET /api/v1/admin/journey-cutover/cases/{caseId}` — authority (from the binding, never re-evaluated against current policy), admission evidence, binding (definition, version id/number, mode, bound/started timestamps, runtime started, pinned deployment readiness), latest failure category/time. No patient name/contact, no engine reference.
+- Both require `journey.view` at PLATFORM scope (ADMIN_WEB/API), checked before any lookup; `SecurityConfig` permits authenticated **GET only** on this path (other methods fall through to the legacy `/api/v1/admin/**` role rule).
+
+**10. Audit / metrics.** Existing `AccessAuditRepository`/`audit_events` extended with `JOURNEY_ADMISSION_SELECTED`, `LEGACY_ADMISSION_SELECTED` (payload: reason, policy, revision, version), `JOURNEY_RUNTIME_START_FAILED`, `JOURNEY_CUTOVER_POLICY_CHANGED`; the 7A `JOURNEY_CASE_BOUND/STARTED` events are unchanged. The 7A `JOURNEY_PRODUCTION_INTAKE_SKIPPED` event is superseded by `LEGACY_ADMISSION_SELECTED` + a stored reason. Micrometer (already on the classpath via actuator; first use in this codebase, no new dependency): `journey.admission{decision,reason}`, `journey.runtime.start{outcome}`, `journey.binding.conflict`. "Policy miss" is `journey.admission{decision=LEGACY,reason=POLICY_NO_MATCH}`.
+
+**11. Schema.** V48 `journey_case_admissions` (additive SQL; PK/FK to `medical_cases`, FK to `journey_versions`, CHECKs tying JOURNEY ⇔ version+policy present). V1–V47 untouched.
+
+**12. Phase 7A tests adjusted for the new semantics, not weakened.** `JourneyProductionIntakeIntegrationTest` now configures an explicit `ALL_NEW_CASES` policy (master-on alone no longer admits) and constructs its flag-off instance through the new constructor; every 7A assertion is unchanged. `CaseServiceTest` stubs `findForSubmission` instead of `findById`.
+
+### PHASE 7B COMPLETE: YES
+
+### PHASE 7 ACCEPTED: NO
+
+### PHASE 8 READY: NO
+
+### NEXT EXACT ACTIONS — Phase 7C and remaining Phase 7
+
+1. **Phase 7C live shadow comparison** for real cases: for JOURNEY-admitted cases (`journey_case_admissions.decision='JOURNEY'`), compare the legacy transition/WorkItem outcome against the Journey runtime's, reusing `JourneyParityHarness` and Phase 3 `SHADOW`; the admission rows give 7C its population and its policy revision per case.
+2. Before any real enablement: publish+deploy a real `INTERNATIONAL_CARE` version, set the master switch plus a single narrow `CARE_CATEGORY` policy in one environment, restart, confirm `configurationValid=true`, `readiness.category=READY` and zero anomalies on `GET /api/v1/admin/journey-cutover`, then watch `journey.runtime.start{outcome=failure}` and the per-case view for the first admissions. Rollback = disable the policy or the master switch and restart; bound cases stay Journey-owned.
+3. Remaining Phase 7 frontend slice (unchanged, still deliberately out of this session): `Portal.tsx` Finance-approve button, `CaseWorkflowActions.tsx` status-derived forms, `availableActions` cleanup.
+4. Optional operator UI for the status endpoint only if 7C/rollout needs it — the JSON surface is sufficient for config-controlled operation.
+5. Pre-existing, not introduced here: a malformed (non-UUID) path id returns the generic 500 `INTERNAL_ERROR` app-wide (`GlobalExceptionHandler` has no `MethodArgumentTypeMismatchException` mapping); no data leaks, but it should be a 400.
+
 ## Phase 7A — real Journey intake hook — 2026-09-23 (Claude Code)
 
 Scoped exactly to Phase 7A per this session's brief: the real production case-intake path, new-case-only version binding, transactional runtime start, fail-safe default-off control. No Phase 7B/7C (cutover-scope policy beyond a single global flag, observability layer, shadow-vs-live comparison for real cases), no Portal.tsx/frontend work, no Phase 8.

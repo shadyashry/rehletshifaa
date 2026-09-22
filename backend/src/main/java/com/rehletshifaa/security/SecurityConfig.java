@@ -19,6 +19,7 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/account/preferences").authenticated()
         .requestMatchers("/api/v1/tasks/**","/api/v1/work/**","/api/v1/notifications/**","/api/v1/notifications").authenticated()
         .requestMatchers("/api/v1/admin/journeys/**","/api/v1/admin/journeys").authenticated()
+        .requestMatchers(HttpMethod.GET,"/api/v1/admin/journey-cutover","/api/v1/admin/journey-cutover/**").authenticated()
         .requestMatchers("/api/v1/admin/coordination/**").authenticated()
         .requestMatchers("/api/v1/admin/access/**").authenticated()
         .requestMatchers("/api/v1/admin/providers/**","/api/v1/admin/providers").authenticated()

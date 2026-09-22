@@ -1,5 +1,9 @@
 # Phase 4B Journey parity status
 
+## Phase 7B note — 2026-09-23 (Claude Code)
+
+No parity result changed. Phase 7B added the admission policy and evidence (`journey_case_admissions`) that Phase 7C's live shadow comparison will use to select its real-case population and attribute each case to a policy revision. The legacy-vs-Journey business-outcome comparison for real cases is still not built (Phase 7C).
+
 ## Phase 7A note — 2026-09-23 (Claude Code)
 
 The "version-pinning/active-case-safety parity is mechanism-verified but not yet a business-outcome comparison" line below (and the same point in the blocking matrix's last row) is now partially superseded: Phase 7A added the first real (flag-gated, default-off) production intake path — `JourneyProductionIntakeService`, reacting to real `CaseService.submit()` — and proved genuine new-case binding, version pinning across a later publish, and reachability into the existing Phase 4B `completeWorkItem` runtime path using a real, non-synthetic case (see implementation-status.md/test-status.md Phase 7A entries). This is still not a legacy-vs-Journey *business-outcome* comparison for a real case (no production case has actually been routed through it — both flags default off, and no session has enabled them against a real deployed `INTERNATIONAL_CARE` version) — that remains Phase 7B's live shadow-comparison work, reusing the existing `JourneyParityHarness`/Phase 3 `SHADOW` mechanism, not a new one. The 11-action mapping, the blocking matrix and every PASS/BLOCKED classification below are otherwise unchanged by this session — no parity result was altered.

@@ -13,11 +13,16 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class JourneyDeploymentService {
     public record Readiness(UUID journeyVersionId, String status, String compilerVersion, String artifactHash) {}
+    /** Production-admission readiness: {@code READY} carries the version new cases bind to; any other category carries none. */
+    public record AdmissionReadiness(String category, Optional<Version> version) {
+        public boolean ready() { return version.isPresent(); }
+    }
     private final JourneyDefinitionRepository definitions;
     private final JourneyDeploymentRepository deployments;
     private final JourneyCompiler compiler;
@@ -67,6 +72,30 @@ public class JourneyDeploymentService {
         var deployed=runtime.deploy(artifact);
         deployments.insert(version.graphHash(),artifact,deployed,actor.subject());
         audit.record(actor.subject(),version.id().toString(),"JOURNEY_DEPLOYED","SUCCESS","compiler="+artifact.compilerVersion()+"; hash="+artifact.hash());
+    }
+    /**
+     * The one runtime-readiness rule for new production admissions (moved here from Phase 7A's intake service so
+     * admission and operator status share it): the highest-numbered PUBLISHED version of the single canonical
+     * definition whose deployment graph hash still matches. Publication alone is not readiness (§16). No
+     * authorization: callers are the system intake hook and the already-authorized cutover status read.
+     */
+    AdmissionReadiness admissionReadiness() {
+        var defs = definitions.definitions();
+        if (defs.size() != 1) return new AdmissionReadiness("NO_DEFINITION", Optional.empty());
+        boolean published = false, deployed = false;
+        for (Version v : definitions.versions(defs.get(0).id())) {
+            if (v.status() != Status.PUBLISHED) continue;
+            published = true;
+            var deployment = deployments.find(v.id());
+            if (deployment.isEmpty()) continue;
+            deployed = true;
+            if (deployment.get().graphHash().equals(v.graphHash())) return new AdmissionReadiness("READY", Optional.of(v));
+        }
+        return new AdmissionReadiness(!published ? "NOT_PUBLISHED" : !deployed ? "NOT_DEPLOYED" : "GRAPH_MISMATCH", Optional.empty());
+    }
+    /** Whether an already-pinned version's deployment still matches its immutable graph. */
+    String pinnedReadiness(Version version) {
+        return deployments.find(version.id()).map(d -> d.graphHash().equals(version.graphHash()) ? "DEPLOYED" : "GRAPH_MISMATCH").orElse("NOT_DEPLOYED");
     }
     private Readiness view(UUID version) {
         return deployments.find(version).map(d -> new Readiness(version,"DEPLOYED",d.compilerVersion(),d.bpmnHash()))
