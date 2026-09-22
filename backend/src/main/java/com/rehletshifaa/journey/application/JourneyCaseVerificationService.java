@@ -72,7 +72,7 @@ public class JourneyCaseVerificationService {
         var deployment=deployments.find(versionId).orElseThrow(()->conflict("JourneyVersion is not deployed."));
         if(!deployment.graphHash().equals(version.graphHash())) throw conflict("Journey deployment differs from the immutable version.");
         UUID caseId=cases.create(command.intake()).caseId();
-        bindings.insert(caseId,versionId,subject,command.commandKey(),hash);
+        bindings.insert(caseId,versionId,"VERIFICATION",subject,command.commandKey(),hash);
         audit.record(subject,caseId.toString(),"JOURNEY_CASE_BOUND","SUCCESS","version="+versionId+"; mode=VERIFICATION");
         return new View(caseId,versionId,"BOUND");
     }

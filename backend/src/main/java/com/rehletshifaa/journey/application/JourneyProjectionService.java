@@ -64,11 +64,17 @@ public class JourneyProjectionService {
             JourneyStageProjectionRepository projections, ObjectProvider<JourneyRuntimePort> runtimes,
             JourneyActionDispatcher dispatcher, CoordinatorRoutingPort routing, AuthorizationService authorization,
             PatientJourneyAuthorizationService patientAuthorization, AccessAuditRepository audit,
-            @Value("${app.journey.runtime.case-verification-enabled:false}") boolean enabled) {
+            @Value("${app.journey.runtime.case-verification-enabled:false}") boolean verificationEnabled,
+            @Value("${app.journey.runtime.production-intake-enabled:false}") boolean productionIntakeEnabled) {
         this.bindings = bindings; this.definitions = definitions; this.projections = projections; this.runtimes = runtimes;
         this.dispatcher = dispatcher; this.routing = routing; this.authorization = authorization;
         this.patientAuthorization = patientAuthorization;
-        this.audit = audit; this.enabled = enabled;
+        this.audit = audit;
+        // Two independent callers now reach syncInternal: the journey.simulate verification harness and the
+        // real production intake hook (JourneyProductionIntakeService, Phase 7A). Either flag is sufficient to
+        // let the shared projection machinery run; neither caller grants the other any extra authority — this
+        // only gates whether a JourneyRuntimePort call is attempted at all, the same fail-closed 503 either way.
+        this.enabled = verificationEnabled || productionIntakeEnabled;
     }
 
     /**
@@ -199,6 +205,18 @@ public class JourneyProjectionService {
         String subject = authorize();
         bindings.lock(caseId, subject); // scoped to the creating subject, matching every other verification-harness read
         return projections.forCase(caseId);
+    }
+
+    /**
+     * Package-private: projects the newly started runtime's active human stages for a real production
+     * admission ({@link JourneyProductionIntakeService}), where there is no human caller to hold
+     * {@code journey.simulate} yet — the runtime reaching its first node is a system event, exactly like
+     * every other {@code syncInternal} call site above. Deliberately not {@code public}: it must never be
+     * reachable from a controller or an ordinary client, only from this package's own system-triggered code.
+     */
+    List<Projection> syncAsSystem(UUID caseId) {
+        var binding = bindings.lockByCase(caseId);
+        return syncInternal(caseId, binding, "SYSTEM");
     }
 
     private List<Projection> syncInternal(UUID caseId, Binding binding, String subject) {

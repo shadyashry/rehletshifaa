@@ -58,6 +58,10 @@ app:
   # No case cutover is implied. Keep off until the complete Phase 4B parity gate passes.
   journey.runtime.enabled: ${JOURNEY_RUNTIME_ENABLED:false}
   journey.runtime.schema-update: ${JOURNEY_RUNTIME_SCHEMA_UPDATE:false}
+  # Phase 7A: real new-case intake hook (JourneyProductionIntakeService). Requires journey.runtime.enabled
+  # AND this flag both true. A real published+deployed JourneyVersion must also exist, or intake stays on
+  # legacy authority. Existing cases are never rebound. Keep off outside an explicit, reviewed cutover.
+  journey.runtime.production-intake-enabled: ${JOURNEY_RUNTIME_PRODUCTION_INTAKE_ENABLED:false}
   # Redis-backed reference-data cache. Only the caches named in CacheNames exist; live workflow,
   # payment and authorization state is never cached.
   cache:

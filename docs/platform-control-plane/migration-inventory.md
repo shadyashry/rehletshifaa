@@ -1,5 +1,13 @@
 # Platform Control Plane — migration inventory
 
+## Phase 7A migration and cutover status — 2026-09-23 (Claude Code)
+
+- V47 is the additive migration: widens `journey_case_bindings.admission_mode`'s CHECK constraint from `'VERIFICATION'`-only to `IN ('VERIFICATION','PRODUCTION')` (Java migration, portable-constraint-name lookup, same technique as V33/V46). No other schema change. V1–V46 remain immutable.
+- New-policy cutover: `JourneyProductionIntakeService` reacts to `IntakeEvents.CaseSubmitted` (already published inside `CaseService.submit()`'s transaction) and, only when `app.journey.runtime.production-intake-enabled=true` (default `false`, requires `app.journey.runtime.enabled=true` too), binds a newly-RECEIVED case to the latest eligible `PUBLISHED`+deployed `INTERNATIONAL_CARE` version and starts the runtime. No existing endpoint's authorization changed; no new endpoint was added.
+- Both flags default off. No case has been bound through this path outside this session's own test suite. Existing cases are never touched — the hook only ever fires once, at the moment a case is newly submitted, and is idempotent against redelivery via `journey_case_bindings.case_id`'s primary key plus an explicit existence check.
+- Rollback: revoke by setting `app.journey.runtime.production-intake-enabled=false` (or leaving it at its default). This stops *new* cases from entering Journey; it does not and cannot retroactively touch any case already bound (no code path reads the flag for an existing binding). Do not attempt schema rollback of V47 — it is purely additive and widening, safe to leave applied even with the flag off.
+- Full offline backend regression after this slice: see test-status.md for exact counts. Focused suite: `JourneyProductionIntakeIntegrationTest` (7), `JourneyProductionIntakeDisabledTest` (1), plus a clean rerun of `JourneyCaseBindingIntegrationTest`/`JourneyStageProjectionIntegrationTest` (unaffected by the `JourneyProjectionService` constructor widening).
+
 ## Phase 7 cutover inventory — 2026-09-23 (Claude Code)
 
 Evidence-based inventory built by reading source (not inferring from these docs' prose), per the Phase 7 brief's own instruction to search code first. No file was changed to produce this section; classification uses the brief's own A–E scale (A = already authoritative new path, B = compatibility wrapper still required, C = ready for controlled cutover, D = defer to Phase 8/later cleanup, E = do not remove — still semantically required).

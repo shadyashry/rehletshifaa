@@ -35,9 +35,14 @@ public class JourneyCaseBindingRepository {
                 .orElseThrow(()->new ApiException(404,"JOURNEY_CASE_NOT_FOUND","Journey verification case not found."));
     }
 
-    public void insert(UUID caseId, UUID version, String subject, String key, String hash) {
-        jdbc.sql("INSERT INTO journey_case_bindings(case_id,journey_version_id,admission_mode,created_by,command_key,request_hash,created_at) VALUES(?,?,'VERIFICATION',?,?,?,?)")
-                .params(caseId,version,subject,key,hash,timestamp(clock.instant())).update();
+    /** Existence check only (no lock): the production intake idempotency guard, checked before attempting an insert. */
+    public Optional<Binding> findByCase(UUID caseId) {
+        return jdbc.sql("SELECT * FROM journey_case_bindings WHERE case_id=?").param(caseId).query(this::map).optional();
+    }
+
+    public void insert(UUID caseId, UUID version, String admissionMode, String subject, String key, String hash) {
+        jdbc.sql("INSERT INTO journey_case_bindings(case_id,journey_version_id,admission_mode,created_by,command_key,request_hash,created_at) VALUES(?,?,?,?,?,?,?)")
+                .params(caseId,version,admissionMode,subject,key,hash,timestamp(clock.instant())).update();
     }
 
     public void started(UUID caseId, String reference) {
