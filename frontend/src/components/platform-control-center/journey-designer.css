@@ -1,0 +1,68 @@
+/* Journey Designer — scoped under .jd, reusing the shared .cc- chrome (buttons, dialog, badges, tabs). */
+
+.jd-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.jd-head-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.jd-head-actions{display:flex;gap:8px;flex-wrap:wrap}
+.jd-saved{color:#1c6b43;font-size:13px}
+.jd-unsaved{color:#8a5218;font-size:13px}
+
+.jd-layout{display:grid;grid-template-columns:220px 1fr 320px;gap:14px;align-items:start}
+.jd-palette,.jd-inspector{border:1px solid #d7e1dc;border-radius:10px;padding:12px;background:#fbfdfc;max-height:78vh;overflow:auto}
+.jd-palette h3,.jd-inspector h3{margin-top:0;font-size:14px}
+.jd-palette-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.jd-palette-list button{width:100%;justify-content:flex-start;background:white;color:#233e40;border-color:#d7e1dc;min-height:40px}
+
+.jd-canvas-wrap{border:1px solid #d7e1dc;border-radius:10px;background:#f4f7f5;height:72vh;min-height:420px;position:relative}
+
+.jd-node{border:1.5px solid #90a8a4;border-radius:10px;background:white;padding:8px 10px;min-width:170px;font-size:12.5px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.jd-node-head{display:flex;align-items:center;gap:6px;font-weight:650;color:#233e40}
+.jd-node-actor{font-size:11px;color:#526866}
+.jd-node-badges{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.jd-node.jd-selected{border-color:#27665e;box-shadow:0 0 0 3px rgba(39,102,94,.25)}
+.jd-node.jd-has-error{border-color:#c85c5c}
+.jd-node.jd-has-warning{border-color:#c8912f}
+.jd-node.jd-sim-visited{background:#eaf5ef}
+.jd-node.jd-sim-current{background:#e6f0eb;border-color:#27665e}
+.jd-node.jd-control{background:#f7faf8}
+.jd-node .jd-badge-blocking{background:#fbeee2;border:1px solid #e7c39a;color:#8a5218;border-radius:5px;padding:1px 5px;font-size:10.5px}
+.jd-node .jd-badge-sla{background:#eef2ee;border:1px solid #c4d3c9;border-radius:5px;padding:1px 5px;font-size:10.5px}
+
+.jd-edge-recovery path{stroke-dasharray:5 4}
+
+.jd-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.jd-toolbar button{min-height:36px;padding:6px 10px;font-size:13px}
+
+.jd-field{margin-bottom:10px}
+.jd-inline{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.jd-inline>*{flex:1;min-width:110px}
+
+.jd-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.jd-list>li{border:1px solid #d7e1dc;border-radius:8px;padding:10px}
+.jd-list>li.jd-selected{border-color:#27665e;background:#f2f8f5}
+
+.jd-issue-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.jd-issue{border-inline-start:3px solid #9a2f2f;background:#fbe4e4;border-radius:6px;padding:8px 10px;font-size:13px}
+.jd-issue.jd-warning{border-inline-start-color:#936728;background:#f6f1e4}
+.jd-issue button{margin-top:6px}
+
+.jd-sim-steps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.jd-sim-steps>li{border:1px solid #d7e1dc;border-radius:8px;padding:8px 10px;font-size:13px;display:flex;justify-content:space-between;gap:10px}
+
+.jd-diff-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.jd-diff-list>li{padding:8px 10px;border-radius:6px;font-size:13px}
+.jd-diff-added{background:#e6f5ec;border-inline-start:3px solid #1c6b43}
+.jd-diff-removed{background:#fbe4e4;border-inline-start:3px solid #9a2f2f}
+.jd-diff-changed{background:#f6f1e4;border-inline-start:3px solid #936728}
+
+.jd-publish-checks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.jd-publish-checks>li{display:flex;justify-content:space-between;gap:10px;align-items:center}
+
+[dir=rtl] .jd-edge-recovery path{stroke-dasharray:5 4}
+
+@media(max-width:1100px){
+  .jd-layout{grid-template-columns:1fr}
+  .jd-palette,.jd-inspector{max-height:none}
+}
+@media(max-width:900px){
+  .jd-canvas-wrap{height:auto}
+}
