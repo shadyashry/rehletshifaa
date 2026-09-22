@@ -3,6 +3,14 @@
 Phase 0 plans, implemented Phase 1 (§10–§11) and Phase 2A (§12), and frozen Phase 2B design review (§13), 2026-09-14.
 Canonical product requirements: [blueprint](blueprint.md), [master spec](master-implementation-spec.md).
 
+## 28. Phase 8A — security boundary corrections — 2026-09-23 (Codex)
+
+- Anonymous intake remains public by design. A random, short-lived, case-bound bearer is the minimum correlation primitive between bot-verified creation and draft uploads/submission; only its peppered SHA-256 hash is persisted. Re-authenticating the endpoint or trusting the UUID would respectively break the intended intake or preserve the IDOR.
+- Recent authentication means the identity-provider `auth_time` claim only. `iat` identifies token issuance/refresh and is not evidence of an interactive login. Missing, stale or future `auth_time` therefore fails closed.
+- Resource-server trust is issuer + signature + token time + expected client. Keycloak access tokens may express the client as audience or authorized party (`azp`), so either exact match is accepted; a realm-valid token for another client is denied.
+- Identifier conversion and framework request-binding failures are client errors under the existing `ApiError` contract. Unknown application exceptions remain a logged generic 500; internal exception text and stack traces are never serialized.
+- The security inventory is durable at `phase-8a-security-surface-inventory.md`. Existing resource resolvers, dual Journey/Access authorization, tenant tests, OTP grants, document inspection and audit architecture were retained rather than redesigned.
+
 ## 27. Phase 7C — evaluation-only live shadow and action authority — 2026-09-23 (Codex)
 
 - Live shadow is an immutable comparison projection, not a second executor: after the shared WorkItem/PatientAction is opened for a real Journey admission, it reads that business projection and the pinned Journey node, classifies their external business equivalence, and records evidence. It never completes a task, dispatches an action, changes the case, assigns staff, notifies, charges, activates a patient, or starts a runtime.

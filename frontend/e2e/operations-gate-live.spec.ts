@@ -55,9 +55,9 @@ async function signIn(browser: Browser, user: string): Promise<Session> {
   return { request: context.request, subject, token: token! };
 }
 
-async function call<T = unknown>(s: Session | null, method: string, path: string, body?: unknown, expected?: number): Promise<{ status: number; body: T }> {
+async function call<T = unknown>(s: Session | null, method: string, path: string, body?: unknown, expected?: number, extraHeaders: Record<string,string> = {}): Promise<{ status: number; body: T }> {
   const res = await (s?.request ?? anonymous!).fetch(`${API}${path}`, {
-    method, headers: { ...(s ? { Authorization: `Bearer ${s.token}` } : {}), "Content-Type": "application/json" }, data: body,
+    method, headers: { ...(s ? { Authorization: `Bearer ${s.token}` } : {}), "Content-Type": "application/json",...extraHeaders }, data: body,
   });
   const text = await res.text();
   const parsed = (text ? JSON.parse(text) : null) as T;
@@ -103,12 +103,12 @@ test("operations may draft before the gate, cannot advance the journey, and the 
   const operations = await signIn(browser, "operations");
   const finance = await signIn(browser, "finance");
 
-  const created = await call<{ caseId: string; caseNumber: string }>(null, "POST", "/cases", {
+  const created = await call<{ caseId: string; caseNumber: string; intakeGrant: string }>(null, "POST", "/cases", {
     caseFor: "MYSELF", givenName: "Playwright", familyName: "Ops Gate", country: "Kenya", whatsappNumber: whatsapp, conditionDescription: "Synthetic case for the Operations gate check.",
     preferredLanguage: "en", consent: true, turnstileToken: null, email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: true,
   }, 201);
   const caseId = created.body.caseId;
-  await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200);
+  await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200,{"X-Case-Grant":created.body.intakeGrant});
   const workspace = async (s: Session = coordinator, prefix = "coordinator") => (await call<Workspace>(s, "GET", `/${prefix}/cases/${caseId}`, undefined, 200)).body;
 
   await call(coordinator, "POST", `/coordinator/cases/${caseId}/claim`, undefined, 200);

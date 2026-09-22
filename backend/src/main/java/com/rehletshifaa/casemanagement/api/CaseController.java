@@ -13,5 +13,5 @@ public class CaseController {
     private final CaseService service; private final BotProtectionPort botProtection;
     public CaseController(CaseService service, BotProtectionPort botProtection) { this.service=service; this.botProtection=botProtection; }
     @PostMapping @ResponseStatus(HttpStatus.CREATED) public CaseDtos.CreateCaseResponse create(@Valid @RequestBody CaseDtos.CreateCaseRequest request, HttpServletRequest http) { botProtection.verify(request.turnstileToken(), http.getRemoteAddr()); return service.create(request); }
-    @PostMapping("/{caseId}/submit") public CaseDtos.SubmitCaseResponse submit(@PathVariable UUID caseId) { return service.submit(caseId); }
+    @PostMapping("/{caseId}/submit") public CaseDtos.SubmitCaseResponse submit(@PathVariable UUID caseId,@RequestHeader("X-Case-Grant") String grant) { return service.submitPublic(caseId,grant); }
 }

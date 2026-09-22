@@ -1,5 +1,26 @@
 # Platform Control Plane — implementation status
 
+## Phase 8A — security and authorization hardening — 2026-09-23 (Codex)
+
+Scope stayed inside Phase 8A. Phase 8B reliability/resilience, Phase 8C E2E/visual/RTL/accessibility, Phase 8D independent red-team closure and Journey production enablement were not started.
+
+- Inventoried every reachable controller family and classified it as public-by-design, authenticated patient/staff, platform admin, organization-scoped, callback/webhook or internal/service. The durable matrix and threat review are in `phase-8a-security-surface-inventory.md`.
+- Closed the application-wide malformed identifier debt centrally: path/query UUID conversion now returns the existing structured error contract as `400 INVALID_IDENTIFIER`; framework binding/validation, method/media, payload-size and unknown-route errors receive bounded structured 4xx responses with no exception or stack-trace leakage.
+- Corrected recent authentication: legacy `ActorContext` no longer treats token `iat` as login time. Missing, stale and implausibly future `auth_time` deny sensitive operations, so token refresh cannot falsely satisfy re-authentication. Access Governance already used strict `auth_time` and remains unchanged.
+- Hardened JWT trust: Spring's issuer/signature/time validation is retained and now also requires the expected Keycloak browser client through `aud` or Keycloak `azp`. Realm claims remain coarse route/legacy compatibility only; database state remains business authority.
+- Closed public-draft IDOR: V50 adds one hashed, random, expiring intake grant per draft. Bot-verified creation returns the opaque grant; draft document presign/confirm and public submit require the exact case-bound grant, and successful submit consumes it. Wrong case, guessed token and replay fail without mutation or case enumeration. Existing submission row locking still serializes races.
+- Rechecked provider/credential/pricing/availability, Access Governance, coordination/assignment, Journey definition/runtime, PatientAction/WorkItem, documents, public OTP/grant flows, webhook and cutover-read boundaries against their existing cross-tenant, relationship, state, version, maker/checker, idempotency and audit tests. No business authorization was weakened and no frontend check became authoritative.
+- Meta webhook HMAC and duplicate-delivery semantics remain; malformed signed JSON now returns `400 INVALID_WEBHOOK_PAYLOAD` without parser detail.
+- Verification: frontend typecheck passed; frontend full suite **223 tests / 37 files, 0 failures**. Backend clean full rerun **452 tests / 50 suites, 0 failures, 0 errors, 1 intentional skip**, including Flyway V1–V50. One first-pass OTP fixture error passed immediately in isolation and the clean full rerun; no product change was made for it.
+
+### PHASE 8A COMPLETE: YES
+
+### NEXT EXACT ACTIONS — separately authorized Phase 8B only
+
+1. Do not enable Journey production intake; its master flag and policy set remain operator-controlled and off by default.
+2. Begin Phase 8B reliability/resilience only in a separate authorized session. Do not fold Phase 8C visual/E2E/accessibility or Phase 8D independent review into that work.
+3. When deploying this slice, rebuild with the canonical base+tunnel Compose command so the frontend intake-grant contract and backend V50/API change move together.
+
 ## Phase 7C — live shadow, frontend authority closure, acceptance — 2026-09-23 (Codex)
 
 Scope stayed inside Phase 7C: no Journey catalog expansion, legacy deletion, flag enablement, environment change, or Phase 8 work.

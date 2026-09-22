@@ -20,7 +20,7 @@ type FormValues = {
 type CareAreaKey = "" | "cardiology" | "rheumatology-rehabilitation" | "orthopedics";
 type FieldKey = keyof FormValues | "files" | "server";
 type Errors = Partial<Record<FieldKey, string>>;
-type CreateCaseResponse = { caseId: string; caseNumber: string; status: "DRAFT" };
+type CreateCaseResponse = { caseId: string; caseNumber: string; status: "DRAFT"; intakeGrant: string };
 type PresignResponse = { documentId: string; uploadUrl: string; requiredHeaders: Record<string, string> };
 type Session = { linked: boolean; displayName: string | null; accountStatus: string; currentCaseId: string | null };
 
@@ -169,19 +169,20 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   /** Attach the chosen files to a draft, then submit it. Shared by both the new-patient and returning-patient paths. */
   async function uploadAndSubmit(created: CreateCaseResponse) {
+    const intakeHeaders = { "Content-Type": "application/json", "X-Case-Grant": created.intakeGrant };
     for (const file of files) {
       if (uploaded.current.has(fileKey(file))) continue;
-      const presignResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/presign`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ originalFileName: file.name, contentType: file.type, sizeBytes: file.size }) });
+      const presignResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/presign`), { method: "POST", headers: intakeHeaders, body: JSON.stringify({ originalFileName: file.name, contentType: file.type, sizeBytes: file.size }) });
       if (!presignResponse.ok) throw new SubmitFailure("upload");
       const presigned = await presignResponse.json() as PresignResponse;
       const uploadResponse = await fetch(presigned.uploadUrl, { method: "PUT", headers: presigned.requiredHeaders, body: file });
       if (!uploadResponse.ok) throw new SubmitFailure("upload");
-      const confirmResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/confirm`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: presigned.documentId }) });
+      const confirmResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/confirm`), { method: "POST", headers: intakeHeaders, body: JSON.stringify({ documentId: presigned.documentId }) });
       if (!confirmResponse.ok) throw new SubmitFailure("upload");
       uploaded.current.add(fileKey(file));
       track("medical_file_uploaded");
     }
-    const finalResponse = await fetch(apiUrl(`/cases/${created.caseId}/submit`), { method: "POST" });
+    const finalResponse = await fetch(apiUrl(`/cases/${created.caseId}/submit`), { method: "POST", headers: { "X-Case-Grant": created.intakeGrant } });
     if (!finalResponse.ok) throw new SubmitFailure("submitAfterUpload");
     return await finalResponse.json() as { caseNumber: string; statusToken: string };
   }

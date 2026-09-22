@@ -1,5 +1,16 @@
 # Platform Control Plane — verification status
 
+## Phase 8A security hardening verification — 2026-09-23 (Codex)
+
+- Focused security regression passed: central malformed UUID and missing-header structured errors; strict missing/stale/future/fresh `auth_time`; expected-client JWT validator; public intake wrong-token/cross-case/consume-and-replay behavior; Meta signature and malformed-payload handling; H2 Flyway through V50.
+- Frontend `pnpm typecheck`: PASS.
+- Frontend `pnpm test`: **223 tests / 37 files, 0 failures**.
+- Backend `mvn -o -q test`: clean final rerun **452 tests / 50 suites, 0 failures, 0 errors, 1 intentional skip**. Flyway validated/applied **V1–V50**.
+- The first full backend pass had one OTP fixture error in `PatientActivationJourneyTest.completingTheProfileActivatesItWithoutAnyPayment`. The unchanged suite passed immediately alone, and the clean full rerun passed; treated as transient test-order/random-fixture behavior, not hidden by a product change.
+- Playwright/live tunnel tests were intentionally not run: they are Phase 8C scope, and the running stack was not rebuilt to this uncommitted V50/frontend contract. Journey production intake was not enabled.
+
+**Phase 8A security gate: PASS.**
+
 ## Phase 7C acceptance verification — 2026-09-23 (Codex)
 
 - Frontend: `pnpm typecheck` passed; `pnpm test` passed **223 tests / 37 files, 0 failures**. Five focused authority tests prove Finance and Operations render from `availableActions` without local gate reconstruction, unavailable controls stay hidden, the supported `CaseWorkflowActions` subset is authoritative, deferred downstream actions are unchanged, and stale/direct rejection refreshes queue plus workspace.

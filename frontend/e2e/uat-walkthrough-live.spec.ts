@@ -42,8 +42,8 @@ async function signIn(browser: Browser, user: string): Promise<Session> {
 }
 
 let anonymous: APIRequestContext | null = null;
-async function call<T = unknown>(s: Session | null, method: string, path: string, body?: unknown, expected?: number): Promise<{ status: number; body: T }> {
-  const res = await (s?.request ?? anonymous!).fetch(`${API}${path}`, { method, headers: { ...(s ? { Authorization: `Bearer ${s.token}` } : {}), "Content-Type": "application/json" }, data: body });
+async function call<T = unknown>(s: Session | null, method: string, path: string, body?: unknown, expected?: number, extraHeaders: Record<string,string> = {}): Promise<{ status: number; body: T }> {
+  const res = await (s?.request ?? anonymous!).fetch(`${API}${path}`, { method, headers: { ...(s ? { Authorization: `Bearer ${s.token}` } : {}), "Content-Type": "application/json",...extraHeaders }, data: body });
   const text = await res.text();
   const parsed = (text ? JSON.parse(text) : null) as T;
   if (expected !== undefined) expect(res.status(), `${method} ${path} -> ${text.slice(0, 300)}`).toBe(expected);
@@ -99,12 +99,12 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   const idle = async (p: Page) => { await expect(p.getByText("Loading your workspace…")).toHaveCount(0); };
 
   // --- 1. Intake: the request lands in the team queue and the team mailbox, not in anyone's inbox ----------
-  const created = await call<{ caseId: string; caseNumber: string }>(null, "POST", "/cases", {
+  const created = await call<{ caseId: string; caseNumber: string; intakeGrant: string }>(null, "POST", "/cases", {
     caseFor: "MYSELF", givenName: "Playwright", familyName: "UAT Pass", country: "Kenya", whatsappNumber: whatsapp, conditionDescription: "Synthetic case for the UAT defect-correction walkthrough.",
     preferredLanguage: "en", consent: true, turnstileToken: null, email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: false,
   }, 201);
   const caseId = created.body.caseId, caseNumber = created.body.caseNumber;
-  await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200);
+  await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200,{"X-Case-Grant":created.body.intakeGrant});
   const newCase = await expectMail(request, TEAM_MAILBOX, started, new RegExp(`New care request for case ${caseNumber}`));
   expect(newCase.Text).toContain("waiting in the coordination team queue");
   expect(newCase.Text).not.toMatch(/Playwright|UAT Pass|Kenya/); // reference only, never patient facts

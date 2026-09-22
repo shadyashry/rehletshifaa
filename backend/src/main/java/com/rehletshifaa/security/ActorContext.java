@@ -6,6 +6,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.util.Arrays;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,6 +16,8 @@ import java.util.stream.Collectors;
 
 @Component
 public class ActorContext {
+    private final Clock clock;
+    public ActorContext(Clock clock) { this.clock = clock; }
     public Actor current() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) throw new ApiException(401, "AUTHENTICATION_REQUIRED", "Authentication is required");
@@ -24,7 +27,7 @@ public class ActorContext {
         Instant authenticatedAt=Instant.EPOCH;
         if(auth instanceof JwtAuthenticationToken jwt){
             Instant authTime=jwt.getToken().getClaimAsInstant("auth_time");
-            authenticatedAt=authTime!=null?authTime:java.util.Objects.requireNonNullElse(jwt.getToken().getIssuedAt(),Instant.EPOCH);
+            authenticatedAt=authTime!=null?authTime:Instant.EPOCH;
         }
         return new Actor(auth.getName(), roles, authenticatedAt);
     }
@@ -52,7 +55,7 @@ public class ActorContext {
     }
     public record AccountEmail(String email, boolean verified) {}
 
-    public Actor requireRecentAuthentication(Duration maximumAge,ActorRole... allowed){Actor actor=require(allowed);if(actor.authenticatedAt().equals(Instant.EPOCH)||actor.authenticatedAt().isBefore(Instant.now().minus(maximumAge)))throw new ApiException(401,"REAUTHENTICATION_REQUIRED","Please authenticate again before completing this sensitive action");return actor;}
+    public Actor requireRecentAuthentication(Duration maximumAge,ActorRole... allowed){Actor actor=require(allowed);Instant now=clock.instant();if(actor.authenticatedAt().equals(Instant.EPOCH)||actor.authenticatedAt().isBefore(now.minus(maximumAge))||actor.authenticatedAt().isAfter(now.plusSeconds(60)))throw new ApiException(401,"REAUTHENTICATION_REQUIRED","Please authenticate again before completing this sensitive action");return actor;}
 
     public record Actor(String subject, Set<ActorRole> roles, Instant authenticatedAt) {
         public boolean has(ActorRole role) { return roles.contains(role); }

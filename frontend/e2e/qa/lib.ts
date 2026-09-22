@@ -237,8 +237,8 @@ export function intakePayload(id: ReturnType<typeof identity>, overrides: Partia
 
 export type CaseRef = { caseId: string; caseNumber: string; statusToken?: string };
 export async function createAndSubmit(id: ReturnType<typeof identity>, overrides: Partial<Intake> = {}, opts: CallOptions = {}): Promise<CaseRef> {
-  const created = await call<{ caseId: string; caseNumber: string; status: string }>(null, "POST", "/cases", intakePayload(id, overrides), 201, opts);
-  const submitted = await call<{ caseNumber: string; status: string; statusToken: string }>(null, "POST", `/cases/${created.body.caseId}/submit`, undefined, 200, opts);
+  const created = await call<{ caseId: string; caseNumber: string; status: string; intakeGrant: string }>(null, "POST", "/cases", intakePayload(id, overrides), 201, opts);
+  const submitted = await call<{ caseNumber: string; status: string; statusToken: string }>(null, "POST", `/cases/${created.body.caseId}/submit`, undefined, 200, {...opts,headers:{...(opts.headers??{}),"X-Case-Grant":created.body.intakeGrant}});
   return { caseId: created.body.caseId, caseNumber: created.body.caseNumber, statusToken: submitted.body.statusToken };
 }
 

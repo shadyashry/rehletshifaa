@@ -1,6 +1,7 @@
 package com.rehletshifaa.document.application;
 
 import com.rehletshifaa.casemanagement.application.CaseService;
+import com.rehletshifaa.casemanagement.application.CaseIntakeGrantService;
 import com.rehletshifaa.document.api.DocumentDtos.*;
 import com.rehletshifaa.document.domain.DocumentStatus;
 import com.rehletshifaa.document.domain.MedicalDocument;
@@ -13,11 +14,12 @@ import java.time.Clock; import java.time.LocalDate; import java.time.ZoneOffset;
 
 @Service
 public class DocumentService {
-    private final MedicalDocumentRepository documents; private final CaseService cases; private final StoragePort storage; private final DocumentInspectionPort inspector; private final Clock clock; private final long maxBytes; private final long maxCaseBytes; private final int maxFilesPerCase; private final Set<String> allowedTypes;
-    public DocumentService(MedicalDocumentRepository documents, CaseService cases, StoragePort storage, DocumentInspectionPort inspector, Clock clock, @Value("${app.storage.max-bytes}") long maxBytes, @Value("${app.storage.max-case-bytes}") long maxCaseBytes, @Value("${app.storage.max-files-per-case}") int maxFilesPerCase, @Value("${app.storage.allowed-types}") String allowedTypes) { this.documents=documents; this.cases=cases; this.storage=storage; this.inspector=inspector; this.clock=clock; this.maxBytes=maxBytes; this.maxCaseBytes=maxCaseBytes;this.maxFilesPerCase=maxFilesPerCase;this.allowedTypes=Set.of(allowedTypes.split(",")); }
+    private final MedicalDocumentRepository documents; private final CaseService cases; private final CaseIntakeGrantService intakeGrants; private final StoragePort storage; private final DocumentInspectionPort inspector; private final Clock clock; private final long maxBytes; private final long maxCaseBytes; private final int maxFilesPerCase; private final Set<String> allowedTypes;
+    public DocumentService(MedicalDocumentRepository documents, CaseService cases, CaseIntakeGrantService intakeGrants, StoragePort storage, DocumentInspectionPort inspector, Clock clock, @Value("${app.storage.max-bytes}") long maxBytes, @Value("${app.storage.max-case-bytes}") long maxCaseBytes, @Value("${app.storage.max-files-per-case}") int maxFilesPerCase, @Value("${app.storage.allowed-types}") String allowedTypes) { this.documents=documents; this.cases=cases; this.intakeGrants=intakeGrants;this.storage=storage;this.inspector=inspector;this.clock=clock;this.maxBytes=maxBytes;this.maxCaseBytes=maxCaseBytes;this.maxFilesPerCase=maxFilesPerCase;this.allowedTypes=Set.of(allowedTypes.split(",")); }
     @Transactional public PresignResponse presign(UUID caseId, PresignRequest request) {
         return presignForCase(cases.findDraft(caseId),caseId,request);
     }
+    @Transactional public PresignResponse presignIntake(UUID caseId,String grant,PresignRequest request){intakeGrants.require(caseId,grant);return presign(caseId,request);}
     @Transactional public PresignResponse presignAdditional(UUID caseId, PresignRequest request) {
         var medicalCase=cases.findById(caseId); if(medicalCase.getStatus()==com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT)throw new ApiException(409,"CASE_NOT_SUBMITTED","Additional documents require a submitted case");
         return presignForCase(medicalCase,caseId,request);
@@ -32,6 +34,7 @@ public class DocumentService {
     @Transactional(noRollbackFor=ApiException.class) public ConfirmResponse confirm(UUID caseId, ConfirmRequest request) {
         cases.findDraft(caseId); return confirmForCase(caseId,request);
     }
+    @Transactional(noRollbackFor=ApiException.class) public ConfirmResponse confirmIntake(UUID caseId,String grant,ConfirmRequest request){intakeGrants.require(caseId,grant);return confirm(caseId,request);}
     @Transactional(noRollbackFor=ApiException.class) public ConfirmResponse confirmAdditional(UUID caseId,ConfirmRequest request){cases.findById(caseId);return confirmForCase(caseId,request);}
     private ConfirmResponse confirmForCase(UUID caseId,ConfirmRequest request){var document=documents.findByIdAndMedicalCaseId(request.documentId(), caseId).orElseThrow(() -> new ApiException(404,"DOCUMENT_NOT_FOUND","Document was not found"));
         if (document.getStatus()!=DocumentStatus.PENDING) throw new ApiException(409,"DOCUMENT_NOT_PENDING","Document cannot be confirmed in its current state");

@@ -2,6 +2,7 @@ package com.rehletshifaa.notification.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -70,7 +71,7 @@ public class MetaWhatsAppWebhookService {
                 for (JsonNode change : entry.path("changes"))
                     processStatuses(change.path("value").path("statuses"), payload);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid Meta webhook payload", e);
+            throw new ApiException(400,"INVALID_WEBHOOK_PAYLOAD","The webhook payload is invalid");
         }
     }
 

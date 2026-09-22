@@ -1,5 +1,12 @@
 # Platform Control Plane — migration inventory
 
+## Phase 8A secure public-intake status — 2026-09-23 (Codex)
+
+- V50 (additive, H2-safe SQL) creates `case_intake_grants`: one row per draft case, hash-only bearer storage, explicit expiry/consumption timestamps and FK cascade. V1–V49 are untouched.
+- The opaque grant is returned only by case creation, after public bot verification (or authenticated returning-patient creation), and is required for anonymous draft document presign/confirm and submit. It is bound to one case and consumed transactionally only after successful submit.
+- Wrong, expired, cross-case and consumed grants return the same non-enumerating case-not-found response. Existing `findForSubmission` row locking and duplicate-submit behavior remain authoritative.
+- Deployment requires backend migration and the matching frontend contract in one canonical Compose+tunnel rebuild. No active/submitted case is migrated, no public status/proposal/onboarding token changes, and no Journey cutover configuration changes.
+
 ## Phase 7C live-shadow and cutover acceptance — 2026-09-23 (Codex)
 
 - V49 (additive, H2-safe SQL) adds `journey_live_shadow_comparisons`, one immutable structured result per projected stage (`UNIQUE projection_id`) with case, pinned Journey version, policy revision, result/category, legacy/Journey outcomes, explanation, and timestamp. V1–V48 are untouched.

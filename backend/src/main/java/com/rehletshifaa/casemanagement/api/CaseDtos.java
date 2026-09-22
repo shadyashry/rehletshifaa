@@ -51,6 +51,7 @@ public final class CaseDtos {
         @AssertTrue Boolean consent
     ) {}
 
-    public record CreateCaseResponse(UUID caseId, String caseNumber, String status) {}
+    /** Opaque short-lived bearer used only to finish this anonymous draft intake. */
+    public record CreateCaseResponse(UUID caseId, String caseNumber, String status, String intakeGrant) {}
     public record SubmitCaseResponse(String caseNumber, String status, String statusToken) {}
 }

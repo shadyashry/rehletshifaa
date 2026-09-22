@@ -1,5 +1,5 @@
 package com.rehletshifaa.security;
-import org.springframework.beans.factory.annotation.Value; import org.springframework.context.annotation.*; import org.springframework.http.HttpMethod; import org.springframework.security.config.annotation.web.builders.HttpSecurity; import org.springframework.security.config.http.SessionCreationPolicy; import org.springframework.security.web.SecurityFilterChain; import org.springframework.web.cors.*;
+import org.springframework.beans.factory.annotation.Value; import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty; import org.springframework.context.annotation.*; import org.springframework.http.HttpMethod; import org.springframework.security.config.annotation.web.builders.HttpSecurity; import org.springframework.security.config.http.SessionCreationPolicy; import org.springframework.security.oauth2.core.*; import org.springframework.security.oauth2.jwt.*; import org.springframework.security.web.SecurityFilterChain; import org.springframework.web.cors.*;
 import java.util.Arrays;
 @Configuration
 public class SecurityConfig {
@@ -28,5 +28,13 @@ public class SecurityConfig {
         .requestMatchers(HttpMethod.GET,"/api/v1/cases/*/documents").authenticated()
         .anyRequest().denyAll());if(securityEnabled)http.oauth2ResourceServer(oauth2->oauth2.jwt(jwt->jwt.jwtAuthenticationConverter(new JwtRoleConverter())));return http.headers(headers->headers.contentSecurityPolicy(csp->csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))).build();}
     @Bean CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}")String configured){var config=new CorsConfiguration();config.setAllowedOrigins(Arrays.stream(configured.split(",")).map(String::trim).filter(s->!s.isBlank()).toList());config.setAllowedMethods(ListHolder.METHODS);config.setAllowedHeaders(ListHolder.HEADERS);config.setExposedHeaders(ListHolder.EXPOSED);config.setAllowCredentials(false);config.setMaxAge(3600L);var source=new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/api/**",config);return source;}
+    @Bean @ConditionalOnProperty(name="app.security.enabled",havingValue="true") JwtDecoder jwtDecoder(
+            @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")String issuer,
+            @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}")String jwkSetUri,
+            @Value("${app.security.allowed-client-id:rehletshifaa-web}")String allowedClientId){
+        NimbusJwtDecoder decoder=NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(issuer),new KeycloakClientTokenValidator(allowedClientId)));
+        return decoder;
+    }
     private static final class ListHolder{static final java.util.List<String> METHODS=java.util.List.of("GET","POST","PUT","PATCH","OPTIONS");static final java.util.List<String> HEADERS=java.util.List.of("Authorization","Content-Type","Idempotency-Key","X-Request-ID","X-Case-Grant");static final java.util.List<String> EXPOSED=java.util.List.of("X-Request-ID");}
 }

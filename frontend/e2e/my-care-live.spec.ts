@@ -40,8 +40,8 @@ async function signIn(browser: Browser, user: string): Promise<Session> {
 }
 
 let anonymous: APIRequestContext | null = null;
-async function call<T = unknown>(s: Session | null, method: string, path: string, body?: unknown, expected?: number): Promise<{ status: number; body: T }> {
-  const res = await (s?.request ?? anonymous!).fetch(`${API}${path}`, { method, headers: { ...(s ? { Authorization: `Bearer ${s.token}` } : {}), "Content-Type": "application/json" }, data: body });
+async function call<T = unknown>(s: Session | null, method: string, path: string, body?: unknown, expected?: number, extraHeaders: Record<string,string> = {}): Promise<{ status: number; body: T }> {
+  const res = await (s?.request ?? anonymous!).fetch(`${API}${path}`, { method, headers: { ...(s ? { Authorization: `Bearer ${s.token}` } : {}), "Content-Type": "application/json",...extraHeaders }, data: body });
   const text = await res.text();
   const parsed = (text ? JSON.parse(text) : null) as T;
   if (expected !== undefined) expect(res.status(), `${method} ${path} -> ${text.slice(0, 300)}`).toBe(expected);
@@ -78,12 +78,12 @@ test("activation → password → sign-in lands on My Care for the current case;
   const finance = await signIn(browser, "finance");
 
   // --- Fixture: a synthetic case to the acknowledged estimate, through the real journey ------------------
-  const created = await call<{ caseId: string; caseNumber: string }>(null, "POST", "/cases", {
+  const created = await call<{ caseId: string; caseNumber: string; intakeGrant: string }>(null, "POST", "/cases", {
     caseFor: "MYSELF", givenName: "Playwright", familyName: "Landing", country: "Kenya", whatsappNumber: whatsapp, conditionDescription: "Synthetic case for the post-activation landing check.",
     preferredLanguage: "en", consent: true, turnstileToken: null, email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: false,
   }, 201);
   const caseId = created.body.caseId, caseNumber = created.body.caseNumber;
-  await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200);
+  await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200,{"X-Case-Grant":created.body.intakeGrant});
   const workspace = async (s: Session = coordinator, prefix = "coordinator") => (await call<Workspace>(s, "GET", `/${prefix}/cases/${caseId}`, undefined, 200)).body;
   await call(coordinator, "POST", `/coordinator/cases/${caseId}/claim`, undefined, 200);
   const assignment = await call<{ id: string }>(coordinator, "POST", `/coordinator/cases/${caseId}/assignments`, { assigneeSubject: doctor.subject, assigneeRole: "DOCTOR", assignmentType: "PRIMARY", pod: null, reason: "Clinical review" }, 200);

@@ -1,6 +1,7 @@
 package com.rehletshifaa.notification.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rehletshifaa.shared.api.ApiException;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -11,6 +12,7 @@ import java.time.Clock;
 import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 class MetaWhatsAppWebhookServiceTest {
@@ -32,4 +34,6 @@ class MetaWhatsAppWebhookServiceTest {
         assertThat(service.validSignature("{}".getBytes(StandardCharsets.UTF_8),signature)).isFalse();
         assertThat(service.validSignature(payload,null)).isFalse();
     }
+
+    @Test void malformedSignedPayloadIsAClientErrorWithoutParserLeakage(){assertThatThrownBy(()->service.process("{".getBytes(StandardCharsets.UTF_8))).isInstanceOf(ApiException.class).hasMessage("The webhook payload is invalid");}
 }

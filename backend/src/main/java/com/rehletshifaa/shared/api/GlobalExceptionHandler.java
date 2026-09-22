@@ -3,8 +3,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.*;
 import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import jakarta.validation.ConstraintViolationException;
 import java.time.Instant; import java.util.*;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -13,8 +21,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(FieldValidationException.class) ResponseEntity<ApiError> fieldValidation(FieldValidationException e,HttpServletRequest request){return response(400,"VALIDATION_FAILED",e.getMessage(),e.errors(),request);}
     @ExceptionHandler(MethodArgumentNotValidException.class) ResponseEntity<ApiError> validation(MethodArgumentNotValidException e,HttpServletRequest request){var errors=e.getBindingResult().getFieldErrors().stream().map(x->new ApiError.FieldError(x.getField(),safeValidationMessage(x.getDefaultMessage()))).toList();return response(400,"VALIDATION_FAILED","The request contains invalid fields",errors,request);}
     @ExceptionHandler(HttpMessageNotReadableException.class) ResponseEntity<ApiError> malformed(HttpServletRequest request){return response(400,"MALFORMED_REQUEST","The request body is invalid",List.of(),request);}
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class) ResponseEntity<ApiError> invalidIdentifier(MethodArgumentTypeMismatchException e,HttpServletRequest request){return response(400,"INVALID_IDENTIFIER","A path or query identifier is invalid",List.of(),request);}
+    @ExceptionHandler({ServletRequestBindingException.class,ConstraintViolationException.class,HandlerMethodValidationException.class}) ResponseEntity<ApiError> invalidRequest(Exception e,HttpServletRequest request){return response(400,"VALIDATION_FAILED","The request contains invalid fields",List.of(),request);}
+    @ExceptionHandler(MaxUploadSizeExceededException.class) ResponseEntity<ApiError> tooLarge(MaxUploadSizeExceededException e,HttpServletRequest request){return response(413,"PAYLOAD_TOO_LARGE","The request payload is too large",List.of(),request);}
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class) ResponseEntity<ApiError> unsupportedMedia(HttpMediaTypeNotSupportedException e,HttpServletRequest request){return response(415,"UNSUPPORTED_MEDIA_TYPE","The request content type is not supported",List.of(),request);}
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class) ResponseEntity<ApiError> unsupportedMethod(HttpRequestMethodNotSupportedException e,HttpServletRequest request){return response(405,"METHOD_NOT_ALLOWED","The request method is not supported",List.of(),request);}
+    @ExceptionHandler(NoResourceFoundException.class) ResponseEntity<ApiError> missingRoute(NoResourceFoundException e,HttpServletRequest request){return response(404,"ROUTE_NOT_FOUND","The requested resource was not found",List.of(),request);}
     @ExceptionHandler(Exception.class) ResponseEntity<ApiError> unknown(Exception e,HttpServletRequest request){log.error("Unhandled request failure",e);return response(500,"INTERNAL_ERROR","The request could not be completed",List.of(),request);}
     private ResponseEntity<ApiError> response(int status,String code,String message,List<ApiError.FieldError> errors,HttpServletRequest request){String requestId=(String)request.getAttribute("requestId");return ResponseEntity.status(status).body(new ApiError(Instant.now(),code,message,requestId,errors));}
     private String safeValidationMessage(String value){return value==null?"Invalid value":value.replaceAll("[\r\n]"," ");}
 }
-

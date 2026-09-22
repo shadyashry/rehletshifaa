@@ -13,8 +13,8 @@ import java.time.Clock; import java.time.Instant; import java.util.UUID;
 
 @Service
 public class CaseService {
-    private final MedicalCaseRepository cases; private final CaseNumberGenerator numbers; private final IntakeLifecycleService intake; private final Clock clock; private final org.springframework.context.ApplicationEventPublisher events;
-    public CaseService(MedicalCaseRepository cases, CaseNumberGenerator numbers, IntakeLifecycleService intake, Clock clock, org.springframework.context.ApplicationEventPublisher events) { this.cases=cases; this.numbers=numbers; this.intake=intake;this.clock=clock;this.events=events; }
+    private final MedicalCaseRepository cases; private final CaseNumberGenerator numbers; private final IntakeLifecycleService intake; private final CaseIntakeGrantService intakeGrants; private final Clock clock; private final org.springframework.context.ApplicationEventPublisher events;
+    public CaseService(MedicalCaseRepository cases, CaseNumberGenerator numbers, IntakeLifecycleService intake, CaseIntakeGrantService intakeGrants, Clock clock, org.springframework.context.ApplicationEventPublisher events) { this.cases=cases; this.numbers=numbers; this.intake=intake;this.intakeGrants=intakeGrants;this.clock=clock;this.events=events; }
     /**
      * Create the draft case together with its canonical patient and submission contact. The case row keeps
      * a display-name SNAPSHOT of the patient (audit/history only); identity lives on patient_profiles.
@@ -26,7 +26,7 @@ public class CaseService {
         var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), displayName, request.country(), request.whatsappNumber(), request.conditionDescription(), request.preferredLanguage(), request.careArea(), now);
         if (Boolean.TRUE.equals(request.travelPackageRequested())) medicalCase.setTravelPackageRequested(true);
         cases.saveAndFlush(medicalCase); intake.createFoundation(medicalCase,request);
-        return new CreateCaseResponse(medicalCase.getId(), medicalCase.getCaseNumber(), medicalCase.getStatus().name());
+        return new CreateCaseResponse(medicalCase.getId(), medicalCase.getCaseNumber(), medicalCase.getStatus().name(),intakeGrants.issue(medicalCase.getId()));
     }
     /**
      * A returning patient's next case. Identity and contact details come from the canonical patient row —
@@ -40,7 +40,7 @@ public class CaseService {
         var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), p.displayName(), p.country(), p.whatsapp(), request.conditionDescription(), p.language(), request.careArea(), now);
         if (Boolean.TRUE.equals(request.travelPackageRequested())) medicalCase.setTravelPackageRequested(true);
         cases.saveAndFlush(medicalCase); intake.createFoundationForExistingPatient(medicalCase, patientId, p.language());
-        return new CreateCaseResponse(medicalCase.getId(), medicalCase.getCaseNumber(), medicalCase.getStatus().name());
+        return new CreateCaseResponse(medicalCase.getId(), medicalCase.getCaseNumber(), medicalCase.getStatus().name(),intakeGrants.issue(medicalCase.getId()));
     }
     /** Structured-name rules that bean validation cannot express across fields. */
     private void validateNames(CreateCaseRequest r) {
@@ -55,6 +55,7 @@ public class CaseService {
     }
     /** Locks the case row first, so two racing submits serialize: exactly one DRAFT→RECEIVED, the loser gets 409 CASE_NOT_DRAFT. */
     @Transactional public SubmitCaseResponse submit(UUID id) { MedicalCase medicalCase = cases.findForSubmission(id).orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found")); if (medicalCase.getStatus() != com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT) throw new ApiException(409, "CASE_NOT_DRAFT", "Case cannot be changed in its current state");intake.validateSubmittable(id); try { medicalCase.submit(clock.instant()); } catch (IllegalStateException e) { throw new ApiException(409, "CASE_NOT_DRAFT", "Case cannot be submitted in its current state"); } cases.saveAndFlush(medicalCase);String statusToken=intake.onSubmitted(medicalCase);events.publishEvent(new IntakeEvents.CaseSubmitted(medicalCase.getId()));return new SubmitCaseResponse(medicalCase.getCaseNumber(), medicalCase.getStatus().name(),statusToken); }
+    @Transactional public SubmitCaseResponse submitPublic(UUID id,String grant){intakeGrants.require(id,grant);var response=submit(id);intakeGrants.consume(id,grant);return response;}
     @Transactional(readOnly=true) public MedicalCase findDraft(UUID id) { MedicalCase medicalCase = cases.findById(id).orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found")); if (medicalCase.getStatus() != com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT) throw new ApiException(409, "CASE_NOT_DRAFT", "Case cannot be changed in its current state"); return medicalCase; }
     @Transactional(readOnly=true) public MedicalCase findById(UUID id){return cases.findById(id).orElseThrow(()->new ApiException(404,"CASE_NOT_FOUND","Case was not found"));}
 }
