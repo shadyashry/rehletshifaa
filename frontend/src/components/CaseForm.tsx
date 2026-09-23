@@ -36,6 +36,9 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   // new one. Refs, not state: retry correctness must not depend on a re-render happening first.
   const draftCase = useRef<CreateCaseResponse | null>(null);
   const uploaded = useRef(new Set<string>());
+  // Stored but not yet confirmed (e.g. the malware scanner was briefly unavailable): a retry confirms that
+  // same upload. A fresh presign would leave the first one pending, which blocks the draft from submitting.
+  const unconfirmed = useRef(new Map<string, string>());
   const [phoneLocal, setPhoneLocal] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [careArea, setCareArea] = useState<CareAreaKey>("");
@@ -171,15 +174,22 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   async function uploadAndSubmit(created: CreateCaseResponse) {
     const intakeHeaders = { "Content-Type": "application/json", "X-Case-Grant": created.intakeGrant };
     for (const file of files) {
-      if (uploaded.current.has(fileKey(file))) continue;
-      const presignResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/presign`), { method: "POST", headers: intakeHeaders, body: JSON.stringify({ originalFileName: file.name, contentType: file.type, sizeBytes: file.size }) });
-      if (!presignResponse.ok) throw new SubmitFailure("upload");
-      const presigned = await presignResponse.json() as PresignResponse;
-      const uploadResponse = await fetch(presigned.uploadUrl, { method: "PUT", headers: presigned.requiredHeaders, body: file });
-      if (!uploadResponse.ok) throw new SubmitFailure("upload");
-      const confirmResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/confirm`), { method: "POST", headers: intakeHeaders, body: JSON.stringify({ documentId: presigned.documentId }) });
+      const key = fileKey(file);
+      if (uploaded.current.has(key)) continue;
+      let documentId = unconfirmed.current.get(key);
+      if (!documentId) {
+        const presignResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/presign`), { method: "POST", headers: intakeHeaders, body: JSON.stringify({ originalFileName: file.name, contentType: file.type, sizeBytes: file.size }) });
+        if (!presignResponse.ok) throw new SubmitFailure("upload");
+        const presigned = await presignResponse.json() as PresignResponse;
+        const uploadResponse = await fetch(presigned.uploadUrl, { method: "PUT", headers: presigned.requiredHeaders, body: file });
+        if (!uploadResponse.ok) throw new SubmitFailure("upload");
+        documentId = presigned.documentId;
+        unconfirmed.current.set(key, documentId);
+      }
+      const confirmResponse = await fetch(apiUrl(`/cases/${created.caseId}/documents/confirm`), { method: "POST", headers: intakeHeaders, body: JSON.stringify({ documentId }) });
       if (!confirmResponse.ok) throw new SubmitFailure("upload");
-      uploaded.current.add(fileKey(file));
+      unconfirmed.current.delete(key);
+      uploaded.current.add(key);
       track("medical_file_uploaded");
     }
     const finalResponse = await fetch(apiUrl(`/cases/${created.caseId}/submit`), { method: "POST", headers: { "X-Case-Grant": created.intakeGrant } });
@@ -226,7 +236,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       }
       const submitted = await uploadAndSubmit(created);
       window.localStorage.setItem("rehletshifaa:last-status-path", `/${locale}/status/${submitted.statusToken}`);
-      draftCase.current = null; uploaded.current.clear();
+      draftCase.current = null; uploaded.current.clear(); unconfirmed.current.clear();
       setCaseNumber(submitted.caseNumber); setStatusToken(submitted.statusToken); track("case_submitted");
     } catch (failure) {
       // Each stage fails for a different reason and needs a different next step from the patient;
@@ -252,7 +262,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
         draftCase.current = created;
       }
       const submitted = await uploadAndSubmit(created);
-      draftCase.current = null; uploaded.current.clear();
+      draftCase.current = null; uploaded.current.clear(); unconfirmed.current.clear();
       setCaseNumber(submitted.caseNumber); track("case_submitted");
     } catch (failure) { setErrors({ server: d.form.errors[failure instanceof SubmitFailure ? failure.stage : "server"] }); }
     finally { setBusy(false); }

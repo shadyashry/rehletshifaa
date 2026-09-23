@@ -6,8 +6,11 @@ import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyLiveShadowRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyLiveShadowRepository.Comparison;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.util.Map;
@@ -21,6 +24,7 @@ import java.util.UUID;
  */
 @Service
 public class JourneyLiveShadowService {
+    private static final Logger log = LoggerFactory.getLogger(JourneyLiveShadowService.class);
     public enum Result { MATCH, ACCEPTABLE_DIFFERENCE, MISMATCH, NOT_COMPARABLE }
     public enum Category { ACTION_SET_MISMATCH, ACTOR_MISMATCH, STATE_MAPPING_MISMATCH, WAITING_STATE_MISMATCH,
         PROJECTION_INTENT_MISMATCH, TERMINAL_STATE_MISMATCH, EXPECTED_LEGACY_DIFFERENCE, OUT_OF_FROZEN_V1_SCOPE }
@@ -53,6 +57,32 @@ public class JourneyLiveShadowService {
         this.jdbc = jdbc; this.admissions = admissions; this.results = results; this.audit = audit; this.metrics = metrics; this.clock = clock;
     }
 
+    /**
+     * The production entry point: {@link #compare} inside a JDBC savepoint of the caller's business transaction.
+     * It must read that transaction's uncommitted case/task rows, yet a failure may unwind only its own evidence.
+     * On PostgreSQL a failed statement poisons the whole transaction unless rolled back to a savepoint, so a
+     * catch alone would not protect the submission. (Hibernate's JPA dialect cannot give Spring savepoints, so
+     * {@code Propagation.NESTED} is not available; the savepoint is issued as SQL through the same
+     * transaction-bound {@link JdbcClient}. It is left to be released by the commit.)
+     * Never throws: failures are counted, logged and audited, and the business action proceeds.
+     */
+    public void compareIsolated(UUID caseId, UUID projectionId, UUID versionId, UUID caseTaskId, Node node) {
+        boolean savepoint = false;
+        try {
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                jdbc.sql("SAVEPOINT journey_live_shadow").update();
+                savepoint = true;
+            }
+            compare(caseId, projectionId, versionId, caseTaskId, node);
+        } catch (RuntimeException failure) {
+            if (savepoint) {
+                try { jdbc.sql("ROLLBACK TO SAVEPOINT journey_live_shadow").update(); }
+                catch (RuntimeException rollbackFailure) { log.error("Journey live shadow savepoint could not be rolled back for case {}", caseId); }
+            }
+            recordFailure(caseId, projectionId, failure);
+        }
+    }
+
     /** Called only after a projection row exists; verification/synthetic bindings have no admission and are ignored. */
     public void compare(UUID caseId, UUID projectionId, UUID versionId, UUID caseTaskId, Node node) {
         var admission = admissions.find(caseId).filter(a -> "JOURNEY".equals(a.decision())).orElse(null);
@@ -67,6 +97,19 @@ public class JourneyLiveShadowService {
         audit.record("SYSTEM", caseId.toString(), "JOURNEY_LIVE_SHADOW_COMPARED", "SUCCESS",
                 "result=" + outcome.result() + "; category=" + (outcome.category() == null ? "NONE" : outcome.category())
                         + "; version=" + versionId + "; revision=" + admission.policyRevision());
+    }
+
+    /** Observation-only failure path: never throws, never names the exception text (it may carry row data). */
+    void recordFailure(UUID caseId, UUID projectionId, Exception failure) {
+        try {
+            metrics.counter("journey.shadow.comparison.failure", "exception", failure.getClass().getSimpleName()).increment();
+            log.warn("Journey live shadow comparison failed for case {} projection {} ({}); business action unaffected",
+                    caseId, projectionId, failure.getClass().getSimpleName());
+            audit.record("SYSTEM", caseId.toString(), "JOURNEY_LIVE_SHADOW_FAILED", "FAILURE",
+                    "projection=" + projectionId + "; exception=" + failure.getClass().getSimpleName());
+        } catch (RuntimeException secondary) {
+            log.warn("Journey live shadow failure could not be recorded for case {}", caseId);
+        }
     }
 
     BusinessState read(UUID caseId, UUID taskId) {

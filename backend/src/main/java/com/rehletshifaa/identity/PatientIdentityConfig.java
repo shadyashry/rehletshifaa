@@ -26,13 +26,14 @@ public class PatientIdentityConfig {
             @Value("${app.identity-admin.client-secret:}") String clientSecret,
             @Value("${app.identity-admin.web-client-id:rehletshifaa-web}") String webClientId,
             @Value("${app.web-base-url:http://localhost:3000}") String webBaseUrl,
-            @Value("${app.identity-admin.setup-lifespan-seconds:86400}") int setupLifespan) {
+            @Value("${app.identity-admin.setup-lifespan-seconds:86400}") int setupLifespan,
+            org.springframework.web.client.RestClient.Builder http) {
         boolean configured = clientSecret != null && !clientSecret.isBlank();
         boolean simulate = "simulator".equalsIgnoreCase(mode) || (!"keycloak".equalsIgnoreCase(mode) && !configured);
         if (simulate) {
             log.info("Patient identity provider: in-memory simulator (mode={}, adminClientConfigured={})", mode, configured);
             return new LocalPatientIdentitySimulator();
         }
-        return new KeycloakPatientIdentityService(baseUrl, realm, clientId, clientSecret == null ? "" : clientSecret, webClientId, webBaseUrl, setupLifespan);
+        return new KeycloakPatientIdentityService(http.build(), baseUrl, realm, clientId, clientSecret == null ? "" : clientSecret, webClientId, webBaseUrl, setupLifespan);
     }
 }

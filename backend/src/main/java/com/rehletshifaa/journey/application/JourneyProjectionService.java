@@ -241,7 +241,7 @@ public class JourneyProjectionService {
         UUID projectionId = projections.insert(caseId, versionId, node.key(), node.actorType(), node.type().name(), caseTaskId, engineTaskReference);
         audit.record(subject, caseId.toString(), node.type() == StageType.STAFF_TASK ? "JOURNEY_WORK_ITEM_OPENED" : "JOURNEY_PATIENT_ACTION_OPENED",
                 "SUCCESS", "node=" + node.key() + "; action=" + node.action());
-        liveShadow.compare(caseId, projectionId, versionId, caseTaskId, node);
+        liveShadow.compareIsolated(caseId, projectionId, versionId, caseTaskId, node); // observation only: never fails the real action
     }
 
     private static Node node(Version version, String nodeKey) {

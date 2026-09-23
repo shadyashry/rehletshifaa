@@ -1,5 +1,34 @@
 # Platform Control Plane — verification status
 
+## Phase 8B reliability verification — 2026-09-23 (Claude Code, continuing Codex)
+
+Focused suites (all green):
+
+| Suite | Tests | Covers |
+|---|---|---|
+| `NotificationOutboxProcessorTest` | 6 | Unknown outcome is never booked as a provider failure; lease-margin release; shutdown; permanent template failure; stale worker |
+| `NotificationOutboxDeliveryTest` | 8 | Includes Codex's crash/stale-lease tests, plus release in one transaction |
+| `ClamAvDocumentInspectorTest` | 6 | Scripted clamd socket: exact OK, `…OK…FOUND` stays malware, error / closed / unreachable are retryable, size limit is permanent |
+| `DocumentServiceTest` | 6 | Outage leaves the document PENDING with its object kept and returns 503, then recovers; malware still condemns; CLEAN confirm is idempotent |
+| `ProviderCredentialIntegrationTest` | 8 | Evidence outage stays PENDING, then seals |
+| `JourneyProductionIntakeIntegrationTest` | 9 | A comparator failing after a real evidence insert leaves the submission committed with no duplicate runtime/WorkItem/projection, the evidence unwound, the failure metric +1 and a failure audit |
+| `RuntimeReliabilityConfigurationTest` | 4 | Shipped `application.yml` plus both compose files: finite timeouts, `SEND_MARGIN` > slowest delivery, probe groups, shutdown bound < stop grace |
+| `RuntimeReliabilityWiringTest` | 3 | Boot RestClient builder times out on a silent server; mail sender timeouts; readiness = db only, both probes UP |
+| `CaseControllerTest` | 6 | 409 `CONCURRENT_MODIFICATION`, 503 `SERVICE_UNAVAILABLE` + `Retry-After` |
+| `ArchitectureRulesTest` | 9 | — |
+
+Gate results:
+- Frontend (touched: `CaseForm` re-confirm on retry): `pnpm typecheck` PASS. `pnpm test` **223 tests / 37 files, 0 failures**.
+- Backend `mvn -o test`: **481 tests / 54 suites, 0 failures, 0 errors, 1 intentional skip**.
+- Flyway validated and applied **V1–V50** (no new migration).
+- The first full rerun had one failure in the new release test: a scheduler in another cached context sharing the H2 database correctly claimed the released row first. The test was made transactional (the product was not changed), the focused suite was rerun, then the full suite passed.
+- Not run:
+  - Playwright/live stack (Phase 8C).
+  - Live dependency outage drills (infrastructure).
+  - PostgreSQL-specific aborted-transaction behaviour. H2 does not poison a transaction, but the savepoint rollback is proven by the evidence row being unwound.
+
+**Phase 8B reliability gate: PASS.**
+
 ## Phase 8A security hardening verification — 2026-09-23 (Codex)
 
 - Focused security regression passed: central malformed UUID and missing-header structured errors; strict missing/stale/future/fresh `auth_time`; expected-client JWT validator; public intake wrong-token/cross-case/consume-and-replay behavior; Meta signature and malformed-payload handling; H2 Flyway through V50.

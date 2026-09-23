@@ -73,6 +73,8 @@ services:
 
   backend:
     build: ./backend
+    # Above the backend's own bound (25s web drain + 30s scheduler await); Docker's 10s default would SIGKILL mid-drain.
+    stop_grace_period: 60s
     environment:
       SPRING_PROFILES_ACTIVE: local
       DB_URL: jdbc:postgresql://postgres:5432/rehletshifaa

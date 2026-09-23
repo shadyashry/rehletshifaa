@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -24,6 +25,7 @@ class NotificationOutboxDeliveryTest {
     @Autowired NotificationOutboxStore store;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
 
     @AfterEach void clear() { jdbc.update("DELETE FROM notification_outbox WHERE idempotency_key LIKE 'outbox-test:%'"); }
 
@@ -43,7 +45,7 @@ class NotificationOutboxDeliveryTest {
         UUID id = seed("outbox-test:sent", 0, 5, clock.instant().minusSeconds(1));
         store.claim(10);
 
-        store.recordDelivered(id, "provider-ref-1");
+        store.recordDelivered(id, 1, "provider-ref-1");
 
         assertThat(status(id)).isEqualTo("DELIVERED");
         assertThat(jdbc.queryForObject("SELECT provider_reference FROM notification_outbox WHERE id=?", String.class, id)).isEqualTo("provider-ref-1");
@@ -82,6 +84,45 @@ class NotificationOutboxDeliveryTest {
 
         assertThat(store.claim(10)).extracting(NotificationOutboxStore.OutboxMessage::id).contains(id);
         assertThat(attempts(id)).isEqualTo(2); // the lost attempt still counts against max_attempts
+    }
+
+    @Test void aFinalAttemptStrandedByACrashedWorkerIsDeadLetteredInsteadOfReclaimedForever() {
+        UUID id = seed("outbox-test:unknown", 5, 5, clock.instant().minusSeconds(1));
+        jdbc.update("UPDATE notification_outbox SET status='PROCESSING' WHERE id=?", id);
+
+        assertThat(store.claim(10)).extracting(NotificationOutboxStore.OutboxMessage::id).doesNotContain(id);
+        assertThat(status(id)).isEqualTo("DEAD_LETTER");
+        assertThat(jdbc.queryForObject("SELECT last_error_code FROM notification_outbox WHERE id=?", String.class, id))
+                .isEqualTo("UNKNOWN_OUTCOME");
+    }
+
+    @Test void aStaleWorkerCannotOverwriteTheNewerLeaseOutcome() {
+        UUID id = seed("outbox-test:stale", 1, 5, clock.instant().minusSeconds(1));
+        jdbc.update("UPDATE notification_outbox SET status='PROCESSING' WHERE id=?", id);
+        var second = store.claim(10).stream().filter(m -> m.id().equals(id)).findFirst().orElseThrow();
+
+        assertThat(store.recordDelivered(id, 1, "late-provider-ref")).isFalse();
+        assertThat(store.recordFailure(id, second.attempts(), second.maxAttempts(), "PROVIDER_FAILURE")).isTrue();
+        assertThat(status(id)).isEqualTo("RETRY");
+        assertThat(jdbc.queryForObject("SELECT provider_reference FROM notification_outbox WHERE id=?", String.class, id)).isNull();
+    }
+
+    @Test void aClaimHandedBackBeforeAnySendIsDueAgainAtOnceWithoutSpendingAnAttempt() {
+        UUID id = seed("outbox-test:release", 2, 5, clock.instant().minusSeconds(1));
+        Instant before = clock.instant();
+        var claimed = store.claim(10).stream().filter(m -> m.id().equals(id)).findFirst().orElseThrow();
+        assertThat(claimed.leaseExpiresAt()).isBetween(before.plusSeconds(NotificationOutboxStore.LEASE_SECONDS), clock.instant().plusSeconds(NotificationOutboxStore.LEASE_SECONDS));
+
+        // One transaction: the released row is due at once, so a scheduler in another cached test context sharing
+        // this H2 database would otherwise legitimately claim it first. The row lock makes SKIP LOCKED pass it by.
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            assertThat(store.release(id, claimed.attempts())).isTrue();
+            assertThat(store.release(id, claimed.attempts())).isFalse(); // no longer PROCESSING: a repeat is a no-op
+
+            assertThat(status(id)).isEqualTo("RETRY");
+            assertThat(attempts(id)).isEqualTo(2);
+            assertThat(store.claim(10)).extracting(NotificationOutboxStore.OutboxMessage::id).contains(id);
+        });
     }
 
     private UUID seed(String key, int attempts, int maxAttempts, Instant nextAttemptAt) {

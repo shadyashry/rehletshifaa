@@ -37,11 +37,14 @@ public class DocumentService {
     @Transactional(noRollbackFor=ApiException.class) public ConfirmResponse confirmIntake(UUID caseId,String grant,ConfirmRequest request){intakeGrants.require(caseId,grant);return confirm(caseId,request);}
     @Transactional(noRollbackFor=ApiException.class) public ConfirmResponse confirmAdditional(UUID caseId,ConfirmRequest request){cases.findById(caseId);return confirmForCase(caseId,request);}
     private ConfirmResponse confirmForCase(UUID caseId,ConfirmRequest request){var document=documents.findByIdAndMedicalCaseId(request.documentId(), caseId).orElseThrow(() -> new ApiException(404,"DOCUMENT_NOT_FOUND","Document was not found"));
+        if (document.getStatus()==DocumentStatus.CLEAN) return new ConfirmResponse(document.getId(),document.getStatus().name()); // a retry after a lost response
         if (document.getStatus()!=DocumentStatus.PENDING) throw new ApiException(409,"DOCUMENT_NOT_PENDING","Document cannot be confirmed in its current state");
         StoragePort.StoredObject stored=storage.verify(document.getObjectKey());
         if (stored.sizeBytes()!=document.getSizeBytes() || !document.getContentType().equalsIgnoreCase(stored.contentType())) { document.reject(); documents.save(document); storage.delete(document.getObjectKey()); throw new ApiException(422,"DOCUMENT_METADATA_MISMATCH","Uploaded document metadata does not match the request"); }
         document.quarantine(clock.instant()); documents.saveAndFlush(document);
         var result=inspector.inspect(storage.read(document.getObjectKey(),maxBytes),document.getContentType());
+        // No verdict is not a verdict: keep the upload, keep it unusable, and let the same confirm be retried.
+        if(result.retryable()){document.scanDeferred();documents.save(document);throw new ApiException(503,"DOCUMENT_SCAN_UNAVAILABLE","Document security inspection is temporarily unavailable; retry shortly");}
         if(!result.clean()){document.scanFailed();documents.save(document);storage.delete(document.getObjectKey());throw new ApiException(422,"DOCUMENT_INSPECTION_FAILED","Uploaded document did not pass security inspection");}
         storage.markClean(document.getObjectKey());document.markClean();documents.save(document);return new ConfirmResponse(document.getId(),document.getStatus().name());
     }

@@ -10,5 +10,9 @@ class CaseControllerTest {
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_IDENTIFIER")).andExpect(jsonPath("$.message").value("A path or query identifier is invalid"));}
     @Test void missingRequiredGrantUsesStructuredClientError()throws Exception{mvc.perform(post("/api/v1/cases/"+UUID.randomUUID()+"/submit"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));}
+    @Test void aLostConcurrencyRaceIsAConflictNotAnInternalError()throws Exception{when(service.submitPublic(any(),anyString())).thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException("MedicalCase",UUID.randomUUID()));
+        mvc.perform(post("/api/v1/cases/"+UUID.randomUUID()+"/submit").header("X-Case-Grant","g")).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONCURRENT_MODIFICATION"));}
+    @Test void anUnreachableDatabaseIsARetryableUnavailableNotAnInternalError()throws Exception{when(service.submitPublic(any(),anyString())).thenThrow(new org.springframework.transaction.CannotCreateTransactionException("Could not open JPA EntityManager for transaction"));
+        mvc.perform(post("/api/v1/cases/"+UUID.randomUUID()+"/submit").header("X-Case-Grant","g")).andExpect(status().isServiceUnavailable()).andExpect(header().string("Retry-After","5")).andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));}
     @Test void rejectsMissingConsent()throws Exception{mvc.perform(post("/api/v1/cases").contentType(MediaType.APPLICATION_JSON).content("{\"givenName\":\"Jane\",\"familyName\":\"Doe\",\"country\":\"Kenya\",\"whatsappNumber\":\"+254700000000\",\"preferredLanguage\":\"en\",\"consent\":false}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));verifyNoInteractions(service);}
 }

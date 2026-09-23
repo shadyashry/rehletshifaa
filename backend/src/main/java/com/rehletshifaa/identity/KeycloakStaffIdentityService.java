@@ -25,7 +25,7 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
     private final int inviteLifespan;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public KeycloakStaffIdentityService(ObjectMapper json,
+    public KeycloakStaffIdentityService(org.springframework.web.client.RestClient.Builder http, ObjectMapper json,
         @Value("${app.identity-admin.base-url:http://localhost:8180}") String baseUrl,
         @Value("${app.identity-admin.realm:rehletshifaa}") String realm,
         @Value("${app.identity-admin.client-id:staff-identity-admin}") String clientId,
@@ -33,7 +33,8 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
         @Value("${app.identity-admin.web-client-id:rehletshifaa-web}") String webClientId,
         @Value("${app.web-base-url:http://localhost:3000}") String webBaseUrl,
         @Value("${app.identity-admin.invite-lifespan-seconds:43200}") int inviteLifespan) {
-        this(RestClient.create(),json,baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl,inviteLifespan);
+        // The Boot builder carries the finite spring.http.client timeouts; RestClient.create() has none.
+        this(http.build(),json,baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl,inviteLifespan);
     }
 
     KeycloakStaffIdentityService(RestClient http,ObjectMapper json,String baseUrl,String realm,String clientId,

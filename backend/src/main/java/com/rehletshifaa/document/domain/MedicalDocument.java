@@ -23,6 +23,8 @@ public class MedicalDocument {
     public void quarantine(Instant now) { if (status != DocumentStatus.PENDING) throw new IllegalStateException("Document is not pending"); status=DocumentStatus.QUARANTINED; confirmedAt=now; }
     public void markClean() { if (status != DocumentStatus.QUARANTINED) throw new IllegalStateException("Document is not quarantined"); status=DocumentStatus.CLEAN; }
     public void scanFailed() { if (status != DocumentStatus.QUARANTINED) throw new IllegalStateException("Document is not quarantined"); status=DocumentStatus.SCAN_FAILED; }
+    /** The scanner gave no verdict: back to unconfirmed, still unusable, and confirmable again once it recovers. */
+    public void scanDeferred() { if (status != DocumentStatus.QUARANTINED) throw new IllegalStateException("Document is not quarantined"); status=DocumentStatus.PENDING; confirmedAt=null; }
     public void reject() { status=DocumentStatus.REJECTED; }
     public UUID getId(){return id;} public MedicalCase getMedicalCase(){return medicalCase;} public String getObjectKey(){return objectKey;} public String getOriginalFileName(){return originalFileName;} public String getSafeFileName(){return safeFileName;} public String getContentType(){return contentType;} public long getSizeBytes(){return sizeBytes;} public DocumentStatus getStatus(){return status;}
 }

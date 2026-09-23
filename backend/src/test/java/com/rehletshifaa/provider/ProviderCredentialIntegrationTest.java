@@ -91,6 +91,16 @@ class ProviderCredentialIntegrationTest {
         signIn("doctor-a",now);when(inspector.inspect(any(),eq("application/pdf"))).thenReturn(new DocumentInspectionPort.InspectionResult(false,"MALWARE"));var upload=credentials.presign(org,clinician,new ProviderCredentialService.EvidenceCommand("unsafe.pdf","application/pdf",8));assertThatThrownBy(()->credentials.confirm(org,upload.evidenceId(),0)).isInstanceOf(ApiException.class).hasMessageContaining("security inspection");assertThat(jdbc.queryForObject("SELECT scan_status FROM provider_credential_evidence WHERE id=?",String.class,upload.evidenceId())).isEqualTo("REJECTED");
     }
 
+    @Test void aScannerOutageLeavesEvidencePendingAndConfirmableRatherThanRejected(){signIn("doctor-a",now);completeProfile();
+        when(inspector.inspect(any(),eq("application/pdf"))).thenReturn(DocumentInspectionPort.InspectionResult.unavailable("SCANNER_UNAVAILABLE"));
+        var upload=credentials.presign(org,clinician,new ProviderCredentialService.EvidenceCommand("license.pdf","application/pdf",8));
+        assertThatThrownBy(()->credentials.confirm(org,upload.evidenceId(),0)).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.status()).isEqualTo(503));
+        assertThat(jdbc.queryForObject("SELECT scan_status FROM provider_credential_evidence WHERE id=?",String.class,upload.evidenceId())).isEqualTo("PENDING");
+        verify(storage,never()).delete(anyString()); // the staged upload survives the outage
+        when(inspector.inspect(any(),eq("application/pdf"))).thenReturn(new DocumentInspectionPort.InspectionResult(true,"CLEAN"));
+        assertThat(credentials.confirm(org,upload.evidenceId(),0).status()).isEqualTo("CLEAN");
+    }
+
     @Test void expiryReconciliationIsImmutableAndNotificationsAreIdempotent(){signIn("doctor-a",now);completeProfile();var license=submitAndVerifyResult("MEDICAL_LICENSE",Instant.now().plus(Duration.ofDays(6)),"expiry-reconciliation");
         jdbc.update("UPDATE practitioner_profiles SET email_encrypted=? WHERE id=?",crypto.encrypt("doctor-a@example.test"),clinician);expiry.expireCredentials();expiry.expireCredentials();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_outbox WHERE idempotency_key LIKE ?",Long.class,"credential-expiry-reminder:"+license.id()+":%" )).isEqualTo(2);

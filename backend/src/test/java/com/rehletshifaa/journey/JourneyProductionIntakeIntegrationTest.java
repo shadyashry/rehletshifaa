@@ -60,7 +60,7 @@ class JourneyProductionIntakeIntegrationTest {
     @Autowired org.springframework.jdbc.core.simple.JdbcClient jdbcClient;
     @Autowired io.micrometer.core.instrument.MeterRegistry meters;
     @Autowired JourneyLiveShadowService liveShadow;
-    @Autowired JourneyLiveShadowRepository shadowResults;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean JourneyLiveShadowRepository shadowResults;
     Version version;
     JourneyDefinitionIntegrationTest fixture;
     static final UUID JOURNEY_WORK_PLATFORM = UUID.fromString("42000001-0000-0000-0000-000000000001");
@@ -141,6 +141,27 @@ class JourneyProductionIntakeIntegrationTest {
         assertThat(shadowResults.aggregate().matches()).isGreaterThanOrEqualTo(1);
         assertThat(shadowResults.aggregate().journeyVersions()).contains(version.id().toString());
         assertThat(shadowResults.aggregate().policyRevisions()).contains(admissions.find(caseId).orElseThrow().policyRevision());
+    }
+
+    @Test void aShadowComparatorFailureNeitherFailsNorRollsBackTheRealSubmissionAndIsObservable() {
+        // The evidence row is really written, then the comparator fails: its savepoint must unwind that row only.
+        org.mockito.Mockito.doAnswer(call -> { call.callRealMethod(); throw new org.springframework.dao.DataIntegrityViolationException("shadow evidence rejected"); })
+                .when(shadowResults).insert(org.mockito.ArgumentMatchers.any());
+        double failuresBefore = meters.counter("journey.shadow.comparison.failure", "exception", "DataIntegrityViolationException").count();
+        var created = cases.create(intake());
+
+        var submitted = cases.submit(created.caseId());
+
+        UUID caseId = created.caseId();
+        assertThat(submitted.status()).isEqualTo("RECEIVED");
+        assertThat(cases.findById(caseId).getStatus().name()).isEqualTo("RECEIVED"); // committed, not rolled back
+        assertThat(bindings.findByCase(caseId)).isPresent();
+        assertThat(engine.getRuntimeService().createProcessInstanceQuery().processInstanceBusinessKey("case:" + caseId).count()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='JOURNEY:review'", Integer.class, caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_stage_projections WHERE case_id=?", Integer.class, caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_live_shadow_comparisons WHERE case_id=?", Integer.class, caseId)).isZero();
+        assertThat(meters.counter("journey.shadow.comparison.failure", "exception", "DataIntegrityViolationException").count()).isEqualTo(failuresBefore + 1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE entity_id=? AND action='JOURNEY_LIVE_SHADOW_FAILED'", Integer.class, caseId.toString())).isEqualTo(1);
     }
 
     @Test void completingTheProjectedWorkReachesTheExistingPhase4bRuntimeAndOpensTheNextPatientAction() {

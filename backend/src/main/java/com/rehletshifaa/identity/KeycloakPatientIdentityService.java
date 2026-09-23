@@ -33,13 +33,14 @@ public class KeycloakPatientIdentityService implements PatientIdentityPort {
     private static final ParameterizedTypeReference<Map<String, Object>> OBJECT = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<Map<String, Object>>> OBJECTS = new ParameterizedTypeReference<>() {};
 
-    private final RestClient http = RestClient.create();
+    private final RestClient http;
     private final String baseUrl, realm, clientId, clientSecret, webClientId, webBaseUrl;
     private final int setupLifespan;
 
-    public KeycloakPatientIdentityService(String baseUrl, String realm, String clientId, String clientSecret,
+    /** {@code http} must carry finite connect/read timeouts (the Boot-configured builder does). */
+    public KeycloakPatientIdentityService(RestClient http, String baseUrl, String realm, String clientId, String clientSecret,
                                           String webClientId, String webBaseUrl, int setupLifespanSeconds) {
-        this.baseUrl = stripSlash(baseUrl); this.realm = realm; this.clientId = clientId; this.clientSecret = clientSecret;
+        this.http = http; this.baseUrl = stripSlash(baseUrl); this.realm = realm; this.clientId = clientId; this.clientSecret = clientSecret;
         this.webClientId = webClientId; this.webBaseUrl = stripSlash(webBaseUrl); this.setupLifespan = setupLifespanSeconds;
     }
 

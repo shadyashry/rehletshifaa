@@ -1,5 +1,50 @@
 # Platform Control Plane — implementation status
 
+## Phase 8B — runtime reliability and recovery — 2026-09-23 (Codex start, Claude Code completion)
+
+Scope stayed inside Phase 8B. No Phase 8C/8D work, no Journey enablement, no new infrastructure, Flyway unchanged at V50. Full detail, classification table and severity list: [phase-8b-reliability-status.md](phase-8b-reliability-status.md).
+
+- **Codex handoff (uncommitted, preserved):** outbox slice partially implemented. Expired final-attempt leases are parked as `UNKNOWN_OUTCOME`, exhausted rows are no longer claimed, outcome writes are fenced by `PROCESSING` + attempt number, and delivery counters were added. The other three slices were not started.
+- **Outbox:**
+  - A provider-accepted but unrecorded delivery is no longer booked as a provider failure (which re-sent it).
+  - No send starts within 60 s of lease expiry.
+  - Unstarted claims are released (attempt refunded) when the lease is nearly spent and on shutdown.
+  - Template failures are dead-lettered at once.
+  - At-least-once semantics documented.
+- **Malware scanning:**
+  - Fixed the fail-open clamd parse (`OK` was tested before `FOUND`).
+  - A scanner outage is now a retryable non-verdict: the document or evidence stays `PENDING` and unusable, keeps its upload, and returns 503. The same confirm succeeds after recovery.
+  - Confirming an already-`CLEAN` document is idempotent.
+  - `CaseForm` re-confirms the same upload on retry.
+- **Shadow isolation:** the comparator runs under a SQL savepoint on the business transaction. A failure unwinds only its evidence and is counted, logged and audited (`JOURNEY_LIVE_SHADOW_FAILED`); it never fails or rolls back the real submission.
+- **Timeouts:**
+  - Finite connect/read timeouts for every Boot-built HTTP client (Keycloak admin, JWKS, WhatsApp, Turnstile, FX) and for SMTP.
+  - Keycloak services and the JWKS decoder now use the Boot builders.
+- **Readiness:** liveness is process only; readiness is `readinessState + db`. Redis, SMTP, ClamAV and the Journey runtime are deliberately excluded.
+- **Graceful shutdown:** graceful web shutdown (25 s phase), scheduler await (30 s), outbox claim release, and local compose `stop_grace_period: 60s` (Oracle already 60 s).
+- **Also fixed:**
+  - Per-case failure isolation in the coordination queue retry.
+  - Concurrency losers now return `409 CONCURRENT_MODIFICATION`.
+  - Database unavailability now returns `503 SERVICE_UNAVAILABLE` + `Retry-After`.
+- **Findings:** CRITICAL none. HIGH 6 found, all fixed. Open MEDIUM debt is infrastructure/environment only: Keycloak calls inside DB transactions (now bounded), Micrometer not exported, no restore rehearsal, no live outage drills.
+
+Verification: backend **481 tests / 54 suites, 0 failures, 0 errors, 1 intentional skip**. Flyway V1–V50. Frontend typecheck clean; **223 tests / 37 files** passing.
+
+### PHASE 8B COMPLETE: YES
+
+### PHASE 8C READY: YES
+
+### NEXT EXACT ACTIONS
+
+1. Do not enable Journey production intake.
+2. Rebuild the stack with the canonical base+tunnel command so the new timeouts, probes, graceful shutdown and `stop_grace_period` take effect together.
+3. Separately authorized Phase 8C: Playwright/live-stack E2E, EN/AR, desktop/mobile, RTL, accessibility, deferred visual review and UX/E2E defect closure. Include the intake-upload retry path and the 503 scan-unavailable message.
+4. Operator/infrastructure backlog (not Phase 8C):
+   - Restore rehearsal from `backup.sh` output.
+   - Controlled outage drills (PostgreSQL, Keycloak, MinIO, ClamAV, SMTP) against the running stack.
+   - Choose and secure a metrics exporter.
+   - Move Keycloak admin calls out of DB transactions if outage drills show connection-pool pressure.
+
 ## Phase 8A — security and authorization hardening — 2026-09-23 (Codex)
 
 Scope stayed inside Phase 8A. Phase 8B reliability/resilience, Phase 8C E2E/visual/RTL/accessibility, Phase 8D independent red-team closure and Journey production enablement were not started.
