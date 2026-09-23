@@ -1,5 +1,16 @@
 # Platform Control Plane — implementation status
 
+## UX-0 — platform experience design freeze — 2026-09-23 (Claude Code)
+
+Documentation only; no application code changed. Phase 8C not started; Journey production intake OFF.
+Product decisions A–D approved; target IA, Workspace vs Control Center, Consultant Setup, Access & Governance,
+credential lifecycle, coordination split, terminology (AR glossary draft) and the UX-1 … UX-8 program are frozen in
+[ux-implementation-plan.md](ux-implementation-plan.md) (canonical handoff). The audit
+[platform-ux-audit.md](platform-ux-audit.md) keeps its original findings and marks superseded recommendations (§31).
+
+### UX TARGET APPROVED: YES
+### UX-1 READY: YES — start only when separately authorized
+
 ## Admin UX simplification (pre-Phase 8C) — 2026-09-23 (Claude Code)
 
 Scope: Control Center information architecture, routes, naming, task grouping and onboarding flow. No business rule, authorization, readiness semantic or Journey cutover change; Journey production intake stays OFF; Phase 8C not started. Full record (IA, old→new route map, terminology, parity checklist, debt): [admin-ux-redesign.md](admin-ux-redesign.md).

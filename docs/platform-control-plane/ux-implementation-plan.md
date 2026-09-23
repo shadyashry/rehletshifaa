@@ -1,0 +1,292 @@
+# RehletShifaa — UX implementation plan (UX-0 design freeze)
+
+Date: 2026-09-23 · Branch: `codex/platform-control-plane` · Base: Phase 8B complete (`2f19ed0`), admin UX `44dd629`
+Status: **FROZEN design direction. No UI implemented.** Phase 8C not started. Journey production intake OFF.
+
+This is the canonical handoff for UX-1 … UX-8. Evidence and original findings (UX-001 … UX-040) are in
+[platform-ux-audit.md](platform-ux-audit.md); where this plan and an earlier audit recommendation disagree,
+**this plan wins** (the audit marks those recommendations as superseded).
+
+---
+
+## 1. Approved product decisions
+
+### A — Consultant models
+- DIRECT and PROVIDER-ORGANIZATION consultants **stay separate backend/business models**. No backend merge.
+- Admins get **one `Clinicians` directory**. Each row states its engagement model — *Direct with RehletShifaa*
+  or *Through a provider organization* — and its real operational capability: **Can receive cases**, **Setup in
+  progress**, credential status, organization.
+- The two models must not look identical where behaviour differs. Clinician detail is one page family;
+  model-specific sections and actions are allowed where genuinely required (e.g. Direct: legacy case approval and
+  price list; Provider: readiness, credential dossiers, organization-derived prices).
+- Direct is **potentially transitional**. It is not retired until functional parity and migration criteria are
+  proven (§14, assumption V-1).
+- Truth constraint: today only Direct consultants can receive cases. Provider clinicians cannot reach
+  `readyForActivation` while commercial & legal acceptance is fail-closed. The directory says so.
+
+### B — Provider personas: Workspace vs Control Center
+- Provider-side users **do not land in the general Control Center** by default.
+- **Workspace** = daily work. **Control Center** = configuring and administering the platform.
+- Target per persona (existing capabilities and scopes only; no authorization-architecture change):
+
+| Persona | Default landing | Contents |
+|---|---|---|
+| Provider consultant | Provider Workspace | My work · My cases · My practice · My schedule · My credentials · Prices needing my approval (where existing capability permits) |
+| Associate doctor | Provider Workspace | Same operational model, plus supervision context (who supervises me) |
+| Practice manager | Provider Workspace | Clinicians I manage · schedules · setup status · commercial tasks allowed by existing permissions · practice staff |
+| Consultant assistant | Provider Workspace | Only the clinicians and tasks I support · schedule · existing scoped capabilities |
+| Organization owner | Provider Workspace | Plus a clear **Manage organization** entry into scoped Control Center administration, when authorized |
+
+- Unrelated platform-admin navigation is never shown merely because a capability technically exists.
+- Any patient/case data in the Provider Workspace is gated by the minimum-necessary verification (P0-9).
+
+### C — Shadow routing
+- A routing command that does not change the live case is **never** labelled Assign, Reassign or Transfer.
+- Everyday operations show only **authoritative** live assignment/transfer commands.
+- Shadow functionality lives only under **Coordination Setup › Advanced**, labelled
+  **Preview routing recommendation**, with the copy:
+  *"Evaluation only — this will not change the case owner or the person assigned to this work."*
+- `SHADOW` / `LIVE` are not business-facing labels. Operational users never see rollout-engine terminology.
+
+### D — Activation states
+| Case | Condition | UX |
+|---|---|---|
+| 1 | Action not relevant to this user/state | **Hide** |
+| 2 | Relevant, waiting for achievable prerequisites | **Show disabled with blockers**: *"Not ready to activate · Waiting for: Independent credential review."* |
+| 3 | Cannot be completed in the current release | **No disabled primary button.** Informational status (copy below) |
+
+Case 3 copy: **Activation isn't available yet** — *"Commercial & Legal Acceptance must be completed before this
+organization can receive cases. That step isn't available in the current release. You can complete the remaining
+setup now. No cases will be routed to this organization until activation becomes available."*
+
+All backend readiness and activation gates stay. Commercial & Legal Acceptance is never bypassed or hidden as
+"complete".
+
+---
+
+## 2. Final Control Center IA
+
+```
+CONTROL CENTER
+Home                        What needs my attention?
+Providers
+  Organizations
+  Clinicians                one directory, both engagement models
+  Practice Staff
+Reviews & Safety
+  Credential Reviews
+  Identity Checks
+Commercial
+  Price Lists
+  Exchange Rates
+  Margin & Deposit          moved from the Finance portal <details>
+Operations
+  RehletShifaa Staff
+  Coordination Setup        Pools & People · Clinician Preferences · Rules · Advanced
+Care Journeys
+  Journeys
+  Journey Design / Publishing
+Access & Governance
+  People
+  Roles
+  Audit                     (permission catalogue kept as an advanced reference, not a sidebar item)
+```
+
+- No target number of groups. *Care Journeys* stays separate: design/publishing is product governance, not
+  coordination configuration.
+- Navigation is permission-gated; users see only sections they can open.
+- **Home** answers *"What needs my attention?"*: attention items from real reads, pending review/setup work,
+  persona-relevant shortcuts. No destination grid, no fabricated metrics. Navigation stays in the sidebar.
+- The Control Center uses an app shell (no public marketing footer).
+
+## 3. Workspace vs Control Center principle
+
+| | Workspace | Control Center |
+|---|---|---|
+| Question | "What do I do next?" | "How is the platform/organization set up?" |
+| Users | Coordinators, finance, operations, clinicians, provider personas | Admins, provider operations, reviewers, commercial, access, journey managers |
+| Language | *My work, My cases, My schedule* | Objects and configuration |
+| Surfaces | Staff Portal (RehletShifaa staff) · Provider Workspace (provider personas) · My Care (patients) | Control Center |
+
+A person may have both. They land in their workspace; the Control Center (or *Manage organization*) is one
+persistent link in the header/account menu. Admin-only users land directly in the Control Center.
+
+## 4. Consultant Setup model
+
+**Step 1 — `Add Consultant`** (one short screen): name · email · organization · clinician type · engagement model
+· invitation language · only other *existing* mandatory invite facts. The backend audit reason is prefilled and
+under Advanced. → lands on **Consultant Setup**.
+
+**Consultant Setup** is a persistent workspace/checklist, not a linear wizard. Each section shows status, owner,
+next action and who can act. Backend readiness rules are unchanged (`ProviderCredentialService.computeReadiness`).
+
+| # | Section | Backend facts | Owner |
+|---|---|---|---|
+| 1 | Account | `identityProvisioned`, `organizationMembershipActive` | Provider Operations |
+| 2 | Professional Profile | `clinicianProfileComplete`, `requiredRelationshipsComplete` (supervising consultant for associate doctors) | Provider Operations (clinician self-service later, if enabled) |
+| 3 | Credentials Submitted | `requiredCredentialsSubmitted` | Provider Operations / clinician (`credential.submit`) |
+| 4 | Independent Credential Review | `requiredCredentialsVerified`, `mandatoryCredentialsUnexpired` | **Credential Review Team** — status only here; decision controls live in Credential Reviews |
+| 5 | Operational Setup | pricing, availability (when required), routing preference | Provider Operations / Commercial / Coordination Setup (deep links) |
+| 6 | Activation | provider profile, owner, organization active, commercial & legal acceptance, `readyForActivation` | Provider Operations (`provider.activate`, recent auth, confirmation) |
+
+Example rendering: *Professional Profile — Completed — Owner: Provider Operations* · *Credential Review — Waiting —
+Owner: Credential Review Team* · *Operational Setup — Needs attention — Pricing / Schedule / routing*.
+Section 6 follows Decision D (case 3 today). Provider Operations never sees reviewer controls in setup; independent
+review, self/submitter blocks and reasons stay. The **Direct** model shows its own sections (Account, Profile,
+Credential & case approval with confirmation, Price list, Account access).
+
+## 5. Access & Governance model
+
+- **People** (person-centred, primary): who this person is · accounts and workspaces · RehletShifaa business roles ·
+  **Access summary** (inside it: *"Can this person…?"* → allowed/denied + reason) · how to change business access.
+- **Roles** (first-class): what the role allows · where it applies · restrictions · versions/status.
+- **Audit**.
+- Authority sources are **visually separated by source**:
+
+```
+ACCOUNT & WORKSPACES                      BUSINESS ACCESS
+Coordinator · Staff Portal                Provider Operations Manager · Al Noor Hospital
+Managed by Identity System (read-only)    Managed by RehletShifaa (give / remove)
+```
+
+Realm/Keycloak roles are read-only and never presented as interchangeable with platform assignments. The
+permission catalogue moves out of the sidebar to an advanced/reference surface (not deleted). Reason asked once,
+at submit/publish; person picker for role simulation.
+
+## 6. Credential lifecycle design principle
+
+Credentialing is an **ongoing lifecycle**, not an onboarding step. Credential Reviews is its own operational
+workspace. What the data model supports today (verified in `V34`, `ProviderCredentialService`):
+
+| Lifecycle state | Today | How the UX may present it |
+|---|---|---|
+| Submitted | Revision `SUBMITTED` | Direct |
+| Under review | `UNDER_REVIEW` via `START_REVIEW` | Direct; action label **Start review** / **Assign review to me** |
+| More information required | `MORE_INFORMATION_REQUIRED` (reason required) | Direct |
+| Verified (independent) | `VERIFY` from `UNDER_REVIEW`; reviewer ≠ clinician ≠ submitter; `reviewed_by`, reason, recent auth | Direct |
+| Rejected | `REJECTED` (reason required) | Direct |
+| Suspended / restored | `SUSPEND` (from VERIFIED) / `RESTORE`; revision + dossier `SUSPENDED` | Direct |
+| Expired | Status value exists but **no provider job writes it**; expiry is computed at read time (`expires_at <= now` → `CREDENTIAL_EXPIRED` blocker) | Derive from `expires_at`; never rely on the stored status alone |
+| Expiring | Not a state; derivable from `expires_at` per clinician | Derived label only; no reminder or cross-organization "expiring" query exists → future backend capability |
+| Renewal submitted | Representable: a newer revision in the same dossier while an earlier VERIFIED one remains effective | Derived label; behaviour to verify (V-4) |
+| Revoked | Dossier status `REVOKED` exists in schema; no command produces it | Future business decision / backend capability; do not show |
+| Legacy unreviewed | `LEGACY_UNREVIEWED` provenance | Never shown as independently verified |
+
+Preserve independent review, reviewer identity, reasons, evidence, expiry and audit history. Distinguish:
+**document uploaded & scanned** (evidence `CLEAN`) ≠ **credential submitted** (`SUBMITTED`) ≠ **reviewed** (any
+decision) ≠ **independently verified** (`VERIFIED`). Credential validity ≠ approval to receive cases
+(`credentialReady` vs `readyForActivation` vs `ACTIVE`); clinical scope/privileging does not exist as a model
+(future business decision).
+
+## 7. Care coordination: operations vs configuration
+
+| Daily operations → **Staff Portal** | Configuration → **Control Center › Coordination Setup** |
+|---|---|
+| My work · My cases · Team queue | Pools & People · Clinician Preferences · Rules |
+| Authoritative Assign / Transfer / Reassign only | **Advanced:** Preview routing recommendation · routing simulation · decision history · technical configuration only when truly necessary |
+
+Never collapse **Case Owner**, **WorkItem assignee** and **routing preference** into one concept; label each. People
+by name, cases by case number (small read allowed), never UUIDs.
+
+## 8. Terminology principles
+
+Plain language, without simplifying away governance or clinical meaning. Frozen English direction:
+
+| Use | Instead of / note |
+|---|---|
+| RehletShifaa staff · Practice staff | "Staff & teams" · "Practice team" |
+| Schedule (clinician-facing) | Availability |
+| *Where it applies* (helper for Scope) | "Scope" alone |
+| Ready to activate | Readiness |
+| Professional relationships — Manages · Assists · Supervises | "Works with" (superseded) |
+| Access summary, containing *Can this person…?* | "Can they…?" as a page name (superseded) |
+| Assignment history / Routing history | "Coordinator changes" (superseded) |
+| Start review / Assign review to me | "Claim review" (insurance ambiguity; superseded) |
+| Retire version + consequence copy | "Stop using" (superseded where versioned governance matters) |
+| Direct with RehletShifaa · Through a provider organization | "Direct (current case workflow)" |
+| Preview routing recommendation | Shadow / Assign-in-shadow |
+| Care Journeys / Journey design | "Care pathways" (superseded: implies a clinical protocol; the engine models operational patient coordination) |
+
+Arabic: draft glossary in the audit §31.7 — **not final; native Arabic healthcare-operations review required
+before Phase 8C.**
+
+## 9. Cross-cutting implementation safety rules
+
+1. One page, one primary business job.
+2. One obvious primary action per scenario.
+3. An action appears only when the user is authorized **and** it makes sense in the current state **and** it really
+   does what its label promises.
+4. One canonical place to manage each concept; elsewhere link or summarize.
+5. Advanced technical detail uses progressive disclosure.
+6. No UUIDs, revision tokens, engine hashes or compiler/runtime details as ordinary business UX.
+7. Never remove independent credential review, maker/checker, OTP, required audit reasons, activation gates or
+   sensitive confirmations.
+8. No backend architecture change for UX convenience.
+9. Small read-only APIs are allowed where needed to present existing data truthfully.
+10. Preserve redirects for old routes where reasonably possible.
+
+## 10. Revised P0 (truthfulness / safety / material user error)
+
+| ID | Item | Audit refs | Program |
+|---|---|---|---|
+| P0-1 | Provider personas have no home (red "no portal role" error) — truthful interim landing now; full workspace in UX-4 | UX-001 | UX-1 → UX-4 |
+| P0-2 | False/unreachable activation (enabled *Activate organization*; disabled primary *Activate consultant*; "Needs action" with no action) → Decision D | UX-002 | UX-1 |
+| P0-3 | Fake/no-op shadow Assign/Reassign → Decision C (remove from daily UI; Preview under Advanced) | UX-003 | UX-1 |
+| P0-4 | Incomplete access picture across authority sources (realm roles invisible) → read-only *Account & workspaces* block (small read) | UX-004 | UX-1 (block) → UX-5 (People) |
+| P0-5 | Professional details saved but shown blank / overwrite risk → small profile read, show and edit in place | UX-007 | UX-1 |
+| P0-6 | Any reachable control that performs no real action (inventory all; e.g. `PAY_DEPOSIT` stub if reachable) | UX-035, §7 | UX-1 |
+| P0-7 | Dangerous actions missing confirmation (Retire price; Approve for cases) → one confirmation pattern | UX-024/025/032 | UX-1 |
+| P0-8 | Misleading permission/error states (coordination "You do not have access" for empty lists; raw errors that hide whether anything was saved; inconsistent re-authentication prompts) | §25, UX-031 | UX-1 |
+| P0-9 | Minimum-necessary access verification (per-persona patient/case data matrix) **before** provider personas get new workspace exposure | new | UX-1 (analysis) gates UX-4 |
+| P0-10 | Credential review missing the submitted issuer, reference number, issue date and jurisdiction: `VERIFY` attests facts the reviewer cannot see (`RevisionView` omits them). Classified **P0** because the reviewer cannot safely compare the claim against the evidence | UX-013 | UX-1 |
+
+Everything else (shell, Home, one directory, onboarding shape, terminology, finance policy move, coordination
+restructure, journeys) is **P1/P2** and lands in UX-2 … UX-8.
+
+## 11. Implementation program
+
+| Phase | Boundary (in scope) | Not in scope |
+|---|---|---|
+| **UX-1 Truthfulness & Safety** | P0-1 interim landing, P0-2 … P0-8, P0-10; P0-9 written data matrix; small reads: professional profile, credential revision facts, person realm roles. Same pages, truthful states | New IA, new pages, directory merge |
+| **UX-2 Shell / Navigation / Home / Terminology** | App shell without public footer; §2 IA and labels; permission-gated nav; attention-only Home; admin-only redirect to CC; Margin & Deposit route in CC; old-route redirects; EN terminology; AR draft labels behind review | Page restructures |
+| **UX-3 Clinician Directory & Consultant Setup** | One Clinicians directory (engagement + capability); Add Consultant screen; Consultant Setup checklist (§4); clinician page family with model-specific sections; clinician Schedule (retire Availability hub); organization default prices on the organization; membership confirmation in Organization › People + Home | Provider Workspace |
+| **UX-4 Provider Workspace / Personas** | Persona landing from existing memberships/capabilities; §1-B contents; *Manage organization* entry; patient/case data only as permitted by the approved P0-9 matrix | Keycloak role provisioning, new authorization |
+| **UX-5 Access & Governance** | People (merge User access + Effective access), Access summary, Roles, Audit, permission reference; reason at publish; person picker; access-removal/offboarding summary | Changing the realm-role/platform-role split |
+| **UX-6 Credentials & Provider Readiness** | Credential Reviews workspace (typed rows incl. Direct approvals); derived lifecycle labels (§6); decision history where supported; organization Setup and profile edit (existing `PUT /admin/providers/{id}`); Ready-to-activate wording | Reminders, revocation, privileging |
+| **UX-7 Care Coordination** | Staff Portal Team queue with authoritative Assign/Transfer, names + case numbers; Coordination Setup (Pools & People, Clinician Preferences, Rules); Advanced (Preview routing recommendation, simulation, history); no org-picker hop | Routing-mode changes |
+| **UX-8 Commercial / Care Journeys / Portal polish** | Price Lists overview, Exchange Rates, Margin & Deposit polish; financial truthfulness copy (audit §31.8 E); Journeys publish checklist, Advanced engine detail, reason at submit, *Retire version* copy; staff/patient portal polish; representative context | Online payment, Journey production intake |
+
+Each phase: focused unit tests + typecheck; update affected e2e specs; live visual check of touched pages.
+Estimate: **~10–14 focused sessions** (UX-3, UX-4, UX-7 are L; the rest M). Risk: medium. Main risks: UX-4 may find
+no existing case-read path for provider personas (then scope down, never fake); small read APIs; test churn; Arabic
+review lead time.
+
+## 12. Phase 8C / 8D relationship
+
+- **Phase 8C** (formal E2E, visual, EN/AR, RTL, mobile, accessibility) runs **after UX-8**, on the redesigned UI.
+  Entry condition: native Arabic review of the glossary done.
+- **Phase 8D** (independent architecture/security/operations/red-team review) runs after 8C and receives the
+  findings flagged here: offboarding completeness, re-authentication coverage, minimum-necessary enforcement,
+  provider-persona data exposure.
+
+## 13. Out of scope (UX program)
+
+Backend authorization changes · merging consultant models · enabling or bypassing Commercial & Legal Acceptance ·
+Journey production intake · Keycloak roles for provider personas · new credential functions (reminders,
+cross-organization expiring queue, revocation) · clinical scope/privileging model · online payment · new patient
+representative authority · Phase 8C/8D work.
+
+## 14. Assumptions requiring later verification
+
+| ID | Assumption | Verify in |
+|---|---|---|
+| V-1 | Direct retirement criteria: provider path reaches ACTIVE (commercial acceptance exists), routing/assignment uses provider eligibility, price parity, V33 legacy mappings reviewed/adopted, no case-history loss | Product, before any retirement |
+| V-2 | Persona can be derived from existing memberships/capabilities (`/admin/access/me` + membership role types) without a Keycloak role | UX-4 start |
+| V-3 | Provider consultants/associates have an existing, correctly scoped case-read path; if not, "My cases" is omitted until a backend capability is approved | UX-1 (P0-9) |
+| V-4 | A renewal revision can be submitted while an earlier VERIFIED revision is effective, and the earlier one stays effective (per technical-decisions §13.7) | UX-6 |
+| V-5 | Clinician directory needs a small list read with engagement + readiness summary (avoid N+1) | UX-3 |
+| V-6 | Offboarding: membership deactivation, legacy staff/practitioner disable, role revoke and organization status are separate; no dedicated clinician offboarding command was found (OFFBOARDED is only guarded) | UX-5; Phase 8D |
+| V-7 | Re-authentication (`REAUTHENTICATION_REQUIRED`) is handled consistently on every recent-auth action (credential decisions, activation, journey approve/publish/retire, access changes) | UX-1 |
+| V-8 | Which proposal/consent actions a `PATIENT_REPRESENTATIVE` may take | UX-8 |
+| V-9 | Arabic glossary validated by a native healthcare-operations reviewer | Before Phase 8C |
+| V-10 | "Clinicians" = physicians only today (`CONSULTANT`, `ASSOCIATE_DOCTOR`) → Arabic الأطباء; revisit if non-physician types are added | UX-2 |
