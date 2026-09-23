@@ -11,7 +11,7 @@ import { ccHref } from "./control-center-nav";
 import { ActionMenu, ErrorNotice, Facts, Section, SectionTabs, StatusBadge, SuccessNotice, TabPanel, TechnicalDetails } from "./cc-ui";
 import { clinicianStatusLabel, membershipStatusLabel, personRoleLabel, type SetupArea } from "./admin-labels";
 import { personName } from "./provider-directory";
-import { ActivationPanel, CredentialRequirements, PracticeRelationships, ProfessionalDetailsForm, ReadinessChecklist, SetupIssues, issuesFor, useClinician } from "./consultant-setup";
+import { ActivationPanel, CredentialRequirements, PracticeRelationships, ProfessionalDetailsForm, ReadinessChecklist, SetupIssues, activationUnavailable, issuesFor, readinessSummary, useClinician } from "./consultant-setup";
 import { PricingManagement } from "./PricingManagement";
 import { AvailabilityManagement } from "./AvailabilityManagement";
 import { firstOpenStep, setupHref } from "./ConsultantOnboardingWizard";
@@ -59,7 +59,7 @@ export function ConsultantWorkspace({ locale, organizationId, practitionerId, in
     { key: "relationships" as const, label: ar ? "علاقات العيادة" : "Practice relationships" },
     ...(access.can("price_list.view") ? [{ key: "pricing" as const, label: ar ? "الأسعار" : "Pricing", attention: !!readiness && readiness.pricingSetupRequired && !readiness.pricingSetupComplete }] : []),
     ...(access.can("availability.view") ? [{ key: "availability" as const, label: ar ? "المواعيد المتاحة" : "Availability", attention: !!readiness && readiness.availabilitySetupRequired && !readiness.availabilitySetupComplete }] : []),
-    { key: "readiness" as const, label: ar ? "الجاهزية" : "Readiness", attention: !!readiness && !readiness.readyForActivation && !active },
+    { key: "readiness" as const, label: ar ? "الجاهزية" : "Readiness", attention: !!readiness && !readiness.readyForActivation && !active && !(activationUnavailable(readiness) && readiness.blockers.length === 1) },
   ];
   const current = tabs.some((t) => t.key === tab) ? tab : "overview";
 
@@ -77,7 +77,7 @@ export function ConsultantWorkspace({ locale, organizationId, practitionerId, in
               [ar ? "المؤسسة" : "Organization", <Link key="org" href={ccHref(locale, `/providers/${organizationId}`)}>{detail.organization.displayName}</Link>],
               [ar ? "العضوية" : "Membership", member ? <StatusBadge tone={membershipStatusLabel(member.status, locale).tone}>{membershipStatusLabel(member.status, locale).label}</StatusBadge> : "—"],
               [ar ? "دولة الترخيص" : "Licensing country", onboarding.jurisdiction ?? "—"],
-              [ar ? "الجاهزية" : "Readiness", readiness ? (readiness.readyForActivation || active ? (ar ? "جاهز" : "Ready") : (ar ? `${readiness.blockers.length} بنود متبقية` : `${readiness.blockers.length} item${readiness.blockers.length === 1 ? "" : "s"} remaining`)) : "—"],
+              [ar ? "الجاهزية" : "Readiness", readiness ? (active ? (ar ? "نشط" : "Active") : readinessSummary(readiness, locale)) : "—"],
             ]} />
             <SetupIssues issues={issuesFor(readiness, "details", locale)} locale={locale} />
             {member?.status === "PENDING" && access.can("provider.member.invite") && <button type="button" className="cc-secondary" disabled={busy} onClick={() => void activateMembership()}>{ar ? "تفعيل العضوية" : "Activate membership"}</button>}

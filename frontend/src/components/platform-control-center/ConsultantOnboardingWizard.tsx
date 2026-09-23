@@ -12,7 +12,7 @@ import { ccHref } from "./control-center-nav";
 import { EmptyState, ErrorNotice, Facts, Field, SectionTabs, Section, StatusBadge, SuccessNotice, TabPanel, WizardProgress } from "./cc-ui";
 import { CARE_AREAS, careAreaLabel, clinicianStatusLabel, membershipStatusLabel, personRoleLabel, type SetupArea } from "./admin-labels";
 import { personName, useProviderDirectory, type ProviderDetail } from "./provider-directory";
-import { ActivationPanel, CredentialRequirements, PracticeRelationships, ProfessionalDetailsForm, ReadinessChecklist, SetupIssues, issuesFor, useClinician, type Readiness } from "./consultant-setup";
+import { ActivationPanel, CredentialRequirements, PracticeRelationships, ProfessionalDetailsForm, ReadinessChecklist, SetupIssues, issuesFor, readinessSummary, useClinician, type Readiness } from "./consultant-setup";
 import { PricingManagement } from "./PricingManagement";
 import { AvailabilityManagement } from "./AvailabilityManagement";
 
@@ -278,7 +278,7 @@ function ResumeSetup({ locale, organizationId, practitionerId, initialStep }: { 
           <h2>{name || (ar ? "الاستشاري" : "Consultant")}</h2>
           <p className="cc-meta">{personRoleLabel(onboarding.clinicianType, locale)} · {detail.organization.displayName}</p>
           <p><StatusBadge tone={status.tone}>{status.label}</StatusBadge></p>
-          {readiness && <p className="cc-meta">{readiness.readyForActivation ? (ar ? "جاهز للتفعيل." : "Ready to activate.") : (ar ? `${readiness.blockers.length} بنود متبقية` : `${readiness.blockers.length} item${readiness.blockers.length === 1 ? "" : "s"} remaining`)}</p>}
+          {readiness && <p className="cc-meta">{readinessSummary(readiness, locale)}</p>}
         </aside>
       </div>
     </>

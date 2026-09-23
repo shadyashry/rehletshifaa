@@ -26,11 +26,16 @@ describe("Care Coordination organization picker", () => {
     expect(await screen.findByRole("link", { name: /Nile Care Clinic/ })).toHaveAttribute("href", "/en/portal/control-center/coordination/org-1");
   });
 
-  it("shows a denied state when the picker returns no organizations", async () => {
+  it("distinguishes an empty organization list from a denied one", async () => {
     vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
       if (path === "/admin/coordination/organizations") return new Response(JSON.stringify([]), { status: 200 });
       return new Response(JSON.stringify({}), { status: 200 });
     });
+    render(<CareCoordinationOrganizations locale="en" />);
+    expect(await screen.findByText(/No provider organizations are set up for care coordination yet/)).toBeVisible();
+    expect(screen.queryByText(/You do not have access/)).not.toBeInTheDocument();
+    cleanup();
+    vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => new Response(JSON.stringify({}), { status: path === "/admin/coordination/organizations" ? 403 : 200 }));
     render(<CareCoordinationOrganizations locale="en" />);
     expect(await screen.findByText(/You do not have access/)).toBeVisible();
   });

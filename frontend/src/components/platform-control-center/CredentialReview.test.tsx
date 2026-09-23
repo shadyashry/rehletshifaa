@@ -47,16 +47,60 @@ describe("Credential review", () => {
   });
 
   it("requires a reason, keeps Reject visually separate, and records the decision with an idempotency key", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes("UNDER_REVIEW"), "POST /admin/providers/org-a/credential-reviews/rev-1/decision": { ...revision, status: "VERIFIED" } }, capabilities));
+    let state = "UNDER_REVIEW";
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes(), "/admin/providers/org-a/credential-reviews/rev-1": () => ({ ...revision, status: state }), "POST /admin/providers/org-a/credential-reviews/rev-1/decision": () => { state = "VERIFIED"; return { ...revision, status: state }; } }, capabilities));
     render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
     const verify = await screen.findByRole("button", { name: "Verify credential" });
-    expect(screen.getByRole("button", { name: "Reject" })).toHaveClass("cc-danger-button");
+    expect(screen.getByRole("button", { name: "Reject…" })).toHaveClass("cc-danger-button");
     fireEvent.click(verify);
     expect(await screen.findByText("A reason is required for this decision.")).toBeVisible();
     fireEvent.change(screen.getByLabelText(/Reason for your decision/), { target: { value: "Licence checked with the issuing authority" } });
     fireEvent.click(verify);
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/providers/org-a/credential-reviews/rev-1/decision", expect.objectContaining({ method: "POST", headers: expect.objectContaining({ "Idempotency-Key": expect.any(String) }) })));
     expect(await screen.findByText("Decision recorded.")).toBeVisible();
-    expect(screen.getByText("Verified")).toBeVisible();
+    expect(await screen.findByText("Verified")).toBeVisible();
+  });
+
+  it("separates the submitted facts from the evidence and the independent decision, and never calls them verified", async () => {
+    const facts = { issuer: "Egyptian Medical Syndicate", referenceNumber: "EMS-12345", issuedAt: "2024-01-10T00:00:00Z", expiresAt: "2030-01-10T00:00:00Z", jurisdiction: "EG" };
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes(), "/admin/providers/org-a/credential-reviews/rev-1": { ...revision, expiresAt: facts.expiresAt, submittedFacts: facts, reviewedBy: null, reviewedAt: null } }, capabilities));
+    render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
+    expect(await screen.findByRole("heading", { name: "Submitted facts" })).toBeVisible();
+    expect(screen.getByText("EMS-12345")).toBeVisible();
+    expect(screen.getByText("Egyptian Medical Syndicate")).toBeVisible();
+    expect(screen.getByText(/doesn't mean they have been verified/)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Evidence documents" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Independent review decision" })).toBeVisible();
+    expect(screen.getByText("No decision yet.")).toBeVisible();
+    expect(screen.queryByText("Verified")).not.toBeInTheDocument();
+  });
+
+  it("says plainly when a submitted fact is missing or the facts cannot be shown, instead of inventing them", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes(), "/admin/providers/org-a/credential-reviews/rev-1": { ...revision, submittedFacts: { issuer: "Authority", referenceNumber: null, issuedAt: null, expiresAt: null, jurisdiction: "EG" } } }, capabilities));
+    render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
+    expect(await screen.findAllByText("Not provided")).toHaveLength(2);
+    expect(screen.getByText("No expiry declared")).toBeVisible();
+    cleanup();
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi(routes(), capabilities));
+    render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
+    expect(await screen.findByText(/couldn't be shown. Don't verify it/)).toBeVisible();
+  });
+
+  it("asks for a consequence-aware confirmation before rejecting, and sends nothing until confirmed", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes("UNDER_REVIEW"), "POST /admin/providers/org-a/credential-reviews/rev-1/decision": { ...revision, status: "REJECTED" } }, capabilities));
+    render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
+    fireEvent.change(await screen.findByLabelText(/Reason for your decision/), { target: { value: "Illegible licence" } });
+    fireEvent.click(screen.getByRole("button", { name: "Reject…" }));
+    expect(screen.getByText(/can't become ready until an acceptable version is verified/)).toBeVisible();
+    expect(apiFetchAs).not.toHaveBeenCalledWith("test", "/admin/providers/org-a/credential-reviews/rev-1/decision", expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: "Yes, reject" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/providers/org-a/credential-reviews/rev-1/decision", expect.objectContaining({ method: "POST", body: expect.stringContaining("\"decision\":\"REJECT\"") })));
+  });
+
+  it("shows a verified credential past its expiry date as expired, not verified", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes(), "/admin/providers/org-a/credential-reviews/rev-1": { ...revision, status: "VERIFIED", expiresAt: "2025-01-01T00:00:00Z", submittedFacts: { issuer: "A", referenceNumber: "R", issuedAt: null, expiresAt: "2025-01-01T00:00:00Z", jurisdiction: "EG" } } }, capabilities));
+    render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
+    expect((await screen.findAllByText("Expired")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Verified")).not.toBeInTheDocument();
   });
 });

@@ -34,6 +34,10 @@ public class ProviderCredentialService {
         this.allowedTypes=Set.of(allowedTypes.split(","));}
 
     public OnboardingView onboarding(UUID organization,UUID practitioner){var c=clinician(organization,practitioner,false);authorizeAny("provider.view",context(c));return c;}
+    /** Read-back of the saved professional details, gated by the same capability as the write, so an editor changes the stored values instead of re-typing them blind. */
+    public ProfileView profile(UUID organization,UUID practitioner){var c=clinician(organization,practitioner,false);authorizeAny("provider.update",context(c));
+        return jdbc.sql("SELECT registration_number,specialty,subspecialty,qualifications FROM practitioner_profiles WHERE id=?").param(practitioner)
+                .query((r,n)->new ProfileView(r.getString(1),r.getString(2),r.getString(3),r.getString(4),c.jurisdiction(),c.version())).single();}
 
     @Transactional
     public OnboardingView completeProfile(UUID organization,UUID practitioner,ProfileCommand command){var c=clinician(organization,practitioner,true);
@@ -97,7 +101,15 @@ public class ProviderCredentialService {
     }
 
     public List<RevisionView> list(UUID organization,UUID practitioner){var c=clinician(organization,practitioner,false);authorizeAny("credential.view",context(c));return jdbc.sql("SELECT r.id FROM provider_credential_revisions r JOIN provider_credential_dossiers d ON d.id=r.dossier_id WHERE d.organization_id=? AND d.practitioner_id=? ORDER BY r.submitted_at DESC").params(organization,practitioner).query(UUID.class).list().stream().map(id->revision(id,organization,false)).toList();}
-    public RevisionView reviewDetail(UUID organization,UUID revisionId){RevisionView r=revision(revisionId,organization,false);authorizeAny("credential.view",context(clinician(organization,r.practitionerId(),false)));return r;}
+    /**
+     * The review page's read: the revision plus the facts the submitter declared (issuer, reference number, issue and
+     * expiry dates, jurisdiction) so the reviewer can compare them with the evidence. Showing them is not verification.
+     */
+    public ReviewDetail reviewDetail(UUID organization,UUID revisionId){RevisionView r=revision(revisionId,organization,false);var actor=authorizeAny("credential.view",context(clinician(organization,r.practitionerId(),false)));
+        var detail=jdbc.sql("SELECT issuer_encrypted,reference_number_encrypted,issued_at,jurisdiction,reviewed_by,reviewed_at FROM provider_credential_revisions WHERE id=?").param(revisionId)
+                .query((x,n)->new ReviewDetail(r.id(),r.dossierId(),r.organizationId(),r.practitionerId(),r.ownerSubject(),r.credentialType(),r.revisionNumber(),r.policyVersionId(),r.status(),r.dossierStatus(),r.expiresAt(),r.submittedBy(),r.submittedAt(),r.version(),r.evidenceIds(),
+                        new SubmittedFacts(crypto.decrypt(x.getString("issuer_encrypted")),crypto.decrypt(x.getString("reference_number_encrypted")),instant(x,"issued_at"),r.expiresAt(),x.getString("jurisdiction")),x.getString("reviewed_by"),instant(x,"reviewed_at"))).single();
+        audit.record(actor.subject(),revisionId.toString(),"CREDENTIAL_SUBMITTED_FACTS_VIEWED","SUCCESS","organization="+organization);return detail;}
     public List<RevisionView> queue(UUID organization){organization(organization);authorizeAny("credential.review",new ResourceContext(organization,true,"PROVIDER_ORGANIZATION",organization.toString(),null,false));return jdbc.sql("SELECT r.id FROM provider_credential_revisions r JOIN provider_credential_dossiers d ON d.id=r.dossier_id WHERE d.organization_id=? AND r.status IN ('SUBMITTED','UNDER_REVIEW') ORDER BY r.submitted_at").param(organization).query(UUID.class).list().stream().map(id->revision(id,organization,false)).toList();}
 
     @Transactional
@@ -189,6 +201,9 @@ public class ProviderCredentialService {
     private record LegacyMapping(UUID practitionerId,String status){}
     private record Evidence(UUID id,UUID organizationId,UUID practitionerId,String stagingKey,String sealedKey,String safeName,String contentType,long expectedSize,String status,long version){}
     public record OnboardingView(UUID organizationId,UUID practitionerId,String clinicianType,ClinicianOnboardingStatus status,String jurisdiction,long version,String ownerSubject){}
+    public record ProfileView(String registrationNumber,String specialty,String subspecialty,String qualifications,String jurisdiction,long version){}
+    public record SubmittedFacts(String issuer,String referenceNumber,Instant issuedAt,Instant expiresAt,String jurisdiction){}
+    public record ReviewDetail(UUID id,UUID dossierId,UUID organizationId,UUID practitionerId,String ownerSubject,String credentialType,int revisionNumber,UUID policyVersionId,String status,String dossierStatus,Instant expiresAt,String submittedBy,Instant submittedAt,long version,List<UUID> evidenceIds,SubmittedFacts submittedFacts,String reviewedBy,Instant reviewedAt){}
     public record ProfileCommand(String registrationNumber,String specialty,String subspecialty,String qualifications,String jurisdiction,long version){}
     public record Requirement(String type,String displayName,boolean mandatory,boolean expiryRequired){}
     public record EvidenceCommand(String fileName,String contentType,long sizeBytes){}

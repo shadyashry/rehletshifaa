@@ -48,15 +48,24 @@ function ManualAssignmentDialog({ locale, api, allowed, teams, caseId, onClose, 
     } finally { setBusy(false); }
   };
 
+  // Only a case whose routing is live accepts ASSIGN/REASSIGN (the backend refuses them otherwise). An evaluation-only
+  // case is never offered an Assign/Reassign command here: its coordinator changes through the Staff Portal transfer.
+  const live = facts?.mode === "LIVE";
+  const heading = facts && !live ? t.notLiveTitle : isReassign ? t.manualReassign : t.manualAssign;
   return (
-    <FocusTrapDialog label={isReassign ? t.manualReassign : t.manualAssign} onClose={onClose}>
-      <h2>{isReassign ? t.manualReassign : t.manualAssign}</h2>
+    <FocusTrapDialog label={heading} onClose={onClose}>
+      <h2>{heading}</h2>
       {loading && <p role="status">{t.loading}</p>}
       {error && <p role="alert" className="cc-message">{error}</p>}
       {notice && <p role="status" className="cc-message">{notice}</p>}
-      {facts && (
+      {facts && !live && (
         <>
-          <p className="cc-meta">{t.currentMode}: {facts.mode === "LIVE" ? t.modeLive : t.modeShadow} · {t.currentRevision}: {facts.revision}</p>
+          <p>{t.notLiveBody}</p>
+          <div className="cc-toolbar"><button type="button" className="cc-secondary" onClick={onClose}>{t.close}</button></div>
+        </>
+      )}
+      {facts && live && (
+        <>
           <p className="cc-meta" dir="ltr">{t.currentOwner}: {facts.owner ?? t.caseUnassigned}</p>
           <p className="cc-meta">{t.caseOwnerNote}</p>
           {!(allowed(isReassign ? "assignment.reassign" : "assignment.manual_assign")) ? <p className="cc-empty">{t.denied}</p> : (
@@ -119,7 +128,7 @@ export function AssignmentQueue({ locale, api, allowed, queue, teams, onChanged 
         <button>{t.lookUp}</button>
       </form>
       {lookedUp && allowed("assignment.reassign") && (
-        <button type="button" onClick={() => setDialogCase(lookedUp)}>{t.manualReassign}</button>
+        <button type="button" className="cc-secondary" onClick={() => setDialogCase(lookedUp)}>{t.lookupOpen}</button>
       )}
 
       {dialogCase && (

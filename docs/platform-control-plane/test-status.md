@@ -1,5 +1,39 @@
 # Platform Control Plane — verification status
 
+## UX-1 truthfulness & safety verification — 2026-09-23 (Claude Code)
+
+**Backend focused suites (all green):**
+
+| Suite | Tests | Covers |
+|---|---|---|
+| `CallerCapabilityIntegrationTest` (new) | 7 | Organization-scoped grants reported for the caller's own organization; held recent-auth capability flagged; platform grants unchanged; an assignment without an active membership is not reported; `?subject=`/`?organization=` are ignored and no organization/assignment IDs are disclosed; navigation visibility does not bypass endpoint authorization (403 on another organization); workspace-roles is 403 without `access.effective_access.view`, reports `available=false` when identity admin is unconfigured, and has no write verbs |
+| `ProviderCredentialIntegrationTest` | 10 (+2) | Profile read-back, edit without clearing, stale version refused, 403 without `provider.update`; review detail submitted facts, reviewer identity after independent verify, owner still cannot decide |
+| `IdentityProvisioningPortTest` | 6 (+2) | Composite realm roles filtered to portal workspaces with account status; 404 → `NOT_FOUND`, 5xx/unconfigured → unavailable (never "no roles") |
+| `AccessGovernanceIntegrationTest` | 14 | Updated for the capability record |
+
+**Gate results:**
+- Backend `mvn -o test`: **492 tests / 55 suites, 0 failures, 0 errors, 1 intentional skip**.
+  - The first full run failed once in `NotificationOutboxDeliveryTest.aClaimHandedBackBeforeAnySendIsDueAgainAtOnceWithoutSpendingAnAttempt`. This is the known cross-context scheduler race; no notification code changed.
+  - The suite passes alone (8/8) and the full rerun is clean.
+- Flyway validated and applied **V1–V50** (no new migration).
+- Frontend `pnpm typecheck` clean. `pnpm test` **272 tests / 40 files, 0 failures**.
+  - New suites: `NoPortalWorkspace`, `JourneyPublishPanel`, `reauthentication`.
+  - Extended: `ConsultantOnboardingWizard`, `ProviderOrganizationDetail`, `CredentialReview`, `AccessGovernance`, `AssignmentQueue`, `PricingManagement`, `CareOperations`, `CareCoordinationOrganizations`, `routes`, `MyCare`.
+- ESLint on touched files: only the pre-existing repository-wide `react-hooks/set-state-in-effect` load pattern remains; new-code findings fixed.
+
+**Live rendered sanity (limited; not Phase 8C):**
+- Canonical base+tunnel rebuild, then a temporary Playwright script (deleted, not committed) against `https://dev.rehletshifaa.com`.
+- Synthetic session and mocked reads; every write refused. EN desktop.
+- Flows, 6/6 passed:
+  - provider interim landing;
+  - organization and clinician "Activation isn't available yet";
+  - evaluation-only routing dialog;
+  - Access workspace vs. business access;
+  - professional details read-back and edit;
+  - credential submitted facts plus a `REAUTHENTICATION_REQUIRED` refusal with "Sign in again".
+- Screenshots in the session temp folder only.
+- **Not run:** Arabic/mobile/a11y formal passes and the full Playwright suite (Phase 8C).
+
 ## Admin UX simplification verification — 2026-09-23 (Claude Code)
 
 - Frontend: `pnpm typecheck` clean; `pnpm test` **246 tests / 37 files** green. New suites: `ControlCenterShell` (capability-gated grouped nav, legacy role areas, header/breadcrumb, mobile toggle, RTL), `ControlCenterOverview` (real counts, empty state), `ConsultantOnboardingWizard` (validation, provider + direct invite, resume step, profile save with version, activation gating, workspace), `CareOperations` (staff lead assignment and `_LEAD` invite parity, auditor read-only, direct approval/reject reason, price list, FX pin), `routes` (old URL redirects, error copy, status icon+text, action menu). Rewritten: organization list/detail, credential queue/review, access governance (5-step wizard, person-first User access, effective access).

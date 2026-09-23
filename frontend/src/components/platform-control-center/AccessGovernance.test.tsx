@@ -111,11 +111,38 @@ describe("Access & governance", () => {
 
   it("keeps an open panel when the access token silently renews (same subject, new object)", async () => {
     const { rerender } = render(<AccessGovernance locale="en" view="users" initialSubject="kc-manager" initialOrganization="org-a" />);
-    expect(await screen.findByText("No matching access assignment.")).toBeVisible();
+    expect(await screen.findByText("No RehletShifaa business roles assigned")).toBeVisible();
     vi.mocked(apiFetchAs).mockClear();
     auth.user = { access_token: "renewed", profile: { sub: "owner" } };
     rerender(<AccessGovernance locale="en" view="users" initialSubject="kc-manager" initialOrganization="org-a" />);
-    expect(screen.getByText("No matching access assignment.")).toBeVisible();
+    expect(screen.getByText("No RehletShifaa business roles assigned")).toBeVisible();
     expect(apiFetchAs).not.toHaveBeenCalled();
+  });
+});
+
+describe("Access picture across authority sources", () => {
+  const person = { initialSubject: "kc-manager", initialOrganization: "org-a" };
+  it("shows identity-system workspaces read-only and separately from RehletShifaa business access", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes, "/admin/access/workspace-roles?subject=kc-manager": { subject: "kc-manager", source: "IDENTITY_SYSTEM", available: true, accountStatus: "ACTIVE", roles: ["COORDINATOR"] } }, capabilities));
+    render(<AccessGovernance locale="en" view="users" {...person} />);
+    const workspaces = await screen.findByRole("region", { name: "Account & workspaces" });
+    expect(await within(workspaces).findByText("Coordinator")).toBeVisible();
+    expect(within(workspaces).getByText("Staff Portal")).toBeVisible();
+    expect(within(workspaces).getByText(/Managed by the identity system · read-only/)).toBeVisible();
+    expect(within(workspaces).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByRole("heading", { name: "Business access" })).toBeVisible();
+    expect(screen.getByText(/Managed by RehletShifaa/)).toBeVisible();
+    // A person with a working workspace but no business role is not described as having "no access".
+    expect(screen.getByText("No RehletShifaa business roles assigned")).toBeVisible();
+    expect(screen.queryByText("No matching access assignment.")).not.toBeInTheDocument();
+    // The read surface is GET-only: nothing on this screen writes to the identity system.
+    expect(vi.mocked(apiFetchAs).mock.calls.filter(([, path, init]) => String(path).includes("workspace-roles") && (init?.method ?? "GET") !== "GET")).toHaveLength(0);
+  });
+
+  it("never claims an account has no workspaces when the identity system could not be asked", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes, "/admin/access/workspace-roles?subject=kc-manager": { subject: "kc-manager", source: "IDENTITY_SYSTEM", available: false, accountStatus: null, roles: [] } }, capabilities));
+    render(<AccessGovernance locale="en" view="users" {...person} />);
+    expect(await screen.findByText(/couldn't be asked right now.*doesn't mean the person has none/)).toBeVisible();
+    expect(screen.queryByText(/has no portal workspace role/)).not.toBeInTheDocument();
   });
 });

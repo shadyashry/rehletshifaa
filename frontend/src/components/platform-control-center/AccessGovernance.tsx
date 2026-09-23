@@ -77,7 +77,7 @@ export function AccessGovernance({ locale, view: requested, initialTab, initialS
   if (!user) return shell(<button onClick={() => void signIn()}>{t.signin}</button>);
   if (!canView) return shell(<EmptyState title={t.denied} />);
   if (!loaded && !error) return shell(<p role="status">{t.loading}</p>);
-  const recentAuth = access.decisions.some((d) => d.reason === "RECENT_AUTHENTICATION_REQUIRED");
+  const recentAuth = access.decisions.some((d) => d.permission.startsWith("access.") && access.needsFreshSignIn(d.permission));
   const common = <>
     <ErrorNotice error={error} locale={locale} action={loaded && roles.length ? "save" : "load"} onRetry={() => void reload()} />
     <SuccessNotice>{notice || null}</SuccessNotice>
@@ -175,9 +175,11 @@ function PeopleAccess({ locale, api, can, roles, label, mode, initial }: ViewPro
       {loading && <p role="status">{t.loading}</p>}
       {person && effective && !loading && <>
         {granting && <GrantAccess locale={locale} api={api} roles={roles} person={{ ...person, name: shown.name }} onCancel={() => setGranting(false)} onGranted={async (status) => { setGranting(false); setNotice((ar ? "تم حفظ الوصول: " : "Access saved: ") + businessLabel(status, locale)); await load(person); }} />}
+        {can("access.effective_access.view") && <WorkspaceRolesBlock key={person.subject} locale={locale} api={api} subject={person.subject} />}
+        <h3>{ar ? "الوصول إلى أعمال رحلة شفاء" : "Business access"}</h3>
+        <p className="cc-meta">{ar ? "تديرها رحلة شفاء · أدوار الأعمال المسندة لهذا الشخص" : "Managed by RehletShifaa · business roles assigned to this person"}</p>
         {effective.membership && <p className="cc-meta">{businessLabel(effective.membership.status, locale)} · {effective.membership.accountActive ? (ar ? "الحساب نشط" : "Account active") : (ar ? "الحساب غير نشط" : "Account inactive")}</p>}
-        <h3>{mode === "users" ? (ar ? "الوصول الحالي" : "Current access") : t.source}</h3>
-        {!effective.sources.length ? <EmptyState title={t.noAccess} body={mode === "users" && manage ? (ar ? "امنح هذا الشخص دورًا ليبدأ العمل." : "Give this person a role so they can start working.") : undefined} /> : (
+        {!effective.sources.length ? <EmptyState title={ar ? "لا توجد أدوار أعمال مسندة" : "No RehletShifaa business roles assigned"} body={mode === "users" && manage ? (ar ? "امنح هذا الشخص دورًا إذا كان يحتاج إلى وصول إلى أعمال رحلة شفاء. مساحات العمل أعلاه منفصلة." : "Give this person a role if they need RehletShifaa business access. Workspace roles above are separate.") : undefined} /> : (
           <ul className="ag-capabilities">{effective.sources.map((s) => {
             const a = s.assignment;
             return (
@@ -216,6 +218,47 @@ function PeopleAccess({ locale, api, can, roles, label, mode, initial }: ViewPro
   );
 }
 
+type WorkspaceRoles = { subject: string; source: "IDENTITY_SYSTEM"; available: boolean; accountStatus: string | null; roles: string[] };
+/** Identity-system (realm) roles and the portal workspace each one opens. Read-only here: they are managed where staff accounts are managed. */
+const WORKSPACES: Record<string, [string, string, string, string]> = {
+  COORDINATOR: ["Coordinator", "Staff Portal", "منسق", "بوابة الموظفين"], COORDINATOR_LEAD: ["Coordination lead", "Staff Portal", "قائد التنسيق", "بوابة الموظفين"],
+  OPERATIONS: ["Operations", "Staff Portal", "العمليات", "بوابة الموظفين"], OPERATIONS_LEAD: ["Operations lead", "Staff Portal", "قائد العمليات", "بوابة الموظفين"],
+  FINANCE: ["Finance", "Staff Portal", "المالية", "بوابة الموظفين"], FINANCE_LEAD: ["Finance lead", "Staff Portal", "قائد المالية", "بوابة الموظفين"],
+  DOCTOR: ["Consultant (direct)", "Staff Portal — clinical work", "استشاري (مباشر)", "بوابة الموظفين — العمل السريري"],
+  CREDENTIALING_ADMIN: ["Credentialing administrator", "Control Center", "مسؤول الاعتمادات", "مركز التحكم"], SYSTEM_ADMIN: ["System administrator", "Control Center", "مسؤول النظام", "مركز التحكم"],
+  AUDITOR: ["Auditor (read-only)", "Control Center", "مدقق (قراءة فقط)", "مركز التحكم"], PATIENT_IDENTITY_REVIEWER: ["Identity reviewer", "Identity checks", "مراجع الهوية", "التحقق من الهوية"],
+  PATIENT: ["Patient", "My Care", "مريض", "رعايتي"], PATIENT_REPRESENTATIVE: ["Patient representative", "My Care", "ممثل المريض", "رعايتي"],
+};
+const ACCOUNT_STATUS: Record<string, [string, string]> = { ACTIVE: ["Account active", "الحساب نشط"], INVITED: ["Invitation not yet accepted", "لم تُقبل الدعوة بعد"], DISABLED: ["Account disabled — cannot sign in", "الحساب معطّل — لا يمكن تسجيل الدخول"], NOT_FOUND: ["No sign-in account found", "لا يوجد حساب دخول"] };
+
+/**
+ * ACCOUNT & WORKSPACES — what the identity system says about this person's sign-in account. Shown beside, and never
+ * merged with, RehletShifaa business access. It offers no controls: nothing here changes identity-system roles.
+ */
+function WorkspaceRolesBlock({ locale, api, subject }: { locale: Locale; api: ViewProps["api"]; subject: string }) {
+  const ar = locale === "ar";
+  const [value, setValue] = useState<WorkspaceRoles | null>(null); const [error, setError] = useState<unknown>(null);
+  useEffect(() => {
+    let live = true;
+    api<WorkspaceRoles>("/workspace-roles?subject=" + encodeURIComponent(subject)).then((v) => { if (live) setValue(v); }).catch((e) => { if (live) setError(e); });
+    return () => { live = false; };
+  }, [api, subject]);
+  return (
+    <section className="ag-source" aria-labelledby="workspace-roles-title">
+      <h3 id="workspace-roles-title">{ar ? "الحساب ومساحات العمل" : "Account & workspaces"}</h3>
+      <p className="cc-meta">{ar ? "يديرها نظام الهوية · للقراءة فقط" : "Managed by the identity system · read-only"}</p>
+      {error ? <ErrorNotice error={error} locale={locale} action="load" />
+        : !value ? <p role="status" className="cc-meta">{ar ? "جارٍ التحميل…" : "Loading…"}</p>
+        : !value.available ? <p className="cc-meta">{ar ? "تعذّر سؤال نظام الهوية الآن، لذا لا تُعرض مساحات العمل. هذا لا يعني أن الشخص لا يملك أيًا منها." : "The identity system couldn't be asked right now, so workspaces aren't shown. This doesn't mean the person has none."}</p>
+        : <>
+          {value.accountStatus && ACCOUNT_STATUS[value.accountStatus] && <p className="cc-meta">{ACCOUNT_STATUS[value.accountStatus][ar ? 1 : 0]}</p>}
+          {!value.roles.length ? <p className="cc-meta">{ar ? "لا توجد مساحة عمل في البوابة لهذا الحساب." : "This account has no portal workspace role."}</p>
+            : <ul className="ag-capabilities">{value.roles.map((r) => { const w = WORKSPACES[r]; return <li key={r}><div><strong>{w ? w[ar ? 2 : 0] : r}</strong><p>{w ? w[ar ? 3 : 1] : ""}</p></div></li>; })}</ul>}
+        </>}
+    </section>
+  );
+}
+
 function RevokeMenu({ locale, name, onRevoke }: { locale: Locale; name: string; onRevoke: (reason: string) => Promise<void> }) {
   const ar = locale === "ar";
   const [open, setOpen] = useState(false); const [reason, setReason] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState<unknown>(null);
@@ -223,6 +266,7 @@ function RevokeMenu({ locale, name, onRevoke }: { locale: Locale; name: string; 
   return (
     <form className="cc-card" onSubmit={(e) => { e.preventDefault(); if (!reason.trim()) return; setBusy(true); setError(null); void onRevoke(reason.trim()).catch(setError).finally(() => setBusy(false)); }}>
       <ErrorNotice error={error} locale={locale} />
+      <p><strong>{ar ? `إزالة دور «${name}»؟` : `Remove the ${name} role?`}</strong> {ar ? "يفقد هذا الشخص كل ما يمنحه هذا الدور فورًا. يُسجَّل التغيير في سجل التدقيق." : "This person loses everything this role allows, immediately. The change is recorded in the audit log."}</p>
       <Field label={ar ? "سبب الإزالة" : "Reason for removing access"} required><input value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} /></Field>
       <div className="cc-form-actions"><button className="cc-danger-button" disabled={busy || !reason.trim()}>{ar ? "إزالة الوصول" : "Remove access"}</button><button type="button" className="cc-secondary" onClick={() => setOpen(false)}>{ar ? "إلغاء" : "Cancel"}</button></div>
     </form>

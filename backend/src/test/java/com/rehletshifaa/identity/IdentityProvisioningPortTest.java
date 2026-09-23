@@ -83,4 +83,22 @@ class IdentityProvisioningPortTest {
         assertThatThrownBy(()->port.invite("New Member","new@example.test","en"))
                 .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
     }
+    @Test void workspaceRolesAreReadOnlyAndFilteredToPortalWorkspaces() {
+        token();server.expect(requestTo(ADMIN+"/users/staff-subject/role-mappings/realm/composite")).andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("[{\"name\":\"COORDINATOR_LEAD\"},{\"name\":\"COORDINATOR\"},{\"name\":\"offline_access\"},{\"name\":\"default-roles-rehletshifaa\"}]",MediaType.APPLICATION_JSON));
+        token();server.expect(requestTo(ADMIN+"/users/staff-subject")).andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"enabled\":true,\"requiredActions\":[]}",MediaType.APPLICATION_JSON));
+        var roles=adapter.workspaceRoles("staff-subject");
+        assertThat(roles.available()).isTrue();
+        assertThat(roles.roles()).containsExactly("COORDINATOR","COORDINATOR_LEAD");
+        assertThat(roles.accountStatus()).isEqualTo("ACTIVE");
+    }
+    @Test void workspaceRolesNeverClaimAnythingWhenTheIdentitySystemCannotBeAsked() {
+        token();server.expect(requestTo(ADMIN+"/users/missing/role-mappings/realm/composite")).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        token();server.expect(requestTo(ADMIN+"/users/down/role-mappings/realm/composite")).andRespond(withServerError());
+        assertThat(adapter.workspaceRoles("missing")).isEqualTo(new IdentityWorkspaceRoleReader.WorkspaceRoles(true,"NOT_FOUND",java.util.List.of()));
+        assertThat(adapter.workspaceRoles("down").available()).isFalse();
+        var unconfigured=new KeycloakStaffIdentityService(RestClient.builder().build(),new ObjectMapper(),BASE,"rehletshifaa","identity-admin","","rehletshifaa-web","https://dev.rehletshifaa.com",43200);
+        assertThat(unconfigured.workspaceRoles("anyone")).isEqualTo(IdentityWorkspaceRoleReader.WorkspaceRoles.unavailable());
+    }
 }

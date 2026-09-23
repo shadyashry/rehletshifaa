@@ -4,6 +4,8 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AlertTriangle, Check, CircleDot, Clock, Info, MoreHorizontal, XCircle } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
+import { REAUTHENTICATION_REQUIRED, reauthenticationCopy } from "@/lib/reauthentication";
+import { ReauthenticationPrompt } from "@/components/ReauthenticationNotices";
 import type { Tone } from "./admin-labels";
 
 /** Status is never colour alone: every tone carries its own icon and the text label. */
@@ -21,20 +23,37 @@ export class ControlCenterError extends Error {
   code?: string; status?: number;
   constructor(message: string, code?: string, status?: number) { super(message); this.code = code; this.status = status; }
 }
+/** A 409 caused by someone else's newer change (a stale version/revision), as opposed to a business rule refusing the action. */
+export function isStaleConflict(error: unknown) {
+  return error instanceof ControlCenterError && error.status === 409 && /STALE|CONCURRENT|CHANGED|STATE_CONFLICT|REVALIDATION/.test(error.code ?? "");
+}
+/**
+ * One business sentence per failure class, never claiming a save happened when it did not: 4xx responses are
+ * refusals (nothing changed); a 5xx or lost response leaves the outcome unknown, so the person is told to check.
+ */
 export function friendlyError(error: unknown, locale: Locale, action: "load" | "save" = "save") {
   const ar = locale === "ar";
   const e = error instanceof ControlCenterError ? error : null;
-  if (e?.status === 403) return ar ? "ليس لديك صلاحية لهذا الإجراء. تواصل مع مسؤول الوصول إذا كنت تحتاجها." : "You don't have permission to do this. Ask your access administrator if you need it.";
-  if (e?.status === 409) return (ar ? "تغيّرت هذه المعلومات منذ فتحتها. حدّث الصفحة ثم حاول مجددًا. " : "This information changed since you opened it. Refresh and try again. ") + (e.message && e.message !== e.code ? e.message : "");
-  if (e?.status === 400 || e?.status === 422) return e.message || (ar ? "بعض المعلومات غير صحيحة. راجع الحقول وحاول مجددًا." : "Some information isn't valid. Check the fields and try again.");
-  if (e?.status === 503) return ar ? "الخدمة غير متاحة مؤقتًا. لم تُفقد معلوماتك — حاول بعد قليل." : "The service is temporarily unavailable. Nothing was lost — try again shortly.";
-  if (action === "load") return ar ? "تعذّر تحميل هذه المعلومات. حاول مجددًا." : "We couldn't load this information. Try again.";
-  return ar ? "تعذّر حفظ هذه التغييرات. لم تُفقد معلوماتك — حاول مجددًا." : "We couldn't save these changes. Your information has not been lost. Try again.";
+  const detail = e?.message && e.message !== e.code && !/^\d+$/.test(e.message) ? e.message : "";
+  if (e?.code === REAUTHENTICATION_REQUIRED) return reauthenticationCopy[locale].required;
+  if (e?.status === 401) return ar ? "انتهت جلستك. سجّل الدخول مجددًا. لم يتغير شيء." : "Your session has ended. Sign in again. Nothing was changed.";
+  if (e?.status === 403) return ar ? "ليس لديك صلاحية لهذا الإجراء، ولم يتغير شيء. تواصل مع مسؤول الوصول إذا كنت تحتاجها." : "You don't have permission to do this, so nothing was changed. Ask your access administrator if you need it.";
+  if (e?.status === 404) return ar ? "لم يعد هذا العنصر موجودًا أو لا يمكنك رؤيته." : "This item no longer exists, or you can't see it.";
+  if (isStaleConflict(e)) return ar ? "تغيّرت هذه المعلومات منذ فتحتها، ولم يُحفظ شيء. حدّث الصفحة لرؤية أحدث نسخة ثم حاول مجددًا." : "This information changed since you opened it, so nothing was saved. Refresh to see the latest version, then try again.";
+  if (e?.status === 409) return (ar ? "لا يمكن تنفيذ هذا الآن، ولم يتغير شيء." : "This can't be done right now, so nothing was changed.") + (detail ? ` ${detail}` : "");
+  if (e?.status === 400 || e?.status === 422) return (detail || (ar ? "بعض المعلومات غير صحيحة. راجع الحقول وحاول مجددًا." : "Some information isn't valid. Check the fields and try again.")) + (ar ? " لم يُحفظ شيء." : " Nothing was saved.");
+  if (e?.status === 429) return ar ? "طلبات كثيرة في وقت قصير. انتظر قليلًا ثم حاول مجددًا. لم يتغير شيء." : "Too many requests in a short time. Wait a moment, then try again. Nothing was changed.";
+  if (action === "load") return e?.status === 503 ? (ar ? "الخدمة غير متاحة مؤقتًا. حاول بعد قليل." : "The service is temporarily unavailable. Try again shortly.") : (ar ? "تعذّر تحميل هذه المعلومات. حاول مجددًا." : "We couldn't load this information. Try again.");
+  if (e?.status === 503) return ar ? "الخدمة غير متاحة مؤقتًا، وقد لا يكون التغيير قد حُفظ. حدّث الصفحة للتحقق قبل المحاولة مجددًا." : "The service is temporarily unavailable, and your change may not have been saved. Refresh to check before trying again.";
+  return ar ? "تعذّر التأكد من حفظ هذا التغيير. حدّث الصفحة للتحقق قبل المحاولة مجددًا؛ ما كتبته ما زال في النموذج." : "We couldn't confirm this change was saved. Refresh to check before trying again; what you typed is still in the form.";
 }
 export function ErrorNotice({ error, locale, action = "save", onRetry }: { error: unknown; locale: Locale; action?: "load" | "save"; onRetry?: () => void }) {
   if (!error) return null;
   const code = error instanceof ControlCenterError ? error.code : undefined;
   const raw = error instanceof Error ? error.message : String(error);
+  if (code === REAUTHENTICATION_REQUIRED) return (
+    <div role="alert" className="cc-notice cc-notice-info"><Info size={18} aria-hidden /><div><ReauthenticationPrompt locale={locale} /></div></div>
+  );
   return (
     <div role="alert" className="cc-notice cc-notice-error">
       <AlertTriangle size={18} aria-hidden />

@@ -148,8 +148,6 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
                 <p className="mt-1 text-[0.85rem] text-ink-600">{t.received} <span dir="ltr">{money(deposit.paidDisplay, deposit.currency)}</span></p>
               )}
               <p className="mt-2 text-[0.85rem] leading-6 text-ink-600">{t.depositNote[deposit.status] ?? ""}</p>
-              {/* Reserved for an online step: rendered only when the backend resolves PAY_DEPOSIT, which it does not today. */}
-              {code === "PAY_DEPOSIT" && <button type="button" className="btn-primary mt-4 w-full">{t.payDeposit}</button>}
             </section>
           )}
 
@@ -240,7 +238,7 @@ function copy(ar: boolean) {
     coordinator: "المنسق", consultant: "الاستشاري", notAssigned: "لم يُسند بعد",
     currentStep: "الخطوة الحالية", next: "الخطوة التالية", noAction: "لا يلزم منك أي إجراء الآن.",
     reviewProposal: "مراجعة العرض", replyInMessages: "الرد في الرسائل", requested: "المطلوب منك", provided: "تم تقديمه",
-    deposit: "الوديعة", received: "المستلم", payDeposit: "دفع الوديعة بأمان",
+    deposit: "الوديعة", received: "المستلم",
     depositStatus: { REQUESTED: "قيد الترتيب", PARTIALLY_PAID: "استُلم جزئيًا", PAID: "تم استلام الوديعة", WAIVED: "معفاة", REFUNDED: "مستردة", CANCELLED: "ملغاة" } as Record<string, string>,
     depositNote: { REQUESTED: "سيرسل لك منسقك تعليمات الدفع.", PARTIALLY_PAID: "سيؤكد منسقك المبلغ المتبقي.", PAID: "شكرًا لك — تُحتسب من رصيدك النهائي.", WAIVED: "لا يلزم دفع وديعة لهذه الحالة.", REFUNDED: "أُعيدت الوديعة إليك." } as Record<string, string>,
     journey: "مسار رعايتك", done: "مكتمل", current: "الحالية",
@@ -255,7 +253,7 @@ function copy(ar: boolean) {
     coordinator: "Coordinator", consultant: "Consultant", notAssigned: "Not assigned yet",
     currentStep: "Current step", next: "Next", noAction: "No action is required from you right now.",
     reviewProposal: "Review proposal", replyInMessages: "Reply in Messages", requested: "What we need from you", provided: "provided",
-    deposit: "Deposit", received: "Received", payDeposit: "Pay deposit securely",
+    deposit: "Deposit", received: "Received",
     depositStatus: { REQUESTED: "Arranging", PARTIALLY_PAID: "Partly received", PAID: "Deposit received", WAIVED: "Waived", REFUNDED: "Refunded", CANCELLED: "Cancelled" } as Record<string, string>,
     depositNote: { REQUESTED: "Your coordinator will send you the payment instructions.", PARTIALLY_PAID: "Your coordinator will confirm the remaining amount.", PAID: "Thank you — credited to your final balance.", WAIVED: "No deposit is needed for your case.", REFUNDED: "The deposit has been returned to you." } as Record<string, string>,
     journey: "Your care journey", done: "done", current: "current",

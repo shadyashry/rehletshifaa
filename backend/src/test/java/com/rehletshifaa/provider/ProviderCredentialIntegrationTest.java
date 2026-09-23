@@ -45,6 +45,30 @@ class ProviderCredentialIntegrationTest {
     }
     @AfterEach void clear(){SecurityContextHolder.clearContext();}
 
+    @Test void savedProfessionalDetailsReadBackForEditorsOnly(){signIn("doctor-a",now);completeProfile();
+        var saved=credentials.profile(org,clinician);
+        assertThat(saved).extracting(ProviderCredentialService.ProfileView::registrationNumber,ProviderCredentialService.ProfileView::specialty,ProviderCredentialService.ProfileView::subspecialty,ProviderCredentialService.ProfileView::qualifications,ProviderCredentialService.ProfileView::jurisdiction)
+                .containsExactly("R-1","Surgery",null,"MBBS, Fellowship","AE");
+        // Edit one field starting from the stored values: nothing else is cleared.
+        credentials.completeProfile(org,clinician,new ProviderCredentialService.ProfileCommand(saved.registrationNumber(),saved.specialty(),"Hand surgery",saved.qualifications(),saved.jurisdiction(),saved.version()));
+        var edited=credentials.profile(org,clinician);
+        assertThat(edited.subspecialty()).isEqualTo("Hand surgery");assertThat(edited.registrationNumber()).isEqualTo("R-1");assertThat(edited.qualifications()).isEqualTo("MBBS, Fellowship");assertThat(edited.version()).isGreaterThan(saved.version());
+        // A stale form cannot overwrite the newer save.
+        assertThatThrownBy(()->credentials.completeProfile(org,clinician,new ProviderCredentialService.ProfileCommand("R-2","Surgery",null,"MBBS","AE",saved.version()))).isInstanceOf(ApiException.class);
+        // The read needs the same capability as the write: a credential reviewer without provider.update gets nothing.
+        signIn("verifier",now);assertThatThrownBy(()->credentials.profile(org,clinician)).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.status()).isEqualTo(403));}
+
+    @Test void reviewDetailShowsTheSubmittedFactsWithoutVerifyingThem(){signIn("doctor-a",now);completeProfile();Instant expires=Instant.now().plus(Duration.ofDays(365));var revision=submit("MEDICAL_LICENSE",expires,"facts");
+        signIn("verifier",now);var detail=credentials.reviewDetail(org,revision.id());
+        assertThat(detail.submittedFacts().issuer()).isEqualTo("Authority");assertThat(detail.submittedFacts().referenceNumber()).isEqualTo("REF-facts");
+        assertThat(detail.submittedFacts().jurisdiction()).isEqualTo("AE");assertThat(detail.submittedFacts().issuedAt()).isNotNull();assertThat(detail.submittedFacts().expiresAt()).isEqualTo(detail.expiresAt());
+        assertThat(detail.status()).isEqualTo("SUBMITTED");assertThat(detail.reviewedBy()).isNull();
+        approve(revision,"facts");var verified=credentials.reviewDetail(org,revision.id());
+        assertThat(verified.status()).isEqualTo("VERIFIED");assertThat(verified.reviewedBy()).isEqualTo("verifier");assertThat(verified.reviewedAt()).isNotNull();
+        // Reading the facts gives the clinician no review authority over their own credential.
+        signIn("doctor-a",now);assertThat(credentials.reviewDetail(org,revision.id()).submittedFacts().referenceNumber()).isEqualTo("REF-facts");
+        assertThatThrownBy(()->credentials.decide(org,revision.id(),new ProviderCredentialService.DecisionCommand("SUSPEND","own",verified.version()),"self-suspend")).isInstanceOf(ApiException.class);}
+
     @Test void consultantLifecycleUsesImmutableEvidenceIndependentReviewAndIdempotency(){signIn("doctor-a",now);completeProfile();
         UUID firstEvidence=evidence("license-1");var firstCommand=new ProviderCredentialService.SubmissionCommand("MEDICAL_LICENSE","Authority","REF-license-1",now,Instant.now().plus(Duration.ofDays(365)),firstEvidence);var first=credentials.submit(org,clinician,firstCommand,"license-1");
         UUID otherOrganization=organization("Evidence IDOR Tenant");member(otherOrganization,"doctor-a",CONSULTANT,"SELF");

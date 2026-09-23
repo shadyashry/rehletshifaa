@@ -2,7 +2,9 @@ package com.rehletshifaa.access.application;
 
 import com.rehletshifaa.access.domain.*;
 import com.rehletshifaa.access.infrastructure.*;
+import com.rehletshifaa.identity.IdentityWorkspaceRoleReader;
 import org.springframework.stereotype.Service;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 
@@ -16,15 +18,68 @@ public class AccessQueryService {
     private final ResourceRelationshipRepository relationships;
     private final AccessAuditRepository audit;
     private final ProviderOrganizationAuthorityPort providerAuthority;
+    private final IdentityWorkspaceRoleReader workspaceRoles;
+    private final Clock clock;
+    /** Upper bound on organizations evaluated for one caller's capability read; real accounts belong to a handful. */
+    static final int MAX_CAPABILITY_ORGANIZATIONS=50;
+    /** The two web applications the Control Center and the clinician web app are served through. */
+    private static final List<ChannelEntitlement> WEB_CHANNELS=List.of(ChannelEntitlement.ADMIN_WEB,ChannelEntitlement.CONSULTANT_WEB);
     public AccessQueryService(AuthorizationService authorization,AccessIdentity identity,PermissionCatalog catalog,
             RoleAssignmentRepository assignments,RoleTemplateRepository roles,ResourceRelationshipRepository relationships,AccessAuditRepository audit,
-            ProviderOrganizationAuthorityPort providerAuthority) {
+            ProviderOrganizationAuthorityPort providerAuthority,IdentityWorkspaceRoleReader workspaceRoles,Clock clock) {
         this.authorization=authorization;this.identity=identity;this.catalog=catalog;this.assignments=assignments;this.roles=roles;this.relationships=relationships;this.audit=audit;this.providerAuthority=providerAuthority;
+        this.workspaceRoles=workspaceRoles;this.clock=clock;
     }
-    public List<AuthorizationDecision> mine() {
+    /**
+     * The caller's OWN capabilities, for navigation and discoverability only — never an authorization input: every
+     * endpoint still authorizes its own request. A capability is reported when the existing AuthorizationService
+     * allows it at the platform or at one of the organizations where the caller holds an active role assignment
+     * (server-side facts only; no organization comes from the request). Only permission keys present in those
+     * assignments' grants are evaluated, so the read is bounded by the caller's own grants. A capability that is held
+     * but asks for a recent sign-in is reported as held, with {@code recentAuthentication} so the UI can say so.
+     * Self- and relationship-scoped grants (for example "own profile", "clinicians I manage") are resource-specific
+     * and are not claimed here.
+     */
+    public List<Capability> mine() {
         var actor=identity.current();
-        return catalog.all().stream().filter(p->p.family().equals("access"))
-                .map(p->authorization.decide(actor,p.key(),ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB)).toList();
+        Map<String,Capability> held=new HashMap<>();
+        if(actor!=null&&actor.subject()!=null&&!actor.subject().isBlank()) {
+            Map<UUID,Set<String>> keysByOrganization=new LinkedHashMap<>();
+            for(var assignment:assignments.allForSubject(actor.subject())) {
+                if(!authorization.active(assignment)) continue;
+                roles.version(assignment.versionId()).filter(authorization::published).ifPresent(v->roles.grants(v.id())
+                        .forEach(g->keysByOrganization.computeIfAbsent(assignment.organizationId(),k->new TreeSet<>()).add(g.permission())));
+            }
+            keysByOrganization.entrySet().stream().limit(MAX_CAPABILITY_ORGANIZATIONS).forEach(entry-> {
+                var context=ResourceContext.PLATFORM.equals(entry.getKey())?ResourceContext.platform():providerContext(entry.getKey());
+                if(context==null) return;
+                for(String key:entry.getValue()) if(!held.containsKey(key)) capability(actor,key,context).ifPresent(c->held.put(key,c));
+            });
+        }
+        return catalog.all().stream().map(p->held.getOrDefault(p.key(),new Capability(p.key(),false,p.recentAuthentication()))).toList();
+    }
+    private Optional<Capability> capability(AccessIdentity.Identity actor,String key,ResourceContext context) {
+        boolean recent=catalog.require(key).recentAuthentication();
+        for(var channel:WEB_CHANNELS) {
+            var decision=authorization.decide(actor,key,context,channel);
+            if(decision.allowed()) return Optional.of(new Capability(key,true,recent));
+            // Held, but the action will ask the caller to sign in again: the same evaluation with a fresh sign-in time.
+            if(decision.reason()==AuthorizationDecision.Reason.RECENT_AUTHENTICATION_REQUIRED
+                    && authorization.decide(new AccessIdentity.Identity(actor.subject(),clock.instant()),key,context,channel).allowed())
+                return Optional.of(new Capability(key,true,true));
+        }
+        return Optional.empty();
+    }
+    /**
+     * Read-only: the identity system's workspace roles for one account, shown beside — never merged with — the
+     * RehletShifaa business role assignments. Nothing here can change identity-system roles.
+     */
+    public WorkspaceRoleView workspaceRoles(String subject) {
+        var actor=authorization.require("access.effective_access.view");
+        RoleTemplateService.text(subject,255);
+        var roles=workspaceRoles.workspaceRoles(subject);
+        audit.record(actor.subject(),ResourceContext.PLATFORM.toString(),"WORKSPACE_ROLES_REVIEWED","SUCCESS","Identity-system workspace roles inspected");
+        return new WorkspaceRoleView(subject,"IDENTITY_SYSTEM",roles.available(),roles.accountStatus(),roles.roles());
     }
     public EffectiveAccess effective(String subject,UUID organization) {
         var actor=authorization.require("access.effective_access.view");
@@ -79,6 +134,8 @@ public class AccessQueryService {
         return providerAuthority.verifiedOrganization(organization)
                 ? new ResourceContext(organization,true,"PROVIDER",organization.toString(),null,false) : null;
     }
+    public record Capability(String permission,boolean allowed,boolean recentAuthentication) {}
+    public record WorkspaceRoleView(String subject,String source,boolean available,String accountStatus,List<String> roles) {}
     public record Source(RoleAssignment assignment,String roleName,RoleTemplateVersion version,List<RolePermissionGrant> grants) {}
     public record EffectiveAccess(String subject,UUID organizationId,RoleAssignmentRepository.Membership membership,List<Source> sources,List<ResourceRelationship> relationships,List<AuthorizationDecision> decisions) {}
     public record Simulation(String subject,String permission,String resourceType,String resourceId,UUID draftVersionId) {

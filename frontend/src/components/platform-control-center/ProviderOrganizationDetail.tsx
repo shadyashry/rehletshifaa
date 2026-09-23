@@ -14,7 +14,7 @@ import { ActionMenu, EmptyState, ErrorNotice, Facts, Section, SectionTabs, Statu
 import { membershipStatusLabel, organizationStatusLabel, personRoleLabel, type Tone } from "./admin-labels";
 import { orgTypeLabel } from "./control-center-copy";
 import { CLINICIAN_ROLES, PRACTICE_ROLES, personName, type Member, type ProviderDetail } from "./provider-directory";
-import type { Readiness } from "./consultant-setup";
+import { ActivationUnavailable, activationUnavailable, type Readiness } from "./consultant-setup";
 import { InvitePersonDialog, RelationshipDialog, memberActions, relationshipSummary, useMemberMutations } from "./ProviderPeople";
 
 export type OrganizationTab = "overview" | "people" | "setup";
@@ -89,6 +89,15 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
   const commercialOutstanding = loaded.filter((r) => r.blockers.some((b) => b.code === "COMMERCIAL_ACCEPTANCE_MISSING")).length;
   const readyClinicians = loaded.filter((r) => r.readyForActivation).length;
   const orgActive = org.status === "ACTIVE";
+  // Provider activation needs at least one clinician ready to activate; when every clinician is blocked by a step that
+  // is not in this release, activation cannot complete (UX-0 Decision D, case 3).
+  const releaseBlocked = loaded.length > 0 && loaded.every(activationUnavailable);
+  const readinessFailed = clinicians.some((m) => m.practitionerId && readiness[m.practitionerId] === "error");
+  const ownerActive = owner?.status === "ACTIVE";
+  const waitingFor = [
+    ...(!ownerActive ? [ar ? "مالك مؤسسة نشط" : "An active organization owner"] : []),
+    ...(readyClinicians === 0 ? [ar ? "طبيب واحد على الأقل جاهز للتفعيل" : "At least one clinician who is ready to activate"] : []),
+  ];
   const step = (key: string, title: string, tone: Tone, state: string, body: React.ReactNode, action?: React.ReactNode) => (
     <div className="cc-requirement" key={key}><div><h3>{title}</h3><div className="cc-meta">{body}</div></div><div className="cc-row-actions"><StatusBadge tone={tone}>{state}</StatusBadge>{action}</div></div>
   );
@@ -136,19 +145,28 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
 
         {tab === "setup" && <>
           <p className="cc-meta" style={{ marginBottom: 14 }}>{ar ? "ما تحتاجه المؤسسة قبل تفعيلها. الحالة مأخوذة من جاهزية كل طبيب في النظام." : "What the organization needs before activation. Status comes from each clinician's readiness in the platform."}</p>
-          {step("owner", ar ? "مالك المؤسسة" : "Organization owner", owner?.status === "ACTIVE" ? "success" : "warning", owner?.status === "ACTIVE" ? done : todo, owner ? personName(owner, locale) : (ar ? "لم يُعيَّن بعد" : "Not assigned yet"))}
+          {step("owner", ar ? "مالك المؤسسة" : "Organization owner", ownerActive ? "success" : "warning", ownerActive ? done : todo, owner ? (ownerActive ? personName(owner, locale) : (ar ? `${personName(owner, locale)} — العضوية غير نشطة بعد` : `${personName(owner, locale)} — membership not active yet`)) : (ar ? "لم يُعيَّن بعد" : "Not assigned yet"),
+            !ownerActive && <button type="button" className="cc-secondary cc-small" onClick={() => change("people")}>{ar ? "فتح الأشخاص" : "Open People"}</button>)}
           {step("clinical", ar ? "الفريق الطبي" : "Clinical team", clinicians.length ? "success" : "warning", clinicians.length ? done : todo, ar ? `${clinicians.length} طبيب` : `${clinicians.length} clinician(s)`, canAddClinician && <Link className="cc-secondary cc-small" href={ccHref(locale, `/providers/onboarding/new?org=${organizationId}`)}>{ar ? "إضافة استشاري" : "Add consultant"}</Link>)}
           {step("practice", ar ? "فريق العيادة" : "Practice team", staff.length ? "success" : "warning", staff.length ? done : todo, ar ? `${staff.length} عضو` : `${staff.length} member(s)`)}
           {step("credentials", ar ? "الاعتمادات" : "Credentials", !allLoaded ? "neutral" : outstandingCredentials ? "warning" : "success", !allLoaded ? checking : outstandingCredentials ? todo : done, !allLoaded ? (ar ? "جارٍ التحقق من الأطباء…" : "Checking clinicians…") : outstandingCredentials ? (ar ? `${outstandingCredentials} طبيب بحاجة إلى اعتمادات موثّقة` : `${outstandingCredentials} clinician(s) still need verified credentials`) : (ar ? "كل الاعتمادات موثّقة" : "All credentials verified"),
             outstandingCredentials > 0 && <Link className="cc-secondary cc-small" href={ccHref(locale, `/credentials?org=${organizationId}`)}>{ar ? "فتح المراجعات" : "Open reviews"}</Link>)}
           {step("working", ar ? "الأسعار والمواعيد" : "Prices & availability", !allLoaded ? "neutral" : workingOutstanding ? "warning" : "success", !allLoaded ? checking : workingOutstanding ? todo : done, !allLoaded ? "—" : workingOutstanding ? (ar ? `${workingOutstanding} طبيب بلا أسعار أو مواعيد مكتملة` : `${workingOutstanding} clinician(s) without complete prices or availability`) : (ar ? "مكتمل لكل الأطباء" : "Complete for every clinician"))}
-          {step("commercial", ar ? "القبول التجاري والقانوني" : "Commercial & legal acceptance", !allLoaded ? "neutral" : commercialOutstanding ? "danger" : "success", !allLoaded ? checking : commercialOutstanding ? todo : done, !allLoaded ? "—" : commercialOutstanding ? (ar ? `${commercialOutstanding} طبيب بانتظار القبول` : `${commercialOutstanding} clinician(s) awaiting acceptance`) : (ar ? "لا يوجد ما ينتظر" : "Nothing outstanding"))}
+          {commercialOutstanding > 0 && releaseBlocked
+            ? step("commercial", ar ? "القبول التجاري والقانوني" : "Commercial & legal acceptance", "neutral", ar ? "غير متاح بعد" : "Not available yet", ar ? "هذه الخطوة غير متاحة في الإصدار الحالي، ولا يمكن لأحد إكمالها الآن." : "This step isn't available in the current release, so nobody can complete it yet.")
+            : step("commercial", ar ? "القبول التجاري والقانوني" : "Commercial & legal acceptance", !allLoaded ? "neutral" : commercialOutstanding ? "warning" : "success", !allLoaded ? checking : commercialOutstanding ? todo : done, !allLoaded ? "—" : commercialOutstanding ? (ar ? `${commercialOutstanding} طبيب بانتظار القبول` : `${commercialOutstanding} clinician(s) awaiting acceptance`) : (ar ? "لا يوجد ما ينتظر" : "Nothing outstanding"))}
           <Section title={ar ? "تفعيل المؤسسة" : "Activate organization"} id="activate">
             <ErrorNotice error={activationError} locale={locale} />
             {orgActive ? <SuccessNotice>{ar ? "المؤسسة نشطة." : "The organization is active."}</SuccessNotice>
-              : !access.can("provider.activate") ? <p className="cc-meta">{ar ? "لا تملك صلاحية تفعيل المؤسسات." : "You don't have permission to activate organizations."}</p>
-              : activating ? <div className="cc-card" role="group" aria-label={ar ? "تأكيد التفعيل" : "Confirm activation"}><p>{ar ? "هل تريد تفعيل هذه المؤسسة الآن؟ هذا إجراء تجاري فعلي." : "Activate this organization now? This is a real business action."}</p><div className="cc-form-actions"><button type="button" disabled={busy} onClick={() => void activate()}>{ar ? "نعم، فعّل المؤسسة" : "Yes, activate"}</button><button type="button" className="cc-secondary" onClick={() => setActivating(false)}>{ar ? "إلغاء" : "Cancel"}</button></div></div>
-              : <><p className="cc-meta">{allLoaded && owner?.status === "ACTIVE" && readyClinicians > 0 ? (ar ? "جاهزة للتفعيل." : "Ready to activate.") : (ar ? "يحتاج التفعيل إلى مالك نشط وطبيب واحد جاهز على الأقل. سيتحقق النظام من كل الشروط." : "Activation needs an active owner and at least one ready clinician. The platform checks every condition.")}</p><button type="button" onClick={() => setActivating(true)}>{ar ? "تفعيل المؤسسة" : "Activate organization"}</button></>}
+              : clinicians.length > 0 && !allLoaded && !readinessFailed ? <p role="status" className="cc-meta">{ar ? "جارٍ التحقق من جاهزية الأطباء…" : "Checking clinicians' readiness…"}</p>
+              : readinessFailed ? <p className="cc-meta">{ar ? "تعذّر التحقق من جاهزية بعض الأطباء، لذا لا يُعرض التفعيل. حدّث الصفحة لاحقًا." : "Some clinicians' readiness couldn't be checked, so activation isn't offered. Refresh to try again."}</p>
+              : releaseBlocked ? <ActivationUnavailable locale={locale} subject="organization" />
+              : <>
+                {waitingFor.length > 0 && <div id="org-activation-waiting"><p><strong>{ar ? "غير جاهزة للتفعيل" : "Not ready to activate"}</strong></p><p className="cc-meta">{ar ? "بانتظار:" : "Waiting for:"}</p><ul>{waitingFor.map((w) => <li key={w}>{w}</li>)}</ul></div>}
+                {!access.can("provider.activate") ? <p className="cc-meta">{ar ? "يفعّل مدير عمليات مقدمي الرعاية المؤسسة عندما تصبح جاهزة." : "A provider operations manager activates the organization once it's ready."}</p>
+                  : activating ? <div className="cc-card" role="group" aria-label={ar ? "تأكيد التفعيل" : "Confirm activation"}><p>{ar ? `تفعيل ${name}؟ بعد التفعيل يمكن للمؤسسة استقبال الحالات لأطبائها المفعّلين.` : `Activate ${name}? Once active, the organization can receive cases for its activated clinicians.`}</p><div className="cc-form-actions"><button type="button" disabled={busy} onClick={() => void activate()}>{ar ? "نعم، فعّل المؤسسة" : "Yes, activate"}</button><button type="button" className="cc-secondary" onClick={() => setActivating(false)}>{ar ? "إلغاء" : "Cancel"}</button></div></div>
+                  : <button type="button" disabled={waitingFor.length > 0} aria-describedby={waitingFor.length ? "org-activation-waiting" : undefined} onClick={() => setActivating(true)}>{ar ? "تفعيل المؤسسة" : "Activate organization"}</button>}
+              </>}
           </Section>
         </>}
       </TabPanel>

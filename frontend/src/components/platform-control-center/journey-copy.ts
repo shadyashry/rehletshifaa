@@ -28,6 +28,7 @@ export const journeyCopy = {
     stageList: "Stage list", switchToGraph: "Switch to graph view", switchToList: "Switch to list view",
     addStage: "Add stage", saveDraft: "Save draft", saved: "Saved", unsaved: "Unsaved changes",
     validate: "Validate", simulate: "Simulate", submit: "Submit for approval", publish: "Publish", retire: "Retire",
+    retireVersion: "Retire version", retireConfirmTitle: "Retire this published version?", retireConfirmBody: "It will no longer be offered for new journeys. Cases already on this version stay on it and are not moved. A retired version can't be published again — to change it, clone it into a new draft.", retireConfirm: "Yes, retire version",
     returnToDraft: "Return to draft", cloneToEdit: "Published versions are immutable. Clone this version to make changes.",
 
     stageTypes: {
@@ -120,6 +121,7 @@ export const journeyCopy = {
     stageList: "قائمة المراحل", switchToGraph: "التبديل إلى عرض المخطط", switchToList: "التبديل إلى عرض القائمة",
     addStage: "إضافة مرحلة", saveDraft: "حفظ المسودة", saved: "تم الحفظ", unsaved: "تغييرات غير محفوظة",
     validate: "التحقق", simulate: "محاكاة", submit: "إرسال للموافقة", publish: "نشر", retire: "إنهاء",
+    retireVersion: "إنهاء الإصدار", retireConfirmTitle: "إنهاء هذا الإصدار المنشور؟", retireConfirmBody: "لن يُعرض بعد الآن للرحلات الجديدة. تبقى الحالات الموجودة على هذا الإصدار ولا تُنقل. لا يمكن نشر إصدار منتهٍ مرة أخرى — لتغييره، انسخه إلى مسودة جديدة.", retireConfirm: "نعم، أنهِ الإصدار",
     returnToDraft: "الإعادة إلى مسودة", cloneToEdit: "الإصدارات المنشورة غير قابلة للتعديل. استنسخ هذا الإصدار لإجراء تغييرات.",
 
     stageTypes: {

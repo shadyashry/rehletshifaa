@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, Menu, ShieldCheck, X } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { useControlCenterAccess } from "./control-center-access";
+import { ReauthenticationReturnNotice } from "@/components/ReauthenticationNotices";
 import { NAV_GROUPS, ccHref, pick, type NavKey } from "./control-center-nav";
 import "./control-center.css";
 
@@ -74,6 +75,7 @@ export function ControlCenterShell({ locale, active, crumbs, title, intro, actio
           <div className="cc-header-text"><h1>{title}</h1>{intro && <p>{intro}</p>}</div>
           {actions && <div className="cc-header-actions">{actions}</div>}
         </header>
+        <ReauthenticationReturnNotice locale={locale} />
         {children}
       </main>
     </div>

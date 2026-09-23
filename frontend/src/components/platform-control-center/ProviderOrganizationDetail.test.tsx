@@ -55,3 +55,40 @@ describe("Organization workspace", () => {
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/providers/org-a/relationships", expect.objectContaining({ method: "POST", body: expect.stringContaining("\"type\":\"MANAGES\"") })));
   });
 });
+
+describe("Organization activation is truthful (UX-0 Decision D)", () => {
+  const commercialOnly = readiness({ clinicianProfileComplete: true, requiredCredentialsSubmitted: true, requiredCredentialsVerified: true, mandatoryCredentialsUnexpired: true, pricingSetupComplete: true, availabilitySetupComplete: true, credentialReady: true, blockers: [{ code: "COMMERCIAL_ACCEPTANCE_MISSING", message: "Required commercial or legal acceptance is missing." }] });
+  const ready = readiness({ clinicianProfileComplete: true, requiredCredentialsSubmitted: true, requiredCredentialsVerified: true, mandatoryCredentialsUnexpired: true, pricingSetupComplete: true, availabilitySetupComplete: true, credentialReady: true, blockers: [], readyForActivation: true });
+
+  it("shows 'Activation isn't available yet' with the approved copy and no activate button when acceptance is not in this release", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers/org-a": providerDetail, "/admin/providers/org-a/clinicians/prac-1/readiness": commercialOnly }, caps));
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="setup" />);
+    expect(await screen.findByText("Activation isn't available yet")).toBeVisible();
+    expect(screen.getByText("Commercial & Legal Acceptance must be completed before this organization can receive cases. That step isn't available in the current release. You can complete the remaining setup now. No cases will be routed to this organization until activation becomes available.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Activate organization" })).not.toBeInTheDocument();
+    expect(screen.getByText("Not available yet")).toBeVisible();
+  });
+
+  it("shows a disabled Activate with exactly what it is waiting for while achievable prerequisites remain", async () => {
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="setup" />);
+    expect(await screen.findByRole("button", { name: "Activate organization" })).toBeDisabled();
+    expect(screen.getByText("Not ready to activate")).toBeVisible();
+    expect(screen.getByText("At least one clinician who is ready to activate")).toBeVisible();
+  });
+
+  it("offers real activation, with a consequence-aware confirmation, only when the backend reports a ready clinician", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers/org-a": providerDetail, "/admin/providers/org-a/clinicians/prac-1/readiness": ready, "POST /admin/providers/org-a/activate?version=3": { organizationId: "org-a", status: "ACTIVE" } }, caps));
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="setup" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Activate organization" }));
+    expect(screen.getByText(/Once active, the organization can receive cases/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Yes, activate" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/providers/org-a/activate?version=3", expect.objectContaining({ method: "POST" })));
+  });
+
+  it("hides the activate control from someone who can't activate", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers/org-a": providerDetail, "/admin/providers/org-a/clinicians/prac-1/readiness": ready }, caps.filter((c) => c !== "provider.activate")));
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="setup" />);
+    expect(await screen.findByText(/A provider operations manager activates the organization/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Activate organization" })).not.toBeInTheDocument();
+  });
+});

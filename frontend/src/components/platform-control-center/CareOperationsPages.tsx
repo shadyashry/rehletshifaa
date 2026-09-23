@@ -36,7 +36,7 @@ export function DirectConsultantDetail({ locale, practitionerId, initialTab, jus
   const crumbs = ccCrumbs(locale, { label: ar ? "الاستشاريون" : "Consultants", href: ccHref(locale, "/providers/consultants?view=direct") }, { label: name });
   const act = async (action: "resend-invite" | "disable" | "enable") => {
     if (item === null || item === "missing") return;
-    if (action === "disable" && !window.confirm(ar ? `تعطيل وصول ${name}؟` : `Disable ${name}'s access?`)) return;
+    if (action === "disable" && !window.confirm(ar ? `تعطيل وصول ${name}؟ لن يتمكن من تسجيل الدخول.` : `Disable ${name}'s access? They will no longer be able to sign in.`)) return;
     setBusy(true); setActionError(null); setNotice("");
     try { await api(`/admin/practitioners/${practitionerId}/${action}${action === "resend-invite" ? `?locale=${locale}` : ""}`, { method: "POST" }); setNotice(action === "resend-invite" ? (ar ? "أُعيد إرسال الدعوة." : "Invitation sent again.") : (ar ? "تم تحديث الوصول." : "Access updated.")); await load(); }
     catch (e) { setActionError(e); } finally { setBusy(false); }

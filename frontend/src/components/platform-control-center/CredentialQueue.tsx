@@ -9,7 +9,7 @@ import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import { ccHref } from "./control-center-nav";
 import { EmptyState, ErrorNotice, StatusBadge } from "./cc-ui";
-import { approvalStatusLabel, careAreaLabel, credentialReviewStatus, credentialTypeLabel, formatDate } from "./admin-labels";
+import { approvalStatusLabel, careAreaLabel, credentialDisplayStatus, credentialReviewStatus, credentialTypeLabel, formatDate } from "./admin-labels";
 import { personName, useProviderDirectory } from "./provider-directory";
 import type { Revision } from "./consultant-setup";
 import type { DirectConsultant } from "./ConsultantDirectory";
@@ -77,7 +77,7 @@ function ProviderQueue({ locale, initialOrg }: { locale: Locale; initialOrg?: st
       {!filtered.length ? <EmptyState title={ar ? "لا توجد اعتمادات بانتظار المراجعة" : "No credentials are waiting for review"} body={rows.length ? (ar ? "غيّر عوامل التصفية لعرض المزيد." : "Change the filters to see more.") : (ar ? "ستظهر الاعتمادات هنا عندما تُرسل للمراجعة." : "Credentials appear here when they are sent for review.")} /> : (
         <ul className="cc-list" aria-label={ar ? "قائمة المراجعة" : "Review queue"}>
           <li className="cc-list-head" aria-hidden><span>{ar ? "الاعتماد" : "Credential"}</span><span>{ar ? "المؤسسة" : "Organization"}</span><span>{ar ? "الحالة" : "Status"}</span><span /></li>
-          {filtered.map((r) => { const s = credentialReviewStatus(r.status, locale); return (
+          {filtered.map((r) => { const s = credentialDisplayStatus(r.status, r.expiresAt, locale); return (
             <li key={r.id}>
               <span><strong>{credentialTypeLabel(r.credentialType, locale)}</strong><span className="cc-row-sub">{person(r)} · {ar ? "أُرسل" : "Submitted"} {formatDate(r.submittedAt, locale)}{r.revisionNumber > 1 ? (ar ? ` · إرسال رقم ${r.revisionNumber}` : ` · submission ${r.revisionNumber}`) : ""}</span></span>
               <span>{orgName(r.organizationId)}{r.expiresAt && <span className="cc-row-sub">{ar ? "ينتهي" : "Expires"} {formatDate(r.expiresAt, locale)}</span>}</span>

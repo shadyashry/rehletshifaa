@@ -17,8 +17,11 @@ import java.util.*;
 
 /** Least-privilege Keycloak integration for staff lifecycle; passwords never pass through this application. */
 @Service
-public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
+public class KeycloakStaffIdentityService implements IdentityProvisioningPort, IdentityWorkspaceRoleReader {
     private static final List<String> INVITE_ACTIONS=List.of("VERIFY_EMAIL","UPDATE_PASSWORD");
+    /** Workspace roles the portal understands; Keycloak defaults (offline_access, uma_authorization, default-roles-*) are not reported. */
+    private static final Set<String> WORKSPACE_ROLES=Set.of("PATIENT","PATIENT_REPRESENTATIVE","COORDINATOR","COORDINATOR_LEAD","DOCTOR","OPERATIONS","OPERATIONS_LEAD",
+        "FINANCE","FINANCE_LEAD","CREDENTIALING_ADMIN","SYSTEM_ADMIN","AUDITOR","PATIENT_IDENTITY_REVIEWER");
     private final RestClient http;
     private final ObjectMapper json;
     private final String baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl;
@@ -90,6 +93,19 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
             Object actions=user.get("requiredActions");
             return actions instanceof Collection<?> collection&&!collection.isEmpty()?"INVITED":"ACTIVE";
         } catch(RuntimeException ignored){return storedStatus;}
+    }
+
+    /** Read-only: effective (composite) realm roles, filtered to the portal workspaces. Never writes to the identity system. */
+    @Override
+    public WorkspaceRoles workspaceRoles(String subject) {
+        if(clientSecret.isBlank())return WorkspaceRoles.unavailable();
+        try {
+            List<Map<String,Object>> mappings=http.get().uri(admin("/users/"+encode(subject)+"/role-mappings/realm/composite")).header("Authorization",bearer()).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});
+            List<String> roles=(mappings==null?List.<Map<String,Object>>of():mappings).stream().map(m->String.valueOf(m.get("name"))).filter(WORKSPACE_ROLES::contains).sorted().toList();
+            return new WorkspaceRoles(true,status(subject,null),roles);
+        } catch(RestClientResponseException e) {
+            return e.getStatusCode().value()==404?new WorkspaceRoles(true,"NOT_FOUND",List.of()):WorkspaceRoles.unavailable();
+        } catch(RuntimeException e) {return WorkspaceRoles.unavailable();}
     }
 
     private void replaceStaffRole(String subject,String role){

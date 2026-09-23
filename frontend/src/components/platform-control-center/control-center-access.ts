@@ -5,7 +5,20 @@ import { useAuth } from "@/components/AuthProvider";
 import { apiFetchAs } from "@/lib/api";
 import { legacyAdministration } from "@/lib/portal-role-access";
 
-export type Decision = { permission: string; allowed: boolean; reason?: string };
+/**
+ * One of the caller's own capabilities from `/admin/access/me`: held at the platform or in an organization where the
+ * caller has an active role. `recentAuthentication` marks actions that ask for a fresh sign-in when performed.
+ * Navigation only — every endpoint still authorizes its own request.
+ */
+export type Decision = { permission: string; allowed: boolean; reason?: string; recentAuthentication?: boolean };
+
+/** The backend's recent-authentication window is 15 minutes; warn a little before it runs out. */
+const FRESH_SIGN_IN_MS = 14 * 60_000;
+
+/** True when the current sign-in is older than the recent-authentication window (or its time is unknown). */
+export function signInIsStale(authTime: unknown, now = Date.now()) {
+  return typeof authTime !== "number" || now - authTime * 1000 > FRESH_SIGN_IN_MS;
+}
 
 export type ControlCenterAccess = {
   loading: boolean;
@@ -13,6 +26,8 @@ export type ControlCenterAccess = {
   /** Exact backend capability key, fail-closed. */
   can: (permission: string) => boolean;
   canAny: (permissions: string[]) => boolean;
+  /** The caller holds this capability, but performing it will ask them to sign in again first. */
+  needsFreshSignIn: (permission: string) => boolean;
   legacy: ReturnType<typeof legacyAdministration>;
 };
 
@@ -45,5 +60,7 @@ export function useControlCenterAccess(): ControlCenterAccess {
   }, [subject, signedIn]);
   const can = useCallback((permission: string) => decisions.some((d) => d.permission === permission && d.allowed), [decisions]);
   const canAny = useCallback((permissions: string[]) => permissions.some((p) => can(p)), [can]);
-  return { loading, decisions, can, canAny, legacy: legacyAdministration(roles ?? []) };
+  const authTime = user?.profile?.auth_time;
+  const needsFreshSignIn = useCallback((permission: string) => decisions.some((d) => d.permission === permission && d.allowed && d.recentAuthentication) && signInIsStale(authTime), [decisions, authTime]);
+  return { loading, decisions, can, canAny, needsFreshSignIn, legacy: legacyAdministration(roles ?? []) };
 }

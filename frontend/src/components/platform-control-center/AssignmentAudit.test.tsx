@@ -24,8 +24,8 @@ describe("Assignment audit trail", () => {
     fireEvent.change(screen.getByLabelText(/Case ID/), { target: { value: "case-1" } });
     fireEvent.click(screen.getByRole("button", { name: "Look up" }));
     expect(await screen.findByText("Manually reassigned")).toBeVisible();
-    expect(screen.getByText("Live (adopted)")).toBeVisible();
-    expect(screen.getByText("Shadow (comparison only)")).toBeVisible();
+    expect(screen.getByText("Applied to the case")).toBeVisible();
+    expect(screen.getByText("Evaluation only — nothing changed")).toBeVisible();
     expect(screen.getByText(/coordinator-a → Selected coordinator: coordinator-b/)).toBeVisible();
     expect(api).toHaveBeenCalledWith("/cases/case-1/history");
   });

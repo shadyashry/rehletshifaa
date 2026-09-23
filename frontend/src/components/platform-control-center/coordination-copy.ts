@@ -2,7 +2,7 @@ import type { Locale } from "@/lib/i18n";
 
 export const coordCopy = {
   en: {
-    navCoordination: "Care Coordination", orgList: "Choose a provider organization", search: "Find an organization",
+    navCoordination: "Care Coordination", orgList: "Choose a provider organization", noOrganizations: "No provider organizations are set up for care coordination yet.", search: "Find an organization",
     loading: "Loading…", denied: "You do not have access to this area.", error: "We could not complete this request. Refresh and try again.",
     signin: "Sign in securely", retry: "Refresh", back: "Back to Care Coordination", close: "Close", cancel: "Cancel", save: "Save", reason: "Reason",
 
@@ -58,7 +58,8 @@ export const coordCopy = {
 
     auditIntro: "Look up a case to see its full routing decision history — every shadow comparison, adoption, automatic route, manual assignment and reassignment.",
     noHistory: "No routing decisions recorded for this case.", decisionAt: "Decided", decisionMode: "Mode", decisionSource: "Source",
-    decisionExplanation: "Explanation", previousOwner: "Previous coordinator", selectedOwner: "Selected coordinator", modeShadow: "Shadow (comparison only)", modeLive: "Live (adopted)",
+    decisionExplanation: "Explanation", previousOwner: "Previous coordinator", selectedOwner: "Selected coordinator", modeShadow: "Evaluation only — nothing changed", modeLive: "Applied to the case",
+    notLiveTitle: "Coordinator for this case", notLiveBody: "Routing for this case is evaluation-only, so its coordinator can't be changed here — nothing you do on this screen would change the case. To change who coordinates this case, open it in the Staff Portal and use Transfer case.", lookupOpen: "Check coordinator assignment",
 
     exclusions: {
       ACCESS_OR_MEMBERSHIP_DENIED: "No active access grant to receive coordination work in this provider", STAFF_DISABLED: "Staff account disabled",
@@ -74,7 +75,7 @@ export const coordCopy = {
     } as Record<string, string>,
   },
   ar: {
-    navCoordination: "تنسيق الرعاية", orgList: "اختر مؤسسة مقدم رعاية", search: "البحث عن مؤسسة",
+    navCoordination: "تنسيق الرعاية", orgList: "اختر مؤسسة مقدم رعاية", noOrganizations: "لا توجد بعد مؤسسات مقدمي رعاية مُعدّة لتنسيق الرعاية.", search: "البحث عن مؤسسة",
     loading: "جارٍ التحميل…", denied: "ليس لديك وصول إلى هذه المساحة.", error: "تعذر إكمال الطلب. حدّث الصفحة وحاول مجددًا.",
     signin: "تسجيل الدخول الآمن", retry: "تحديث", back: "العودة إلى تنسيق الرعاية", close: "إغلاق", cancel: "إلغاء", save: "حفظ", reason: "السبب",
 
@@ -130,7 +131,8 @@ export const coordCopy = {
 
     auditIntro: "ابحث عن حالة لعرض سجل قرارات التوجيه الكامل الخاص بها — كل مقارنة ظلية، واعتماد، وتوجيه تلقائي، وتعيين يدوي، وإعادة تعيين.",
     noHistory: "لا توجد قرارات توجيه مسجلة لهذه الحالة.", decisionAt: "تاريخ القرار", decisionMode: "الوضع", decisionSource: "المصدر",
-    decisionExplanation: "التفسير", previousOwner: "المنسق السابق", selectedOwner: "المنسق المختار", modeShadow: "ظلي (مقارنة فقط)", modeLive: "فعلي (معتمد)",
+    decisionExplanation: "التفسير", previousOwner: "المنسق السابق", selectedOwner: "المنسق المختار", modeShadow: "تقييم فقط — لم يتغير شيء", modeLive: "طُبّق على الحالة",
+    notLiveTitle: "منسق هذه الحالة", notLiveBody: "التوجيه لهذه الحالة للتقييم فقط، لذا لا يمكن تغيير منسقها من هنا — لن يغيّر أي إجراء في هذه الشاشة الحالة. لتغيير منسق الحالة، افتحها في بوابة الموظفين واستخدم «نقل الحالة».", lookupOpen: "التحقق من تعيين المنسق",
 
     exclusions: {
       ACCESS_OR_MEMBERSHIP_DENIED: "لا توجد صلاحية وصول نشطة لاستقبال عمل التنسيق في هذه المؤسسة", STAFF_DISABLED: "حساب الموظف معطّل",

@@ -43,6 +43,7 @@ const credentialStatus: Record<string, Entry> = {
   REJECTED: { en: "Rejected", ar: "مرفوض", tone: "danger" },
   MORE_INFORMATION_REQUIRED: { en: "Correction requested", ar: "مطلوب تصحيح", tone: "warning" },
   SUSPENDED: { en: "Suspended", ar: "موقوف", tone: "danger" },
+  EXPIRED: { en: "Expired", ar: "منتهي الصلاحية", tone: "danger" },
 };
 const memberStatus: Record<string, Entry> = {
   PENDING: { en: "Invitation pending", ar: "الدعوة معلّقة", tone: "warning" },
@@ -74,6 +75,9 @@ const priceStatus: Record<string, Entry> = {
 export const clinicianStatusLabel = (k: string | null | undefined, l: Locale) => lookup(clinicianStatus, k, l);
 export const organizationStatusLabel = (k: string | null | undefined, l: Locale) => lookup(orgStatus, k, l);
 export const credentialReviewStatus = (k: string | null | undefined, l: Locale) => lookup(credentialStatus, k, l);
+/** A verified credential whose expiry date has passed no longer counts (the backend treats it as expired at read time), so it is never shown as "Verified". */
+export const credentialIsExpired = (status: string, expiresAt: string | null | undefined, now = Date.now()) => status === "VERIFIED" && !!expiresAt && new Date(expiresAt).getTime() <= now;
+export const credentialDisplayStatus = (status: string, expiresAt: string | null | undefined, l: Locale, now = Date.now()) => lookup(credentialStatus, credentialIsExpired(status, expiresAt, now) ? "EXPIRED" : status, l);
 export const membershipStatusLabel = (k: string | null | undefined, l: Locale) => lookup(memberStatus, k, l);
 export const accountStatusLabel = (k: string | null | undefined, l: Locale) => lookup(accountStatus, k, l);
 export const approvalStatusLabel = (k: string | null | undefined, l: Locale) => lookup(approvalStatus, k, l);
@@ -103,7 +107,7 @@ export type SetupArea = "details" | "professional" | "working" | "organization";
 const blockers: Record<string, { area: SetupArea; en: string; ar: string }> = {
   IDENTITY_NOT_PROVISIONED: { area: "details", en: "The sign-in account has not been created yet.", ar: "لم يُنشأ حساب الدخول بعد." },
   MEMBERSHIP_INACTIVE: { area: "details", en: "Their organization membership is not active yet.", ar: "عضويته في المؤسسة غير نشطة بعد." },
-  PROVIDER_PROFILE_INCOMPLETE: { area: "organization", en: "The organization's profile is incomplete.", ar: "ملف المؤسسة غير مكتمل." },
+  PROVIDER_PROFILE_INCOMPLETE: { area: "organization", en: "The organization's profile or legacy-record review is incomplete. This can't be completed from the Control Center yet.", ar: "ملف المؤسسة أو مراجعة سجلها القديم غير مكتملة. لا يمكن إكمال ذلك من مركز التحكم بعد." },
   CLINICIAN_PROFILE_INCOMPLETE: { area: "professional", en: "Professional details are missing.", ar: "البيانات المهنية غير مكتملة." },
   CREDENTIAL_POLICY_UNCONFIGURED: { area: "professional", en: "No credential requirements exist for this country yet — contact the platform team.", ar: "لا توجد متطلبات اعتماد لهذه الدولة بعد — تواصل مع فريق المنصة." },
   CREDENTIAL_MISSING: { area: "professional", en: "A required credential has not been added.", ar: "لم يُضف اعتماد مطلوب." },
@@ -114,7 +118,7 @@ const blockers: Record<string, { area: SetupArea; en: string; ar: string }> = {
   SERVICES_PRICING_INCOMPLETE: { area: "working", en: "At least one live price is needed.", ar: "يلزم سعر منشور واحد على الأقل." },
   AVAILABILITY_INCOMPLETE: { area: "working", en: "Weekly availability has not been set.", ar: "لم يُحدَّد التوافر الأسبوعي." },
   ROUTING_INCOMPLETE: { area: "working", en: "A routing preference is missing (set in Care coordination).", ar: "تفضيل التوجيه غير موجود (يُضبط في تنسيق الرعاية)." },
-  COMMERCIAL_ACCEPTANCE_MISSING: { area: "working", en: "Commercial or legal terms have not been accepted.", ar: "لم تُقبل الشروط التجارية أو القانونية." },
+  COMMERCIAL_ACCEPTANCE_MISSING: { area: "working", en: "Commercial & Legal Acceptance isn't available in the current release.", ar: "القبول التجاري والقانوني غير متاح في الإصدار الحالي." },
 };
 export const blockerInfo = (code: string, message: string, locale: Locale) => {
   const b = blockers[code];

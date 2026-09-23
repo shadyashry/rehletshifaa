@@ -1,5 +1,6 @@
 "use client";
 
+import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { LayoutList, Network, RefreshCw } from "lucide-react";
@@ -55,7 +56,7 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
     const response = await apiFetchAs(user.access_token, "/admin/journeys" + path, { method, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      if (data.code === "REAUTHENTICATION_REQUIRED") { await signIn(true); throw new ApiCodeError(t.denied, data.code); }
+      if (data.code === REAUTHENTICATION_REQUIRED) { await requestReauthentication(signIn); throw new ApiCodeError(reauthenticationCopy[locale].required, data.code); }
       throw new ApiCodeError(data.message || (response.status === 403 ? t.denied : t.error), data.code);
     }
     const text = await response.text();

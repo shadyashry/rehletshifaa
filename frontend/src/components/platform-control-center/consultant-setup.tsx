@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, Clock, Upload } from "lucide-react";
+import { AlertTriangle, Check, Clock, Info, Upload } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
 import { useAdminApi, type AdminApi } from "./admin-api";
 import { ControlCenterError, EmptyState, ErrorNotice, Field, StatusBadge, SuccessNotice } from "./cc-ui";
-import { blockerInfo, credentialReviewStatus, credentialTypeLabel, formatDate, relationshipLabel, type SetupArea } from "./admin-labels";
+import { blockerInfo, credentialDisplayStatus, credentialIsExpired, credentialTypeLabel, formatDate, relationshipLabel, type SetupArea } from "./admin-labels";
 import { ccHref } from "./control-center-nav";
 import { personName, type ProviderDetail } from "./provider-directory";
 
@@ -43,8 +43,46 @@ export function useClinician(organizationId: string, practitionerId: string) {
   return { api, detail, onboarding, readiness, member, loading, error, reload };
 }
 
+/**
+ * Commercial & Legal Acceptance has no command anywhere in the current release: the backend reports it as a
+ * permanent `COMMERCIAL_ACCEPTANCE_MISSING` blocker (fail-closed by design). Flip this when the acceptance step ships,
+ * so the blocker is then shown as an ordinary, achievable prerequisite.
+ */
+export const COMMERCIAL_ACCEPTANCE_IN_RELEASE = false;
+export const COMMERCIAL_ACCEPTANCE_MISSING = "COMMERCIAL_ACCEPTANCE_MISSING";
+/** True when activation cannot complete in this release, whatever else is done (UX-0 Decision D, case 3). */
+export const activationUnavailable = (readiness: Readiness | null) =>
+  !COMMERCIAL_ACCEPTANCE_IN_RELEASE && !!readiness?.blockers.some((b) => b.code === COMMERCIAL_ACCEPTANCE_MISSING);
+/** The approved "Activation isn't available yet" state: information, never a disabled primary button. */
+export function ActivationUnavailable({ locale, subject }: { locale: Locale; subject: "organization" | "consultant" }) {
+  const ar = locale === "ar";
+  const who = subject === "organization" ? (ar ? "هذه المؤسسة" : "this organization") : (ar ? "هذا الاستشاري" : "this consultant");
+  return (
+    <div className="cc-notice cc-notice-info" role="note" aria-labelledby={`activation-unavailable-${subject}`}>
+      <Info size={18} aria-hidden />
+      <div>
+        <p id={`activation-unavailable-${subject}`}><strong>{ar ? "التفعيل غير متاح بعد" : "Activation isn't available yet"}</strong></p>
+        <p>{ar
+          ? `يجب إكمال القبول التجاري والقانوني قبل أن يتمكن ${who} من استقبال الحالات. هذه الخطوة غير متاحة في الإصدار الحالي. يمكنك إكمال بقية الإعداد الآن. لن تُوجَّه أي حالات إلى ${who} حتى يصبح التفعيل متاحًا.`
+          : `Commercial & Legal Acceptance must be completed before ${who} can receive cases. That step isn't available in the current release. You can complete the remaining setup now. No cases will be routed to ${who} until activation becomes available.`}</p>
+      </div>
+    </div>
+  );
+}
+
+/** One-line readiness summary that never counts the release-unavailable step as something left to do. */
+export function readinessSummary(readiness: Readiness, locale: Locale) {
+  const ar = locale === "ar";
+  if (readiness.readyForActivation) return ar ? "جاهز للتفعيل" : "Ready to activate";
+  const remaining = readiness.blockers.filter((b) => COMMERCIAL_ACCEPTANCE_IN_RELEASE || b.code !== COMMERCIAL_ACCEPTANCE_MISSING).length;
+  if (!remaining && activationUnavailable(readiness)) return ar ? "الإعداد مكتمل — التفعيل غير متاح بعد" : "Setup complete — activation isn't available yet";
+  return ar ? `${remaining} بنود متبقية` : `${remaining} item${remaining === 1 ? "" : "s"} remaining`;
+}
+
+/** Readiness issues for one setup area. The release-unavailable commercial step is not an issue anyone can fix, so it is shown once, in the activation state, instead. */
 export const issuesFor = (readiness: Readiness | null, area: SetupArea, locale: Locale) =>
-  (readiness?.blockers ?? []).map((b) => ({ ...blockerInfo(b.code, b.message, locale), code: b.code })).filter((b) => b.area === area);
+  (readiness?.blockers ?? []).filter((b) => COMMERCIAL_ACCEPTANCE_IN_RELEASE || b.code !== COMMERCIAL_ACCEPTANCE_MISSING)
+    .map((b) => ({ ...blockerInfo(b.code, b.message, locale), code: b.code })).filter((b) => b.area === area);
 
 /** Readiness issues shown next to the section that resolves them. */
 export function SetupIssues({ issues, locale }: { issues: { label: string; detail: string; code: string }[]; locale: Locale }) {
@@ -56,34 +94,59 @@ export function SetupIssues({ issues, locale }: { issues: { label: string; detai
   );
 }
 
-/** Professional details — backend `PUT …/profile`. The backend has no read of these fields, so the form never pretends to show saved values. */
+export type ProfessionalProfile = { registrationNumber: string | null; specialty: string | null; subspecialty: string | null; qualifications: string | null; jurisdiction: string | null; version: number };
+type ProfileForm = { registrationNumber: string; specialty: string; subspecialty: string; qualifications: string; jurisdiction: string };
+const toForm = (p: ProfessionalProfile): ProfileForm => ({ registrationNumber: p.registrationNumber ?? "", specialty: p.specialty ?? "", subspecialty: p.subspecialty ?? "", qualifications: p.qualifications ?? "", jurisdiction: p.jurisdiction ?? "" });
+
+/**
+ * Professional details — read back from `GET …/profile` and saved with `PUT …/profile`. The form always starts from the
+ * stored values, so editing one field never blanks the others, and it is not offered at all until those values have
+ * been read. The save carries the version that was read, so a newer save by someone else is never silently overwritten.
+ */
 export function ProfessionalDetailsForm({ locale, api, organizationId, onboarding, complete, onSaved, canEdit }: { locale: Locale; api: AdminApi; organizationId: string; onboarding: Onboarding; complete: boolean; onSaved: () => void; canEdit: boolean }) {
   const ar = locale === "ar";
   const [open, setOpen] = useState(!complete);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState({ registrationNumber: "", specialty: "", subspecialty: "", qualifications: "", jurisdiction: onboarding.jurisdiction ?? "" });
+  const [stored, setStored] = useState<ProfessionalProfile | null>(null);
+  const [form, setForm] = useState<ProfileForm>({ registrationNumber: "", specialty: "", subspecialty: "", qualifications: "", jurisdiction: onboarding.jurisdiction ?? "" });
   const [touched, setTouched] = useState(false);
+  const path = `/admin/providers/${organizationId}/clinicians/${onboarding.practitionerId}/profile`;
+  const read = useCallback(async () => {
+    setLoadError(null);
+    try { const p = await api<ProfessionalProfile>(path); setStored(p); setForm(toForm(p)); } catch (err) { setLoadError(err); }
+  }, [api, path]);
+  // The saved values are the starting point for any edit; only editors (provider.update) can read them.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (canEdit) void read(); }, [canEdit, read, onboarding.version]);
   const missing = (v: string) => touched && !v.trim() ? (ar ? "هذا الحقل مطلوب." : "This field is required.") : undefined;
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k: keyof ProfileForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setTouched(true);
+    if (!stored) return;
     if (!form.registrationNumber.trim() || !form.specialty.trim() || !form.qualifications.trim() || !form.jurisdiction.trim()) return;
     setBusy(true); setError(null); setSaved(false);
     try {
-      await api(`/admin/providers/${organizationId}/clinicians/${onboarding.practitionerId}/profile`, { method: "PUT", body: { ...form, subspecialty: form.subspecialty || null, jurisdiction: form.jurisdiction.trim().toUpperCase(), version: onboarding.version } });
+      await api(path, { method: "PUT", body: { ...form, subspecialty: form.subspecialty || null, jurisdiction: form.jurisdiction.trim().toUpperCase(), version: stored.version } });
       setSaved(true); setOpen(false); onSaved();
     } catch (err) { setError(err); } finally { setBusy(false); }
   };
+  const summary = stored && complete && !open ? [
+    [ar ? "رقم التسجيل المهني" : "Registration number", stored.registrationNumber], [ar ? "دولة الترخيص" : "Licensing country", stored.jurisdiction],
+    [ar ? "التخصص" : "Speciality", stored.specialty], [ar ? "التخصص الدقيق" : "Sub-speciality", stored.subspecialty],
+  ] as [string, string | null][] : null;
   return (
     <div>
-      {complete && !open && <p className="cc-meta"><StatusBadge tone="success">{ar ? "البيانات المهنية محفوظة" : "Professional details saved"}</StatusBadge>{canEdit && <> <button type="button" className="cc-link" onClick={() => setOpen(true)}>{ar ? "تحديث البيانات" : "Update details"}</button></>}</p>}
+      {complete && !open && <p className="cc-meta"><StatusBadge tone="success">{ar ? "البيانات المهنية محفوظة" : "Professional details saved"}</StatusBadge>{canEdit && stored && <> <button type="button" className="cc-link" onClick={() => { setForm(toForm(stored)); setOpen(true); }}>{ar ? "تعديل البيانات" : "Edit details"}</button></>}</p>}
+      {summary && <dl className="cc-facts" aria-label={ar ? "البيانات المهنية المحفوظة" : "Saved professional details"}>{summary.map(([k, v]) => <div key={k}><dt>{k}</dt><dd><bdi>{v || "—"}</bdi></dd></div>)}</dl>}
       <SuccessNotice>{saved ? (ar ? "تم حفظ البيانات المهنية." : "Professional details saved.") : null}</SuccessNotice>
-      {open && canEdit && (
+      {canEdit && loadError ? <ErrorNotice error={loadError} locale={locale} action="load" onRetry={() => void read()} /> : null}
+      {canEdit && !stored && !loadError && <p role="status" className="cc-meta">{ar ? "جارٍ تحميل البيانات المحفوظة…" : "Loading the saved details…"}</p>}
+      {open && canEdit && stored && (
         <form onSubmit={submit} noValidate aria-label={ar ? "البيانات المهنية" : "Professional details"}>
           <ErrorNotice error={error} locale={locale} />
-          {complete && <p className="cc-meta">{ar ? "لا تُعرض القيم المحفوظة هنا؛ ما تُدخله يحل محلها." : "Saved values aren't shown here; what you enter replaces them."}</p>}
           <div className="cc-form-grid">
             <Field label={ar ? "رقم التسجيل المهني" : "Professional registration number"} required error={missing(form.registrationNumber)}><input dir="ltr" maxLength={100} value={form.registrationNumber} onChange={set("registrationNumber")} aria-required /></Field>
             <Field label={ar ? "دولة الترخيص" : "Licensing country"} hint={ar ? "رمز الدولة من حرفين، مثل EG" : "Two-letter country code, for example EG"} required error={missing(form.jurisdiction)}><input dir="ltr" maxLength={2} value={form.jurisdiction} onChange={set("jurisdiction")} aria-required /></Field>
@@ -133,8 +196,9 @@ export function CredentialRequirements({ locale, api, organizationId, practition
     <div>
       {requirements.map((req) => {
         const rev = latest(req.type);
-        const status = rev ? credentialReviewStatus(rev.status, locale) : null;
-        const needsNew = !rev || ["REJECTED", "MORE_INFORMATION_REQUIRED"].includes(rev.status);
+        const status = rev ? credentialDisplayStatus(rev.status, rev.expiresAt, locale) : null;
+        const expired = !!rev && credentialIsExpired(rev.status, rev.expiresAt);
+        const needsNew = !rev || expired || ["REJECTED", "MORE_INFORMATION_REQUIRED"].includes(rev.status);
         return (
           <div key={req.type} className="cc-requirement">
             <div>
@@ -145,7 +209,7 @@ export function CredentialRequirements({ locale, api, organizationId, practition
             <div className="cc-row-actions">
               {status ? <StatusBadge tone={status.tone}>{status.label}</StatusBadge> : <StatusBadge tone="neutral">{ar ? "مطلوب" : "Needed"}</StatusBadge>}
               {canReview && rev && ["SUBMITTED", "UNDER_REVIEW"].includes(rev.status) && <Link className="cc-secondary cc-small" href={ccHref(locale, `/credentials/${organizationId}/${rev.id}`)}>{ar ? "مراجعة" : "Review"}</Link>}
-              {canSubmit && needsNew && adding?.type !== req.type && <button type="button" className={rev ? "cc-secondary cc-small" : "cc-small"} onClick={() => setAdding(req)}><Upload size={15} aria-hidden />{rev ? (ar ? "إرسال بديل" : "Submit replacement") : (ar ? "إضافة" : "Add")}</button>}
+              {canSubmit && needsNew && adding?.type !== req.type && <button type="button" className={rev ? "cc-secondary cc-small" : "cc-small"} onClick={() => setAdding(req)}><Upload size={15} aria-hidden />{expired ? (ar ? "إرسال تجديد" : "Submit renewal") : rev ? (ar ? "إرسال بديل" : "Submit replacement") : (ar ? "إضافة" : "Add")}</button>}
             </div>
           </div>
         );
@@ -272,7 +336,7 @@ export function ReadinessChecklist({ locale, readiness, onGoTo }: { locale: Loca
   ];
   const labels: Record<SetupArea, string> = ar ? { details: "بيانات الاستشاري", organization: "المؤسسة", professional: "الإعداد المهني", working: "إعداد العمل" } : { details: "Consultant details", organization: "Organization", professional: "Professional setup", working: "Working setup" };
   const areas: SetupArea[] = ["details", "organization", "professional", "working"];
-  const extra = readiness.blockers.map((b) => ({ ...blockerInfo(b.code, b.message, locale), code: b.code }));
+  const extra = readiness.blockers.filter((b) => COMMERCIAL_ACCEPTANCE_IN_RELEASE || b.code !== COMMERCIAL_ACCEPTANCE_MISSING).map((b) => ({ ...blockerInfo(b.code, b.message, locale), code: b.code }));
   return (
     <div className="cc-readiness-groups">
       {areas.map((area) => {
@@ -308,18 +372,32 @@ export function ActivationPanel({ locale, api, organizationId, onboarding, readi
     try { await api(`/admin/providers/${organizationId}/clinicians/${onboarding.practitionerId}/activate?version=${onboarding.version}`, { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() } }); setConfirming(false); onActivated(); }
     catch (err) { setError(err); } finally { setBusy(false); }
   };
+  // Case 3 — cannot complete in this release: information only, no button.
+  if (activationUnavailable(readiness)) return <ActivationUnavailable locale={locale} subject="consultant" />;
+  // Case 2 — relevant, waiting for achievable prerequisites: say exactly what it is waiting for.
+  const waitingFor = [
+    ...(readiness?.blockers ?? []).map((b) => blockerInfo(b.code, b.message, locale).label),
+    ...(ready && !organizationActive ? [ar ? "تفعيل المؤسسة أولًا" : "The organization to be activated first"] : []),
+  ];
+  if (!readiness) return <p className="cc-meta">{ar ? "تعذّر التحقق من الجاهزية الآن، لذا لا يمكن التفعيل. حدّث الصفحة لاحقًا." : "Readiness couldn't be checked right now, so activation isn't offered. Refresh to try again."}</p>;
   return (
     <div>
       <ErrorNotice error={error} locale={locale} />
-      {!ready && <p className="cc-meta">{ar ? "يصبح التفعيل متاحًا عندما تكتمل كل البنود أعلاه." : "Activation becomes available when every item above is complete."}</p>}
-      {ready && !organizationActive && <p className="cc-issue"><AlertTriangle size={16} aria-hidden />{ar ? "يجب تفعيل المؤسسة أولًا قبل تفعيل أطبائها." : "The organization must be activated before its clinicians can be."}</p>}
-      {!canActivate ? <p className="cc-meta">{ar ? "لا تملك صلاحية التفعيل. يمكن لمدير عمليات مقدمي الرعاية إكمال هذه الخطوة." : "You don't have permission to activate. A provider operations manager can complete this step."}</p>
+      {waitingFor.length > 0 && (
+        <div aria-labelledby="activation-waiting">
+          <p id="activation-waiting"><strong>{ar ? "غير جاهز للتفعيل" : "Not ready to activate"}</strong></p>
+          <p className="cc-meta">{ar ? "بانتظار:" : "Waiting for:"}</p>
+          <ul className="cc-readiness">{waitingFor.map((label) => <li key={label}><Clock size={16} className="cc-todo" aria-hidden /><span>{label}</span></li>)}</ul>
+        </div>
+      )}
+      {/* Case 1 — the person can't activate: no control, just who can. */}
+      {!canActivate ? <p className="cc-meta">{ar ? "يفعّل مدير عمليات مقدمي الرعاية الاستشاري عند اكتمال الإعداد." : "A provider operations manager activates the consultant once setup is complete."}</p>
         : confirming ? (
           <div className="cc-card" role="group" aria-label={ar ? "تأكيد التفعيل" : "Confirm activation"}>
-            <p>{ar ? "سيصبح الاستشاري متاحًا لاستقبال الحالات. هل تريد المتابعة؟" : "The consultant will become available to receive cases. Continue?"}</p>
+            <p>{ar ? "بعد التفعيل يصبح الاستشاري مؤهلًا لاستقبال الحالات. هل تريد المتابعة؟" : "After activation the consultant becomes eligible to receive cases. Continue?"}</p>
             <div className="cc-form-actions"><button type="button" disabled={busy} onClick={() => void activate()}>{ar ? "نعم، فعّل الاستشاري" : "Yes, activate consultant"}</button><button type="button" className="cc-secondary" onClick={() => setConfirming(false)}>{ar ? "إلغاء" : "Cancel"}</button></div>
           </div>
-        ) : <button type="button" disabled={!ready || !organizationActive} onClick={() => setConfirming(true)}>{ar ? "تفعيل الاستشاري" : "Activate consultant"}</button>}
+        ) : <button type="button" disabled={waitingFor.length > 0} aria-describedby={waitingFor.length ? "activation-waiting" : undefined} onClick={() => setConfirming(true)}>{ar ? "تفعيل الاستشاري" : "Activate consultant"}</button>}
     </div>
   );
 }

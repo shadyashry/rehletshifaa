@@ -64,9 +64,12 @@ describe("Direct consultants (moved from the Administration console)", () => {
     expect(screen.getByRole("menuitem", { name: "Disable access" })).toHaveClass("cc-menu-danger");
   });
 
-  it("approves for cases, and requires a reason to reject", async () => {
+  it("approves for cases only after a consequence-aware confirmation, and requires a reason to reject", async () => {
     render(<DirectConsultantDetail locale="en" practitionerId="p-9" initialTab="approval" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Approve for cases" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Approve for cases…" }));
+    expect(screen.getByText(/may become eligible for live case assignment/)).toBeVisible();
+    expect(apiFetchAs).not.toHaveBeenCalledWith("test", "/admin/practitioners/p-9/decision?approved=true", expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: "Yes, approve for cases" }));
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/practitioners/p-9/decision?approved=true", expect.objectContaining({ method: "POST" })));
     fireEvent.click(screen.getByRole("button", { name: "Reject…" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm rejection" }));

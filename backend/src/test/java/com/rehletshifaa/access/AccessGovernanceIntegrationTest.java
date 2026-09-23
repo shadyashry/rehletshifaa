@@ -57,7 +57,7 @@ class AccessGovernanceIntegrationTest {
     @Test void catalogSeedsAndDatabaseOnlyIdentityAreUsable() {
         assertThat(catalogRepository.registeredKeys()).containsExactlyInAnyOrderElementsOf(catalog.all().stream().map(PermissionDefinition::key).toList());
         assertThat(service.list(0)).hasSize(27); // +2 V42 Coordinator, +2 V43 Consultant, +2 V44 Finance, +2 V45 Operations Journey Work templates
-        assertThat(queries.mine()).anyMatch(AuthorizationDecision::allowed);
+        assertThat(queries.mine()).anyMatch(AccessQueryService.Capability::allowed);
         assertThatThrownBy(legacy::current).hasMessageContaining("platform role");
     }
     @Test void immutableLifecycleStaleEditDependenciesAndIndependentPublication() {
@@ -92,7 +92,7 @@ class AccessGovernanceIntegrationTest {
         assignmentService.revoke(own.id(),ResourceContext.PLATFORM,new RoleTemplateService.Change(0,"Revoked bootstrap"));
         bootstrap.initialize("governance-owner");
         assertThat(assignments.assignments("governance-owner",ResourceContext.PLATFORM)).hasSize(1);
-        assertThat(queries.mine()).noneMatch(AuthorizationDecision::allowed);
+        assertThat(queries.mine()).noneMatch(AccessQueryService.Capability::allowed);
     }
     @Test void providerAssignmentsAndRelationshipsCannotActivateFromUntrustedIds() {
         UUID organization=UUID.randomUUID();
@@ -190,7 +190,7 @@ class AccessGovernanceIntegrationTest {
         var jwt=Jwt.withTokenValue("legacy").header("alg","none").subject("doctor").claim("realm_access",Map.of("roles",List.of("DOCTOR","PRACTICE_MANAGER"))).build();
         SecurityContextHolder.getContext().setAuthentication(new JwtRoleConverter().convert(jwt));
         assertThat(legacy.require(ActorRole.DOCTOR).has(ActorRole.DOCTOR)).isTrue();
-        assertThat(queries.mine()).noneMatch(AuthorizationDecision::allowed);
+        assertThat(queries.mine()).noneMatch(AccessQueryService.Capability::allowed);
         assertThat(new LegacyRoleCompatibilityAdapter().suggestedTemplates(Set.of(ActorRole.DOCTOR))).containsExactly("CONSULTANT");
         assertThat(new LegacyRoleCompatibilityAdapter().suggestedTemplates(Set.of(ActorRole.PATIENT_REPRESENTATIVE))).isEmpty();
     }

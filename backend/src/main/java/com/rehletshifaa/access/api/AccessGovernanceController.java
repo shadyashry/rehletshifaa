@@ -33,6 +33,7 @@ public class AccessGovernanceController {
     @PostMapping("/relationships") public Object relationship(@RequestBody ResourceRelationshipService.Create command) { return relationships.create(command); }
     @PostMapping("/relationships/{id}/revoke") public void revokeRelationship(@PathVariable UUID id,@RequestParam String subject,@RequestParam UUID organization,@RequestBody RoleTemplateService.Change command) { relationships.revoke(subject,organization,id,command); }
     @GetMapping("/effective-access") public Object effective(@RequestParam @Size(min=1,max=255) String subject,@RequestParam UUID organization) { return queries.effective(subject,organization); }
+    @GetMapping("/workspace-roles") public Object workspaceRoles(@RequestParam @Size(min=1,max=255) String subject) { return queries.workspaceRoles(subject); }
     @PostMapping("/simulate") public Object simulate(@RequestBody AccessQueryService.Simulation command) { return queries.simulate(command); }
     @GetMapping("/audit") public Object audit(@RequestParam(defaultValue="0") @Min(0) @Max(100000) int offset) { return queries.audit(offset); }
     public record Draft(UUID baseVersionId,String reason) {}

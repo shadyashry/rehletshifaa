@@ -1,5 +1,6 @@
 "use client";
 
+import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
 import { useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
@@ -41,6 +42,7 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
   const [can, setCan] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [retiring, setRetiring] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<PriceView | null>(null);
   const [creating, setCreating] = useState(false);
@@ -54,12 +56,12 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
     const response = await apiFetchAs(user.access_token, base + path, { method, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      if (data.code === "REAUTHENTICATION_REQUIRED") { await signIn(true); throw new Error(t.denied); }
+      if (data.code === REAUTHENTICATION_REQUIRED) { await requestReauthentication(signIn); throw new Error(reauthenticationCopy[locale].required); }
       throw new Error(data.message || t.error);
     }
     const text = await response.text();
     return text ? JSON.parse(text) : (undefined as T);
-  }, [user, t, signIn, base]);
+  }, [user, t, signIn, base, locale]);
 
   const refresh = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -103,7 +105,7 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
 
   const publish = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/publish?revision=${p.revision}`, "POST"); await refresh(); onChanged?.(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
   const approve = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/approve?revision=${p.revision}`, "POST"); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
-  const retire = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/retire?revision=${p.revision}`, "POST"); await refresh(); onChanged?.(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
+  const retire = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/retire?revision=${p.revision}`, "POST"); setRetiring(null); await refresh(); onChanged?.(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
 
   const grouped = Object.entries(
     prices.reduce<Record<string, PriceView[]>>((acc, p) => { (acc[p.serviceCode] ??= []).push(p); return acc; }, {})
@@ -195,7 +197,13 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
                           )}
                           {p.status === "ACTIVE" && allowed("price_list.publish") && (
                             <div className="cc-step-actions">
-                              <button type="button" className="cc-secondary cc-danger-button cc-small" disabled={busy} onClick={() => void retire(p)}>{t.retire}</button>
+                              {retiring === p.id ? (
+                                <div className="cc-card" role="group" aria-label={t.retireConfirmTitle}>
+                                  <p><strong>{t.retireConfirmTitle}</strong></p>
+                                  <p>{t.retireConfirmBody}</p>
+                                  <div className="cc-form-actions"><button type="button" className="cc-danger-button" disabled={busy} onClick={() => void retire(p)}>{t.retireConfirm}</button><button type="button" className="cc-secondary" onClick={() => setRetiring(null)}>{t.cancel}</button></div>
+                                </div>
+                              ) : <button type="button" className="cc-secondary cc-danger-button cc-small" disabled={busy} onClick={() => setRetiring(p.id)}>{t.retire}</button>}
                             </div>
                           )}
                         </li>

@@ -40,6 +40,21 @@ describe("Assignment queue", () => {
     expect(fetchApi).toHaveBeenCalledWith("/cases/case-1/commands", "POST", expect.objectContaining({ revision: 3, action: "ASSIGN", target: "coordinator-a", reason: "Reviewed queue and assigned" }));
   });
 
+  it("never offers Assign/Reassign for an evaluation-only case: it points to the authoritative Staff Portal transfer and sends no command", async () => {
+    const fetchApi = api({ "/cases/case-9": { ...facts, id: "case-9", owner: "coordinator-b", mode: "SHADOW" as const }, "/cases/case-9/history": history });
+    render(<AssignmentQueue locale="en" api={fetchApi} allowed={() => true} queue={[]} teams={[team]} onChanged={vi.fn()} subject="manager" />);
+    fireEvent.change(screen.getByLabelText("Case ID"), { target: { value: "case-9" } });
+    fireEvent.click(screen.getByRole("button", { name: "Look up" }));
+    expect(screen.queryByRole("button", { name: "Reassign" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Check coordinator assignment" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await screen.findByText(/can't be changed here/)).toBeVisible();
+    expect(dialog).toHaveTextContent(/Transfer case/);
+    expect(screen.queryByRole("button", { name: /Confirm (re)?assignment/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Shadow/)).not.toBeInTheDocument();
+    expect(fetchApi).not.toHaveBeenCalledWith("/cases/case-9/commands", expect.anything(), expect.anything());
+  });
+
   it("shows the empty-queue state when there is no unassigned coordination work", () => {
     render(<AssignmentQueue locale="en" api={api({})} allowed={() => true} queue={[]} teams={[]} onChanged={vi.fn()} subject="manager" />);
     expect(screen.getByText(/No unassigned coordination work/)).toBeVisible();

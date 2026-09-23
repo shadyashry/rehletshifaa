@@ -18,6 +18,7 @@ export function CareCoordinationOrganizations({ locale }: { locale: Locale }) {
   const [orgs, setOrgs] = useState<OrganizationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [denied, setDenied] = useState(false);
   const [query, setQuery] = useState("");
 
   const refresh = useCallback(async () => {
@@ -25,7 +26,8 @@ export function CareCoordinationOrganizations({ locale }: { locale: Locale }) {
     setLoading(true); setError("");
     try {
       const response = await apiFetchAs(user.access_token, "/admin/coordination/organizations");
-      if (!response.ok) { if (response.status === 403) { setOrgs([]); return; } throw new Error(t.error); }
+      if (!response.ok) { if (response.status === 403) { setOrgs([]); setDenied(true); return; } throw new Error(t.error); }
+      setDenied(false);
       setOrgs(await response.json());
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
   }, [user, t.error]);
@@ -42,7 +44,7 @@ export function CareCoordinationOrganizations({ locale }: { locale: Locale }) {
   return (
     <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={t.orgList} actions={actions}>
       {error && <p role="alert" className="cc-message">{error}</p>}
-      {!orgs.length ? <p className="cc-empty">{t.denied}</p> : (
+      {error ? null : denied ? <p className="cc-empty">{t.denied}</p> : !orgs.length ? <p className="cc-empty">{t.noOrganizations}</p> : (
         <>
           <div className="cc-toolbar"><label>{t.search}<input type="search" value={query} onChange={(e) => setQuery(e.target.value)} /></label></div>
           <ul className="cc-cards">

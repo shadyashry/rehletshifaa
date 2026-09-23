@@ -19,6 +19,7 @@ const setupRoutes = {
   "/admin/providers/org-a/clinicians/prac-1/readiness": readiness(),
   "/admin/providers/org-a/clinicians/prac-1/credential-requirements": [{ type: "MEDICAL_LICENSE", displayName: "Medical licence", mandatory: true, expiryRequired: true }],
   "/admin/providers/org-a/clinicians/prac-1/credentials": [],
+  "/admin/providers/org-a/clinicians/prac-1/profile": { registrationNumber: null, specialty: null, subspecialty: null, qualifications: null, jurisdiction: "EG", version: 4 },
 };
 beforeEach(() => { auth.roles = []; vi.mocked(apiFetchAs).mockImplementation(fakeApi(setupRoutes, caps)); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
@@ -82,10 +83,58 @@ describe("Add consultant wizard — resume", () => {
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/providers/org-a/clinicians/prac-1/profile", expect.objectContaining({ method: "PUT", body: expect.stringContaining("\"version\":4") })));
   });
 
-  it("keeps activation disabled until the backend says the consultant is ready", async () => {
+  it("reads saved professional details back, edits them in place and never blanks untouched fields", async () => {
+    const saved = { registrationNumber: "EG-12345", specialty: "Cardiology", subspecialty: null, qualifications: "MD, FRCP", jurisdiction: "EG", version: 6 };
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...setupRoutes, "/admin/providers/org-a/clinicians/prac-1/readiness": readiness({ clinicianProfileComplete: true }), "/admin/providers/org-a/clinicians/prac-1/profile": saved }, caps));
+    render(<ConsultantOnboardingWizard locale="en" organizationId="org-a" practitionerId="prac-1" initialStep="professional" />);
+    const summary = await screen.findByLabelText("Saved professional details");
+    expect(within(summary).getByText("EG-12345")).toBeVisible();
+    expect(screen.queryByText(/Saved values aren't shown/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit details" }));
+    const form = screen.getByRole("form", { name: "Professional details" });
+    expect(within(form).getByLabelText(/registration number/)).toHaveValue("EG-12345");
+    expect(within(form).getByLabelText(/Qualifications/)).toHaveValue("MD, FRCP");
+    fireEvent.change(within(form).getByLabelText(/Sub-speciality/), { target: { value: "Interventional" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save professional details" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/providers/org-a/clinicians/prac-1/profile", expect.objectContaining({ method: "PUT" })));
+    const put = vi.mocked(apiFetchAs).mock.calls.find(([, path, init]) => path === "/admin/providers/org-a/clinicians/prac-1/profile" && init?.method === "PUT")!;
+    expect(JSON.parse(String(put[2]!.body))).toEqual({ registrationNumber: "EG-12345", specialty: "Cardiology", subspecialty: "Interventional", qualifications: "MD, FRCP", jurisdiction: "EG", version: 6 });
+  });
+
+  it("does not offer the professional details form until the saved values could be read", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...setupRoutes, "/admin/providers/org-a/clinicians/prac-1/profile": new Response(JSON.stringify({ code: "SERVICE_UNAVAILABLE", message: "down" }), { status: 503 }) }, caps));
+    render(<ConsultantOnboardingWizard locale="en" organizationId="org-a" practitionerId="prac-1" initialStep="professional" />);
+    expect(await screen.findByText(/temporarily unavailable/)).toBeVisible();
+    expect(screen.queryByRole("form", { name: "Professional details" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+  });
+
+  it("keeps activation disabled with named blockers while achievable prerequisites remain", async () => {
     render(<ConsultantOnboardingWizard locale="en" organizationId="org-a" practitionerId="prac-1" initialStep="review" />);
     expect(await screen.findByRole("button", { name: "Activate consultant" })).toBeDisabled();
+    expect(screen.getByText("Not ready to activate")).toBeVisible();
     expect(screen.getAllByText("Needs action").length).toBeGreaterThan(0);
+  });
+
+  it("shows 'Activation isn't available yet' — with no activate button — when commercial acceptance is not in this release", async () => {
+    const blocked = readiness({ clinicianProfileComplete: true, requiredCredentialsSubmitted: true, requiredCredentialsVerified: true, mandatoryCredentialsUnexpired: true, pricingSetupComplete: true, availabilitySetupComplete: true, credentialReady: true, blockers: [{ code: "COMMERCIAL_ACCEPTANCE_MISSING", message: "Required commercial or legal acceptance is missing." }] });
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...setupRoutes, "/admin/providers/org-a/clinicians/prac-1/readiness": blocked }, caps));
+    render(<ConsultantOnboardingWizard locale="en" organizationId="org-a" practitionerId="prac-1" initialStep="review" />);
+    expect(await screen.findByText("Activation isn't available yet")).toBeVisible();
+    expect(screen.getByText(/That step isn't available in the current release/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Activate consultant" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Needs action")).not.toBeInTheDocument();
+    expect(screen.getByText("Setup complete — activation isn't available yet")).toBeVisible();
+  });
+
+  it("still offers real activation, behind a confirmation, when the backend says the consultant is ready", async () => {
+    const ready = readiness({ clinicianProfileComplete: true, requiredCredentialsSubmitted: true, requiredCredentialsVerified: true, mandatoryCredentialsUnexpired: true, pricingSetupComplete: true, availabilitySetupComplete: true, credentialReady: true, blockers: [], readyForActivation: true });
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...setupRoutes, "/admin/providers/org-a": { ...providerDetail, organization: { ...organization, status: "ACTIVE" } }, "/admin/providers/org-a/clinicians/prac-1/readiness": ready, "POST /admin/providers/org-a/clinicians/prac-1/activate?version=4": ready }, caps));
+    render(<ConsultantOnboardingWizard locale="en" organizationId="org-a" practitionerId="prac-1" initialStep="review" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Activate consultant" }));
+    expect(screen.getByText(/becomes eligible to receive cases/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Yes, activate consultant" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/providers/org-a/clinicians/prac-1/activate?version=4", expect.objectContaining({ method: "POST" })));
   });
 
   it("derives the resume step from backend readiness only", () => {

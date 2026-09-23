@@ -1,5 +1,35 @@
 # Platform Control Plane — implementation status
 
+## UX-1 — truthfulness & safety — 2026-09-23 (Claude Code)
+
+Scope stayed inside UX-1: no UX-2 navigation redesign, no Provider Workspace, no Journey enablement, no Phase 8C/8D.
+Full record: [ux-1-truthfulness-safety-status.md](ux-1-truthfulness-safety-status.md). P0-9 gate:
+[provider-persona-data-access-matrix.md](provider-persona-data-access-matrix.md).
+
+- **P0-1:** provider people see a truthful interim landing listing the Control Center areas their own capabilities open, never "no portal role".
+- **P0-2:** clinician and organization activation follow Decision D. Case 3 is "Activation isn't available yet" with no button. Backend gates unchanged.
+- **P0-3:** evaluation-only cases are never offered Assign/Reassign; the dialog points to the Staff Portal Transfer. Audit corrected: the backend refuses these commands in SHADOW mode rather than ignoring them.
+- **P0-4:** Access shows identity-system workspaces (read-only) apart from business access.
+- **P0-5:** professional details read back and edit in place.
+- **P0-6:** the dead `PAY_DEPOSIT` button is removed.
+- **P0-7:** consequence confirmations for price retire, direct approval, credential reject/suspend and journey retire; consequence copy for access removal and staff disable.
+- **P0-8:** a distinct error taxonomy; re-authentication explained before and after the sign-in round trip.
+- **P0-10:** credential review shows the submitted facts separately from the evidence and the independent decision; expired credentials never show as verified.
+- **New Critical defect found and fixed (fourth approved read):** `/admin/access/me` returned only `access.*` decisions at platform scope, so every other capability-gated area showed "no access" to authorized users. It now reports the caller's own capabilities at the platform and the organizations of their active assignments: self-only, read-only, bounded, navigation-only.
+- **Backend (read-only additions, no migration):**
+  - `GET /admin/access/me` (capability read)
+  - `GET /admin/access/workspace-roles`
+  - `GET /admin/providers/{org}/clinicians/{id}/profile`
+  - `submittedFacts` / `reviewedBy` / `reviewedAt` on the credential review read
+- **Verification:**
+  - Frontend typecheck clean; **272 tests / 40 files**.
+  - Backend **492 tests / 55 suites, 0 failures, 0 errors, 1 intentional skip**. The first full run hit the known cross-context outbox scheduler race recorded in Phase 8B; the suite passes alone and the rerun is clean.
+  - Flyway V1–V50.
+  - Rendered sanity on the rebuilt tunnel stack: 6/6 changed flows.
+
+### UX-1 COMPLETE: YES
+### UX-2 READY: YES — start only when separately authorized
+
 ## UX-0 — platform experience design freeze — 2026-09-23 (Claude Code)
 
 Documentation only; no application code changed. Phase 8C not started; Journey production intake OFF.

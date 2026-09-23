@@ -56,3 +56,16 @@ describe("Pricing management", () => {
     expect(await screen.findByText(/You do not have access/)).toBeVisible();
   });
 });
+
+describe("Retiring a live price", () => {
+  it("states the consequence and sends nothing until confirmed", async () => {
+    mockApi(["price_list.view", "price_list.publish"], [orgPrice]);
+    render(<PricingManagement locale="en" organizationId="org-a" practitionerId="prac-1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Retire" }));
+    expect(screen.getByText(/won't be used for new estimates or quotes/)).toBeVisible();
+    expect(screen.getByText(/Proposals already sent to patients keep the price/)).toBeVisible();
+    expect(apiFetchAs).not.toHaveBeenCalledWith("test", expect.stringContaining("/retire"), expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: "Yes, retire price" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", expect.stringContaining("/prices/price-org/retire?revision=0"), expect.objectContaining({ method: "POST" })));
+  });
+});

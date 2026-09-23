@@ -190,7 +190,7 @@ export function CareAreaTemplates({ locale, api, editable }: { locale: Locale; a
 export function DirectApproval({ locale, api, practitionerId, status, editable, onChanged }: { locale: Locale; api: AdminApi; practitionerId: string; status?: string; editable: boolean; onChanged: () => void }) {
   const ar = locale === "ar";
   const [busy, setBusy] = useState(false); const [error, setError] = useState<unknown>(null); const [notice, setNotice] = useState("");
-  const [reason, setReason] = useState(""); const [rejecting, setRejecting] = useState(false); const [touched, setTouched] = useState(false);
+  const [reason, setReason] = useState(""); const [rejecting, setRejecting] = useState(false); const [approving, setApproving] = useState(false); const [touched, setTouched] = useState(false);
   const run = async (work: () => Promise<unknown>, done: string) => { setBusy(true); setError(null); setNotice(""); try { await work(); setNotice(done); onChanged(); return true; } catch (e) { setError(e); return false; } finally { setBusy(false); } };
   if (!editable) return <p className="cc-meta">{ar ? "وصول للقراءة فقط." : "Read-only access."}</p>;
   return (
@@ -210,9 +210,15 @@ export function DirectApproval({ locale, api, practitionerId, status, editable, 
       </form>
       <h3 style={{ marginTop: 28 }}>{ar ? "٢. قرار الاعتماد للحالات" : "2. Case approval decision"}</h3>
       <p className="cc-meta">{ar ? "الموافقة تجعل الاستشاري متاحًا للتعيين على الحالات. الرفض يتطلب سببًا." : "Approving makes the consultant available for case assignment. Rejecting needs a reason."}{status ? <> · {ar ? "الحالة الحالية" : "Current"}: {status}</> : null}</p>
-      {!rejecting ? (
+      {approving ? (
+        <div className="cc-card" role="group" aria-label={ar ? "تأكيد الاعتماد للحالات" : "Confirm case approval"}>
+          <p><strong>{ar ? "اعتماد هذا الاستشاري لاستقبال الحالات؟" : "Approve this consultant to receive cases?"}</strong></p>
+          <p>{ar ? "بعد الاعتماد قد يصبح الاستشاري مؤهلًا للتعيين على حالات فعلية متى استوفى بقية الشروط. تأكد أولًا من أن اعتماداته الموثّقة مسجّلة." : "After approval, this consultant may become eligible for live case assignment when all other requirements are satisfied. Make sure their verified credentials are recorded first."}</p>
+          <div className="cc-form-actions"><button type="button" disabled={busy} onClick={() => void run(() => api(`/admin/practitioners/${practitionerId}/decision?approved=true`, json("POST")), ar ? "تم اعتماد الاستشاري للحالات." : "Consultant approved for cases.").then((ok) => { if (ok) setApproving(false); })}>{ar ? "نعم، اعتمده للحالات" : "Yes, approve for cases"}</button><button type="button" className="cc-secondary" onClick={() => setApproving(false)}>{ar ? "إلغاء" : "Cancel"}</button></div>
+        </div>
+      ) : !rejecting ? (
         <div className="cc-form-actions">
-          <button type="button" disabled={busy} onClick={() => void run(() => api(`/admin/practitioners/${practitionerId}/decision?approved=true`, json("POST")), ar ? "تم اعتماد الاستشاري للحالات." : "Consultant approved for cases.")}>{ar ? "اعتماد للحالات" : "Approve for cases"}</button>
+          <button type="button" disabled={busy} onClick={() => setApproving(true)}>{ar ? "اعتماد للحالات…" : "Approve for cases…"}</button>
           <button type="button" className="cc-secondary cc-danger-button" disabled={busy} onClick={() => setRejecting(true)}>{ar ? "رفض…" : "Reject…"}</button>
         </div>
       ) : (

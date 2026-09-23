@@ -66,6 +66,13 @@ describe("MyCare", () => {
     expect(screen.getAllByRole("button", { name: /^message$/i })).toHaveLength(1);
   });
 
+  it("never shows a 'pay deposit' button that has nothing behind it, even if an online-payment step code arrives", () => {
+    renderCare({ actions: focus("PAY_DEPOSIT"), deposit: { status: "REQUESTED", currency: "USD", totalDisplay: 500, paidDisplay: null } });
+    const deposit = screen.getByRole("region", { name: "Deposit" });
+    expect(within(deposit).queryByRole("button")).toBeNull();
+    expect(screen.queryByText(/Pay deposit/i)).toBeNull();
+  });
+
   it("once the deposit is confirmed it reads as received and the stale step is gone", () => {
     renderCare({ actions: wait("WAIT_COORDINATION"), deposit: { status: "PAID", currency: "USD", totalDisplay: 500, paidDisplay: 500 } });
     const deposit = screen.getByRole("region", { name: "Deposit" });
