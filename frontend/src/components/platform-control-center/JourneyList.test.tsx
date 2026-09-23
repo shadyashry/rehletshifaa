@@ -44,7 +44,9 @@ describe("Journey list", () => {
   it("renders a recoverable error without stale data", async () => {
     vi.mocked(apiFetchAs).mockRejectedValue(new Error("boom"));
     render(<JourneyList locale="en" />);
-    expect(await screen.findByRole("alert")).toBeVisible();
+    // The page's own error, plus the shell's truthful "sections couldn't be loaded" (never "no access").
+    expect((await screen.findAllByRole("alert")).some((a) => a.textContent === "boom")).toBe(true);
+    expect(screen.getByText("Some sections couldn't be loaded.")).toBeVisible();
     expect(screen.getByRole("button", { name: /Refresh/ })).toBeEnabled();
   });
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
-import { ControlCenterShell, ccCrumbs } from "./ControlCenterShell";
+import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import { ccHref } from "./control-center-nav";
@@ -49,7 +49,7 @@ export function ConsultantOnboardingWizard({ locale, organizationId, practitione
   const ar = locale === "ar";
   const { user, loading: authLoading, signIn } = useAuth();
   const title = ar ? "إضافة استشاري" : "Add consultant";
-  const crumbs = ccCrumbs(locale, { label: ar ? "الاستشاريون" : "Consultants", href: ccHref(locale, "/providers/consultants") }, { label: title });
+  const crumbs = [{ label: title }];
   if (authLoading) return <ControlCenterShell locale={locale} active="consultants" crumbs={crumbs} title={title}><p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p></ControlCenterShell>;
   if (!user) return <ControlCenterShell locale={locale} active="consultants" crumbs={crumbs} title={title}><button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button></ControlCenterShell>;
   if (!organizationId || !practitionerId) return <NewConsultant locale={locale} initialOrg={initialOrg} />;
@@ -110,7 +110,7 @@ function NewConsultant({ locale, initialOrg }: { locale: Locale; initialOrg?: st
 
   const steps = stepCopy(locale);
   const title = ar ? "إضافة استشاري" : "Add consultant";
-  const crumbs = ccCrumbs(locale, { label: ar ? "الاستشاريون" : "Consultants", href: ccHref(locale, "/providers/consultants") }, { label: title });
+  const crumbs = [{ label: title }];
   const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="consultants" crumbs={crumbs} title={title} intro={ar ? "أربع خطوات قصيرة. يُحفظ كل ما تدخله فورًا، ويمكنك المتابعة لاحقًا." : "Four short steps. Everything you enter is saved as you go, so you can finish later."}>{body}</ControlCenterShell>;
   if (access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!canProvider && !canDirect) return shell(<EmptyState title={ar ? "لا يمكنك إضافة استشاريين" : "You can't add consultants"} body={ar ? "اطلب من مسؤول الوصول صلاحية دعوة الأطباء." : "Ask your access administrator for permission to invite clinicians."} />);
@@ -191,7 +191,7 @@ function ResumeSetup({ locale, organizationId, practitionerId, initialStep }: { 
   const steps = stepCopy(locale);
   const name = member ? personName(member, locale) : "";
   const title = name ? (ar ? `إعداد ${name}` : `Set up ${name}`) : (ar ? "إعداد الاستشاري" : "Consultant setup");
-  const crumbs = ccCrumbs(locale, { label: ar ? "الاستشاريون" : "Consultants", href: ccHref(locale, "/providers/consultants") }, ...(name ? [{ label: name, href: consultantHref(locale, organizationId, practitionerId) }] : []), { label: ar ? "الإعداد" : "Setup" });
+  const crumbs = [...(name ? [{ label: name, href: consultantHref(locale, organizationId, practitionerId) }] : []), { label: ar ? "الإعداد" : "Setup" }];
   const go = (s: WizardStep) => { setStep(s); setNotice(""); router.replace(setupHref(locale, organizationId, practitionerId, s), { scroll: false }); requestAnimationFrame(() => document.getElementById("wizard-step-title")?.focus()); };
   const index = STEPS.indexOf(step);
   const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="consultants" crumbs={crumbs} title={title} intro={ar ? "يُحفظ كل قسم فور حفظه. يمكنك المتابعة لاحقًا من صفحة الاستشاري." : "Each section saves as soon as you save it. You can finish later from the consultant's page."}>{body}</ControlCenterShell>;
@@ -251,7 +251,7 @@ function ResumeSetup({ locale, organizationId, practitionerId, initialStep }: { 
             {issuesFor(readiness, "working", locale).some((i) => i.code === "ROUTING_INCOMPLETE") && access.canAny(["assignment.policy.view"]) && <p className="cc-meta"><Link href={ccHref(locale, "/coordination")}>{ar ? "افتح تنسيق الرعاية لضبط التوجيه" : "Open Care coordination to set routing"}</Link></p>}
             <SectionTabs attentionLabel={locale === "ar" ? "يحتاج إجراء" : "needs attention"} label={steps.working.title} active={workTab} onChange={setWorkTab} tabs={[
               { key: "pricing", label: ar ? "الأسعار" : "Pricing", attention: !!readiness && readiness.pricingSetupRequired && !readiness.pricingSetupComplete },
-              { key: "availability", label: ar ? "المواعيد المتاحة" : "Availability", attention: !!readiness && readiness.availabilitySetupRequired && !readiness.availabilitySetupComplete },
+              { key: "availability", label: ar ? "الجدول" : "Schedule", attention: !!readiness && readiness.availabilitySetupRequired && !readiness.availabilitySetupComplete },
             ]} />
             <TabPanel id={workTab}>
               {workTab === "pricing" ? <PricingManagement locale={locale} organizationId={organizationId} practitionerId={practitionerId} onChanged={() => void reload()} />

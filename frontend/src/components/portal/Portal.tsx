@@ -25,10 +25,11 @@ import { RequestInformationDialog } from "@/components/portal/RequestInformation
 import { MyWork, waitingLabel, type WorkItem } from "@/components/portal/MyWork";
 import { NotificationBell } from "@/components/portal/NotificationBell";
 import { AccountLinkRequest } from "@/components/portal/AccountLinkRequest";
-import { IdentityReviewQueue } from "@/components/portal/PortalDirectories";
 import { ccHref } from "@/components/platform-control-center/control-center-nav";
+import { useControlCenterEntry } from "@/components/platform-control-center/ControlCenterNavigation";
 import type { Locale } from "@/lib/i18n";
-import { portalRoles, type PortalRoleKey as RoleKey } from "@/lib/portal-role-access";
+import { CONTROL_CENTER_ROLES, legacyAdministration, portalRoles, type PortalRoleKey as RoleKey } from "@/lib/portal-role-access";
+import { useRouter } from "next/navigation";
 import { apiFetchAs, SITE_URL } from "@/lib/api";
 import { scrollIntoView } from "@/lib/scroll";
 
@@ -62,9 +63,6 @@ export async function refreshAfterRejectedAction(path:string,workspace:Workspace
  if(path.endsWith("/claim")){await refresh();return;}
  await refresh();if(workspace)await reopen(workspace.caseSummary);
 }
-type Api=<T,>(path:string,init?:RequestInit)=>Promise<T>;
-type CommercialPolicy={id:string;name:string;careCategory?:string;marginRate:number;active:boolean;version:number;createdBy?:string;validFrom?:string};
-type DepositPolicy={id:string;name:string;careCategory?:string;coordinationDepositEgp:number;active:boolean;version:number;createdBy?:string;validFrom?:string};
 
 function normalizeCases(rows:(CaseView|StaffCaseResponse)[]):CaseView[]{return rows.map(row=>"caseSummary" in row?{...row.caseSummary,assignmentId:row.assignmentId,assignmentStatus:row.assignmentStatus,openTaskCount:row.openTaskCount,overdueTaskCount:row.overdueTaskCount,documentCount:row.documentCount}:row);}
 // Display labels for currencies the doctor can view/quote in (EGP is the base).
@@ -76,7 +74,13 @@ const copy={
 };
 
 export function Portal({locale}:{locale:Locale}){
-  const t=copy[locale];const{user,roles,loading,signIn,signOut}=useAuth();const available=useMemo(()=>portalRoles(roles),[roles]);
+  const t=copy[locale];const{user,roles,loading,signIn,signOut}=useAuth();
+  // Case workspaces only. Administration and identity checks are Control Center work: an account with nothing else
+  // lands there directly, and everyone else reaches it from the account menu.
+  const available=useMemo(()=>portalRoles(roles).filter(role=>!CONTROL_CENTER_ROLES.includes(role)),[roles]);
+  const controlCenterOnly=!!user&&!available.length&&portalRoles(roles).length>0;
+  const controlCenter=useControlCenterEntry(locale);const router=useRouter();
+  useEffect(()=>{if(controlCenterOnly)router.replace(ccHref(locale));},[controlCenterOnly,router,locale]);
   const[active,setActive]=useState<RoleKey|undefined>();const[cases,setCases]=useState<CaseView[]>([]);const[myTasks,setMyTasks]=useState<Task[]>([]);const[workspace,setWorkspace]=useState<Workspace|null>(null);const[documents,setDocuments]=useState<CaseDocument[]>([]);const[doctors,setDoctors]=useState<VerifiedDoctor[]>([]);const[categories,setCategories]=useState<CareCategory[]>([]);const[staff,setStaff]=useState<StaffMember[]>([]);const[share,setShare]=useState<{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null>(null);const[doctorProfile,setDoctorProfile]=useState<DoctorProfile|null>(null);const[coordinatorProfile,setCoordinatorProfile]=useState<StaffProfile|null>(null);const[catalog,setCatalog]=useState<CatalogService[]>([]);const[fxRates,setFxRates]=useState<FxRate[]>([]);const[busy,setBusy]=useState(false);const[notice,setNotice]=useState("");const[error,setError]=useState("");
   const [preferences,setPreferences]=useState<Preferences>({displayName:null,locale:null});
   const [queueState,setQueueState]=useState<QueueState>(initialQueue);
@@ -161,6 +165,7 @@ export function Portal({locale}:{locale:Locale}){
     finally{mutationPending.current=false;setBusy(false);}
   }
   if(loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
+  if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح مركز التحكم…":"Opening the Control Center…"}/>;
   if(!user)return <PortalFrame title={t.title} subtitle={t.subtitle}><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]"><div className="card p-6 sm:p-8"><p className="eyebrow">{locale==="ar"?"مساحة خاصة ومحمية":"Private, protected space"}</p><h2 className="title mt-3">{locale==="ar"?"سجّل الدخول للوصول إلى حالتك":"Sign in to open your case"}</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-ink-600">{locale==="ar"?"للمرضى الذين أكملوا ملفهم وفعّلوا حسابهم، وللفريق الطبي والتنسيقي. بعد الدخول تصل مباشرة إلى حالتك الحالية وخطوتها التالية.":"For patients who completed their profile and set up their account, and for the care team. After signing in you land directly on your current case and its next step."}</p><div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn-primary" onClick={()=>void signIn()}>{t.signIn}</button><a className="btn-secondary" href={locale==="ar"?"/en/portal":"/ar/portal"} lang={locale==="ar"?"en":"ar"}>{locale==="ar"?"English":"العربية"}</a></div><p className="mt-5 border-t border-line pt-4 text-sm leading-6 text-ink-500">{locale==="ar"?"أرسلت حالتك ولم تفعّل حسابك بعد؟ ":"Sent a case but haven't set up your account yet? "}<a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/track-case`}>{locale==="ar"?"تابع حالتك عبر الرابط الآمن":"Check your case status with your secure link"}</a>{locale==="ar"?" — أما الحساب فتُنشئه عند إكمال ملفك بعد قبول العرض.":" — your account is created when you complete your profile after accepting a proposal."}</p></div><aside className="surface-muted p-6"><h2 className="font-bold text-brand-900">{locale==="ar"?"حماية الوصول":"Secure access"}</h2><ul className="mt-4 space-y-3 text-sm leading-6 text-ink-600"><li>✓ {locale==="ar"?"تسجيل دخول موحّد وآمن":"Secure single sign-on"}</li><li>✓ {locale==="ar"?"صلاحيات منفصلة لكل دور":"Role-specific access"}</li><li>✓ {locale==="ar"?"المستندات الطبية ليست عامة":"Medical files are never public"}</li></ul><p className="mt-5 border-t border-line pt-4 text-xs leading-5 text-ink-500">{locale==="ar"?"إذا لم تتمكن من الدخول، تواصل مع منسقك أو مسؤول النظام دون مشاركة كلمة المرور.":"If you cannot sign in, contact your coordinator or system administrator without sharing your password."}</p></aside></div></PortalFrame>;
   const profile=user.profile as {name?:string;preferred_username?:string;email?:string;sub?:string};
   const accountName=profile.name??profile.preferred_username??profile.email??profile.sub??"";
@@ -174,7 +179,7 @@ export function Portal({locale}:{locale:Locale}){
   return <PortalFrame title={isPatientRole?(locale==="ar"?"رعايتي":"My Care"):currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>void openCaseById(caseId)}/>}
     {isPatientRole&&workspace&&<PatientNav locale={locale} view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
-    <PortalAccount locale={locale} name={displayName} email={profile.email} role={currentRole?roleLabel(currentRole,locale):""} api={api} signOut={signOut} preferences={preferences} onSaved={value=>{setPreferences(value);setNotice(t.success);}} patient={isPatientRole}/>
+    <PortalAccount locale={locale} name={displayName} email={profile.email} role={currentRole?roleLabel(currentRole,locale):""} api={api} signOut={signOut} preferences={preferences} onSaved={value=>{setPreferences(value);setNotice(t.success);}} patient={isPatientRole} controlCenter={controlCenter}/>
     {available.length>1&&<div className="mb-8 flex flex-wrap gap-2">{available.map(role=><button key={role} className={currentRole===role?"btn-primary":"btn-secondary"} onClick={()=>{setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}}>{roleLabel(role,locale)}</button>)}</div>}
     <ReauthenticationReturnNotice locale={locale} className="mb-4 rounded-xl bg-brand-50 p-4 text-brand-800"/>
     {!available.length&&<NoPortalWorkspace locale={locale}/>}
@@ -182,31 +187,18 @@ export function Portal({locale}:{locale:Locale}){
     {notice&&<p role="status" className="mb-4 rounded-xl bg-brand-50 p-4 text-brand-800">{notice}</p>}{error&&<div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-alert-50 p-4 text-alert-800"><span>{error}</span><button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.82rem]" onClick={()=>{setError("");void refresh();}}>{locale==="ar"?"إعادة المحاولة":"Retry"}</button></div>}
     {busy&&workspace&&<p role="status" className="mb-3 text-sm text-ink-500">{t.loading}</p>}
     {documentError&&workspace&&<p role="alert" className="mb-4 rounded-xl bg-alert-50 p-4 text-sm text-alert-800">{locale==="ar"?"تعذّر تحميل المستندات.":"Documents could not be loaded."} <button className="link-cta" onClick={()=>void openCase(workspace.caseSummary)}>{locale==="ar"?"إعادة المحاولة":"Retry"}</button></p>}
-    {currentRole === "admin"
-      ? <AdminHandoff locale={locale}/>
-      : currentRole==="identity" ? <IdentityReviewQueue api={api} locale={locale}/>
-      : workspace
+    {workspace
         ? <WorkspaceView locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={roles.includes("COORDINATOR_LEAD")} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={openCaseById}/>
         : isPatientRole ? (queueLoading||(!landed&&roles.some(r=>["PATIENT","PATIENT_REPRESENTATIVE"].includes(r)))||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)
         : null}
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div hidden={!!workspace}><Queue queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={roles.includes("COORDINATOR_LEAD")} openCase={openCase} mutate={mutate}/></div>}
-    {currentRole==="finance"&&!workspace&&roles.some(role=>["FINANCE_LEAD","SYSTEM_ADMIN"].includes(role))&&<details className="card mt-8 p-5"><summary className="cursor-pointer font-bold">{locale==="ar"?"السياسات المالية":"Financial policies"}</summary><FinancePolicies api={api} locale={locale}/></details>}
+
+    {currentRole==="finance"&&!workspace&&legacyAdministration(roles).financePolicy&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
   </PortalFrame>;
 }
 
-/** Administration now lives in the Control Center; the portal role is a single, clear way in. */
-function AdminHandoff({locale}:{locale:Locale}){
- const ar=locale==="ar";
- const links:[string,string,string][]=[["/providers/consultants",ar?"الاستشاريون":"Consultants",ar?"أضف الاستشاريين وتابع إعدادهم.":"Add consultants and follow their setup."],["/credentials",ar?"مراجعة الاعتمادات":"Credential reviews",ar?"التراخيص التي تنتظر قرارًا.":"Licences waiting for a decision."],["/team",ar?"الموظفون والفرق":"Staff & teams",ar?"ادعُ الموظفين وحدّد قادة الفرق.":"Invite staff and set team leads."],["/commercial/pricing",ar?"الأسعار":"Pricing",ar?"قوائم الأسعار وأسعار الصرف.":"Price lists and exchange rates."]];
- return <section className="card max-w-3xl p-6 sm:p-8" aria-labelledby="admin-handoff-title">
-  <h2 id="admin-handoff-title" className="title">{ar?"الإدارة انتقلت إلى مركز التحكم":"Administration has moved to the Control Center"}</h2>
-  <p className="mt-2 text-sm leading-6 text-ink-600">{ar?"كل ما كان هنا — الاستشاريون والاعتمادات والموظفون والأسعار — أصبح في مساحة واحدة منظمة حسب المهمة.":"Everything that was here — consultants, credentials, staff and pricing — is now in one workspace organised by task."}</p>
-  <a className="btn-primary mt-5 inline-flex" href={ccHref(locale)}>{ar?"فتح مركز التحكم":"Open the Control Center"}</a>
-  <ul className="mt-6 grid gap-3 sm:grid-cols-2">{links.map(([path,label,hint])=><li key={path}><a className="block rounded-xl border border-line p-4 hover:bg-mist" href={ccHref(locale,path)}><strong className="block text-ink-900">{label}</strong><span className="text-sm text-ink-500">{hint}</span></a></li>)}</ul>
- </section>;
-}
 /** A signed-in patient with no case yet: one calm sentence and the one thing they can do. */
 function PatientNoCase({locale}:{locale:Locale}){
  const ar=locale==="ar";
@@ -745,34 +737,6 @@ export function RoleActions({role,t,c,proposal,gates,availableActions,locale,mut
  return null;
 }
 function ProposalCard({locale,t,proposal}:{locale:Locale;t:typeof copy.en;proposal:Proposal}){const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-xl bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>v{proposal.versionNumber} · {statusLabel(proposal.status,locale)}</strong><strong>{new Intl.NumberFormat(locale,{style:"currency",currency:proposal.currency}).format(total)}</strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?(locale==="ar"?" (اختياري)":" (optional)"):""}</span><strong className="whitespace-nowrap">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{locale==="ar"?"صالح حتى":"Valid until"} {new Intl.DateTimeFormat(locale).format(new Date(proposal.validUntil))}</p>}</div>}
-function FinancePolicies({api,locale}:{api:Api;locale:Locale}){
- const[commercial,setCommercial]=useState<CommercialPolicy[]>([]);const[deposits,setDeposits]=useState<DepositPolicy[]>([]);
- const[busy,setBusy]=useState(false);const[msg,setMsg]=useState("");const[err,setErr]=useState("");
- const g=locale==="ar"?{title:"الإعدادات التجارية (مالية عليا)",intro:"تُطبَّق هذه السياسات المركزية على الحالات الجديدة فقط، ولا تتغيّر بعد إصدار تقدير مبدئي. تتطلب مصادقة حديثة.",marginTitle:"سياسة الهامش (تُدمج في باقة المريض)",depositTitle:"سياسة الوديعة",careArea:"مجال الرعاية",default:"الافتراضي (الكل)",rate:"الهامش %",amount:"وديعة التنسيق (ج.م)",active:"نشِطة",version:"الإصدار",save:"حفظ إصدار جديد",saved:"تم الحفظ."}:{title:"Commercial settings (senior Finance)",intro:"These central policies apply to new cases only and never change after a preliminary estimate is released. Saving requires recent authentication.",marginTitle:"Margin policy (included in the patient package)",depositTitle:"Deposit policy",careArea:"Care area",default:"Default (all)",rate:"Margin %",amount:"Coordination deposit (EGP)",active:"Active",version:"Version",save:"Save new version",saved:"Saved."};
- const load=useCallback(async()=>{try{const[c,d]=await Promise.all([api<CommercialPolicy[]>("/finance/commercial-policies"),api<DepositPolicy[]>("/finance/deposit-policies")]);setCommercial(c);setDeposits(d);}catch(e){setErr(e instanceof Error?e.message:"Error");}},[api]);
- useEffect(()=>{void load();},[load]);
- const areas=["cardiology","rheumatology-rehabilitation","orthopedics"];
- const areaLabel=(a?:string)=>a?a:g.default;
- const run=async(fn:()=>Promise<unknown>)=>{setBusy(true);setErr("");setMsg("");try{await fn();setMsg(g.saved);await load();return true;}catch(e){setErr(e instanceof Error?e.message:"Error");return false;}finally{setBusy(false);}};
- return <section className="card mb-8 space-y-6 p-6">
-  <div><h2 className="title">{g.title}</h2><p className="mt-1 text-sm text-ink-500">{g.intro}</p></div>
-  {msg&&<p className="rounded-lg bg-brand-50 p-2 text-sm text-brand-800">{msg}</p>}{err&&<p className="rounded-lg bg-alert-50 p-2 text-sm text-alert-800">{err}</p>}
-  <div><h3 className="font-bold text-ink-800">{g.marginTitle}</h3>
-   <div className="mt-2 overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-xs uppercase tracking-wide text-ink-500"><th className="p-2 text-start">{g.careArea}</th><th className="p-2 text-end">{g.rate}</th><th className="p-2 text-end">{g.version}</th></tr></thead><tbody>{commercial.filter(p=>p.active).map(p=><tr key={p.id} className="border-t border-line"><td className="p-2">{areaLabel(p.careCategory)}</td><td className="p-2 text-end">{(p.marginRate*100).toFixed(2)}%</td><td className="p-2 text-end">v{p.version}</td></tr>)}</tbody></table></div>
-   <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void run(()=>api("/finance/commercial-policies",{method:"PUT",body:JSON.stringify({careCategory:String(d.get("area")||"")||undefined,marginRate:(Number(d.get("rate"))||0)/100})})).then(result=>{if(result)f.reset();});}}>
-    <label className="text-xs font-bold">{g.careArea}<select className="field w-52" name="area"><option value="">{g.default}</option>{areas.map(a=><option key={a} value={a}>{a}</option>)}</select></label>
-    <label className="text-xs font-bold">{g.rate}<input className="field w-24" name="rate" type="number" min="0" max="50" step="0.1" placeholder="12" required/></label>
-    <button className="btn-primary" disabled={busy}>{g.save}</button>
-   </form></div>
-  <div className="border-t border-line pt-4"><h3 className="font-bold text-ink-800">{g.depositTitle}</h3>
-   <div className="mt-2 overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-xs uppercase tracking-wide text-ink-500"><th className="p-2 text-start">{g.careArea}</th><th className="p-2 text-end">{g.amount}</th><th className="p-2 text-end">{g.version}</th></tr></thead><tbody>{deposits.filter(p=>p.active).map(p=><tr key={p.id} className="border-t border-line"><td className="p-2">{areaLabel(p.careCategory)}</td><td className="p-2 text-end">{new Intl.NumberFormat(locale).format(p.coordinationDepositEgp)} EGP</td><td className="p-2 text-end">v{p.version}</td></tr>)}</tbody></table></div>
-   <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void run(()=>api("/finance/deposit-policies",{method:"PUT",body:JSON.stringify({careCategory:String(d.get("area")||"")||undefined,coordinationDepositEgp:Number(d.get("amount"))||0})})).then(result=>{if(result)f.reset();});}}>
-    <label className="text-xs font-bold">{g.careArea}<select className="field w-52" name="area"><option value="">{g.default}</option>{areas.map(a=><option key={a} value={a}>{a}</option>)}</select></label>
-    <label className="text-xs font-bold">{g.amount}<input className="field w-32" name="amount" type="number" min="0" step="0.01" placeholder="3000" required/></label>
-    <button className="btn-primary" disabled={busy}>{g.save}</button>
-   </form></div>
- </section>;
-}
 function Panel({title,children,wide=false}:{title:string;children:React.ReactNode;wide?:boolean}){return <section className={`card mt-6 p-5 ${wide?"":""}`}><h3 className="title mb-4">{title}</h3><div className="space-y-3">{children}</div></section>}
 function Empty(){return <p className="text-ink-500">—</p>}
 function prettyCategory(slug:string,locale:Locale){const map:Record<string,{en:string;ar:string}>={cardiology:{en:"Cardiology",ar:"أمراض القلب"},"rheumatology-rehabilitation":{en:"Rehabilitation & Dysphagia",ar:"إعادة التأهيل والبلع"},orthopedics:{en:"Orthopedics",ar:"العظام"}};return map[slug]?.[locale]??slug.replace(/-/g," ").replace(/\b\w/g,ch=>ch.toUpperCase());}

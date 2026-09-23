@@ -7,13 +7,13 @@ import { useAuth } from "@/components/AuthProvider";
 import { apiFetchAs } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
-import { ccCopy, orgStatusLabel, orgTypeLabel } from "./control-center-copy";
+import { orgStatusLabel, orgTypeLabel } from "./control-center-copy";
 import { coordCopy } from "./coordination-copy";
 
 type OrganizationSummary = { id: string; displayName: string; type: string; status: string };
 
 export function CareCoordinationOrganizations({ locale }: { locale: Locale }) {
-  const t = coordCopy[locale]; const cc = ccCopy[locale];
+  const t = coordCopy[locale];
   const { user, loading: authLoading, signIn } = useAuth();
   const [orgs, setOrgs] = useState<OrganizationSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,14 +35,13 @@ export function CareCoordinationOrganizations({ locale }: { locale: Locale }) {
 
   const filtered = orgs.filter((o) => (o.displayName + " " + o.type).toLowerCase().includes(query.toLowerCase()));
 
-  const crumbs = [{ label: cc.breadcrumbHome, href: `/${locale}/portal/control-center` }, { label: t.navCoordination }];
   const actions = <button type="button" className="cc-secondary" disabled={loading} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden />{t.retry}</button>;
 
-  if (authLoading || loading) return <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={t.loading}><p role="status">{t.loading}</p></ControlCenterShell>;
-  if (!user) return <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={t.orgList}><button onClick={() => void signIn()}>{t.signin}</button></ControlCenterShell>;
+  if (authLoading || loading) return <ControlCenterShell locale={locale} active="coordination" title={t.navCoordination} intro={t.orgListIntro}><p role="status">{t.loading}</p></ControlCenterShell>;
+  if (!user) return <ControlCenterShell locale={locale} active="coordination" title={t.navCoordination} intro={t.orgListIntro}><button onClick={() => void signIn()}>{t.signin}</button></ControlCenterShell>;
 
   return (
-    <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={t.orgList} actions={actions}>
+    <ControlCenterShell locale={locale} active="coordination" title={t.navCoordination} intro={t.orgListIntro} actions={actions}>
       {error && <p role="alert" className="cc-message">{error}</p>}
       {error ? null : denied ? <p className="cc-empty">{t.denied}</p> : !orgs.length ? <p className="cc-empty">{t.noOrganizations}</p> : (
         <>

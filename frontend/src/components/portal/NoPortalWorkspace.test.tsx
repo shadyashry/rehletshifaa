@@ -22,7 +22,7 @@ describe("Signed-in account without a care-portal role (interim, until the Provi
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     // Discoverability only: nothing beyond the caller's own capability read is fetched — no case or patient data.
     expect(vi.mocked(apiFetchAs).mock.calls.map(([, path]) => path)).toEqual(["/admin/access/me"]);
-    expect(screen.queryByRole("link", { name: /Journey library|Roles|Staff/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Journeys|Roles|RehletShifaa Staff|Price Lists/ })).not.toBeInTheDocument();
   });
 
   it("tells an account with nothing set up the truth calmly, with the next step", async () => {

@@ -2,7 +2,7 @@ import type { Locale } from "@/lib/i18n";
 
 export const coordCopy = {
   en: {
-    navCoordination: "Care Coordination", orgList: "Choose a provider organization", noOrganizations: "No provider organizations are set up for care coordination yet.", search: "Find an organization",
+    navCoordination: "Coordination Setup", organization: "Organization", orgListIntro: "Choose an organization to set up its coordinator teams, routing rules and assignment queue.", orgList: "Choose a provider organization", noOrganizations: "No provider organizations are set up for care coordination yet.", search: "Find an organization",
     loading: "Loading…", denied: "You do not have access to this area.", error: "We could not complete this request. Refresh and try again.",
     signin: "Sign in securely", retry: "Refresh", back: "Back to Care Coordination", close: "Close", cancel: "Cancel", save: "Save", reason: "Reason",
 
@@ -75,7 +75,7 @@ export const coordCopy = {
     } as Record<string, string>,
   },
   ar: {
-    navCoordination: "تنسيق الرعاية", orgList: "اختر مؤسسة مقدم رعاية", noOrganizations: "لا توجد بعد مؤسسات مقدمي رعاية مُعدّة لتنسيق الرعاية.", search: "البحث عن مؤسسة",
+    navCoordination: "إعداد التنسيق", organization: "الجهة الطبية", orgListIntro: "اختر جهة لإعداد فرق المنسقين وقواعد التوجيه وقائمة الإسناد.", orgList: "اختر مؤسسة مقدم رعاية", noOrganizations: "لا توجد بعد مؤسسات مقدمي رعاية مُعدّة لتنسيق الرعاية.", search: "البحث عن مؤسسة",
     loading: "جارٍ التحميل…", denied: "ليس لديك وصول إلى هذه المساحة.", error: "تعذر إكمال الطلب. حدّث الصفحة وحاول مجددًا.",
     signin: "تسجيل الدخول الآمن", retry: "تحديث", back: "العودة إلى تنسيق الرعاية", close: "إغلاق", cancel: "إلغاء", save: "حفظ", reason: "السبب",
 

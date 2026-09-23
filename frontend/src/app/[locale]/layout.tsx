@@ -4,6 +4,7 @@ import { AnalyticsScripts } from "@/components/AnalyticsScripts";
 import { AuthProvider } from "@/components/AuthProvider";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { HideInControlCenter, SiteMain } from "@/components/nav/HideInControlCenter";
 import { getDictionary } from "@/lib/dictionary";
 import { fontVariables } from "@/lib/fonts";
 import { isLocale, locales } from "@/lib/i18n";
@@ -31,12 +32,16 @@ export default async function LocaleLayout({
       data-scroll-behavior="smooth"
     >
       <body>
-        <a href="#main" className="skip-link">
-          {d.common.skip}
-        </a>
-        <Header locale={locale} d={d} />
-        <AuthProvider><main id="main" tabIndex={-1}>{children}</main></AuthProvider>
-        <Footer locale={locale} d={d} />
+        <HideInControlCenter>
+          <a href="#main" className="skip-link">
+            {d.common.skip}
+          </a>
+          <Header locale={locale} d={d} />
+        </HideInControlCenter>
+        <AuthProvider><SiteMain>{children}</SiteMain></AuthProvider>
+        <HideInControlCenter>
+          <Footer locale={locale} d={d} />
+        </HideInControlCenter>
         <AnalyticsScripts />
       </body>
     </html>

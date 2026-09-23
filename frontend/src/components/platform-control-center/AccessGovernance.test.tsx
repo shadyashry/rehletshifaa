@@ -50,7 +50,7 @@ describe("Access & governance", () => {
   it("explains a denial in business words, found by person name rather than account identifier", async () => {
     render(<AccessGovernance locale="en" view="effective" />);
     fireEvent.change(await screen.findByLabelText(/Find a person/), { target: { value: "Mona" } });
-    fireEvent.click(within(await screen.findByRole("list", { name: "Results" })).getByRole("button", { name: "Select" }));
+    fireEvent.click(await within(await screen.findByRole("list", { name: "Results" })).findByRole("button", { name: "Select" }));
     expect(await screen.findByRole("heading", { name: "Mona Adel" })).toBeVisible();
     expect(screen.getAllByText("Not allowed").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText("Why can't they?"));
@@ -112,11 +112,15 @@ describe("Access & governance", () => {
   it("keeps an open panel when the access token silently renews (same subject, new object)", async () => {
     const { rerender } = render(<AccessGovernance locale="en" view="users" initialSubject="kc-manager" initialOrganization="org-a" />);
     expect(await screen.findByText("No RehletShifaa business roles assigned")).toBeVisible();
+    // Let the page finish its first loads (people directory, workspaces) so only a renewal-triggered read could follow.
+    await waitFor(() => expect(screen.queryAllByRole("status").filter((el) => /Loading|Checking/.test(el.textContent ?? ""))).toHaveLength(0));
+    await new Promise((r) => setTimeout(r, 50));
     vi.mocked(apiFetchAs).mockClear();
     auth.user = { access_token: "renewed", profile: { sub: "owner" } };
     rerender(<AccessGovernance locale="en" view="users" initialSubject="kc-manager" initialOrganization="org-a" />);
     expect(screen.getByText("No RehletShifaa business roles assigned")).toBeVisible();
-    expect(apiFetchAs).not.toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(vi.mocked(apiFetchAs).mock.calls.map(([, path]) => path)).toEqual([]);
   });
 });
 

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { ProviderOrganizations } from "./ProviderOrganizations";
-import { ControlCenterNavigation } from "./ControlCenterNavigation";
+import { useControlCenterEntry } from "./ControlCenterNavigation";
 import { apiFetchAs } from "@/lib/api";
 import { failure, fakeApi, organization } from "./test-support";
 
@@ -48,10 +48,10 @@ describe("Provider organizations list", () => {
 
   it("fails closed when the caller lacks provider.view", async () => {
     vi.mocked(apiFetchAs).mockImplementation(fakeApi({}, []));
-    const navigation = render(<ControlCenterNavigation locale="en" />);
+    const entry = renderHook(() => useControlCenterEntry("en"));
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalled());
-    expect(screen.queryByRole("link", { name: /Control Center/ })).not.toBeInTheDocument();
-    navigation.unmount();
+    expect(entry.result.current).toBeNull();
+    entry.unmount();
     render(<ProviderOrganizations locale="en" />);
     expect(await screen.findByText(/You do not have access/)).toBeVisible();
     expect(screen.queryByRole("button", { name: /Add organization/ })).not.toBeInTheDocument();

@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import "@testing-library/jest-dom/vitest";
 import { StaffAndTeams, DirectConsultantDetail } from "./CareOperationsPages";
 import { ConsultantDirectory } from "./ConsultantDirectory";
-import { PricingHub } from "./CommercialSetup";
+import { ExchangeRatesPage, PricingHub } from "./CommercialSetup";
 import { apiFetchAs } from "@/lib/api";
 import { fakeApi, organization, providerDetail } from "./test-support";
 
@@ -87,14 +87,18 @@ describe("Direct consultants (moved from the Administration console)", () => {
   });
 });
 
-describe("Commercial setup › Pricing", () => {
-  it("explains the price order visually and lets exchange rates be pinned", async () => {
+describe("Commercial › Price Lists and Exchange Rates", () => {
+  it("explains the price order visually, and Exchange Rates is its own page where a rate can be pinned", async () => {
     vi.mocked(apiFetchAs).mockImplementation(fakeApi(routes, ["price_list.view", "provider.view"]));
     render(<PricingHub locale="en" />);
     expect(await screen.findByText("1. Organization default")).toBeVisible();
     expect(screen.getByText("2. Consultant override")).toBeVisible();
     expect(screen.getByText("3. Associate doctor override")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Exchange rates" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Price Lists" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Exchange rates" })).not.toBeInTheDocument();
+    cleanup();
+    render(<ExchangeRatesPage locale="en" />);
+    expect(screen.getByRole("heading", { level: 1, name: "Exchange Rates" })).toBeVisible();
     const input = await screen.findByLabelText(/USD — EGP per unit/);
     fireEvent.change(input, { target: { value: "50" } });
     fireEvent.click(screen.getByRole("button", { name: "Save rate" }));

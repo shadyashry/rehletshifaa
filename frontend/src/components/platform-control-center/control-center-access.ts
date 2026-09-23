@@ -22,6 +22,9 @@ export function signInIsStale(authTime: unknown, now = Date.now()) {
 
 export type ControlCenterAccess = {
   loading: boolean;
+  /** The capability read itself failed (network or server error). Never shown as "no access". */
+  failed: boolean;
+  retry: () => void;
   decisions: Decision[];
   /** Exact backend capability key, fail-closed. */
   can: (permission: string) => boolean;
@@ -42,25 +45,29 @@ export function useControlCenterAccess(): ControlCenterAccess {
   const { user, roles } = useAuth();
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const token = user?.access_token;
   const subject = user?.profile?.sub;
   const signedIn = !!token;
   useEffect(() => {
     let live = true;
-    setDecisions([]);
+    setDecisions([]); setFailed(false);
     if (!token) { setLoading(false); return; }
     setLoading(true);
+    // 401/403 mean "no Control Center capabilities"; anything else is a failed read, not an access answer.
     void apiFetchAs(token, "/admin/access/me")
-      .then(async (r) => (r.ok ? (await r.json()) as Decision[] : []))
-      .catch(() => [] as Decision[])
-      .then((d) => { if (live) { setDecisions(Array.isArray(d) ? d : []); setLoading(false); } });
+      .then(async (r) => (r.ok ? { d: (await r.json()) as Decision[], bad: false } : { d: [] as Decision[], bad: r.status !== 401 && r.status !== 403 }))
+      .catch(() => ({ d: [] as Decision[], bad: true }))
+      .then(({ d, bad }) => { if (live) { setDecisions(Array.isArray(d) ? d : []); setFailed(bad); setLoading(false); } });
     return () => { live = false; };
     // Re-read on a new signed-in subject, not on every silent token renewal.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, signedIn]);
+  }, [subject, signedIn, attempt]);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const can = useCallback((permission: string) => decisions.some((d) => d.permission === permission && d.allowed), [decisions]);
   const canAny = useCallback((permissions: string[]) => permissions.some((p) => can(p)), [can]);
   const authTime = user?.profile?.auth_time;
   const needsFreshSignIn = useCallback((permission: string) => decisions.some((d) => d.permission === permission && d.allowed && d.recentAuthentication) && signInIsStale(authTime), [decisions, authTime]);
-  return { loading, decisions, can, canAny, needsFreshSignIn, legacy: legacyAdministration(roles ?? []) };
+  return { loading, failed, retry, decisions, can, canAny, needsFreshSignIn, legacy: legacyAdministration(roles ?? []) };
 }

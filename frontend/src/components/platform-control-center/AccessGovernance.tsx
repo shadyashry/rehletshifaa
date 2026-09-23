@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
 import { accessCopy, businessLabel, familyLabel, permissionLabel, roleLabel } from "./access-copy";
 import "./access-governance.css";
-import { ControlCenterShell, ccCrumbs } from "./ControlCenterShell";
+import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import { ccHref, type NavKey } from "./control-center-nav";
@@ -63,16 +63,18 @@ export function AccessGovernance({ locale, view: requested, initialTab, initialS
   const label = useCallback((key: string) => { const p = permissions.find((x) => x.key === key); return p ? permissionLabel(p, locale) : t.technical; }, [permissions, locale, t.technical]);
 
   const titles: Record<AccessView, [string, string, string, string]> = {
-    users: ["User access", "وصول المستخدمين", "Find a person, see what they can do, and give or remove access.", "ابحث عن شخص، واعرف ما يستطيع فعله، وامنح الوصول أو أزله."],
-    roles: ["Roles", "الأدوار", "Job roles define what people can do. Changes are drafted, checked and published by an independent reviewer.", "تحدد الأدوار الوظيفية ما يستطيع الأشخاص فعله. تُعد التغييرات كمسودة وتُفحص ثم ينشرها مراجع مستقل."],
-    effective: ["Effective access", "الوصول الفعلي", "Why a person can — or cannot — do something, explained by the platform itself.", "لماذا يستطيع الشخص — أو لا يستطيع — القيام بإجراء، كما تشرحه المنصة نفسها."],
-    permissions: ["Permissions", "الصلاحيات", "Everything a role can grant, grouped by area.", "كل ما يمكن أن يمنحه الدور، مجمّعًا حسب المجال."],
-    audit: ["Audit", "سجل التدقيق", "Every access change and decision, newest first.", "كل تغيير وقرار في الوصول، الأحدث أولًا."],
+    users: ["People", "الأشخاص", "Find a person, see their accounts and business access, and give or remove access.", "ابحث عن شخص، واعرض حساباته وصلاحياته في العمل، وامنح الصلاحيات أو أزلها."],
+    roles: ["Roles", "الأدوار", "What each business role allows and where it applies. Changes are drafted, checked and published by an independent reviewer.", "ما يسمح به كل دور وأين يُطبَّق. تُعد التغييرات كمسودة وتُفحص ثم ينشرها مراجع مستقل."],
+    effective: ["Access summary", "ملخص الصلاحيات", "Can this person…? The platform's own answer, and the reason for it.", "هل يستطيع هذا الشخص…؟ إجابة المنصة نفسها، وسببها."],
+    permissions: ["Permission reference", "مرجع الصلاحيات", "Everything a role can grant, grouped by area.", "كل ما يمكن أن يمنحه الدور، مجمّعًا حسب المجال."],
+    audit: ["Audit", "سجل التدقيق", "Every access change and decision, newest first.", "كل تغيير وقرار في الصلاحيات، الأحدث أولًا."],
   };
   const [en, arTitle, enIntro, arIntro] = titles[view];
   const title = ar ? arTitle : en;
-  const crumbs = ccCrumbs(locale, { label: t.title, href: ccHref(locale, "/access/users") }, { label: title });
-  const shell = (body: React.ReactNode, actions?: React.ReactNode) => <ControlCenterShell locale={locale} active={navFor[view]} crumbs={crumbs} title={title} intro={ar ? arIntro : enIntro} actions={actions}><div className="ag ag-embedded" dir={ar ? "rtl" : "ltr"}>{body}</div></ControlCenterShell>;
+  // One secondary way to each advanced page that no longer has its own sidebar line.
+  const secondary = view === "users" && can("access.effective_access.view") ? <Link className="cc-secondary" href={ccHref(locale, "/access/effective")}>{ar ? "ملخص الصلاحيات" : "Access summary"}</Link>
+    : view === "roles" ? <Link className="cc-secondary" href={ccHref(locale, "/access/permissions")}>{ar ? "مرجع الصلاحيات" : "Permission reference"}</Link> : null;
+  const shell = (body: React.ReactNode, actions?: React.ReactNode) => <ControlCenterShell locale={locale} active={navFor[view]} title={title} intro={ar ? arIntro : enIntro} actions={actions || secondary ? <>{actions}{secondary}</> : undefined}><div className="ag ag-embedded" dir={ar ? "rtl" : "ltr"}>{body}</div></ControlCenterShell>;
   if (authLoading || access.loading) return shell(<p role="status">{t.loading}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{t.signin}</button>);
   if (!canView) return shell(<EmptyState title={t.denied} />);

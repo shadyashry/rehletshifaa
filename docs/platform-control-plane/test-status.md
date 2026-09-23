@@ -1,5 +1,27 @@
 # Platform Control Plane — verification status
 
+## UX-2 shell & navigation verification — 2026-09-24 (Claude Code)
+
+- Frontend `pnpm typecheck` clean. `pnpm test` **299 tests / 43 files, 0 failures**, three consecutive full runs.
+- New suites: `ControlCenterShell` rewritten (personas A provider-only, B credential reviewer, C coordination manager,
+  D journey manager, E access administrator, F broad administrator, G mixed-role, plus schedule-only; disclosure
+  groups, active/parent state, no duplicate destinations, failed capability read + retry, IA breadcrumbs, top bar,
+  account menu, drawer focus/Escape, Arabic), `ControlCenterOverview` rewritten (attention only, direct links, all
+  caught up, persona-aware, failed and partial counts, failed capability read), `PageHeaders` (Margin & Deposit
+  unchanged body + non-lead refusal, stable h1, access titles and secondary actions, Clinicians/Schedules),
+  `PortalEntry` (Control-Center-only accounts land there, account-menu entry, no admin tab), `HideInControlCenter`.
+- Updated: `routes` (pricing → prices / exchange-rates), `CareOperations`, `ConsultantOnboardingWizard`, `JourneyList`,
+  `NoPortalWorkspace`, `ProviderOrganizations`, `AccessGovernance` (two load races made deterministic).
+- **Suite reliability:** the base (`c8272b5`) also failed 4 `findBy…` tests under parallel load on this machine.
+  `vitest.setup.ts` sets Testing Library's `asyncUtilTimeout` to 5 s and `testTimeout` to 20 s.
+- Backend not run: no backend file changed.
+- ESLint (touched files): only pre-existing findings remain; new-code findings fixed.
+- **Live sanity (limited, not Phase 8C):** canonical base+tunnel rebuild; temporary Playwright script (not committed),
+  synthetic session, mocked reads, writes refused. EN desktop Home + 7 areas, legacy pricing redirect, EN mobile
+  (drawer), AR desktop + mobile (drawer), journey-manager and reviewer Home: one `main`, no site header/footer, stable
+  h1, correct breadcrumbs, no horizontal overflow, no page errors (only the pre-existing Cloudflare beacon CSP refusal).
+  Screenshots in the session scratchpad only.
+
 ## UX-1 truthfulness & safety verification — 2026-09-23 (Claude Code)
 
 **Backend focused suites (all green):**

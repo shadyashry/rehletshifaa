@@ -38,7 +38,14 @@ describe("Old admin deep links keep working", () => {
 
   it("opens section landing pages on their first task", async () => {
     expect(await go(() => import("@/app/[locale]/portal/control-center/access/page"), { locale: "en" })).toBe("/en/portal/control-center/access/users");
-    expect(await go(() => import("@/app/[locale]/portal/control-center/commercial/page"), { locale: "en" })).toBe("/en/portal/control-center/commercial/pricing");
+    expect(await go(() => import("@/app/[locale]/portal/control-center/commercial/page"), { locale: "en" })).toBe("/en/portal/control-center/commercial/prices");
+  });
+
+  it("sends the former Pricing page to Price Lists (keeping its selection) and its rates view to Exchange Rates", async () => {
+    const pricing = () => import("@/app/[locale]/portal/control-center/commercial/pricing/page");
+    expect(await go(pricing, { locale: "en" }, { view: "rates" })).toBe("/en/portal/control-center/commercial/exchange-rates");
+    expect(await go(pricing, { locale: "ar" }, { view: "provider", org: "org-a", clinician: "p1" })).toBe("/ar/portal/control-center/commercial/prices?view=provider&org=org-a&clinician=p1");
+    expect(await go(pricing, { locale: "en" })).toBe("/en/portal/control-center/commercial/prices");
   });
 });
 

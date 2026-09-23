@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Languages, LogOut, Settings, X, ExternalLink } from "lucide-react";
+import { Languages, LayoutDashboard, LogOut, Settings, X, ExternalLink } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { OIDC_AUTHORITY } from "@/lib/api";
 
@@ -12,9 +12,11 @@ type Api = <T,>(path: string, init?: RequestInit) => Promise<T>;
 /** The patient's reusable account facts, exactly as the backend returns them — never anything from a case. */
 type PatientProfile = { givenName?: string | null; familyName?: string | null; displayName?: string | null; preferredName?: string | null; dateOfBirth?: string | null; country?: string | null; nationality?: string | null; preferredLanguage?: string | null; email?: string | null; emailVerified: boolean; whatsappNumber?: string | null; phoneVerified: boolean };
 
-export function PortalAccount({ locale, name, email, role, api, signOut, preferences, onSaved, patient = false }: {
+export function PortalAccount({ locale, name, email, role, api, signOut, preferences, onSaved, patient = false, controlCenter }: {
   locale: Locale; name: string; email?: string; role: string; api: Api;
   signOut: () => Promise<void>; preferences: Preferences; onSaved: (value: Preferences) => void; patient?: boolean;
+  /** The one persistent way into the Control Center, for people who can open at least one of its areas. */
+  controlCenter?: { href: string; label: string } | null;
 }) {
   // Profile & Security (patients): account facts, loaded when the dialog opens — separate from any case.
   const [profile, setProfile] = useState<PatientProfile | null>(null);
@@ -46,6 +48,7 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
       <summary aria-label={`${text.account}: ${name}`} className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full bg-brand-700 font-bold text-white ring-4 ring-brand-50">{name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase() || "•"}</summary>
       <div className="absolute end-0 top-14 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-white p-2 shadow-xl">
         <div className="border-b border-line px-3 py-3"><p className="break-words font-bold">{name}</p><p className="text-sm text-ink-500">{role}</p>{email && <p dir="auto" className="truncate text-xs text-ink-500">{email}</p>}</div>
+        {controlCenter && <a className="account-option" href={controlCenter.href}><LayoutDashboard size={18}/>{controlCenter.label}</a>}
         <button className="account-option" onClick={() => { trigger.current = menu.current?.querySelector("summary") ?? null; if(menu.current)menu.current.open=false; setError(""); if (patient) loadProfile(); dialog.current?.showModal(); }}><Settings size={18}/>{text.settings}</button>
         <button className="account-option" disabled={busy} onClick={async () => { setBusy(true); setError(""); try { const next = ar ? "en" : "ar"; const value = await api<Preferences>("/account/preferences", { method: "PUT", body: JSON.stringify({ ...preferences, locale: next }) }); onSaved(value); changeLanguage(next); } catch (e) { setError(e instanceof Error ? e.message : text.settings); } finally { setBusy(false); } }}><Languages size={18}/><span lang={ar ? "en" : "ar"}>{ar ? "English" : "العربية"}</span></button>
         <button className="account-option" onClick={() => void signOut()}><LogOut size={18}/>{text.signOut}</button>

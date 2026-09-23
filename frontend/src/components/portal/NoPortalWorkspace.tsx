@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
 import { useControlCenterAccess } from "@/components/platform-control-center/control-center-access";
-import { NAV_ITEMS, ccHref, pick } from "@/components/platform-control-center/control-center-nav";
+import { ccHref, openableSections, pick } from "@/components/platform-control-center/control-center-nav";
 
 /**
  * Interim landing (until the Provider Workspace, UX-4) for a signed-in account with no care-portal role — typically
@@ -15,7 +15,9 @@ export function NoPortalWorkspace({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
   const access = useControlCenterAccess();
   if (access.loading) return <p role="status" className="text-sm text-ink-500">{ar ? "جارٍ التحقق مما يمكنك الوصول إليه…" : "Checking what you can use…"}</p>;
-  const areas = NAV_ITEMS.filter((item) => item.key !== "overview" && item.visible(access));
+  // A failed capability read is not an access answer: never tell someone "nothing is set up" because a read failed.
+  if (access.failed) return <p role="alert" className="text-sm text-alert-800">{ar ? "تعذّر التحقق مما يمكنك الوصول إليه. " : "We couldn't check what you can use. "}<button type="button" className="font-semibold underline" onClick={access.retry}>{ar ? "إعادة المحاولة" : "Try again"}</button></p>;
+  const areas = openableSections(access);
   if (areas.length) return (
     <section className="card max-w-3xl p-6 sm:p-8" aria-labelledby="no-portal-workspace-title">
       <h2 id="no-portal-workspace-title" className="title">{ar ? "عملك في مركز التحكم" : "Your work is in the Control Center"}</h2>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
-import { ControlCenterShell, ccCrumbs } from "./ControlCenterShell";
+import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { ccHref } from "./control-center-nav";
 import { ActionMenu, ErrorNotice, Facts, Section, SectionTabs, StatusBadge, SuccessNotice, TabPanel, TechnicalDetails } from "./cc-ui";
@@ -28,8 +28,8 @@ export function ConsultantWorkspace({ locale, organizationId, practitionerId, in
   const [tab, setTab] = useState<ConsultantTab>(initialTab ?? "overview");
   const [notice, setNotice] = useState(""); const [busy, setBusy] = useState(false); const [actionError, setActionError] = useState<unknown>(null);
   const change = (t: ConsultantTab) => { setTab(t); setNotice(""); router.replace(ccHref(locale, `/providers/consultants/${organizationId}/${practitionerId}?tab=${t}`), { scroll: false }); };
-  const name = member ? personName(member, locale) : (ar ? "الاستشاري" : "Consultant");
-  const crumbs = ccCrumbs(locale, { label: ar ? "الاستشاريون" : "Consultants", href: ccHref(locale, "/providers/consultants") }, { label: name });
+  const name = member ? personName(member, locale) : (ar ? "الطبيب" : "Clinician");
+  const crumbs = [{ label: name }];
   const shell = (body: React.ReactNode, intro?: string, actions?: React.ReactNode) => <ControlCenterShell locale={locale} active="consultants" crumbs={crumbs} title={name} intro={intro} actions={actions}>{body}</ControlCenterShell>;
   if (authLoading || loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
@@ -58,7 +58,7 @@ export function ConsultantWorkspace({ locale, organizationId, practitionerId, in
     { key: "credentials" as const, label: ar ? "الاعتمادات" : "Credentials", attention: issuesFor(readiness, "professional", locale).length > 0 },
     { key: "relationships" as const, label: ar ? "علاقات العيادة" : "Practice relationships" },
     ...(access.can("price_list.view") ? [{ key: "pricing" as const, label: ar ? "الأسعار" : "Pricing", attention: !!readiness && readiness.pricingSetupRequired && !readiness.pricingSetupComplete }] : []),
-    ...(access.can("availability.view") ? [{ key: "availability" as const, label: ar ? "المواعيد المتاحة" : "Availability", attention: !!readiness && readiness.availabilitySetupRequired && !readiness.availabilitySetupComplete }] : []),
+    ...(access.can("availability.view") ? [{ key: "availability" as const, label: ar ? "الجدول" : "Schedule", attention: !!readiness && readiness.availabilitySetupRequired && !readiness.availabilitySetupComplete }] : []),
     { key: "readiness" as const, label: ar ? "الجاهزية" : "Readiness", attention: !!readiness && !readiness.readyForActivation && !active && !(activationUnavailable(readiness) && readiness.blockers.length === 1) },
   ];
   const current = tabs.some((t) => t.key === tab) ? tab : "overview";

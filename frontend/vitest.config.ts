@@ -9,6 +9,8 @@ export default defineConfig({
     // Unit tests only. `e2e/` is owned by Playwright (`pnpm test:e2e`); loading
     // those specs into Vitest throws at collection time.
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    setupFiles: ["./vitest.setup.ts"],
+    testTimeout: 20000,
   },
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
 });

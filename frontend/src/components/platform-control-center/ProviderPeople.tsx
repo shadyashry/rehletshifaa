@@ -5,7 +5,7 @@ import Link from "next/link";
 import { UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
-import { ControlCenterShell, ccCrumbs } from "./ControlCenterShell";
+import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess, type ControlCenterAccess } from "./control-center-access";
 import { useAdminApi, type AdminApi } from "./admin-api";
 import { ccHref } from "./control-center-nav";
@@ -32,7 +32,7 @@ export function InvitePersonDialog({ locale, api, organizations, initialOrg, rol
     try { await api(`/admin/providers/${org}/members/invite`, { method: "POST", body: { name: name.trim(), email: email.trim(), role, locale: language, reason: reason.trim() } }); onInvited(org); }
     catch (err) { setError(err); } finally { setBusy(false); }
   };
-  const title = ar ? "إضافة عضو إلى فريق العيادة" : "Add a practice team member";
+  const title = ar ? "إضافة عضو إلى فريق العيادة" : "Add a practice staff member";
   return (
     <FocusTrapDialog label={title} onClose={onClose}>
       <form onSubmit={submit} noValidate>
@@ -139,10 +139,10 @@ export function PracticeTeam({ locale }: { locale: Locale }) {
   const mutations = useMemberMutations(locale, api, directory.reload);
   const [inviting, setInviting] = useState(false); const [relating, setRelating] = useState<{ detail: ProviderDetail; member: Member } | null>(null);
   const [query, setQuery] = useState(""); const [role, setRole] = useState("");
-  const title = ar ? "فريق العيادة" : "Practice team";
+  const title = ar ? "فريق العيادة" : "Practice Staff";
   const canInvite = access.can("provider.practice_staff.manage");
   const actions = canInvite ? <button type="button" onClick={() => setInviting(true)}><UserPlus size={16} aria-hidden />{ar ? "إضافة عضو" : "Add team member"}</button> : undefined;
-  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="practiceTeam" crumbs={ccCrumbs(locale, { label: title })} title={title} intro={ar ? "مديرو العيادات ومساعدو الاستشاريين ومالكو المؤسسات، ومن يعملون معه." : "Practice managers, consultant assistants and organization owners — and who they work with."} actions={actions}>{body}</ControlCenterShell>;
+  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="practiceTeam" title={title} intro={ar ? "مديرو العيادات ومساعدو الاستشاريين ومالكو المؤسسات، ومن يعملون معه." : "Practice managers, consultant assistants and organization owners — and who they work with."} actions={actions}>{body}</ControlCenterShell>;
   if (authLoading || access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
   if (!access.can("provider.view")) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى مقدمي الرعاية" : "You don't have access to providers"} />);
@@ -156,7 +156,7 @@ export function PracticeTeam({ locale }: { locale: Locale }) {
     <>
       <SuccessNotice>{mutations.notice || null}</SuccessNotice>
       <ErrorNotice error={mutations.error} locale={locale} />
-      {!staff.length ? <EmptyState title={ar ? "لا يوجد أعضاء في فريق العيادة بعد" : "No practice team members yet"} body={ar ? "أضف مدير عيادة أو مساعد استشاري لدعم الاستشاريين." : "Add a practice manager or consultant assistant to support your consultants."} action={canInvite ? <button type="button" onClick={() => setInviting(true)}><UserPlus size={16} aria-hidden />{ar ? "إضافة عضو" : "Add team member"}</button> : undefined} /> : <>
+      {!staff.length ? <EmptyState title={ar ? "لا يوجد أعضاء في فريق العيادة بعد" : "No practice staff yet"} body={ar ? "أضف مدير عيادة أو مساعد استشاري لدعم الاستشاريين." : "Add a practice manager or consultant assistant to support your consultants."} action={canInvite ? <button type="button" onClick={() => setInviting(true)}><UserPlus size={16} aria-hidden />{ar ? "إضافة عضو" : "Add team member"}</button> : undefined} /> : <>
         <div className="cc-filterbar">
           <label>{ar ? "بحث" : "Search"}<input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={ar ? "الاسم أو المؤسسة" : "Name or organization"} /></label>
           <label>{ar ? "الدور" : "Role"}<select value={role} onChange={(e) => setRole(e.target.value)}><option value="">{ar ? "كل الأدوار" : "All roles"}</option>{PRACTICE_ROLES.map((r) => <option key={r} value={r}>{personRoleLabel(r, locale)}</option>)}</select></label>

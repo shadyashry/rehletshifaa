@@ -8,7 +8,6 @@ import { useAuth } from "@/components/AuthProvider";
 import { apiFetchAs } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
-import { ccCopy } from "./control-center-copy";
 import { coordCopy } from "./coordination-copy";
 import type { CoordinationApi, Decision, QueueItem, Team } from "./coordination-types";
 import { CoordinatorTeams } from "./CoordinatorTeams";
@@ -22,7 +21,7 @@ export type CoordinationTab = "overview" | "teams" | "preferences" | "policy" | 
 class ApiCodeError extends Error { code?: string; constructor(message: string, code?: string) { super(message); this.code = code; } }
 
 export function CareCoordinationWorkspace({ locale, orgId, initialTab }: { locale: Locale; orgId: string; initialTab?: CoordinationTab }) {
-  const t = coordCopy[locale]; const cc = ccCopy[locale];
+  const t = coordCopy[locale];
   const { user, loading: authLoading, signIn } = useAuth();
   const router = useRouter();
 
@@ -79,16 +78,13 @@ export function CareCoordinationWorkspace({ locale, orgId, initialTab }: { local
 
   const changeTab = (k: CoordinationTab) => { setTab(k); router.replace(`/${locale}/portal/control-center/coordination/${orgId}?tab=${k}`, { scroll: false }); };
 
-  const crumbs = [
-    { label: cc.breadcrumbHome, href: `/${locale}/portal/control-center` },
-    { label: t.navCoordination, href: `/${locale}/portal/control-center/coordination` },
-    { label: orgName ?? orgId },
-  ];
+  // Never an identifier in the trail or the title: a stable generic label until the organization's name is known.
+  const crumbs = [{ label: orgName ?? t.organization }];
   const actions = <button type="button" className="cc-secondary" disabled={loading} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden />{t.retry}</button>;
 
-  if (authLoading || loading) return <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={t.loading}><p role="status">{t.loading}</p></ControlCenterShell>;
-  if (!user) return <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={t.navCoordination}><button onClick={() => void signIn()}>{t.signin}</button></ControlCenterShell>;
-  if (!orgName) return <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={t.navCoordination}><p className="cc-empty">{t.denied}</p></ControlCenterShell>;
+  if (authLoading || loading) return <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={orgName ?? t.organization}><p role="status">{t.loading}</p></ControlCenterShell>;
+  if (!user) return <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={t.organization}><button onClick={() => void signIn()}>{t.signin}</button></ControlCenterShell>;
+  if (!orgName) return <ControlCenterShell locale={locale} active="coordination" crumbs={crumbs} title={t.organization}><p className="cc-empty">{t.denied}</p></ControlCenterShell>;
 
   const activeTab = visibleTabs.some((x) => x.key === tab) ? tab : (visibleTabs[0]?.key ?? "overview");
 

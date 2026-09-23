@@ -168,8 +168,8 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
   return (
     <ControlCenterShell
       locale={locale} active="journeys"
-      crumbs={[{ label: locale === "ar" ? "مركز التحكم" : "Control Center", href: `/${locale}/portal/control-center` }, { label: t.breadcrumbJourneys, href: `/${locale}/portal/control-center/journeys` }, { label: detail?.definition.name ?? t.breadcrumbVersions, href: `/${locale}/portal/control-center/journeys/${definitionId}` }, { label: version ? `${t.versionNumber} ${version.number}` : t.breadcrumbDesigner }]}
-      title={detail?.definition.name ?? t.designer}
+      crumbs={[{ label: detail?.definition.name ?? t.journey, href: `/${locale}/portal/control-center/journeys/${definitionId}` }, { label: version ? `${t.versionNumber} ${version.number}` : t.breadcrumbDesigner }]}
+      title={detail?.definition.name ?? t.journey}
       intro={version ? `${t.versionNumber} ${version.number} · ${journeyStatusLabel(version.status, locale)}` : undefined}
       actions={actions}
     >

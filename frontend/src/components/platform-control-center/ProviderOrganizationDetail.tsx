@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Plus, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
-import { ControlCenterShell, ccCrumbs } from "./ControlCenterShell";
+import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import { ccHref } from "./control-center-nav";
@@ -53,11 +53,11 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
   }, [detail, api, organizationId]);
   const change = (t: OrganizationTab) => { setTab(t); router.replace(ccHref(locale, `/providers/${organizationId}?tab=${t}`), { scroll: false }); };
   const name = detail?.organization.displayName ?? (ar ? "المؤسسة" : "Organization");
-  const crumbs = ccCrumbs(locale, { label: ar ? "المؤسسات" : "Organizations", href: ccHref(locale, "/providers") }, { label: name });
+  const crumbs = [{ label: name }];
   const canAddClinician = access.can("provider.clinician.invite"), canAddPractice = access.can("provider.practice_staff.manage");
   const actions = detail && (canAddClinician || canAddPractice) ? <>
     {canAddClinician && <Link className="cc-primary" href={ccHref(locale, `/providers/onboarding/new?org=${organizationId}`)}><Plus size={16} aria-hidden />{ar ? "إضافة استشاري" : "Add consultant"}</Link>}
-    {canAddPractice && <button type="button" className="cc-secondary" onClick={() => setInviting(true)}><UserPlus size={16} aria-hidden />{ar ? "إضافة عضو لفريق العيادة" : "Add practice team member"}</button>}
+    {canAddPractice && <button type="button" className="cc-secondary" onClick={() => setInviting(true)}><UserPlus size={16} aria-hidden />{ar ? "إضافة عضو لفريق العيادة" : "Add practice staff member"}</button>}
   </> : undefined;
   const shell = (body: React.ReactNode, intro?: string) => <ControlCenterShell locale={locale} active="organizations" crumbs={crumbs} title={name} intro={intro} actions={actions}>{body}</ControlCenterShell>;
   if (authLoading || access.loading || (canView && !detail && !error)) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
@@ -114,7 +114,7 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
           <Facts items={[
             [ar ? "الاسم القانوني" : "Legal name", org.legalName], [ar ? "النوع" : "Type", orgTypeLabel(org.type, locale)], [ar ? "الدولة" : "Country", org.countryCode],
             [ar ? "المنطقة الزمنية" : "Time zone", <bdi key="tz" dir="ltr">{org.timeZone}</bdi>], [ar ? "العملة" : "Currency", org.defaultCurrency],
-            [ar ? "الأطباء" : "Clinicians", String(clinicians.filter((m) => m.status !== "REVOKED").length)], [ar ? "فريق العيادة" : "Practice team", String(staff.filter((m) => m.status !== "REVOKED").length)],
+            [ar ? "الأطباء" : "Clinicians", String(clinicians.filter((m) => m.status !== "REVOKED").length)], [ar ? "فريق العيادة" : "Practice staff", String(staff.filter((m) => m.status !== "REVOKED").length)],
           ]} />
           <TechnicalDetails locale={locale} items={[[ar ? "معرّف المؤسسة" : "Organization ID", org.id], [ar ? "حالة الربط القديم" : "Legacy mapping", org.legacyMappingStatus ?? "—"], [ar ? "إصدار السجل" : "Record version", String(org.version)]]} />
         </Section>}
@@ -148,7 +148,7 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
           {step("owner", ar ? "مالك المؤسسة" : "Organization owner", ownerActive ? "success" : "warning", ownerActive ? done : todo, owner ? (ownerActive ? personName(owner, locale) : (ar ? `${personName(owner, locale)} — العضوية غير نشطة بعد` : `${personName(owner, locale)} — membership not active yet`)) : (ar ? "لم يُعيَّن بعد" : "Not assigned yet"),
             !ownerActive && <button type="button" className="cc-secondary cc-small" onClick={() => change("people")}>{ar ? "فتح الأشخاص" : "Open People"}</button>)}
           {step("clinical", ar ? "الفريق الطبي" : "Clinical team", clinicians.length ? "success" : "warning", clinicians.length ? done : todo, ar ? `${clinicians.length} طبيب` : `${clinicians.length} clinician(s)`, canAddClinician && <Link className="cc-secondary cc-small" href={ccHref(locale, `/providers/onboarding/new?org=${organizationId}`)}>{ar ? "إضافة استشاري" : "Add consultant"}</Link>)}
-          {step("practice", ar ? "فريق العيادة" : "Practice team", staff.length ? "success" : "warning", staff.length ? done : todo, ar ? `${staff.length} عضو` : `${staff.length} member(s)`)}
+          {step("practice", ar ? "فريق العيادة" : "Practice staff", staff.length ? "success" : "warning", staff.length ? done : todo, ar ? `${staff.length} عضو` : `${staff.length} member(s)`)}
           {step("credentials", ar ? "الاعتمادات" : "Credentials", !allLoaded ? "neutral" : outstandingCredentials ? "warning" : "success", !allLoaded ? checking : outstandingCredentials ? todo : done, !allLoaded ? (ar ? "جارٍ التحقق من الأطباء…" : "Checking clinicians…") : outstandingCredentials ? (ar ? `${outstandingCredentials} طبيب بحاجة إلى اعتمادات موثّقة` : `${outstandingCredentials} clinician(s) still need verified credentials`) : (ar ? "كل الاعتمادات موثّقة" : "All credentials verified"),
             outstandingCredentials > 0 && <Link className="cc-secondary cc-small" href={ccHref(locale, `/credentials?org=${organizationId}`)}>{ar ? "فتح المراجعات" : "Open reviews"}</Link>)}
           {step("working", ar ? "الأسعار والمواعيد" : "Prices & availability", !allLoaded ? "neutral" : workingOutstanding ? "warning" : "success", !allLoaded ? checking : workingOutstanding ? todo : done, !allLoaded ? "—" : workingOutstanding ? (ar ? `${workingOutstanding} طبيب بلا أسعار أو مواعيد مكتملة` : `${workingOutstanding} clinician(s) without complete prices or availability`) : (ar ? "مكتمل لكل الأطباء" : "Complete for every clinician"))}

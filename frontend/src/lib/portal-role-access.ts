@@ -32,5 +32,11 @@ export function legacyAdministration(roles:string[]){
   const admin=keys.includes("admin");
   const readOnly=admin&&roles.includes("AUDITOR");
   // systemAdmin mirrors the console: account, team and price-list edits were offered to SYSTEM_ADMIN only, and never in read-only mode.
-  return {admin,readOnly,canManage:admin&&!readOnly,systemAdmin:admin&&!readOnly&&roles.includes("SYSTEM_ADMIN"),identityReviewer:keys.includes("identity")};
+  // financePolicy mirrors the Finance workspace's former "Financial policies" panel: a Finance account (the
+  // `/finance/**` route gate) that is also a Finance lead or a system administrator (the policy service's check).
+  const financePolicy=keys.includes("finance")&&(roles.includes("FINANCE_LEAD")||roles.includes("SYSTEM_ADMIN"));
+  return {admin,readOnly,canManage:admin&&!readOnly,systemAdmin:admin&&!readOnly&&roles.includes("SYSTEM_ADMIN"),identityReviewer:keys.includes("identity"),financePolicy};
 }
+
+/** Portal roles whose work lives in the Control Center rather than in a care-portal case workspace. */
+export const CONTROL_CENTER_ROLES:PortalRoleKey[]=["admin","identity"];

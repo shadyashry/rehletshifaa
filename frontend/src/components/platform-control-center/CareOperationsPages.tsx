@@ -6,7 +6,7 @@ import { UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
 import { IdentityReviewQueue } from "@/components/portal/PortalDirectories";
-import { ControlCenterShell, ccCrumbs } from "./ControlCenterShell";
+import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import { ccHref } from "./control-center-nav";
@@ -33,7 +33,7 @@ export function DirectConsultantDetail({ locale, practitionerId, initialTab, jus
   useEffect(() => { if (user) void load(); }, [user, load]);
   const change = (t: DirectTab) => { setTab(t); router.replace(ccHref(locale, `/providers/consultants/direct/${practitionerId}?tab=${t}`), { scroll: false }); };
   const name = item && item !== "missing" ? item.displayName ?? (ar ? "بلا اسم" : "Unnamed") : (ar ? "استشاري مباشر" : "Direct consultant");
-  const crumbs = ccCrumbs(locale, { label: ar ? "الاستشاريون" : "Consultants", href: ccHref(locale, "/providers/consultants?view=direct") }, { label: name });
+  const crumbs = [{ label: name }];
   const act = async (action: "resend-invite" | "disable" | "enable") => {
     if (item === null || item === "missing") return;
     if (action === "disable" && !window.confirm(ar ? `تعطيل وصول ${name}؟ لن يتمكن من تسجيل الدخول.` : `Disable ${name}'s access? They will no longer be able to sign in.`)) return;
@@ -86,9 +86,9 @@ export function StaffAndTeams({ locale }: { locale: Locale }) {
   const access = useControlCenterAccess();
   const api = useAdminApi();
   const [inviting, setInviting] = useState(false); const [version, setVersion] = useState(0); const [notice, setNotice] = useState("");
-  const title = ar ? "الموظفون والفرق" : "Staff & teams";
+  const title = ar ? "فريق رحلة شفاء" : "RehletShifaa Staff";
   const actions = access.legacy.canManage && !inviting ? <button type="button" onClick={() => { setInviting(true); setNotice(""); }}><UserPlus size={16} aria-hidden />{ar ? "دعوة موظف" : "Invite staff member"}</button> : undefined;
-  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="staff" crumbs={ccCrumbs(locale, { label: title })} title={title} intro={ar ? "موظفو التنسيق والعمليات والمالية، وقادة فرقهم، ووصول حساباتهم." : "Coordination, operations and finance staff, their team leads and their account access."} actions={actions}>{body}</ControlCenterShell>;
+  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="staff" title={title} intro={ar ? "موظفو التنسيق والعمليات والمالية، وقادة فرقهم، ووصول حساباتهم." : "Coordination, operations and finance staff, their team leads and their account access."} actions={actions}>{body}</ControlCenterShell>;
   if (authLoading || access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(signInButton(locale, () => void signIn()));
   if (!access.legacy.admin) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى هذه المساحة" : "You don't have access to this area"} />);
@@ -108,8 +108,8 @@ export function IdentityChecks({ locale }: { locale: Locale }) {
   const access = useControlCenterAccess();
   const api = useAdminApi();
   const legacyApi = useCallback(<T,>(path: string, init?: RequestInit) => api<T>(path, { method: init?.method, raw: init?.body ?? undefined }), [api]);
-  const title = ar ? "التحقق من الهوية" : "Identity checks";
-  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="identity" crumbs={ccCrumbs(locale, { label: title })} title={title} intro={ar ? "راجع أدلة هوية المرضى والممثلين وسجّل القرار." : "Review patient and representative identity evidence and record a decision."}>{body}</ControlCenterShell>;
+  const title = ar ? "التحقق من الهوية" : "Identity Checks";
+  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="identity" title={title} intro={ar ? "راجع أدلة هوية المرضى والممثلين وسجّل القرار." : "Review patient and representative identity evidence and record a decision."}>{body}</ControlCenterShell>;
   if (authLoading || access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(signInButton(locale, () => void signIn()));
   if (!access.legacy.identityReviewer) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى هذه المساحة" : "You don't have access to this area"} />);

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
-import { ControlCenterShell, ccCrumbs } from "./ControlCenterShell";
+import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import { ccHref } from "./control-center-nav";
@@ -28,14 +28,14 @@ export function ConsultantDirectory({ locale, initialView }: { locale: Locale; i
   const canProvider = access.can("provider.view"), canDirect = access.legacy.admin;
   const [view, setView] = useState<"provider" | "direct">(initialView ?? "provider");
   useEffect(() => { if (!access.loading && view === "provider" && !canProvider && canDirect) setView("direct"); }, [access.loading, canProvider, canDirect, view]);
-  const title = ar ? "الاستشاريون" : "Consultants";
-  const crumbs = ccCrumbs(locale, { label: title });
+  const title = ar ? "الأطباء" : "Clinicians";
   const canAdd = access.can("provider.clinician.invite") || access.legacy.canManage;
-  const actions = canAdd ? <Link className="cc-primary" href={ccHref(locale, "/providers/onboarding/new")}><Plus size={16} aria-hidden />{ar ? "إضافة استشاري" : "Add consultant"}</Link> : undefined;
-  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="consultants" crumbs={crumbs} title={title} intro={ar ? "كل استشاري ومدى تقدم إعداده، في مكان واحد." : "Every consultant and how far their setup has progressed, in one place."} actions={actions}>{body}</ControlCenterShell>;
+  const schedules = access.can("availability.view") ? <Link className="cc-secondary" href={ccHref(locale, "/commercial/availability")}>{ar ? "الجداول" : "Schedules"}</Link> : null;
+  const actions = canAdd || schedules ? <>{canAdd && <Link className="cc-primary" href={ccHref(locale, "/providers/onboarding/new")}><Plus size={16} aria-hidden />{ar ? "إضافة استشاري" : "Add consultant"}</Link>}{schedules}</> : undefined;
+  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="consultants" title={title} intro={ar ? "الاستشاريون والأطباء المشاركون، ومدى تقدم إعداد كل منهم." : "Consultants and associate doctors, and how far each one's setup has progressed."} actions={actions}>{body}</ControlCenterShell>;
   if (authLoading || access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
-  if (!canProvider && !canDirect) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى الاستشاريين" : "You don't have access to consultants"} />);
+  if (!canProvider && !canDirect) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى الأطباء" : "You don't have access to clinicians"} />);
   return shell(
     <>
       {canProvider && canDirect && (
@@ -92,7 +92,7 @@ function ProviderConsultants({ locale, canAdd }: { locale: Locale; canAdd: boole
                     { label: ar ? "فتح" : "Open", onSelect: () => undefined, href: consultantHref(locale, c.organization.id, c.practitionerId!) },
                     { label: ar ? "الاعتمادات" : "Credentials", onSelect: () => undefined, href: consultantHref(locale, c.organization.id, c.practitionerId!, "credentials") },
                     { label: ar ? "الأسعار" : "Pricing", onSelect: () => undefined, href: consultantHref(locale, c.organization.id, c.practitionerId!, "pricing") },
-                    { label: ar ? "المواعيد المتاحة" : "Availability", onSelect: () => undefined, href: consultantHref(locale, c.organization.id, c.practitionerId!, "availability") },
+                    { label: ar ? "الجدول" : "Schedule", onSelect: () => undefined, href: consultantHref(locale, c.organization.id, c.practitionerId!, "availability") },
                   ]} />
                 </span>
               </li>

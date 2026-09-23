@@ -1,17 +1,16 @@
 "use client";
 
-import Link from "next/link";
-import { LayoutDashboard } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { useControlCenterAccess } from "./control-center-access";
-import { NAV_ITEMS, ccHref } from "./control-center-nav";
+import { ccHref, openableSections } from "./control-center-nav";
 
 /**
- * The single way into the Control Center from the portal. Shown only when the caller can use at least one
- * Control Center area (exact capability keys, or the legacy administration role check the backend applies).
+ * The single way into the Control Center from a workspace: one persistent entry (in the account menu), offered only
+ * when the caller can open at least one Control Center area (exact capability keys, or the legacy administration
+ * role check the backend applies). Hiding the entry never replaces the backend's authorization.
  */
-export function ControlCenterNavigation({ locale }: { locale: Locale }) {
+export function useControlCenterEntry(locale: Locale): { href: string; label: string } | null {
   const access = useControlCenterAccess();
-  const allowed = !access.loading && NAV_ITEMS.some((i) => i.key !== "overview" && i.visible(access));
-  return allowed ? <Link className="btn-secondary my-3 inline-flex items-center gap-2" href={ccHref(locale)}><LayoutDashboard size={16} aria-hidden />{locale === "ar" ? "مركز التحكم" : "Control Center"}</Link> : null;
+  if (access.loading || !openableSections(access).length) return null;
+  return { href: ccHref(locale), label: locale === "ar" ? "مركز التحكم" : "Control Center" };
 }

@@ -14,7 +14,7 @@ export const journeyCopy = {
     journeyList: "Journeys", journeyListEmpty: "No journeys have been created yet.", newJourney: "New journey", createJourney: "Create journey",
     journeyName: "Name", journeyKey: "Key", createdAt: "Created", openVersions: "Open versions",
 
-    versions: "Versions", versionNumber: "Version", noVersions: "No versions yet.", cloneVersion: "Clone into a new draft",
+    journey: "Journey", versions: "Versions", versionNumber: "Version", noVersions: "No versions yet.", cloneVersion: "Clone into a new draft",
     openDesigner: "Open designer", history: "History", historyEmpty: "No history recorded yet.",
     runtimeStatus: "Runtime status", deployed: "Deployed", notDeployed: "Not deployed", deployVersion: "Deploy",
     publishedDate: "Published", retiredDate: "Retired", noPublished: "No published version yet.", noDraft: "No draft in progress.",
@@ -107,7 +107,7 @@ export const journeyCopy = {
     journeyList: "الرحلات", journeyListEmpty: "لم يتم إنشاء أي رحلة بعد.", newJourney: "رحلة جديدة", createJourney: "إنشاء رحلة",
     journeyName: "الاسم", journeyKey: "المفتاح", createdAt: "تاريخ الإنشاء", openVersions: "فتح الإصدارات",
 
-    versions: "الإصدارات", versionNumber: "الإصدار", noVersions: "لا توجد إصدارات بعد.", cloneVersion: "استنساخ إلى مسودة جديدة",
+    journey: "الرحلة", versions: "الإصدارات", versionNumber: "الإصدار", noVersions: "لا توجد إصدارات بعد.", cloneVersion: "استنساخ إلى مسودة جديدة",
     openDesigner: "فتح المصمم", history: "السجل", historyEmpty: "لا يوجد سجل مسجل بعد.",
     runtimeStatus: "حالة التشغيل", deployed: "تم النشر التشغيلي", notDeployed: "لم يُنشر تشغيليًا", deployVersion: "نشر تشغيلي",
     publishedDate: "تاريخ النشر", retiredDate: "تاريخ الإنهاء", noPublished: "لا يوجد إصدار منشور بعد.", noDraft: "لا توجد مسودة قيد العمل.",

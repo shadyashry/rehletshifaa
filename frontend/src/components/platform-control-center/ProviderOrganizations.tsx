@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
-import { ControlCenterShell, ccCrumbs } from "./ControlCenterShell";
+import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import { ccHref } from "./control-center-nav";
@@ -32,7 +32,7 @@ export function ProviderOrganizations({ locale }: { locale: Locale }) {
   const title = ar ? "المؤسسات" : "Organizations";
   const canCreate = access.can("provider.create");
   const addButton = canCreate ? <button type="button" onClick={() => setCreating(true)}><Plus size={16} aria-hidden />{ar ? "إضافة مؤسسة" : "Add organization"}</button> : undefined;
-  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="organizations" crumbs={ccCrumbs(locale, { label: title })} title={title} intro={ar ? "المستشفيات والعيادات والممارسات التي تعمل معها، ومدى جاهزيتها." : "The hospitals, clinics and practices you work with, and how ready each one is."} actions={addButton}>{body}</ControlCenterShell>;
+  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="organizations" title={title} intro={ar ? "المستشفيات والعيادات والممارسات التي تعمل معها، ومدى جاهزيتها." : "The hospitals, clinics and practices you work with, and how ready each one is."} actions={addButton}>{body}</ControlCenterShell>;
   if (authLoading || access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
   if (!access.can("provider.view")) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى هذه المساحة" : "You do not have access to this area"} body={ar ? "تواصل مع مدير عمليات مقدمي الرعاية." : "Ask your provider operations manager."} />);

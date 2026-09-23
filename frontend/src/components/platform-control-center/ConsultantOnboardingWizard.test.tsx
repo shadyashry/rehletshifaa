@@ -150,7 +150,7 @@ describe("Consultant workspace", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Dr Salma Farouk" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Continue setup" })).toHaveAttribute("href", "/en/portal/control-center/providers/consultants/org-a/prac-1/setup?step=professional");
     const tabs = screen.getByRole("tablist");
-    expect(within(tabs).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "Credentials — needs attention", "Practice relationships", "Pricing — needs attention", "Availability — needs attention", "Readiness — needs attention"]);
+    expect(within(tabs).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "Credentials — needs attention", "Practice relationships", "Pricing — needs attention", "Schedule — needs attention", "Readiness — needs attention"]);
     expect(screen.getByText("Setup in progress")).toBeVisible();
     expect(screen.getByText("prac-1").closest("details")).not.toHaveAttribute("open");
     fireEvent.click(within(tabs).getByRole("tab", { name: /^Readiness/ }));

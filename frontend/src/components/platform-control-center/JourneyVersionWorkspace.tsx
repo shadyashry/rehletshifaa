@@ -98,7 +98,7 @@ export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Loca
   );
 
   return (
-    <ControlCenterShell locale={locale} active="journeys" crumbs={[{ label: locale === "ar" ? "مركز التحكم" : "Control Center", href: `/${locale}/portal/control-center` }, { label: t.breadcrumbJourneys, href: `/${locale}/portal/control-center/journeys` }, { label: detail?.definition.name ?? t.breadcrumbVersions }]} title={detail?.definition.name ?? t.versions} intro={t.intro} actions={actions}>
+    <ControlCenterShell locale={locale} active="journeys" crumbs={[{ label: detail?.definition.name ?? t.journey }]} title={detail?.definition.name ?? t.journey} intro={t.intro} actions={actions}>
       {error && <p role="alert" className="cc-message">{error}</p>}
       {notice && <p role="status" className="cc-message">{notice}</p>}
       {(authLoading || loading) && <p role="status">{t.loading}</p>}

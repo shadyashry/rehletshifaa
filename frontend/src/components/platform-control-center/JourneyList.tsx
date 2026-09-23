@@ -67,7 +67,7 @@ export function JourneyList({ locale }: { locale: Locale }) {
   );
 
   return (
-    <ControlCenterShell locale={locale} active="journeys" crumbs={[{ label: locale === "ar" ? "مركز التحكم" : "Control Center", href: `/${locale}/portal/control-center` }, { label: t.breadcrumbJourneys }]} title={t.journeyList} intro={t.intro} actions={actions}>
+    <ControlCenterShell locale={locale} active="journeys" title={t.journeyList} intro={t.intro} actions={actions}>
       {error && <p role="alert" className="cc-message">{error}</p>}
       {(authLoading || loading) && <p role="status">{t.loading}</p>}
       {!authLoading && !user && <button onClick={() => void signIn()}>{t.signin}</button>}

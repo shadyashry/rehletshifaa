@@ -248,7 +248,7 @@ restructure, journeys) is **P1/P2** and lands in UX-2 … UX-8.
 | Phase | Boundary (in scope) | Not in scope |
 |---|---|---|
 | **UX-1 Truthfulness & Safety** — **COMPLETE** (§15) | P0-1 interim landing, P0-2 … P0-8, P0-10; P0-9 written data matrix; small reads: professional profile, credential revision facts, person realm roles, and (approved fourth) the caller's own capability read. Same pages, truthful states | New IA, new pages, directory merge |
-| **UX-2 Shell / Navigation / Home / Terminology** | App shell without public footer; §2 IA and labels; permission-gated nav; attention-only Home; admin-only redirect to CC; Margin & Deposit route in CC; old-route redirects; EN terminology; AR draft labels behind review | Page restructures |
+| **UX-2 Shell / Navigation / Home / Terminology** — **COMPLETE** (§16) | App shell without public footer; §2 IA and labels; permission-gated nav; attention-only Home; admin-only redirect to CC; Margin & Deposit route in CC; old-route redirects; EN terminology; AR draft labels behind review | Page restructures |
 | **UX-3 Clinician Directory & Consultant Setup** | One Clinicians directory (engagement + capability); Add Consultant screen; Consultant Setup checklist (§4); clinician page family with model-specific sections; clinician Schedule (retire Availability hub); organization default prices on the organization; membership confirmation in Organization › People + Home | Provider Workspace |
 | **UX-4 Provider Workspace / Personas** | Persona landing from existing memberships/capabilities; §1-B contents; *Manage organization* entry; patient/case data only as permitted by the approved P0-9 matrix | Keycloak role provisioning, new authorization |
 | **UX-5 Access & Governance** | People (merge User access + Effective access), Access summary, Roles, Audit, permission reference; reason at publish; person picker; access-removal/offboarding summary | Changing the realm-role/platform-role split |
@@ -306,3 +306,21 @@ UX-1 is complete — record: [ux-1-truthfulness-safety-status.md](ux-1-truthfuln
 - Backend read additions: capability read, workspace (realm) roles, professional profile, credential submitted
   facts. No write API, no migration, no authorization-model change.
 - UX-2 can start; what remains is structural navigation and IA, not P0 truthfulness.
+
+## 16. UX-2 outcome (2026-09-24)
+
+UX-2 is complete — record: [ux-2-shell-navigation-status.md](ux-2-shell-navigation-status.md).
+
+- The §2 IA is the sidebar: seven disclosure groups, current group expanded, a one-line group shown as one link;
+  permission-gated through the UX-1 capability read and the existing legacy role gate (navigation only).
+- The Control Center is an app shell: no public header/footer, one `main`, a compact top bar with the account menu
+  (sign-out, account security, *My workspace*) and the language switch; a focus-managed drawer on mobile.
+- Home is attention-only (real reads, direct links, failed/partial counts stated). The destination grid is gone.
+- One entry: the account-menu *Control Center* item; administration/identity-only accounts land in the Control Center;
+  the portal hand-off card and the portal Administration/Identity tabs are removed.
+- New routes: Commercial › Price Lists, Exchange Rates, Margin & Deposit (moved from the Finance workspace); the former
+  Pricing URL redirects. No backend change.
+- Deviations recorded in the status file: *Journey Design / Publishing* is the page family inside each journey (no
+  cross-journey destination exists yet); *Schedules* sits under Clinicians and keeps a sidebar line only for people who
+  cannot open Clinicians; «مركز التحكم» kept pending the V-9 glossary review.
+- UX-3 can start: no structural shell or navigation issue blocks the Clinician redesign.

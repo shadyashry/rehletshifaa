@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
-import { ControlCenterShell, ccCrumbs } from "./ControlCenterShell";
+import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import { ccHref } from "./control-center-nav";
@@ -27,7 +27,7 @@ function ClinicianPicker({ locale, org, clinician, onChange }: { locale: Locale;
   useEffect(() => { if (!org && orgs.length === 1) onChange(orgs[0].id, ""); }, [org, orgs, onChange]);
   if (directory.loading) return <p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>;
   if (directory.error) return <ErrorNotice error={directory.error} locale={locale} action="load" onRetry={() => void directory.reload()} />;
-  if (!orgs.length) return <EmptyState title={ar ? "لا توجد مؤسسات بعد" : "No organizations yet"} body={ar ? "أضف مؤسسة ثم أطباءها لإعداد الأسعار والمواعيد." : "Add an organization and its clinicians to set up prices and availability."} action={<Link className="cc-primary" href={ccHref(locale, "/providers")}>{ar ? "فتح المؤسسات" : "Open organizations"}</Link>} />;
+  if (!orgs.length) return <EmptyState title={ar ? "لا توجد مؤسسات بعد" : "No organizations yet"} body={ar ? "أضف مؤسسة ثم أطباءها لإعداد الأسعار والمواعيد." : "Add an organization and its clinicians to set up prices and schedules."} action={<Link className="cc-primary" href={ccHref(locale, "/providers")}>{ar ? "فتح المؤسسات" : "Open organizations"}</Link>} />;
   return (
     <div className="cc-filterbar">
       <Field label={ar ? "المؤسسة" : "Organization"}><select value={org} onChange={(e) => onChange(e.target.value, "")}><option value="">{ar ? "اختر مؤسسة" : "Choose an organization"}</option>{orgs.map((o) => <option key={o.id} value={o.id}>{o.displayName}</option>)}</select></Field>
@@ -43,26 +43,26 @@ function useSelection(locale: Locale, path: string, initialOrg?: string, initial
   return { org, clinician, change };
 }
 
-type PricingView = "provider" | "direct" | "templates" | "rates";
+type PricingView = "provider" | "direct" | "templates";
 
-/** Commercial setup › Pricing: provider service prices with their inheritance, and the current workflow's price lists. */
+/** Commercial › Price Lists: provider service prices with their inheritance, and the current workflow's price lists. */
 export function PricingHub({ locale, initialView, initialOrg, initialClinician }: { locale: Locale; initialView?: PricingView; initialOrg?: string; initialClinician?: string }) {
   const ar = locale === "ar";
   const { user, loading: authLoading, signIn } = useAuth();
   const access = useControlCenterAccess();
   const api = useAdminApi();
   const canProvider = access.can("price_list.view"), legacy = access.legacy.admin;
-  const views = ([["provider", ar ? "أسعار المؤسسات" : "Provider prices", canProvider], ["direct", ar ? "قوائم أسعار الاستشاريين المباشرين" : "Direct consultant price lists", legacy], ["templates", ar ? "قوالب مجالات الرعاية" : "Care-area templates", legacy], ["rates", ar ? "أسعار الصرف" : "Exchange rates", legacy]] as [PricingView, string, boolean][]).filter(([, , v]) => v);
+  const views = ([["provider", ar ? "أسعار المؤسسات" : "Provider prices", canProvider], ["direct", ar ? "قوائم أسعار الاستشاريين المباشرين" : "Direct consultant price lists", legacy], ["templates", ar ? "قوالب مجالات الرعاية" : "Care-area templates", legacy]] as [PricingView, string, boolean][]).filter(([, , v]) => v);
   const [view, setView] = useState<PricingView>(initialView ?? "provider");
   const current = views.some(([k]) => k === view) ? view : views[0]?.[0];
-  const selection = useSelection(locale, "/commercial/pricing", initialOrg, initialClinician);
+  const selection = useSelection(locale, "/commercial/prices", initialOrg, initialClinician);
   const [direct, setDirect] = useState<DirectConsultant[]>([]); const [directId, setDirectId] = useState("");
   useEffect(() => { if (legacy && current === "direct") void api<DirectConsultant[]>("/admin/practitioners").then(setDirect).catch(() => setDirect([])); }, [legacy, current, api]);
-  const title = ar ? "الأسعار" : "Pricing";
-  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="pricing" crumbs={ccCrumbs(locale, { label: ar ? "الإعداد التجاري" : "Commercial setup" }, { label: title })} title={title} intro={ar ? "أسعار الخدمات، وكيف يُختار السعر المطبّق، وأسعار الصرف." : "Service prices, how the applicable price is chosen, and exchange rates."}>{body}</ControlCenterShell>;
+  const title = ar ? "قوائم الأسعار" : "Price Lists";
+  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="pricing" title={title} intro={ar ? "أسعار الخدمات وكيف يُختار السعر المطبّق على كل حالة." : "Service prices, and how the price applied to each case is chosen."}>{body}</ControlCenterShell>;
   if (authLoading || access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
-  if (!current) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى الأسعار" : "You don't have access to pricing"} />);
+  if (!current) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى قوائم الأسعار" : "You don't have access to price lists"} />);
   const selectedDirect = direct.find((d) => d.id === directId);
   return shell(
     <>
@@ -87,27 +87,40 @@ export function PricingHub({ locale, initialView, initialOrg, initialClinician }
           : <EmptyState title={ar ? "اختر استشاريًا لعرض قائمة أسعاره" : "Choose a consultant to see their price list"} body={ar ? "كل قائمة مشتقة من قالب مجال رعايته." : "Each list is derived from their care-area template."} />}
       </>}
       {current === "templates" && <CareAreaTemplates locale={locale} api={api} editable={access.legacy.systemAdmin} />}
-      {current === "rates" && <ExchangeRates locale={locale} api={api} editable={access.legacy.systemAdmin} />}
     </>
   );
 }
 
-/** Commercial setup › Availability: pick a clinician, then manage their weekly hours and exceptions. */
+/** Commercial › Exchange Rates: the rates used to show EGP prices in other currencies (current case workflow). */
+export function ExchangeRatesPage({ locale }: { locale: Locale }) {
+  const ar = locale === "ar";
+  const { user, loading: authLoading, signIn } = useAuth();
+  const access = useControlCenterAccess();
+  const api = useAdminApi();
+  const title = ar ? "أسعار الصرف" : "Exchange Rates";
+  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="exchangeRates" title={title} intro={ar ? "الأسعار المستخدمة لعرض الأسعار بالجنيه المصري بعملات أخرى." : "The rates used to show EGP prices in other currencies."}>{body}</ControlCenterShell>;
+  if (authLoading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
+  if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
+  if (!access.legacy.admin) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى أسعار الصرف" : "You don't have access to exchange rates"} />);
+  return shell(<ExchangeRates locale={locale} api={api} editable={access.legacy.systemAdmin} />);
+}
+
+/** Providers › Clinicians › Schedules: pick a clinician, then manage their weekly hours and exceptions. */
 export function AvailabilityHub({ locale, initialOrg, initialClinician }: { locale: Locale; initialOrg?: string; initialClinician?: string }) {
   const ar = locale === "ar";
   const { user, loading: authLoading, signIn } = useAuth();
   const access = useControlCenterAccess();
   const selection = useSelection(locale, "/commercial/availability", initialOrg, initialClinician);
-  const title = ar ? "المواعيد المتاحة" : "Availability";
-  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="availability" crumbs={ccCrumbs(locale, { label: ar ? "الإعداد التجاري" : "Commercial setup" }, { label: title })} title={title} intro={ar ? "الساعات الأسبوعية والإجازات وإغلاق العيادات لكل طبيب." : "Weekly hours, leave and clinic closures for each clinician."}>{body}</ControlCenterShell>;
+  const title = ar ? "الجداول" : "Schedules";
+  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="availability" title={title} intro={ar ? "الساعات الأسبوعية والإجازات وإغلاق العيادات لكل طبيب." : "Weekly hours, leave and clinic closures for each clinician."}>{body}</ControlCenterShell>;
   if (authLoading || access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
-  if (!access.can("availability.view")) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى المواعيد" : "You don't have access to availability"} />);
+  if (!access.can("availability.view")) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى الجداول" : "You don't have access to schedules"} />);
   return shell(
     <>
       <ClinicianPicker locale={locale} org={selection.org} clinician={selection.clinician} onChange={selection.change} />
       {selection.org && selection.clinician ? <AvailabilityManagement key={selection.clinician} locale={locale} organizationId={selection.org} practitionerId={selection.clinician} />
-        : <EmptyState title={ar ? "اختر طبيبًا لعرض مواعيده" : "Choose a clinician to see their availability"} />}
+        : <EmptyState title={ar ? "اختر طبيبًا لعرض جدوله" : "Choose a clinician to see their schedule"} />}
     </>
   );
 }

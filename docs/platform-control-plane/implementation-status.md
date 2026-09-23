@@ -1,5 +1,34 @@
 # Platform Control Plane — implementation status
 
+## UX-2 — Control Center shell, navigation, Home, terminology — 2026-09-24 (Claude Code)
+
+Scope stayed inside UX-2: no Provider Workspace, no Consultant Setup / directory, Access, Credential, Coordination or
+Journey redesign, no Phase 8C. Journey production intake OFF. **No backend change.** Full record:
+[ux-2-shell-navigation-status.md](ux-2-shell-navigation-status.md).
+
+- **IA:** Home · Providers (Organizations, Clinicians, Practice Staff) · Reviews & Safety (Credential Reviews, Identity
+  Checks) · Commercial (Price Lists, Exchange Rates, Margin & Deposit) · Operations (RehletShifaa Staff, Coordination
+  Setup) · Care Journeys · Access & Governance (People, Roles, Audit). Disclosure groups; one-line groups render as one
+  link; capability-gated (navigation only).
+- **Shell:** public header/footer/skip-link removed inside the Control Center (no nested `main`); compact top bar with
+  brand, language switch and account menu (sign-out, account security, *My workspace*); mobile drawer with focus
+  management; breadcrumbs generated from the IA; stable h1 while loading; a failed capability read is reported, never
+  shown as "no access".
+- **Home:** attention only — real counts with direct links, failed and partial counts stated, persona-aware empty
+  states; the destination grid is removed.
+- **Entry points:** one *Control Center* item in the workspace account menu; administration/identity-only accounts land
+  in the Control Center; the "Administration has moved" card and the portal Administration/Identity tabs are removed;
+  the Finance "Financial policies" panel moved to Commercial › Margin & Deposit.
+- **Routes:** new `/commercial/prices`, `/commercial/exchange-rates`, `/commercial/margin-deposit`; `/commercial/pricing`
+  redirects (query kept; `?view=rates` → Exchange Rates). Other URLs unchanged.
+- **Terminology:** Clinicians, Practice Staff, Credential Reviews, Identity Checks, Price Lists, Exchange Rates, Margin &
+  Deposit, RehletShifaa Staff, Coordination Setup, Care Journeys, People, Access summary, Permission reference, Schedule.
+- **Verification:** frontend typecheck clean; **299 tests / 43 files** (3 consecutive full runs); limited live sanity
+  on the rebuilt tunnel stack (EN desktop 7 areas, EN mobile, AR desktop + mobile; synthetic session, writes refused).
+
+### UX-2 COMPLETE: YES
+### UX-3 READY: YES — start only when separately authorized
+
 ## UX-1 — truthfulness & safety — 2026-09-23 (Claude Code)
 
 Scope stayed inside UX-1: no UX-2 navigation redesign, no Provider Workspace, no Journey enablement, no Phase 8C/8D.
