@@ -26,7 +26,7 @@ describe("Control Center Home answers 'What needs my attention?'", () => {
     expect(screen.getByRole("link", { name: /Organizations still being set up/ })).toHaveAttribute("href", "/en/portal/control-center/providers/org-a?tab=setup");
     expect(screen.getByRole("link", { name: /People waiting for membership activation/ })).toHaveAttribute("href", "/en/portal/control-center/providers/org-a?tab=people");
     expect(screen.queryByText(/Cases waiting for a coordinator/)).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Add consultant" })).toHaveAttribute("href", "/en/portal/control-center/providers/onboarding/new");
+    expect(screen.getByRole("link", { name: "Add clinician" })).toHaveAttribute("href", "/en/portal/control-center/providers/clinicians/new");
     expect(screen.queryByRole("heading", { name: "What do you want to manage?" })).not.toBeInTheDocument();
     // Every link in the page body is an attention item or the one primary action: nothing duplicates the sidebar.
     expect(within(main()).getAllByRole("link").map((a) => a.textContent)).toHaveLength(4);
@@ -46,7 +46,7 @@ describe("Control Center Home answers 'What needs my attention?'", () => {
     render(<ControlCenterOverview locale="en" />);
     expect(await screen.findByText("There's no waiting work to track here for your areas")).toBeVisible();
     expect(within(main()).getByRole("link", { name: "Journeys" })).toHaveAttribute("href", "/en/portal/control-center/journeys");
-    expect(screen.queryByRole("link", { name: "Add consultant" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Add clinician" })).not.toBeInTheDocument();
     expect(vi.mocked(apiFetchAs).mock.calls.map(([, path]) => path)).toEqual(["/admin/access/me", "/admin/access/me"]);
   });
 

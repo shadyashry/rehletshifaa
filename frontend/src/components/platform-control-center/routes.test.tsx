@@ -31,9 +31,29 @@ describe("Old admin deep links keep working", () => {
     }
   });
 
-  it("sends clinician pricing and availability pages to the consultant workspace", async () => {
-    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/[id]/clinicians/[practitionerId]/pricing/page"), { locale: "en", id: "org-a", practitionerId: "p1" })).toBe("/en/portal/control-center/providers/consultants/org-a/p1?tab=pricing");
-    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/[id]/clinicians/[practitionerId]/availability/page"), { locale: "en", id: "org-a", practitionerId: "p1" })).toBe("/en/portal/control-center/providers/consultants/org-a/p1?tab=availability");
+  it("sends clinician pricing and availability pages to the clinician page's Prices and Schedule", async () => {
+    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/[id]/clinicians/[practitionerId]/pricing/page"), { locale: "en", id: "org-a", practitionerId: "p1" })).toBe("/en/portal/control-center/providers/clinicians/org-a/p1?tab=prices");
+    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/[id]/clinicians/[practitionerId]/availability/page"), { locale: "en", id: "org-a", practitionerId: "p1" })).toBe("/en/portal/control-center/providers/clinicians/org-a/p1?tab=schedule");
+  });
+
+  it("keeps UX-2 consultant bookmarks working in the Clinicians page family (UX-3)", async () => {
+    const base = "/en/portal/control-center/providers/clinicians";
+    const list = () => import("@/app/[locale]/portal/control-center/providers/consultants/page");
+    expect(await go(list, { locale: "en" })).toBe(base);
+    expect(await go(list, { locale: "ar" }, { view: "direct" })).toBe("/ar/portal/control-center/providers/clinicians?engagement=direct");
+    const workspace = () => import("@/app/[locale]/portal/control-center/providers/consultants/[orgId]/[practitionerId]/page");
+    expect(await go(workspace, { locale: "en", orgId: "org-a", practitionerId: "p1" })).toBe(`${base}/org-a/p1`);
+    expect(await go(workspace, { locale: "en", orgId: "org-a", practitionerId: "p1" }, { tab: "readiness" })).toBe(`${base}/org-a/p1?tab=setup`);
+    expect(await go(workspace, { locale: "en", orgId: "org-a", practitionerId: "p1" }, { tab: "availability" })).toBe(`${base}/org-a/p1?tab=schedule`);
+    expect(await go(workspace, { locale: "en", orgId: "org-a", practitionerId: "p1" }, { tab: "pricing" })).toBe(`${base}/org-a/p1?tab=prices`);
+    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/consultants/[orgId]/[practitionerId]/setup/page"), { locale: "en", orgId: "org-a", practitionerId: "p1" }, { step: "working" })).toBe(`${base}/org-a/p1?tab=setup`);
+    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/clinicians/[orgId]/[practitionerId]/setup/page"), { locale: "en", orgId: "org-a", practitionerId: "p1" })).toBe(`${base}/org-a/p1?tab=setup`);
+    const direct = () => import("@/app/[locale]/portal/control-center/providers/consultants/direct/[id]/page");
+    expect(await go(direct, { locale: "en", id: "p-9" })).toBe(`${base}/direct/p-9`);
+    expect(await go(direct, { locale: "en", id: "p-9" }, { tab: "pricing", created: "1" })).toBe(`${base}/direct/p-9?tab=prices&invited=1`);
+    const add = () => import("@/app/[locale]/portal/control-center/providers/onboarding/new/page");
+    expect(await go(add, { locale: "en" })).toBe(`${base}/new`);
+    expect(await go(add, { locale: "en" }, { org: "org-a" })).toBe(`${base}/new?org=org-a`);
   });
 
   it("opens section landing pages on their first task", async () => {

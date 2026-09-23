@@ -140,7 +140,8 @@ public final class JourneyDtos {
     public record ServiceTemplateItemRequest(@NotBlank @Size(max=60)String serviceCode,@NotBlank @Size(max=500)String serviceName,@Size(max=120)String category,@DecimalMin("0.00")BigDecimal suggestedPriceEgp,@PositiveOrZero Integer sortOrder,Boolean active) {}
     public record FxRateView(String currency,BigDecimal rate,LocalDate rateDate,String source) {}
     public record FxOverrideRequest(@NotNull @DecimalMin("0.00000001")BigDecimal rate,LocalDate date) {}
-    public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus,String email,String accountStatus,Instant invitedAt) {}
+    /** providerCredentialing: the practitioner is enrolled under provider credentialing (ProviderCredentialEligibility.adopted), so Direct approval writes are refused. */
+    public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus,String email,String accountStatus,Instant invitedAt,boolean providerCredentialing) {}
     public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,boolean active,int version,String createdBy,LocalDate validFrom) {}
     public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate) {}
     // Deposit + payment sub-workflow (offline record-only in this build).

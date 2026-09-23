@@ -6,7 +6,7 @@ import { fakeApi } from "./test-support";
 import { MarginDeposit } from "./MarginDeposit";
 import { CareCoordinationOrganizations } from "./CareCoordinationOrganizations";
 import { AccessGovernance } from "./AccessGovernance";
-import { ConsultantDirectory } from "./ConsultantDirectory";
+import { ClinicianDirectory } from "./ClinicianDirectory";
 import { AvailabilityHub } from "./CommercialSetup";
 
 const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "u1", auth_time: Math.floor(Date.now() / 1000) } }, roles: [] as string[], loading: false, signIn: vi.fn(), signOut: vi.fn() }));
@@ -72,13 +72,13 @@ describe("Page header standard", () => {
     expect(await screen.findByRole("link", { name: "Permission reference" })).toHaveAttribute("href", "/en/portal/control-center/access/permissions");
   });
 
-  it("calls the directory Clinicians, with Schedules as its secondary action", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers": [] }, ["provider.view", "provider.clinician.invite", "availability.view"]));
-    render(<ConsultantDirectory locale="en" />);
+  it("calls the directory Clinicians with one primary action; schedules live on each clinician (the hub stays reachable)", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers": [], "/admin/providers/clinicians": [] }, ["provider.view", "provider.clinician.invite", "availability.view"]));
+    render(<ClinicianDirectory locale="en" />);
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
     expect(h1()).toEqual(["Clinicians"]);
     const header = screen.getByRole("heading", { level: 1 }).closest("header")!;
-    expect(within(header).getAllByRole("link").map((a) => a.textContent)).toEqual(["Add consultant", "Schedules"]);
+    expect(within(header).getAllByRole("link").map((a) => a.textContent)).toEqual(["Add clinician"]);
     cleanup();
     render(<AvailabilityHub locale="en" />);
     await waitFor(() => expect(trail()).toEqual(["Control Center", "Providers", "Clinicians", "Schedules"]));

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { StaffAndTeams, DirectConsultantDetail } from "./CareOperationsPages";
-import { ConsultantDirectory } from "./ConsultantDirectory";
+import { StaffAndTeams } from "./CareOperationsPages";
+import { DirectClinicianPage } from "./DirectClinicianPage";
+import { ClinicianDirectory } from "./ClinicianDirectory";
 import { ExchangeRatesPage, PricingHub } from "./CommercialSetup";
 import { apiFetchAs } from "@/lib/api";
 import { fakeApi, organization, providerDetail } from "./test-support";
@@ -54,18 +55,26 @@ describe("Staff & teams (moved from the Administration console)", () => {
   });
 });
 
-describe("Direct consultants (moved from the Administration console)", () => {
-  it("lists direct consultants with approval and account status, and account actions in a menu", async () => {
-    render(<ConsultantDirectory locale="en" initialView="direct" />);
-    expect(await screen.findByRole("link", { name: "Dr Omar Said" })).toHaveAttribute("href", "/en/portal/control-center/providers/consultants/direct/p-9");
-    expect(screen.getByText("Awaiting approval", { selector: ".cc-status" })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Actions: Dr Omar Said" }));
-    expect(screen.getByRole("menuitem", { name: "Resend invitation" })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: "Disable access" })).toHaveClass("cc-menu-danger");
+describe("Direct clinicians (Direct with RehletShifaa)", () => {
+  it("lists Direct clinicians in the one Clinicians directory with their own model facts and no row menu", async () => {
+    render(<ClinicianDirectory locale="en" />);
+    expect(await screen.findByRole("link", { name: "Dr Omar Said" })).toHaveAttribute("href", "/en/portal/control-center/providers/clinicians/direct/p-9");
+    const row = screen.getByRole("link", { name: "Dr Omar Said" }).closest("li")!;
+    expect(within(row).getByText("Direct with RehletShifaa")).toBeVisible();
+    expect(within(row).getByText("Awaiting review", { selector: ".cc-status" })).toBeVisible();
+    expect(within(row).getByText("Waiting for case approval", { selector: ".cc-row-sub" })).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: /Actions/ })).not.toBeInTheDocument();
+    expect(within(row).getByRole("link", { name: "Continue setup: Dr Omar Said" })).toHaveAttribute("href", "/en/portal/control-center/providers/clinicians/direct/p-9");
+  });
+
+  it("keeps account actions on the Direct clinician's page", async () => {
+    render(<DirectClinicianPage locale="en" practitionerId="p-9" initialTab="access" />);
+    expect(await screen.findByRole("button", { name: "Resend invitation" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Disable access" })).toHaveClass("cc-danger-button");
   });
 
   it("approves for cases only after a consequence-aware confirmation, and requires a reason to reject", async () => {
-    render(<DirectConsultantDetail locale="en" practitionerId="p-9" initialTab="approval" />);
+    render(<DirectClinicianPage locale="en" practitionerId="p-9" initialTab="approval" />);
     fireEvent.click(await screen.findByRole("button", { name: "Approve for cases…" }));
     expect(screen.getByText(/may become eligible for live case assignment/)).toBeVisible();
     expect(apiFetchAs).not.toHaveBeenCalledWith("test", "/admin/practitioners/p-9/decision?approved=true", expect.anything());
@@ -80,7 +89,7 @@ describe("Direct consultants (moved from the Administration console)", () => {
   });
 
   it("keeps the price list out of onboarding: it has its own tab, with an actionable empty state", async () => {
-    render(<DirectConsultantDetail locale="en" practitionerId="p-9" initialTab="pricing" />);
+    render(<DirectClinicianPage locale="en" practitionerId="p-9" initialTab="prices" />);
     expect(await screen.findByText("No price list yet")).toBeVisible();
     fireEvent.click(screen.getAllByRole("button", { name: "Derive from template" })[0]);
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/practitioners/p-9/catalog/derive", expect.objectContaining({ method: "POST" })));

@@ -12,7 +12,7 @@ import { EmptyState, ErrorNotice, StatusBadge } from "./cc-ui";
 import { approvalStatusLabel, careAreaLabel, credentialDisplayStatus, credentialReviewStatus, credentialTypeLabel, formatDate } from "./admin-labels";
 import { personName, useProviderDirectory } from "./provider-directory";
 import type { Revision } from "./consultant-setup";
-import type { DirectConsultant } from "./ConsultantDirectory";
+import { directClinicianHref, type DirectConsultant } from "./clinician-model";
 
 /**
  * Credentials › Review queue — an operational queue, oldest first. The backend only exposes a per-organization
@@ -98,7 +98,8 @@ function DirectApprovals({ locale }: { locale: Locale }) {
   useEffect(() => { void load(); }, [load]);
   if (items === null) return <p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>;
   if (error) return <ErrorNotice error={error} locale={locale} action="load" onRetry={() => void load()} />;
-  const waiting = items.filter((i) => i.credentialingStatus === "UNDER_REVIEW");
+  // Someone under provider credentialing is reviewed in the provider queue; the backend refuses a Direct approval for them.
+  const waiting = items.filter((i) => i.credentialingStatus === "UNDER_REVIEW" && !i.providerCredentialing);
   return !waiting.length ? <EmptyState title={ar ? "لا يوجد استشاريون بانتظار الاعتماد" : "No direct consultants are waiting for approval"} /> : (
     <ul className="cc-list" aria-label={ar ? "بانتظار الاعتماد" : "Waiting for approval"}>
       <li className="cc-list-head" aria-hidden><span>{ar ? "الاستشاري" : "Consultant"}</span><span>{ar ? "مجال الرعاية" : "Care area"}</span><span>{ar ? "الحالة" : "Status"}</span><span /></li>
@@ -107,7 +108,7 @@ function DirectApprovals({ locale }: { locale: Locale }) {
           <span><strong>{i.displayName}</strong><span className="cc-row-sub">{i.specialty}</span></span>
           <span>{careAreaLabel(i.careCategory, locale)}</span>
           <span><StatusBadge tone={s.tone}>{s.label}</StatusBadge></span>
-          <span className="cc-row-actions"><Link className="cc-primary cc-small" href={ccHref(locale, `/providers/consultants/direct/${i.id}?tab=approval`)}>{ar ? "مراجعة" : "Review"}</Link></span>
+          <span className="cc-row-actions"><Link className="cc-primary cc-small" href={directClinicianHref(locale, i.id, "approval")}>{ar ? "مراجعة" : "Review"}</Link></span>
         </li>); })}
     </ul>
   );

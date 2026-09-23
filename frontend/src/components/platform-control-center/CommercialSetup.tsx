@@ -15,8 +15,8 @@ import { CLINICIAN_ROLES, personName, useProviderDirectory } from "./provider-di
 import { PricingManagement } from "./PricingManagement";
 import { AvailabilityManagement } from "./AvailabilityManagement";
 import { CareAreaTemplates, DirectPriceList, ExchangeRates } from "./legacy-admin";
-import { consultantHref } from "./ConsultantOnboardingWizard";
-import type { DirectConsultant } from "./ConsultantDirectory";
+import { clinicianHref } from "./clinician-model";
+import type { DirectConsultant } from "./clinician-model";
 
 /** Choose an organization, then one of its clinicians — names only; identifiers never shown as primary text. */
 function ClinicianPicker({ locale, org, clinician, onChange }: { locale: Locale; org: string; clinician: string; onChange: (org: string, clinician: string) => void }) {
@@ -77,7 +77,7 @@ export function PricingHub({ locale, initialView, initialOrg, initialClinician }
         </Section>
         <ClinicianPicker locale={locale} org={selection.org} clinician={selection.clinician} onChange={selection.change} />
         {selection.org && selection.clinician ? <>
-          <p className="cc-meta"><Link href={consultantHref(locale, selection.org, selection.clinician)}>{ar ? "فتح صفحة الطبيب" : "Open the clinician's page"}</Link></p>
+          <p className="cc-meta"><Link href={clinicianHref(locale, selection.org, selection.clinician)}>{ar ? "فتح صفحة الطبيب" : "Open the clinician's page"}</Link></p>
           <PricingManagement key={selection.clinician} locale={locale} organizationId={selection.org} practitionerId={selection.clinician} showOrder={false} />
         </> : <EmptyState title={ar ? "اختر طبيبًا لعرض أسعاره" : "Choose a clinician to see their prices"} body={ar ? "ستظهر الأسعار الافتراضية للمؤسسة والأسعار الخاصة بالطبيب معًا." : "The organization defaults and the clinician's own prices appear together."} />}
       </>}

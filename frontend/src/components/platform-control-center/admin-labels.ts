@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n";
+import { COUNTRIES } from "@/lib/countries";
 
 /**
  * Business-language labels for backend states. The backend value is never changed; these only translate it
@@ -18,8 +19,8 @@ const clinicianStatus: Record<string, Entry> = {
   INVITED: { en: "Invitation sent", ar: "تم إرسال الدعوة", tone: "info" },
   PROFILE_INCOMPLETE: { en: "Setup in progress", ar: "الإعداد قيد التنفيذ", tone: "warning" },
   DOCUMENTS_SUBMITTED: { en: "Credentials submitted", ar: "تم تقديم الاعتمادات", tone: "info" },
-  UNDER_VERIFICATION: { en: "Credentials in review", ar: "الاعتمادات قيد المراجعة", tone: "info" },
-  MORE_INFORMATION_REQUIRED: { en: "Correction requested", ar: "مطلوب تصحيح", tone: "warning" },
+  UNDER_VERIFICATION: { en: "Credentials under review", ar: "الاعتمادات قيد المراجعة", tone: "info" },
+  MORE_INFORMATION_REQUIRED: { en: "More information required", ar: "مطلوب مزيد من المعلومات", tone: "warning" },
   VERIFIED: { en: "Credentials verified", ar: "تم التحقق من الاعتمادات", tone: "success" },
   REJECTED: { en: "Not approved", ar: "غير معتمد", tone: "danger" },
   OPERATIONAL_SETUP: { en: "Working setup in progress", ar: "إعداد العمل قيد التنفيذ", tone: "warning" },
@@ -37,11 +38,11 @@ const orgStatus: Record<string, Entry> = {
   OFFBOARDED: { en: "Offboarded", ar: "منتهية", tone: "neutral" },
 };
 const credentialStatus: Record<string, Entry> = {
-  SUBMITTED: { en: "Awaiting review", ar: "بانتظار المراجعة", tone: "warning" },
-  UNDER_REVIEW: { en: "In review", ar: "قيد المراجعة", tone: "info" },
+  SUBMITTED: { en: "Submitted", ar: "مُقدَّم", tone: "warning" },
+  UNDER_REVIEW: { en: "Under review", ar: "قيد المراجعة", tone: "info" },
   VERIFIED: { en: "Verified", ar: "تم التحقق", tone: "success" },
   REJECTED: { en: "Rejected", ar: "مرفوض", tone: "danger" },
-  MORE_INFORMATION_REQUIRED: { en: "Correction requested", ar: "مطلوب تصحيح", tone: "warning" },
+  MORE_INFORMATION_REQUIRED: { en: "More information required", ar: "مطلوب مزيد من المعلومات", tone: "warning" },
   SUSPENDED: { en: "Suspended", ar: "موقوف", tone: "danger" },
   EXPIRED: { en: "Expired", ar: "منتهي الصلاحية", tone: "danger" },
 };
@@ -127,7 +128,7 @@ export const blockerInfo = (code: string, message: string, locale: Locale) => {
 
 /** Relationship keys stay unchanged on the wire; people see what the relationship means. */
 const relationshipNames: Record<string, [string, string]> = {
-  SUPERVISES: ["Supervising consultant", "الاستشاري المشرف"], MANAGES: ["Manages consultant", "يدير الاستشاري"], ASSISTS: ["Assists consultant", "يساعد الاستشاري"],
+  SUPERVISES: ["Supervising Consultant", "الاستشاري المشرف"], MANAGES: ["Manages", "يدير"], ASSISTS: ["Assists", "يساعد"],
 };
 export const relationshipLabel = (key: string, locale: Locale) => relationshipNames[key]?.[locale === "ar" ? 1 : 0] ?? readable(key);
 
@@ -136,3 +137,12 @@ export const CARE_AREAS = Object.keys(careAreas);
 export const careAreaLabel = (slug: string | null | undefined, locale: Locale) => (slug ? careAreas[slug]?.[locale === "ar" ? 1 : 0] ?? slug.replace(/-/g, " ") : "—");
 
 export const formatDate = (iso: string | null | undefined, locale: Locale) => (iso ? new Date(iso).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
+
+/** A licensing country for people: the localized country name, never the bare ISO code the backend stores. */
+export function countryName(code: string | null | undefined, locale: Locale) {
+  if (!code) return "—";
+  try { const name = new Intl.DisplayNames([locale === "ar" ? "ar" : "en"], { type: "region" }).of(code.toUpperCase()); if (name && name !== code.toUpperCase()) return name; } catch { /* unknown code */ }
+  return COUNTRIES.find((c) => c.iso2 === code.toUpperCase())?.name ?? code;
+}
+/** Country options for a picker, sorted by their localized name; the value stays the ISO code the backend expects. */
+export const countryOptions = (locale: Locale) => COUNTRIES.map((c) => ({ code: c.iso2, name: countryName(c.iso2, locale) })).sort((a, b) => a.name.localeCompare(b.name, locale));

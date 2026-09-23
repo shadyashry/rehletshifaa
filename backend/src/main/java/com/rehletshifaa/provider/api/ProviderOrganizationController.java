@@ -1,5 +1,6 @@
 package com.rehletshifaa.provider.api;
 
+import com.rehletshifaa.provider.application.ProviderClinicianDirectoryService;
 import com.rehletshifaa.provider.application.ProviderOrganizationService;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
@@ -8,9 +9,11 @@ import java.util.UUID;
 @RequestMapping("/api/v1/admin/providers")
 public class ProviderOrganizationController {
     private final ProviderOrganizationService providers;
-    public ProviderOrganizationController(ProviderOrganizationService providers){this.providers=providers;}
+    private final ProviderClinicianDirectoryService clinicians;
+    public ProviderOrganizationController(ProviderOrganizationService providers,ProviderClinicianDirectoryService clinicians){this.providers=providers;this.clinicians=clinicians;}
     @PostMapping public Object create(@RequestBody ProviderOrganizationService.CreateOrganization command){return providers.create(command);}
     @GetMapping public Object list(){return providers.list();}
+    @GetMapping("/clinicians") public Object clinicians(@RequestParam(required=false) UUID organizationId){return clinicians.list(organizationId);}
     @GetMapping("/{id}") public Object detail(@PathVariable UUID id){return providers.detail(id);}
     @PutMapping("/{id}") public Object update(@PathVariable UUID id,@RequestBody ProviderOrganizationService.UpdateOrganization command){return providers.update(id,command);}
     @PostMapping("/{id}/members/link") public Object link(@PathVariable UUID id,@RequestBody ProviderOrganizationService.Membership command){return providers.link(id,command);}

@@ -15,6 +15,7 @@ import { membershipStatusLabel, organizationStatusLabel, personRoleLabel, type T
 import { orgTypeLabel } from "./control-center-copy";
 import { CLINICIAN_ROLES, PRACTICE_ROLES, personName, type Member, type ProviderDetail } from "./provider-directory";
 import { ActivationUnavailable, activationUnavailable, type Readiness } from "./consultant-setup";
+import { addClinicianHref, clinicianHref } from "./clinician-model";
 import { InvitePersonDialog, RelationshipDialog, memberActions, relationshipSummary, useMemberMutations } from "./ProviderPeople";
 
 export type OrganizationTab = "overview" | "people" | "setup";
@@ -56,7 +57,7 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
   const crumbs = [{ label: name }];
   const canAddClinician = access.can("provider.clinician.invite"), canAddPractice = access.can("provider.practice_staff.manage");
   const actions = detail && (canAddClinician || canAddPractice) ? <>
-    {canAddClinician && <Link className="cc-primary" href={ccHref(locale, `/providers/onboarding/new?org=${organizationId}`)}><Plus size={16} aria-hidden />{ar ? "إضافة استشاري" : "Add consultant"}</Link>}
+    {canAddClinician && <Link className="cc-primary" href={addClinicianHref(locale, organizationId)}><Plus size={16} aria-hidden />{ar ? "إضافة طبيب" : "Add clinician"}</Link>}
     {canAddPractice && <button type="button" className="cc-secondary" onClick={() => setInviting(true)}><UserPlus size={16} aria-hidden />{ar ? "إضافة عضو لفريق العيادة" : "Add practice staff member"}</button>}
   </> : undefined;
   const shell = (body: React.ReactNode, intro?: string) => <ControlCenterShell locale={locale} active="organizations" crumbs={crumbs} title={name} intro={intro} actions={actions}>{body}</ControlCenterShell>;
@@ -119,7 +120,7 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
           <TechnicalDetails locale={locale} items={[[ar ? "معرّف المؤسسة" : "Organization ID", org.id], [ar ? "حالة الربط القديم" : "Legacy mapping", org.legacyMappingStatus ?? "—"], [ar ? "إصدار السجل" : "Record version", String(org.version)]]} />
         </Section>}
 
-        {tab === "people" && (detail.members.length === 0 ? <EmptyState title={ar ? "لا يوجد أشخاص في هذه المؤسسة بعد" : "Nobody works here yet"} body={ar ? "أضف أول استشاري أو عضو في فريق العيادة." : "Add the first consultant or practice team member."} action={actions} /> : PEOPLE_GROUPS.map((g) => {
+        {tab === "people" && (detail.members.length === 0 ? <EmptyState title={ar ? "لا يوجد أشخاص في هذه المؤسسة بعد" : "Nobody works here yet"} body={ar ? "أضف أول طبيب أو عضو في فريق العيادة." : "Add the first clinician or practice staff member."} action={actions} /> : PEOPLE_GROUPS.map((g) => {
           const people = detail.members.filter((m) => m.roles.includes(g.role));
           if (!people.length) return null;
           return (
@@ -130,7 +131,7 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
                   const clinician = m.practitionerId && m.roles.some((r) => CLINICIAN_ROLES.includes(r));
                   return (
                     <li key={m.subject}>
-                      <span>{clinician ? <Link className="cc-row-title" href={ccHref(locale, `/providers/consultants/${organizationId}/${m.practitionerId}`)}>{personName(m, locale)}</Link> : <strong>{personName(m, locale)}</strong>}
+                      <span>{clinician ? <Link className="cc-row-title" href={clinicianHref(locale, organizationId, m.practitionerId!)}>{personName(m, locale)}</Link> : <strong>{personName(m, locale)}</strong>}
                         <span className="cc-row-sub">{m.roles.filter((r) => r !== g.role && [...CLINICIAN_ROLES, ...PRACTICE_ROLES].includes(r)).map((r) => personRoleLabel(r, locale)).join(" · ")}</span></span>
                       <span className="cc-meta">{rel || "—"}</span>
                       <span><StatusBadge tone={s.tone}>{s.label}</StatusBadge></span>
@@ -147,7 +148,7 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
           <p className="cc-meta" style={{ marginBottom: 14 }}>{ar ? "ما تحتاجه المؤسسة قبل تفعيلها. الحالة مأخوذة من جاهزية كل طبيب في النظام." : "What the organization needs before activation. Status comes from each clinician's readiness in the platform."}</p>
           {step("owner", ar ? "مالك المؤسسة" : "Organization owner", ownerActive ? "success" : "warning", ownerActive ? done : todo, owner ? (ownerActive ? personName(owner, locale) : (ar ? `${personName(owner, locale)} — العضوية غير نشطة بعد` : `${personName(owner, locale)} — membership not active yet`)) : (ar ? "لم يُعيَّن بعد" : "Not assigned yet"),
             !ownerActive && <button type="button" className="cc-secondary cc-small" onClick={() => change("people")}>{ar ? "فتح الأشخاص" : "Open People"}</button>)}
-          {step("clinical", ar ? "الفريق الطبي" : "Clinical team", clinicians.length ? "success" : "warning", clinicians.length ? done : todo, ar ? `${clinicians.length} طبيب` : `${clinicians.length} clinician(s)`, canAddClinician && <Link className="cc-secondary cc-small" href={ccHref(locale, `/providers/onboarding/new?org=${organizationId}`)}>{ar ? "إضافة استشاري" : "Add consultant"}</Link>)}
+          {step("clinical", ar ? "الفريق الطبي" : "Clinical team", clinicians.length ? "success" : "warning", clinicians.length ? done : todo, ar ? `${clinicians.length} طبيب` : `${clinicians.length} clinician(s)`, canAddClinician && <Link className="cc-secondary cc-small" href={addClinicianHref(locale, organizationId)}>{ar ? "إضافة طبيب" : "Add clinician"}</Link>)}
           {step("practice", ar ? "فريق العيادة" : "Practice staff", staff.length ? "success" : "warning", staff.length ? done : todo, ar ? `${staff.length} عضو` : `${staff.length} member(s)`)}
           {step("credentials", ar ? "الاعتمادات" : "Credentials", !allLoaded ? "neutral" : outstandingCredentials ? "warning" : "success", !allLoaded ? checking : outstandingCredentials ? todo : done, !allLoaded ? (ar ? "جارٍ التحقق من الأطباء…" : "Checking clinicians…") : outstandingCredentials ? (ar ? `${outstandingCredentials} طبيب بحاجة إلى اعتمادات موثّقة` : `${outstandingCredentials} clinician(s) still need verified credentials`) : (ar ? "كل الاعتمادات موثّقة" : "All credentials verified"),
             outstandingCredentials > 0 && <Link className="cc-secondary cc-small" href={ccHref(locale, `/credentials?org=${organizationId}`)}>{ar ? "فتح المراجعات" : "Open reviews"}</Link>)}

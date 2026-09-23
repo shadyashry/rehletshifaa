@@ -30,9 +30,9 @@ describe("Pricing management", () => {
   it("shows the organization default as the real backend-resolved effective price, with the Consultant override listed underneath", async () => {
     mockApi(["price_list.view"]);
     render(<PricingManagement locale="en" organizationId="org-a" practitionerId="prac-1" />);
-    expect(await screen.findByText(/Effective price/)).toBeVisible();
-    expect(screen.getByText("Organization default · v1")).toBeVisible();
-    expect(screen.getByText("Consultant override · v1")).toBeVisible();
+    expect(await screen.findByText(/Price that applies now/)).toBeVisible();
+    expect(screen.getByText("Organization price · v1")).toBeVisible();
+    expect(screen.getByText("Clinician-specific price · v1")).toBeVisible();
   });
 
   it("shows an empty state when no prices are configured", async () => {
@@ -44,7 +44,7 @@ describe("Pricing management", () => {
   it("lets the Consultant themselves record approval on their own draft override", async () => {
     mockApi(["price_list.view", "price_list.manage"]);
     render(<PricingManagement locale="en" organizationId="org-a" practitionerId="prac-1" />);
-    await screen.findByText("Consultant override · v1");
+    await screen.findByText("Clinician-specific price · v1");
     const approveButton = screen.getByRole("button", { name: "Record Consultant approval" });
     fireEvent.click(approveButton);
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", expect.stringContaining("/prices/price-consultant/approve"), expect.objectContaining({ method: "POST" })));

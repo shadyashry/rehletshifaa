@@ -126,7 +126,7 @@ describe("Control Center app shell", () => {
     const trail = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(within(trail).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Control Center", "Providers", "Clinicians", "Dr Salma Farouk"]);
     expect(within(trail).getByRole("link", { name: "Control Center" })).toHaveAttribute("href", "/en/portal/control-center");
-    expect(within(trail).getByRole("link", { name: "Clinicians" })).toHaveAttribute("href", "/en/portal/control-center/providers/consultants");
+    expect(within(trail).getByRole("link", { name: "Clinicians" })).toHaveAttribute("href", "/en/portal/control-center/providers/clinicians");
     expect(screen.getAllByRole("heading", { level: 1 }).map((h) => h.textContent)).toEqual(["Dr Salma Farouk"]);
     expect(screen.getByText("One sentence about this page.")).toBeVisible();
     expect(screen.getByRole("link", { name: "Skip to content" })).toHaveAttribute("href", "#cc-main");
@@ -143,10 +143,10 @@ describe("Control Center app shell", () => {
 
   it("keeps the brand, language switch and account menu in a compact top bar", async () => {
     as(["provider.view"]);
-    window.history.replaceState({}, "", "/en/portal/control-center/providers/consultants?view=direct");
+    window.history.replaceState({}, "", "/en/portal/control-center/providers/clinicians?engagement=direct");
     renderShell();
     expect(screen.getByRole("link", { name: /RehletShifaa/ })).toHaveAttribute("href", "/en/portal/control-center");
-    expect(screen.getByRole("link", { name: "العربية" })).toHaveAttribute("href", "/ar/portal/control-center/providers/consultants?view=direct");
+    expect(screen.getByRole("link", { name: "العربية" })).toHaveAttribute("href", "/ar/portal/control-center/providers/clinicians?engagement=direct");
     const account = screen.getByRole("button", { name: "Account: Nour Hassan" });
     fireEvent.click(account);
     expect(account).toHaveAttribute("aria-expanded", "true");

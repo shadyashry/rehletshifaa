@@ -10,6 +10,7 @@ import { useControlCenterAccess, type ControlCenterAccess } from "./control-cent
 import { useAdminApi, type AdminApi } from "./admin-api";
 import { NAV_GROUPS, ccHref, openableSections, pick } from "./control-center-nav";
 import { EmptyState } from "./cc-ui";
+import { addClinicianHref } from "./clinician-model";
 
 type Org = { id: string; status: string };
 /** Where the waiting work is and how much of it; `partial` says the count covers only part of the data. */
@@ -35,8 +36,8 @@ const SOURCES: Source[] = [
       const rows = await Promise.all((await orgs()).map(async (o) => [o.id, (await api<unknown[]>(`/admin/providers/${o.id}/credential-reviews`)).length] as const));
       return { count: sum(rows.map(([, n]) => n)), href: one(rows.filter(([, n]) => n).map(([id]) => id), (id) => ccHref(locale, `/credentials?org=${id}`), ccHref(locale, "/credentials")) };
     } },
-  { key: "direct", group: "reviews", label: ["Direct consultants waiting for approval", "استشاريون مباشرون بانتظار الاعتماد"], applies: (a) => a.legacy.admin,
-    find: async ({ api, locale }) => ({ count: (await api<{ credentialingStatus?: string }[]>("/admin/practitioners")).filter((p) => p.credentialingStatus === "UNDER_REVIEW").length, href: ccHref(locale, "/credentials?view=direct") }) },
+  { key: "direct", group: "reviews", label: ["Direct clinicians waiting for case approval", "أطباء مباشرون بانتظار اعتماد الحالات"], applies: (a) => a.legacy.admin,
+    find: async ({ api, locale }) => ({ count: (await api<{ credentialingStatus?: string; providerCredentialing?: boolean }[]>("/admin/practitioners")).filter((p) => p.credentialingStatus === "UNDER_REVIEW" && !p.providerCredentialing).length, href: ccHref(locale, "/credentials?view=direct") }) },
   { key: "identity", group: "reviews", label: ["Identity checks waiting for a decision", "طلبات تحقق من الهوية بانتظار قرار"], applies: (a) => a.legacy.identityReviewer,
     find: async ({ api, locale }) => ({ count: (await api<unknown[]>("/identity-review/queue")).length, href: ccHref(locale, "/identity-checks") }) },
   { key: "orgs", group: "providers", label: ["Organizations still being set up", "جهات طبية ما زالت قيد الإعداد"], applies: (a) => a.can("provider.view"),
@@ -87,7 +88,7 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
   }, [access.loading, sourceKeys, user?.profile?.sub, locale, attempt]);
 
   const canAddConsultant = access.can("provider.clinician.invite") || access.legacy.canManage;
-  const actions = canAddConsultant ? <Link className="cc-primary" href={ccHref(locale, "/providers/onboarding/new")}><Plus size={16} aria-hidden />{ar ? "إضافة استشاري" : "Add consultant"}</Link> : undefined;
+  const actions = canAddConsultant ? <Link className="cc-primary" href={addClinicianHref(locale)}><Plus size={16} aria-hidden />{ar ? "إضافة طبيب" : "Add clinician"}</Link> : undefined;
   const title = ar ? "مركز التحكم" : "Control Center";
   const intro = ar ? "ما يحتاج إلى متابعتك في المجالات التي تديرها." : "What needs your attention in the areas you manage.";
   const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="overview" title={title} intro={intro} actions={actions}>{body}</ControlCenterShell>;

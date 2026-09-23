@@ -12,7 +12,7 @@ import { ControlCenterError, EmptyState, ErrorNotice, Facts, Field, Section, Sta
 import { credentialDisplayStatus, credentialTypeLabel, formatDate, personRoleLabel } from "./admin-labels";
 import { personName, type ProviderDetail } from "./provider-directory";
 import type { Onboarding, Revision } from "./consultant-setup";
-import { consultantHref } from "./ConsultantOnboardingWizard";
+import { clinicianHref } from "./clinician-model";
 
 /** Which decisions each state allows, and the exact capability each one needs — unchanged from the accepted review screen. */
 const decisionsForStatus: Record<string, string[]> = { SUBMITTED: ["START_REVIEW"], UNDER_REVIEW: ["VERIFY", "REQUEST_INFORMATION", "REJECT"], VERIFIED: ["SUSPEND"], SUSPENDED: ["RESTORE"] };
@@ -97,7 +97,7 @@ export function CredentialReview({ locale, organizationId, revisionId }: { local
       <SuccessNotice>{notice || null}</SuccessNotice>
       <Section title={ar ? "الملخص" : "Summary"} id="summary">
         <Facts items={[
-          [ar ? "الطبيب" : "Clinician", onboarding ? <Link key="p" href={consultantHref(locale, organizationId, row.practitionerId, "credentials")}>{who}</Link> : who],
+          [ar ? "الطبيب" : "Clinician", onboarding ? <Link key="p" href={clinicianHref(locale, organizationId, row.practitionerId, "credentials")}>{who}</Link> : who],
           [ar ? "النوع" : "Type", onboarding ? personRoleLabel(onboarding.clinicianType, locale) : "—"],
           [ar ? "المؤسسة" : "Organization", detail?.organization?.displayName ?? "—"],
           [ar ? "أُرسل" : "Submitted", formatDate(row.submittedAt, locale)],

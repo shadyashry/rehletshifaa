@@ -249,7 +249,7 @@ restructure, journeys) is **P1/P2** and lands in UX-2 … UX-8.
 |---|---|---|
 | **UX-1 Truthfulness & Safety** — **COMPLETE** (§15) | P0-1 interim landing, P0-2 … P0-8, P0-10; P0-9 written data matrix; small reads: professional profile, credential revision facts, person realm roles, and (approved fourth) the caller's own capability read. Same pages, truthful states | New IA, new pages, directory merge |
 | **UX-2 Shell / Navigation / Home / Terminology** — **COMPLETE** (§16) | App shell without public footer; §2 IA and labels; permission-gated nav; attention-only Home; admin-only redirect to CC; Margin & Deposit route in CC; old-route redirects; EN terminology; AR draft labels behind review | Page restructures |
-| **UX-3 Clinician Directory & Consultant Setup** | One Clinicians directory (engagement + capability); Add Consultant screen; Consultant Setup checklist (§4); clinician page family with model-specific sections; clinician Schedule (retire Availability hub); organization default prices on the organization; membership confirmation in Organization › People + Home | Provider Workspace |
+| **UX-3 Clinician Directory & Consultant Setup** — **COMPLETE** (§17) | One Clinicians directory (engagement + capability); Add Consultant screen; Consultant Setup checklist (§4); clinician page family with model-specific sections; clinician Schedule (retire Availability hub); organization default prices on the organization; membership confirmation in Organization › People + Home | Provider Workspace |
 | **UX-4 Provider Workspace / Personas** | Persona landing from existing memberships/capabilities; §1-B contents; *Manage organization* entry; patient/case data only as permitted by the approved P0-9 matrix | Keycloak role provisioning, new authorization |
 | **UX-5 Access & Governance** | People (merge User access + Effective access), Access summary, Roles, Audit, permission reference; reason at publish; person picker; access-removal/offboarding summary | Changing the realm-role/platform-role split |
 | **UX-6 Credentials & Provider Readiness** | Credential Reviews workspace (typed rows incl. Direct approvals); derived lifecycle labels (§6); decision history where supported; organization Setup and profile edit (existing `PUT /admin/providers/{id}`); Ready-to-activate wording | Reminders, revocation, privileging |
@@ -284,7 +284,7 @@ representative authority · Phase 8C/8D work.
 | V-2 | Persona can be derived from existing memberships/capabilities (`/admin/access/me` + membership role types) without a Keycloak role | UX-4 start |
 | V-3 | **Resolved in UX-1: no.** No provider persona has a case-read path (realm-role gated; clinical capabilities catalogued but not executable). "My cases" stays omitted until a backend capability is approved — see provider-persona-data-access-matrix.md | UX-4 |
 | V-4 | A renewal revision can be submitted while an earlier VERIFIED revision is effective, and the earlier one stays effective (per technical-decisions §13.7). UX-1: submission has no state guard, so "Submit renewal" is offered for an expired credential; effectiveness of the earlier revision still to verify | UX-6 |
-| V-5 | Clinician directory needs a small list read with engagement + readiness summary (avoid N+1) | UX-3 |
+| V-5 | **Resolved in UX-3: yes.** One bounded read `GET /admin/providers/clinicians` (stored setup facts + status-level credential summary, no readiness computation) replaced a 1 + O + 3C fan-out; see ux-3-clinicians-setup-status.md §11–12 | UX-3 |
 | V-6 | Offboarding: membership deactivation, legacy staff/practitioner disable, role revoke and organization status are separate; no dedicated clinician offboarding command was found (OFFBOARDED is only guarded) | UX-5; Phase 8D |
 | V-7 | **Resolved in UX-1.** Every fetcher now routes `REAUTHENTICATION_REQUIRED` through one helper: explained before (shared `ErrorNotice`) or after (return notice) the sign-in round trip; a form cannot be restored after the reload (architecture limit, stated to the user) | Phase 8D (independent check) |
 | V-8 | Which proposal/consent actions a `PATIENT_REPRESENTATIVE` may take | UX-8 |
@@ -324,3 +324,21 @@ UX-2 is complete — record: [ux-2-shell-navigation-status.md](ux-2-shell-naviga
   cross-journey destination exists yet); *Schedules* sits under Clinicians and keeps a sidebar line only for people who
   cannot open Clinicians; «مركز التحكم» kept pending the V-9 glossary review.
 - UX-3 can start: no structural shell or navigation issue blocks the Clinician redesign.
+
+## 17. UX-3 outcome (2026-09-24)
+
+UX-3 is complete — record: [ux-3-clinicians-setup-status.md](ux-3-clinicians-setup-status.md).
+
+- **One Clinicians directory** (`/providers/clinicians`) for both engagement models; each row states *Direct with
+  RehletShifaa* or *Through a Provider Organization* and keeps credential status, setup and case eligibility separate.
+  The engagement rule is the backend's own provider-credentialing switch (credential-policy cutover), so provider-invited
+  clinicians no longer appear as unapprovable "Direct" consultants.
+- **One clinician page family**: provider (Overview · Setup · Credentials · Professional Relationships · Prices ·
+  Schedule) and Direct (Overview · Credential & case approval · Price list · Account access), sections gated by capability.
+- **Add clinician** is one short invitation screen (audit note prefilled under a disclosure); it opens **Consultant
+  Setup**, a six-section checklist with status, owner (derived from the seeded grants), what remains and only the
+  caller's own actions. No review decisions in setup; Decision D unchanged.
+- Old `/providers/consultants/**` and `/providers/onboarding/new` URLs redirect. Backend: two read-only additions, no
+  write, migration or authorization change.
+- **UX-4 is not ready**: the provider-persona data-access matrix still has UNDECIDED patient/case rows (listed in the
+  UX-3 record §18).

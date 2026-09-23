@@ -27,7 +27,7 @@ describe("Credential review", () => {
   it("names the credential and the clinician, shows the evidence and offers one primary action", async () => {
     render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
     expect(await screen.findByRole("heading", { level: 1, name: "Medical licence — Dr Salma Farouk" })).toBeVisible();
-    expect(screen.getByText("Awaiting review")).toBeVisible();
+    expect(screen.getByText("Submitted", { selector: ".cc-status" })).toBeVisible();
     expect(screen.getByRole("button", { name: /View document/ })).toBeVisible();
     expect(screen.getByRole("button", { name: "Start review" })).toBeVisible();
     expect(screen.queryByText("ev-1")).not.toBeInTheDocument();

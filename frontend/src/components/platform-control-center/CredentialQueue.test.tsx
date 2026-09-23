@@ -30,7 +30,7 @@ describe("Credential review queue", () => {
     render(<CredentialQueue locale="en" />);
     expect(await screen.findByText("Medical licence", { selector: "strong" })).toBeVisible();
     expect(screen.getByText(/Dr Salma Farouk/)).toBeVisible();
-    expect(screen.getByText("Awaiting review", { selector: ".cc-status" })).toBeVisible();
+    expect(screen.getByText("Submitted", { selector: ".cc-status" })).toBeVisible();
     expect(screen.getByRole("link", { name: /Review: Medical licence/ })).toHaveAttribute("href", "/en/portal/control-center/credentials/org-a/rev-1");
     expect(screen.queryByText("kc-consultant")).not.toBeInTheDocument();
   });
@@ -54,7 +54,7 @@ describe("Credential review queue", () => {
     render(<CredentialQueue locale="en" initialView="direct" />);
     expect(await screen.findByText("Dr Omar Said")).toBeVisible();
     expect(screen.getByText("Awaiting approval")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Review" })).toHaveAttribute("href", "/en/portal/control-center/providers/consultants/direct/p-9?tab=approval");
+    expect(screen.getByRole("link", { name: "Review" })).toHaveAttribute("href", "/en/portal/control-center/providers/clinicians/direct/p-9?tab=approval");
     expect(screen.getByRole("button", { name: "Provider credentials" })).toHaveAttribute("aria-pressed", "false");
   });
 });

@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
 import { useAdminApi, type AdminApi } from "./admin-api";
 import { ControlCenterError, EmptyState, ErrorNotice, Field, StatusBadge, SuccessNotice } from "./cc-ui";
-import { blockerInfo, credentialDisplayStatus, credentialIsExpired, credentialTypeLabel, formatDate, relationshipLabel, type SetupArea } from "./admin-labels";
+import { blockerInfo, countryName, countryOptions, credentialDisplayStatus, credentialIsExpired, credentialTypeLabel, formatDate, relationshipLabel } from "./admin-labels";
 import { ccHref } from "./control-center-nav";
 import { personName, type ProviderDetail } from "./provider-directory";
 
@@ -70,30 +70,6 @@ export function ActivationUnavailable({ locale, subject }: { locale: Locale; sub
   );
 }
 
-/** One-line readiness summary that never counts the release-unavailable step as something left to do. */
-export function readinessSummary(readiness: Readiness, locale: Locale) {
-  const ar = locale === "ar";
-  if (readiness.readyForActivation) return ar ? "جاهز للتفعيل" : "Ready to activate";
-  const remaining = readiness.blockers.filter((b) => COMMERCIAL_ACCEPTANCE_IN_RELEASE || b.code !== COMMERCIAL_ACCEPTANCE_MISSING).length;
-  if (!remaining && activationUnavailable(readiness)) return ar ? "الإعداد مكتمل — التفعيل غير متاح بعد" : "Setup complete — activation isn't available yet";
-  return ar ? `${remaining} بنود متبقية` : `${remaining} item${remaining === 1 ? "" : "s"} remaining`;
-}
-
-/** Readiness issues for one setup area. The release-unavailable commercial step is not an issue anyone can fix, so it is shown once, in the activation state, instead. */
-export const issuesFor = (readiness: Readiness | null, area: SetupArea, locale: Locale) =>
-  (readiness?.blockers ?? []).filter((b) => COMMERCIAL_ACCEPTANCE_IN_RELEASE || b.code !== COMMERCIAL_ACCEPTANCE_MISSING)
-    .map((b) => ({ ...blockerInfo(b.code, b.message, locale), code: b.code })).filter((b) => b.area === area);
-
-/** Readiness issues shown next to the section that resolves them. */
-export function SetupIssues({ issues, locale }: { issues: { label: string; detail: string; code: string }[]; locale: Locale }) {
-  if (!issues.length) return null;
-  return (
-    <div aria-label={locale === "ar" ? "ما يلزم لإكمال هذه الخطوة" : "What this step still needs"}>
-      {issues.map((i) => <p key={i.code + i.detail} className="cc-issue"><AlertTriangle size={16} aria-hidden /><span>{i.label}{i.label !== i.detail && <span className="cc-row-sub">{i.detail}</span>}</span></p>)}
-    </div>
-  );
-}
-
 export type ProfessionalProfile = { registrationNumber: string | null; specialty: string | null; subspecialty: string | null; qualifications: string | null; jurisdiction: string | null; version: number };
 type ProfileForm = { registrationNumber: string; specialty: string; subspecialty: string; qualifications: string; jurisdiction: string };
 const toForm = (p: ProfessionalProfile): ProfileForm => ({ registrationNumber: p.registrationNumber ?? "", specialty: p.specialty ?? "", subspecialty: p.subspecialty ?? "", qualifications: p.qualifications ?? "", jurisdiction: p.jurisdiction ?? "" });
@@ -122,7 +98,7 @@ export function ProfessionalDetailsForm({ locale, api, organizationId, onboardin
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (canEdit) void read(); }, [canEdit, read, onboarding.version]);
   const missing = (v: string) => touched && !v.trim() ? (ar ? "هذا الحقل مطلوب." : "This field is required.") : undefined;
-  const set = (k: keyof ProfileForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k: keyof ProfileForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setTouched(true);
     if (!stored) return;
@@ -134,7 +110,7 @@ export function ProfessionalDetailsForm({ locale, api, organizationId, onboardin
     } catch (err) { setError(err); } finally { setBusy(false); }
   };
   const summary = stored && complete && !open ? [
-    [ar ? "رقم التسجيل المهني" : "Registration number", stored.registrationNumber], [ar ? "دولة الترخيص" : "Licensing country", stored.jurisdiction],
+    [ar ? "رقم التسجيل المهني" : "Registration number", stored.registrationNumber], [ar ? "دولة الترخيص" : "Licensing country", stored.jurisdiction ? countryName(stored.jurisdiction, locale) : null],
     [ar ? "التخصص" : "Speciality", stored.specialty], [ar ? "التخصص الدقيق" : "Sub-speciality", stored.subspecialty],
   ] as [string, string | null][] : null;
   return (
@@ -149,7 +125,7 @@ export function ProfessionalDetailsForm({ locale, api, organizationId, onboardin
           <ErrorNotice error={error} locale={locale} />
           <div className="cc-form-grid">
             <Field label={ar ? "رقم التسجيل المهني" : "Professional registration number"} required error={missing(form.registrationNumber)}><input dir="ltr" maxLength={100} value={form.registrationNumber} onChange={set("registrationNumber")} aria-required /></Field>
-            <Field label={ar ? "دولة الترخيص" : "Licensing country"} hint={ar ? "رمز الدولة من حرفين، مثل EG" : "Two-letter country code, for example EG"} required error={missing(form.jurisdiction)}><input dir="ltr" maxLength={2} value={form.jurisdiction} onChange={set("jurisdiction")} aria-required /></Field>
+            <Field label={ar ? "دولة الترخيص" : "Licensing country"} hint={ar ? "تحدد الاعتمادات المطلوبة." : "Decides which credentials are required."} required error={missing(form.jurisdiction)}><select value={form.jurisdiction} onChange={set("jurisdiction")} aria-required><option value="">{ar ? "اختر الدولة" : "Choose a country"}</option>{form.jurisdiction && !countryOptions(locale).some((o) => o.code === form.jurisdiction) && <option value={form.jurisdiction}>{form.jurisdiction}</option>}{countryOptions(locale).map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}</select></Field>
             <Field label={ar ? "التخصص" : "Speciality"} required error={missing(form.specialty)}><input maxLength={120} value={form.specialty} onChange={set("specialty")} aria-required /></Field>
             <Field label={ar ? "التخصص الدقيق" : "Sub-speciality"} optionalLabel={ar ? "اختياري" : "optional"}><input maxLength={120} value={form.subspecialty} onChange={set("subspecialty")} /></Field>
             <div className="cc-span"><Field label={ar ? "المؤهلات" : "Qualifications"} hint={ar ? "الشهادات والزمالات، سطر لكل مؤهل" : "Degrees and fellowships, one per line"} required error={missing(form.qualifications)}><textarea maxLength={4000} value={form.qualifications} onChange={set("qualifications")} aria-required /></Field></div>
@@ -208,7 +184,7 @@ export function CredentialRequirements({ locale, api, organizationId, practition
             </div>
             <div className="cc-row-actions">
               {status ? <StatusBadge tone={status.tone}>{status.label}</StatusBadge> : <StatusBadge tone="neutral">{ar ? "مطلوب" : "Needed"}</StatusBadge>}
-              {canReview && rev && ["SUBMITTED", "UNDER_REVIEW"].includes(rev.status) && <Link className="cc-secondary cc-small" href={ccHref(locale, `/credentials/${organizationId}/${rev.id}`)}>{ar ? "مراجعة" : "Review"}</Link>}
+              {canReview && rev && ["SUBMITTED", "UNDER_REVIEW"].includes(rev.status) && <Link className="cc-secondary cc-small" href={ccHref(locale, `/credentials/${organizationId}/${rev.id}`)}>{ar ? "فتح المراجعة" : "Open review"}</Link>}
               {canSubmit && needsNew && adding?.type !== req.type && <button type="button" className={rev ? "cc-secondary cc-small" : "cc-small"} onClick={() => setAdding(req)}><Upload size={15} aria-hidden />{expired ? (ar ? "إرسال تجديد" : "Submit renewal") : rev ? (ar ? "إرسال بديل" : "Submit replacement") : (ar ? "إضافة" : "Add")}</button>}
             </div>
           </div>
@@ -260,7 +236,7 @@ function CredentialSubmitForm({ locale, api, organizationId, base, requirement, 
 }
 
 /**
- * Practice relationships in business words. Keys stay as the backend defines them: SUPERVISES (consultant →
+ * Professional relationships in business words. Keys stay as the backend defines them: SUPERVISES (consultant →
  * associate doctor), MANAGES (practice manager → consultant), ASSISTS (assistant → consultant).
  */
 export function PracticeRelationships({ locale, api, detail, practitionerId, clinicianType, canManage, onChanged }: { locale: Locale; api: AdminApi; detail: ProviderDetail; practitionerId: string; clinicianType: string; canManage: boolean; onChanged: () => void }) {
@@ -300,9 +276,9 @@ export function PracticeRelationships({ locale, api, detail, practitionerId, cli
       {clinicianType === "ASSOCIATE_DOCTOR"
         ? group(relationshipLabel("SUPERVISES", locale), supervisors.map((r) => ({ id: r.id, label: nameOf(r.subject), status: r.status })), ar ? "لا يوجد استشاري مشرف بعد — مطلوب لتفعيل الطبيب المشارك." : "No supervising consultant yet — required before an associate doctor can be activated.", { type: "SUPERVISES", label: ar ? "تعيين استشاري مشرف" : "Assign supervising consultant" })
         : <>
-          {group(ar ? "مديرو العيادة" : "Practice managers", managers.map((r) => ({ id: r.id, label: nameOf(r.subject), status: r.status })), ar ? "لا يوجد مدير عيادة معيّن." : "No practice manager assigned.", { type: "MANAGES", label: ar ? "تعيين مدير عيادة" : "Assign practice manager" })}
-          {group(ar ? "مساعدو الاستشاري" : "Consultant assistants", assistants.map((r) => ({ id: r.id, label: nameOf(r.subject), status: r.status })), ar ? "لا يوجد مساعد معيّن." : "No assistant assigned.", { type: "ASSISTS", label: ar ? "تعيين مساعد" : "Assign assistant" })}
-          {group(ar ? "الأطباء المشاركون تحت إشرافه" : "Associate doctors they supervise", supervised.map((r) => ({ id: r.id, label: nameOfPractitioner(r.targetPractitionerId), status: r.status })), ar ? "لا يشرف على أطباء مشاركين." : "Not supervising any associate doctors.")}
+          {group(ar ? "يديره (مدير العيادة)" : "Manages this consultant (practice manager)", managers.map((r) => ({ id: r.id, label: nameOf(r.subject), status: r.status })), ar ? "لا يوجد مدير عيادة معيّن." : "No practice manager assigned.", { type: "MANAGES", label: ar ? "تعيين مدير عيادة" : "Assign practice manager" })}
+          {group(ar ? "يساعده (مساعد الاستشاري)" : "Assists this consultant (consultant assistant)", assistants.map((r) => ({ id: r.id, label: nameOf(r.subject), status: r.status })), ar ? "لا يوجد مساعد معيّن." : "No assistant assigned.", { type: "ASSISTS", label: ar ? "تعيين مساعد" : "Assign assistant" })}
+          {group(ar ? "يشرف على (أطباء مشاركون)" : "Supervises (associate doctors)", supervised.map((r) => ({ id: r.id, label: nameOfPractitioner(r.targetPractitionerId), status: r.status })), ar ? "لا يشرف على أطباء مشاركين." : "Not supervising any associate doctors.")}
         </>}
       {adding && (
         <form className="cc-card" onSubmit={submit} style={{ marginTop: 8 }}>
@@ -315,48 +291,6 @@ export function PracticeRelationships({ locale, api, detail, practitionerId, cli
         </form>
       )}
       <p className="cc-meta">{ar ? "تنتهي العلاقات تلقائيًا عند إزالة أحد الطرفين من المؤسسة." : "Relationships end automatically when either person is removed from the organization."}</p>
-    </div>
-  );
-}
-
-/** The readiness checklist grouped by the four setup milestones. Values are the backend's, never recomputed. */
-export function ReadinessChecklist({ locale, readiness, onGoTo }: { locale: Locale; readiness: Readiness; onGoTo?: (area: SetupArea) => void }) {
-  const ar = locale === "ar";
-  const rows: { area: SetupArea; ok: boolean; label: string }[] = [
-    { area: "details", ok: readiness.identityProvisioned, label: ar ? "تم إنشاء حساب الدخول" : "Sign-in account created" },
-    { area: "details", ok: readiness.organizationMembershipActive, label: ar ? "العضوية في المؤسسة نشطة" : "Organization membership active" },
-    { area: "organization", ok: readiness.providerProfileComplete, label: ar ? "ملف المؤسسة مكتمل" : "Organization profile complete" },
-    { area: "professional", ok: readiness.clinicianProfileComplete, label: ar ? "البيانات المهنية مكتملة" : "Professional details complete" },
-    { area: "professional", ok: readiness.requiredCredentialsSubmitted, label: ar ? "كل الاعتمادات المطلوبة مُرسلة" : "All required credentials submitted" },
-    { area: "professional", ok: readiness.requiredCredentialsVerified, label: ar ? "كل الاعتمادات المطلوبة تم التحقق منها" : "All required credentials verified" },
-    { area: "professional", ok: readiness.mandatoryCredentialsUnexpired, label: ar ? "الاعتمادات سارية" : "Credentials in date" },
-    { area: "professional", ok: readiness.requiredRelationshipsComplete, label: ar ? "علاقات العيادة المطلوبة موجودة" : "Required practice relationships in place" },
-    ...(readiness.pricingSetupRequired ? [{ area: "working" as SetupArea, ok: readiness.pricingSetupComplete, label: ar ? "سعر منشور واحد على الأقل" : "At least one live price" }] : []),
-    ...(readiness.availabilitySetupRequired ? [{ area: "working" as SetupArea, ok: readiness.availabilitySetupComplete, label: ar ? "التوافر الأسبوعي محدد" : "Weekly availability set" }] : []),
-  ];
-  const labels: Record<SetupArea, string> = ar ? { details: "بيانات الاستشاري", organization: "المؤسسة", professional: "الإعداد المهني", working: "إعداد العمل" } : { details: "Consultant details", organization: "Organization", professional: "Professional setup", working: "Working setup" };
-  const areas: SetupArea[] = ["details", "organization", "professional", "working"];
-  const extra = readiness.blockers.filter((b) => COMMERCIAL_ACCEPTANCE_IN_RELEASE || b.code !== COMMERCIAL_ACCEPTANCE_MISSING).map((b) => ({ ...blockerInfo(b.code, b.message, locale), code: b.code }));
-  return (
-    <div className="cc-readiness-groups">
-      {areas.map((area) => {
-        const items = rows.filter((r) => r.area === area); const issues = extra.filter((b) => b.area === area);
-        if (!items.length && !issues.length) return null;
-        const allOk = items.every((r) => r.ok) && !issues.length;
-        return (
-          <div key={area} className="cc-requirement">
-            <div>
-              <h3>{labels[area]}</h3>
-              <ul className="cc-readiness">{items.map((r) => <li key={r.label}>{r.ok ? <Check size={16} className="cc-ok" aria-hidden /> : <Clock size={16} className="cc-todo" aria-hidden />}<span>{r.label}<span className="cc-sr">{r.ok ? (ar ? " — مكتمل" : " — done") : (ar ? " — غير مكتمل" : " — not yet")}</span></span></li>)}</ul>
-              <SetupIssues issues={issues} locale={locale} />
-            </div>
-            <div className="cc-row-actions">
-              <StatusBadge tone={allOk ? "success" : "warning"}>{allOk ? (ar ? "مكتمل" : "Complete") : (ar ? "يحتاج إجراء" : "Needs action")}</StatusBadge>
-              {!allOk && onGoTo && area !== "organization" && <button type="button" className="cc-secondary cc-small" onClick={() => onGoTo(area)}>{ar ? "إكمال" : "Fix"}</button>}
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }

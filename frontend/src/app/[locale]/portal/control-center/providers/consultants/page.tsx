@@ -1,10 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
-import { ConsultantDirectory } from "@/components/platform-control-center/ConsultantDirectory";
 
-export default async function ConsultantsPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ view?: string }> }) {
+/** Compatibility: the Consultants directory is now Providers › Clinicians (one list for both engagement models). */
+export default async function LegacyConsultantsPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ view?: string }> }) {
   const { locale } = await params;
   const { view } = await searchParams;
   if (!isLocale(locale)) notFound();
-  return <ConsultantDirectory locale={locale} initialView={view === "direct" ? "direct" : undefined} />;
+  redirect(`/${locale}/portal/control-center/providers/clinicians${view === "direct" ? "?engagement=direct" : ""}`);
 }

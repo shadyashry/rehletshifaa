@@ -13,7 +13,7 @@ import { FocusTrapDialog } from "./FocusTrapDialog";
 import { ActionMenu, EmptyState, ErrorNotice, Field, StatusBadge, SuccessNotice, type MenuAction } from "./cc-ui";
 import { membershipStatusLabel, personRoleLabel, relationshipLabel } from "./admin-labels";
 import { CLINICIAN_ROLES, PRACTICE_ROLES, personName, useProviderDirectory, type Member, type Organization, type ProviderDetail } from "./provider-directory";
-import { consultantHref } from "./ConsultantOnboardingWizard";
+import { clinicianHref } from "./clinician-model";
 
 const invitePermission = (role: string) => (CLINICIAN_ROLES.includes(role) ? "provider.clinician.invite" : "provider.practice_staff.manage");
 
@@ -107,7 +107,7 @@ export function relationshipSummary(detail: ProviderDetail, member: Member, loca
 export function memberActions(locale: Locale, access: ControlCenterAccess, detail: ProviderDetail, member: Member, handlers: { activate: () => void; deactivate: () => void; relate: () => void }): MenuAction[] {
   const ar = locale === "ar";
   const out: MenuAction[] = [];
-  if (member.practitionerId && member.roles.some((r) => CLINICIAN_ROLES.includes(r))) out.push({ label: ar ? "فتح صفحة الطبيب" : "Open clinician page", onSelect: () => undefined, href: consultantHref(locale, detail.organization.id, member.practitionerId) });
+  if (member.practitionerId && member.roles.some((r) => CLINICIAN_ROLES.includes(r))) out.push({ label: ar ? "فتح صفحة الطبيب" : "Open clinician page", onSelect: () => undefined, href: clinicianHref(locale, detail.organization.id, member.practitionerId) });
   const relatable = member.roles.some((r) => ["ASSOCIATE_DOCTOR", "PRACTICE_MANAGER", "CONSULTANT_ASSISTANT"].includes(r));
   if (relatable && member.status !== "REVOKED" && access.can("provider.relationship.manage")) out.push({ label: member.roles.includes("ASSOCIATE_DOCTOR") ? (ar ? "تعيين استشاري مشرف" : "Assign supervising consultant") : member.roles.includes("PRACTICE_MANAGER") ? (ar ? "إضافة استشاري يديره" : "Add a managed consultant") : (ar ? "تعيين لاستشاري" : "Assign to a consultant"), onSelect: handlers.relate });
   if (member.status === "PENDING" && access.can("provider.member.invite")) out.push({ label: ar ? "تفعيل العضوية" : "Activate membership", onSelect: handlers.activate });

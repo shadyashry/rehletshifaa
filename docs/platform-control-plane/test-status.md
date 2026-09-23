@@ -1,5 +1,31 @@
 # Platform Control Plane — verification status
 
+## UX-3 clinicians & setup verification — 2026-09-24 (Claude Code)
+
+- Frontend `pnpm typecheck` clean. `pnpm test` **314 tests / 45 files, 0 failures**, three consecutive full runs.
+- New suites: `ClinicianDirectory` (mixed Direct + provider list, no toggle, engagement/organization/type, separate
+  credential/setup/eligibility facts, *Continue setup* only in progress, exactly one read per engagement model,
+  permission-scoped reads, filters + filtered/empty states, one-source failure, Arabic + `bdi`; credential summary,
+  eligibility and legacy-mapping merge rules), `ClinicianPage` (invitation lands on Setup with focus, six sections with
+  owners, Provider Ops has no review controls, reviewer *Open review* link, operational summaries + deep links, Decision D
+  cases 2/3 and confirmed activation, Overview facts, profile read-back with country name and untouched fields
+  preserved, capability-gated tabs, Arabic; Direct page model, provider-credentialed Direct record refuses approval),
+  `AddClinician` (short form, prefilled audit note, unchanged invite body → Setup, Direct path, recoverable identity).
+- Updated: `routes` (every old clinician URL redirects), `CareOperations`, `PageHeaders`, `CredentialQueue`,
+  `CredentialReview`, `PricingManagement`, `ProviderOrganizationDetail`, `ControlCenterOverview`, `ControlCenterShell`.
+  Removed with the wizard: `ConsultantOnboardingWizard.test` (its profile/activation cases now in `ClinicianPage.test`).
+- Backend: new `ProviderClinicianDirectoryIntegrationTest` (3/3: organization isolation incl. `?organizationId=` for an
+  invisible organization and a stranger, status-level credential summary, expiry derived from `expires_at`, the Direct
+  list's `providerCredentialing` fact). Full offline regression `mvn -o -q test`: **495 tests, 0 failures, 0 errors,
+  1 skipped**.
+- ESLint (touched files): only the codebase's existing `set-state-in-effect` load idiom remains in pre-existing files;
+  new files carry the same targeted disable comment as `consultant-setup.tsx`.
+- **Live sanity (limited, not Phase 8C):** canonical base + tunnel rebuild; temporary Playwright script (not committed),
+  synthetic session, mocked reads, writes refused (none attempted). 12 views: EN desktop directory, provider Setup /
+  Overview / Credentials, Direct page, Add clinician, legacy bookmark; EN mobile directory + Setup; AR desktop Setup +
+  directory; AR mobile directory. No horizontal overflow, one `main`, stable h1, no page errors. Found and fixed: focus
+  after invitation, directory column alignment, badge overflow. Screenshots in the session scratchpad only.
+
 ## UX-2 shell & navigation verification — 2026-09-24 (Claude Code)
 
 - Frontend `pnpm typecheck` clean. `pnpm test` **299 tests / 43 files, 0 failures**, three consecutive full runs.

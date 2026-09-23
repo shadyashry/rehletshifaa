@@ -42,10 +42,10 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { key: "providers", label: ["Providers", "مقدمو الرعاية"], icon: Building2, items: [
     { key: "organizations", path: "/providers", label: ["Organizations", "الجهات الطبية"], summary: ["Hospitals, clinics and practices that work with RehletShifaa.", "المستشفيات والعيادات والممارسات التي تعمل مع رحلة شفاء."], visible: (a) => a.can("provider.view") },
-    { key: "consultants", path: "/providers/consultants", label: ["Clinicians", "الأطباء"], summary: ["Consultants and associate doctors, and how far their setup has progressed.", "الاستشاريون والأطباء المشاركون ومدى تقدم إعدادهم."], visible: canOpenClinicians },
+    { key: "consultants", path: "/providers/clinicians", label: ["Clinicians", "الأطباء"], summary: ["Every clinician, Direct or through a provider organization, and how far their setup has progressed.", "كل الأطباء، مباشرةً أو من خلال جهة طبية، ومدى تقدم إعدادهم."], visible: canOpenClinicians },
     { key: "practiceTeam", path: "/providers/practice-team", label: ["Practice Staff", "فريق العيادة"], summary: ["Practice managers, consultant assistants and organization owners.", "مديرو العيادات ومساعدو الاستشاريين ومالكو الجهات."], visible: (a) => a.can("provider.view") },
-    // Clinician schedules live with each clinician (UX-3 retires this hub). The hub keeps a sidebar line only for
-    // people who can read schedules but cannot open Clinicians, so they are never left without a way in.
+    // Clinician schedules live on each clinician's page (UX-3). The hub remains only for people who can read schedules
+    // but cannot open Clinicians (e.g. clinical support), so they are never left without a way in.
     { key: "availability", path: "/commercial/availability", parent: "consultants", label: ["Schedules", "الجداول"], summary: ["Weekly hours, leave and clinic closures for each clinician.", "ساعات العمل الأسبوعية والإجازات وإغلاق العيادات لكل طبيب."], visible: (a) => a.can("availability.view"), sidebar: (a) => !canOpenClinicians(a) },
   ] },
   { key: "reviews", label: ["Reviews & Safety", "المراجعات والسلامة"], icon: BadgeCheck, items: [

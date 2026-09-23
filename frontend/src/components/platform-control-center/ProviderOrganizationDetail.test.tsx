@@ -30,7 +30,7 @@ describe("Organization workspace", () => {
 
   it("lists people by name and business role, never by account identifier", async () => {
     render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="people" />);
-    expect(await screen.findByRole("link", { name: "Dr Salma Farouk" })).toHaveAttribute("href", "/en/portal/control-center/providers/consultants/org-a/prac-1");
+    expect(await screen.findByRole("link", { name: "Dr Salma Farouk" })).toHaveAttribute("href", "/en/portal/control-center/providers/clinicians/org-a/prac-1");
     expect(screen.getByRole("heading", { name: "Practice managers" })).toBeVisible();
     expect(screen.getByText("Mona Adel")).toBeVisible();
     expect(screen.getByText("Invitation pending")).toBeVisible();

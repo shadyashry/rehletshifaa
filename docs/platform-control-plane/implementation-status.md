@@ -1,5 +1,36 @@
 # Platform Control Plane — implementation status
 
+## UX-3 — Clinicians directory, clinician page family, Consultant Setup — 2026-09-24 (Claude Code)
+
+Scope stayed inside UX-3: no Provider Workspace, Access, credential lifecycle, Coordination or Journey redesign, no
+Phase 8C. Journey production intake OFF. Direct and provider consultants remain separate backend models. Full record:
+[ux-3-clinicians-setup-status.md](ux-3-clinicians-setup-status.md).
+
+- **Directory:** `/providers/clinicians` lists provider Consultants, Associate Doctors and Direct consultants together
+  (no toggle); per row: engagement, organization or RehletShifaa, credentials, setup, case eligibility; only *Continue
+  setup* as a row action; search + engagement/organization/type/setup filters; truthful empty, filtered and
+  partial-failure states.
+- **Engagement rule:** the backend's provider-credentialing switch (`ProviderCredentialEligibility.adopted`). Fixes a
+  pre-existing truthfulness defect: provider-invited consultants were listed (and counted on Home and in the Direct
+  approval queue) as "Direct · Awaiting approval" although the backend refuses that approval.
+- **Clinician pages:** provider (Overview · Setup · Credentials · Professional Relationships · Prices · Schedule) and
+  Direct (Overview · Credential & case approval · Price list · Account access); tabs gated by capability; professional
+  profile read-back with a localized country picker; credential status and case eligibility shown separately.
+- **Add clinician → Consultant Setup:** one short invitation screen (audit note prefilled under a disclosure); the wizard
+  is replaced by a six-section checklist with status, owner (from seeded grants), what remains and the caller's own
+  actions; reviewers get only an *Open review* link; activation keeps Decision D.
+- **Routes:** new `/providers/clinicians`, `/new`, `/{org}/{practitioner}`, `/direct/{id}`; every
+  `/providers/consultants/**`, `/providers/onboarding/new` and old clinician pricing/availability URL redirects.
+- **Backend (read-only):** `GET /api/v1/admin/providers/clinicians[?organizationId=]` (bounded, organization-filtered as
+  the organization list, 3 queries); `providerCredentialing` on `GET /admin/practitioners`. No write, migration or
+  authorization change.
+- **Verification:** frontend typecheck clean, **314 tests / 45 files** (3 consecutive runs); backend full regression
+  **495 tests, 0 failures, 1 skipped**; limited live sanity on the rebuilt tunnel stack (12 views EN/AR, desktop/mobile;
+  two layout defects and one focus defect found and fixed).
+
+### UX-3 COMPLETE: YES
+### UX-4 READY: NO — the provider-persona data-access matrix still has UNDECIDED patient/case rows (UX-3 record §18)
+
 ## UX-2 — Control Center shell, navigation, Home, terminology — 2026-09-24 (Claude Code)
 
 Scope stayed inside UX-2: no Provider Workspace, no Consultant Setup / directory, Access, Credential, Coordination or

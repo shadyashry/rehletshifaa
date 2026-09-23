@@ -171,7 +171,7 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
                   <section className="cc-card" key={code} style={{ marginBottom: 14 }}>
                     <h3 style={{ marginTop: 0 }}>{sorted[0]?.serviceName ?? code} <small className="cc-meta">({code})</small></h3>
                     {eff && eff !== "none" ? (
-                      <p className="cc-meta"><span className="cc-badge cc-ready">{t.effectivePriceLabel}: {money(eff.amount, eff.currency, locale)}</span> · {priceScopeLabel(eff.sourceLevel, locale)}</p>
+                      <p className="cc-meta"><span className="cc-badge cc-ready">{t.effectivePriceLabel}: {money(eff.amount, eff.currency, locale)}</span> · {eff.sourceLevel === "ORGANIZATION" ? (locale === "ar" ? "يُطبَّق سعر الجهة" : "Using organization price") : priceScopeLabel(eff.sourceLevel, locale)}</p>
                     ) : <p className="cc-empty">{t.noPriceForService}</p>}
                     <ul className="cc-stepper">
                       {sorted.map((p) => (
