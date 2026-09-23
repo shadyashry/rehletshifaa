@@ -167,7 +167,7 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
   return (
     <ControlCenterShell
       locale={locale} active="journeys"
-      crumbs={[{ label: t.breadcrumbJourneys, href: `/${locale}/portal/journeys` }, { label: detail?.definition.name ?? t.breadcrumbVersions, href: `/${locale}/portal/journeys/${definitionId}` }, { label: version ? `${t.versionNumber} ${version.number}` : t.breadcrumbDesigner }]}
+      crumbs={[{ label: locale === "ar" ? "مركز التحكم" : "Control Center", href: `/${locale}/portal/control-center` }, { label: t.breadcrumbJourneys, href: `/${locale}/portal/control-center/journeys` }, { label: detail?.definition.name ?? t.breadcrumbVersions, href: `/${locale}/portal/control-center/journeys/${definitionId}` }, { label: version ? `${t.versionNumber} ${version.number}` : t.breadcrumbDesigner }]}
       title={detail?.definition.name ?? t.designer}
       intro={version ? `${t.versionNumber} ${version.number} · ${journeyStatusLabel(version.status, locale)}` : undefined}
       actions={actions}
@@ -276,7 +276,7 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
           )}
 
           <p className="cc-meta" style={{ marginTop: 20 }}>
-            <Link href={`/${locale}/portal/journeys/${definitionId}`}>{t.backToVersions}</Link>
+            <Link href={`/${locale}/portal/control-center/journeys/${definitionId}`}>{t.backToVersions}</Link>
           </p>
         </>
       )}

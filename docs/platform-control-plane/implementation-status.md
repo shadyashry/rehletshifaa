@@ -1,5 +1,15 @@
 # Platform Control Plane — implementation status
 
+## Admin UX simplification (pre-Phase 8C) — 2026-09-23 (Claude Code)
+
+Scope: Control Center information architecture, routes, naming, task grouping and onboarding flow. No business rule, authorization, readiness semantic or Journey cutover change; Journey production intake stays OFF; Phase 8C not started. Full record (IA, old→new route map, terminology, parity checklist, debt): [admin-ux-redesign.md](admin-ux-redesign.md).
+
+- One shell and one entry: the portal "Administration" console, the Provider Control Center, "Roles & Access" (`/portal/access`) and Journeys (`/portal/journeys`) are now one **Control Center** with grouped, capability-gated navigation (`control-center-nav.ts`, one `/admin/access/me` read per shell). Legacy-console areas keep the backend's own realm-role gate via `legacyAdministration()`.
+- New **Overview** (real attention counts only), **Add consultant** wizard (4 milestones over the unchanged readiness model; first UI for profile completion, credential requirements, evidence upload/submission and clinician activation), **Consultant workspace**, **Practice team**, **Credential reviews** queue, **Commercial setup** (Pricing with visual inheritance, Availability), **Staff & teams**, **Identity checks**, and **Access & governance** reorganised as User access / Roles (5-step wizard) / Effective access / Permissions / Audit.
+- Every old route still resolves (redirects for role pages, clinician pricing/availability, `/portal/journeys/**`, `/portal/access?tab=`).
+- Backend: one additive read field, `MemberView.displayName` (no schema/permission change).
+- Verification: frontend typecheck clean; **246 tests / 37 files** pass. Backend **481 tests / 54 suites, 0 failures, 0 errors, 1 intentional skip**. Live visual review on the rebuilt tunnel stack (synthetic session + fixtures, 15 pages × desktop/mobile × EN/AR): no page errors, no horizontal overflow; defects found and fixed during review are listed in test-status.md.
+
 ## Phase 8B — runtime reliability and recovery — 2026-09-23 (Codex start, Claude Code completion)
 
 Scope stayed inside Phase 8B. No Phase 8C/8D work, no Journey enablement, no new infrastructure, Flyway unchanged at V50. Full detail, classification table and severity list: [phase-8b-reliability-status.md](phase-8b-reliability-status.md).

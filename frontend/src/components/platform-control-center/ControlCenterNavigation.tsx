@@ -1,22 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@/components/AuthProvider";
-import { apiFetchAs } from "@/lib/api";
+import { LayoutDashboard } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
+import { useControlCenterAccess } from "./control-center-access";
+import { NAV_ITEMS, ccHref } from "./control-center-nav";
 
+/**
+ * The single way into the Control Center from the portal. Shown only when the caller can use at least one
+ * Control Center area (exact capability keys, or the legacy administration role check the backend applies).
+ */
 export function ControlCenterNavigation({ locale }: { locale: Locale }) {
-  const { user } = useAuth();
-  const [allowed, setAllowed] = useState(false);
-  useEffect(() => {
-    let active = true; setAllowed(false);
-    if (user) void apiFetchAs(user.access_token, "/admin/access/me").then(async (r) => {
-      if (!r.ok) return;
-      const decisions = await r.json() as { permission: string; allowed: boolean }[];
-      if (active) setAllowed(decisions.some((d) => d.permission === "provider.view" && d.allowed));
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [user]);
-  return allowed ? <Link className="btn-secondary my-3 inline-flex" href={"/" + locale + "/portal/control-center"}>{locale === "ar" ? "مركز تحكم مقدمي الرعاية" : "Provider Control Center"}</Link> : null;
+  const access = useControlCenterAccess();
+  const allowed = !access.loading && NAV_ITEMS.some((i) => i.key !== "overview" && i.visible(access));
+  return allowed ? <Link className="btn-secondary my-3 inline-flex items-center gap-2" href={ccHref(locale)}><LayoutDashboard size={16} aria-hidden />{locale === "ar" ? "مركز التحكم" : "Control Center"}</Link> : null;
 }

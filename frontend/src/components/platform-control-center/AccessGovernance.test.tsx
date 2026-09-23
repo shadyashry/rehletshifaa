@@ -1,114 +1,121 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { AccessGovernance } from "./AccessGovernance";
-import { AccessNavigation } from "./AccessNavigation";
 import { apiFetchAs } from "@/lib/api";
+import { fakeApi, providerDetail, organization } from "./test-support";
 
-const auth=vi.hoisted(()=>({user:{access_token:"test",profile:{sub:"owner"}},loading:false,signIn:vi.fn()}));
-vi.mock("@/components/AuthProvider",()=>({useAuth:()=>auth}));
-vi.mock("@/lib/api",()=>({apiFetchAs:vi.fn()}));
-const role={id:"role-1",key:"PRACTICE_MANAGER",name:"Practice Manager",purpose:"Manage practice operations within assigned scope",description:"Practice operations",family:"PROVIDER",systemTemplate:true};
-const permission={key:"access.role.view",name:"View roles and capabilities",family:"access",risk:"LOW",scopes:["PLATFORM"],actors:["GOVERNANCE"],channels:["ADMIN_WEB"],dependencies:[],conflicts:[],executable:true};
-const capabilities=["access.role.view","access.role.create","access.role.edit_draft","access.role.publish","access.role.simulate","access.effective_access.view","access.audit.view"];
-beforeEach(()=>{
-  vi.mocked(apiFetchAs).mockImplementation(async (_token,path)=>{
-    const result=path.endsWith("/me")?capabilities.map(permission=>({permission,allowed:true,reason:"ALLOWED"}))
-      :path.includes("/permissions")?[permission]:path.includes("/effective-access")?{subject:"owner",sources:[],relationships:[],decisions:[{permission:"access.role.view",allowed:false,reason:"INACTIVE_MEMBERSHIP"}]}
-      :path.includes("/roles/")?{role,versions:[{version:{id:"v1",number:1,status:"PUBLISHED",revision:0,actorType:"PRACTICE_OPERATIONS",channel:"STAFF_WEB",createdBy:"maker"},grants:[]}]}
-      :[role];
-    return new Response(JSON.stringify(result),{status:200});
-  });
-});
-afterEach(()=>{cleanup();vi.clearAllMocks();auth.user={access_token:"test",profile:{sub:"owner"}};});
-describe("Access governance business interface",()=>{
-  it("renders business roles and keeps capability keys in advanced details",async()=>{
-    render(<AccessGovernance locale="en"/>);
-    expect(await screen.findByRole("button",{name:/Practice Manager/})).toBeVisible();
+const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "owner" } } as { access_token: string; profile: { sub: string } }, roles: [] as string[], loading: false, signIn: vi.fn() }));
+vi.mock("@/components/AuthProvider", () => ({ useAuth: () => auth }));
+vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
+
+const role = { id: "role-1", key: "PRACTICE_MANAGER", name: "Practice Manager", purpose: "Manage practice operations within assigned scope", description: "Practice operations", family: "PROVIDER", systemTemplate: true };
+const permission = { key: "access.role.view", name: "View roles and capabilities", family: "access", risk: "LOW", scopes: ["PLATFORM"], actors: ["GOVERNANCE"], channels: ["ADMIN_WEB"], dependencies: [], conflicts: [], executable: true };
+const capabilities = ["access.role.view", "access.role.create", "access.role.edit_draft", "access.role.publish", "access.role.simulate", "access.effective_access.view", "access.audit.view", "access.assignment.manage", "provider.view"];
+const roleDetail = { role, versions: [{ version: { id: "v1", number: 1, status: "PUBLISHED", revision: 0, actorType: "PRACTICE_OPERATIONS", channel: "STAFF_WEB", createdBy: "maker" }, grants: [{ permission: "access.role.view", scope: "PLATFORM", relationship: null }] }] };
+const denied = { subject: "kc-manager", organizationId: "org-a", sources: [], relationships: [], decisions: [{ permission: "access.role.view", allowed: false, reason: "INACTIVE_MEMBERSHIP", roleVersionId: null, scope: null, relationship: null }] };
+const routes = {
+  "/admin/access/roles?offset=0": [role], "/admin/access/permissions": [permission], "/admin/access/roles/role-1": roleDetail,
+  "/admin/providers": [organization], "/admin/providers/org-a": providerDetail,
+  "/admin/access/effective-access?subject=kc-manager&organization=org-a": denied,
+};
+beforeEach(() => { auth.user = { access_token: "test", profile: { sub: "owner" } }; vi.mocked(apiFetchAs).mockImplementation(fakeApi(routes, capabilities)); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+describe("Access & governance", () => {
+  it("renders business roles and keeps capability keys in advanced details", async () => {
+    render(<AccessGovernance locale="en" view="roles" />);
+    expect(await screen.findByRole("button", { name: /Practice Manager/ })).toBeVisible();
     expect(screen.queryByText("PRACTICE_MANAGER")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button",{name:"Capabilities"}));
-    expect(screen.getByText("View roles and capabilities")).toBeVisible();
-    const code=screen.getByText("access.role.view");expect(code.closest("details")).not.toHaveAttribute("open");
+    cleanup();
+    render(<AccessGovernance locale="en" view="permissions" />);
+    expect(await screen.findByText("View roles and capabilities")).toBeVisible();
+    expect(screen.getByText("access.role.view").closest("details")).not.toHaveAttribute("open");
     expect(screen.queryByText(/Keycloak|JWT|Spring Security/)).not.toBeInTheDocument();
   });
-  it("provides eleven labelled configuration steps and Arabic RTL controls",async()=>{
-    const {container}=render(<AccessGovernance locale="ar"/>);
-    await screen.findByRole("button",{name:/مدير العيادة/});
-    expect(container.querySelector("main")).toHaveAttribute("dir","rtl");
-    fireEvent.click(screen.getByRole("button",{name:"إنشاء دور"}));
-    expect(screen.getByRole("list",{name:"إنشاء دور"}).querySelectorAll("button")).toHaveLength(11);
+
+  it("groups role creation into five labelled steps with Arabic RTL controls", async () => {
+    const { container } = render(<AccessGovernance locale="ar" view="roles" />);
+    await screen.findByRole("button", { name: /مدير العيادة/ });
+    expect(container.querySelector(".cc")).toHaveAttribute("dir", "rtl");
+    fireEvent.click(screen.getByRole("button", { name: /إنشاء دور/ }));
+    expect(screen.getByRole("list", { name: "إنشاء دور" }).querySelectorAll("button")).toHaveLength(5);
     expect(screen.getByLabelText("اسم الدور")).toBeVisible();
-    expect(screen.getByRole("button",{name:"حفظ المسودة"})).toBeDisabled();
-    fireEvent.click(screen.getByRole("button",{name:"4. نطاق البيانات"}));
-    expect(screen.getByRole("button",{name:"4. نطاق البيانات"})).toHaveAttribute("aria-current","step");
+    expect(screen.getByRole("button", { name: "حفظ المسودة" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "3. النطاق" }));
+    expect(screen.getByRole("button", { name: "3. النطاق" })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("متقدم: المشاركة في الرحلة وقناة الوصول").closest("details")).not.toHaveAttribute("open");
   });
-  it("shows explicit denial explanations for effective access",async()=>{
-    render(<AccessGovernance locale="en"/>);
-    await screen.findByRole("button",{name:/Practice Manager/});
-    fireEvent.click(screen.getByRole("button",{name:"Effective access"}));
-    fireEvent.change(screen.getByLabelText("Account identifier"),{target:{value:"owner"}});
-    fireEvent.click(screen.getByRole("button",{name:"Review access"}));
-    expect(await screen.findByText("Not allowed")).toBeVisible();
+
+  it("explains a denial in business words, found by person name rather than account identifier", async () => {
+    render(<AccessGovernance locale="en" view="effective" />);
+    fireEvent.change(await screen.findByLabelText(/Find a person/), { target: { value: "Mona" } });
+    fireEvent.click(within(await screen.findByRole("list", { name: "Results" })).getByRole("button", { name: "Select" }));
+    expect(await screen.findByRole("heading", { name: "Mona Adel" })).toBeVisible();
+    expect(screen.getAllByText("Not allowed").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText("Why can't they?"));
     expect(screen.getByText("No active membership in this organization")).toBeVisible();
   });
-  it("shows the real backend effective-from/expiry dates for each source, never a computed active/inactive verdict",async()=>{
-    vi.mocked(apiFetchAs).mockImplementation(async(_token,path)=>{
-      const result=path.endsWith("/me")?capabilities.map(permission=>({permission,allowed:true,reason:"ALLOWED"}))
-        :path.includes("/permissions")?[permission]
-        :path.includes("/effective-access")?{subject:"owner",sources:[{assignment:{id:"a1",status:"ACTIVE",scope:"PLATFORM",source:"ASSIGNED",revision:0,effectiveFrom:"2026-01-01T00:00:00Z",effectiveTo:null},roleName:"Practice Manager",version:{number:1},grants:[]},{assignment:{id:"a2",status:"ACTIVE",scope:"PLATFORM",source:"ASSIGNED",revision:0,effectiveFrom:"2026-01-01T00:00:00Z",effectiveTo:"2026-12-31T00:00:00Z"},roleName:"Practice Manager",version:{number:2},grants:[]}],relationships:[],decisions:[]}
-        :path.includes("/roles/")?{role,versions:[{version:{id:"v1",number:1,status:"PUBLISHED",revision:0,actorType:"PRACTICE_OPERATIONS",channel:"STAFF_WEB",createdBy:"maker"},grants:[]}]}
-        :[role];
-      return new Response(JSON.stringify(result),{status:200});
-    });
-    render(<AccessGovernance locale="en"/>);
-    await screen.findByRole("button",{name:/Practice Manager/});
-    fireEvent.click(screen.getByRole("button",{name:"Effective access"}));
-    fireEvent.change(screen.getByLabelText("Account identifier"),{target:{value:"owner"}});
-    fireEvent.click(screen.getByRole("button",{name:"Review access"}));
+
+  it("shows the real backend effective-from and expiry dates for each source", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes, "/admin/access/effective-access?subject=kc-manager&organization=org-a": { ...denied, sources: [
+      { assignment: { id: "a1", subject: "kc-manager", organizationId: "org-a", status: "ACTIVE", scope: "PLATFORM", source: "ADMINISTRATIVE", revision: 0, effectiveFrom: "2026-01-01T00:00:00Z", effectiveTo: null }, roleName: "Practice Manager", version: { id: "v1", number: 1 }, grants: [] },
+      { assignment: { id: "a2", subject: "kc-manager", organizationId: "org-a", status: "ACTIVE", scope: "ORGANIZATION", source: "ADMINISTRATIVE", revision: 0, effectiveFrom: "2026-01-01T00:00:00Z", effectiveTo: "2027-01-01T00:00:00Z" }, roleName: "Practice Manager", version: { id: "v1", number: 1 }, grants: [] },
+    ] } }, capabilities));
+    render(<AccessGovernance locale="en" view="users" initialSubject="kc-manager" initialOrganization="org-a" />);
     expect(await screen.findByText(/No expiry/)).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Mona Adel" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "kc-manager" })).not.toBeInTheDocument();
     expect(screen.getByText(/^Expires at/)).toBeVisible();
     expect(screen.getAllByText(/^Starts at/).length).toBe(2);
   });
-  it("fails closed on navigation and on a denied page",async()=>{
-    vi.mocked(apiFetchAs).mockResolvedValue(new Response(JSON.stringify([{permission:"access.role.view",allowed:false}]),{status:200}));
-    const navigation=render(<AccessNavigation locale="en"/>);
-    await waitFor(()=>expect(apiFetchAs).toHaveBeenCalled());
-    expect(screen.queryByRole("link",{name:"Roles & Access"})).not.toBeInTheDocument();navigation.unmount();
-    render(<AccessGovernance locale="en"/>);
+
+  it("gives access person-first: role, scope, validity, then review and confirm", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes, "POST /admin/access/assignments": { status: "PENDING" } }, capabilities));
+    render(<AccessGovernance locale="en" view="users" initialSubject="kc-manager" initialOrganization="org-a" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Give access/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /Practice Manager/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("radio", { name: "Platform governance" })).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    const confirm = screen.getByRole("button", { name: "Confirm access" });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Reason for giving access/), { target: { value: "Covers the Nile Care practice" } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/access/assignments", expect.objectContaining({ method: "POST", body: expect.stringContaining("\"versionId\":\"v1\"") })));
+    expect(await screen.findByText("Access saved: Pending verification")).toBeVisible();
+  });
+
+  it("fails closed on a denied page", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({}, []));
+    render(<AccessGovernance locale="en" view="roles" />);
     expect(await screen.findByText(/You do not have access/)).toBeVisible();
-    expect(screen.queryByRole("button",{name:"Create role"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Create role/ })).not.toBeInTheDocument();
   });
-  it("renders a recoverable error without stale role data",async()=>{
-    vi.mocked(apiFetchAs).mockRejectedValue(new Error("We could not complete this request."));
-    render(<AccessGovernance locale="en"/>);
+
+  it("renders a recoverable error without stale role data", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/access/roles?offset=0": new Response("{}", { status: 500 }) }, capabilities));
+    render(<AccessGovernance locale="en" view="roles" />);
     expect(await screen.findByRole("alert")).toBeVisible();
-    expect(screen.getByRole("button",{name:"Refresh"})).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
   });
-  it("honors initialTab (from the Control Center's deep-linking sidebar) and auto-loads that tab's own data",async()=>{
-    vi.mocked(apiFetchAs).mockImplementation(async(_token,path)=>{
-      if(path.endsWith("/me")) return new Response(JSON.stringify(capabilities.map(permission=>({permission,allowed:true,reason:"ALLOWED"}))),{status:200});
-      if(path.includes("/permissions")) return new Response(JSON.stringify([permission]),{status:200});
-      if(path.includes("/audit")) return new Response(JSON.stringify([{actor:"owner",entity:"role-1",action:"ROLE_PUBLISHED",outcome:"SUCCESS",reason:"Initial publication",occurredAt:"2026-01-01T00:00:00Z"}]),{status:200});
-      return new Response(JSON.stringify([role]),{status:200});
-    });
-    render(<AccessGovernance locale="en" initialTab="audit"/>);
-    expect(await screen.findByRole("button",{name:"Access history"})).toHaveAttribute("aria-current","page");
+
+  it("loads the audit view's own data", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes, "/admin/access/audit": [{ actor: "owner", entity: "role-1", action: "ROLE_PUBLISHED", outcome: "SUCCESS", reason: "Initial publication", occurredAt: "2026-01-01T00:00:00Z" }] }, capabilities));
+    render(<AccessGovernance locale="en" view="audit" />);
     expect(await screen.findByText("role published")).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: "Audit" })).toBeVisible();
   });
-  it("keeps the open Effective Access panel when the access token silently renews (same subject, new object)",async()=>{
-    const {rerender}=render(<AccessGovernance locale="en"/>);
-    await screen.findByRole("button",{name:/Practice Manager/});
-    fireEvent.click(screen.getByRole("button",{name:"Effective access"}));
-    fireEvent.change(screen.getByLabelText("Account identifier"),{target:{value:"owner"}});
-    fireEvent.click(screen.getByRole("button",{name:"Review access"}));
-    expect(await screen.findByText("Not allowed")).toBeVisible();
+
+  it("keeps an open panel when the access token silently renews (same subject, new object)", async () => {
+    const { rerender } = render(<AccessGovernance locale="en" view="users" initialSubject="kc-manager" initialOrganization="org-a" />);
+    expect(await screen.findByText("No matching access assignment.")).toBeVisible();
     vi.mocked(apiFetchAs).mockClear();
-    // oidc-client-ts's automaticSilentRenew fires userLoaded with a brand-new `user` object on the same subject
-    // every time the access token renews; this must not re-run the full initial fetch or discard the open panel.
-    auth.user={access_token:"renewed",profile:{sub:"owner"}};
-    rerender(<AccessGovernance locale="en"/>);
-    expect(screen.getByText("Not allowed")).toBeVisible();
-    expect(screen.getByRole("button",{name:"Effective access"})).toHaveAttribute("aria-current","page");
+    auth.user = { access_token: "renewed", profile: { sub: "owner" } };
+    rerender(<AccessGovernance locale="en" view="users" initialSubject="kc-manager" initialOrganization="org-a" />);
+    expect(screen.getByText("No matching access assignment.")).toBeVisible();
     expect(apiFetchAs).not.toHaveBeenCalled();
   });
 });

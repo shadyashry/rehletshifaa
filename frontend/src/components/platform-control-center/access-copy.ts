@@ -1,7 +1,7 @@
 import type { Locale } from "@/lib/i18n";
 
 export const accessCopy = {
-  en: { title:"Roles & Access", intro:"Define responsibilities, review capabilities and understand who can do what.",
+  en: { title:"Access & governance", intro:"Decide who can do what, and understand why.",
     roles:"Role catalogue", permissions:"Capabilities", effective:"Effective access", audit:"Access history",
     loading:"Loading access governance…", denied:"You do not have access to this area. Ask your access governance manager.",
     error:"We could not complete this request. Refresh and try again.", retry:"Refresh", signin:"Sign in securely", back:"Back to workspace",
@@ -9,7 +9,7 @@ export const accessCopy = {
     future:"Available in a later phase", risk:"Sensitivity", scope:"Data scope", relationship:"Required relationship",
     version:"Version", history:"Version history", edit:"Create new draft", resume:"Configure draft", close:"Back to catalogue",
     purpose:"Role purpose", name:"Business name", description:"Description", base:"Base template", capabilities:"Business capabilities",
-    steps:["Purpose","Base template","Capabilities","Data scope","Relationships","Sensitive data","Journey participation","Channels","Constraints","Simulate","Review & publish"],
+    steps:["Role purpose","Permissions","Scope","Restrictions & checks","Review & publish"],
     next:"Continue", previous:"Back", save:"Save draft", validate:"Validate configuration", publish:"Publish version", retire:"Retire version",
     reason:"Reason for change", effectiveDate:"Effective from", saved:"Draft saved.", valid:"Configuration validated.", invalid:"Resolve the following checks before publishing.",
     independent:"An independent authorized reviewer must publish. Published versions are preserved; assignments keep their selected version.",
@@ -24,7 +24,7 @@ export const accessCopy = {
     grant:"Grant access", revoke:"Revoke access", assignment:"Role assignment", roleVersion:"Published role version", noAccess:"No matching access assignment.",
     choose:"Choose", technical:"Registered capability", review:"Review", date:"Date", action:"Action", outcome:"Outcome",
   },
-  ar: { title:"الأدوار والوصول", intro:"حدد المسؤوليات وراجع الصلاحيات وافهم ما يستطيع كل شخص القيام به.",
+  ar: { title:"الوصول والحوكمة", intro:"حدد من يستطيع فعل ماذا، وافهم السبب.",
     roles:"دليل الأدوار", permissions:"الصلاحيات", effective:"الوصول الفعلي", audit:"سجل الوصول",
     loading:"جارٍ تحميل حوكمة الوصول…", denied:"ليس لديك وصول إلى هذه المساحة. تواصل مع مدير حوكمة الوصول.",
     error:"تعذر إكمال الطلب. حدّث الصفحة وحاول مجددًا.", retry:"تحديث", signin:"تسجيل الدخول الآمن", back:"العودة إلى مساحة العمل",
@@ -32,7 +32,7 @@ export const accessCopy = {
     future:"متاح في مرحلة لاحقة", risk:"الحساسية", scope:"نطاق البيانات", relationship:"العلاقة المطلوبة",
     version:"الإصدار", history:"سجل الإصدارات", edit:"إنشاء مسودة جديدة", resume:"إعداد المسودة", close:"العودة إلى الدليل",
     purpose:"الغرض من الدور", name:"اسم الدور", description:"الوصف", base:"القالب الأساسي", capabilities:"صلاحيات الأعمال",
-    steps:["الغرض","القالب الأساسي","الصلاحيات","نطاق البيانات","العلاقات","البيانات الحساسة","المشاركة في الرحلة","قنوات الوصول","الضوابط","المحاكاة","المراجعة والنشر"],
+    steps:["الغرض من الدور","الصلاحيات","النطاق","القيود والفحص","المراجعة والنشر"],
     next:"متابعة", previous:"رجوع", save:"حفظ المسودة", validate:"التحقق من الإعداد", publish:"نشر الإصدار", retire:"إيقاف الإصدار",
     reason:"سبب التغيير", effectiveDate:"ساري من", saved:"تم حفظ المسودة.", valid:"تم التحقق من الإعداد.", invalid:"عالج الملاحظات التالية قبل النشر.",
     independent:"يجب أن ينشر مراجع مستقل مخوّل هذا الدور. تُحفظ الإصدارات المنشورة وتبقى التعيينات مرتبطة بإصداراتها.",

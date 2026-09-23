@@ -20,3 +20,8 @@
 .ag[dir=rtl] .ag-back svg{transform:rotate(180deg)}
 @media(max-width:900px){.ag-editor{grid-template-columns:minmax(0,1fr)}.ag-preview{position:static}.ag-effective-form{grid-template-columns:1fr}}
 @media(max-width:600px){.ag{padding:18px 16px 40px}.ag h1{font-size:24px}.ag-header{align-items:start;flex-direction:column;gap:8px}.ag-tabs{gap:0}.ag-tabs button{padding:8px 10px}.ag-capabilities>li{flex-direction:column;gap:8px}.ag-decisions li{grid-template-columns:1fr;gap:4px}.ag-role-link>span:last-child{display:none}.ag-steps{max-height:200px;overflow:auto}.ag-toolbar>button{flex:1}.ag :is(input,select,textarea){max-width:100%}}
+/* Embedded in the Control Center shell: the shell owns width, padding and the page header. */
+.ag.ag-embedded{max-width:none;margin:0;padding:0}
+.ag.ag-embedded h2{margin-top:6px}
+.ag.ag-embedded .ag-steps{border-top:0;padding-top:6px}
+.ag.ag-embedded .ag-capabilities>li{align-items:flex-start}

@@ -1,52 +1,57 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { ProviderOrganizationDetail } from "./ProviderOrganizationDetail";
 import { apiFetchAs } from "@/lib/api";
+import { fakeApi, providerDetail, readiness } from "./test-support";
 
 vi.mock("@/components/AuthProvider", () => {
-  const auth = { user: { access_token: "test", profile: { sub: "owner" } }, loading: false, signIn: vi.fn() };
+  const auth = { user: { access_token: "test", profile: { sub: "owner" } }, roles: [], loading: false, signIn: vi.fn() };
   return { useAuth: () => auth };
 });
 vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 
-const organization = { id: "org-a", legalName: "Nile Care LLC", businessName: "Nile Care", displayName: "Nile Care Clinic", type: "CLINIC", status: "ONBOARDING", countryCode: "EG", timeZone: "Africa/Cairo", defaultCurrency: "EGP", legacyMappingStatus: "REVIEWED", version: 0 };
-const owner = { subject: "dr-owner", kind: "PRACTICE_STAFF" as const, practitionerId: null, status: "ACTIVE", effectiveFrom: "2026-01-01T00:00:00Z", effectiveTo: null, invitationStatus: "ACTIVE", revision: 0, roles: ["ORGANIZATION_OWNER"] };
-const consultant = { subject: "dr-consultant", kind: "CLINICIAN" as const, practitionerId: "prac-1", status: "ACTIVE", effectiveFrom: "2026-01-01T00:00:00Z", effectiveTo: null, invitationStatus: "ACTIVE", revision: 0, roles: ["CONSULTANT"] };
-const detail = { organization, members: [owner, consultant], relationships: [] };
-const readiness = {
-  identityProvisioned: true, organizationMembershipActive: true, providerProfileComplete: true, clinicianProfileComplete: true,
-  requiredCredentialsSubmitted: true, requiredCredentialsVerified: false, mandatoryCredentialsUnexpired: true, requiredRelationshipsComplete: true,
-  pricingSetupRequired: true, pricingSetupComplete: false, availabilitySetupRequired: true, availabilitySetupComplete: false,
-  credentialReady: false, blockers: [{ code: "CREDENTIAL_AWAITING_VERIFICATION", message: "Medical license is awaiting verification." }],
-  readyForActivation: false, evaluatedAt: "2026-09-22T00:00:00Z",
-};
-const onboarding = { organizationId: "org-a", practitionerId: "prac-1", clinicianType: "CONSULTANT", status: "DOCUMENTS_SUBMITTED", jurisdiction: "AE", version: 0, ownerSubject: "dr-consultant" };
-
+const verifying = readiness({ requiredCredentialsVerified: false, pricingSetupComplete: true, availabilitySetupComplete: true, blockers: [{ code: "CREDENTIAL_AWAITING_VERIFICATION", message: "Medical licence is awaiting verification." }] });
+const caps = ["provider.view", "provider.activate", "provider.member.invite", "provider.member.deactivate", "provider.relationship.manage", "provider.clinician.invite", "provider.practice_staff.manage"];
 beforeEach(() => {
-  vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
-    if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify(["provider.view", "provider.activate"].map((permission) => ({ permission, allowed: true }))), { status: 200 });
-    if (path === "/admin/providers/org-a") return new Response(JSON.stringify(detail), { status: 200 });
-    if (path === "/admin/providers/org-a/clinicians/prac-1/onboarding") return new Response(JSON.stringify(onboarding), { status: 200 });
-    if (path === "/admin/providers/org-a/clinicians/prac-1/readiness") return new Response(JSON.stringify(readiness), { status: 200 });
-    return new Response(JSON.stringify({}), { status: 200 });
-  });
+  vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers/org-a": providerDetail, "/admin/providers/org-a/clinicians/prac-1/readiness": verifying }, caps));
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-describe("Guided provider onboarding", () => {
-  it("shows the real backend readiness blocker count and links straight to the filtered credential queue", async () => {
-    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Onboarding & readiness" }));
-    expect(await screen.findByText("1 credential needs review")).toBeVisible();
-    const link = screen.getByRole("link", { name: /Review in credential queue/ });
-    expect(link).toHaveAttribute("href", "/en/portal/control-center/credentials?org=org-a");
+describe("Organization workspace", () => {
+  it("shows the real backend readiness and links straight to the filtered credential reviews", async () => {
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="setup" />);
+    expect(await screen.findByText("1 clinician(s) still need verified credentials")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open reviews" })).toHaveAttribute("href", "/en/portal/control-center/credentials?org=org-a");
+    expect(screen.getByRole("button", { name: "Activate organization" })).toBeInTheDocument();
+    expect(screen.queryByText(/Phase 5A/)).not.toBeInTheDocument();
   });
 
-  it("never claims activation readiness itself; it only renders the backend's own decision", async () => {
-    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Onboarding & readiness" }));
-    await screen.findByText("1 credential needs review");
-    expect(screen.getByRole("button", { name: /Activate provider organization/ })).toBeInTheDocument();
+  it("lists people by name and business role, never by account identifier", async () => {
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="people" />);
+    expect(await screen.findByRole("link", { name: "Dr Salma Farouk" })).toHaveAttribute("href", "/en/portal/control-center/providers/consultants/org-a/prac-1");
+    expect(screen.getByRole("heading", { name: "Practice managers" })).toBeVisible();
+    expect(screen.getByText("Mona Adel")).toBeVisible();
+    expect(screen.getByText("Invitation pending")).toBeVisible();
+    expect(screen.queryByText("kc-manager")).not.toBeInTheDocument();
+  });
+
+  it("groups row actions and separates the destructive one", async () => {
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="people" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Actions: Dr Salma Farouk" }));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: "Remove from organization" })).toHaveClass("cc-menu-danger");
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+  });
+
+  it("links a practice manager to a consultant with the unchanged relationship key", async () => {
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="people" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Actions: Mona Adel" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add a managed consultant" }));
+    fireEvent.change(within(screen.getByRole("dialog")).getByRole("combobox"), { target: { value: "kc-consultant" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/providers/org-a/relationships", expect.objectContaining({ method: "POST", body: expect.stringContaining("\"type\":\"MANAGES\"") })));
   });
 });

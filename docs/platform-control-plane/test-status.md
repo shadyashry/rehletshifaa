@@ -1,5 +1,13 @@
 # Platform Control Plane — verification status
 
+## Admin UX simplification verification — 2026-09-23 (Claude Code)
+
+- Frontend: `pnpm typecheck` clean; `pnpm test` **246 tests / 37 files** green. New suites: `ControlCenterShell` (capability-gated grouped nav, legacy role areas, header/breadcrumb, mobile toggle, RTL), `ControlCenterOverview` (real counts, empty state), `ConsultantOnboardingWizard` (validation, provider + direct invite, resume step, profile save with version, activation gating, workspace), `CareOperations` (staff lead assignment and `_LEAD` invite parity, auditor read-only, direct approval/reject reason, price list, FX pin), `routes` (old URL redirects, error copy, status icon+text, action menu). Rewritten: organization list/detail, credential queue/review, access governance (5-step wizard, person-first User access, effective access).
+- Playwright specs updated for moved screens only (`access-governance.spec.ts`: 5 steps, new route; `portal-ux.spec.ts`: Staff & teams). Not run in this session; Phase 8C owns E2E.
+- Backend: `mvn -o -q test` **481 tests / 54 suites, 0 failures, 0 errors, 1 skip**; `ProviderOrganizationIntegrationTest` asserts the new `displayName`.
+- Live: canonical base+tunnel rebuild; scripted capture of 15 Control Center pages in EN/AR desktop (1440 px) and mobile (390 px) with fixture data: 0 page errors, 0 horizontal overflow. Fixed during review: a server page importing a constant from a client module (RSC render error on the consultant workspace), a duplicated single-item breadcrumb, colour-only tab attention dots, deep-linked User access showing an account identifier, and a tall mobile filter stack.
+- `eslint`: remaining findings are the repository-wide `react-hooks/set-state-in-effect` load pattern (present in previously accepted files); no new rule categories.
+
 ## Phase 8B reliability verification — 2026-09-23 (Claude Code, continuing Codex)
 
 Focused suites (all green):

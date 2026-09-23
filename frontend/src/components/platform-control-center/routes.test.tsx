@@ -1,0 +1,71 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { ActionMenu, ControlCenterError, ErrorNotice, StatusBadge, friendlyError } from "./cc-ui";
+
+const redirect = vi.hoisted(() => vi.fn((url: string) => { throw new Error("REDIRECT:" + url); }));
+vi.mock("next/navigation", () => ({ redirect, notFound: () => { throw new Error("NOT_FOUND"); } }));
+afterEach(() => { cleanup(); redirect.mockClear(); });
+
+const go = async (load: () => Promise<{ default: (a: never) => Promise<unknown> }>, params: Record<string, string>, searchParams: Record<string, string> = {}) => {
+  const page = (await load()).default;
+  await expect(page({ params: Promise.resolve(params), searchParams: Promise.resolve(searchParams) } as never)).rejects.toThrow(/REDIRECT:/);
+  return redirect.mock.calls.at(-1)?.[0];
+};
+
+describe("Old admin deep links keep working", () => {
+  it("sends Roles & Access tabs to Access & governance", async () => {
+    expect(await go(() => import("@/app/[locale]/portal/access/page"), { locale: "en" }, { tab: "audit" })).toBe("/en/portal/control-center/access/audit");
+    expect(await go(() => import("@/app/[locale]/portal/access/page"), { locale: "ar" })).toBe("/ar/portal/control-center/access/roles");
+  });
+
+  it("sends journey routes into the Control Center, preserving the designer tab", async () => {
+    expect(await go(() => import("@/app/[locale]/portal/journeys/page"), { locale: "en" })).toBe("/en/portal/control-center/journeys");
+    expect(await go(() => import("@/app/[locale]/portal/journeys/[definitionId]/versions/[versionId]/page"), { locale: "en", definitionId: "d1", versionId: "v1" }, { tab: "simulation" })).toBe("/en/portal/control-center/journeys/d1/versions/v1?tab=simulation");
+  });
+
+  it("sends the former per-role organization pages to the People tab", async () => {
+    for (const r of ["consultants", "associate-doctors", "practice-managers", "assistants"]) {
+      expect(await go(() => import(`@/app/[locale]/portal/control-center/providers/[id]/${r}/page`), { locale: "en", id: "org-a" })).toBe("/en/portal/control-center/providers/org-a?tab=people");
+    }
+  });
+
+  it("sends clinician pricing and availability pages to the consultant workspace", async () => {
+    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/[id]/clinicians/[practitionerId]/pricing/page"), { locale: "en", id: "org-a", practitionerId: "p1" })).toBe("/en/portal/control-center/providers/consultants/org-a/p1?tab=pricing");
+    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/[id]/clinicians/[practitionerId]/availability/page"), { locale: "en", id: "org-a", practitionerId: "p1" })).toBe("/en/portal/control-center/providers/consultants/org-a/p1?tab=availability");
+  });
+
+  it("opens section landing pages on their first task", async () => {
+    expect(await go(() => import("@/app/[locale]/portal/control-center/access/page"), { locale: "en" })).toBe("/en/portal/control-center/access/users");
+    expect(await go(() => import("@/app/[locale]/portal/control-center/commercial/page"), { locale: "en" })).toBe("/en/portal/control-center/commercial/pricing");
+  });
+});
+
+describe("Shared Control Center UI", () => {
+  it("leads with actionable language and keeps the support code secondary", () => {
+    render(<ErrorNotice error={new ControlCenterError("boom", "REQUEST_FAILED", 500)} locale="en" onRetry={() => undefined} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("We couldn't save these changes. Your information has not been lost. Try again.");
+    expect(screen.getByText("REQUEST_FAILED").tagName).toBe("CODE");
+    expect(friendlyError(new ControlCenterError("x", "ACCESS_DENIED", 403), "ar")).toContain("ليس لديك صلاحية");
+    expect(friendlyError(new ControlCenterError("Expiry required", "VALID_EXPIRY_REQUIRED", 400), "en")).toBe("Expiry required");
+  });
+
+  it("never conveys status by colour alone", () => {
+    const { container } = render(<StatusBadge tone="danger">Rejected</StatusBadge>);
+    expect(screen.getByText("Rejected")).toBeVisible();
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+
+  it("opens row actions as an accessible menu and keeps destructive items last and distinct", () => {
+    const remove = vi.fn();
+    render(<ActionMenu label="Actions: Mona" actions={[{ label: "Remove", destructive: true, onSelect: remove }, { label: "Open", onSelect: () => undefined }]} />);
+    const trigger = screen.getByRole("button", { name: "Actions: Mona" });
+    expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.click(trigger);
+    const items = screen.getAllByRole("menuitem");
+    expect(items.map((i) => i.textContent)).toEqual(["Open", "Remove"]);
+    fireEvent.click(items[1]);
+    expect(remove).toHaveBeenCalled();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+});

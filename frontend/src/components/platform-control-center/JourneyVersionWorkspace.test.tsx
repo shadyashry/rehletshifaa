@@ -45,6 +45,6 @@ describe("Journey version workspace", () => {
     render(<JourneyVersionWorkspace locale="en" definitionId="def-1" />);
     await screen.findByText("Published");
     const links = screen.getAllByRole("link", { name: /Open designer/ });
-    expect(links.map((l) => l.getAttribute("href"))).toContain("/en/portal/journeys/def-1/versions/v-1");
+    expect(links.map((l) => l.getAttribute("href"))).toContain("/en/portal/control-center/journeys/def-1/versions/v-1");
   });
 });

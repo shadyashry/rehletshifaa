@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { apiFetchAs } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
-import { ControlCenterShell } from "./ControlCenterShell";
+import { EmptyState, Section } from "./cc-ui";
 import { ccCopy, exceptionTypeLabel } from "./control-center-copy";
 
 type SlotView = { id: string; dayOfWeek: number; startTime: string; endTime: string; timeZone: string; serviceCode: string | null; consultationMode: string | null; location: string | null; effectiveFrom: string; effectiveTo: string | null; status: string; revision: number };
@@ -18,7 +18,11 @@ const EXCEPTION_TYPES = ["LEAVE", "BLOCKED", "CLINIC_CLOSURE", "EXTRA_AVAILABILI
 
 function toLocalInput(iso: string) { const d = new Date(iso); const pad = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 
-export function AvailabilityManagement({ locale, organizationId, practitionerId }: { locale: Locale; organizationId: string; practitionerId: string }) {
+/**
+ * Weekly availability and exceptions for one clinician — an embeddable panel shown inside the consultant workspace,
+ * the onboarding wizard's working-setup step and Commercial setup › Availability.
+ */
+export function AvailabilityManagement({ locale, organizationId, practitionerId, onChanged }: { locale: Locale; organizationId: string; practitionerId: string; onChanged?: () => void }) {
   const t = ccCopy[locale];
   const { user, loading: authLoading, signIn } = useAuth();
   const [schedule, setSchedule] = useState<ScheduleView | null>(null);
@@ -72,7 +76,7 @@ export function AvailabilityManagement({ locale, organizationId, practitionerId 
       const body = { dayOfWeek: Number(slotForm.dayOfWeek), startTime: slotForm.startTime, endTime: slotForm.endTime, timeZone: slotForm.timeZone, serviceCode: slotForm.serviceCode || null, consultationMode: slotForm.consultationMode || null, location: slotForm.location || null, effectiveFrom: slotForm.effectiveFrom, effectiveTo: slotForm.effectiveTo || null, revision: editingSlot?.revision ?? 0 };
       if (editingSlot) await api(`/availability/slots/${editingSlot.id}`, "PUT", body);
       else await api("/availability/slots", "POST", body);
-      setAddingSlot(false); setEditingSlot(null); await refresh();
+      setAddingSlot(false); setEditingSlot(null); await refresh(); onChanged?.();
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   };
 
@@ -81,35 +85,28 @@ export function AvailabilityManagement({ locale, organizationId, practitionerId 
     try {
       const body = { type: exceptionForm.type, startsAt: new Date(exceptionForm.startsAt).toISOString(), endsAt: new Date(exceptionForm.endsAt).toISOString(), timeZone: exceptionForm.timeZone, serviceCode: exceptionForm.serviceCode || null, consultationMode: exceptionForm.consultationMode || null, location: exceptionForm.location || null, reason: exceptionForm.reason || null };
       await api("/availability/exceptions", "POST", body);
-      setAddingException(false); await refresh();
+      setAddingException(false); await refresh(); onChanged?.();
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   };
 
   const removeException = async (ex: ExceptionView) => { setBusy(true); setError(""); try { await api(`/availability/exceptions/${ex.id}?revision=${ex.revision}`, "DELETE"); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
 
-  const crumbs = [
-    { label: t.breadcrumbHome, href: `/${locale}/portal/control-center` },
-    { label: t.breadcrumbProviders, href: `/${locale}/portal/control-center/providers` },
-    { label: organizationId, href: `/${locale}/portal/control-center/providers/${organizationId}` },
-    { label: t.breadcrumbAvailability },
-  ];
-
-  if (authLoading || (loading && !schedule)) return <ControlCenterShell locale={locale} active="providers" crumbs={crumbs} title={t.loading}><p role="status">{t.loading}</p></ControlCenterShell>;
-  if (!user) return <ControlCenterShell locale={locale} active="providers" crumbs={crumbs} title={t.availability}><button onClick={() => void signIn()}>{t.signin}</button></ControlCenterShell>;
+  if (authLoading || (loading && !schedule)) return <p role="status">{t.loading}</p>;
+  if (!user) return <button onClick={() => void signIn()}>{t.signin}</button>;
+  const ar = locale === "ar";
 
   return (
-    <ControlCenterShell locale={locale} active="providers" crumbs={crumbs} title={t.availability}
-      actions={<button type="button" className="cc-secondary" disabled={busy} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden />{t.refresh}</button>}>
+    <div className="cc-panel">
       {error && <p role="alert" className="cc-message">{error}</p>}
       {!allowed("availability.view") ? <p>{t.denied}</p> : !schedule ? <p className="cc-empty">{t.noSelection}</p> : (
         <>
           <p className="cc-meta">{t.timeZoneNote}</p>
           {effective && (
-            <p><span className={"cc-badge " + (effective.available ? "cc-ready" : "cc-blocked")}>{effective.available ? t.effectiveNow : t.notAvailableNow}</span> · {t.effectiveSource}: {effective.source}</p>
+            <p><span className={"cc-badge " + (effective.available ? "cc-ready" : "cc-blocked")}>{effective.available ? t.effectiveNow : t.notAvailableNow}</span></p>
           )}
 
-          <h2>{t.weeklySchedule}</h2>
-          {canManage && !addingSlot && <button type="button" onClick={openAddSlot}><Plus size={16} aria-hidden />{t.newSlot}</button>}
+          <Section title={t.weeklySchedule} description={ar ? "الساعات المتكررة التي يستقبل فيها الطبيب الحالات." : "The recurring hours when this clinician can take cases."}
+            actions={canManage && !addingSlot ? <button type="button" onClick={openAddSlot}><Plus size={16} aria-hidden />{t.newSlot}</button> : undefined}>
           {addingSlot && (
             <form className="cc-card" onSubmit={submitSlot} style={{ margin: "16px 0" }} aria-label={t.newSlot}>
               <label>{t.dayOfWeek}
@@ -122,11 +119,12 @@ export function AvailabilityManagement({ locale, organizationId, practitionerId 
                 <label>{t.endTime}<input required type="time" dir="ltr" value={slotForm.endTime} onChange={(e) => setSlotForm((f) => ({ ...f, endTime: e.target.value }))} /></label>
                 <label>{t.timeZone}<input required dir="ltr" value={slotForm.timeZone} onChange={(e) => setSlotForm((f) => ({ ...f, timeZone: e.target.value }))} /></label>
               </div>
+              <details className="cc-technical"><summary>{ar ? "خيارات إضافية (الخدمة، طريقة الاستشارة، الموقع)" : "More options (service, consultation mode, location)"}</summary>
               <div className="cc-toolbar">
                 <label>{t.service}<input maxLength={60} dir="ltr" value={slotForm.serviceCode} onChange={(e) => setSlotForm((f) => ({ ...f, serviceCode: e.target.value }))} /></label>
                 <label>{t.consultationMode}<input maxLength={60} value={slotForm.consultationMode} onChange={(e) => setSlotForm((f) => ({ ...f, consultationMode: e.target.value }))} /></label>
                 <label>{t.location}<input maxLength={200} value={slotForm.location} onChange={(e) => setSlotForm((f) => ({ ...f, location: e.target.value }))} /></label>
-              </div>
+              </div></details>
               <div className="cc-toolbar">
                 <label>{locale === "ar" ? "ساري من" : "Effective from"}<input required type="date" dir="ltr" value={slotForm.effectiveFrom} onChange={(e) => setSlotForm((f) => ({ ...f, effectiveFrom: e.target.value }))} /></label>
                 <label>{locale === "ar" ? "ساري حتى" : "Effective to"}<input type="date" dir="ltr" value={slotForm.effectiveTo} onChange={(e) => setSlotForm((f) => ({ ...f, effectiveTo: e.target.value }))} /></label>
@@ -137,21 +135,22 @@ export function AvailabilityManagement({ locale, organizationId, practitionerId 
               </div>
             </form>
           )}
-          {!schedule.recurring.length ? <p className="cc-empty">{t.noSlots}</p> : (
+          {!schedule.recurring.length ? <EmptyState title={t.noSlots} body={ar ? "أضف الساعات الأسبوعية ليصبح الطبيب متاحًا للحالات." : "Add weekly hours so this clinician can be offered cases."} /> : (
             <ul className="cc-table" aria-label={t.weeklySchedule}>
               {schedule.recurring.map((s) => (
                 <li key={s.id}>
                   <span>{t.days[s.dayOfWeek]}</span>
                   <span dir="ltr">{s.startTime.slice(0, 5)}–{s.endTime.slice(0, 5)} <small>({s.timeZone})</small></span>
                   <span>{s.serviceCode ?? "—"}{s.location ? ` · ${s.location}` : ""}</span>
-                  <span>{canManage && <button type="button" className="cc-secondary" onClick={() => openEditSlot(s)}>{t.edit}</button>}</span>
+                  <span>{canManage && <button type="button" className="cc-secondary cc-small" onClick={() => openEditSlot(s)}>{t.edit}</button>}</span>
                 </li>
               ))}
             </ul>
           )}
+          </Section>
 
-          <h2>{t.exceptions}</h2>
-          {canManage && !addingException && <button type="button" onClick={() => setAddingException(true)}><Plus size={16} aria-hidden />{t.newException}</button>}
+          <Section title={t.exceptions} description={ar ? "الإجازات والأوقات المحجوبة وإغلاق العيادة والعيادات الإضافية." : "Leave, blocked time, clinic closures and extra clinics."}
+            actions={canManage && !addingException ? <button type="button" className="cc-secondary" onClick={() => setAddingException(true)}><Plus size={16} aria-hidden />{t.newException}</button> : undefined}>
           {addingException && (
             <form className="cc-card" onSubmit={submitException} style={{ margin: "16px 0" }} aria-label={t.newException}>
               <label>{t.exceptionType}
@@ -178,13 +177,14 @@ export function AvailabilityManagement({ locale, organizationId, practitionerId 
                   <span>{exceptionTypeLabel(ex.type, locale)}</span>
                   <span dir="ltr">{toLocalInput(ex.startsAt).replace("T", " ")}–{toLocalInput(ex.endsAt).replace("T", " ")} <small>({ex.timeZone})</small></span>
                   <span>{ex.reason ?? "—"}</span>
-                  <span>{canManage && <button type="button" className="cc-secondary" disabled={busy} onClick={() => void removeException(ex)}>{t.remove}</button>}</span>
+                  <span>{canManage && <button type="button" className="cc-secondary cc-danger-button cc-small" disabled={busy} onClick={() => void removeException(ex)}>{t.remove}</button>}</span>
                 </li>
               ))}
             </ul>
           )}
+          </Section>
         </>
       )}
-    </ControlCenterShell>
+    </div>
   );
 }

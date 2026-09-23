@@ -100,7 +100,7 @@ class ProviderOrganizationIntegrationTest {
         verify(identities).inviteTracked(eq("Dr Invite"),eq("invite@example.test"),eq("en"),anyString());
         assertThat(operation.status()).isEqualTo("COMPLETED");assertThat(operation.subject()).isEqualTo("kc-stable-subject");
         assertThat(jdbc.queryForObject("SELECT external_subject FROM practitioner_profiles WHERE email_hash IS NOT NULL AND external_subject='kc-stable-subject'",String.class)).isEqualTo("kc-stable-subject");
-        assertThat(providers.detail(org.id()).members()).anySatisfy(m->{assertThat(m.subject()).isEqualTo("kc-stable-subject");assertThat(m.status()).isEqualTo("PENDING");assertThat(m.roles()).contains("ASSOCIATE_DOCTOR");});
+        assertThat(providers.detail(org.id()).members()).anySatisfy(m->{assertThat(m.subject()).isEqualTo("kc-stable-subject");assertThat(m.status()).isEqualTo("PENDING");assertThat(m.roles()).contains("ASSOCIATE_DOCTOR");assertThat(m.displayName()).isEqualTo("Dr Invite");});
     }
 
     @Test void invitationTimeoutRecoversByOperationMarkerWithoutCreatingAgain(){

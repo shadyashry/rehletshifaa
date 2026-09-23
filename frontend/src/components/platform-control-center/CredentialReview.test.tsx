@@ -3,65 +3,60 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import "@testing-library/jest-dom/vitest";
 import { CredentialReview } from "./CredentialReview";
 import { apiFetchAs } from "@/lib/api";
+import { failure, fakeApi, onboarding, providerDetail } from "./test-support";
 
-const capabilities = ["provider.view", "credential.view", "credential.review", "credential.verify"];
-const auth = { user: { access_token: "test", profile: { sub: "coordinator-1" } }, loading: false, signIn: vi.fn() };
+const capabilities = ["provider.view", "credential.view", "credential.review", "credential.verify", "credential.reject", "credential.request_information"];
+const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "reviewer-1" } }, roles: [] as string[], loading: false, signIn: vi.fn() }));
 vi.mock("@/components/AuthProvider", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
 
 const revision = {
-  id: "rev-1", dossierId: "dossier-1", organizationId: "org-a", practitionerId: "prac-1", ownerSubject: "dr-owner",
+  id: "rev-1", dossierId: "dossier-1", organizationId: "org-a", practitionerId: "prac-1", ownerSubject: "kc-consultant",
   credentialType: "MEDICAL_LICENSE", revisionNumber: 1, policyVersionId: "policy-1", status: "SUBMITTED", dossierStatus: "OPEN",
-  expiresAt: null, submittedBy: "dr-owner", submittedAt: "2026-09-01T00:00:00Z", version: 0, evidenceIds: ["ev-1"],
+  expiresAt: null, submittedBy: "kc-consultant", submittedAt: "2026-09-01T00:00:00Z", version: 0, evidenceIds: ["ev-1"],
 };
-const onboarding = { organizationId: "org-a", practitionerId: "prac-1", clinicianType: "CONSULTANT", status: "DOCUMENTS_SUBMITTED", jurisdiction: "AE", version: 0, ownerSubject: "dr-owner" };
-
-beforeEach(() => {
-  auth.user.profile.sub = "coordinator-1";
-  vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
-    if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify(capabilities.map((permission) => ({ permission, allowed: true }))), { status: 200 });
-    if (path === "/admin/providers/org-a/credential-reviews/rev-1") return new Response(JSON.stringify(revision), { status: 200 });
-    if (path === "/admin/providers/org-a/clinicians/prac-1/onboarding") return new Response(JSON.stringify(onboarding), { status: 200 });
-    return new Response(JSON.stringify({}), { status: 200 });
-  });
+const routes = (status = "SUBMITTED") => ({
+  "/admin/providers/org-a/credential-reviews/rev-1": { ...revision, status },
+  "/admin/providers/org-a/clinicians/prac-1/onboarding": onboarding,
+  "/admin/providers/org-a": providerDetail,
 });
+beforeEach(() => { auth.user.profile.sub = "reviewer-1"; vi.mocked(apiFetchAs).mockImplementation(fakeApi(routes(), capabilities)); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-describe("Credential review workspace", () => {
-  it("shows the real submitted evidence and lets an independent reviewer start review", async () => {
+describe("Credential review", () => {
+  it("names the credential and the clinician, shows the evidence and offers one primary action", async () => {
     render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
-    expect(await screen.findByText(/#1/)).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: "Medical licence — Dr Salma Farouk" })).toBeVisible();
+    expect(screen.getByText("Awaiting review")).toBeVisible();
     expect(screen.getByRole("button", { name: /View document/ })).toBeVisible();
     expect(screen.getByRole("button", { name: "Start review" })).toBeVisible();
+    expect(screen.queryByText("ev-1")).not.toBeInTheDocument();
   });
 
-  it("disables review actions and shows a clear message when the signed-in user is the credential subject", async () => {
-    auth.user.profile.sub = "dr-owner";
+  it("blocks self-review with a clear message", async () => {
+    auth.user.profile.sub = "kc-consultant";
     render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
-    await screen.findByText(/#1/);
-    expect(screen.getByText(/cannot review your own submission/)).toBeVisible();
+    expect(await screen.findByText(/cannot review your own submission/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Start review" })).not.toBeInTheDocument();
   });
 
   it("shows a not-found state for a revision the caller cannot access", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
-      if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify(capabilities.map((permission) => ({ permission, allowed: true }))), { status: 200 });
-      return new Response(null, { status: 404 });
-    });
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers/org-a/credential-reviews/missing": failure(404, "NOT_FOUND") }, capabilities));
     render(<CredentialReview locale="en" organizationId="org-a" revisionId="missing" />);
     expect(await screen.findByText(/could not be found/)).toBeVisible();
   });
 
-  it("requires a reason before submitting a decision", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
-      if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify(capabilities.map((permission) => ({ permission, allowed: true }))), { status: 200 });
-      if (path === "/admin/providers/org-a/credential-reviews/rev-1") return new Response(JSON.stringify({ ...revision, status: "UNDER_REVIEW" }), { status: 200 });
-      if (path === "/admin/providers/org-a/clinicians/prac-1/onboarding") return new Response(JSON.stringify(onboarding), { status: 200 });
-      return new Response(JSON.stringify({}), { status: 200 });
-    });
+  it("requires a reason, keeps Reject visually separate, and records the decision with an idempotency key", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...routes("UNDER_REVIEW"), "POST /admin/providers/org-a/credential-reviews/rev-1/decision": { ...revision, status: "VERIFIED" } }, capabilities));
     render(<CredentialReview locale="en" organizationId="org-a" revisionId="rev-1" />);
-    const verify = await screen.findByRole("button", { name: "Verify" });
+    const verify = await screen.findByRole("button", { name: "Verify credential" });
+    expect(screen.getByRole("button", { name: "Reject" })).toHaveClass("cc-danger-button");
     fireEvent.click(verify);
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/reason is required/));
+    expect(await screen.findByText("A reason is required for this decision.")).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/Reason for your decision/), { target: { value: "Licence checked with the issuing authority" } });
+    fireEvent.click(verify);
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/providers/org-a/credential-reviews/rev-1/decision", expect.objectContaining({ method: "POST", headers: expect.objectContaining({ "Idempotency-Key": expect.any(String) }) })));
+    expect(await screen.findByText("Decision recorded.")).toBeVisible();
+    expect(screen.getByText("Verified")).toBeVisible();
   });
 });

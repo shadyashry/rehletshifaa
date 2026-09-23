@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { apiFetchAs } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
-import { ControlCenterShell } from "./ControlCenterShell";
-import { ccCopy, priceScopeLabel, priceStatusLabel } from "./control-center-copy";
+import { EmptyState, StatusBadge } from "./cc-ui";
+import { priceLiveStatus } from "./admin-labels";
+import { ccCopy, priceScopeLabel } from "./control-center-copy";
 
 type PriceView = {
   id: string; organizationId: string; serviceCode: string; serviceName: string; category: string | null;
@@ -27,7 +28,11 @@ function money(amount: string, currency: string, locale: Locale) {
   catch { return `${n.toLocaleString(locale)} ${currency}`; }
 }
 
-export function PricingManagement({ locale, organizationId, practitionerId }: { locale: Locale; organizationId: string; practitionerId: string }) {
+/**
+ * Service prices for one clinician — an embeddable panel (consultant workspace, onboarding working-setup step,
+ * Commercial setup › Pricing). The backend resolves which level applies; the panel only shows that result.
+ */
+export function PricingManagement({ locale, organizationId, practitionerId, onChanged, showOrder = true }: { locale: Locale; organizationId: string; practitionerId: string; onChanged?: () => void; showOrder?: boolean }) {
   const t = ccCopy[locale];
   const { user, loading: authLoading, signIn } = useAuth();
   const [onboarding, setOnboarding] = useState<Onboarding | null>(null);
@@ -92,13 +97,13 @@ export function PricingManagement({ locale, organizationId, practitionerId }: { 
       };
       if (editing) await api(`/prices/${editing.id}?revision=${editing.revision}`, "PUT", body);
       else await api("/prices", "POST", body);
-      setCreating(false); setEditing(null); await refresh();
+      setCreating(false); setEditing(null); await refresh(); onChanged?.();
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   };
 
-  const publish = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/publish?revision=${p.revision}`, "POST"); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
+  const publish = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/publish?revision=${p.revision}`, "POST"); await refresh(); onChanged?.(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
   const approve = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/approve?revision=${p.revision}`, "POST"); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
-  const retire = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/retire?revision=${p.revision}`, "POST"); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
+  const retire = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/retire?revision=${p.revision}`, "POST"); await refresh(); onChanged?.(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
 
   const grouped = Object.entries(
     prices.reduce<Record<string, PriceView[]>>((acc, p) => { (acc[p.serviceCode] ??= []).push(p); return acc; }, {})
@@ -106,23 +111,21 @@ export function PricingManagement({ locale, organizationId, practitionerId }: { 
 
   const scopeOrder = { ORGANIZATION: 0, CONSULTANT: 1, ASSOCIATE_DOCTOR: 1 } as const;
 
-  const crumbs = [
-    { label: t.breadcrumbHome, href: `/${locale}/portal/control-center` },
-    { label: t.breadcrumbProviders, href: `/${locale}/portal/control-center/providers` },
-    { label: organizationId, href: `/${locale}/portal/control-center/providers/${organizationId}` },
-    { label: t.breadcrumbPricing },
-  ];
-
-  if (authLoading || (loading && !onboarding)) return <ControlCenterShell locale={locale} active="providers" crumbs={crumbs} title={t.loading}><p role="status">{t.loading}</p></ControlCenterShell>;
-  if (!user) return <ControlCenterShell locale={locale} active="providers" crumbs={crumbs} title={t.pricing}><button onClick={() => void signIn()}>{t.signin}</button></ControlCenterShell>;
+  if (authLoading || (loading && !onboarding)) return <p role="status">{t.loading}</p>;
+  if (!user) return <button onClick={() => void signIn()}>{t.signin}</button>;
+  const ar = locale === "ar";
+  const levels = ["ORGANIZATION", ...(clinicianScope ? [clinicianScope] : [])];
 
   return (
-    <ControlCenterShell locale={locale} active="providers" crumbs={crumbs} title={t.pricing} intro={t.pricingIntro}
-      actions={<button type="button" className="cc-secondary" disabled={busy} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden />{t.refresh}</button>}>
+    <div className="cc-panel">
       {error && <p role="alert" className="cc-message">{error}</p>}
       {!allowed("price_list.view") ? <p>{t.denied}</p> : (
         <>
-          {allowed("price_list.manage") && !creating && <button type="button" onClick={openCreate}><Plus size={16} aria-hidden />{t.newPrice}</button>}
+          {showOrder && <><p className="cc-meta">{ar ? "كيف يُحدَّد السعر:" : "How the price is chosen:"}</p>
+          <ol className="cc-inheritance" aria-label={ar ? "ترتيب الأسعار" : "Price order"}>
+            {levels.map((l, i) => <li key={l}><strong>{i + 1}. {priceScopeLabel(l, locale)}</strong><span>{l === "ORGANIZATION" ? (ar ? "يُطبَّق على كل أطباء المؤسسة" : "Applies to every clinician in the organization") : (ar ? "يحل محل السعر الافتراضي لهذا الطبيب فقط" : "Replaces the default for this clinician only")}</span></li>)}
+          </ol></>}
+          {allowed("price_list.manage") && !creating && <div className="cc-section-actions" style={{ marginBottom: 16 }}><button type="button" onClick={openCreate}><Plus size={16} aria-hidden />{t.newPrice}</button></div>}
 
           {creating && (
             <form className="cc-card" onSubmit={submitForm} style={{ margin: "16px 0" }} aria-label={t.newPrice}>
@@ -157,9 +160,8 @@ export function PricingManagement({ locale, organizationId, practitionerId }: { 
             </form>
           )}
 
-          {!grouped.length ? <p className="cc-empty">{t.noPrices}</p> : (
+          {!grouped.length ? <EmptyState title={t.noPrices} body={ar ? "أضف سعرًا ثم انشره ليصبح متاحًا." : "Add a price, then publish it to make it live."} /> : (
             <>
-              <p className="cc-meta">{t.inheritanceHint}</p>
               {grouped.map(([code, rows]) => {
                 const sorted = [...rows].sort((a, b) => (scopeOrder[a.scopeType] - scopeOrder[b.scopeType]) || b.versionNumber - a.versionNumber);
                 const eff = effective[code];
@@ -174,7 +176,7 @@ export function PricingManagement({ locale, organizationId, practitionerId }: { 
                         <li className="cc-step" key={p.id}>
                           <div className="cc-step-head">
                             <h3>{priceScopeLabel(p.scopeType, locale)} · v{p.versionNumber}</h3>
-                            <span className={"cc-badge" + (p.status === "ACTIVE" ? " cc-ready" : p.status === "DRAFT" ? "" : "")}>{priceStatusLabel(p.status, locale)}</span>
+                            <StatusBadge tone={priceLiveStatus(p.status, locale).tone}>{priceLiveStatus(p.status, locale).label}</StatusBadge>
                           </div>
                           <p className="cc-meta">{money(p.amount, p.currency, locale)} · {new Date(p.effectiveFrom).toLocaleDateString(locale)}{p.effectiveTo ? ` – ${new Date(p.effectiveTo).toLocaleDateString(locale)}` : ""}</p>
                           {p.consultantApprovalRequired && (
@@ -193,7 +195,7 @@ export function PricingManagement({ locale, organizationId, practitionerId }: { 
                           )}
                           {p.status === "ACTIVE" && allowed("price_list.publish") && (
                             <div className="cc-step-actions">
-                              <button type="button" className="cc-secondary" disabled={busy} onClick={() => void retire(p)}>{t.retire}</button>
+                              <button type="button" className="cc-secondary cc-danger-button cc-small" disabled={busy} onClick={() => void retire(p)}>{t.retire}</button>
                             </div>
                           )}
                         </li>
@@ -206,6 +208,6 @@ export function PricingManagement({ locale, organizationId, practitionerId }: { 
           )}
         </>
       )}
-    </ControlCenterShell>
+    </div>
   );
 }

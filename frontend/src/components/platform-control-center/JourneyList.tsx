@@ -54,7 +54,7 @@ export function JourneyList({ locale }: { locale: Locale }) {
       const created = await api<JourneyDetail>("", "POST");
       setCreating(false);
       await refresh();
-      window.location.href = `/${locale}/portal/journeys/${created.definition.id}`;
+      window.location.href = `/${locale}/portal/control-center/journeys/${created.definition.id}`;
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   };
 
@@ -66,7 +66,7 @@ export function JourneyList({ locale }: { locale: Locale }) {
   );
 
   return (
-    <ControlCenterShell locale={locale} active="journeys" crumbs={[{ label: t.breadcrumbJourneys }]} title={t.journeyList} intro={t.intro} actions={actions}>
+    <ControlCenterShell locale={locale} active="journeys" crumbs={[{ label: locale === "ar" ? "مركز التحكم" : "Control Center", href: `/${locale}/portal/control-center` }, { label: t.breadcrumbJourneys }]} title={t.journeyList} intro={t.intro} actions={actions}>
       {error && <p role="alert" className="cc-message">{error}</p>}
       {(authLoading || loading) && <p role="status">{t.loading}</p>}
       {!authLoading && !user && <button onClick={() => void signIn()}>{t.signin}</button>}
@@ -88,7 +88,7 @@ export function JourneyList({ locale }: { locale: Locale }) {
             <ul className="cc-cards">
               {journeys.map((j) => (
                 <li key={j.id} className="cc-card">
-                  <Link className="cc-card-link" href={`/${locale}/portal/journeys/${j.id}`}>
+                  <Link className="cc-card-link" href={`/${locale}/portal/control-center/journeys/${j.id}`}>
                     <div>
                       <h3>{j.name || j.key}</h3>
                       <p className="cc-meta">{t.journeyKey}: <bdi dir="ltr">{j.key}</bdi></p>

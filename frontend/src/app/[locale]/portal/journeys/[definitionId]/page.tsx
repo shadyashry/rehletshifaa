@@ -1,9 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
-import { JourneyVersionWorkspace } from "@/components/platform-control-center/JourneyVersionWorkspace";
 
-export default async function JourneyVersionsPage({ params }: { params: Promise<{ locale: string; definitionId: string }> }) {
+/** Compatibility: journeys moved into the Control Center. */
+export default async function LegacyJourneyVersionsPage({ params }: { params: Promise<{ locale: string; definitionId: string }> }) {
   const { locale, definitionId } = await params;
   if (!isLocale(locale)) notFound();
-  return <JourneyVersionWorkspace locale={locale} definitionId={definitionId} />;
+  redirect(`/${locale}/portal/control-center/journeys/${definitionId}`);
 }

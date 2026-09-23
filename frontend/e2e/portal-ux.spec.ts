@@ -43,13 +43,12 @@ test("the team queue is a lead-only tab reachable from the keyboard",async({page
   await expect(page.getByText("Omar Example")).toBeVisible();
 });
 
-test("administration assigns every staff function to its lead inline",async({page})=>{
-  const {writes}=await setup(page,"SYSTEM_ADMIN");await page.goto("/en/portal");
-  await page.getByRole("tab",{name:"Staff accounts"}).click();
-  await expect(page.getByRole("heading",{name:"Staff teams & leads"})).toBeVisible();
+test("Control Center staff & teams assigns every staff function to its lead inline",async({page})=>{
+  const {writes}=await setup(page,"SYSTEM_ADMIN");await page.goto("/en/portal/control-center/team");
+  await expect(page.getByRole("heading",{level:1,name:"Staff & teams"})).toBeVisible();
   await page.getByRole("tab",{name:/Operations/}).click();
-  await page.getByLabel("Lead: Operations Staff").selectOption("ops-lead");
-  await expect(page.getByText("Saved")).toBeVisible();
+  await page.getByLabel("Reports to: Operations Staff").selectOption("ops-lead");
+  await expect(page.getByText("Operations Staff's team updated.")).toBeVisible();
   expect(writes).toContainEqual({path:"/admin/staff-teams/ops-staff",body:{leadSubject:"ops-lead"}});
 });
 

@@ -1,9 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
-import { JourneyList } from "@/components/platform-control-center/JourneyList";
 
-export default async function JourneysPage({ params }: { params: Promise<{ locale: string }> }) {
+/** Compatibility: journeys moved into the Control Center. */
+export default async function LegacyJourneysPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  return <JourneyList locale={locale} />;
+  redirect(`/${locale}/portal/control-center/journeys`);
 }

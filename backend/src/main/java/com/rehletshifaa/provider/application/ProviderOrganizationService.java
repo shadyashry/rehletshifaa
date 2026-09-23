@@ -68,7 +68,7 @@ public class ProviderOrganizationService {
     public ProviderDetail detail(UUID id) {
         OrganizationView organization=organization(id);authorize("provider.view",context(organization));
         var members=jdbc.sql("SELECT d.subject,d.member_kind,d.practitioner_id,m.status,m.effective_from,m.effective_to,m.invitation_status,m.revision FROM provider_membership_details d JOIN access_memberships m ON m.subject=d.subject AND m.organization_id=d.organization_id WHERE d.organization_id=? ORDER BY d.subject")
-                .param(id).query((r,n)->new MemberView(r.getString(1),r.getString(2),r.getObject(3,UUID.class),r.getString(4),instant(r,"effective_from"),instant(r,"effective_to"),r.getString(7),r.getLong(8),memberRoles(r.getString(1),id))).list();
+                .param(id).query((r,n)->new MemberView(r.getString(1),r.getString(2),r.getObject(3,UUID.class),r.getString(4),instant(r,"effective_from"),instant(r,"effective_to"),r.getString(7),r.getLong(8),memberRoles(r.getString(1),id),memberName(r.getString(1),id,r.getObject(3,UUID.class)))).list();
         var rels=jdbc.sql("SELECT * FROM resource_relationships WHERE organization_id=? ORDER BY id").param(id).query((r,n)->new RelationshipView(r.getObject("id",UUID.class),r.getString("subject"),r.getString("relationship_type"),r.getString("target_id"),r.getString("status"),r.getLong("revision"))).list();
         return new ProviderDetail(organization,members,rels);
     }
@@ -255,7 +255,18 @@ public class ProviderOrganizationService {
 
     private MemberView member(String subject,UUID organization) {
         return jdbc.sql("SELECT d.subject,d.member_kind,d.practitioner_id,m.status,m.effective_from,m.effective_to,m.invitation_status,m.revision FROM provider_membership_details d JOIN access_memberships m ON m.subject=d.subject AND m.organization_id=d.organization_id WHERE d.subject=? AND d.organization_id=?")
-                .params(subject,organization).query((r,n)->new MemberView(r.getString(1),r.getString(2),r.getObject(3,UUID.class),r.getString(4),instant(r,"effective_from"),instant(r,"effective_to"),r.getString(7),r.getLong(8),memberRoles(subject,organization))).optional().orElseThrow(()->new ApiException(404,"MEMBERSHIP_NOT_FOUND","Provider membership not found"));
+                .params(subject,organization).query((r,n)->new MemberView(r.getString(1),r.getString(2),r.getObject(3,UUID.class),r.getString(4),instant(r,"effective_from"),instant(r,"effective_to"),r.getString(7),r.getLong(8),memberRoles(subject,organization),memberName(subject,organization,r.getObject(3,UUID.class)))).optional().orElseThrow(()->new ApiException(404,"MEMBERSHIP_NOT_FOUND","Provider membership not found"));
+    }
+    /** Read-only display name so administrators see people rather than account identifiers: practitioner profile, else the invitation or staff record. */
+    private String memberName(String subject,UUID organization,UUID practitioner) {
+        if(practitioner!=null) {
+            var name=jdbc.sql("SELECT display_name FROM practitioner_profiles WHERE id=?").param(practitioner).query(String.class).optional();
+            if(name.isPresent()&&!name.get().isBlank()) return name.get();
+        }
+        var encrypted=jdbc.sql("SELECT display_name_encrypted FROM provider_identity_operations WHERE organization_id=? AND external_subject=? AND display_name_encrypted IS NOT NULL ORDER BY created_at DESC LIMIT 1").params(organization,subject).query(String.class).optional()
+                .or(()->jdbc.sql("SELECT display_name_encrypted FROM staff_members WHERE external_subject=?").param(subject).query(String.class).optional());
+        // A label must never fail the membership read it decorates: an undecryptable legacy value is simply shown as unnamed.
+        try { return encrypted.map(crypto::decrypt).orElse(null); } catch(RuntimeException unreadable) { return null; }
     }
     private List<String> memberRoles(String subject,UUID organization) {return jdbc.sql("SELECT DISTINCT t.template_key FROM role_assignments a JOIN role_template_versions v ON v.id=a.version_id JOIN role_templates t ON t.id=v.template_id WHERE a.subject=? AND a.organization_id=? AND a.status<>'REVOKED' ORDER BY t.template_key").params(subject,organization).query(String.class).list();}
     private boolean hasRole(String subject,UUID org,String role){return jdbc.sql("SELECT COUNT(*) FROM role_assignments a JOIN role_template_versions v ON v.id=a.version_id JOIN role_templates t ON t.id=v.template_id WHERE a.subject=? AND a.organization_id=? AND a.status<>'REVOKED' AND t.template_key=?").params(subject,org,role).query(Long.class).single()>0;}
@@ -289,7 +300,7 @@ public class ProviderOrganizationService {
     public record InviteMember(String name,String email,String role,String locale,String reason){}
     public record Relationship(String subject,RelationshipType type,UUID targetPractitionerId,Instant effectiveFrom,Instant effectiveTo,String reason){}
     public record OrganizationView(UUID id,String legalName,String businessName,String displayName,String type,String status,String countryCode,String timeZone,String defaultCurrency,String legacyMappingStatus,long version){}
-    public record MemberView(String subject,String kind,UUID practitionerId,String status,Instant effectiveFrom,Instant effectiveTo,String invitationStatus,long revision,List<String> roles){}
+    public record MemberView(String subject,String kind,UUID practitionerId,String status,Instant effectiveFrom,Instant effectiveTo,String invitationStatus,long revision,List<String> roles,String displayName){}
     public record RelationshipView(UUID id,String subject,String type,String targetPractitionerId,String status,long revision){}
     public record ProviderDetail(OrganizationView organization,List<MemberView> members,List<RelationshipView> relationships){}
     public record IdentityOperation(UUID id,UUID organizationId,String subject,String status,String role){}

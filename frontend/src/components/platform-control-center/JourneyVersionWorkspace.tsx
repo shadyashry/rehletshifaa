@@ -82,7 +82,7 @@ export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Loca
     await run(async () => {
       const created = await api<JourneyVersion>("/" + definitionId + "/versions/" + cloning.id + "/clone", "POST", { revision: cloning.revision, reason });
       setCloning(null); setReason("");
-      window.location.href = `/${locale}/portal/journeys/${definitionId}/versions/${created.id}`;
+      window.location.href = `/${locale}/portal/control-center/journeys/${definitionId}/versions/${created.id}`;
     });
   };
 
@@ -97,7 +97,7 @@ export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Loca
   );
 
   return (
-    <ControlCenterShell locale={locale} active="journeys" crumbs={[{ label: t.breadcrumbJourneys, href: `/${locale}/portal/journeys` }, { label: detail?.definition.name ?? t.breadcrumbVersions }]} title={detail?.definition.name ?? t.versions} intro={t.intro} actions={actions}>
+    <ControlCenterShell locale={locale} active="journeys" crumbs={[{ label: locale === "ar" ? "مركز التحكم" : "Control Center", href: `/${locale}/portal/control-center` }, { label: t.breadcrumbJourneys, href: `/${locale}/portal/control-center/journeys` }, { label: detail?.definition.name ?? t.breadcrumbVersions }]} title={detail?.definition.name ?? t.versions} intro={t.intro} actions={actions}>
       {error && <p role="alert" className="cc-message">{error}</p>}
       {notice && <p role="status" className="cc-message">{notice}</p>}
       {(authLoading || loading) && <p role="status">{t.loading}</p>}
@@ -137,7 +137,7 @@ export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Loca
                     {rt === "error" ? "—" : rt ? (rt.status === "DEPLOYED" ? <span className="cc-badge cc-ready">{t.deployed}</span> : <span className="cc-badge">{t.notDeployed}</span>) : "…"}
                   </span>
                   <div className="cc-step-actions">
-                    <Link className="cc-secondary" style={{ display: "inline-flex" }} href={`/${locale}/portal/journeys/${definitionId}/versions/${v.id}`}>{canEdit ? t.openDesigner : t.openDesigner}</Link>
+                    <Link className="cc-secondary" style={{ display: "inline-flex" }} href={`/${locale}/portal/control-center/journeys/${definitionId}/versions/${v.id}`}>{canEdit ? t.openDesigner : t.openDesigner}</Link>
                     {(v.status === "PUBLISHED" || v.status === "RETIRED") && allowed(t.permission.create) && (
                       <button type="button" className="cc-secondary" onClick={() => setCloning(v)}>{t.cloneVersion}</button>
                     )}
