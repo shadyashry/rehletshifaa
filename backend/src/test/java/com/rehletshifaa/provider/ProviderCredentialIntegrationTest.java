@@ -32,7 +32,7 @@ class ProviderCredentialIntegrationTest {
     private static final UUID VERIFIER=UUID.fromString("34000001-0000-0000-0000-000000000005");
     private static final UUID OWNER=UUID.fromString("32000001-0000-0000-0000-000000000011");
     @Autowired ProviderCredentialService credentials; @Autowired JdbcTemplate jdbc; @Autowired AuthorizationService authorization;
-    @Autowired ProviderCredentialEligibility eligibility;
+    @Autowired ProviderCredentialEligibility eligibility; @Autowired CredentialReviewQueueService reviewQueue;
     @Autowired com.rehletshifaa.journey.application.CredentialExpiryService expiry; @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @MockBean LocalStorageAdapter storage; @MockBean DocumentInspectionPort inspector; @MockBean ProviderOperationalSetupService operational;
     Instant now=Instant.now().minusSeconds(5); UUID org; UUID clinician;
@@ -132,6 +132,65 @@ class ProviderCredentialIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM provider_domain_events WHERE aggregate_id=? AND event_type='CREDENTIAL_EXPIRED'",Long.class,license.id().toString())).isOne();
         assertThat(jdbc.queryForObject("SELECT status FROM provider_credential_revisions WHERE id=?",String.class,license.id())).isEqualTo("VERIFIED");
     }
+
+    @Test void reviewQueueGroupsOpenWorkAcrossReviewableOrganizationsOnly(){signIn("doctor-a",now);completeProfile();
+        var waiting=submit("IDENTITY_EVIDENCE",null,"q-waiting");var reviewing=submit("QUALIFICATION",null,"q-reviewing");var info=submit("CONSULTANT_STATUS_EVIDENCE",null,"q-info");
+        UUID other=organization("Unreviewable Clinic");UUID otherClinician=clinician(other,"doctor-b","CONSULTANT",CONSULTANT);signIn("doctor-b",now);submitIn(other,otherClinician,"IDENTITY_EVIDENCE",null,"q-other");
+        signIn("verifier",now);var started=credentials.decide(org,reviewing.id(),new ProviderCredentialService.DecisionCommand("START_REVIEW",null,reviewing.version()),"q-start");
+        var infoStarted=credentials.decide(org,info.id(),new ProviderCredentialService.DecisionCommand("START_REVIEW",null,info.version()),"q-start-info");
+        credentials.decide(org,info.id(),new ProviderCredentialService.DecisionCommand("REQUEST_INFORMATION","Upload the page showing the registration stamp",infoStarted.version()),"q-info");
+        var open=reviewQueue.queue(null);
+        assertThat(open).extracting(CredentialReviewQueueService.QueueRow::id,CredentialReviewQueueService.QueueRow::status).containsExactlyInAnyOrder(tuple(waiting.id(),"SUBMITTED"),tuple(reviewing.id(),"UNDER_REVIEW"),tuple(info.id(),"MORE_INFORMATION_REQUIRED"));
+        assertThat(open).allSatisfy(row->{assertThat(row.organizationName()).isEqualTo("Credential Clinic");assertThat(row.clinicianName()).isEqualTo("doctor-a");assertThat(row.clinicianType()).isEqualTo("CONSULTANT");assertThat(row.evidenceCount()).isOne();});
+        assertThat(open.stream().filter(r->r.id().equals(reviewing.id())).findFirst().orElseThrow().reviewedBy()).as("starting a review assigns it").isEqualTo("verifier");
+        // Starting a review is not a decision about the credential: nothing is verified by it.
+        assertThat(started.status()).isEqualTo("UNDER_REVIEW");assertThat(started.dossierStatus()).isEqualTo("OPEN");
+        signIn("provider-ops",now);assertThat(credentials.readiness(org,clinician).blockers()).extracting(ProviderCredentialService.Blocker::code).contains("CREDENTIAL_AWAITING_VERIFICATION","CREDENTIAL_MORE_INFORMATION_REQUIRED","CREDENTIAL_MISSING");
+        assertThat(reviewQueue.queue("open")).as("provider operations hold no review capability").isEmpty();
+        // A newer submission supersedes the information request: only the new submission waits for review.
+        signIn("doctor-a",now);var replacement=submit("CONSULTANT_STATUS_EVIDENCE",null,"q-info-2");
+        signIn("verifier",now);assertThat(reviewQueue.queue("open")).extracting(CredentialReviewQueueService.QueueRow::id).containsExactlyInAnyOrder(waiting.id(),reviewing.id(),replacement.id());
+        approve(replacement,"q-info-2");
+        assertThat(reviewQueue.queue("completed")).extracting(CredentialReviewQueueService.QueueRow::id,CredentialReviewQueueService.QueueRow::status).containsExactly(tuple(replacement.id(),"VERIFIED"));
+        assertThatThrownBy(()->reviewQueue.queue("everything")).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.status()).isEqualTo(400));
+        // Another organization's credentials cannot be reviewed without review access there.
+        var foreign=jdbc.queryForObject("SELECT r.id FROM provider_credential_revisions r JOIN provider_credential_dossiers d ON d.id=r.dossier_id WHERE d.organization_id=?",UUID.class,other);
+        assertThatThrownBy(()->credentials.decide(other,foreign,new ProviderCredentialService.DecisionCommand("START_REVIEW",null,0),"q-foreign")).isInstanceOf(ApiException.class);
+        assertThat(jdbc.queryForObject("SELECT status FROM provider_credential_revisions WHERE id=?",String.class,foreign)).isEqualTo("SUBMITTED");}
+
+    @Test void reviewHistoryKeepsReasonsForReviewersAndSharesOnlyTheInformationRequestWithTheProviderSide(){signIn("doctor-a",now);completeProfile();var first=submit("MEDICAL_LICENSE",Instant.now().plus(Duration.ofDays(365)),"h-1");
+        signIn("verifier",now);var reviewing=credentials.decide(org,first.id(),new ProviderCredentialService.DecisionCommand("START_REVIEW",null,first.version()),"h-start");
+        credentials.decide(org,first.id(),new ProviderCredentialService.DecisionCommand("REQUEST_INFORMATION","Licence copy is cut off at the expiry date",reviewing.version()),"h-info");
+        signIn("doctor-a",now);var second=submit("MEDICAL_LICENSE",Instant.now().plus(Duration.ofDays(365)),"h-2");
+        signIn("verifier",now);approve(second,"h-2");
+        var reviewer=credentials.reviewDetail(org,second.id());
+        assertThat(reviewer.reviewerView()).isTrue();assertThat(reviewer.clinicianName()).isEqualTo("doctor-a");assertThat(reviewer.organizationName()).isEqualTo("Credential Clinic");assertThat(reviewer.clinicianType()).isEqualTo("CONSULTANT");
+        assertThat(reviewer.history()).extracting(ProviderCredentialService.HistoryEntry::event).containsExactly("VERIFIED","REVIEW_STARTED","RESUBMITTED","MORE_INFORMATION_REQUIRED","REVIEW_STARTED","SUBMITTED");
+        assertThat(reviewer.history().getFirst().reason()).isEqualTo("Evidence and issuing authority reviewed");assertThat(reviewer.history().getFirst().byYou()).isTrue();
+        assertThat(reviewer.evidence()).singleElement().satisfies(e->{assertThat(e.fileName()).isEqualTo("h-2.pdf");assertThat(e.securityCheck()).isEqualTo("CLEAN");assertThat(e.uploadedByName()).isEqualTo("doctor-a");});
+        for(String providerSide:List.of("provider-ops","doctor-a")){signIn(providerSide,now);var view=credentials.reviewDetail(org,second.id());
+            assertThat(view.reviewerView()).as(providerSide).isFalse();assertThat(view.reviewerName()).isNull();
+            assertThat(view.history()).as(providerSide).allSatisfy(h->assertThat(h.event().equals("SUBMITTED")||h.event().equals("RESUBMITTED")||h.actorName()==null).isTrue());
+            assertThat(view.history()).filteredOn(h->h.event().equals("MORE_INFORMATION_REQUIRED")).singleElement().extracting(ProviderCredentialService.HistoryEntry::reason).isEqualTo("Licence copy is cut off at the expiry date");
+            assertThat(view.history()).filteredOn(h->h.event().equals("VERIFIED")).singleElement().extracting(ProviderCredentialService.HistoryEntry::reason).isNull();}
+        // Every decision keeps its reason in the decision record.
+        assertThat(jdbc.queryForList("SELECT reason_encrypted FROM provider_credential_decisions WHERE revision_id=? AND decision='MORE_INFORMATION_REQUIRED'",String.class,first.id())).singleElement().satisfies(v->assertThat(crypto.decrypt(v)).isEqualTo("Licence copy is cut off at the expiry date"));}
+
+    @Test void decisionsUseTheirOwnTransitionsAndReadinessNamesTheCredentialState(){signIn("doctor-a",now);completeProfile();var identity=submit("IDENTITY_EVIDENCE",null,"t-identity");var qualification=submit("QUALIFICATION",null,"t-qualification");
+        signIn("provider-ops",now);var opsStarted=identity;
+        assertThatThrownBy(()->credentials.decide(org,opsStarted.id(),new ProviderCredentialService.DecisionCommand("VERIFY","Looks right",opsStarted.version()),"ops-verify")).isInstanceOf(ApiException.class).hasMessageContaining("not allowed");
+        signIn("owner",now);assertThatThrownBy(()->credentials.decide(org,identity.id(),new ProviderCredentialService.DecisionCommand("START_REVIEW",null,identity.version()),"owner-review")).as("no review grant").isInstanceOf(ApiException.class);
+        signIn("verifier",now);var reviewing=credentials.decide(org,identity.id(),new ProviderCredentialService.DecisionCommand("START_REVIEW",null,identity.version()),"t-start");
+        assertThatThrownBy(()->credentials.decide(org,qualification.id(),new ProviderCredentialService.DecisionCommand("VERIFY","Skipped review",qualification.version()),"t-skip")).as("verify only from In review").isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code()).isEqualTo("CREDENTIAL_STATE_CONFLICT"));
+        signIn("provider-ops",now);var inReview=reviewing;assertThatThrownBy(()->credentials.decide(org,inReview.id(),new ProviderCredentialService.DecisionCommand("REJECT","Not acceptable",inReview.version()),"ops-reject")).isInstanceOf(ApiException.class).hasMessageContaining("not allowed");
+        signIn("verifier",now);assertThat(credentials.decide(org,identity.id(),new ProviderCredentialService.DecisionCommand("REJECT","Document is not an identity document",reviewing.version()),"t-reject").status()).isEqualTo("REJECTED");
+        var qualReview=credentials.decide(org,qualification.id(),new ProviderCredentialService.DecisionCommand("START_REVIEW",null,qualification.version()),"t-q-start");var verified=credentials.decide(org,qualification.id(),new ProviderCredentialService.DecisionCommand("VERIFY","Registry checked",qualReview.version()),"t-q-verify");
+        assertThat(verified.status()).isEqualTo("VERIFIED");assertThat(verified.dossierStatus()).isEqualTo("VERIFIED");
+        var suspended=credentials.decide(org,qualification.id(),new ProviderCredentialService.DecisionCommand("SUSPEND","Registry reports a suspension",verified.version()),"t-q-suspend");assertThat(suspended.dossierStatus()).isEqualTo("SUSPENDED");
+        signIn("provider-ops",now);assertThat(credentials.readiness(org,clinician).blockers()).extracting(ProviderCredentialService.Blocker::code).contains("CREDENTIAL_REJECTED","CREDENTIAL_SUSPENDED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM provider_credential_decisions WHERE revision_id IN (?,?) AND reason_encrypted IS NOT NULL",Long.class,identity.id(),qualification.id())).isEqualTo(3);}
+
+    private ProviderCredentialService.RevisionView submitIn(UUID organization,UUID practitioner,String type,Instant expiry,String key){var upload=credentials.presign(organization,practitioner,new ProviderCredentialService.EvidenceCommand(key+".pdf","application/pdf",8));UUID evidence=credentials.confirm(organization,upload.evidenceId(),0).id();return credentials.submit(organization,practitioner,new ProviderCredentialService.SubmissionCommand(type,"Authority","REF-"+key,now,expiry,evidence),key);}
 
     private void completeProfile(){var decision=authorization.decide(new AccessIdentity.Identity("doctor-a",now),"provider.update",new ResourceContext(org,true,"CLINICIAN",clinician.toString(),"doctor-a",false),ChannelEntitlement.CONSULTANT_WEB);assertThat(decision.allowed()).as(decision.toString()).isTrue();credentials.completeProfile(org,clinician,new ProviderCredentialService.ProfileCommand("R-1","Surgery",null,"MBBS, Fellowship","AE",0));}
     private ProviderCredentialService.RevisionView submit(String type,Instant expiry,String key){return credentials.submit(org,clinician,new ProviderCredentialService.SubmissionCommand(type,"Authority","REF-"+key,now,expiry,evidence(key)),key);}

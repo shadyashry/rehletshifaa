@@ -45,6 +45,7 @@ const credentialStatus: Record<string, Entry> = {
   MORE_INFORMATION_REQUIRED: { en: "More information required", ar: "مطلوب مزيد من المعلومات", tone: "warning" },
   SUSPENDED: { en: "Suspended", ar: "موقوف", tone: "danger" },
   EXPIRED: { en: "Expired", ar: "منتهي الصلاحية", tone: "danger" },
+  NOT_SUBMITTED: { en: "Not submitted", ar: "لم يُقدَّم", tone: "neutral" },
 };
 const memberStatus: Record<string, Entry> = {
   PENDING: { en: "Invitation pending", ar: "الدعوة معلّقة", tone: "warning" },
@@ -76,8 +77,10 @@ const priceStatus: Record<string, Entry> = {
 export const clinicianStatusLabel = (k: string | null | undefined, l: Locale) => lookup(clinicianStatus, k, l);
 export const organizationStatusLabel = (k: string | null | undefined, l: Locale) => lookup(orgStatus, k, l);
 export const credentialReviewStatus = (k: string | null | undefined, l: Locale) => lookup(credentialStatus, k, l);
+/** The one expiry rule, as the backend's `CredentialValidity`: expired from the expiry instant onwards; no expiry date never expires. */
+export const credentialExpired = (expiresAt: string | null | undefined, now = Date.now()) => !!expiresAt && new Date(expiresAt).getTime() <= now;
 /** A verified credential whose expiry date has passed no longer counts (the backend treats it as expired at read time), so it is never shown as "Verified". */
-export const credentialIsExpired = (status: string, expiresAt: string | null | undefined, now = Date.now()) => status === "VERIFIED" && !!expiresAt && new Date(expiresAt).getTime() <= now;
+export const credentialIsExpired = (status: string, expiresAt: string | null | undefined, now = Date.now()) => status === "VERIFIED" && credentialExpired(expiresAt, now);
 export const credentialDisplayStatus = (status: string, expiresAt: string | null | undefined, l: Locale, now = Date.now()) => lookup(credentialStatus, credentialIsExpired(status, expiresAt, now) ? "EXPIRED" : status, l);
 export const membershipStatusLabel = (k: string | null | undefined, l: Locale) => lookup(memberStatus, k, l);
 export const accountStatusLabel = (k: string | null | undefined, l: Locale) => lookup(accountStatus, k, l);
@@ -97,6 +100,9 @@ const credentialTypes: Record<string, [string, string]> = {
   SPECIALIST_REGISTRATION: ["Specialist registration", "تسجيل التخصص"], BOARD_CERTIFICATION: ["Board certification", "شهادة البورد"],
   MALPRACTICE_INSURANCE: ["Indemnity insurance", "تأمين المسؤولية المهنية"], INDEMNITY_INSURANCE: ["Indemnity insurance", "تأمين المسؤولية المهنية"],
   IDENTITY_DOCUMENT: ["Identity document", "وثيقة الهوية"], GOOD_STANDING: ["Certificate of good standing", "شهادة حسن السيرة المهنية"],
+  // The seeded credential policy (V34) codes.
+  IDENTITY_EVIDENCE: ["Identity or professional evidence", "إثبات الهوية أو الصفة المهنية"], QUALIFICATION: ["Professional qualification", "المؤهل المهني"],
+  CONSULTANT_STATUS_EVIDENCE: ["Consultant status evidence", "إثبات صفة الاستشاري"],
 };
 export const credentialTypeLabel = (key: string, locale: Locale) => credentialTypes[key]?.[locale === "ar" ? 1 : 0] ?? readable(key);
 
@@ -112,7 +118,10 @@ const blockers: Record<string, { area: SetupArea; en: string; ar: string }> = {
   CLINICIAN_PROFILE_INCOMPLETE: { area: "professional", en: "Professional details are missing.", ar: "البيانات المهنية غير مكتملة." },
   CREDENTIAL_POLICY_UNCONFIGURED: { area: "professional", en: "No credential requirements exist for this country yet — contact the platform team.", ar: "لا توجد متطلبات اعتماد لهذه الدولة بعد — تواصل مع فريق المنصة." },
   CREDENTIAL_MISSING: { area: "professional", en: "A required credential has not been added.", ar: "لم يُضف اعتماد مطلوب." },
-  CREDENTIAL_AWAITING_VERIFICATION: { area: "professional", en: "A credential is waiting for review.", ar: "اعتماد بانتظار المراجعة." },
+  CREDENTIAL_AWAITING_VERIFICATION: { area: "professional", en: "A credential is waiting for independent review.", ar: "اعتماد بانتظار المراجعة المستقلة." },
+  CREDENTIAL_MORE_INFORMATION_REQUIRED: { area: "professional", en: "A reviewer asked for more information about a credential.", ar: "طلب المراجِع معلومات إضافية عن اعتماد." },
+  CREDENTIAL_REJECTED: { area: "professional", en: "A credential was rejected — a new version is needed.", ar: "رُفض اعتماد — تلزم نسخة جديدة." },
+  CREDENTIAL_SUSPENDED: { area: "professional", en: "A credential is suspended.", ar: "اعتماد موقوف." },
   CREDENTIAL_EXPIRED: { area: "professional", en: "A credential has expired.", ar: "انتهت صلاحية اعتماد." },
   SUPERVISION_REQUIRED: { area: "professional", en: "An associate doctor needs an active supervising consultant.", ar: "يحتاج الطبيب المشارك إلى استشاري مشرف نشط." },
   OPERATIONAL_SETUP_UNAVAILABLE: { area: "working", en: "Working setup is not available yet.", ar: "إعداد العمل غير متاح بعد." },

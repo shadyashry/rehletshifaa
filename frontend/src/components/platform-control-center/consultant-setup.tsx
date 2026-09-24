@@ -7,7 +7,9 @@ import { useAuth } from "@/components/AuthProvider";
 import type { Locale } from "@/lib/i18n";
 import { useAdminApi, type AdminApi } from "./admin-api";
 import { ControlCenterError, EmptyState, ErrorNotice, Field, StatusBadge, SuccessNotice } from "./cc-ui";
-import { blockerInfo, countryName, countryOptions, credentialDisplayStatus, credentialIsExpired, credentialTypeLabel, formatDate, relationshipLabel } from "./admin-labels";
+import { blockerInfo, countryName, countryOptions, credentialReviewStatus, credentialTypeLabel, formatDate, relationshipLabel } from "./admin-labels";
+import { credentialValidity, latestEntry, requirementState, type ReviewDetail, type Revision } from "./credential-lifecycle";
+import { CredentialHistory, EvidenceList, MoreInformationNotice, SubmittedInformation, ValidityLine } from "./credential-ui";
 import { ccHref } from "./control-center-nav";
 import { personName, type ProviderDetail } from "./provider-directory";
 
@@ -15,7 +17,7 @@ export type Onboarding = { organizationId: string; practitionerId: string; clini
 export type Blocker = { code: string; message: string };
 export type Readiness = { identityProvisioned: boolean; organizationMembershipActive: boolean; providerProfileComplete: boolean; clinicianProfileComplete: boolean; requiredCredentialsSubmitted: boolean; requiredCredentialsVerified: boolean; mandatoryCredentialsUnexpired: boolean; requiredRelationshipsComplete: boolean; pricingSetupRequired: boolean; pricingSetupComplete: boolean; availabilitySetupRequired: boolean; availabilitySetupComplete: boolean; credentialReady: boolean; blockers: Blocker[]; readyForActivation: boolean; evaluatedAt: string };
 export type Requirement = { type: string; displayName: string; mandatory: boolean; expiryRequired: boolean };
-export type Revision = { id: string; organizationId: string; practitionerId: string; ownerSubject: string; credentialType: string; revisionNumber: number; status: string; dossierStatus: string; expiresAt: string | null; submittedBy: string; submittedAt: string; version: number; evidenceIds: string[] };
+export type { Revision } from "./credential-lifecycle";
 
 /** Everything one clinician's setup screens read, from existing endpoints only. The backend readiness stays authoritative. */
 export function useClinician(organizationId: string, practitionerId: string) {
@@ -143,8 +145,13 @@ export function ProfessionalDetailsForm({ locale, api, organizationId, onboardin
 const ACCEPT = ".pdf,.jpg,.jpeg,.png";
 const toInstant = (date: string) => (date ? new Date(`${date}T12:00:00Z`).toISOString() : null);
 
-/** Credential requirements from the clinician's credential policy, each with its latest submission and the next action. */
-export function CredentialRequirements({ locale, api, organizationId, practitionerId, canSubmit, canReview, onChanged }: { locale: Locale; api: AdminApi; organizationId: string; practitionerId: string; canSubmit: boolean; canReview: boolean; onChanged: () => void }) {
+/**
+ * The clinician's Credentials section: one row per credential their policy requires, with its credential status (submitted,
+ * in review, more information required, verified, rejected, suspended, expired), validity, and — under "Details" — the
+ * submitted information, evidence and history. Used by the Control Center clinician page and, read-only, by My Credentials.
+ * Credential status is not case eligibility; review decisions are made only in Credential Reviews.
+ */
+export function CredentialRequirements({ locale, api, organizationId, practitionerId, canSubmit, canReview, onChanged, audience = "team", legacy = false }: { locale: Locale; api: AdminApi; organizationId: string; practitionerId: string; canSubmit: boolean; canReview: boolean; onChanged: () => void; audience?: "team" | "self"; legacy?: boolean }) {
   const ar = locale === "ar";
   const base = `/admin/providers/${organizationId}/clinicians/${practitionerId}`;
   const [requirements, setRequirements] = useState<Requirement[] | null>(null);
@@ -152,6 +159,7 @@ export function CredentialRequirements({ locale, api, organizationId, practition
   const [policyMissing, setPolicyMissing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [adding, setAdding] = useState<Requirement | null>(null);
+  const [now] = useState(() => Date.now());
   const load = useCallback(async () => {
     setLoadError(null); setPolicyMissing(false);
     try {
@@ -162,34 +170,94 @@ export function CredentialRequirements({ locale, api, organizationId, practition
       setRequirements(req); setRevisions(rev);
     } catch (e) { setLoadError(e); setRequirements([]); }
   }, [api, base]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- the Control Center load-on-mount idiom
   useEffect(() => { void load(); }, [load]);
   if (requirements === null) return <p role="status">{ar ? "جارٍ تحميل متطلبات الاعتماد…" : "Loading credential requirements…"}</p>;
   if (loadError) return <ErrorNotice error={loadError} locale={locale} action="load" onRetry={() => void load()} />;
-  if (policyMissing) return <p className="cc-issue"><AlertTriangle size={16} aria-hidden />{ar ? "لا توجد متطلبات اعتماد لدولة الترخيص هذه بعد. احفظ دولة الترخيص الصحيحة أولًا، أو تواصل مع فريق المنصة." : "There are no credential requirements for this licensing country yet. Save the correct licensing country first, or contact the platform team."}</p>;
-  if (!requirements.length) return <EmptyState title={ar ? "لا توجد اعتمادات مطلوبة" : "No credentials are required"} />;
-  const latest = (type: string) => revisions.filter((r) => r.credentialType === type).sort((a, b) => b.revisionNumber - a.revisionNumber)[0];
+  const legacyNote = legacy && <p className="cc-notice cc-notice-info" role="note">{ar ? "سجل مستورد — لم تُسجَّل مراجعة مستقلة. الموافقة السابقة بنموذج الاعتماد المباشر ليست مراجعة مستقلة لاعتمادات مقدم الرعاية، ولا تُعرض هنا كاعتماد تم التحقق منه." : "Legacy record — independent review not recorded. An earlier approval under the Direct model is not an independent provider credential review, and it is not shown here as verified."}</p>;
+  if (policyMissing) return <>{legacyNote}<p className="cc-issue"><AlertTriangle size={16} aria-hidden />{ar ? "لا توجد متطلبات اعتماد لدولة الترخيص هذه بعد. احفظ دولة الترخيص الصحيحة أولًا، أو تواصل مع فريق المنصة." : "There are no credential requirements for this licensing country yet. Save the correct licensing country first, or contact the platform team."}</p></>;
+  if (!requirements.length) return <>{legacyNote}<EmptyState title={ar ? "لا توجد اعتمادات مطلوبة" : "No credentials are required"} /></>;
+  const states = requirements.map((req) => ({ req, state: requirementState(revisions.filter((r) => r.credentialType === req.type), now) }));
+  const mandatory = states.filter((s) => s.req.mandatory);
+  const tally = (k: string) => mandatory.filter((s) => s.state.key === k).length;
+  const attention = [
+    [tally("MORE_INFORMATION_REQUIRED"), ar ? "يحتاج إلى معلومات إضافية" : "need more information"], [tally("REJECTED"), ar ? "مرفوض" : "rejected"],
+    [tally("EXPIRED"), ar ? "منتهي الصلاحية" : "expired"], [tally("SUSPENDED"), ar ? "موقوف" : "suspended"],
+    [tally("SUBMITTED") + tally("UNDER_REVIEW"), ar ? "بانتظار المراجعة المستقلة" : "awaiting independent review"], [tally("NOT_SUBMITTED"), ar ? "لم يُقدَّم" : "not submitted"],
+  ].filter(([n]) => (n as number) > 0).map(([n, label]) => `${n} ${label}`);
+  const selfOwner = ar ? "عمليات مقدمي الرعاية في جهتك، أو أنت من خلال جهتك" : "Your practice's Provider Operations, or you through your practice";
   return (
     <div>
-      {requirements.map((req) => {
-        const rev = latest(req.type);
-        const status = rev ? credentialDisplayStatus(rev.status, rev.expiresAt, locale) : null;
-        const expired = !!rev && credentialIsExpired(rev.status, rev.expiresAt);
-        const needsNew = !rev || expired || ["REJECTED", "MORE_INFORMATION_REQUIRED"].includes(rev.status);
+      {legacyNote}
+      <p className="cc-credential-summary"><strong>{ar ? `${tally("VERIFIED")} من ${mandatory.length} تم التحقق منها` : `${tally("VERIFIED")} of ${mandatory.length} verified`}</strong>{attention.length > 0 && <span className="cc-meta"> · {attention.join(" · ")}</span>}</p>
+      {states.map(({ req, state }) => {
+        const shown = state.shown, latest = state.latest;
+        const label = credentialReviewStatus(state.key, locale);
+        const pendingNewer = state.newer && ["SUBMITTED", "UNDER_REVIEW"].includes(state.newer.status);
+        const needsNew = state.key === "NOT_SUBMITTED" || (state.key === "EXPIRED" && !pendingNewer) || ["REJECTED", "MORE_INFORMATION_REQUIRED"].includes(latest?.status ?? "");
+        // Policy display names are stored in English; Arabic uses the localized label for known policy codes.
+        const name = (ar ? null : req.displayName) || credentialTypeLabel(req.type, locale);
         return (
-          <div key={req.type} className="cc-requirement">
-            <div>
-              <h3>{req.displayName || credentialTypeLabel(req.type, locale)}{!req.mandatory && <span className="cc-optional"> ({ar ? "اختياري" : "optional"})</span>}</h3>
-              <p className="cc-meta">{rev ? <>{ar ? "أُرسل" : "Submitted"} {formatDate(rev.submittedAt, locale)}{rev.expiresAt ? <> · {ar ? "ينتهي" : "Expires"} {formatDate(rev.expiresAt, locale)}</> : null}</> : req.expiryRequired ? (ar ? "يلزم تاريخ انتهاء" : "Expiry date required") : (ar ? "لم يُضف بعد" : "Not added yet")}</p>
+          <div key={req.type} className="cc-requirement cc-credential-row">
+            <div className="cc-credential-main">
+              <h3>{name}{!req.mandatory && <span className="cc-optional"> ({ar ? "اختياري" : "optional"})</span>}</h3>
+              <p className="cc-meta">
+                {shown ? <>{ar ? "أُرسل" : "Submitted"} {formatDate(shown.submittedAt, locale)}{shown.revisionNumber > 1 ? (ar ? ` · النسخة ${shown.revisionNumber}` : ` · version ${shown.revisionNumber}`) : ""}</> : req.expiryRequired ? (ar ? "لم يُقدَّم بعد · يلزم تاريخ انتهاء" : "Not submitted yet · an expiry date is required") : (ar ? "لم يُقدَّم بعد" : "Not submitted yet")}
+              </p>
+              {shown && <p className="cc-meta"><ValidityLine validity={state.validity} locale={locale} none={ar ? "بلا تاريخ انتهاء" : "No expiry date"} /></p>}
+              {state.newer && <p className="cc-meta">{ar ? `نسخة أحدث (النسخة ${state.newer.revisionNumber}): ` : `A newer version (version ${state.newer.revisionNumber}) is `}<strong>{credentialReviewStatus(state.newer.status, locale).label.toLowerCase()}</strong>{state.key === "VERIFIED" ? (ar ? " — تبقى النسخة الموثّقة سارية حتى ذلك الحين." : " — the verified version keeps counting meanwhile.") : "."}</p>}
+              {latest?.status === "MORE_INFORMATION_REQUIRED" && <InformationRequest locale={locale} api={api} organizationId={organizationId} revision={latest} responsible={audience === "self" ? selfOwner : undefined}
+                action={canSubmit && adding?.type !== req.type ? <button type="button" className="cc-small" onClick={() => setAdding(req)}><Upload size={15} aria-hidden />{ar ? "إرسال نسخة جديدة" : "Submit a new version"}</button> : audience === "self" ? <p className="cc-meta">{ar ? "تُرسل النسخة الجديدة من خلال جهتك." : "The new version is submitted through your practice."}</p> : undefined} />}
+              {latest?.status === "REJECTED" && <p className="cc-issue">{ar ? `رُفضت النسخة ${latest.revisionNumber}. لا يستوفي هذا المتطلب حتى يُتحقق من نسخة جديدة.` : `Version ${latest.revisionNumber} was rejected. This requirement isn't met until a new version is verified.`}</p>}
+              {state.key === "SUSPENDED" && <p className="cc-issue">{ar ? "هذا الاعتماد موقوف ولا يُحتسب حتى يستعيده فريق مراجعة الاعتمادات." : "This credential is suspended and doesn't count until the Credential Review Team restores it."}</p>}
+              {state.key === "EXPIRED" && <p className="cc-issue">{ar ? "تحقق منه مراجع مستقل سابقًا، لكن صلاحيته انتهت فلم يعد يُحتسب." : "It was independently verified before, but it has expired, so it no longer counts."}</p>}
+              {shown && <CredentialDetails locale={locale} api={api} organizationId={organizationId} revision={latest?.status === "MORE_INFORMATION_REQUIRED" || latest?.status === "REJECTED" ? latest : shown} name={name} />}
               {adding?.type === req.type && <CredentialSubmitForm locale={locale} api={api} organizationId={organizationId} base={base} requirement={req} onCancel={() => setAdding(null)} onSubmitted={() => { setAdding(null); void load(); onChanged(); }} />}
             </div>
             <div className="cc-row-actions">
-              {status ? <StatusBadge tone={status.tone}>{status.label}</StatusBadge> : <StatusBadge tone="neutral">{ar ? "مطلوب" : "Needed"}</StatusBadge>}
-              {canReview && rev && ["SUBMITTED", "UNDER_REVIEW"].includes(rev.status) && <Link className="cc-secondary cc-small" href={ccHref(locale, `/credentials/${organizationId}/${rev.id}`)}>{ar ? "فتح المراجعة" : "Open review"}</Link>}
-              {canSubmit && needsNew && adding?.type !== req.type && <button type="button" className={rev ? "cc-secondary cc-small" : "cc-small"} onClick={() => setAdding(req)}><Upload size={15} aria-hidden />{expired ? (ar ? "إرسال تجديد" : "Submit renewal") : rev ? (ar ? "إرسال بديل" : "Submit replacement") : (ar ? "إضافة" : "Add")}</button>}
+              <StatusBadge tone={label.tone}>{label.label}</StatusBadge>
+              {canReview && latest && ["SUBMITTED", "UNDER_REVIEW"].includes(latest.status) && <Link className="cc-secondary cc-small" href={ccHref(locale, `/credentials/${organizationId}/${latest.id}`)} aria-label={`${ar ? "فتح في مراجعة التراخيص والمؤهلات" : "Open in Credential Reviews"}: ${name}`}>{ar ? "فتح في مراجعة التراخيص والمؤهلات" : "Open in Credential Reviews"}</Link>}
+              {canSubmit && needsNew && latest?.status !== "MORE_INFORMATION_REQUIRED" && adding?.type !== req.type && <button type="button" className={shown ? "cc-secondary cc-small" : "cc-small"} onClick={() => setAdding(req)}><Upload size={15} aria-hidden />{shown ? (ar ? "إرسال نسخة جديدة" : "Submit a new version") : (ar ? "إضافة" : "Add")}</button>}
             </div>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** The reviewer's request for a version in More information required — read from the credential's own history. */
+function InformationRequest({ locale, api, organizationId, revision, responsible, action }: { locale: Locale; api: AdminApi; organizationId: string; revision: Revision; responsible?: string; action?: React.ReactNode }) {
+  const [detail, setDetail] = useState<ReviewDetail | null>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- load-on-mount
+  useEffect(() => { let live = true; api<ReviewDetail>(`/admin/providers/${organizationId}/credential-reviews/${revision.id}`).then((d) => { if (live) setDetail(d); }).catch(() => { if (live) setDetail(null); }); return () => { live = false; }; }, [api, organizationId, revision.id]);
+  return <MoreInformationNotice request={latestEntry(detail?.history, "MORE_INFORMATION_REQUIRED", revision.revisionNumber)} locale={locale} responsible={responsible} action={action} headingLevel={4} />;
+}
+
+/** Submitted information, evidence and history for one version, loaded when opened (the read is audited as a facts view). */
+function CredentialDetails({ locale, api, organizationId, revision, name }: { locale: Locale; api: AdminApi; organizationId: string; revision: Revision; name: string }) {
+  const ar = locale === "ar";
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<ReviewDetail | null>(null); const [error, setError] = useState<unknown>(null); const [busy, setBusy] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
+  const read = useCallback(async () => { setError(null); try { setDetail(await api<ReviewDetail>(`/admin/providers/${organizationId}/credential-reviews/${revision.id}`)); } catch (e) { setError(e); } }, [api, organizationId, revision.id]);
+  const view = async (id: string) => { setBusy(id); setError(null); try { const doc = await api<{ url: string }>(`/admin/providers/${organizationId}/credential-evidence/${id}/view`); window.open(doc.url, "_blank", "noopener,noreferrer"); } catch (e) { setError(e); } finally { setBusy(null); } };
+  const id = `credential-details-${revision.id}`;
+  return (
+    <div className="cc-credential-details">
+      <button type="button" className="cc-link" aria-expanded={open} aria-controls={id} onClick={() => { const next = !open; setOpen(next); if (next && !detail) void read(); }}>{open ? (ar ? "إخفاء التفاصيل" : "Hide details") : (ar ? "عرض التفاصيل" : "Show details")}<span className="cc-sr">: {name}</span></button>
+      {open && (
+        <div id={id} className="cc-credential-details-body">
+          <ErrorNotice error={error} locale={locale} action="load" onRetry={() => void read()} />
+          {!detail && !error ? <p role="status" className="cc-meta">{ar ? "جارٍ التحميل…" : "Loading…"}</p> : detail && <>
+            <h4>{ar ? "المعلومات المقدَّمة" : "Submitted information"}</h4>
+            <SubmittedInformation detail={detail} locale={locale} validity={credentialValidity(detail.expiresAt, now)} />
+            <h4>{ar ? "المستندات" : "Evidence"}</h4>
+            <EvidenceList detail={detail} locale={locale} onView={(e) => void view(e)} busyId={busy} />
+            <CredentialHistory history={detail.history} locale={locale} reviewerView={!!detail.reviewerView} />
+          </>}
+        </div>
+      )}
     </div>
   );
 }

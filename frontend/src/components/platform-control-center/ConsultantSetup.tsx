@@ -16,7 +16,7 @@ export type SetupTab = "overview" | "credentials" | "relationships" | "prices" |
 export type SectionKey = "account" | "profile" | "submitted" | "review" | "operational" | "activation";
 export type SectionState = "complete" | "attention" | "waiting" | "unavailable";
 export type SetupAction = { label: string; tab?: SetupTab; anchor?: string; href?: string; activateMembership?: true };
-export type SetupSection = { key: SectionKey; title: string; state: SectionState; owner: string; remaining: { label: string; detail?: string }[]; items?: { label: string; value: string; ok: boolean }[]; actions: SetupAction[] };
+export type SetupSection = { key: SectionKey; title: string; state: SectionState; doneLabel?: string; owner: string; remaining: { label: string; detail?: string }[]; items?: { label: string; value: string; ok: boolean }[]; actions: SetupAction[] };
 
 const t = (locale: Locale, en: string, ar: string) => (locale === "ar" ? ar : en);
 export const stateBadge = (state: SectionState, locale: Locale): { label: string; tone: Tone } => ({
@@ -59,12 +59,12 @@ export function buildSetupSections(input: { locale: Locale; readiness: Readiness
   };
 
   const replacements = [
-    ...(count("REJECTED") ? [{ label: t(locale, "A credential was rejected — submit a replacement.", "رُفض اعتماد — أرسل بديلًا.") }] : []),
-    ...(count("MORE_INFORMATION_REQUIRED") ? [{ label: t(locale, "A reviewer asked for more information — submit a replacement.", "طلب المراجِع مزيدًا من المعلومات — أرسل بديلًا.") }] : []),
+    ...(count("REJECTED") ? [{ label: t(locale, "A credential was rejected — a new version is needed.", "رُفض اعتماد — تلزم نسخة جديدة.") }] : []),
+    ...(count("MORE_INFORMATION_REQUIRED") ? [{ label: t(locale, "A reviewer asked for more information — see the request on the Credentials tab and submit a new version.", "طلب المراجِع مزيدًا من المعلومات — اطّلع على الطلب في تبويب الاعتمادات وأرسل نسخة جديدة.") }] : []),
   ];
   const submittedDone = r.requiredCredentialsSubmitted && !replacements.length;
   const submitted: SetupSection = {
-    key: "submitted", title: t(locale, "Credentials Submitted", "تقديم الاعتمادات"), state: submittedDone ? "complete" : "attention",
+    key: "submitted", title: t(locale, "Credentials Submitted", "تقديم الاعتمادات"), state: submittedDone ? "complete" : "attention", doneLabel: t(locale, "All submitted", "قُدّمت كلها"),
     owner: t(locale, "The clinician or Provider Operations", "الطبيب أو عمليات مقدمي الرعاية"),
     remaining: [...issues(["CREDENTIAL_POLICY_UNCONFIGURED", "CREDENTIAL_MISSING"]), ...replacements],
     actions: !submittedDone && access.can("credential.submit") ? [{ label: t(locale, "Add credentials", "إضافة الاعتمادات"), tab: "credentials" }] : [],
@@ -72,12 +72,12 @@ export function buildSetupSections(input: { locale: Locale; readiness: Readiness
 
   const reviewDone = r.requiredCredentialsVerified && r.mandatoryCredentialsUnexpired;
   const expired = has("CREDENTIAL_EXPIRED");
-  const reviewRemaining = expired ? issues(["CREDENTIAL_EXPIRED"]).map((i) => ({ ...i, label: t(locale, "A credential has expired — a renewal must be submitted and independently reviewed.", "انتهت صلاحية اعتماد — يجب تقديم تجديد ومراجعته مراجعة مستقلة.") }))
+  const reviewRemaining = has("CREDENTIAL_SUSPENDED") ? issues(["CREDENTIAL_SUSPENDED"]) : expired ? issues(["CREDENTIAL_EXPIRED"]).map((i) => ({ ...i, label: t(locale, "A credential has expired — a renewal must be submitted and independently reviewed.", "انتهت صلاحية اعتماد — يجب تقديم تجديد ومراجعته مراجعة مستقلة.") }))
     : !r.requiredCredentialsSubmitted ? [{ label: t(locale, "Starts once every required credential is submitted.", "تبدأ بعد تقديم كل الاعتمادات المطلوبة.") }]
     : replacements.length ? [{ label: t(locale, "Waiting for a replacement credential.", "بانتظار اعتماد بديل.") }]
     : !reviewDone ? [{ label: t(locale, "Awaiting independent review.", "بانتظار مراجعة مستقلة."), detail: input.credentials?.detail }] : [];
   const review: SetupSection = {
-    key: "review", title: t(locale, "Independent Credential Review", "المراجعة المستقلة للاعتمادات"), state: reviewDone ? "complete" : expired ? "attention" : "waiting",
+    key: "review", title: t(locale, "Independent Credential Review", "المراجعة المستقلة للاعتمادات"), state: reviewDone ? "complete" : expired || has("CREDENTIAL_SUSPENDED") ? "attention" : "waiting", doneLabel: t(locale, "All verified", "تم التحقق منها كلها"),
     owner: t(locale, "Credential Review Team", "فريق مراجعة الاعتمادات"), remaining: reviewRemaining,
     // Review decisions are never made here: reviewers open the review in Reviews & Safety; everyone else sees the status.
     actions: reviewDone ? [] : access.can("credential.review") ? [{ label: t(locale, "Open review", "فتح المراجعة"), href: ccHref(locale, `/credentials?org=${orgId}`) }]
@@ -119,6 +119,34 @@ export function buildSetupSections(input: { locale: Locale; readiness: Readiness
   return [account, profile, submitted, review, operational, activation];
 }
 
+/**
+ * Operational readiness in business words — grouped and labelled from the backend readiness (the same sections as the
+ * checklist), never recomputed. Credential status is a separate fact shown next to it, and so is case eligibility.
+ */
+export function ReadinessSummary({ locale, sections, readiness }: { locale: Locale; sections: SetupSection[]; readiness: Readiness }) {
+  const ar = locale === "ar";
+  const unavailable = activationUnavailable(readiness);
+  const rows: { area: string; value: string; ok: boolean }[] = [];
+  for (const s of sections) {
+    if (s.key === "operational" && s.items) { s.items.forEach((it) => rows.push({ area: it.label, value: it.value, ok: it.ok })); continue; }
+    if (s.key === "activation") {
+      rows.push({ area: s.title, ok: s.state === "complete", value: s.state === "complete" ? t(locale, "Activated", "مفعّل") : unavailable ? t(locale, "Unavailable in this release", "غير متاح في هذا الإصدار") : readiness.readyForActivation ? t(locale, "Ready — not activated yet", "جاهز — لم يُفعَّل بعد") : t(locale, "Not ready yet", "غير جاهز بعد") });
+      continue;
+    }
+    rows.push({ area: s.title, ok: s.state === "complete", value: s.state === "complete" ? (s.doneLabel ?? stateBadge("complete", locale).label) : s.remaining[0]?.label ?? stateBadge(s.state, locale).label });
+  }
+  const overall = sections.find((s) => s.key === "activation")?.state === "complete" ? { label: t(locale, "Activated for cases", "مفعّل لاستقبال الحالات"), tone: "success" as Tone }
+    : readiness.readyForActivation ? { label: t(locale, "Ready to activate", "جاهز للتفعيل"), tone: "info" as Tone } : { label: t(locale, "Needs attention", "يحتاج إجراء"), tone: "warning" as Tone };
+  return (
+    <div className="cc-readiness-summary">
+      <p><StatusBadge tone={overall.tone}>{overall.label}</StatusBadge></p>
+      <ul className="cc-readiness cc-setup-items" aria-label={ar ? "الجاهزية التشغيلية" : "Operational readiness"}>
+        {rows.map((r) => <li key={r.area}><span className="cc-setup-item-label">{r.area}</span><span>{r.value}<span className="cc-sr">{r.ok ? (ar ? " — مكتمل" : " — done") : (ar ? " — غير مكتمل" : " — not done")}</span></span></li>)}
+      </ul>
+    </div>
+  );
+}
+
 export function ConsultantSetupChecklist({ locale, sections, api, onboarding, readiness, member, organizationId, organizationActive, canActivate, onGo, onChanged }: {
   locale: Locale; sections: SetupSection[]; api: AdminApi; onboarding: Onboarding; readiness: Readiness; member: Member | null; organizationId: string; organizationActive: boolean; canActivate: boolean;
   onGo: (tab: SetupTab, anchor?: string) => void; onChanged: (notice: string) => void;
@@ -147,7 +175,7 @@ export function ConsultantSetupChecklist({ locale, sections, api, onboarding, re
       <ErrorNotice error={error} locale={locale} />
       <ol className="cc-setup-list" aria-label={ar ? "خطوات إعداد الاستشاري" : "Consultant setup sections"}>
         {sections.map((s, i) => {
-          const badge = stateBadge(s.state, locale);
+          const badge = s.state === "complete" && s.doneLabel ? { label: s.doneLabel, tone: "success" as Tone } : stateBadge(s.state, locale);
           return (
             <li key={s.key} className={`cc-setup-section cc-setup-${s.state}${s === current ? " cc-setup-current" : ""}`} aria-current={s === current ? "step" : undefined}>
               <div className="cc-setup-head">

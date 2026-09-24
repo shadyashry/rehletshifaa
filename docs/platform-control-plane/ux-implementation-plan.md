@@ -252,7 +252,7 @@ restructure, journeys) is **P1/P2** and lands in UX-2 … UX-8.
 | **UX-3 Clinician Directory & Consultant Setup** — **COMPLETE** (§17) | One Clinicians directory (engagement + capability); Add Consultant screen; Consultant Setup checklist (§4); clinician page family with model-specific sections; clinician Schedule (retire Availability hub); organization default prices on the organization; membership confirmation in Organization › People + Home | Provider Workspace |
 | **UX-4 Provider Workspace / Personas** — decisions frozen in UX-4A (§18); **COMPLETE** (§19) | Persona landing from existing memberships/capabilities; §1-B contents; *Manage organization* entry; patient/case data only as permitted by the approved P0-9 matrix; V-3 assigned-case summary read and V-11 self read | Keycloak role provisioning, new authorization, any FUTURE / NOT CURRENTLY SUPPORTABLE matrix row |
 | **UX-5 Access & Governance** — **COMPLETE** (§20) | People (merge User access + Effective access), Access summary, Roles, Audit, permission reference; reason at publish; person picker; access-removal/offboarding summary | Changing the realm-role/platform-role split |
-| **UX-6 Credentials & Provider Readiness** | Credential Reviews workspace (typed rows incl. Direct approvals); derived lifecycle labels (§6); decision history where supported; organization Setup and profile edit (existing `PUT /admin/providers/{id}`); Ready-to-activate wording | Reminders, revocation, privileging |
+| **UX-6 Credentials & Provider Readiness** — **COMPLETE** (§21) | Credential Reviews workspace (typed rows incl. Direct approvals); derived lifecycle labels (§6); decision history where supported; organization Setup and profile edit (existing `PUT /admin/providers/{id}`); Ready-to-activate wording | Reminders, revocation, privileging |
 | **UX-7 Care Coordination** | Staff Portal Team queue with authoritative Assign/Transfer, names + case numbers; Coordination Setup (Pools & People, Clinician Preferences, Rules); Advanced (Preview routing recommendation, simulation, history); no org-picker hop | Routing-mode changes |
 | **UX-8 Commercial / Care Journeys / Portal polish** | Price Lists overview, Exchange Rates, Margin & Deposit polish; financial truthfulness copy (audit §31.8 E); Journeys publish checklist, Advanced engine detail, reason at submit, *Retire version* copy; staff/patient portal polish; representative context | Online payment, Journey production intake |
 
@@ -283,7 +283,7 @@ representative authority · Phase 8C/8D work.
 | V-1 | Direct retirement criteria: provider path reaches ACTIVE (commercial acceptance exists), routing/assignment uses provider eligibility, price parity, V33 legacy mappings reviewed/adopted, no case-history loss | Product, before any retirement |
 | V-2 | Persona can be derived from existing memberships/capabilities (`/admin/access/me` + membership role types) without a Keycloak role. **UX-4A:** direction frozen with V-11 (labels from membership role types; sections from capabilities) | UX-4 start |
 | V-3 | **Resolved in UX-1: no** provider persona has a case-read path. **UX-4A: APPROVED DIRECTION** — one assignment-scoped, read-only, server-shaped summary read (identity summary, status, proposal stage; no clinical or commercial content) keyed on the caller's own `case_assignments` row; never `CaseWorkspace`. Empty in practice until provider clinicians can be assigned — [ux-4-provider-workspace-decisions.md](ux-4-provider-workspace-decisions.md) §8 | UX-4 — **implemented** (§19): `GET /provider-workspace/cases` |
-| V-4 | A renewal revision can be submitted while an earlier VERIFIED revision is effective, and the earlier one stays effective (per technical-decisions §13.7). UX-1: submission has no state guard, so "Submit renewal" is offered for an expired credential; effectiveness of the earlier revision still to verify | UX-6 |
+| V-4 | **Resolved in UX-6: yes.** A newer revision can be submitted while an earlier VERIFIED revision is effective; the earlier one keeps counting while the newer is pending or rejected (readiness `anyMatch`, integration test). The UI now shows the effective verified version with the newer version's state; the action is *Submit a new version* (no renewal workflow) | UX-6 |
 | V-5 | **Resolved in UX-3: yes.** One bounded read `GET /admin/providers/clinicians` (stored setup facts + status-level credential summary, no readiness computation) replaced a 1 + O + 3C fan-out; see ux-3-clinicians-setup-status.md §11–12 | UX-3 |
 | V-6 | Offboarding: membership deactivation, legacy staff/practitioner disable, role revoke and organization status are separate; no dedicated clinician offboarding command was found (OFFBOARDED is only guarded). **UX-5: mapped** (ux-5 record §13); People offers only the separate existing steps; gaps (provider member account disable, OFFBOARDED, reassignment) → Phase 8D | UX-5 — **mapped**; Phase 8D |
 | V-7 | **Resolved in UX-1.** Every fetcher now routes `REAUTHENTICATION_REQUIRED` through one helper: explained before (shared `ErrorNotice`) or after (return notice) the sign-in round trip; a form cannot be restored after the reload (architecture limit, stated to the user) | Phase 8D (independent check) |
@@ -400,3 +400,25 @@ UX-5 is complete — record: [ux-5-access-governance-status.md](ux-5-access-gove
   one additive seed migration; no write API, no authorization-model change.
 - **UX-6 READY: YES** — what remains for UX-6 is credential/readiness UX; the access findings left open are Phase 8D items
   with no UI exposure.
+
+## 21. UX-6 outcome — Credentials & readiness (2026-09-24)
+
+UX-6 is complete — record: [ux-6-credentials-readiness-status.md](ux-6-credentials-readiness-status.md).
+
+- **Credential Reviews** is the canonical review workspace: one cross-organization read, groups from the stored status
+  (Needs review · In review · More information required · Completed) with counts, named clinicians/organizations, validity,
+  review ownership (*Start review* assigns, never verifies), search and filters. Direct approvals stay a separate typed view.
+- **Review page**: Clinician · Submitted information (never styled as verified) · Evidence (attached + scanned ≠ verified) ·
+  Independent review · Decision history · Decision. Each decision has its own panel with its real effect and a required,
+  audience-labelled reason; Verify never claims case eligibility.
+- **Lifecycle**: one expiry rule (backend `CredentialValidity`, frontend `credentialExpired`), one *Expiring soon*
+  threshold (30 days, the first existing reminder); expired verified = *Expired*; legacy records say independent review
+  was not recorded; suspension outranks newer versions.
+- **More information required** shows the reviewer's request, who acts and how review resumes — the backend now shares that
+  request (only) with the provider side; other reviewer reasons and names stay reviewer-only.
+- **Readiness**: credential status, operational readiness and case eligibility shown separately from backend readiness;
+  blocker codes now distinguish more-information / rejected / suspended (explanation only). Organization Setup adds profile /
+  legacy review and routing and no longer shows *Checking…* with no clinicians. Decision D unchanged.
+- Backend: read additions only (queue endpoint, enriched review detail, blocker codes, directory suspension precedence);
+  no migration, no write or authorization change.
+- **UX-7 READY: YES.**

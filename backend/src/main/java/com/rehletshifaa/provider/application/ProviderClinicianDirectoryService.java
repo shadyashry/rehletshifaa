@@ -56,8 +56,9 @@ public class ProviderClinicianDirectoryService {
             var rows=revisions.getOrDefault(e.organizationId()+"|"+e.practitionerId()+"|"+type,List.of());
             String status;
             if(rows.isEmpty())status="MISSING";
-            else if(rows.stream().anyMatch(r->r.status().equals("VERIFIED")&&r.dossierStatus().equals("VERIFIED")&&(r.expiresAt()==null||r.expiresAt().isAfter(now))))status="VERIFIED";
-            else if(rows.stream().anyMatch(r->r.status().equals("VERIFIED")&&r.expiresAt()!=null&&!r.expiresAt().isAfter(now)))status="EXPIRED";
+            else if(rows.stream().anyMatch(r->r.dossierStatus().equals("SUSPENDED")))status="SUSPENDED"; // an explicit suspension invalidates the lineage until restored
+            else if(rows.stream().anyMatch(r->CredentialValidity.effectiveVerified(r.status(),r.dossierStatus(),r.expiresAt(),now)))status="VERIFIED";
+            else if(rows.stream().anyMatch(r->CredentialValidity.verifiedButExpired(r.status(),r.expiresAt(),now)))status="EXPIRED";
             else status=rows.stream().max(Comparator.comparingInt(CredentialRevision::revisionNumber)).orElseThrow().status();
             counts.merge(status,1,Integer::sum);
         }

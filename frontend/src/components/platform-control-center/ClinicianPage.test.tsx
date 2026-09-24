@@ -173,3 +173,63 @@ describe("Direct clinician page", () => {
     auth.roles = [];
   });
 });
+
+describe("Clinician page — credential status and operational readiness stay separate (UX-6)", () => {
+  const complete = { clinicianProfileComplete: true, requiredCredentialsSubmitted: true, requiredCredentialsVerified: true, mandatoryCredentialsUnexpired: true, credentialReady: true, pricingSetupComplete: true, availabilitySetupComplete: true };
+  const readinessPanel = async () => (await screen.findByRole("heading", { name: "Operational readiness" })).closest("div")!;
+  const renderWith = (r: ReturnType<typeof readiness>, statuses: Record<string, number>, over: Record<string, unknown> = {}) => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi(routes({ [`${base}/readiness`]: r, "/admin/providers/clinicians?organizationId=org-a": [{ ...directoryRow, credentialStatuses: statuses }], ...over }), ops));
+    render(<ClinicianPage locale="en" organizationId="org-a" practitionerId="prac-1" initialTab="overview" />);
+  };
+
+  it("credential verified but schedule missing: credentials Verified, readiness names the schedule and the unavailable activation", async () => {
+    renderWith(readiness({ ...complete, availabilitySetupComplete: false, blockers: [{ code: "AVAILABILITY_INCOMPLETE", message: "x" }, { code: "COMMERCIAL_ACCEPTANCE_MISSING", message: "y" }] }), { VERIFIED: 1 });
+    const panel = await readinessPanel();
+    expect(within(panel).getByText("Needs attention", { selector: ".cc-status" })).toBeVisible();
+    expect(within(panel).getByText("Schedule").nextElementSibling).toHaveTextContent("Not configured");
+    expect(within(panel).getByText("Activation").nextElementSibling).toHaveTextContent("Unavailable in this release");
+    const summary = screen.getByRole("heading", { name: "Summary" }).closest("section")!;
+    expect(within(summary).getByText("Verified", { selector: ".cc-status" })).toBeVisible();
+    expect(within(summary).getByText("Not ready for cases", { selector: ".cc-status" })).toBeVisible();
+    expect(screen.queryByText("Ready for cases")).not.toBeInTheDocument();
+  });
+
+  it("credential verified but routing missing: routing needs configuration", async () => {
+    renderWith(readiness({ ...complete, blockers: [{ code: "ROUTING_INCOMPLETE", message: "x" }, { code: "COMMERCIAL_ACCEPTANCE_MISSING", message: "y" }] }), { VERIFIED: 1 });
+    const panel = await readinessPanel();
+    expect(within(panel).getByText("Routing").nextElementSibling).toHaveTextContent("Needs configuration");
+  });
+
+  it("credentials incomplete: the credential status says what is outstanding and readiness is not claimed", async () => {
+    renderWith(readiness({ clinicianProfileComplete: true, requiredCredentialsSubmitted: true, blockers: [{ code: "CREDENTIAL_MORE_INFORMATION_REQUIRED", message: "Medical licence needs more information before review can continue." }] }), { MORE_INFORMATION_REQUIRED: 1 });
+    await readinessPanel();
+    const summary = screen.getByRole("heading", { name: "Summary" }).closest("section")!;
+    expect(within(summary).getByText("More information required", { selector: ".cc-status" })).toBeVisible();
+    expect(within(summary).getByText("0 of 1 verified · 1 needs more information")).toBeVisible();
+    expect(screen.queryByText("CREDENTIAL_MORE_INFORMATION_REQUIRED")).not.toBeInTheDocument();
+  });
+
+  it("everything complete but activation unavailable in this release: never Ready for cases", async () => {
+    renderWith(readiness({ ...complete, blockers: [{ code: "COMMERCIAL_ACCEPTANCE_MISSING", message: "y" }] }), { VERIFIED: 1 });
+    const panel = await readinessPanel();
+    expect(within(panel).getByText("Needs attention", { selector: ".cc-status" })).toBeVisible();
+    expect(within(panel).getByText("Activation").nextElementSibling).toHaveTextContent("Unavailable in this release");
+    expect(within(panel).getByText("Independent Credential Review").nextElementSibling).toHaveTextContent("All verified");
+    expect(screen.queryByText(/Ready for cases|Activated for cases/)).not.toBeInTheDocument();
+  });
+
+  it("a provider clinician who is not activated is not described as activated even when the backend says ready", async () => {
+    renderWith(readiness({ ...complete, blockers: [], readyForActivation: true }), { VERIFIED: 1 });
+    const panel = await readinessPanel();
+    expect(within(panel).getByText("Ready to activate", { selector: ".cc-status" })).toBeVisible();
+    expect(within(panel).getByText("Activation").nextElementSibling).toHaveTextContent("Ready — not activated yet");
+  });
+
+  it("the Setup checklist labels the review section by its exact outcome", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi(routes({ [`${base}/readiness`]: readiness({ ...complete, blockers: [{ code: "COMMERCIAL_ACCEPTANCE_MISSING", message: "y" }] }), "/admin/providers/clinicians?organizationId=org-a": [{ ...directoryRow, credentialStatuses: { VERIFIED: 1 } }] }), ops));
+    render(<ClinicianPage locale="en" organizationId="org-a" practitionerId="prac-1" initialTab="setup" />);
+    await screen.findByRole("heading", { level: 3, name: /Independent Credential Review/ });
+    expect(within(section("Independent Credential Review")).getByText("All verified", { selector: ".cc-status" })).toBeVisible();
+    expect(within(section("Credentials Submitted")).getByText("All submitted", { selector: ".cc-status" })).toBeVisible();
+  });
+});

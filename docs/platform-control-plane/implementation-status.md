@@ -1,5 +1,29 @@
 # Platform Control Plane — implementation status
 
+## UX-6 — Credential Reviews, credential lifecycle presentation, readiness — 2026-09-24 (Claude Code)
+
+Scope stayed inside UX-6: no Care Coordination, Commercial or Journey redesign, no Phase 8C. Journey production intake OFF.
+No migration, no authorization-model change, no new activation path, no renewal/reminder or privileging work.
+Full record: [ux-6-credentials-readiness-status.md](ux-6-credentials-readiness-status.md).
+
+- **Credential Reviews**: grouped queue (Needs review · In review · More information required · Completed) from one read
+  `GET /admin/providers/credential-reviews[?view=completed]` (organizations where the caller holds `credential.review`);
+  names, validity, ownership, filters/search; Direct approvals separate.
+- **Review page**: Clinician · Submitted information · Evidence · Independent review · Decision history · Decision, with
+  per-decision confirmation panels, required reasons with stated audience, error summary and focus management.
+- **Review detail read** (`GET …/credential-reviews/{id}`) now adds clinician/organization names, submitter/reviewer
+  names, evidence summaries and the dossier history; reasons only for reviewers, except the information request, which the
+  provider side (and My credentials) now sees. The owner never gets the reviewer view.
+- **Expiry**: `CredentialValidity` is the one backend rule (readiness, directory); frontend `credentialExpired` +
+  `EXPIRING_SOON_DAYS = 30` in `credential-lifecycle.ts`.
+- **Readiness**: blocker codes `CREDENTIAL_MORE_INFORMATION_REQUIRED` / `CREDENTIAL_REJECTED` / `CREDENTIAL_SUSPENDED`
+  (explanation only); clinician Overview *Operational readiness*; checklist *All submitted* / *All verified*; organization
+  Setup profile/legacy + routing + no-clinician state; directory keeps a suspended lineage *Suspended*.
+- Verification: see test-status.md.
+
+### UX-6 COMPLETE: YES
+### UX-7 READY: YES
+
 ## UX-5 — Access & Governance, role-version alignment, person-centred access — 2026-09-24 (Claude Code)
 
 Scope stayed inside UX-5: no credential-lifecycle, Care Coordination or Commercial/Journey redesign, no Phase 8C. Journey

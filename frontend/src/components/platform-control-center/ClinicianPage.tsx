@@ -14,7 +14,7 @@ import { personName } from "./provider-directory";
 import { CredentialRequirements, PracticeRelationships, ProfessionalDetailsForm, useClinician } from "./consultant-setup";
 import { PricingManagement } from "./PricingManagement";
 import { AvailabilityManagement } from "./AvailabilityManagement";
-import { ConsultantSetupChecklist, buildSetupSections, stateBadge, type SetupTab } from "./ConsultantSetup";
+import { ConsultantSetupChecklist, ReadinessSummary, buildSetupSections, stateBadge, type SetupTab } from "./ConsultantSetup";
 import { clinicianHref, clinicianTypeLabel, credentialSummary, directClinicianHref, engagementLabel, providerCaseEligibility, providerSetupStatus, type ProviderClinicianRow } from "./clinician-model";
 
 export type ClinicianTab = "overview" | "setup" | "credentials" | "relationships" | "prices" | "schedule";
@@ -88,10 +88,15 @@ export function ClinicianPage({ locale, organizationId, practitionerId, initialT
               [ar ? "الجهة" : "Organization", <Link key="org" href={ccHref(locale, `/providers/${organizationId}`)}><bdi>{detail.organization.displayName}</bdi></Link>],
               [ar ? "طريقة العمل" : "Engagement", engagementLabel("provider", locale)],
               [ar ? "العضوية في الجهة" : "Organization membership", member ? <StatusBadge key="m" tone={membershipStatusLabel(member.status, locale).tone}>{membershipStatusLabel(member.status, locale).label}</StatusBadge> : "—"],
-              [ar ? "الاعتمادات" : "Credentials", credentials ? <span key="c"><StatusBadge tone={credentials.tone}>{credentials.label}</StatusBadge>{credentials.detail && <span className="cc-row-sub">{credentials.detail}</span>}</span> : "—"],
+              [ar ? "حالة الاعتمادات" : "Credential status", credentials ? <span key="c"><StatusBadge tone={credentials.tone}>{credentials.label}</StatusBadge>{credentials.detail && <span className="cc-row-sub">{credentials.detail}</span>}</span> : "—"],
               [ar ? "أهلية الحالات" : "Case eligibility", <span key="e"><StatusBadge tone={eligibility.tone}>{eligibility.label}</StatusBadge>{eligibility.detail && <span className="cc-row-sub">{eligibility.detail}</span>}</span>],
               [ar ? "الإعداد" : "Setup", sections ? <span key="s">{ar ? `${done} من ${sections.length} أقسام مكتملة` : `${done} of ${sections.length} sections complete`}{setupStatus.detail && <span className="cc-row-sub">{setupStatus.detail}</span>}</span> : "—"],
             ]} />
+            {sections && readiness && <div className="cc-overview-readiness" aria-labelledby="readiness-title">
+              <h3 id="readiness-title">{ar ? "الجاهزية التشغيلية" : "Operational readiness"}</h3>
+              <p className="cc-meta">{ar ? "من فحص الجاهزية في النظام. حالة الاعتمادات وأهلية الحالات حقيقتان منفصلتان." : "From the platform's readiness check. Credential status and case eligibility are separate facts."}</p>
+              <ReadinessSummary locale={locale} sections={sections} readiness={readiness} />
+            </div>}
             {next && !active && (
               <div className="cc-next" aria-labelledby="next-title">
                 <p id="next-title"><strong>{ar ? "ما يحتاج إلى متابعة" : "What needs attention"}</strong></p>
@@ -110,8 +115,8 @@ export function ClinicianPage({ locale, organizationId, practitionerId, initialT
           ? <ConsultantSetupChecklist locale={locale} sections={sections} api={api} onboarding={onboarding} readiness={readiness} member={member} organizationId={organizationId} organizationActive={detail.organization.status === "ACTIVE"} canActivate={access.can("provider.activate")}
               onGo={(t: SetupTab, anchor) => go(t, anchor)} onChanged={(n) => { setNotice(n); refresh(); }} />
           : <ErrorNotice error={new Error(ar ? "تعذّر التحقق من حالة الإعداد الآن. لم يتغير شيء." : "Setup status couldn't be checked right now. Nothing has changed.")} locale={locale} action="load" onRetry={refresh} />)}
-        {shown === "credentials" && <Section title={ar ? "الاعتمادات المطلوبة" : "Required credentials"} description={ar ? "يراجع كل اعتماد شخص مستقل في «مراجعة التراخيص والمؤهلات». حالة الاعتماد لا تعني الأهلية لاستقبال الحالات." : "Each credential is checked by an independent reviewer in Credential Reviews. A verified credential does not by itself make the clinician eligible for cases."} id="creds">
-          <CredentialRequirements locale={locale} api={api} organizationId={organizationId} practitionerId={practitionerId} canSubmit={access.can("credential.submit")} canReview={access.can("credential.review")} onChanged={refresh} />
+        {shown === "credentials" && <Section title={ar ? "الاعتمادات المطلوبة" : "Required credentials"} description={ar ? "يراجع كل اعتماد مراجع مستقل في «مراجعة التراخيص والمؤهلات». حالة الاعتماد لا تعني الأهلية لاستقبال الحالات." : "Each credential is checked by an independent reviewer in Credential Reviews. A verified credential does not by itself make the clinician eligible for cases."} id="creds">
+          <CredentialRequirements locale={locale} api={api} organizationId={organizationId} practitionerId={practitionerId} canSubmit={access.can("credential.submit")} canReview={access.can("credential.review")} onChanged={refresh} legacy={onboarding.status === "LEGACY_UNREVIEWED" || (!!row && !row.providerCredentialing)} />
         </Section>}
         {shown === "relationships" && <PracticeRelationships locale={locale} api={api} detail={detail} practitionerId={practitionerId} clinicianType={onboarding.clinicianType} canManage={access.can("provider.relationship.manage")} onChanged={refresh} />}
         {shown === "prices" && <PricingManagement locale={locale} organizationId={organizationId} practitionerId={practitionerId} onChanged={refresh} />}

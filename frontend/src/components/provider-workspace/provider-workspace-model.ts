@@ -80,7 +80,7 @@ export function attention(practice: Practice, cases: CasePage | null, locale: Lo
   const out: Attention[] = [];
   const own = practice.clinician;
   if (own && allowed(own.capabilities, "credential.view")) {
-    if (own.setupStatus === "MORE_INFORMATION_REQUIRED") out.push({ key: "own-credential-info", section: "credentials", title: ar ? "مطلوب مزيد من المعلومات لاعتماداتك" : "Your credentials need more information", detail: ar ? "راجع حالة اعتماداتك. تتواصل معك جهتك أو فريق عمليات مقدمي الرعاية في رحلة شفاء بالتفاصيل." : "Check your credential status. Your practice or RehletShifaa provider operations will contact you with the details." });
+    if (own.setupStatus === "MORE_INFORMATION_REQUIRED") out.push({ key: "own-credential-info", section: "credentials", title: ar ? "مطلوب مزيد من المعلومات لاعتماداتك" : "Your credentials need more information", detail: ar ? "اطّلع على طلب المراجِع في «اعتماداتي». تُرسل النسخة الجديدة من خلال جهتك." : "See the reviewer's request in My credentials. The new version is submitted through your practice." });
     if (own.setupStatus === "REJECTED") out.push({ key: "own-credential-rejected", section: "credentials", title: ar ? "لم يُقبل أحد اعتماداتك" : "A credential was not accepted", detail: ar ? "راجع حالة اعتماداتك وتواصل مع جهتك." : "Check your credential status and contact your practice." });
   }
   if (own && cases && cases.items.length) {

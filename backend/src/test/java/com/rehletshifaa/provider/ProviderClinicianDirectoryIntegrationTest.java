@@ -74,6 +74,17 @@ class ProviderClinicianDirectoryIntegrationTest {
         assertThat(a.credentialStatuses()).containsEntry("EXPIRED",1).doesNotContainKey("VERIFIED");
     }
 
+    @Test void aSuspendedCredentialStaysSuspendedEvenWhenANewerVersionIsSubmitted(){
+        signIn("dir-doctor-a");credentials.completeProfile(org,doctorA,new ProviderCredentialService.ProfileCommand("R-1","Surgery",null,"MBBS","AE",0));
+        var license=submit(doctorA,"MEDICAL_LICENSE",Instant.now().plus(Duration.ofDays(300)),"dir-suspend");
+        signIn("dir-verifier");var review=credentials.decide(org,license.id(),new ProviderCredentialService.DecisionCommand("START_REVIEW",null,license.version()),"dir-start-3");
+        var verified=credentials.decide(org,license.id(),new ProviderCredentialService.DecisionCommand("VERIFY","Checked",review.version()),"dir-verify-3");
+        credentials.decide(org,license.id(),new ProviderCredentialService.DecisionCommand("SUSPEND","Regulator notice",verified.version()),"dir-suspend-3");
+        signIn("dir-doctor-a");submit(doctorA,"MEDICAL_LICENSE",Instant.now().plus(Duration.ofDays(600)),"dir-after-suspend");
+        signIn("dir-ops");var a=directory.list(org).stream().filter(r->r.practitionerId().equals(doctorA)).findFirst().orElseThrow();
+        assertThat(a.credentialStatuses()).containsEntry("SUSPENDED",1).doesNotContainKeys("VERIFIED","SUBMITTED");
+    }
+
     @Test void theDirectListMarksPractitionersUnderProviderCredentialing(){
         var auth=new JwtAuthenticationToken(Jwt.withTokenValue("t").header("alg","none").subject("dir-admin").claim("auth_time",now).build(),List.of(new SimpleGrantedAuthority("ROLE_SYSTEM_ADMIN")));
         SecurityContextHolder.getContext().setAuthentication(auth);

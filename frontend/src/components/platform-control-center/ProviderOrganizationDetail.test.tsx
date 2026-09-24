@@ -22,7 +22,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 describe("Organization workspace", () => {
   it("shows the real backend readiness and links straight to the filtered credential reviews", async () => {
     render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="setup" />);
-    expect(await screen.findByText("1 clinician(s) still need verified credentials")).toBeVisible();
+    expect(await screen.findByText("1 clinician(s) still need independently verified credentials")).toBeVisible();
     expect(screen.getByRole("link", { name: "Open reviews" })).toHaveAttribute("href", "/en/portal/control-center/credentials?org=org-a");
     expect(screen.getByRole("button", { name: "Activate organization" })).toBeInTheDocument();
     expect(screen.queryByText(/Phase 5A/)).not.toBeInTheDocument();
@@ -90,5 +90,24 @@ describe("Organization activation is truthful (UX-0 Decision D)", () => {
     render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="setup" />);
     expect(await screen.findByText(/A provider operations manager activates the organization/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Activate organization" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Organization readiness is explained from its own facts (UX-6)", () => {
+  it("with no clinicians says so instead of checking forever, and offers no activation", async () => {
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers/org-a": { ...providerDetail, members: providerDetail.members.filter((m) => m.kind !== "CLINICIAN") } }, caps));
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="setup" />);
+    expect(await screen.findByText("Add a clinician first; their credentials are reviewed after that.")).toBeVisible();
+    expect(screen.queryByText("Checking clinicians…")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Activate organization" })).toBeDisabled();
+  });
+
+  it("names routing and a pending legacy review as organization-level blockers", async () => {
+    const r = readiness({ ...{ clinicianProfileComplete: true, requiredCredentialsSubmitted: true, requiredCredentialsVerified: true, mandatoryCredentialsUnexpired: true, pricingSetupComplete: true, availabilitySetupComplete: true }, blockers: [{ code: "ROUTING_INCOMPLETE", message: "x" }, { code: "PROVIDER_PROFILE_INCOMPLETE", message: "y" }] });
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers/org-a": { ...providerDetail, organization: { ...providerDetail.organization, legacyMappingStatus: "PENDING_REVIEW" } }, "/admin/providers/org-a/clinicians/prac-1/readiness": r }, caps));
+    render(<ProviderOrganizationDetail locale="en" organizationId="org-a" initialTab="setup" />);
+    expect(await screen.findByText(/1 clinician\(s\) without a routing preference/)).toBeVisible();
+    expect(screen.getByText(/An imported legacy record is waiting for review/)).toBeVisible();
+    expect(screen.getByText("Every required credential is independently verified")).toBeVisible();
   });
 });

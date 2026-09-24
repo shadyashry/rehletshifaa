@@ -1,5 +1,24 @@
 # Platform Control Plane — verification status
 
+## UX-6 credentials & readiness verification — 2026-09-24 (Claude Code)
+
+- Backend focused: `CredentialValidityTest` **5/5** (no expiry, future, expiry today before/at/after the instant, past,
+  suspended lineage); `ProviderCredentialIntegrationTest` **13/13** (new: cross-organization queue grouping, superseded
+  information request hidden, completed view, invalid view 400, Provider Operations sees no queue, Start review ≠ verify,
+  foreign-organization decision denied; history + reason visibility for reviewer vs Provider Operations vs owner, evidence
+  summary; decision transitions VERIFY/REQUEST_INFORMATION/REJECT/SUSPEND, verify only from In review, Provider Operations
+  and owner denied, precise blocker codes, reasons retained); `ProviderClinicianDirectoryIntegrationTest` **4/4** (new:
+  suspension outranks a newer submission). Full offline regression `mvn -o test`: **528 tests, 0 failures, 0 errors,
+  1 skipped** (UX-5: 519).
+- Flyway: no migration (latest still V51).
+- Frontend: `pnpm typecheck` clean; `pnpm test` **386 tests / 48 files** (UX-5: 345 / 46). New/rewritten:
+  `CredentialQueue.test.tsx`, `CredentialReview.test.tsx`, `credential-lifecycle.test.ts`, `CredentialRequirements.test.tsx`;
+  readiness combinations in `ClinicianPage.test.tsx`; organization readiness in `ProviderOrganizationDetail.test.tsx`.
+- E2E: new `credential-reviews.spec.ts` **2/2** (EN, AR; queue, five review states, 390 px, clinician readiness and
+  credentials, My credentials; zero writes) and `access-governance.spec.ts` **2/2**, against the rebuilt tunnel stack.
+- Live review (limited, not Phase 8C): screenshots from the spec inspected; three visual fixes applied and re-verified.
+  No writes to the live database.
+
 ## UX-5 access & governance verification — 2026-09-24 (Claude Code)
 
 - Backend: new `AccessGovernanceUx5IntegrationTest` **10/10** (invitation versions: Consultant/Associate v5, Practice

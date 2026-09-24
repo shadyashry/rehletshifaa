@@ -349,3 +349,63 @@
 
 /* Provider Workspace: existing Control Center panels embedded in a workspace page (no app shell around them). */
 .cc.cc-embedded{display:block;min-height:0;background:transparent}
+
+/* UX-6 — credential reviews and readiness */
+.cc-notice-warning{background:var(--cc-warning-bg);color:#6a4012;border:1px solid #efd3ae}
+.cc-notice .cc-notice-title{margin:0 0 4px;font-size:15px}
+.cc-notice blockquote{margin:4px 0 8px;padding:8px 12px;border-inline-start:3px solid #d9a766;background:#fff;border-radius:6px;color:var(--cc-ink)}
+.cc-notice>div>p+p{margin-top:4px}
+.cc-validity{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
+.cc-validity-expired{color:var(--cc-danger);font-weight:600}
+.cc-validity-expiring{color:var(--cc-warning)}
+.cc-fact-stack{display:flex;flex-direction:column;gap:2px}
+.cc-submitted{border:1px dashed #c9d6d1;border-radius:10px;padding:12px 14px;background:var(--cc-surface)}
+.cc-submitted-note{display:flex;gap:8px;align-items:flex-start;margin:0 0 10px;font-size:14px;color:var(--cc-muted)}
+.cc-submitted-note svg{flex-shrink:0;margin-top:3px}
+.cc-doc-main{display:flex;flex-direction:column;min-width:0;overflow-wrap:anywhere}
+.cc-history{margin-top:8px}
+.cc-history summary{cursor:pointer;font-weight:600;color:var(--cc-brand-dark)}
+.cc-history ol{list-style:none;margin:10px 0 0;padding:0;border-inline-start:2px solid var(--cc-line);display:grid;gap:10px}
+.cc-history li{display:grid;grid-template-columns:7.5rem minmax(0,1fr);gap:10px;padding-inline-start:12px}
+.cc-history-date{color:var(--cc-muted);font-size:13.5px}
+.cc-history li>span:last-child{display:flex;flex-direction:column}
+.cc-history-reason{margin-top:2px;font-size:14px;overflow-wrap:anywhere}
+.cc-review-status{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:-8px 0 18px}
+.cc-decision h3{margin:0 0 6px;font-size:16px}
+.cc-error-summary{border:2px solid var(--cc-danger);border-radius:8px;padding:10px 14px;margin:0 0 12px;background:var(--cc-danger-bg)}
+.cc-error-summary p{margin:0}.cc-error-summary ul{margin:4px 0 0;padding-inline-start:18px}
+.cc-error-summary a{color:var(--cc-danger);font-weight:600}
+.cc-group-note{margin:-6px 0 14px}
+.cc-queue-groups .cc-count{margin-inline-start:6px}
+.cc-filterbar label.cc-check{display:flex;flex-direction:row;align-items:center;gap:8px;min-height:44px;flex:0 1 auto}
+.cc-list.cc-queue-list>li{grid-template-columns:minmax(0,1.5fr) minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,1.3fr) 9.5rem;gap:14px}
+.cc-queue-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.cc-credential-summary{margin:0 0 12px}
+.cc-credential-row .cc-row-actions{flex-wrap:wrap;justify-content:flex-end}
+.cc-credential-main{min-width:0;flex:1}
+.cc-credential-main .cc-meta{margin:2px 0}
+.cc-credential-main .cc-notice{margin:10px 0}
+.cc-credential-details{margin-top:6px}
+.cc-credential-details-body{margin-top:10px;display:grid;gap:8px}
+.cc-credential-details-body h4{margin:6px 0 0;font-size:14.5px}
+.cc-overview-readiness{margin:18px 0 0}
+.cc-overview-readiness h3{margin:0;font-size:16px}
+.cc-readiness-summary p{margin:6px 0}
+@media (max-width: 900px) {
+  .cc-list.cc-queue-list>li{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+  .cc-list.cc-queue-list>li>:first-child,.cc-list.cc-queue-list>li>:last-child{grid-column:1/-1;grid-row:auto}
+  .cc-list.cc-queue-list>li>:nth-child(2),.cc-list.cc-queue-list>li>:nth-child(3),.cc-list.cc-queue-list>li>:nth-child(4){grid-column:auto;grid-row:auto}
+  .cc-list.cc-queue-list>li>:last-child{justify-content:flex-start}
+  .cc-list.cc-queue-list .cc-queue-label{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal;display:block;font-size:12.5px;font-weight:600;color:var(--cc-muted)}
+}
+@media (max-width: 640px) {
+  .cc-list.cc-queue-list>li{grid-template-columns:1fr}
+  .cc-list.cc-queue-list>li>*{grid-column:1/-1!important}
+  .cc-credential-row{flex-direction:column}
+  .cc-credential-row .cc-row-actions{justify-content:flex-start}
+  .cc-history li{grid-template-columns:1fr;gap:0}
+  .cc-queue-groups{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .cc-filterbar label.cc-check{grid-column:1/-1}
+}
+.cc-readiness-summary .cc-setup-items>li{display:grid;grid-template-columns:minmax(9rem,14rem) minmax(0,1fr);gap:4px 14px;align-items:baseline}
+@media (max-width: 640px) { .cc-readiness-summary .cc-setup-items>li{grid-template-columns:1fr} }

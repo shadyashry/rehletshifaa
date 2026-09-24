@@ -200,7 +200,7 @@ export function ProviderWorkspace({ locale }: { locale: Locale }) {
 
     {shown === "credentials" && own && (
       <SectionFrame title={t.sections.credentials} lead={t.credentialsLead} headingRef={sectionHeading}>
-        <div className="cc cc-embedded"><CredentialRequirements locale={locale} api={adminApi} organizationId={current.organizationId} practitionerId={own.practitionerId} canSubmit={false} canReview={false} onChanged={() => {}} /></div>
+        <div className="cc cc-embedded"><CredentialRequirements locale={locale} api={adminApi} organizationId={current.organizationId} practitionerId={own.practitionerId} canSubmit={false} canReview={false} onChanged={() => {}} audience="self" /></div>
       </SectionFrame>
     )}
 

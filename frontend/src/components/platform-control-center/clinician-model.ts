@@ -72,7 +72,8 @@ export function credentialSummary(r: Pick<ProviderClinicianRow, "credentialsRequ
   if (r.credentialsRequired === 0) return { label: t(locale, "None required", "لا يلزم شيء"), tone: "neutral" };
   const count = (s: string) => r.credentialStatuses[s] ?? 0;
   const verified = count("VERIFIED"), missing = count("MISSING"), n = r.credentialsRequired;
-  const detail = t(locale, `${verified} of ${n} verified`, `${verified} من ${n} تم التحقق منها`);
+  const info = count("MORE_INFORMATION_REQUIRED");
+  const detail = t(locale, `${verified} of ${n} verified`, `${verified} من ${n} تم التحقق منها`) + (info ? t(locale, ` · ${info} need${info === 1 ? "s" : ""} more information`, ` · ${info} يحتاج إلى معلومات إضافية`) : "");
   const urgent = CREDENTIAL_ORDER.find(([s]) => count(s) > 0);
   if (urgent) return { label: t(locale, urgent[2], urgent[3]), tone: urgent[1], detail };
   if (missing === n) return { label: t(locale, "Not submitted", "لم تُقدَّم"), tone: "neutral", detail };
