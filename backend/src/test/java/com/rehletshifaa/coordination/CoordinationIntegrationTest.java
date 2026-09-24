@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.*;
 class CoordinationIntegrationTest {
     @Autowired AssignmentEngine engine; @Autowired CoordinationConfigurationService config;
     @Autowired CoordinationRepository repo; @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto;
-    @Autowired ProviderOperationalSetupService setup;
+    @Autowired ProviderOperationalSetupService setup; @Autowired CoordinationReadService reads;
     UUID org,consultant,caseId,team;Instant past=Instant.now().minusSeconds(300),future=Instant.now().plusSeconds(86400);
     static final UUID MANAGER=UUID.fromString("36000001-0000-0000-0000-000000000008"),RECEIVER=UUID.fromString("36000001-0000-0000-0000-000000000016");
     @BeforeEach void seed(){org=organization();actor("routing-manager",org,MANAGER);signIn("routing-manager");consultant=clinician(org);caseId=medicalCase(consultant);team=config.saveTeam(org,null,"Coordination",new TeamConfig(true,"Care coordination",Set.of(),Set.of(),"Asia/Dubai",null),0,"Initial setup").id();candidate("routing-a",team,10,true);candidate("routing-b",team,10,true);config.savePolicy(org,0,past,future,policy(team),"Initial policy");}
@@ -60,6 +60,23 @@ class CoordinationIntegrationTest {
         preference("routing-b",team,null);SimulationResult withPreference=engine.simulate(org,consultant,"cardiology","en",null,null);assertThat(withPreference.selection().subject()).isEqualTo("routing-b");assertThat(withPreference.selection().path()).isEqualTo("PREFERRED_COORDINATOR");
         SimulationResult adHocPreference=engine.simulate(org,null,"cardiology","en","routing-b",null);assertThat(adHocPreference.selection().subject()).isEqualTo("routing-b");assertThat(adHocPreference.selection().path()).isEqualTo("PREFERRED_COORDINATOR");
         jdbc.update("UPDATE role_assignments SET version_id='31000001-0000-0000-0000-000000000016' WHERE subject='routing-manager'");assertThatThrownBy(()->engine.simulate(org,null,"cardiology","en",null,null)).hasMessageContaining("not allowed");
+    }
+    @Test void readModelsAreNamedScopedAndWriteNothing(){
+        CoordinationOverview empty=reads.overview(org);assertThat(empty.liveCases()).isZero();assertThat(empty.evaluatedCases()).isZero();assertThat(empty.policyVersion()).isEqualTo(1);
+        command("SHADOW",0,null);long decisions=count("SELECT COUNT(*) FROM coordination_decisions"),assignments=count("SELECT COUNT(*) FROM case_assignments"),tasks=count("SELECT COUNT(*) FROM case_tasks");
+        CoordinationOverview overview=reads.overview(org);assertThat(overview.evaluatedCases()).isEqualTo(1);assertThat(overview.liveCases()).isZero();
+        List<CoordinationPerson> people=reads.people(org);assertThat(people).extracting(CoordinationPerson::name).contains("routing-a","routing-b");
+        CoordinationPerson a=people.stream().filter(p->p.subject().equals("routing-a")).findFirst().orElseThrow();
+        assertThat(a.teams()).extracting(PersonTeam::team).containsExactly(team);assertThat(a.capacity().maximum()).isEqualTo(10);assertThat(a.account()).isEqualTo("ACTIVE");assertThat(a.member()).isTrue();assertThat(a.workload()).isZero();
+        assertThat(people).extracting(CoordinationPerson::subject).doesNotContain(consultant.toString());
+        assertThat(reads.consultants(org)).extracting(ConsultantRouting::consultantId).containsExactly(consultant);assertThat(reads.consultants(org).getFirst().current()).isNull();
+        preference("routing-b",team,null);ConsultantRouting routed=reads.consultants(org).getFirst();assertThat(routed.current().coordinator()).isEqualTo("routing-b");assertThat(routed.latest().version()).isEqualTo(1);
+        List<DecisionEntry> feed=reads.decisions(org,10);assertThat(feed).hasSize(1);DecisionEntry entry=feed.getFirst();
+        assertThat(entry.caseId()).isEqualTo(caseId);assertThat(entry.caseNumber()).isNotBlank();assertThat(entry.mode()).isEqualTo("SHADOW");assertThat(entry.selectedOwnerName()).isEqualTo(entry.selectedOwner());assertThat(reads.decisions(org,0)).hasSize(1);
+        assertThat(count("SELECT COUNT(*) FROM coordination_decisions")).isEqualTo(decisions);assertThat(count("SELECT COUNT(*) FROM case_assignments")).isEqualTo(assignments);assertThat(count("SELECT COUNT(*) FROM case_tasks")).isEqualTo(tasks);
+        UUID foreign=organization();assertThatThrownBy(()->reads.people(foreign)).isInstanceOf(ApiException.class);assertThatThrownBy(()->reads.decisions(foreign,10)).isInstanceOf(ApiException.class);assertThatThrownBy(()->reads.overview(foreign)).isInstanceOf(ApiException.class);assertThatThrownBy(()->reads.consultants(foreign)).isInstanceOf(ApiException.class);
+        jdbc.update("UPDATE role_assignments SET version_id='31000001-0000-0000-0000-000000000016' WHERE subject='routing-manager'");
+        assertThatThrownBy(()->reads.people(org)).hasMessageContaining("not allowed");assertThatThrownBy(()->reads.decisions(org,10)).hasMessageContaining("not allowed");assertThatThrownBy(()->reads.overview(org)).hasMessageContaining("not allowed");
     }
     Decision command(String action,long revision,String target){return engine.execute(org,caseId,new Command(UUID.randomUUID().toString(),revision,action,target,action.equals("QUEUE")?team:null,"Reviewed assignment","TEST"));}
     PolicyConfig policy(UUID team){return new PolicyConfig(80,20,true,false,team,Map.of(),team,null,24);}

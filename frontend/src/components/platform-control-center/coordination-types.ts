@@ -31,23 +31,24 @@ export type CoordinationDecision = {
   candidates: Candidate[]; scores: Scored[]; source: string; reason: string | null; evaluatedAt: string; revision: number;
   legacyMatches: boolean; algorithm: string;
 };
-export type RoutingCommand = { key: string; revision: number; action: "SHADOW" | "ACTIVATE" | "AUTO" | "ASSIGN" | "REASSIGN" | "QUEUE"; target: string | null; team: string | null; reason: string | null; source: string };
-export type QueueItem = { caseId: string; taskId: string; team: string | null; reason: string | null; queuedAt: string | null; dueAt: string | null; revision: number };
+export type QueueItem = { caseId: string; caseNumber: string; taskId: string; team: string | null; reason: string | null; queuedAt: string | null; dueAt: string | null; revision: number };
 export type SimulationResult = { policyId: string; policyVersion: number; algorithm: string; candidates: Candidate[]; selection: Selection };
 
-export type CandidateExclusionCode =
-  | "ACCESS_OR_MEMBERSHIP_DENIED" | "STAFF_DISABLED" | "NO_ACTIVE_TEAM" | "CARE_AREA_MISMATCH" | "LANGUAGE_MISMATCH" | "OFF_DUTY" | "AT_CAPACITY";
+/** UX-7 read models (CoordinationReadService). Names and case numbers for people; subjects only for commands. */
+export type CoordinationOverview = {
+  liveCases: number; evaluatedCases: number; liveQueue: number | null;
+  policyVersion: number | null; policyEffectiveFrom: string | null; policyEffectiveTo: string | null;
+};
+export type PersonTeam = { team: string; active: boolean; lead: boolean; effectiveFrom: string; effectiveTo: string | null; revision: number };
+export type CoordinationPerson = {
+  subject: string; name: string | null; account: "ACTIVE" | "DISABLED" | "NONE"; member: boolean;
+  teams: PersonTeam[]; capacity: Capacity | null; workload: number;
+};
+export type ConsultantRouting = { consultantId: string; name: string | null; current: Preference | null; latest: Preference | null };
+export type DecisionEntry = {
+  id: string; caseId: string; caseNumber: string; mode: "SHADOW" | "LIVE"; path: string; source: string | null; actorName: string | null;
+  previousOwner: string | null; previousOwnerName: string | null; selectedOwner: string | null; selectedOwnerName: string | null;
+  team: string | null; reason: string | null; evaluatedAt: string; legacyMatches: boolean; policyVersion: number;
+};
 
 export type Decision = { permission: string; allowed: boolean };
-/**
- * Shared authenticated-fetch shape every Care Coordination tab receives from the workspace shell.
- * Deliberately not generic (`Promise<unknown>`, cast at each call site with `as T`) — a truly generic
- * call signature cannot be satisfied by a plain `vi.fn()` test double, which only ever returns one
- * concrete fixture type per test, not an arbitrary T.
- */
-export type CoordinationApi = (path: string, method?: string, body?: unknown) => Promise<unknown>;
-
-export type SelectionPath =
-  | "CONTINUITY" | "PREFERRED_COORDINATOR" | "PREFERRED_TEAM" | "PROVIDER_TEAM" | "CARE_AREA_TEAM" | "DEFAULT_TEAM"
-  | "CONSULTANT_FALLBACK_TEAM" | "FALLBACK_TEAM" | "TEAM_FALLBACK" | "SCORED_POOL" | "NO_ELIGIBLE_COORDINATOR"
-  | "MANUAL_ASSIGN" | "MANUAL_REASSIGN" | "MANUAL_QUEUE";

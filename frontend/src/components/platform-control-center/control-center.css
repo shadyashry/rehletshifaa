@@ -409,3 +409,10 @@
 }
 .cc-readiness-summary .cc-setup-items>li{display:grid;grid-template-columns:minmax(9rem,14rem) minmax(0,1fr);gap:4px 14px;align-items:baseline}
 @media (max-width: 640px) { .cc-readiness-summary .cc-setup-items>li{grid-template-columns:1fr} }
+
+/* UX-7 — Coordination Setup: section actions keep one line; sub-headings inside a section; preview result */
+.cc-section-actions>:is(button,a){white-space:nowrap}
+.cc-subhead{font-size:15.5px;font-weight:700;margin:22px 0 2px}
+.cc-subhead+.cc-meta{margin-bottom:10px}
+.cc-result{margin-top:16px}
+.cc-result h3{margin:4px 0 6px}

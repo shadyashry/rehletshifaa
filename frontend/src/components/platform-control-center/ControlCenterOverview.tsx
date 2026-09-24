@@ -53,10 +53,10 @@ const SOURCES: Source[] = [
     } },
   { key: "staff", group: "operations", label: ["Staff invitations not yet accepted", "دعوات موظفين لم تُقبل بعد"], applies: (a) => a.legacy.admin,
     find: async ({ api, locale }) => ({ count: (await api<{ accountStatus: string }[]>("/admin/staff-teams")).filter((m) => m.accountStatus === "INVITED").length, href: ccHref(locale, "/team") }) },
-  { key: "queue", group: "operations", label: ["Cases waiting for a coordinator", "حالات بانتظار منسق"], applies: (a) => a.can("assignment.queue.manage"),
+  { key: "queue", group: "operations", label: ["Live-routed cases waiting for a coordinator", "حالات توجيه فعلي بانتظار منسق"], applies: (a) => a.can("assignment.queue.manage"),
     find: async ({ api, locale }) => {
       const rows = await Promise.all((await api<{ id: string }[]>("/admin/coordination/organizations")).map(async (o) => [o.id, (await api<unknown[]>(`/admin/coordination/${o.id}/queue`)).length] as const));
-      return { count: sum(rows.map(([, n]) => n)), href: one(rows.filter(([, n]) => n).map(([id]) => id), (id) => ccHref(locale, `/coordination/${id}?tab=queue`), ccHref(locale, "/coordination")) };
+      return { count: sum(rows.map(([, n]) => n)), href: one(rows.filter(([, n]) => n).map(([id]) => id), (id) => ccHref(locale, `/coordination/${id}?tab=advanced`), ccHref(locale, "/coordination")) };
     } },
 ];
 

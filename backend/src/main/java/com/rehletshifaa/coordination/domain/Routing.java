@@ -28,9 +28,21 @@ public final class Routing {
                            List<Candidate> candidates, List<Scored> scores, String source, String reason,
                            Instant evaluatedAt, long revision, boolean legacyMatches, String algorithm) {}
     public record Command(String key, long revision, String action, String target, UUID team, String reason, String source) {}
-    public record QueueItem(UUID caseId, UUID taskId, UUID team, String reason, Instant queuedAt, Instant dueAt, long revision) {}
+    public record QueueItem(UUID caseId, String caseNumber, UUID taskId, UUID team, String reason, Instant queuedAt, Instant dueAt, long revision) {}
     /** Ephemeral what-if evaluation: same eligibility/scoring services as a real decision, never persisted. */
     public record SimulationResult(UUID policyId, int policyVersion, String algorithm, List<Candidate> candidates, Selection selection) {}
     /** Org picker for the Care Coordination UI — visible to any assignment.*-view-capable subject, not just provider.view holders. */
     public record OrganizationSummary(UUID id, String displayName, String type, String status) {}
+    /** Organization-level routing facts for Coordination Setup: how many cases are live-routed vs evaluation-only, and the policy in effect. */
+    public record CoordinationOverview(long liveCases, long evaluatedCases, Long liveQueue, Integer policyVersion, Instant policyEffectiveFrom, Instant policyEffectiveTo) {}
+    /** One person's membership of one coordinator team. */
+    public record PersonTeam(UUID team, boolean active, boolean lead, Instant effectiveFrom, Instant effectiveTo, long revision) {}
+    /** Teams & People read model: a coordinator by name with their team memberships, capacity and current caseload. Subject is for commands only. */
+    public record CoordinationPerson(String subject, String name, String account, boolean member, List<PersonTeam> teams, Capacity capacity, long workload) {}
+    /** A Consultant of this organization with the routing preference in effect now and the latest version (for expected-version writes). */
+    public record ConsultantRouting(UUID consultantId, String name, Preference current, Preference latest) {}
+    /** Routing decision history entry: bounded, named, case-numbered; no candidate/score payload. */
+    public record DecisionEntry(UUID id, UUID caseId, String caseNumber, String mode, String path, String source, String actorName,
+                                String previousOwner, String previousOwnerName, String selectedOwner, String selectedOwnerName,
+                                UUID team, String reason, Instant evaluatedAt, boolean legacyMatches, int policyVersion) {}
 }

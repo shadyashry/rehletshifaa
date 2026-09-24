@@ -258,6 +258,35 @@ class SecureJourneyCorrectionsTest {
         assertThat(journey.workspace(created.caseId()).caseSummary().coordinatorSubject()).isEqualTo("replacement-coordinator");
     }
 
+    @Test void transferMovesOpenCoordinatorWorkOnlyRecordsHistoryAndRefusesDisabledCoordinators() {
+        var created=cases.create(new CreateCaseRequest("Transfer", "Patient","Kenya","+254700000023","Transfer","en",true,null,null,null));
+        cases.submit(created.caseId()); em.flush(); em.clear();
+        authenticate("coordinator-subject","COORDINATOR");
+        journey.claimCoordinatorCase(created.caseId(),"pod");
+        for(String[] person:new String[][]{{"replacement-coordinator","COORDINATOR","Replacement Coordinator"},{"lead-subject","COORDINATOR_LEAD","Team Lead"},{"coordinator-subject","COORDINATOR","Original Coordinator"},{"disabled-coordinator","COORDINATOR","Disabled Coordinator"}})
+            jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),person[0],person[1],crypto.encrypt(person[2]),Instant.now(),Instant.now());
+        jdbc.update("UPDATE staff_members SET manager_subject='lead-subject' WHERE external_subject IN ('coordinator-subject','replacement-coordinator','disabled-coordinator')");
+        jdbc.update("UPDATE staff_members SET disabled_at=?,invitation_status='DISABLED' WHERE external_subject='disabled-coordinator'",java.sql.Timestamp.from(Instant.now()));
+        UUID coordinatorWork=workItem(created.caseId(),"coordinator-subject","COORDINATOR","OPEN"),operationsWork=workItem(created.caseId(),"operations-subject","OPERATIONS","OPEN"),doneWork=workItem(created.caseId(),"coordinator-subject","COORDINATOR","COMPLETED");
+        authenticate("lead-subject","COORDINATOR_LEAD");
+        assertThat(journey.staffDirectory("COORDINATOR")).extracting(StaffDirectoryView::subject).contains("replacement-coordinator").doesNotContain("disabled-coordinator");
+        assertThatThrownBy(()->journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("disabled-coordinator","Coverage"))).isInstanceOf(ApiException.class);
+        journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("replacement-coordinator","Leave coverage"));
+        assertThat(owner(coordinatorWork)).isEqualTo("replacement-coordinator");
+        assertThat(owner(operationsWork)).isEqualTo("operations-subject");
+        assertThat(owner(doneWork)).isEqualTo("coordinator-subject");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_role='COORDINATOR' AND visibility_scope='INTERNAL' AND status IN ('OPEN','IN_PROGRESS') AND (owner_subject IS NULL OR owner_subject<>'replacement-coordinator')",Long.class,created.caseId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_notifications WHERE recipient_subject='replacement-coordinator'",Long.class)).isZero();
+        var history=journey.assignmentHistory(created.caseId());
+        assertThat(history.getFirst().role()).isEqualTo("COORDINATOR");assertThat(history.getFirst().assigneeName()).isEqualTo("Replacement Coordinator");assertThat(history.getFirst().status()).isEqualTo("ACTIVE");
+        assertThat(history.getFirst().assignedByKind()).isEqualTo("PERSON");assertThat(history.getFirst().assignedByName()).isEqualTo("Team Lead");assertThat(history.getFirst().reason()).isEqualTo("Leave coverage");
+        assertThat(history).anySatisfy(entry->{assertThat(entry.assigneeName()).isEqualTo("Original Coordinator");assertThat(entry.status()).isEqualTo("ENDED");assertThat(entry.endedAt()).isNotNull();});
+        authenticate("doctor-subject","DOCTOR");
+        assertThatThrownBy(()->journey.assignmentHistory(created.caseId())).isInstanceOf(ApiException.class);
+    }
+    private UUID workItem(UUID caseId,String owner,String role,String status){UUID id=UUID.randomUUID();jdbc.update("INSERT INTO case_tasks(id,case_id,task_type,title,owner_subject,owner_role,visibility_scope,priority,status,blocking,created_by,created_at,updated_at,version) VALUES(?,?,'OTHER','Fixture work',?,?,'INTERNAL','NORMAL',?,FALSE,'TEST',?,?,0)",id,caseId,owner,role,status,java.sql.Timestamp.from(Instant.now()),java.sql.Timestamp.from(Instant.now()));return id;}
+    private String owner(UUID task){return jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE id=?",String.class,task);}
+
     @Test void doctorNotSuitableIsADistinctClinicalOutcome() throws Exception {
         var ctx=assignedDoctorCase();
         authenticate("doctor-subject","DOCTOR");

@@ -50,7 +50,7 @@ describe("Page header standard", () => {
     vi.mocked(apiFetchAs).mockImplementation((_t, path) => (String(path).endsWith("/admin/access/me") ? fakeApi({}, ["assignment.team.view"])(_t, path) : new Promise<Response>((r) => { release = r; })));
     render(<CareCoordinationOrganizations locale="en" />);
     expect(h1()).toEqual(["Coordination Setup"]);
-    expect(screen.getByText("Choose an organization to set up its coordinator teams, routing rules and assignment queue.")).toBeVisible();
+    expect(screen.getByText("Choose the organization whose coordinator teams, clinician preferences and routing rules you want to set up.")).toBeVisible();
     release(new Response("[]"));
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
     expect(h1()).toEqual(["Coordination Setup"]);

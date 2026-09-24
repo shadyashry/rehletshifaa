@@ -25,7 +25,7 @@ describe("Control Center Home answers 'What needs my attention?'", () => {
     expect(reviews).toHaveAttribute("href", "/en/portal/control-center/credentials?org=org-a");
     expect(screen.getByRole("link", { name: /Organizations still being set up/ })).toHaveAttribute("href", "/en/portal/control-center/providers/org-a?tab=setup");
     expect(screen.getByRole("link", { name: /People waiting for membership activation/ })).toHaveAttribute("href", "/en/portal/control-center/providers/org-a?tab=people");
-    expect(screen.queryByText(/Cases waiting for a coordinator/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/waiting for a coordinator/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add clinician" })).toHaveAttribute("href", "/en/portal/control-center/providers/clinicians/new");
     expect(screen.queryByRole("heading", { name: "What do you want to manage?" })).not.toBeInTheDocument();
     // Every link in the page body is an attention item or the one primary action: nothing duplicates the sidebar.

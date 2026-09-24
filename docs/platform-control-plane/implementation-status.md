@@ -1,5 +1,32 @@
 # Platform Control Plane — implementation status
 
+## UX-7 — Care Coordination: Team queue, ownership transfer, Coordination Setup — 2026-09-24 (Claude Code)
+
+Scope stayed inside UX-7: no Commercial or Care Journeys redesign, no Journey runtime/cutover or routing rollout change,
+no Phase 8C. Journey production intake OFF. No migration, no new permission/scope/role version/engine/state machine.
+Full record: [ux-7-care-coordination-status.md](ux-7-care-coordination-status.md).
+
+- **Staff Portal:** Team queue sub-views *Needs an owner* (claim) / *Owned by my team* (leads; *Transfer ownership* on the
+  row); one-line meaning per list; *Received* date on unowned requests; names isolated with `bdi`. *Transfer case
+  ownership* (new `TransferOwnership.tsx`) replaces *Case administration*: search by name, reason, review of consequences,
+  truthful "nobody was notified". Case Activity → **Assignment history** (`AssignmentHistory.tsx`).
+- **Backend (Staff Portal):** `GET /coordinator/cases/{id}/assignment-history` (coordinator roles + `authorizeRead`);
+  transfer moves the previous owner's / unowned **open coordinator WorkItems** to the new owner (Phase 3 rule) and refuses
+  disabled coordinators; `/coordinator/staff` excludes disabled accounts.
+- **Coordination Setup** (`CareCoordinationWorkspace` + `CoordinationTeamsPeople`, `ClinicianPreferences`,
+  `RoutingRules`, `CoordinationAdvanced`; the seven old tab components removed): evaluation-mode banner; people by name
+  with caseload; add/remove membership and capacity with required reasons and consequence copy; preferences and rules with
+  finite, non-overlapping versions (the old UI sent no end date, so every save failed); care-area teams editable; preview
+  routing recommendation; routing decision history; live-routed queue only when live routing exists. Old `?tab=` links map
+  to the new sections; one organization opens directly.
+- **Backend (Coordination Setup):** `CoordinationReadService` — `GET /admin/coordination/{org}/overview`, `/people`,
+  `/consultants`, `/decisions?limit=` (≤100); live queue items carry the case number.
+- Home: the coordination attention item is labelled *Live-routed cases waiting for a coordinator* and opens Advanced.
+- Verification: see test-status.md.
+
+### UX-7 COMPLETE: YES
+### UX-8 READY: YES
+
 ## UX-6 — Credential Reviews, credential lifecycle presentation, readiness — 2026-09-24 (Claude Code)
 
 Scope stayed inside UX-6: no Care Coordination, Commercial or Journey redesign, no Phase 8C. Journey production intake OFF.

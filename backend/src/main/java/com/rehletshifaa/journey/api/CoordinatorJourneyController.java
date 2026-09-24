@@ -22,6 +22,8 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PutMapping("/cases/{caseId}/care-category")public CaseView careCategory(@PathVariable UUID caseId,@Valid @RequestBody CareCategoryUpdateRequest request){return service.updateCareCategory(caseId,request);}
  @PutMapping("/cases/{caseId}/travel-package")public CaseView travelPackage(@PathVariable UUID caseId,@Valid @RequestBody TravelPackageRequest request){return service.setTravelPackage(caseId,request.requested());}
  @PostMapping("/cases/{caseId}/assignments")public IdResponse assign(@PathVariable UUID caseId,@Valid @RequestBody AssignmentRequest request){return service.assign(caseId,request);}
+ /** Assignment history: who has been responsible for this case and its work, including ended assignments. */
+ @GetMapping("/cases/{caseId}/assignment-history")public List<AssignmentHistoryEntry>assignmentHistory(@PathVariable UUID caseId){return service.assignmentHistory(caseId);}
  @PostMapping("/cases/{caseId}/coordinator-assignment")public IdResponse reassignCoordinator(@PathVariable UUID caseId,@Valid @RequestBody CoordinatorReassignmentRequest request){return service.reassignCoordinator(caseId,request);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
  @PostMapping("/cases/{caseId}/messages/{messageId}/read")public IdResponse read(@PathVariable UUID caseId,@PathVariable UUID messageId){return service.markMessageRead(caseId,messageId);}

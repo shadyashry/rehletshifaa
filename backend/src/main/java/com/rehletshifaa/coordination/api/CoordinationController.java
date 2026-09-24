@@ -9,8 +9,13 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/v1/admin/coordination/{org}")
 public class CoordinationController {
-    private final CoordinationConfigurationService config; private final AssignmentEngine engine;
-    public CoordinationController(CoordinationConfigurationService config,AssignmentEngine engine){this.config=config;this.engine=engine;}
+    private final CoordinationConfigurationService config; private final AssignmentEngine engine; private final CoordinationReadService reads;
+    public CoordinationController(CoordinationConfigurationService config,AssignmentEngine engine,CoordinationReadService reads){this.config=config;this.engine=engine;this.reads=reads;}
+    /** UX-7 read models: named, case-numbered, one request per Coordination Setup section. */
+    @GetMapping("/overview") public CoordinationOverview overview(@PathVariable UUID org){return reads.overview(org);}
+    @GetMapping("/people") public List<CoordinationPerson> people(@PathVariable UUID org){return reads.people(org);}
+    @GetMapping("/consultants") public List<ConsultantRouting> consultants(@PathVariable UUID org){return reads.consultants(org);}
+    @GetMapping("/decisions") public List<DecisionEntry> decisions(@PathVariable UUID org,@RequestParam(required=false) Integer limit){return reads.decisions(org,limit);}
     @GetMapping("/teams") public List<Team> teams(@PathVariable UUID org){return config.teams(org);}
     @GetMapping("/teams/{id}") public Team team(@PathVariable UUID org,@PathVariable UUID id){config.authorize(org,"assignment.team.view");return config.team(org,id);}
     @PostMapping("/teams") public Team create(@PathVariable UUID org,@RequestBody TeamCommand x){return config.saveTeam(org,null,x.name(),x.configuration(),x.revision(),x.reason());}

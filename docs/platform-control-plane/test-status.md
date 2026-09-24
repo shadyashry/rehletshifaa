@@ -1,5 +1,32 @@
 # Platform Control Plane — verification status
 
+## UX-7 care coordination verification — 2026-09-24 (Claude Code)
+
+- Backend focused: `CoordinationIntegrationTest` **16/16** (new `readModelsAreNamedScopedAndWriteNothing`: overview
+  live/evaluation counts, people by name with team/capacity/workload and no clinicians, consultants with current/latest
+  preference, org-wide decision feed with case number, reads write no decision/assignment/task row, foreign organization
+  and missing capability denied; existing `simulateIsEphemeralAndNeverMutatesRealState` covers preview side effects),
+  `CoordinationConcurrencyTest` **1/1**, `SecureJourneyCorrectionsTest` **59/59** (new
+  `transferMovesOpenCoordinatorWorkOnlyRecordsHistoryAndRefusesDisabledCoordinators`: only the previous owner's open
+  coordinator work moves, Operations and completed work untouched, no notification, disabled coordinator neither listed nor
+  accepted, assignment history names/by/reason/ended entry, Consultant denied), `PortalExperienceTest` **5/5**.
+- Full offline regression `mvn -o test`: **530 tests, 0 failures, 0 errors, 1 skipped** (UX-6: 528). A first full run had
+  1 failure in `NotificationOutboxDeliveryTest.aClaimHandedBackBeforeAnySendIsDueAgainAtOnce…` (the clock-sensitive test
+  already recorded in UX-5, untouched code); it passed alone (8/8) and in the full rerun.
+- Flyway: no migration (latest still V51).
+- Frontend: `pnpm typecheck` clean; `pnpm test` **383 tests / 42 files** (UX-6: 386 / 48 — the seven old coordination test
+  files were replaced by `CareCoordinationWorkspace.test.tsx` (15) and `portal/CareCoordination.test.tsx` (7)). An untouched,
+  timing-sensitive Provider Workspace test failed intermittently under load in early full runs and passes alone; the final
+  three full runs were 383/383. New files are lint-clean (remaining react-compiler lint findings are pre-existing
+  Portal/CaseQueue lines).
+- E2E: new `care-coordination.spec.ts` **4/4** (EN + AR: Team queue both views, Transfer drawer to review, My work, case
+  Activity → Assignment history; Coordination Setup single-organization landing, Teams & People, Add person dialog, Clinician
+  Preferences, Rules, Advanced preview + decision history; 1280 px and 390 px, no horizontal scroll, one h1; **zero writes**)
+  against the rebuilt tunnel stack.
+- Live review (limited, not Phase 8C): synthetic session + fixtures only; no write reached the live database. Screenshots
+  inspected; fixes applied and re-verified: section actions no longer wrap, sub-headings styled, preview result in a card,
+  duplicated "no capacity" phrase removed.
+
 ## UX-6 credentials & readiness verification — 2026-09-24 (Claude Code)
 
 - Backend focused: `CredentialValidityTest` **5/5** (no expiry, future, expiry today before/at/after the instant, past,

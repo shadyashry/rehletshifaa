@@ -22,11 +22,11 @@ export function MyWork({ locale, items, busy, onOpen }: {
 }) {
   const ar = locale === "ar";
   const t = ar
-    ? { title: "عملي", hint: "الإجراءات المسندة إليك مرتّبة حسب الأولوية.", empty: "لا يوجد عمل مفتوح لديك.",
+    ? { title: "عملي", hint: "العمل المسند إليك شخصيًا، الأكثر إلحاحًا أولًا.", empty: "لا يوجد عمل مفتوح لديك.",
         emptyHint: "سيظهر هنا كل إجراء يُسند إليك.", open: "فتح", due: "الاستحقاق", overdue: "متأخر", today: "اليوم",
         blocking: "يوقف التقدم", loading: "جارٍ التحميل…", waiting: "بانتظار", results: "عنصر عمل", reviewAssignment: "مراجعة التعيين",
         newAssignment: "تعيين جديد", care: "مجال الرعاية", coordinator: "المنسق", docs: "مستندات" }
-    : { title: "My work", hint: "Actions assigned to you, most urgent first.", empty: "You have no open work.",
+    : { title: "My work", hint: "Work assigned to you personally, most urgent first.", empty: "You have no open work.",
         emptyHint: "Anything assigned to you shows up here.", open: "Open", due: "Due", overdue: "Overdue", today: "today",
         blocking: "Blocking", loading: "Loading…", waiting: "Waiting on", results: "work items", reviewAssignment: "Review assignment",
         newAssignment: "New assignment", care: "Care area", coordinator: "Coordinator", docs: "documents" };

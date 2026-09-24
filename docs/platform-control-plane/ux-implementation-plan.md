@@ -253,7 +253,7 @@ restructure, journeys) is **P1/P2** and lands in UX-2 … UX-8.
 | **UX-4 Provider Workspace / Personas** — decisions frozen in UX-4A (§18); **COMPLETE** (§19) | Persona landing from existing memberships/capabilities; §1-B contents; *Manage organization* entry; patient/case data only as permitted by the approved P0-9 matrix; V-3 assigned-case summary read and V-11 self read | Keycloak role provisioning, new authorization, any FUTURE / NOT CURRENTLY SUPPORTABLE matrix row |
 | **UX-5 Access & Governance** — **COMPLETE** (§20) | People (merge User access + Effective access), Access summary, Roles, Audit, permission reference; reason at publish; person picker; access-removal/offboarding summary | Changing the realm-role/platform-role split |
 | **UX-6 Credentials & Provider Readiness** — **COMPLETE** (§21) | Credential Reviews workspace (typed rows incl. Direct approvals); derived lifecycle labels (§6); decision history where supported; organization Setup and profile edit (existing `PUT /admin/providers/{id}`); Ready-to-activate wording | Reminders, revocation, privileging |
-| **UX-7 Care Coordination** | Staff Portal Team queue with authoritative Assign/Transfer, names + case numbers; Coordination Setup (Pools & People, Clinician Preferences, Rules); Advanced (Preview routing recommendation, simulation, history); no org-picker hop | Routing-mode changes |
+| **UX-7 Care Coordination** — **COMPLETE** (§22) | Staff Portal Team queue with authoritative Assign/Transfer, names + case numbers; Coordination Setup (Pools & People, Clinician Preferences, Rules); Advanced (Preview routing recommendation, simulation, history); no org-picker hop | Routing-mode changes |
 | **UX-8 Commercial / Care Journeys / Portal polish** | Price Lists overview, Exchange Rates, Margin & Deposit polish; financial truthfulness copy (audit §31.8 E); Journeys publish checklist, Advanced engine detail, reason at submit, *Retire version* copy; staff/patient portal polish; representative context | Online payment, Journey production intake |
 
 Each phase: focused unit tests + typecheck; update affected e2e specs; live visual check of touched pages.
@@ -422,3 +422,26 @@ UX-6 is complete — record: [ux-6-credentials-readiness-status.md](ux-6-credent
 - Backend: read additions only (queue endpoint, enriched review detail, blocker codes, directory suspension precedence);
   no migration, no write or authorization change.
 - **UX-7 READY: YES.**
+
+## 22. UX-7 outcome — Care Coordination (2026-09-24)
+
+UX-7 is complete — record: [ux-7-care-coordination-status.md](ux-7-care-coordination-status.md).
+
+- **Split frozen and implemented:** daily work in the Staff Portal (My work · My cases · Team queue — *Needs an owner* /
+  *Owned by my team*; *Take ownership*; **Transfer case ownership**; **Assignment history** on the case); configuration in
+  Control Center › **Coordination Setup** (Teams & People · Clinician Preferences · Rules · Advanced). No operational queue
+  in the Control Center's primary sections; the org-picker hop is gone for a single organization.
+- **Case Owner, WorkItem assignee and routing preference stay distinct**, each labelled from verified backend semantics
+  (record §2). Every Assign/Transfer label now does what it says; recommendations are never labelled as assignments.
+- **Transfer** is a two-step drawer (coordinator by name + reason → review of what changes / stays / notifications). Backend
+  fix: open coordinator WorkItems now move with the ownership (the frozen Phase 3 owner-change rule) instead of stranding
+  with the previous owner; disabled coordinators are no longer transfer targets or directory entries. Nobody is notified —
+  the UI says so.
+- **Advanced**: *Preview routing recommendation* (the engine's ephemeral simulation, approved evaluation-only copy, backend
+  reasons only), *Routing decision history* (evaluation-only vs applied, manual overrides with actor and reason), live-routed
+  cases waiting (only when live routing exists), technical configuration. *Evaluation mode* banner replaces "Shadow".
+- Backend: read additions (`/admin/coordination/{org}/overview|people|consultants|decisions`, queue case numbers,
+  `/coordinator/cases/{id}/assignment-history`) and the transfer/directory fix; no migration, no rollout change, no new
+  permission, engine or state machine.
+- **UX-8 READY: YES** — what remains for coordination is recorded debt (WorkItem-level pool when Journey intake turns on,
+  WorkItem reassign UI, real-case preview read, transfer notification decision), not a truthfulness or safety defect.

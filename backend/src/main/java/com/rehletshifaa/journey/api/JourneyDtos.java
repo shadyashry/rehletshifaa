@@ -91,6 +91,8 @@ public final class JourneyDtos {
     public record MessageView(UUID id,String threadType,String senderRole,String senderName,String direction,String body,String language,boolean internalOnly,boolean read,Instant createdAt) {}
     public record TaskView(UUID id,UUID caseId,String type,String title,String description,String ownerSubject,String ownerRole,String visibilityScope,String priority,String status,boolean blocking,boolean overdue,Instant dueAt,long version) {}
     public record StaffDirectoryView(String subject,String name,String role) {}
+    /** One responsibility record on a case (UX-7 Assignment history). assignedByKind: PERSON, ROUTING or SYSTEM; names only, never account identifiers. */
+    public record AssignmentHistoryEntry(String role,String assigneeName,String status,Instant assignedAt,Instant endedAt,String assignedByKind,String assignedByName,String reason) {}
     public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason) {}
     public record ProposalItemView(UUID id,String category,String description,BigDecimal quantity,BigDecimal unitPrice,boolean optional) {}
     /** {@code assigneeName} is resolved server-side so no interface ever renders an identity subject. */

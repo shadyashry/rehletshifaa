@@ -68,8 +68,10 @@ function statusTone(status:string){return ["INFORMATION_REQUIRED","REVISION_REQU
  * people who prefer it. The toolbar carries only search, filters, sort and view — everything else lives
  * in the filter panel and surfaces as removable chips, so the page shows work rather than controls.
  */
-export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,busy,state,scope="all",onChange,onOpen,onMutate,statusLabel,categoryLabel}: {
+export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,busy,state,scope="all",onChange,onOpen,onMutate,onTransfer,statusLabel,categoryLabel}: {
   locale:Locale; role:string; cases:T[]; subject?:string; lead:boolean; busy:boolean; state:QueueState; scope?:"mine"|"team"|"all";
+  /** Transfer case ownership (coordinator leads). Offered only on cases a teammate owns — never a recommendation. */
+  onTransfer?:(item:T)=>void;
   onChange:(value:QueueState)=>void; onOpen:(item:T)=>void; onMutate:(path:string,body?:unknown,method?:string)=>Promise<unknown>; statusLabel:(value:string)=>string; categoryLabel:(value:string)=>string;
 }) {
   const ar=locale==="ar", coordinator=role==="coordinator";
@@ -94,8 +96,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   },[filtersOpen]);
 
   const text=ar
-    ?{title:"قائمة الحالات",unowned:"تحتاج إلى منسق",team:"حالات الفريق",search:"ابحث برقم الحالة أو الاسم أو مجال الرعاية",status:"حالة الطلب",active:"الحالات النشطة",all:"جميع الحالات",empty:"لا توجد حالات هنا",emptyHint:"ستظهر الحالات هنا عندما تصبح متاحة لك.",noMatch:"لا توجد نتائج مطابقة",loading:"جارٍ التحميل…",results:"حالة",filters:"الفلاتر",clearAll:"مسح الكل",sort:"الترتيب",display:"طريقة العرض",list:"قائمة",grid:"بطاقات",open:"فتح",claim:"استلام الحالة",requestInfo:"طلب معلومات",selected:"محددة",clearSelection:"إلغاء التحديد",previous:"السابق",next:"التالي",waiting:"بانتظار",owner:"المنسق",consultant:"الاستشاري",unassigned:"غير مسند",updated:"آخر تحديث",overdue:"متأخر",openWork:"مهام مفتوحة",docs:"مستندات",copy:"نسخ رقم الحالة",copied:"تم النسخ",country:"الدولة",careArea:"مجال الرعاية",createdFrom:"أُنشئت من",createdTo:"أُنشئت إلى",updatedFrom:"حُدّثت من",updatedTo:"حُدّثت إلى",accept:"قبول التعيين"}
-    :{title:"Case list",unowned:"Needs ownership",team:"Team cases",search:"Search case number, name or care area",status:"Case status",active:"Active cases",all:"All cases",empty:"No cases here",emptyHint:"Cases appear here when they become available to you.",noMatch:"No cases match these filters",loading:"Loading…",results:"cases",filters:"Filters",clearAll:"Clear all",sort:"Sort",display:"View",list:"List",grid:"Cards",open:"Open",claim:"Take ownership",requestInfo:"Request info",selected:"selected",clearSelection:"Clear selection",previous:"Previous",next:"Next",waiting:"Waiting",owner:"Coordinator",consultant:"Consultant",unassigned:"Unassigned",updated:"Updated",overdue:"Overdue",openWork:"open",docs:"files",copy:"Copy case number",copied:"Copied",country:"Country",careArea:"Care area",createdFrom:"Created from",createdTo:"Created to",updatedFrom:"Updated from",updatedTo:"Updated to",accept:"Accept assignment"};
+    ?{title:"قائمة الحالات",unowned:"تحتاج إلى مالك",team:"حالات فريقي",unownedHint:"طلبات جديدة لا يملكها أحد بعد. عند استلامها تصبح مالك الحالة.",teamHint:"حالات يملكها منسقون في فريقك. انقل الملكية لإعادة توزيع العمل.",mineHint:"الحالات التي تملكها بصفتك المنسق المسؤول.",assignedHint:"الحالات المسندة إليك.",transfer:"نقل الملكية",received:"وصلت",search:"ابحث برقم الحالة أو الاسم أو مجال الرعاية",status:"حالة الطلب",active:"الحالات النشطة",all:"جميع الحالات",empty:"لا توجد حالات هنا",emptyHint:"ستظهر الحالات هنا عندما تصبح متاحة لك.",noMatch:"لا توجد نتائج مطابقة",loading:"جارٍ التحميل…",results:"حالة",filters:"الفلاتر",clearAll:"مسح الكل",sort:"الترتيب",display:"طريقة العرض",list:"قائمة",grid:"بطاقات",open:"فتح",claim:"استلام الحالة",requestInfo:"طلب معلومات",selected:"محددة",clearSelection:"إلغاء التحديد",previous:"السابق",next:"التالي",waiting:"بانتظار",owner:"المنسق",consultant:"الاستشاري",unassigned:"غير مسند",updated:"آخر تحديث",overdue:"متأخر",openWork:"مهام مفتوحة",docs:"مستندات",copy:"نسخ رقم الحالة",copied:"تم النسخ",country:"الدولة",careArea:"مجال الرعاية",createdFrom:"أُنشئت من",createdTo:"أُنشئت إلى",updatedFrom:"حُدّثت من",updatedTo:"حُدّثت إلى",accept:"قبول التعيين"}
+    :{title:"Case list",unowned:"Needs an owner",team:"Owned by my team",unownedHint:"New requests nobody owns yet. Taking ownership makes you the case owner.",teamHint:"Cases owned by coordinators on your team. Transfer ownership to rebalance work.",mineHint:"Cases you own as the responsible coordinator.",assignedHint:"Cases you are assigned to.",transfer:"Transfer ownership",received:"Received",search:"Search case number, name or care area",status:"Case status",active:"Active cases",all:"All cases",empty:"No cases here",emptyHint:"Cases appear here when they become available to you.",noMatch:"No cases match these filters",loading:"Loading…",results:"cases",filters:"Filters",clearAll:"Clear all",sort:"Sort",display:"View",list:"List",grid:"Cards",open:"Open",claim:"Take ownership",requestInfo:"Request info",selected:"selected",clearSelection:"Clear selection",previous:"Previous",next:"Next",waiting:"Waiting",owner:"Coordinator",consultant:"Consultant",unassigned:"Unassigned",updated:"Updated",overdue:"Overdue",openWork:"open",docs:"files",copy:"Copy case number",copied:"Copied",country:"Country",careArea:"Care area",createdFrom:"Created from",createdTo:"Created to",updatedFrom:"Updated from",updatedTo:"Updated to",accept:"Accept assignment"};
 
   // "My cases" is a single accountable list; the team queue keeps the ownership sub-tabs.
   const selected=scope==="mine"?"mine":(state.tab&&state.tab!=="mine"?state.tab:"unowned");
@@ -141,6 +143,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
         onKeyDown={event=>{const step=event.key==="ArrowRight"?1:event.key==="ArrowLeft"?-1:0;if(!step)return;event.preventDefault();const next=tabs[(index+step+tabs.length)%tabs.length];setFocused(next.id);document.getElementById(`queue-tab-${next.id}`)?.focus();}}
         onClick={()=>change({tab:tab.id})}>{tab.label}</button>)}
     </div>}
+
+    {scope!=="all"&&<p className="text-[0.85rem] text-ink-600">{scope==="team"?(selected==="team"?text.teamHint:text.unownedHint):coordinator?text.mineHint:text.assignedHint}</p>}
 
     {/* Toolbar: search, filters, sort, view — nothing else competes for attention. */}
     <div className="flex flex-wrap items-center gap-2">
@@ -230,6 +234,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
           {pageItems.map(item=>{
             const pending=item.assignmentStatus==="PENDING"&&item.assignmentId;
             const claimable=coordinator&&!item.coordinatorSubject&&item.status==="RECEIVED";
+            const transferable=!!onTransfer&&coordinator&&scope==="team"&&selected==="team"&&!!item.coordinatorSubject&&!terminal.has(item.status);
             const overdue=(item.overdueTaskCount??0)>0;
             const attention=attentionChip(item,ar);
             const quick=async(path:string,body?:unknown)=>{await onMutate(path,body);};
@@ -239,14 +244,15 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
               {attention&&<span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.72rem] font-bold ${attention.tone}`}>{overdue&&<CircleAlert size={12} aria-hidden/>}{attention.label}</span>}
             </>;
             const people=<>
-              <span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-600"><UserRound size={13} className="text-ink-400" aria-hidden/>{item.coordinatorName??text.unassigned}</span>
-              {item.doctorName&&<span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-600"><Stethoscope size={13} className="text-ink-400" aria-hidden/>{item.doctorName}</span>}
+              <span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-600"><UserRound size={13} className="text-ink-400" aria-hidden/>{item.coordinatorName?<bdi>{item.coordinatorName}</bdi>:text.unassigned}</span>
+              {item.doctorName&&<span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-600"><Stethoscope size={13} className="text-ink-400" aria-hidden/><bdi>{item.doctorName}</bdi></span>}
               {(item.openTaskCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-500"><ListTodo size={13} aria-hidden/>{item.openTaskCount} {text.openWork}</span>}
               {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-500"><Files size={13} aria-hidden/>{item.documentCount} {text.docs}</span>}
             </>;
             const actions=<>
               {claimable&&<button type="button" className="btn-primary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
               {pending&&<button type="button" className="btn-primary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
+              {transferable&&<button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
               <button type="button" className={`${claimable||pending?"btn-secondary":"btn-primary"} !min-h-9 !px-3 !text-[0.82rem]`} disabled={busy} onClick={()=>onOpen(item)}>{text.open}<ArrowRight size={14} aria-hidden className="rtl:rotate-180"/></button>
             </>;
 
@@ -277,7 +283,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">{meta}</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">{people}
-                  <span className="text-[0.75rem] text-ink-400">{text.updated} {new Intl.DateTimeFormat(locale,{day:"numeric",month:"short"}).format(new Date(item.updatedAt))}</span>
+                  <span className="text-[0.75rem] text-ink-400">{claimable?text.received:text.updated} {new Intl.DateTimeFormat(locale,{day:"numeric",month:"short"}).format(new Date(claimable?item.createdAt:item.updatedAt))}</span>
                 </div>
               </div>
               <div className="flex flex-none flex-wrap gap-2 sm:justify-end">{actions}</div>

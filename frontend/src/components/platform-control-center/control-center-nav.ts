@@ -59,7 +59,7 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { key: "operations", label: ["Operations", "العمليات"], icon: Workflow, items: [
     { key: "staff", path: "/team", label: ["RehletShifaa Staff", "فريق رحلة شفاء"], summary: ["Coordination, operations and finance staff, and their team leads.", "موظفو التنسيق والعمليات والمالية وقادة فرقهم."], visible: (a) => a.legacy.admin },
-    { key: "coordination", path: "/coordination", label: ["Coordination Setup", "إعداد التنسيق"], summary: ["Coordinator teams, routing rules and the assignment queue.", "فرق المنسقين وقواعد التوجيه وقائمة الإسناد."], visible: (a) => a.canAny(COORDINATION_VIEW) },
+    { key: "coordination", path: "/coordination", label: ["Coordination Setup", "إعداد التنسيق"], summary: ["Coordinator teams, clinician preferences and routing rules.", "فرق المنسقين وتفضيلات الأطباء وقواعد التوجيه."], visible: (a) => a.canAny(COORDINATION_VIEW) },
   ] },
   // Journey design and publishing happen inside each journey (journey › version › design); there is no separate
   // cross-journey destination, so the group has one sidebar line.

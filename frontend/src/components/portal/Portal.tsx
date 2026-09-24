@@ -24,6 +24,8 @@ import { PatientIdentityStep } from "@/components/portal/PatientIdentityStep";
 import { PatientNav } from "@/components/portal/PatientNav";
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
 import { MyWork, waitingLabel, type WorkItem } from "@/components/portal/MyWork";
+import { TransferOwnership } from "@/components/portal/TransferOwnership";
+import { AssignmentHistory, type AssignmentHistoryEntry } from "@/components/portal/AssignmentHistory";
 import { NotificationBell } from "@/components/portal/NotificationBell";
 import { AccountLinkRequest } from "@/components/portal/AccountLinkRequest";
 import { ccHref } from "@/components/platform-control-center/control-center-nav";
@@ -101,6 +103,7 @@ export function Portal({locale}:{locale:Locale}){
   useEffect(()=>{const selected=new URLSearchParams(window.location.search).get("role") as RoleKey;if(available.includes(selected))setActive(selected);},[available]);
   const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{if(!user)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(user.access_token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){await requestReauthentication(signIn);throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[user,t.error,signIn]);
   const refresh=useCallback(async()=>{if(!currentRole||["admin","identity"].includes(currentRole))return;setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}},[currentRole,api,t.error]);
+  const loadAssignmentHistory=useCallback((caseId:string)=>api<AssignmentHistoryEntry[]>(`/coordinator/cases/${caseId}/assignment-history`),[api]);
   useEffect(()=>{if(!user)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[user,api]);
   useEffect(()=>{
     // A provider person on the way to My Practice (see providerLanding) never loads a patient queue.
@@ -202,12 +205,12 @@ export function Portal({locale}:{locale:Locale}){
     {busy&&workspace&&<p role="status" className="mb-3 text-sm text-ink-500">{t.loading}</p>}
     {documentError&&workspace&&<p role="alert" className="mb-4 rounded-xl bg-alert-50 p-4 text-sm text-alert-800">{locale==="ar"?"تعذّر تحميل المستندات.":"Documents could not be loaded."} <button className="link-cta" onClick={()=>void openCase(workspace.caseSummary)}>{locale==="ar"?"إعادة المحاولة":"Retry"}</button></p>}
     {workspace
-        ? <WorkspaceView locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={roles.includes("COORDINATOR_LEAD")} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={openCaseById}/>
+        ? <WorkspaceView locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={roles.includes("COORDINATOR_LEAD")} loadAssignmentHistory={loadAssignmentHistory} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={openCaseById}/>
         : isPatientRole ? (queueLoading||(!landed&&roles.some(r=>["PATIENT","PATIENT_REPRESENTATIVE"].includes(r)))||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)
         : null}
-    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div hidden={!!workspace}><Queue queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={roles.includes("COORDINATOR_LEAD")} openCase={openCase} mutate={mutate}/></div>}
+    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div hidden={!!workspace}><Queue queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={roles.includes("COORDINATOR_LEAD")} staff={staff} openCase={openCase} mutate={mutate}/></div>}
 
     {currentRole==="finance"&&!workspace&&legacyAdministration(roles).financePolicy&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
   </PortalFrame>;
@@ -229,18 +232,19 @@ function roleLabel(role:RoleKey,locale:Locale){const labels={en:{patient:"Patien
  * The operational dashboard: work first, then the cases I own, then what the team has available.
  * Ownership ("Take ownership") belongs to the team queue; My Cases is accountability, not a task list.
  */
-function Queue({locale,role,cases,tasks,busy,mySubject,coordinatorLead,openCase,openCaseById,mutate,queueState,changeQueue}:{locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
+function Queue({locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],openCase,openCaseById,mutate,queueState,changeQueue}:{locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;staff?:StaffMember[];openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
   const ar=locale==="ar";
-  const staff=role!=="patient";
+  const staffView=role!=="patient";
+  const[transferCase,setTransferCase]=useState<CaseView|null>(null);
   // New, unowned requests are shared work: the team-queue tab carries their count so nobody has to open it to know.
   const unownedCount=role==="coordinator"?cases.filter(item=>matchesKpi(item,"unowned","coordinator")).length:0;
   const tabs=[{id:"work",label:ar?"عملي":"My work",count:tasks.length},{id:"mine",label:ar?"حالاتي":"My cases",count:undefined},...(role==="coordinator"?[{id:"team",label:ar?"قائمة الفريق":"Team queue",count:unownedCount}]:[])];
-  const view=staff?(tabs.some(tab=>tab.id===queueState.view)?queueState.view:"work"):"cases";
+  const view=staffView?(tabs.some(tab=>tab.id===queueState.view)?queueState.view:"work"):"cases";
   // Selecting a view also resets the sub-tab and the page, so the click handler and the arrow keys
   // share one function instead of repeating the reset rules.
   const selectQueueView=(id:typeof tabs[number]["id"])=>changeQueue({...queueState,view:id,tab:id==="team"?"unowned":id==="mine"?"mine":queueState.tab,page:1});
-  return <>{staff&&<RoleDashboardSummary locale={locale} role={role??""} cases={cases} tasks={tasks} selected={queueState.kpi} onSelect={value=>changeQueue({...queueState,kpi:value,...(value?{view:value==="unowned"?(role==="coordinator"?"team":"work"):view==="work"?"mine":view,tab:value==="unowned"&&role==="coordinator"?"unowned":queueState.tab}:{}),page:1})}/>}
-    {staff&&<div role="tablist" aria-label={ar?"لوحة العمل":"Operational views"} className="mb-4 flex flex-wrap gap-1 border-b border-line-strong">
+  return <>{staffView&&<RoleDashboardSummary locale={locale} role={role??""} cases={cases} tasks={tasks} selected={queueState.kpi} onSelect={value=>changeQueue({...queueState,kpi:value,...(value?{view:value==="unowned"?(role==="coordinator"?"team":"work"):view==="work"?"mine":view,tab:value==="unowned"&&role==="coordinator"?"unowned":queueState.tab}:{}),page:1})}/>}
+    {staffView&&<div role="tablist" aria-label={ar?"لوحة العمل":"Operational views"} className="mb-4 flex flex-wrap gap-1 border-b border-line-strong">
       {tabs.map(tab=><button key={tab.id} type="button" role="tab" aria-selected={view===tab.id} id={`work-tab-${tab.id}`} aria-controls="work-panel"
         className={`-mb-px border-b-2 px-3.5 py-2 text-[0.88rem] font-bold transition ${view===tab.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
         // Arrow keys and a roving tabindex, matching the case workspace tablist. Without them the
@@ -251,16 +255,17 @@ function Queue({locale,role,cases,tasks,busy,mySubject,coordinatorLead,openCase,
         {tab.label}{tab.count!==undefined&&tab.count>0&&<span className="ms-2 rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-800">{tab.count}</span>}
       </button>)}
     </div>}
-    <div id="work-panel" role={staff?"tabpanel":undefined} aria-labelledby={staff?`work-tab-${view}`:undefined} tabIndex={staff?0:undefined}>
-      {!staff&&tasks.length>0&&<MyWork locale={locale} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>}
+    <div id="work-panel" role={staffView?"tabpanel":undefined} aria-labelledby={staffView?`work-tab-${view}`:undefined} tabIndex={staffView?0:undefined}>
+      {!staffView&&tasks.length>0&&<MyWork locale={locale} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>}
       {view==="work"
         ? <MyWork locale={locale} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>
-        : <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} scope={staff?(view==="team"?"team":"mine"):"all"} onChange={changeQueue} onOpen={openCase} onMutate={mutate} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>prettyCategory(value,locale)}/>}
+        : <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} scope={staffView?(view==="team"?"team":"mine"):"all"} onChange={changeQueue} onOpen={openCase} onMutate={mutate} onTransfer={role==="coordinator"&&coordinatorLead?item=>setTransferCase(item):undefined} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>prettyCategory(value,locale)}/>}
     </div>
+    {transferCase&&<CaseDrawer locale={locale} title={ar?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>setTransferCase(null)}><TransferOwnership locale={locale} caseId={transferCase.id} caseNumber={transferCase.caseNumber} currentOwner={transferCase.coordinatorSubject} currentOwnerName={transferCase.coordinatorName} mySubject={mySubject} staff={staff} busy={busy} mutate={mutate} onClose={()=>setTransferCase(null)}/></CaseDrawer>}
   </>;
 }
 
-function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,careView="care",onCareView,otherCases=[],openCaseById}:{locale:Locale;t:typeof copy.en;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void}){
+function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,careView="care",onCareView,otherCases=[],openCaseById}:{locale:Locale;t:typeof copy.en;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void}){
  const c=value.caseSummary;const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
  const doctorPhase=["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
@@ -387,7 +392,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
       <MessageSquare size={16} aria-hidden/>{locale==="ar"?"الرسائل":"Messages"}{value.messages.length>0&&<span className={`rounded-full px-1.5 text-[0.72rem] font-bold ${unreadMessages?"bg-brand-600 text-white":"bg-mist text-ink-600"}`}>{value.messages.length}</span>}
      </button>}
      {showMore&&<button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" aria-haspopup="dialog" onClick={()=>setMoreOpen(true)}><MoreHorizontal size={16} aria-hidden/>{locale==="ar"?"المزيد":"More"}</button>}
-     {isCoordinator&&!owned&&canRebalance&&!value.preview&&<button type="button" className="icon-button border border-line-strong" aria-label={locale==="ar"?"إدارة الحالة":"Case administration"} aria-haspopup="dialog" onClick={()=>setAdminOpen(true)}><MoreHorizontal size={18}/></button>}
+     {isCoordinator&&!owned&&canRebalance&&!value.preview&&<button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" aria-haspopup="dialog" onClick={()=>setAdminOpen(true)}>{locale==="ar"?"نقل الملكية":"Transfer ownership"}</button>}
     </div>
    </div>
   </header>
@@ -453,7 +458,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
 
       {tab==="documents"&&(documentsPanel??<p className="text-sm text-ink-500">{locale==="ar"?"لم يتم رفع مستندات بعد.":"No documents uploaded yet."}</p>)}
 
-      {tab==="activity"&&<CaseActivity locale={locale} tasks={value.tasks} timeline={value.timeline} onViewJourney={()=>setJourneyOpen(true)}/>}
+      {tab==="activity"&&<><CaseActivity locale={locale} tasks={value.tasks} timeline={value.timeline} onViewJourney={()=>setJourneyOpen(true)}/>{isCoordinator&&loadAssignmentHistory&&<div className="mt-5"><AssignmentHistory key={c.id} locale={locale} caseId={c.id} load={loadAssignmentHistory}/></div>}</>}
      </div>
     </div>
 
@@ -482,7 +487,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
   {proposalOpen&&<CaseDrawer locale={locale} title={t.proposal} onClose={()=>setProposalOpen(false)}>
    <div className="space-y-4">{recommendationBlock}{value.proposal&&<ProposalCard locale={locale} t={t} proposal={value.proposal}/>}{value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} caseId={c.id} versionId={value.proposal.versionId} locale={locale} busy={busy} mutate={mutate} canResend={false}/>}{value.deposit&&<DepositCard deposit={value.deposit} caseId={c.id} role={role} locale={locale} busy={busy} mutate={mutate}/>}</div>
   </CaseDrawer>}
-  {adminOpen&&<CaseDrawer locale={locale} title={locale==="ar"?"إدارة الحالة":"Case administration"} onClose={()=>setAdminOpen(false)}><CaseAdministration caseId={c.id} currentCoordinator={c.coordinatorSubject} mySubject={mySubject} locale={locale} staff={staff} busy={busy} mutate={mutate}/></CaseDrawer>}
+  {adminOpen&&<CaseDrawer locale={locale} title={locale==="ar"?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>setAdminOpen(false)}><TransferOwnership locale={locale} caseId={c.id} caseNumber={c.caseNumber} currentOwner={c.coordinatorSubject} currentOwnerName={c.coordinatorName} mySubject={mySubject} staff={staff} busy={busy} mutate={mutate} onClose={()=>setAdminOpen(false)}/></CaseDrawer>}
   {infoOpen&&<RequestInformationDialog locale={locale} caseIds={[c.id]} busy={busy} mutate={mutate} onClose={()=>setInfoOpen(false)}/>}
   {declineOpen&&myPending&&<DeclineAssignmentDialog locale={locale} caseNumber={c.caseNumber} busy={busy} onClose={()=>setDeclineOpen(false)}
    onConfirm={reason=>void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:false,reason})}/>}
@@ -601,15 +606,6 @@ function CaseActivity({locale,tasks,timeline,onViewJourney}:{locale:Locale;tasks
 }
 
 
-function CaseAdministration({caseId,currentCoordinator,mySubject,locale,staff,busy,mutate}:{caseId:string;currentCoordinator?:string;mySubject?:string;locale:Locale;staff:StaffMember[];busy:boolean;mutate:Mutate}){
- const[assignee,setAssignee]=useState("");const[reason,setReason]=useState("");
- const labels=locale==="ar"?{section:"إدارة الحالة",description:"انقل هذه الحالة إلى منسق آخر ضمن فريقك. يصبح هو المالك الجديد مع بقاء صلاحية الاطلاع لك.",title:"نقل الحالة إلى منسق آخر",coordinator:"المنسق الجديد",select:"اختر منسقًا",reason:"سبب النقل",reasonPlaceholder:"مثال: إعادة توزيع عبء العمل أو تغطية إجازة",submit:"نقل الحالة",empty:"لا يوجد منسقون ضمن فريقك بعد. يضيف مسؤول النظام منسقين إلى هيكل قيادتك قبل أن تتمكن من نقل الحالات."}:{section:"Case administration",description:"Hand this case to another coordinator on your team. They become the new owner; you keep view access.",title:"Transfer to another coordinator",coordinator:"New coordinator",select:"Select a coordinator",reason:"Reason for transfer",reasonPlaceholder:"For example: workload balancing or leave coverage",submit:"Transfer case",empty:"No coordinators report to you yet. A system administrator assigns coordinators to your reporting team before cases can be transferred."};
- // Transfer targets are the lead's own reporting team only, excluding the signed-in lead and the case's
- // current owner. The backend already scopes the directory to reports; we also drop self here.
- const coordinators=staff.filter(person=>(person.role==="COORDINATOR"||person.role==="COORDINATOR_LEAD")&&person.subject!==currentCoordinator&&person.subject!==mySubject);
- const transfer=(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();if(!assignee||!reason.trim())return;void mutate(`/coordinator/cases/${caseId}/coordinator-assignment`,{assigneeSubject:assignee,reason:reason.trim()}).then(result=>{if(result){setAssignee("");setReason("");}});};
- return <section className="card p-5"><div className="flex items-center gap-2.5 border-b border-line pb-3"><span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-brand-50 text-lg text-brand-700" aria-hidden>⇄</span><h3 className="title">{labels.section}</h3></div><p className="mt-3 text-sm text-ink-500">{labels.description}</p>{coordinators.length===0?<p className="mt-4 rounded-xl border border-dashed border-line-strong bg-mist p-4 text-sm text-ink-600">{labels.empty}</p>:<form className="mt-4 space-y-4" onSubmit={transfer}><h4 className="font-bold text-brand-800">{labels.title}</h4><label className="block text-sm font-bold">{labels.coordinator}<select className="field mt-2" required value={assignee} onChange={event=>setAssignee(event.target.value)}><option value="" disabled>{labels.select}</option>{coordinators.map(person=><option key={person.subject} value={person.subject}>{person.name}</option>)}</select></label><label className="block text-sm font-bold">{labels.reason}<textarea className="field mt-2 min-h-24" required maxLength={1000} value={reason} onChange={event=>setReason(event.target.value)} placeholder={labels.reasonPlaceholder}/></label><button className="btn-secondary w-full justify-center" disabled={busy||!assignee||!reason.trim()}>{labels.submit}</button></form>}</section>;
-}
 
 // Patient-facing "where you are / what's next" hero — translates the internal case state into plain,
 // reassuring language so the patient always understands the journey without staff terminology.

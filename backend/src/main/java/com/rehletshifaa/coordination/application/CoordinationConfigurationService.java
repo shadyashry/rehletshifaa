@@ -19,6 +19,10 @@ public class CoordinationConfigurationService {
     private final RoleAssignmentRepository access; private final AccessAuditRepository audit; private final Clock clock;
     public CoordinationConfigurationService(CoordinationRepository repo,AuthorizationService auth,AccessIdentity identity,RoleAssignmentRepository access,AccessAuditRepository audit,Clock clock){this.repo=repo;this.auth=auth;this.identity=identity;this.access=access;this.audit=audit;this.clock=clock;}
     public AccessIdentity.Identity authorize(UUID org,String permission){if(!repo.organization(org,false))throw new ApiException(404,"PROVIDER_NOT_FOUND","Provider was not found or is suspended");return auth.require(permission,context(org),ChannelEntitlement.ADMIN_WEB,ChannelEntitlement.API);}
+    /** Any coordination view capability opens organization-level summaries (the same set that lists the organization). */
+    public AccessIdentity.Identity authorizeAny(UUID org){for(String p:VIEW_PERMISSIONS)if(allowed(org,p))return identity.current();return authorize(org,VIEW_PERMISSIONS.getFirst());}
+    /** Whether the caller holds a capability here — for shaping a read, never for authorizing a write. */
+    public boolean allowed(UUID org,String permission){if(!repo.organization(org,false))return false;var ctx=context(org);var who=identity.current();for(ChannelEntitlement ch:List.of(ChannelEntitlement.ADMIN_WEB,ChannelEntitlement.API))if(auth.decide(who,permission,ctx,ch).allowed())return true;return false;}
     /** Organizations where the caller holds an active membership and at least one coordination view/manage capability. */
     public List<OrganizationSummary> organizations(){String subject=identity.current().subject();return repo.organizationsFor(subject).stream().filter(o->visible(subject,o.id())).toList();}
     private boolean visible(String subject,UUID org){var ctx=context(org);for(String p:VIEW_PERMISSIONS)for(ChannelEntitlement ch:List.of(ChannelEntitlement.ADMIN_WEB,ChannelEntitlement.API))if(auth.decide(new AccessIdentity.Identity(subject,null),p,ctx,ch).allowed())return true;return false;}
