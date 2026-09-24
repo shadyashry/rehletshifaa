@@ -39,7 +39,7 @@ describe("JourneyPulse", () => {
 
   it("gives orientation only: phases, current position and who has the ball", () => {
     render(<JourneyPulse locale="en" stage="PROPOSAL_PREPARATION" waitingOn="STAFF" onViewJourney={vi.fn()}/>);
-    ["Intake", "Consultant", "Proposal", "Patient decision", "Deposit", "Treatment", "Follow-up"]
+    ["Intake", "Consultant", "Proposal", "Patient decision", "Coordination deposit", "Treatment", "Follow-up"]
       .forEach(phase => expect(screen.getByText(phase)).toBeTruthy());
     expect(screen.getByText(/Waiting on: our team/i)).toBeTruthy();
     // It never repeats the current action or the people already shown in the header.

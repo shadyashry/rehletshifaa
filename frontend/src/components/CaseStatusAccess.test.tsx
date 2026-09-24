@@ -142,7 +142,7 @@ describe("CaseStatusAccess journey", () => {
 
     const tracker = screen.getByRole("list");
     const labels = [...tracker.querySelectorAll("li")].map(li => (li.textContent ?? "").trim());
-    expect(labels).toEqual(["Case received", "Coordinator review", "Consultant review", "Your proposal", "Deposit", "Treatment", "Follow-up"]);
+    expect(labels).toEqual(["Case received", "Coordinator review", "Consultant review", "Your proposal", "Coordination deposit", "Treatment", "Follow-up"]);
     // The internal case status is never sent to this page, so it can never be rendered.
     expect(screen.queryByText(/CONSULTANT_REVIEW/)).toBeNull();
   });
@@ -188,7 +188,9 @@ describe("CaseStatusAccess journey", () => {
 
     expect(await screen.findByRole("heading", { name: /your proposal is ready to review/i })).toBeTruthy();
     expect(screen.queryByText(/no action is required/i)).toBeNull(); // a decision is waiting
-    expect(screen.getByText(/version 2/i)).toBeTruthy();
+    // An updated document is said so in words; the technical version number is not patient-facing (UX-8).
+    expect(screen.getByText(/Updated version/)).toBeTruthy();
+    expect(screen.queryByText(/version 2/i)).toBeNull();
     const buttons = screen.getAllByRole("button", { name: /review proposal/i });
     expect(buttons).toHaveLength(1); // one action for one business outcome
     fireEvent.click(buttons[0]);

@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { JourneyDesigner } from "./JourneyDesigner";
 import { apiFetchAs } from "@/lib/api";
@@ -88,7 +88,7 @@ describe("Journey Designer", () => {
     expect(nameField).toHaveValue("Assign Consultant");
   });
 
-  it("editing a stage name marks the draft unsaved, and Save draft requires a governance reason", async () => {
+  it("editing a stage name marks the draft unsaved, and Save draft requires a change note", async () => {
     mockApi();
     await renderDesigner();
     fireEvent.click(screen.getByRole("button", { name: /Assign Consultant — Staff step/ }));
@@ -97,7 +97,7 @@ describe("Journey Designer", () => {
     expect(screen.getByText("Unsaved changes")).toBeVisible();
     const saveButton = screen.getByRole("button", { name: "Save draft" });
     expect(saveButton).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("Governance reason"), { target: { value: "Renaming for clarity" } });
+    fireEvent.change(screen.getByLabelText("Change note"), { target: { value: "Renaming for clarity" } });
     expect(saveButton).toBeEnabled();
   });
 
@@ -113,8 +113,8 @@ describe("Journey Designer", () => {
     mockApi();
     await renderDesigner();
     fireEvent.click(screen.getByRole("button", { name: /Assign Consultant — Staff step/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete stage" }));
-    expect(screen.getByRole("dialog", { name: "Delete this stage?" })).toBeVisible();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete step" }));
+    expect(screen.getByRole("dialog", { name: "Delete this step?" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: /Assign Consultant/ })).not.toBeInTheDocument());
   });
@@ -134,11 +134,18 @@ describe("Journey Designer", () => {
       }), { status: 200 }),
     });
     await renderDesigner();
-    fireEvent.change(screen.getByLabelText("Governance reason"), { target: { value: "Checking the graph" } });
-    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    fireEvent.change(screen.getByLabelText("Change note"), { target: { value: "Checking the graph" } });
+    // Check lives in its own tab — no duplicate header control.
+    expect(screen.queryByRole("button", { name: /^(Validate|Check|Simulate|Test)$/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Check" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run check" }));
+    // The backend message leads, tied to the named step; the engine code is secondary.
     expect(await screen.findByText("This stage cannot be reached.")).toBeVisible();
-    expect(screen.getByText("This configuration is a dry-run domain model.")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Show on graph" }));
+    expect(screen.getByText("1 problem must be fixed before this version can be tested.")).toBeVisible();
+    expect(screen.getByText("Clinical Review", { selector: "bdi" })).toBeVisible();
+    expect(screen.getByText(/Checking and testing never change cases/)).toBeVisible();
+    expect(screen.getAllByText("UNREACHABLE")[0].closest(".cc-row-sub")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Go to step/ }));
     await waitFor(() => expect(screen.getByLabelText("Display name")).toHaveValue("Clinical Review"));
   });
 
@@ -151,10 +158,13 @@ describe("Journey Designer", () => {
     });
     render(<JourneyDesigner locale="en" definitionId="def-1" versionId="v-1" initialTab="simulation" />);
     await screen.findByRole("heading", { name: "International Care Journey" });
-    expect(screen.getByText(/side-effect free/)).toBeVisible();
-    fireEvent.change(screen.getByLabelText("Governance reason"), { target: { value: "Dry run" } });
-    fireEvent.click(screen.getByRole("button", { name: "Run simulation" }));
-    expect(await screen.findByText(/Outcome: Completed/)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Test journey" })).toBeVisible();
+    expect(screen.getByText(/Testing does not publish or change the live journey/)).toBeVisible();
+    fireEvent.change(screen.getByLabelText("Change note"), { target: { value: "Dry run" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run test" }));
+    expect(await screen.findByText(/Result: Completed/)).toBeVisible();
+    // Testing never publishes.
+    expect(vi.mocked(apiFetchAs).mock.calls.some(([, p]) => String(p).includes("/publish"))).toBe(false);
   });
 
   it("blocks publishing until simulation is COMPLETED and the caller holds both journey.publish and journey.approve", async () => {
@@ -162,7 +172,6 @@ describe("Journey Designer", () => {
     mockApi({ "/admin/journeys/def-1": () => new Response(JSON.stringify({ ...detail, versions: [pending] }), { status: 200 }) });
     render(<JourneyDesigner locale="en" definitionId="def-1" versionId="v-1" initialTab="publish" />);
     await screen.findByRole("heading", { name: "International Care Journey" });
-    fireEvent.change(screen.getByLabelText("Governance reason"), { target: { value: "Ready to publish" } });
     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
   });
 
@@ -174,8 +183,10 @@ describe("Journey Designer", () => {
     });
     render(<JourneyDesigner locale="en" definitionId="def-1" versionId="v-1" initialTab="publish" />);
     await screen.findByRole("heading", { name: "International Care Journey" });
-    fireEvent.change(screen.getByLabelText("Governance reason"), { target: { value: "Publishing" } });
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    const dialog = screen.getByRole("dialog", { name: "Publish this journey version?" });
+    fireEvent.change(within(dialog).getByLabelText(/Why are you publishing/), { target: { value: "Approved" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Yes, publish version" }));
     expect(await screen.findByText("Another authorized reviewer must publish this journey.")).toBeVisible();
   });
 
@@ -186,7 +197,7 @@ describe("Journey Designer", () => {
     await renderDesigner();
     fireEvent.click(screen.getByRole("button", { name: /Assign Consultant — Staff step/ }));
     fireEvent.change(await screen.findByLabelText("Display name"), { target: { value: "Assign a Consultant" } });
-    fireEvent.change(screen.getByLabelText("Governance reason"), { target: { value: "Rename" } });
+    fireEvent.change(screen.getByLabelText("Change note"), { target: { value: "Rename" } });
     fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
     expect(await screen.findByText(/Someone else saved a change to this version/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Reload" })).toBeVisible();

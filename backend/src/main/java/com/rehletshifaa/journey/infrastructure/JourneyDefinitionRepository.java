@@ -51,6 +51,11 @@ public class JourneyDefinitionRepository {
         return jdbc.sql("SELECT actor_subject,entity_id,action,outcome,reason,occurred_at FROM audit_events WHERE (entity_id=? OR entity_id IN (SELECT CAST(id AS VARCHAR) FROM journey_versions WHERE definition_id=?)) AND (action LIKE 'JOURNEY_%' OR action='ACCESS_DENIED') ORDER BY occurred_at DESC,id DESC LIMIT 100 OFFSET ?")
             .params(definition.toString(),definition,offset).query((r,n)->new com.rehletshifaa.access.infrastructure.AccessAuditRepository.Entry(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getTimestamp(6).toInstant())).list();
     }
+    /** When anything last happened to this journey or its versions (the newest journey audit event), for list summaries. */
+    public Instant lastActivity(UUID definition){
+        return jdbc.sql("SELECT MAX(occurred_at) FROM audit_events WHERE (entity_id=? OR entity_id IN (SELECT CAST(id AS VARCHAR) FROM journey_versions WHERE definition_id=?)) AND action LIKE 'JOURNEY_%'")
+            .params(definition.toString(),definition).query((r,n)->instant(r.getTimestamp(1))).optional().orElse(null);
+    }
     public boolean edited(UUID id,String actor){return jdbc.sql("SELECT COUNT(*) FROM journey_version_editors WHERE version_id=? AND actor_subject=?").params(id,actor).query(Long.class).single()>0;}
     private void editor(UUID id,String actor){if(!edited(id,actor))jdbc.sql("INSERT INTO journey_version_editors VALUES(?,?)").params(id,actor).update();}
     private void nodes(UUID id,Graph graph){

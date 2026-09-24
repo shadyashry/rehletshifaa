@@ -3,19 +3,26 @@
 import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { apiFetchAs } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
-import { journeyCopy } from "./journey-copy";
-import type { Decision, JourneyDefinition, JourneyDetail } from "./journey-types";
+import { StatusBadge } from "./cc-ui";
+import { journeyCopy, journeyStatusLabel } from "./journey-copy";
+import type { Decision, JourneyDetail, JourneySummary } from "./journey-types";
 import "./journey-designer.css";
 
+const when = (iso: string | null, locale: Locale) => (iso ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso)) : "—");
+
+/**
+ * Care Journeys list: per journey what is published, what is being changed and whether anything needs review — from one
+ * bounded read (`/admin/journeys/summaries`). No usage, performance or SLA figures: none exist.
+ */
 export function JourneyList({ locale }: { locale: Locale }) {
   const t = journeyCopy[locale];
   const { user, loading: authLoading, signIn } = useAuth();
-  const [journeys, setJourneys] = useState<JourneyDefinition[]>([]);
+  const [journeys, setJourneys] = useState<JourneySummary[]>([]);
   const [can, setCan] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -34,7 +41,7 @@ export function JourneyList({ locale }: { locale: Locale }) {
     }
     const text = await response.text();
     return text ? JSON.parse(text) : (undefined as T);
-  }, [user, t, signIn]);
+  }, [user, t, signIn, locale]);
 
   const refresh = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -42,10 +49,8 @@ export function JourneyList({ locale }: { locale: Locale }) {
     try {
       const decisions = await apiFetchAs(user.access_token, "/admin/access/me").then((r) => (r.ok ? r.json() : []));
       setCan(decisions);
-      if ((decisions as Decision[]).some((d) => d.permission === "journey.view" && d.allowed)) {
-        setJourneys(await api<JourneyDefinition[]>(""));
-      }
-    } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
+      if ((decisions as Decision[]).some((d) => d.permission === "journey.view" && d.allowed)) setJourneys(await api<JourneySummary[]>("/summaries"));
+    } catch (e) { setJourneys([]); setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
   }, [api, user, t.error]);
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -54,21 +59,17 @@ export function JourneyList({ locale }: { locale: Locale }) {
     try {
       const created = await api<JourneyDetail>("", "POST");
       setCreating(false);
-      await refresh();
       window.location.href = `/${locale}/portal/control-center/journeys/${created.definition.id}`;
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   };
 
-  const actions = (
-    <div className="cc-toolbar" style={{ margin: 0 }}>
-      <button type="button" className="cc-secondary" disabled={busy} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden />{t.retry}</button>
-      {allowed(t.permission.create) && <button type="button" onClick={() => setCreating(true)}><Plus size={16} aria-hidden />{t.newJourney}</button>}
-    </div>
-  );
+  // The backend supports exactly one care journey (create refuses a second), so creation is offered only before it exists.
+  const canCreate = !loading && allowed(t.permission.create) && journeys.length === 0 && !error;
+  const actions = canCreate && !creating ? <button type="button" onClick={() => setCreating(true)}><Plus size={16} aria-hidden />{t.newJourney}</button> : undefined;
 
   return (
-    <ControlCenterShell locale={locale} active="journeys" title={t.journeyList} intro={t.intro} actions={actions}>
-      {error && <p role="alert" className="cc-message">{error}</p>}
+    <ControlCenterShell locale={locale} active="journeys" title={t.title} intro={t.intro} actions={actions}>
+      {error && <p role="alert" className="cc-message">{error} <button type="button" className="cc-secondary cc-small" onClick={() => void refresh()}>{t.retry}</button></p>}
       {(authLoading || loading) && <p role="status">{t.loading}</p>}
       {!authLoading && !user && <button onClick={() => void signIn()}>{t.signin}</button>}
       {!authLoading && user && !loading && !allowed(t.permission.view) && <p>{t.denied}</p>}
@@ -76,28 +77,32 @@ export function JourneyList({ locale }: { locale: Locale }) {
         <>
           {creating && (
             <form className="cc-card" onSubmit={submitCreate} style={{ marginBottom: 20 }} aria-label={t.newJourney}>
-              <p className="cc-meta">{locale === "ar" ? "سيُنشئ هذا رحلة جديدة بمسودة فارغة يمكنك تسميتها وتصميمها بعد ذلك." : "This creates a new journey with an empty draft you can name and design next."}</p>
+              <p className="cc-meta">{t.createIntro}</p>
               <div className="cc-toolbar">
                 <button type="button" className="cc-secondary" onClick={() => setCreating(false)}>{t.cancel}</button>
                 <button disabled={busy}>{t.createJourney}</button>
               </div>
             </form>
           )}
-          {!journeys.length ? (
-            <p className="cc-empty">{t.journeyListEmpty}</p>
-          ) : (
-            <ul className="cc-cards">
-              {journeys.map((j) => (
-                <li key={j.id} className="cc-card">
-                  <Link className="cc-card-link" href={`/${locale}/portal/control-center/journeys/${j.id}`}>
-                    <div>
-                      <h3>{j.name || j.key}</h3>
-                      <p className="cc-meta">{t.journeyKey}: <bdi dir="ltr">{j.key}</bdi></p>
-                      <p className="cc-meta">{t.createdAt}: {new Date(j.createdAt).toLocaleString(locale)}</p>
-                    </div>
-                  </Link>
-                </li>
-              ))}
+          {!journeys.length ? (!error && <p className="cc-empty">{t.journeyListEmpty}</p>) : (
+            <ul className="cc-cards" aria-label={t.journeyList}>
+              {journeys.map((j) => {
+                const attention = j.draftStatus ? t.attention[j.draftStatus] : undefined;
+                return (
+                  <li key={j.id} className="cc-card">
+                    <Link className="cc-card-link" href={`/${locale}/portal/control-center/journeys/${j.id}`}>
+                      <div>
+                        <h3>{j.name || j.key}{attention && <> <StatusBadge tone="warning">{attention}</StatusBadge></>}</h3>
+                        <dl className="cc-journey-facts">
+                          <div><dt>{t.liveNow}</dt><dd>{j.liveVersion ? `${t.versionNumber} ${j.liveVersion} · ${t.publishedOn} ${when(j.livePublishedAt, locale)}` : t.noLive}</dd></div>
+                          <div><dt>{t.changeInProgress}</dt><dd>{j.draftVersion && j.draftStatus ? `${t.versionNumber} ${j.draftVersion} · ${journeyStatusLabel(j.draftStatus, locale)}` : t.noChange}</dd></div>
+                          <div><dt>{t.lastActivity}</dt><dd>{when(j.lastActivityAt ?? j.createdAt, locale)}</dd></div>
+                        </dl>
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </>

@@ -74,12 +74,12 @@ test("lands on the current case with the deposit being arranged: one step, no fa
   expect(buttons.filter(text => /continue|pay|check status|refresh|go to case|view progress/i.test(text))).toEqual([]);
   await expect(page.getByRole("button", { name: /^view proposal/i })).toHaveCount(1);
   await expect(page.getByRole("button", { name: /^message(\s*\d+)?$/i })).toHaveCount(1); // the coordinator block's one control (with its unread badge)
-  const depositBlock = page.getByRole("region", { name: "Deposit", exact: true });
+  const depositBlock = page.getByRole("region", { name: "Coordination deposit", exact: true });
   await expect(depositBlock).toContainText("$500");
   await expect(depositBlock).toContainText("Arranging");
   await expect(depositBlock.getByRole("button")).toHaveCount(0);
   await expect(page.getByText(/EGP|E£/)).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Your proposal" })).toContainText("$4,850");
+  await expect(page.getByRole("region", { name: "Preliminary care estimate" })).toContainText("$4,850");
   await expect(page.getByRole("region", { name: "Your coordinator" })).toContainText("Sara Ahmed");
   // Header navigation is exactly three destinations.
   const nav = page.getByRole("navigation", { name: "My Care" }).first();
@@ -115,7 +115,7 @@ test("deposit confirmed: success state, no stale arrangement step", async ({ pag
   await setupPatient(page, "deposit-paid");
   await page.goto("/en/portal");
   await expect(page.getByRole("heading", { name: "We are arranging your treatment" })).toBeVisible();
-  const depositBlock = page.getByRole("region", { name: "Deposit", exact: true });
+  const depositBlock = page.getByRole("region", { name: "Coordination deposit", exact: true });
   await expect(depositBlock).toContainText("Deposit received");
   await expect(depositBlock).toContainText("$500");
   await expect(page.getByText(/Arranging|Deposit arrangements|Pay deposit/)).toHaveCount(0);

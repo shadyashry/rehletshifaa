@@ -18,6 +18,17 @@ public class JourneyDefinitionService {
     public JourneyDefinitionService(JourneyDefinitionRepository repository,AuthorizationService authorization,AccessAuditRepository audit,JourneyGraphValidator validator,JourneySimulator simulator,JourneyStageRegistry registry,JourneyDeploymentService deployment){this.repository=repository;this.authorization=authorization;this.audit=audit;this.validator=validator;this.simulator=simulator;this.registry=registry;this.deployment=deployment;}
     public List<HistoryEntry> history(UUID definition,int offset){authorize("journey.view");repository.definition(definition,false);if(offset<0)invalid("Offset must be nonnegative.");return repository.history(definition,offset).stream().map(e->new HistoryEntry(e.actor(),e.entity(),e.action(),e.outcome(),e.reason(),e.occurredAt())).toList();}
     public List<Definition> list(){authorize("journey.view");return repository.definitions();}
+    /**
+     * Read-only list summary (UX-8): what is published, what is being changed and when anything last happened, in one
+     * bounded read instead of one detail call per journey. Stored facts only; no graph, hash or runtime detail.
+     */
+    public List<Summary> summaries(){authorize("journey.view");return repository.definitions().stream().map(d->{
+        List<Version> versions=repository.versions(d.id());
+        Version live=versions.stream().filter(v->v.status()==Status.PUBLISHED).findFirst().orElse(null);
+        Version draft=versions.stream().filter(v->v.status()!=Status.PUBLISHED&&v.status()!=Status.RETIRED).findFirst().orElse(null);
+        return new Summary(d.id(),d.key(),d.name(),d.createdAt(),live==null?null:live.number(),live==null?null:live.publishedAt(),
+            (int)versions.stream().filter(v->v.status()==Status.PUBLISHED).count(),draft==null?null:draft.number(),draft==null?null:draft.status().name(),
+            versions.size(),repository.lastActivity(d.id()));}).toList();}
     public Detail detail(UUID definition){authorize("journey.view");return new Detail(repository.definition(definition,false),repository.versions(definition));}
     public Version version(UUID definition,UUID version){authorize("journey.view");return repository.version(definition,version);}
     public RegistryMetadata registryMetadata(){authorize("journey.view");return new RegistryMetadata(List.of(ActorType.values()),List.of(StageType.values()),List.of(Fact.values()),200,400,"ACYCLIC_ONLY","NOT_DEPLOYED");}
@@ -82,6 +93,8 @@ public class JourneyDefinitionService {
     public record Edit(long revision,String reason,Graph graph) {}
     public record Simulate(long revision,String reason,Map<String,Boolean> facts) {}
     public record Detail(Definition definition,List<Version> versions) {}
+    public record Summary(UUID id,String key,String name,java.time.Instant createdAt,Integer liveVersion,java.time.Instant livePublishedAt,int publishedVersions,
+                          Integer draftVersion,String draftStatus,int versions,java.time.Instant lastActivityAt) {}
     public record ValidationResult(Version version,Validation result) {}
     public record SimulationResult(Version version,Simulation result) {}
 }

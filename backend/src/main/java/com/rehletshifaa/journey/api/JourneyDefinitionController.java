@@ -14,6 +14,7 @@ public class JourneyDefinitionController {
     public JourneyDefinitionController(JourneyDefinitionService service){this.service=service;}
     @GetMapping("/{definition}/history") public List<HistoryEntry> history(@PathVariable UUID definition,@RequestParam(defaultValue="0") int offset){return service.history(definition,offset);}
     @GetMapping public List<Definition> list(){return service.list();}
+    @GetMapping("/summaries") public List<Summary> summaries(){return service.summaries();}
     @GetMapping("/registry/metadata") public RegistryMetadata registryMetadata(){return service.registryMetadata();}
     @GetMapping("/registry") public List<JourneyStageRegistry.Capability> registry(){return service.registry();}
     @PostMapping public Detail create(){return service.create();}

@@ -99,41 +99,73 @@ export function DirectPriceList({ locale, api, practitionerId, careArea, editabl
   );
 }
 
-/** Pinned exchange rates used to show EGP prices in other currencies on doctor, coordinator and patient screens. */
+/**
+ * Commercial › Exchange Rates. Backend semantics (`CurrencyService`): one stored rate per currency per day, EGP → currency.
+ * Each day the market rate is read once from the rate provider (source API); a rate saved here (MANUAL) replaces it for that
+ * day only; with no row for a day the most recent earlier rate is used (FALLBACK). A proposal freezes the rate on the day it
+ * is sent to the patient, so changing a rate never changes a proposal already sent. Nothing here is a live market feed.
+ */
 export function ExchangeRates({ locale, api, editable }: { locale: Locale; api: AdminApi; editable: boolean }) {
   const ar = locale === "ar";
+  const [date, setDate] = useState("");
   const [fx, setFx] = useState<FxRate[] | null>(null); const [error, setError] = useState<unknown>(null); const [notice, setNotice] = useState(""); const [busy, setBusy] = useState(false);
-  const load = useCallback(async () => { try { setFx(await api<FxRate[]>("/admin/fx-rates")); } catch (e) { setError(e); setFx([]); } }, [api]);
+  const load = useCallback(async () => { try { setFx(await api<FxRate[]>(`/admin/fx-rates${date ? `?date=${date}` : ""}`)); } catch (e) { setError(e); setFx([]); } }, [api, date]);
   useEffect(() => { void load(); }, [load]);
-  const pin = async (currency: string, rate: number) => { setBusy(true); setError(null); setNotice(""); try { await api(`/admin/fx-rates/${currency}`, json("PUT", { rate })); setNotice(ar ? `تم حفظ سعر ${currency}.` : `${currency} rate saved.`); await load(); return true; } catch (e) { setError(e); return false; } finally { setBusy(false); } };
+  const pin = async (currency: string, rate: number) => { setBusy(true); setError(null); setNotice(""); try { await api(`/admin/fx-rates/${currency}`, json("PUT", { rate })); setNotice(ar ? `تم حفظ سعر ${currency} لليوم.` : `${currency} rate saved for today.`); await load(); return true; } catch (e) { setError(e); return false; } finally { setBusy(false); } };
   if (fx === null) return <p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>;
   const rows = fx.filter((f) => f.currency !== "EGP");
+  const historical = !!date;
+  const shown = rows[0]?.rateDate;
   return (
     <div>
-      <p className="cc-meta">{ar ? "اترك العملة على سعر السوق اليومي، أو احفظ سعرك الخاص (مثل سعر البنك المركزي المصري)." : "Leave a currency on the daily market rate, or save your own (for example the Central Bank of Egypt rate)."}</p>
+      <div className="cc-card" style={{ marginBottom: 16 }}>
+        <p><strong>{ar ? "كيف تُستخدم هذه الأسعار" : "How these rates are used"}</strong></p>
+        <ul className="cc-consequences">
+          <li>{ar ? "يُخزَّن سعر واحد لكل عملة في اليوم، من الجنيه المصري إلى العملة. هذه ليست أسعار سوق لحظية." : "One rate is stored per currency per day, from EGP to that currency. These are not live market prices."}</li>
+          <li>{ar ? "يُقرأ سعر السوق مرة واحدة يوميًا من مزوّد الأسعار. السعر الذي تحفظه هنا يحل محله لذلك اليوم فقط." : "The market rate is read once a day from the rate provider. A rate you save here replaces it for that day only."}</li>
+          <li>{ar ? "تستخدم الحسابات الجديدة سعر يومها. يحتفظ كل عرض بالسعر المجمَّد يوم إرساله إلى المريض — تغيير السعر لا يغيّر عرضًا أُرسل بالفعل." : "New calculations use the rate of the day they are made. Each proposal keeps the rate frozen on the day it was sent to the patient — changing a rate never changes a proposal already sent."}</li>
+        </ul>
+      </div>
+      <div className="cc-filterbar">
+        <Field label={ar ? "عرض أسعار يوم" : "Show rates for"} hint={ar ? "اتركه فارغًا لليوم." : "Leave empty for today."}><input type="date" dir="ltr" value={date} onChange={(e) => { setDate(e.target.value); setNotice(""); }} /></Field>
+      </div>
       <SuccessNotice>{notice || null}</SuccessNotice>
       <ErrorNotice error={error} locale={locale} />
+      {shown && <p className="cc-meta" role="status">{historical
+        ? (ar ? <>أسعار سابقة — استُخدمت للحسابات يوم <bdi dir="ltr">{shown}</bdi>.</> : <>Historical rates — used for calculations on <bdi dir="ltr">{shown}</bdi>.</>)
+        : (ar ? <>الأسعار المستخدمة للحسابات الجديدة اليوم، <bdi dir="ltr">{shown}</bdi>.</> : <>Rates used for new calculations today, <bdi dir="ltr">{shown}</bdi>.</>)}</p>}
       {!rows.length ? <EmptyState title={ar ? "لا توجد أسعار صرف" : "No exchange rates available"} /> : (
-        <div className="cc-table-wrap"><table className="cc-data">
-          <thead><tr><th>{ar ? "العملة" : "Currency"}</th><th>{ar ? "جنيه لكل وحدة" : "EGP per 1 unit"}</th><th>{ar ? "المصدر" : "Source"}</th>{editable && <th><span className="cc-sr">{ar ? "إجراءات" : "Actions"}</span></th>}</tr></thead>
-          <tbody>{rows.map((f) => <FxRow key={f.currency + f.rate} f={f} locale={locale} busy={busy} editable={editable} onPin={pin} />)}</tbody>
-        </table></div>
+        <ul className="cc-fx-list" aria-label={ar ? "أسعار الصرف" : "Exchange rates"}>
+          {rows.map((f) => <FxRow key={f.currency + f.rate + f.rateDate} f={f} locale={locale} busy={busy} editable={editable && !historical} onPin={pin} />)}
+        </ul>
       )}
     </div>
   );
 }
+const FX_SOURCE: Record<string, [string, string, string, string]> = {
+  API: ["Daily market rate", "سعر السوق اليومي", "Read from the rate provider for this day.", "قُرئ من مزوّد الأسعار لهذا اليوم."],
+  MANUAL: ["Saved manually", "محفوظ يدويًا", "Replaces the market rate for this day only.", "يحل محل سعر السوق لهذا اليوم فقط."],
+  FALLBACK: ["Most recent earlier rate", "أحدث سعر سابق", "No rate is stored for this day, so the most recent earlier rate is used.", "لا يوجد سعر مخزّن لهذا اليوم، لذا يُستخدم أحدث سعر سابق."],
+};
 function FxRow({ f, locale, busy, editable, onPin }: { f: FxRate; locale: Locale; busy: boolean; editable: boolean; onPin: (currency: string, rate: number) => Promise<boolean> }) {
   const ar = locale === "ar";
   const [egpPer, setEgpPer] = useState((f.rate ? 1 / f.rate : 0).toFixed(4));
   const per = Number(egpPer);
-  const manual = f.source === "MANUAL";
+  const stored = f.rate ? 1 / f.rate : 0;
+  const source = FX_SOURCE[f.source] ?? [f.source, f.source, "", ""];
   return (
-    <tr>
-      <td><strong>{currencyName(f.currency, locale)}</strong></td>
-      <td>{editable ? <input aria-label={`${f.currency} — ${ar ? "جنيه لكل وحدة" : "EGP per unit"}`} type="number" min="0" step="0.0001" dir="ltr" value={egpPer} onChange={(e) => setEgpPer(e.target.value)} /> : per.toLocaleString(locale)}{per > 0 && <span className="cc-row-sub">1,000 EGP ≈ {money(1000 / per, f.currency, locale)}</span>}</td>
-      <td>{manual ? <StatusBadge tone="info">{ar ? "سعر محفوظ يدويًا" : "Pinned manually"}</StatusBadge> : <span className="cc-meta">{ar ? "سعر السوق" : "Market rate"}</span>}<span className="cc-row-sub" dir="ltr">{f.rateDate}</span></td>
-      {editable && <td><button type="button" className="cc-secondary cc-small" disabled={busy || !(per > 0)} onClick={() => void onPin(f.currency, 1 / per)}>{ar ? "حفظ السعر" : "Save rate"}</button></td>}
-    </tr>
+    <li>
+      <div><span className="cc-meta">{ar ? "من ← إلى" : "From → To"}</span><strong><bdi dir="ltr">EGP → {f.currency}</bdi></strong><span className="cc-row-sub">{currencyName(f.currency, locale)}</span></div>
+      <div><span className="cc-meta">{ar ? "السعر" : "Rate"}</span>
+        <strong><bdi dir="ltr">1 {f.currency} = {stored.toLocaleString("en", { maximumFractionDigits: 4 })} EGP</bdi></strong>
+        {stored > 0 && <span className="cc-row-sub"><bdi dir="ltr">1,000 EGP ≈ {money(1000 * f.rate, f.currency, "en")}</bdi></span>}</div>
+      <div><span className="cc-meta">{ar ? "المصدر" : "Source"}</span>{f.source === "MANUAL" ? <StatusBadge tone="info">{source[ar ? 1 : 0]}</StatusBadge> : <strong>{source[ar ? 1 : 0]}</strong>}<span className="cc-row-sub">{source[ar ? 3 : 2]} · <bdi dir="ltr">{f.rateDate}</bdi></span></div>
+      {editable ? <div>
+        <label className="cc-field"><span className="cc-field-label">{ar ? `جنيه لكل 1 ${f.currency}` : `EGP per 1 ${f.currency}`}</span><input type="number" min="0" step="0.0001" dir="ltr" value={egpPer} onChange={(e) => setEgpPer(e.target.value)} /></label>
+        <button type="button" className="cc-secondary cc-small" disabled={busy || !(per > 0)} onClick={() => void onPin(f.currency, 1 / per)}>{ar ? "حفظ السعر لليوم" : "Save rate for today"}</button>
+        <span className="cc-row-sub">{ar ? "لليوم فقط؛ غدًا يُستخدم سعر السوق اليومي مجددًا ما لم تحفظ سعرًا آخر." : "Today only; tomorrow the daily market rate is used again unless you save another."}</span>
+      </div> : <div />}
+    </li>
   );
 }
 

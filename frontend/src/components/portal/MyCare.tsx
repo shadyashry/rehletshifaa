@@ -62,7 +62,6 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-[0.95rem] font-bold text-brand-700" dir="ltr">{c.caseNumber}</span>
           {c.careCategory && <><span aria-hidden className="text-ink-300">·</span><span className="text-[0.95rem] text-ink-700">{careArea(c.careCategory, locale)}</span></>}
-          <span className="ms-auto rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-[0.75rem] font-bold text-brand-800">{t.phases[phase]}</span>
         </div>
         <dl className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-[0.9rem]">
           <div className="flex items-baseline gap-1.5"><dt className="text-ink-500">{t.coordinator}</dt><dd className="font-semibold text-ink-900">{c.coordinatorName ?? t.notAssigned}</dd></div>
@@ -97,6 +96,13 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
             <h2 id="current-step-title" className="mt-1.5 text-[1.35rem] font-bold leading-8 text-brand-900 sm:text-[1.5rem]">{step.title}</h2>
             <p className="mt-2 max-w-2xl text-[0.98rem] leading-7 text-ink-700">{step.body}</p>
 
+            {code === "PROVIDE_INFORMATION" && patientAction && (c.coordinatorName || patientAction.dueAt) && (
+              <p className="mt-2 text-[0.88rem] text-ink-600">
+                {c.coordinatorName && <>{t.requestedBy} <bdi className="font-semibold text-ink-800">{c.coordinatorName}</bdi></>}
+                {c.coordinatorName && patientAction.dueAt && " · "}
+                {patientAction.dueAt && <>{t.replyBy} {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(patientAction.dueAt))}</>}
+              </p>
+            )}
             {code === "PROVIDE_INFORMATION" && patientAction && patientAction.items.length > 0 && (
               <ul className="mt-3 space-y-1.5" aria-label={t.requested}>
                 {patientAction.items.map(item => (
@@ -178,9 +184,10 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
             <section aria-labelledby="proposal-title" className="card p-5 lg:col-start-1 lg:row-start-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p id="proposal-title" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.proposal}</p>
+                  <p id="proposal-title" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.documentType[proposal.documentType ?? ""] ?? t.proposal}</p>
                   {proposalTotal != null && <p className="mt-1.5 text-[1.5rem] font-bold leading-8 text-brand-900" dir="ltr">{money(proposalTotal, proposal.currency)}</p>}
-                  <p className="mt-1 text-[0.92rem] font-semibold text-ink-800">{t.proposalStatus[patientProposal.state] ?? patientProposal.state}<span className="font-normal text-ink-500"> · {t.version} {proposal.versionNumber}</span></p>
+                  <p className="mt-1 text-[0.92rem] font-semibold text-ink-800">{t.proposalStatus[patientProposal.state] ?? patientProposal.state}{proposal.versionNumber > 1 && <span className="font-normal text-ink-500"> · {t.updated}</span>}</p>
+                  {proposal.documentType === "PRELIMINARY_ESTIMATE" && <p className="mt-1 max-w-md text-[0.85rem] leading-6 text-ink-600">{t.estimateBasis}</p>}
                 </div>
                 {/* One control for one outcome: reviewing is already the current step's action, so only the settled document gets a link here. */}
                 {patientProposal.action === "VIEW_PROPOSAL" && (
@@ -238,12 +245,14 @@ function copy(ar: boolean) {
     coordinator: "المنسق", consultant: "الاستشاري", notAssigned: "لم يُسند بعد",
     currentStep: "الخطوة الحالية", next: "الخطوة التالية", noAction: "لا يلزم منك أي إجراء الآن.",
     reviewProposal: "مراجعة العرض", replyInMessages: "الرد في الرسائل", requested: "المطلوب منك", provided: "تم تقديمه",
-    deposit: "الوديعة", received: "المستلم",
+    deposit: "وديعة التنسيق", received: "المستلم", requestedBy: "طلبه منسقك", replyBy: "يُرجى الرد قبل",
     depositStatus: { REQUESTED: "قيد الترتيب", PARTIALLY_PAID: "استُلم جزئيًا", PAID: "تم استلام الوديعة", WAIVED: "معفاة", REFUNDED: "مستردة", CANCELLED: "ملغاة" } as Record<string, string>,
     depositNote: { REQUESTED: "سيرسل لك منسقك تعليمات الدفع.", PARTIALLY_PAID: "سيؤكد منسقك المبلغ المتبقي.", PAID: "شكرًا لك — تُحتسب من رصيدك النهائي.", WAIVED: "لا يلزم دفع وديعة لهذه الحالة.", REFUNDED: "أُعيدت الوديعة إليك." } as Record<string, string>,
     journey: "مسار رعايتك", done: "مكتمل", current: "الحالية",
-    phases: ["استلمنا حالتك", "مراجعة المنسق", "مراجعة الاستشاري", "عرضك", "الوديعة", "العلاج", "المتابعة"],
-    proposal: "عرضك", version: "الإصدار", viewProposal: "عرض العرض",
+    phases: ["استلمنا حالتك", "مراجعة المنسق", "مراجعة الاستشاري", "عرضك", "وديعة التنسيق", "العلاج", "المتابعة"],
+    proposal: "عرضك", updated: "نسخة محدّثة", viewProposal: "عرض العرض",
+    documentType: { PRELIMINARY_ESTIMATE: "تقدير مبدئي للرعاية", FINAL_TREATMENT_QUOTE: "خطة العلاج والعرض النهائي" } as Record<string, string>,
+    estimateBasis: "بناءً على التوصية الحالية والخدمات المشمولة. قد يتغيّر العلاج والسعر النهائي بعد الفحص الحضوري.",
     proposalStatus: { READY: "جاهز للمراجعة", ACCEPTED: "تم الإقرار به", DECLINED: "مرفوض", EXPIRED: "منتهي الصلاحية" } as Record<string, string>,
     yourCoordinator: "منسقك", coordinatorHint: "جهة تواصلك طوال رحلة رعايتك.", coordinatorPending: "سيُعرّفك منسقك بنفسه قريبًا.", message: "مراسلة",
     documentsTitle: "المستندات التي شاركتها", documentsHint: "المستندات المرفقة بهذه الحالة. لإضافة مستند، استخدم الرابط الآمن الذي يرسله لك منسقك.", noDocuments: "لم تشارك أي مستندات بعد.",
@@ -253,12 +262,14 @@ function copy(ar: boolean) {
     coordinator: "Coordinator", consultant: "Consultant", notAssigned: "Not assigned yet",
     currentStep: "Current step", next: "Next", noAction: "No action is required from you right now.",
     reviewProposal: "Review proposal", replyInMessages: "Reply in Messages", requested: "What we need from you", provided: "provided",
-    deposit: "Deposit", received: "Received",
+    deposit: "Coordination deposit", received: "Received", requestedBy: "Requested by your coordinator", replyBy: "Please reply by",
     depositStatus: { REQUESTED: "Arranging", PARTIALLY_PAID: "Partly received", PAID: "Deposit received", WAIVED: "Waived", REFUNDED: "Refunded", CANCELLED: "Cancelled" } as Record<string, string>,
     depositNote: { REQUESTED: "Your coordinator will send you the payment instructions.", PARTIALLY_PAID: "Your coordinator will confirm the remaining amount.", PAID: "Thank you — credited to your final balance.", WAIVED: "No deposit is needed for your case.", REFUNDED: "The deposit has been returned to you." } as Record<string, string>,
     journey: "Your care journey", done: "done", current: "current",
-    phases: ["Case received", "Coordinator review", "Consultant review", "Your proposal", "Deposit", "Treatment", "Follow-up"],
-    proposal: "Your proposal", version: "Version", viewProposal: "View proposal",
+    phases: ["Case received", "Coordinator review", "Consultant review", "Your proposal", "Coordination deposit", "Treatment", "Follow-up"],
+    proposal: "Your proposal", updated: "Updated version", viewProposal: "View proposal",
+    documentType: { PRELIMINARY_ESTIMATE: "Preliminary care estimate", FINAL_TREATMENT_QUOTE: "Final treatment plan and quote" } as Record<string, string>,
+    estimateBasis: "Based on the current recommendation and included services. The final treatment and price may change after an in-person assessment.",
     proposalStatus: { READY: "Ready to review", ACCEPTED: "Acknowledged", DECLINED: "Declined", EXPIRED: "Expired" } as Record<string, string>,
     yourCoordinator: "Your coordinator", coordinatorHint: "Your point of contact throughout your care journey.", coordinatorPending: "Your coordinator will introduce themselves shortly.", message: "Message",
     documentsTitle: "Documents you shared", documentsHint: "The documents attached to this case. To add one, use the secure link your coordinator sends you.", noDocuments: "You have not shared any documents yet.",

@@ -64,7 +64,8 @@ export function DirectClinicianPage({ locale, practitionerId, initialTab, invite
   const tabs = [
     { key: "overview" as const, label: ar ? "نظرة عامة" : "Overview" },
     ...(approvalApplies ? [{ key: "approval" as const, label: ar ? "الاعتماد والموافقة على الحالات" : "Credential & case approval", attention: item.credentialingStatus === "UNDER_REVIEW" }] : []),
-    { key: "prices" as const, label: ar ? "قائمة الأسعار" : "Price list" },
+    // Provider-credentialed clinicians are priced through their organization; the Direct price list is not their workflow.
+    ...(approvalApplies ? [{ key: "prices" as const, label: ar ? "قائمة أسعار الطبيب المباشر" : "Direct price list" }] : []),
     { key: "access" as const, label: ar ? "الوصول للحساب" : "Account access" },
   ];
   const shown = tabs.some((x) => x.key === tab) ? tab : "overview";

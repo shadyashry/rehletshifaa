@@ -14,7 +14,7 @@ export const PATIENT_PHASES = [
   { key: "coordinator", en: "Coordinator review", ar: "مراجعة المنسق" },
   { key: "consultant", en: "Consultant review", ar: "مراجعة الاستشاري" },
   { key: "proposal", en: "Your proposal", ar: "عرضك" },
-  { key: "deposit", en: "Deposit", ar: "الوديعة" },
+  { key: "deposit", en: "Coordination deposit", ar: "وديعة التنسيق" },
   { key: "treatment", en: "Treatment", ar: "العلاج" },
   { key: "followup", en: "Follow-up", ar: "المتابعة" },
 ] as const;

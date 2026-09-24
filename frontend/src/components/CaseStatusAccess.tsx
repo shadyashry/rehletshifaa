@@ -44,7 +44,7 @@ const copy = {
     proposalDeclined: "You declined the proposal. Your coordinator remains available if anything changes.",
     proposalRevision: "You asked for changes. Your coordinator is preparing a revised proposal and will send you a new secure link.",
     proposalExpired: "This proposal has expired. Your coordinator can prepare an updated one for you.",
-    proposalVersion: (n: number) => `Version ${n}`, proposalValid: "Valid until",
+    proposalVersion: (n: number) => (n > 1 ? "Updated version" : ""), proposalValid: "Valid until",
     proposalUnavailable: "This proposal is no longer available to review. Please refresh to see the latest status.",
   },
   ar: {
@@ -70,7 +70,7 @@ const copy = {
     proposalDeclined: "رفضت العرض. يبقى منسقك متاحًا إن تغيّر شيء.",
     proposalRevision: "طلبت تعديلات. يجهّز منسقك عرضًا معدّلًا وسيرسل لك رابطًا آمنًا جديدًا.",
     proposalExpired: "انتهت صلاحية هذا العرض. يمكن لمنسقك إعداد عرض محدّث لك.",
-    proposalVersion: (n: number) => `الإصدار ${n}`, proposalValid: "صالح حتى",
+    proposalVersion: (n: number) => (n > 1 ? "نسخة محدّثة" : ""), proposalValid: "صالح حتى",
     proposalUnavailable: "لم يعد هذا العرض متاحًا للمراجعة. يرجى التحديث للاطلاع على آخر حالة.",
   },
 };
@@ -266,10 +266,10 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
           <section aria-labelledby="status-proposal" className="mt-5 rounded-xl border border-line p-4">
             <p id="status-proposal" className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.proposalTitle}</p>
             {status.proposal.state !== "READY" && <p className="mt-1 leading-6 text-ink-700">{proposalCopy(status.proposal.state, t)}</p>}
-            {status.proposal.versionNumber != null && status.proposal.state !== "REVISION_REQUESTED" && (
+            {/* No technical version number for the patient: only whether this is an updated document, and its validity. */}
+            {status.proposal.state !== "REVISION_REQUESTED" && ((status.proposal.versionNumber ?? 0) > 1 || (status.proposal.validUntil && status.proposal.state === "READY")) && (
               <p className="mt-1 text-[0.82rem] text-ink-500">
-                {t.proposalVersion(status.proposal.versionNumber)}
-                {status.proposal.validUntil && status.proposal.state === "READY" && <> · {t.proposalValid} {new Date(status.proposal.validUntil).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}</>}
+                {[t.proposalVersion(status.proposal.versionNumber ?? 0), status.proposal.validUntil && status.proposal.state === "READY" ? `${t.proposalValid} ${new Date(status.proposal.validUntil).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""].filter(Boolean).join(" · ")}
               </p>
             )}
             {status.proposal.action === "REVIEW_PROPOSAL" && (

@@ -155,7 +155,7 @@ describe("Direct clinician page", () => {
     render(<DirectClinicianPage locale="en" practitionerId="p-9" invited />);
     expect(await screen.findByRole("heading", { level: 1, name: "Dr Omar Said" })).toBeVisible();
     expect(screen.getByText(/Invitation sent and profile created/).closest(".cc-focus-target")).toHaveFocus();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "Credential & case approval — needs attention", "Price list", "Account access"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "Credential & case approval — needs attention", "Direct price list", "Account access"]);
     expect(screen.getAllByText("Direct with RehletShifaa").length).toBeGreaterThan(0);
     expect(screen.getByText("Not ready for cases", { selector: ".cc-status" })).toBeVisible();
     expect(screen.getByText("Awaiting review", { selector: ".cc-status" })).toBeVisible();
@@ -170,6 +170,8 @@ describe("Direct clinician page", () => {
     expect(await screen.findByText(/uses its independent credentialing, so Direct approval no longer applies/)).toBeVisible();
     expect(screen.queryByRole("tab", { name: /Credential & case approval/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve for cases…" })).not.toBeInTheDocument();
+    // Nor the Direct price list: they are priced through their organization (UX-8 regression).
+    expect(screen.queryByRole("tab", { name: /price list/i })).not.toBeInTheDocument();
     auth.roles = [];
   });
 });

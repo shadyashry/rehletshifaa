@@ -119,7 +119,7 @@ export function ClinicianPage({ locale, organizationId, practitionerId, initialT
           <CredentialRequirements locale={locale} api={api} organizationId={organizationId} practitionerId={practitionerId} canSubmit={access.can("credential.submit")} canReview={access.can("credential.review")} onChanged={refresh} legacy={onboarding.status === "LEGACY_UNREVIEWED" || (!!row && !row.providerCredentialing)} />
         </Section>}
         {shown === "relationships" && <PracticeRelationships locale={locale} api={api} detail={detail} practitionerId={practitionerId} clinicianType={onboarding.clinicianType} canManage={access.can("provider.relationship.manage")} onChanged={refresh} />}
-        {shown === "prices" && <PricingManagement locale={locale} organizationId={organizationId} practitionerId={practitionerId} onChanged={refresh} />}
+        {shown === "prices" && <PricingManagement locale={locale} organizationId={organizationId} practitionerId={practitionerId} organizationName={row?.organizationName} onChanged={refresh} />}
         {shown === "schedule" && <AvailabilityManagement locale={locale} organizationId={organizationId} practitionerId={practitionerId} onChanged={refresh} />}
       </TabPanel>
     </>,

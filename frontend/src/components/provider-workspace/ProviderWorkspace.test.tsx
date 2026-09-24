@@ -177,7 +177,7 @@ describe("Provider Workspace — C. Practice manager", () => {
     expect(await screen.findByRole("button", { name: /New price/ })).toBeVisible();
     // The clinician's own draft can be edited and published; the organization-wide price — which also governs clinicians
     // this manager does not manage — offers no action here (backend breadth recorded for Phase 8D).
-    expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Edit draft" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Publish" })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /New price/ }));

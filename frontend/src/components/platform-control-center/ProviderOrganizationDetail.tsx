@@ -17,6 +17,7 @@ import { CLINICIAN_ROLES, PRACTICE_ROLES, personName, type Member, type Provider
 import { ActivationUnavailable, activationUnavailable, type Readiness } from "./consultant-setup";
 import { addClinicianHref, clinicianHref } from "./clinician-model";
 import { InvitePersonDialog, RelationshipDialog, memberActions, relationshipSummary, useMemberMutations } from "./ProviderPeople";
+import { OrganizationProfile, profileEditability } from "./OrganizationProfile";
 
 export type OrganizationTab = "overview" | "people" | "setup";
 const PEOPLE_GROUPS: { role: string; label: [string, string] }[] = [
@@ -37,6 +38,7 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
   const [tab, setTab] = useState<OrganizationTab>(initialTab ?? "overview");
   const [readiness, setReadiness] = useState<Record<string, Readiness | "error">>({});
   const [inviting, setInviting] = useState(false); const [relating, setRelating] = useState<Member | null>(null);
+  const [editingProfile, setEditingProfile] = useState(false);
   const [activating, setActivating] = useState(false); const [activationError, setActivationError] = useState<unknown>(null); const [busy, setBusy] = useState(false);
   const load = useCallback(async () => { setError(null); try { setDetail(await api<ProviderDetail>(`/admin/providers/${organizationId}`)); } catch (e) { setError(e); } }, [api, organizationId]);
   const canView = access.can("provider.view");
@@ -114,14 +116,15 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
       <ErrorNotice error={mutations.error} locale={locale} />
       <SectionTabs attentionLabel={locale === "ar" ? "يحتاج إجراء" : "needs attention"} label={name} tabs={tabs} active={tab} onChange={change} />
       <TabPanel id={tab}>
-        {tab === "overview" && <Section title={ar ? "الملخص" : "Summary"} id="summary">
-          <Facts items={[
-            [ar ? "الاسم القانوني" : "Legal name", org.legalName], [ar ? "النوع" : "Type", orgTypeLabel(org.type, locale)], [ar ? "الدولة" : "Country", org.countryCode],
-            [ar ? "المنطقة الزمنية" : "Time zone", <bdi key="tz" dir="ltr">{org.timeZone}</bdi>], [ar ? "العملة" : "Currency", org.defaultCurrency],
-            [ar ? "الأطباء" : "Clinicians", String(clinicians.filter((m) => m.status !== "REVOKED").length)], [ar ? "فريق العيادة" : "Practice staff", String(staff.filter((m) => m.status !== "REVOKED").length)],
-          ]} />
-          <TechnicalDetails locale={locale} items={[[ar ? "معرّف المؤسسة" : "Organization ID", org.id], [ar ? "حالة الربط القديم" : "Legacy mapping", org.legacyMappingStatus ?? "—"], [ar ? "إصدار السجل" : "Record version", String(org.version)]]} />
-        </Section>}
+        {tab === "overview" && <>
+          <OrganizationProfile key={org.version} locale={locale} api={api} organization={org} access={access} editing={editingProfile} onEditing={setEditingProfile} onSaved={() => { setEditingProfile(false); mutations.setNotice(ar ? "تم حفظ ملف الجهة." : "Organization profile saved."); void load(); }} />
+          <Section title={ar ? "الفريق" : "Team"} id="summary">
+            <Facts items={[
+              [ar ? "الأطباء" : "Clinicians", String(clinicians.filter((m) => m.status !== "REVOKED").length)], [ar ? "فريق العيادة" : "Practice staff", String(staff.filter((m) => m.status !== "REVOKED").length)],
+            ]} />
+            <TechnicalDetails locale={locale} items={[[ar ? "معرّف المؤسسة" : "Organization ID", org.id], [ar ? "حالة الربط القديم" : "Legacy mapping", org.legacyMappingStatus ?? "—"], [ar ? "إصدار السجل" : "Record version", String(org.version)]]} />
+          </Section>
+        </>}
 
         {tab === "people" && (detail.members.length === 0 ? <EmptyState title={ar ? "لا يوجد أشخاص في هذه المؤسسة بعد" : "Nobody works here yet"} body={ar ? "أضف أول طبيب أو عضو في فريق العيادة." : "Add the first clinician or practice staff member."} action={actions} /> : PEOPLE_GROUPS.map((g) => {
           const people = detail.members.filter((m) => m.roles.includes(g.role));
@@ -153,7 +156,10 @@ export function ProviderOrganizationDetail({ locale, organizationId, initialTab 
             !ownerActive && <button type="button" className="cc-secondary cc-small" onClick={() => change("people")}>{ar ? "فتح الأشخاص" : "Open People"}</button>)}
           {step("clinical", ar ? "الفريق الطبي" : "Clinical team", clinicians.length ? "success" : "warning", clinicians.length ? done : todo, ar ? `${clinicians.length} طبيب` : `${clinicians.length} clinician(s)`, canAddClinician && <Link className="cc-secondary cc-small" href={addClinicianHref(locale, organizationId)}>{ar ? "إضافة طبيب" : "Add clinician"}</Link>)}
           {step("practice", ar ? "فريق العيادة" : "Practice staff", staff.length ? "success" : "warning", staff.length ? done : todo, ar ? `${staff.length} عضو` : `${staff.length} member(s)`)}
-          {profileIncomplete && step("profile", ar ? "ملف الجهة" : "Organization profile", "warning", todo, org.legacyMappingStatus === "PENDING_REVIEW" ? (ar ? "سجل مستورد بانتظار المراجعة. لا يمكن إكمال ذلك من مركز التحكم بعد." : "An imported legacy record is waiting for review. This can't be completed from the Control Center yet.") : (ar ? "ملف الجهة غير مكتمل." : "The organization profile is incomplete."))}
+          {profileIncomplete
+            ? step("profile", ar ? "ملف الجهة" : "Organization profile", "warning", ar ? "يحتاج انتباهًا" : "Needs attention", org.legacyMappingStatus === "PENDING_REVIEW" ? (ar ? "سجل مستورد بانتظار المراجعة. لا يمكن إكمال ذلك من مركز التحكم بعد." : "An imported legacy record is waiting for review. This can't be completed from the Control Center yet.") : (ar ? "تنقص بيانات مطلوبة في ملف الجهة (مثل الدولة)." : "Required organization details are missing (for example the country)."),
+              org.legacyMappingStatus !== "PENDING_REVIEW" && profileEditability(org, access).editable && <button type="button" className="cc-secondary cc-small" onClick={() => { setEditingProfile(true); change("overview"); }}>{ar ? "إكمال الملف" : "Complete profile"}</button>)
+            : allLoaded && step("profile", ar ? "ملف الجهة" : "Organization profile", "success", done, ar ? "لا تُبلغ جاهزية أي طبيب عن نقص في ملف الجهة." : "No clinician's readiness reports a missing organization detail.")}
           {noClinicians ? step("credentials", ar ? "الاعتمادات" : "Credentials", "neutral", ar ? "لا يوجد أطباء" : "No clinicians", ar ? "أضف طبيبًا أولًا؛ تُراجَع اعتماداته بعد ذلك." : "Add a clinician first; their credentials are reviewed after that.")
           : step("credentials", ar ? "الاعتمادات" : "Credentials", !allLoaded ? "neutral" : outstandingCredentials ? "warning" : "success", !allLoaded ? checking : outstandingCredentials ? todo : (ar ? "تم التحقق منها كلها" : "All verified"), !allLoaded ? (ar ? "جارٍ التحقق من الأطباء…" : "Checking clinicians…") : outstandingCredentials ? (ar ? `${outstandingCredentials} طبيب بحاجة إلى اعتمادات تم التحقق منها` : `${outstandingCredentials} clinician(s) still need independently verified credentials`) : (ar ? "تحقق مراجع مستقل من كل الاعتمادات المطلوبة" : "Every required credential is independently verified"),
             outstandingCredentials > 0 && <Link className="cc-secondary cc-small" href={ccHref(locale, `/credentials?org=${organizationId}`)}>{ar ? "فتح المراجعات" : "Open reviews"}</Link>)}

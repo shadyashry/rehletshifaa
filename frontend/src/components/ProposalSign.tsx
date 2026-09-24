@@ -25,7 +25,7 @@ type Blocked = "EXPIRED" | "SUPERSEDED" | "DECIDED" | null;
 
 const copy = {
   en: {
-    greeting: "Prepared for", caseRef: "Case reference", versionLabel: "Version", validUntil: "Valid until",
+    greeting: "Prepared for", caseRef: "Case reference", versionLabel: "Document", updatedVersion: "Updated version", validUntil: "Valid until",
     servicesLabel: "Recommended services", treatmentLabel: "Your consultant's recommendation",
     risksLabel: "Risks & limitations", notesLabel: "Notes from your coordinator",
     verifyTitle: "Verify it's you", verifyIntroWhatsapp: "To protect your information, we'll send a 6-digit code to your WhatsApp",
@@ -83,7 +83,7 @@ const copy = {
     reviewedBy: "Reviewed by",
   },
   ar: {
-    greeting: "أُعدّ لصالح", caseRef: "رقم الحالة", versionLabel: "الإصدار", validUntil: "صالح حتى",
+    greeting: "أُعدّ لصالح", caseRef: "رقم الحالة", versionLabel: "المستند", updatedVersion: "نسخة محدّثة", validUntil: "صالح حتى",
     servicesLabel: "الخدمات الموصى بها", treatmentLabel: "توصية استشاريك",
     risksLabel: "المخاطر والقيود", notesLabel: "ملاحظات من منسّق حالتك",
     verifyTitle: "لنتأكد أنه أنت", verifyIntroWhatsapp: "لحماية معلوماتك، سنرسل رمزًا من 6 أرقام إلى واتساب الخاص بك",
@@ -359,10 +359,11 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                   <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.caseRef}</dt>
                   <dd className="mt-0.5 font-bold text-ink-900" dir="ltr">{proposal.caseNumber}</dd>
                 </div>
-                {proposal.versionNumber != null && (
+                {/* The technical version number stays internal; a patient only needs to know this document was updated. */}
+                {proposal.versionNumber != null && proposal.versionNumber > 1 && (
                   <div>
                     <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.versionLabel}</dt>
-                    <dd className="mt-0.5 font-bold text-ink-900">{proposal.versionNumber}</dd>
+                    <dd className="mt-0.5 font-bold text-ink-900">{t.updatedVersion}</dd>
                   </div>
                 )}
                 {proposal.validUntil && (

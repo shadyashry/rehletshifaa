@@ -3,13 +3,13 @@
 import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { LayoutList, Network, RefreshCw } from "lucide-react";
+import { LayoutList, Network } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { apiFetchAs } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { journeyCopy, journeyStatusLabel, stageTypeLabel } from "./journey-copy";
-import type { Decision, JourneyCapability, JourneyDetail, JourneyGraph, JourneyReadiness, JourneyRegistryMetadata, JourneySimulation, JourneyValidation, JourneyVersion } from "./journey-types";
+import type { Decision, JourneyCapability, JourneyCutoverStatus, JourneyDetail, JourneyGraph, JourneyRegistryMetadata, JourneySimulation, JourneyValidation, JourneyVersion } from "./journey-types";
 import { JourneyGraphCanvas } from "./JourneyGraphCanvas";
 import { JourneyNodeInspector } from "./JourneyNodeInspector";
 import { JourneyValidationPanel } from "./JourneyValidationPanel";
@@ -32,7 +32,6 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
   const [graph, setGraph] = useState<JourneyGraph | null>(null);
   const [registry, setRegistry] = useState<JourneyCapability[]>([]);
   const [registryMeta, setRegistryMeta] = useState<JourneyRegistryMetadata | null>(null);
-  const [runtime, setRuntime] = useState<JourneyReadiness | null>(null);
   const [can, setCan] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -81,7 +80,6 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
         setDetail(d); setRegistry(reg); setRegistryMeta(meta);
         const v = d.versions.find((x) => x.id === versionId);
         if (v) { setSavedGraph(v.graph); setGraph(v.graph); }
-        try { setRuntime(await api<JourneyReadiness>("/" + definitionId + "/versions/" + versionId + "/runtime")); } catch { setRuntime(null); }
       }
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
   }, [api, user, t.error, definitionId, versionId]);
@@ -125,23 +123,31 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
     if (!version) return;
     const saved = await api<JourneyVersion>("/" + definitionId + "/versions/" + versionId + "/submit", "POST", { revision: version.revision, reason });
     setDetail((d) => d ? { ...d, versions: d.versions.map((v) => (v.id === saved.id ? saved : v)) } : d);
+    setNotice(t.submitted);
   });
   const returnToDraft = () => run(async () => {
     if (!version) return;
     const saved = await api<JourneyVersion>("/" + definitionId + "/versions/" + versionId + "/return-to-draft", "POST", { revision: version.revision, reason });
     setDetail((d) => d ? { ...d, versions: d.versions.map((v) => (v.id === saved.id ? saved : v)) } : d);
+    setNotice(t.returned);
   });
-  const publish = () => run(async () => {
-    if (!version) return;
-    const saved = await api<JourneyVersion>("/" + definitionId + "/versions/" + versionId + "/publish", "POST", { revision: version.revision, reason });
-    setDetail((d) => d ? { ...d, versions: d.versions.map((v) => (v.id === saved.id ? saved : v)) } : d);
-    setNotice(t.publish);
-  });
-  const retire = () => run(async () => {
-    if (!version) return;
-    const saved = await api<JourneyVersion>("/" + definitionId + "/versions/" + versionId + "/retire", "POST", { revision: version.revision, reason });
-    setDetail((d) => d ? { ...d, versions: d.versions.map((v) => (v.id === saved.id ? saved : v)) } : d);
-  });
+  // Publish and retire ask for their own reason in their confirmation; both resolve true only when the backend accepted.
+  const decide = async (action: "publish" | "retire", why: string) => {
+    if (!version) return false;
+    let ok = false;
+    await run(async () => {
+      const saved = await api<JourneyVersion>("/" + definitionId + "/versions/" + versionId + "/" + action, "POST", { revision: version.revision, reason: why });
+      setDetail((d) => d ? { ...d, versions: d.versions.map((v) => (v.id === saved.id ? saved : v)) } : d);
+      setNotice(action === "publish" ? t.published : t.retiredDone); ok = true;
+    });
+    return ok;
+  };
+  const [intake, setIntake] = useState<JourneyCutoverStatus | "error" | null>(null);
+  /** Production intake status for the publish confirmation (read-only; journey.view). Loaded when the dialog opens. */
+  const loadIntake = async () => {
+    if (intake || !user) return;
+    try { const r = await apiFetchAs(user.access_token, "/admin/journey-cutover"); setIntake(r.ok ? await r.json() : "error"); } catch { setIntake("error"); }
+  };
 
   const compareVersion = detail?.versions.find((v) => v.id === compareId) ?? null;
   const diff = useMemo(() => (version && compareVersion ? computeJourneyDiff(compareVersion.graph, version.graph) : null), [version, compareVersion]);
@@ -156,14 +162,12 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
 
   const orderedNodeKeys = useMemo(() => (graph ? Object.entries(computeLayout(graph).positions).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x).map(([k]) => k) : []), [graph]);
 
-  const actions = (
+  // One primary action in the header. Check, Test and publishing live in their own tabs (no duplicate controls).
+  const actions = editable && allowed(t.permission.editDraft) ? (
     <div className="jd-head-actions">
-      <button type="button" className="cc-secondary" disabled={busy} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden />{t.retry}</button>
-      {editable && <button type="button" disabled={busy || !dirty || !reason.trim()} onClick={() => void saveDraft()}>{t.saveDraft}</button>}
-      {editable && <button type="button" className="cc-secondary" disabled={busy || dirty || !reason.trim() || !allowed(t.permission.validate)} onClick={() => void runValidate()}>{t.validate}</button>}
-      {editable && <button type="button" className="cc-secondary" disabled={busy || dirty || !reason.trim() || !allowed(t.permission.simulate)} onClick={() => void runSimulate()}>{t.simulate}</button>}
+      <button type="button" disabled={busy || !dirty || !reason.trim()} onClick={() => void saveDraft()}>{t.saveDraft}</button>
     </div>
-  );
+  ) : undefined;
 
   return (
     <ControlCenterShell
@@ -185,19 +189,19 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
         <>
           <div className="jd-head">
             <div className="jd-head-meta">
-              <span className={dirty ? "jd-unsaved" : "jd-saved"}>{dirty ? t.unsaved : t.saved}</span>
-              {runtime && <span className="cc-badge">{runtime.status === "DEPLOYED" ? t.deployed : t.notDeployed}</span>}
+              {editable && <span className={dirty ? "jd-unsaved" : "jd-saved"} role="status">{dirty ? t.unsaved : t.saved}</span>}
               {!editable && <span className="cc-meta">{t.cloneToEdit}</span>}
             </div>
-            <div className="jd-field" style={{ minWidth: 260 }}>
-              <label>{t.reason}<input maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t.reasonHint} /></label>
-            </div>
+            {(editable || version.status === "PENDING_APPROVAL") && <div className="jd-field" style={{ minWidth: 260 }}>
+              <label>{t.reason}<input maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} aria-describedby="jd-reason-hint" /></label>
+              <span id="jd-reason-hint" className="cc-field-hint">{t.reasonHint}</span>
+            </div>}
           </div>
 
           <div className="cc-tabs" role="tablist">
             {(["designer", "validation", "simulation", "diff", "publish"] as Tab[]).map((k) => (
               <button key={k} type="button" role="tab" aria-selected={tab === k} aria-current={tab === k ? "page" : undefined} onClick={() => setTab(k)}>
-                {k === "designer" ? t.designer : k === "validation" ? t.validation : k === "simulation" ? t.simulation : k === "diff" ? t.diff : t.publishGovernance}
+                {k === "designer" ? t.designer : k === "validation" ? t.validation : k === "simulation" ? t.testTitle : k === "diff" ? t.diff : t.publishGovernance}
               </button>
             ))}
           </div>
@@ -251,7 +255,8 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
 
           {tab === "validation" && (
             <JourneyValidationPanel
-              locale={locale} validation={validation} busy={busy} disabled={!editable || dirty || !reason.trim() || !allowed(t.permission.validate)}
+              locale={locale} validation={validation} graph={graph} busy={busy} disabled={!editable || dirty || !reason.trim() || !allowed(t.permission.validate)}
+              blockedHint={!editable ? t.cloneToEdit : dirty ? t.unsaved : !reason.trim() ? t.reasonRequired : undefined}
               onRun={() => void runValidate()} onFocusIssue={(k) => { setSelectedNodeKey(k); setSelectedEdgeKey(null); setTab("designer"); }}
             />
           )}
@@ -260,6 +265,7 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
             <JourneySimulationPanel
               locale={locale} registryMeta={registryMeta} facts={simFacts} simulation={simulation} busy={busy}
               disabled={!editable || dirty || !reason.trim() || !allowed(t.permission.simulate)}
+              blockedHint={!editable ? t.cloneToEdit : dirty ? t.unsaved : !reason.trim() ? t.reasonRequired : undefined}
               onChangeFacts={setSimFacts} onRun={() => void runSimulate()}
             />
           )}
@@ -270,9 +276,9 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
 
           {tab === "publish" && (
             <JourneyPublishPanel
-              locale={locale} version={version} materialChanges={materialChanges} can={can} busy={busy}
-              reason={reason}
-              onSubmit={() => void submit()} onReturnToDraft={() => void returnToDraft()} onPublish={() => void publish()} onRetire={() => void retire()}
+              locale={locale} version={version} journeyName={detail.definition.name} versions={detail.versions} materialChanges={materialChanges} can={can} busy={busy}
+              reason={reason} currentUser={user?.profile?.sub} intake={intake} onLoadIntake={() => void loadIntake()}
+              onSubmit={() => void submit()} onReturnToDraft={() => void returnToDraft()} onDecide={decide}
             />
           )}
 

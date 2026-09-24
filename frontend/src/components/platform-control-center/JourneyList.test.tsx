@@ -10,28 +10,52 @@ vi.mock("@/components/AuthProvider", () => {
 });
 vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
 
-const journey = { id: "def-1", key: "INTERNATIONAL_CARE", name: "International Care Journey", createdAt: "2026-09-01T00:00:00Z" };
-
-beforeEach(() => {
-  vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
-    if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify([{ permission: "journey.view", allowed: true }, { permission: "journey.create", allowed: true }]), { status: 200 });
-    if (path === "/admin/journeys") return new Response(JSON.stringify([journey]), { status: 200 });
-    return new Response(JSON.stringify({}), { status: 200 });
-  });
+const summary = { id: "def-1", key: "INTERNATIONAL_CARE", name: "International Care Journey", createdAt: "2026-09-01T00:00:00Z", liveVersion: 2, livePublishedAt: "2026-09-10T00:00:00Z", publishedVersions: 1, draftVersion: 3, draftStatus: "PENDING_APPROVAL", versions: 3, lastActivityAt: "2026-09-20T00:00:00Z" };
+const serve = (rows: unknown[], caps = ["journey.view", "journey.create"]) => vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
+  if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify(caps.map((permission) => ({ permission, allowed: true }))), { status: 200 });
+  if (path === "/admin/journeys/summaries") return new Response(JSON.stringify(rows), { status: 200 });
+  return new Response(JSON.stringify({}), { status: 200 });
 });
+beforeEach(() => { serve([summary]); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-describe("Journey list", () => {
-  it("renders real journeys from the backend", async () => {
+describe("Care Journeys list", () => {
+  it("shows what is published, what is changing and what needs review, from one bounded read", async () => {
     render(<JourneyList locale="en" />);
-    expect(await screen.findByRole("link", { name: /International Care Journey/ })).toBeVisible();
+    const card = await screen.findByRole("link", { name: /International Care Journey/ });
+    expect(card).toHaveTextContent("Needs approval");
+    expect(card).toHaveTextContent("PublishedVersion 2 · Published on");
+    expect(card).toHaveTextContent("Change in progressVersion 3 · Waiting for approval");
+    expect(card).toHaveTextContent("Last activity");
+    expect(screen.getByRole("heading", { level: 1, name: "Care Journeys" })).toBeVisible();
+    // Engine detail and fabricated metrics are not on the list.
+    expect(card.textContent).not.toMatch(/INTERNATIONAL_CARE|deploy|runtime|hash|SLA|cases per/i);
+    expect(vi.mocked(apiFetchAs).mock.calls.map(([, p]) => p).filter((p) => p.startsWith("/admin/journeys"))).toEqual(["/admin/journeys/summaries"]);
+  });
+
+  it("offers creation only while no journey exists (the backend supports exactly one)", async () => {
+    render(<JourneyList locale="en" />);
+    await screen.findByRole("link", { name: /International Care Journey/ });
+    expect(screen.queryByRole("button", { name: /New journey/ })).not.toBeInTheDocument();
+    cleanup(); serve([]);
+    render(<JourneyList locale="en" />);
+    expect(await screen.findByText(/No care journey has been created yet/)).toBeVisible();
     expect(screen.getByRole("button", { name: /New journey/ })).toBeVisible();
+  });
+
+  it("says nothing is published when nothing is", async () => {
+    serve([{ ...summary, liveVersion: null, livePublishedAt: null, publishedVersions: 0, draftStatus: "DRAFT", draftVersion: 1, versions: 1 }]);
+    render(<JourneyList locale="en" />);
+    const card = await screen.findByRole("link", { name: /International Care Journey/ });
+    expect(card).toHaveTextContent("Nothing published yet");
+    expect(card).not.toHaveTextContent("Needs approval");
   });
 
   it("supports Arabic RTL rendering", async () => {
     const { container } = render(<JourneyList locale="ar" />);
     await screen.findByRole("link", { name: /International Care Journey/ });
     expect(container.querySelector(".cc")).toHaveAttribute("dir", "rtl");
+    expect(screen.getByRole("heading", { level: 1, name: "رحلات الرعاية" })).toBeVisible();
   });
 
   it("fails closed when the caller lacks journey.view", async () => {
@@ -44,19 +68,9 @@ describe("Journey list", () => {
   it("renders a recoverable error without stale data", async () => {
     vi.mocked(apiFetchAs).mockRejectedValue(new Error("boom"));
     render(<JourneyList locale="en" />);
-    // The page's own error, plus the shell's truthful "sections couldn't be loaded" (never "no access").
-    expect((await screen.findAllByRole("alert")).some((a) => a.textContent === "boom")).toBe(true);
+    expect((await screen.findAllByRole("alert")).some((a) => a.textContent?.startsWith("boom"))).toBe(true);
     expect(screen.getByText("Some sections couldn't be loaded.")).toBeVisible();
-    expect(screen.getByRole("button", { name: /Refresh/ })).toBeEnabled();
-  });
-
-  it("shows the empty state when no journey has been created yet", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
-      if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify([{ permission: "journey.view", allowed: true }]), { status: 200 });
-      if (path === "/admin/journeys") return new Response(JSON.stringify([]), { status: 200 });
-      return new Response(JSON.stringify({}), { status: 200 });
-    });
-    render(<JourneyList locale="en" />);
-    expect(await screen.findByText(/No journeys have been created yet/)).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /Refresh/ })[0]).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /New journey/ })).not.toBeInTheDocument();
   });
 });

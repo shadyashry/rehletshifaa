@@ -212,7 +212,7 @@ export function ProviderWorkspace({ locale }: { locale: Locale }) {
 
     {shown === "prices" && own && (
       <SectionFrame title={t.sections.prices} lead={t.pricesLead} headingRef={sectionHeading}>
-        <div className="cc cc-embedded"><PricingManagement locale={locale} organizationId={current.organizationId} practitionerId={own.practitionerId} showOrder={false} appliedOnly decisions={own.capabilities.filter((c) => c.permission === "price_list.view")} /></div>
+        <div className="cc cc-embedded"><PricingManagement locale={locale} organizationId={current.organizationId} practitionerId={own.practitionerId} organizationName={current.organizationName} showOrder={false} appliedOnly decisions={own.capabilities.filter((c) => c.permission === "price_list.view")} /></div>
       </SectionFrame>
     )}
 
@@ -349,7 +349,7 @@ function Clinicians({ locale, practice, selected, panel, onOpen, headingRef }: {
         <button type="button" className="btn-secondary mb-4 !min-h-11" onClick={() => onOpen(null, null)}>{t.back}</button>
         {can
           ? <div className="cc cc-embedded">{panel === "prices"
-              ? <PricingManagement locale={locale} organizationId={practice.organizationId} practitionerId={clinician.practitionerId} decisions={decisions} clinicianScopeOnly />
+              ? <PricingManagement locale={locale} organizationId={practice.organizationId} practitionerId={clinician.practitionerId} organizationName={practice.organizationName} decisions={decisions} clinicianScopeOnly />
               : <AvailabilityManagement locale={locale} organizationId={practice.organizationId} practitionerId={clinician.practitionerId} decisions={decisions} />}</div>
           : <p className="text-sm text-ink-600">{t.nothingToManage}</p>}
       </SectionFrame>

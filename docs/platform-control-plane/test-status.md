@@ -1,5 +1,25 @@
 # Platform Control Plane — verification status
 
+## UX-8 commercial / journeys / portal polish verification — 2026-09-24 (Claude Code)
+
+- **Test inventory check** (UX-6 386/48 → UX-7 383/42): seven coordination test files were consolidated into
+  `CareCoordinationWorkspace.test.tsx` + `portal/CareCoordination.test.tsx` (none accidentally deleted); the small lost
+  empty/denied-state coverage was restored in one test. Details: ux-8 record §1.
+- Backend focused: `JourneyDefinitionIntegrationTest` **8/8** (new `summariesStateLiveAndDraftWithoutWriting`). Full offline
+  regression `mvn -o test`: **531 tests, 0 failures, 0 errors, 1 skipped** (UX-7: 530).
+- Flyway: no migration (latest V51).
+- Frontend: `pnpm typecheck` clean; `pnpm test` **407 tests / 43 files** (UX-7: 383 / 42). New `CommercialPages.test.tsx`;
+  rewritten `PricingManagement`, `JourneyList`, `JourneyVersionWorkspace`, `JourneyPublishPanel` tests; updated designer,
+  My Care, status link, staff stepper, Margin & Deposit, clinician page, Provider Workspace tests; +1 coordination test. No new
+  lint findings (compared against HEAD; remaining react-compiler findings are pre-existing lines).
+- E2E against the rebuilt tunnel stack: new `ux8-commercial-journeys.spec.ts` **6/6** (Price Lists, retire dialog, Direct view,
+  Exchange Rates, Margin & Deposit, Organization profile, Journey list/detail/Advanced/Check/Test/publish confirmation, Provider
+  Workspace prices; EN + AR, 1280 px + 390 px; no horizontal scroll, one h1; **zero writes**). Re-run: `my-care`,
+  `status-proposal`, `proposal-responsive`, `credential-reviews`, `care-coordination`, `access-governance` — 33 tests; one
+  assertion updated for the intended *Preliminary care estimate* region name, and `credential-reviews` hit one click timeout
+  under load that passed on rerun unchanged. Final: all green.
+- Not run: Phase 8C formal accessibility/RTL/visual certification; live Keycloak journeys (no auth change).
+
 ## UX-7 care coordination verification — 2026-09-24 (Claude Code)
 
 - Backend focused: `CoordinationIntegrationTest` **16/16** (new `readModelsAreNamedScopedAndWriteNothing`: overview

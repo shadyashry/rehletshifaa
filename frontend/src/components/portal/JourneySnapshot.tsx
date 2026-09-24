@@ -125,7 +125,7 @@ const PHASES: { key: string; en: string; ar: string; statuses: string[] }[] = [
   { key: "consultant", en: "Consultant", ar: "الاستشاري", statuses: ["READY_FOR_CONSULTANT", "CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW", "CLINICAL_RECOMMENDATION_READY", "CLINICALLY_NOT_SUITABLE"] },
   { key: "proposal", en: "Proposal", ar: "العرض", statuses: ["PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL", "REVISION_REQUESTED"] },
   { key: "decision", en: "Patient decision", ar: "قرار المريض", statuses: ["PATIENT_DECISION", "DECLINED", "EXPIRED"] },
-  { key: "deposit", en: "Deposit", ar: "الوديعة", statuses: ["ACCEPTED"] },
+  { key: "deposit", en: "Coordination deposit", ar: "وديعة التنسيق", statuses: ["ACCEPTED"] },
   { key: "treatment", en: "Treatment", ar: "العلاج", statuses: ["TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS"] },
   { key: "followup", en: "Follow-up", ar: "المتابعة", statuses: ["DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED"] },
 ];

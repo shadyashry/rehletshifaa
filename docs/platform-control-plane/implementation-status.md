@@ -1,5 +1,31 @@
 # Platform Control Plane — implementation status
 
+## UX-8 — Commercial, Care Journeys, portal polish, Organization profile — 2026-09-24 (Claude Code)
+
+Presentation/structure only: no Phase 8C, Journey production intake OFF, no routing rollout change, no migration, no
+authorization change. Full record: [ux-8-commercial-journeys-polish-status.md](ux-8-commercial-journeys-polish-status.md).
+
+- **Price Lists** (`CommercialSetup.PricingHub`, `PricingManagement`, new `pricing-copy.ts`): plain-language source
+  (*Using organization price · Organization: X* / *Clinician-specific price · Overrides the organization price…* / *Direct
+  clinician price*) from `/prices/effective`; business stages; *Applies to* in the form; approval only for clinician-specific
+  prices; scope-specific retire dialog. Picker uses the bounded `/admin/providers/clinicians` read (was 1 detail per
+  organization). Direct picker and Direct clinician page exclude `providerCredentialing` clinicians.
+- **Exchange Rates** (`legacy-admin.ExchangeRates`): stored daily rates, per-day manual override, fallback, proposal snapshot;
+  historical date view; stacked rows. **Margin & Deposit**: internal notice, verified timing, review → confirm.
+- **Organization profile** (new `OrganizationProfile.tsx`): existing `PUT /admin/providers/{id}` fields, backend edit rule,
+  reason; Setup profile step from backend readiness.
+- **Care Journeys**: backend `GET /admin/journeys/summaries` (read-only); list, detail (published / change / production intake
+  read from `/admin/journey-cutover`), Versions & history, lazy Advanced; designer tabs Design · Check · Test journey · Compare
+  · Approval & publishing; human validation messages linked to steps; publish/retire confirmations with own reasons; one
+  header action. J-1 recorded (journey governance reasons not persisted).
+- **Portals**: My Care document-type naming, *Updated version* instead of *Version N*, *Coordination deposit*, request details,
+  duplicate phase badge removed; status link/proposal document version wording; staff proposal summary names the document type.
+- Arabic glossary handoff: [arabic-ux-glossary-review.md](arabic-ux-glossary-review.md). OPS-1 recorded, not implemented.
+- Verification: see test-status.md.
+
+### UX-8 COMPLETE: YES
+### PHASE 8C READY: YES
+
 ## UX-7 — Care Coordination: Team queue, ownership transfer, Coordination Setup — 2026-09-24 (Claude Code)
 
 Scope stayed inside UX-7: no Commercial or Care Journeys redesign, no Journey runtime/cutover or routing rollout change,

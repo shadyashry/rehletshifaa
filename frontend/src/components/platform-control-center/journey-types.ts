@@ -95,3 +95,13 @@ export const CONTROL_STAGE_TYPES: readonly StageType[] = ["START", "END", "DECIS
 export function isControlStage(type: StageType): boolean {
   return (CONTROL_STAGE_TYPES as StageType[]).includes(type);
 }
+
+/** `GET /admin/journeys/summaries` (UX-8): one bounded list read — what is published, what is changing, last activity. */
+export type JourneySummary = {
+  id: string; key: string; name: string; createdAt: string;
+  liveVersion: number | null; livePublishedAt: string | null; publishedVersions: number;
+  draftVersion: number | null; draftStatus: JourneyStatus | null; versions: number; lastActivityAt: string | null;
+};
+
+/** The only field the Care Journeys pages read from `GET /admin/journey-cutover` (read-only, journey.view). */
+export type JourneyCutoverStatus = { productionIntakeEnabled: boolean };

@@ -254,7 +254,7 @@ restructure, journeys) is **P1/P2** and lands in UX-2 … UX-8.
 | **UX-5 Access & Governance** — **COMPLETE** (§20) | People (merge User access + Effective access), Access summary, Roles, Audit, permission reference; reason at publish; person picker; access-removal/offboarding summary | Changing the realm-role/platform-role split |
 | **UX-6 Credentials & Provider Readiness** — **COMPLETE** (§21) | Credential Reviews workspace (typed rows incl. Direct approvals); derived lifecycle labels (§6); decision history where supported; organization Setup and profile edit (existing `PUT /admin/providers/{id}`); Ready-to-activate wording | Reminders, revocation, privileging |
 | **UX-7 Care Coordination** — **COMPLETE** (§22) | Staff Portal Team queue with authoritative Assign/Transfer, names + case numbers; Coordination Setup (Pools & People, Clinician Preferences, Rules); Advanced (Preview routing recommendation, simulation, history); no org-picker hop | Routing-mode changes |
-| **UX-8 Commercial / Care Journeys / Portal polish** | Price Lists overview, Exchange Rates, Margin & Deposit polish; financial truthfulness copy (audit §31.8 E); Journeys publish checklist, Advanced engine detail, reason at submit, *Retire version* copy; staff/patient portal polish; representative context | Online payment, Journey production intake |
+| **UX-8 Commercial / Care Journeys / Portal polish** — **COMPLETE** (§23) | Price Lists overview, Exchange Rates, Margin & Deposit polish; financial truthfulness copy (audit §31.8 E); Journeys publish checklist, Advanced engine detail, reason at submit, *Retire version* copy; staff/patient portal polish; representative context | Online payment, Journey production intake |
 
 Each phase: focused unit tests + typecheck; update affected e2e specs; live visual check of touched pages.
 Estimate: **~10–14 focused sessions** (UX-3, UX-4, UX-7 are L; the rest M). Risk: medium. Main risks: UX-4 may find
@@ -287,7 +287,7 @@ representative authority · Phase 8C/8D work.
 | V-5 | **Resolved in UX-3: yes.** One bounded read `GET /admin/providers/clinicians` (stored setup facts + status-level credential summary, no readiness computation) replaced a 1 + O + 3C fan-out; see ux-3-clinicians-setup-status.md §11–12 | UX-3 |
 | V-6 | Offboarding: membership deactivation, legacy staff/practitioner disable, role revoke and organization status are separate; no dedicated clinician offboarding command was found (OFFBOARDED is only guarded). **UX-5: mapped** (ux-5 record §13); People offers only the separate existing steps; gaps (provider member account disable, OFFBOARDED, reassignment) → Phase 8D | UX-5 — **mapped**; Phase 8D |
 | V-7 | **Resolved in UX-1.** Every fetcher now routes `REAUTHENTICATION_REQUIRED` through one helper: explained before (shared `ErrorNotice`) or after (return notice) the sign-in round trip; a form cannot be restored after the reload (architecture limit, stated to the user) | Phase 8D (independent check) |
-| V-8 | Which proposal/consent actions a `PATIENT_REPRESENTATIVE` may take | UX-8 |
+| V-8 | Which proposal/consent actions a `PATIENT_REPRESENTATIVE` may take. **UX-8:** the authenticated decision requires the PATIENT role + case read authorization; representatives carry the default PATIENT role (M-5). No UI change; any narrowing is a business decision | UX-8 — **recorded** |
 | V-9 | Arabic glossary validated by a native healthcare-operations reviewer | Before Phase 8C |
 | V-10 | "Clinicians" = physicians only today (`CONSULTANT`, `ASSOCIATE_DOCTOR`) → Arabic الأطباء; revisit if non-physician types are added | UX-2 |
 | V-11 | `/admin/access/me` (capability read, fixed in UX-1) reports org-scoped grants only at organization level; self- and relationship-scoped grants are not claimed. **UX-4A: APPROVED DIRECTION** — one self-only, bounded read of memberships, own relationships and existing-`AuthorizationService` decisions on own/managed clinician resources; navigation only — decisions record §9 | UX-4 — **implemented** (§19): `GET /provider-workspace/me` |
@@ -445,3 +445,25 @@ UX-7 is complete — record: [ux-7-care-coordination-status.md](ux-7-care-coordi
   permission, engine or state machine.
 - **UX-8 READY: YES** — what remains for coordination is recorded debt (WorkItem-level pool when Journey intake turns on,
   WorkItem reassign UI, real-case preview read, transfer notification decision), not a truthfulness or safety defect.
+
+## 23. UX-8 outcome — Commercial, Care Journeys, portal polish (2026-09-24)
+
+UX-8 is complete — record: [ux-8-commercial-journeys-polish-status.md](ux-8-commercial-journeys-polish-status.md); Arabic
+handoff: [arabic-ux-glossary-review.md](arabic-ux-glossary-review.md).
+
+- **Commercial:** Price Lists explain *Organization price → Clinician-specific price* in plain words; each service states the
+  price that applies now and its backend-resolved source; versions by business stage (Current · Scheduled · Draft · awaiting
+  clinician approval · Ended · Retired), numbers only under Technical details; scope-specific retire consequences. Provider
+  clinicians no longer appear in (or open) the Direct price list. Exchange Rates state stored daily rates, per-day manual
+  override, fallback and proposal snapshot; historical view. Margin & Deposit marked internal, correct timing, confirmation.
+- **Financial stages:** Proposal (object) · Preliminary estimate / Preliminary care estimate · Final treatment quote / Final
+  treatment plan and quote · Coordination deposit — consistent in staff and patient UX; no technical *Version N* for patients.
+- **Organization profile:** existing `PUT /admin/providers/{id}` fields on Organization › Overview, editable only where the
+  backend accepts it; Setup step derived from backend readiness. Activation remains blocked (Decision D).
+- **Care Journeys:** list from one bounded summary read; detail leads with published / change in progress / production intake
+  (OFF, read-only); Check, Test journey, Approval & publishing distinct; maker/checker stated; consequence-aware publish and
+  retire; engine detail only under Advanced. Finding J-1: journey governance reasons are not persisted (copy corrected).
+- Backend: one read-only endpoint (`GET /admin/journeys/summaries`); no migration, write, permission or rollout change.
+- Follow-ups before/around 8C: **OPS-1** (notify the new owner on transfer — direction YES), **J-1**, legal copy review of the
+  estimate basis and patient deposit terms, native Arabic review (V-9).
+- **PHASE 8C READY: YES.**

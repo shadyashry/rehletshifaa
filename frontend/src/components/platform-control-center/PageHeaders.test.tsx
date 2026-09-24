@@ -31,7 +31,14 @@ describe("Commercial › Margin & Deposit (moved from the Finance workspace)", (
     expect(h1()).toEqual(["Margin & Deposit"]);
     expect(trail()).toEqual(["Control Center", "Commercial", "Margin & Deposit"]);
     fireEvent.change(screen.getByLabelText("Margin %"), { target: { value: "15" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Save new version" })[0]);
+    // Internal configuration, stated as such; saving shows its real consequence first and sends nothing until confirmed.
+    expect(screen.getByRole("note")).toHaveTextContent(/Internal only.*never shown to patients, clinicians or provider organizations/);
+    fireEvent.click(screen.getAllByRole("button", { name: "Review new version" })[0]);
+    const dialog = screen.getByRole("dialog", { name: "Confirm new version" });
+    expect(within(dialog).getByText(/used for preliminary estimates created from now on/)).toBeVisible();
+    expect(within(dialog).getByText(/Existing estimates and final quotes keep the margin/)).toBeVisible();
+    expect(apiFetchAs).not.toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15 }) })));
   });
 

@@ -222,6 +222,21 @@ describe("Advanced — evaluation only", () => {
     await waitFor(() => expect(body("POST", `${coordBase}/cases/case-9/commands`)).toMatchObject({ revision: 3, action: "ASSIGN", target: "kc-sara", reason: "Nobody on duty", source: "ADMIN_WEB" }));
   });
 
+  // UX-8 inventory check: restores the empty/denied states the seven pre-UX-7 files covered (RoutingSimulation, AssignmentAudit).
+  it("offers the preview only with assignment.simulate, and says so when nobody is eligible or nothing was recorded", async () => {
+    setup(VIEW.filter((c) => c !== "assignment.simulate"), { [`${coordBase}/decisions?limit=50`]: [] });
+    render(<CareCoordinationWorkspace locale="en" orgId="org-1" initialSection="advanced" />);
+    expect(await screen.findByText("No routing decisions have been recorded for this organization.")).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Preview routing recommendation" })).not.toBeInTheDocument();
+    cleanup();
+    setup(VIEW, { [`POST ${coordBase}/simulate`]: { ...simulation, candidates: [simulation.candidates[1]], selection: { subject: null, team: null, path: "QUEUE", scores: [] } } });
+    render(<CareCoordinationWorkspace locale="en" orgId="org-1" initialSection="advanced" />);
+    const preview = (await screen.findByRole("heading", { name: "Preview routing recommendation" })).closest("section")!;
+    fireEvent.click(within(preview).getByRole("button", { name: "Preview recommendation" }));
+    expect(await within(preview).findByText("Nobody is eligible")).toBeVisible();
+    expect(calls().some((c) => c.includes("/commands"))).toBe(false);
+  });
+
   it("renders Arabic right-to-left with names isolated", async () => {
     setup(VIEW);
     const { container } = render(<CareCoordinationWorkspace locale="ar" orgId="org-1" />);

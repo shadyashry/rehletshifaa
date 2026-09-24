@@ -100,17 +100,18 @@ describe("Commercial › Price Lists and Exchange Rates", () => {
   it("explains the price order visually, and Exchange Rates is its own page where a rate can be pinned", async () => {
     vi.mocked(apiFetchAs).mockImplementation(fakeApi(routes, ["price_list.view", "provider.view"]));
     render(<PricingHub locale="en" />);
-    expect(await screen.findByText("1. Organization default")).toBeVisible();
-    expect(screen.getByText("2. Consultant override")).toBeVisible();
-    expect(screen.getByText("3. Associate doctor override")).toBeVisible();
+    // UX-8: business words for where a price comes from, never override/default engine vocabulary.
+    expect(await screen.findByText("1. Organization price")).toBeVisible();
+    expect(screen.getByText("2. Clinician-specific price")).toBeVisible();
+    expect(screen.queryByText(/override|Organization default/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "Price Lists" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Exchange rates" })).not.toBeInTheDocument();
     cleanup();
     render(<ExchangeRatesPage locale="en" />);
     expect(screen.getByRole("heading", { level: 1, name: "Exchange Rates" })).toBeVisible();
-    const input = await screen.findByLabelText(/USD — EGP per unit/);
+    const input = await screen.findByLabelText("EGP per 1 USD");
     fireEvent.change(input, { target: { value: "50" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save rate" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save rate for today" }));
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/fx-rates/USD", expect.objectContaining({ method: "PUT", body: JSON.stringify({ rate: 0.02 }) })));
   });
 });

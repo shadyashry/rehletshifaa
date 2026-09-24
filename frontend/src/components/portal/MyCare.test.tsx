@@ -44,7 +44,7 @@ describe("MyCare", () => {
     // No fake workflow CTA of any kind.
     expect(screen.queryByRole("button", { name: /continue|pay|check status|refresh/i })).toBeNull();
     // Deposit: USD 500, arranging, and no pay button.
-    const deposit = screen.getByRole("region", { name: "Deposit" });
+    const deposit = screen.getByRole("region", { name: "Coordination deposit" });
     expect(within(deposit).getByText("$500")).toBeTruthy();
     expect(within(deposit).getByText("Arranging")).toBeTruthy();
     expect(within(deposit).queryByRole("button")).toBeNull();
@@ -68,14 +68,14 @@ describe("MyCare", () => {
 
   it("never shows a 'pay deposit' button that has nothing behind it, even if an online-payment step code arrives", () => {
     renderCare({ actions: focus("PAY_DEPOSIT"), deposit: { status: "REQUESTED", currency: "USD", totalDisplay: 500, paidDisplay: null } });
-    const deposit = screen.getByRole("region", { name: "Deposit" });
+    const deposit = screen.getByRole("region", { name: "Coordination deposit" });
     expect(within(deposit).queryByRole("button")).toBeNull();
     expect(screen.queryByText(/Pay deposit/i)).toBeNull();
   });
 
   it("once the deposit is confirmed it reads as received and the stale step is gone", () => {
     renderCare({ actions: wait("WAIT_COORDINATION"), deposit: { status: "PAID", currency: "USD", totalDisplay: 500, paidDisplay: 500 } });
-    const deposit = screen.getByRole("region", { name: "Deposit" });
+    const deposit = screen.getByRole("region", { name: "Coordination deposit" });
     expect(within(deposit).getByText("Deposit received")).toBeTruthy();
     expect(within(deposit).getByText("$500")).toBeTruthy();
     expect(screen.queryByText(/Arranging|Deposit arrangements/)).toBeNull();
@@ -104,6 +104,32 @@ describe("MyCare", () => {
     const primary = screen.getByRole("button", { name: "Reply in Messages" });
     fireEvent.click(primary);
     expect(onView).toHaveBeenCalledWith("messages");
+  });
+
+  it("names the financial stage truthfully: preliminary estimate with its basis, no technical version, separate coordination deposit", () => {
+    renderCare({ proposal: { ...proposal, versionNumber: 3, documentType: "PRELIMINARY_ESTIMATE" } });
+    const estimate = screen.getByRole("region", { name: "Preliminary care estimate" });
+    expect(within(estimate).getByText(/may change after an in-person assessment/)).toBeTruthy();
+    expect(within(estimate).getByText(/Updated version/)).toBeTruthy();
+    expect(screen.queryByText(/Version 3|v3/)).toBeNull();
+    // The deposit is its own thing — never presented as the treatment price.
+    const deposit = screen.getByRole("region", { name: "Coordination deposit" });
+    expect(within(deposit).queryByText("$4,850")).toBeNull();
+    cleanup();
+    renderCare({ proposal: { ...proposal, documentType: "FINAL_TREATMENT_QUOTE" } });
+    const quote = screen.getByRole("region", { name: "Final treatment plan and quote" });
+    expect(within(quote).queryByText(/may change after/)).toBeNull();
+    expect(within(quote).queryByText(/Updated version/)).toBeNull();
+  });
+
+  it("an information request says who asked and by when, without a second way to answer", () => {
+    renderCare({ actions: focus("PROVIDE_INFORMATION"), deposit: null, patientProposal: null, proposal: null,
+      patientAction: { taskId: "t1", title: "Information required", message: null, blocking: true, dueAt: "2026-09-30T09:00:00Z", items: [{ id: "i1", kind: "INFORMATION", code: "MEDS", label: "Current medicines", required: true, completed: true }] } });
+    expect(screen.getByText(/Requested by your coordinator/).textContent).toContain("Sara Ahmed");
+    expect(screen.getByText(/Please reply by/)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /reply/i })).toHaveLength(1);
+    // The phase is shown once (the journey stepper), not again as a header badge.
+    expect(screen.getAllByText("Coordinator review")).toHaveLength(1);
   });
 
   it("never decides an action from the stage: an accepted case with no backend action shows none", () => {
