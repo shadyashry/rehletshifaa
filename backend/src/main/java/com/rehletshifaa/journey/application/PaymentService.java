@@ -27,6 +27,10 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class PaymentService {
+    /** Version of the patient-facing deposit terms (frontend lib/commercial-terms.ts), recorded with each new component. */
+    public static final String DEPOSIT_TERMS_VERSION = "deposit-terms-2026-09-25";
+    static final String DEPOSIT_TERMS_REFERENCE = "Deducted from the final treatment plan and quote price. Refund and cancellation terms: as shown to the patient ("
+            + DEPOSIT_TERMS_VERSION + "). Refund classification awaits a legal decision.";
     private final JdbcClient jdbc;
     private final ActorContext actors;
     private final Clock clock;
@@ -74,8 +78,12 @@ public class PaymentService {
         // Raising the deposit is not the end of the story: with an offline process a person has to arrange
         // it, so the case gains real staff work rather than sitting silently waiting for money to appear.
         events.publishEvent(new CaseEvents.DepositRequired(caseId));
+        // Pre-8C copy decisions (F2): the refund class is left as it was because conditional refund eligibility has no
+        // truthful value in the current model and its enforceability awaits a legal decision. The terms text only
+        // points to the terms the patient is shown; it no longer claims a refund window tied to coordination starting,
+        // which payment of this deposit itself triggers. Existing rows keep the text they were created with.
         jdbc.sql("INSERT INTO deposit_components(id,deposit_id,beneficiary,purpose,amount_egp,refundability,cancellation_terms,credited_to_final,sort_order) VALUES(?,?,?,?,?,?,?,?,0)")
-                .params(UUID.randomUUID(), depositId, "PLATFORM", "Case coordination initiation", totalEgp, "NON_REFUNDABLE", "Refundable in full before case coordination begins; non-refundable once coordination has started.", true).update();
+                .params(UUID.randomUUID(), depositId, "PLATFORM", "Case coordination initiation", totalEgp, "NON_REFUNDABLE", DEPOSIT_TERMS_REFERENCE, true).update();
         appendEvent(caseId, depositId, "DEPOSIT_REQUESTED", totalEgp, totalDisplay, fx.currency(), null, "OFFLINE", null, "REQUESTED", "SYSTEM", null, "deposit-req:" + depositId);
     }
 

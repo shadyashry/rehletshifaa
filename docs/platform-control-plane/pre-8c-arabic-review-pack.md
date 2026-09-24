@@ -70,6 +70,28 @@ Screens: *Control Center* = internal admin workspace; *Staff Portal* = coordinat
 | X3 | Deposit credited | وديعة تنسيق للبدء — تُخصم من رصيدك النهائي. / مدفوع مسبقًا (يُخصم من هذا العرض) | Proposal document | Deposit reduces the final balance | «تُخصم» (deducted) vs *credited*; depends on M1/M3 | Approve or replace | |
 | X4 | Updated version | نسخة محدّثة | Proposal card, status link, document | A newer version of the same document | — | Approve or replace | |
 
+## 6a. Added by the commercial copy closure (2026-09-25)
+
+The English commercial copy was corrected ([decisions](pre-8c-commercial-copy-decisions.md)); Arabic legal wording was **not**
+written. Arabic pages show the approved English deposit terms and exchange-rate sentence inside an English block with the
+notice below. Only these Arabic strings changed, each to remove a factual error using existing product words:
+
+| # | English (approved) | Arabic now in product | Where | Why it changed | Decision |
+|---|---|---|---|---|---|
+| X5 | Terms shown in English notice *(new)* | تُعرض هذه الشروط بالإنجليزية إلى حين اعتماد صياغتها العربية. | Above the deposit terms (estimate, activation, signed-in drawer) | Arabic terms not yet approved | |
+| X6 | Deposit for your acknowledged preliminary estimate | وديعة التنسيق لتقديرك المبدئي الذي أقررت به | Activation next step | Was «…الذي قبلته» (*accepted*) | |
+| X7 | Preliminary estimate acknowledged | تم الإقرار بالتقدير المبدئي | Activation checklist | Was «تم قبول العرض»; now the existing status label | |
+| X8 | You acknowledged your preliminary estimate. … | تم الإقرار بتقديرك المبدئي. … | My Care deposit step; legacy patient status card | Was «تم قبول عرضك» | |
+| X9 | We've sent you a secure link to complete your profile. | أرسلنا دعوة لتفعيل حسابك. | Proposal document, after acknowledgement | Removed «لنبدأ تنسيق رعايتك» (coordination begins after the deposit, not activation) | |
+| X10 | This quote has expired and can no longer be accepted. … | انتهت صلاحية هذا المستند. يمكن لمنسّق حالتك إعداد نسخة محدّثة لك. | Expired final quote | The estimate sentence was shown for quotes | |
+
+**Needs Arabic + legal translation (English changed, Arabic unchanged, so the two now differ):** the deposit terms block (§3 of the
+decisions); the activation checkbox (X2 — Arabic still «قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد.», the recorded
+consent text for Arabic); the estimate non-binding/basis statement (X1); the final-quote checkbox (Arabic still says «اتفاق مالي»,
+*financial agreement*, which English no longer says) and the not-medical-consent sentence; the exchange-rate sentences; the
+disclaimer footer; the final-quote payment paragraph; "Not included unless listed" list. On Arabic pages the estimate basis list,
+exclusion list, final-quote terms and disclaimer footer are **not shown** until translated (the previous Arabic lines remain).
+
 ## 7. Grammar items (implementation after review)
 
 Counted nouns without dual/plural agreement (e.g. «${n} خدمة», «${n} إصدار»): reviewer supplies the rule; implementation will

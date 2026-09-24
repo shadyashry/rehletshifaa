@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { ProfileActivation } from "./ProfileActivation";
 
@@ -248,6 +248,27 @@ describe("ProfileActivation", () => {
     vi.stubGlobal("fetch", stub({ "000": () => json({ code: "CASE_LINK_INVALID" }, false, 404) }));
     render(<ProfileActivation locale="en" token="tok-000" />);
     expect(await screen.findByText(/invalid or has expired/i)).toBeTruthy();
+  });
+
+  it("shows the deposit, refund and cancellation terms right above the consent that accepts them", async () => {
+    await reachForm();
+    const terms = screen.getByRole("region", { name: "Coordination deposit, refunds and cancellation" });
+    expect(terms.textContent).toMatch(/EGP.3,000/);
+    expect(within(terms).getByText(/Full refund if we cannot arrange your care, the provider does not accept your case/)).toBeTruthy();
+    expect(within(terms).getByText(/You can cancel at any time by telling your coordinator/)).toBeTruthy();
+    const consent = screen.getByRole("checkbox", { name: "I have read the coordination deposit, refund and cancellation terms shown above and accept them." });
+    expect(consent.getAttribute("aria-describedby")).toBe("activation-deposit-terms");
+    expect(terms.compareDocumentPosition(consent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Nothing the business has not decided: no refund timing, no provider charges, no old wording.
+    expect(document.body.textContent).not.toMatch(/within 14 days|provider.{0,20}charges|accepted care estimate|I have read and accept the coordination deposit, cancellation and refund terms/i);
+  });
+
+  it("names the next step as the deposit for the acknowledged preliminary estimate", async () => {
+    await reachForm({ "/activate": () => json(completed(active)) });
+    await fillRequired();
+    submit();
+    expect(await screen.findByText("Deposit for your acknowledged preliminary estimate")).toBeTruthy();
+    expect(screen.queryByText(/accepted care estimate/i)).toBeNull();
   });
 
   it("renders the Arabic journey for RTL locales", async () => {

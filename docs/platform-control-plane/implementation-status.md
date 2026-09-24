@@ -1,5 +1,34 @@
 # Platform Control Plane — implementation status
 
+## Pre-8C commercial copy closure — 2026-09-25 (Claude Code)
+
+No Phase 8C, Journey production intake OFF, no migration, no historical row changed. Decisions:
+[pre-8c-commercial-copy-decisions.md](pre-8c-commercial-copy-decisions.md); record: [pre-8c-closure-status.md](pre-8c-closure-status.md) §15.
+
+- **IMPLEMENTED:**
+  - **F1:** approved deposit/refund/cancellation/how-to-pay terms (`lib/commercial-terms.ts`, `CoordinationDepositTerms`)
+    appear before estimate acknowledgement (secure link + signed-in drawer) and above the activation consent, with the
+    approved checkbox copy. The consent record keeps the exact text and `deposit-terms-2026-09-25`. Acknowledgement version is
+    `proposal-ack-2026-09-25`.
+  - Estimate copy: non-binding, basis, range + expected, included/not included.
+  - Final-quote copy: accept, revised quote, not medical consent, payment.
+  - Expiry copy; acknowledged-estimate terminology.
+  - **F4:** `PublicProposalView.fxRateDate` feeds the exchange-rate sentence.
+  - **F3 partial:** new estimates store the approved payment facts only. Placeholders are never rendered.
+  - New deposit components get neutral terms text.
+- **WAITING FOR LEGAL:**
+  - **F2:** refund enforceability. The refund class is unchanged; there is no `CONDITIONAL` value and no data fix.
+  - Provider cancellation charges; emergency-cost clause; binding/financial-agreement wording; taxes; payable currency and
+    bank fees; principal vs agent; other jurisdictions and governing language.
+- **WAITING FOR BUSINESS:** final-quote validity (still 14 days); refund processing time and method; whether the remaining
+  balance should gate treatment.
+- **WAITING FOR ARABIC REVIEW:** every changed commercial string. Arabic pages show the English terms with a notice. Arabic
+  pack §6a X5–X10.
+- Test-only: the OPS-1 transfer test no longer asserts order between same-instant history entries (intermittent failure).
+
+### COPY CLOSURE TECHNICAL PASS: YES
+### PHASE 8C ENTRY: NO — legal (F2, provider charges, tax/currency, principal-vs-agent), business (final-quote validity) and native Arabic approval open
+
 ## Pre-8C closure — J-1, OPS-1, COPY-1, COPY-2 — 2026-09-24 (Claude Code)
 
 No Phase 8C, Journey production intake OFF, routing rollout unchanged. Full record:

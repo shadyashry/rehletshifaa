@@ -261,6 +261,39 @@ class PatientActivationJourneyTest {
         assertThat(summary.satisfied()).isFalse();
     }
 
+    // ---------- pre-8C commercial copy decisions (F1 / F2) ----------
+
+    @Test void theDepositTermsConsentRecordsTheWordingShownAndTheTermsVersion() throws Exception {
+        var ctx = accepted();
+        activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
+        var deposit = jdbc.queryForMap("SELECT policy_version,exact_text FROM consent_records WHERE case_id=? AND consent_type='DEPOSIT_CANCELLATION_TERMS'", ctx.caseId);
+        assertThat(deposit.get("policy_version")).isEqualTo(PaymentService.DEPOSIT_TERMS_VERSION);
+        assertThat(List.of("I have read the coordination deposit, refund and cancellation terms shown above and accept them.",
+                "قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد.")).contains((String) deposit.get("exact_text"));
+        // Only the deposit-terms consent changed wording; the others keep their version.
+        assertThat(jdbc.queryForList("SELECT DISTINCT policy_version FROM consent_records WHERE case_id=? AND consent_type<>'DEPOSIT_CANCELLATION_TERMS'", String.class, ctx.caseId))
+                .isNotEmpty().doesNotContain(PaymentService.DEPOSIT_TERMS_VERSION);
+    }
+
+    @Test void aNewDepositNoLongerClaimsARefundWindowAndItsRefundClassIsLeftForTheLegalDecision() throws Exception {
+        var ctx = accepted();
+        var component = jdbc.queryForMap("SELECT dc.refundability,dc.cancellation_terms FROM deposit_components dc JOIN deposits d ON d.id=dc.deposit_id WHERE d.case_id=?", ctx.caseId);
+        assertThat((String) component.get("cancellation_terms")).isEqualTo(PaymentService.DEPOSIT_TERMS_REFERENCE)
+                .doesNotContainIgnoringCase("before case coordination begins").doesNotContainIgnoringCase("refundable in full");
+        // F2 is blocked: no conditional value exists and PARTIALLY_REFUNDABLE would mean a partial amount, so the class is unchanged.
+        assertThat(component.get("refundability")).isEqualTo("NON_REFUNDABLE");
+    }
+
+    @Test void readingAHistoricalDepositNeverRewritesItsTerms() throws Exception {
+        var ctx = accepted();
+        String legacy = "Refundable in full before case coordination begins; non-refundable once coordination has started.";
+        jdbc.update("UPDATE deposit_components SET cancellation_terms=? WHERE deposit_id IN (SELECT id FROM deposits WHERE case_id=?)", legacy, ctx.caseId);
+        activation.deposit(ctx.token, grant(ctx));
+        activation.prefill(ctx.token, grant(ctx)); em.flush();
+        assertThat(jdbc.queryForObject("SELECT dc.cancellation_terms FROM deposit_components dc JOIN deposits d ON d.id=dc.deposit_id WHERE d.case_id=?", String.class, ctx.caseId))
+                .isEqualTo(legacy);
+    }
+
     // ---------- post-deposit handoff ----------
 
     @Test void settlingTheDepositContinuesTheJourneyAndRestoresTheCoordinator() throws Exception {

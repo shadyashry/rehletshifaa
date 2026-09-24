@@ -5,6 +5,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import type { Locale } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
+import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
+import { DEPOSIT_TERMS_CONSENT } from "@/lib/commercial-terms";
 
 type Summary = { caseNumber: string; purpose: string; channel: string; destinationHint: string };
 type Deposit = {
@@ -80,7 +82,7 @@ const copy = {
     readyTitle: "Your profile is ready",
     readyIntro: "Your patient profile is active and your account is set up. Sign in to follow this case and any other case linked to your profile.",
     nextStepLabel: "Next step",
-    nextDeposit: "Deposit for your accepted care estimate",
+    nextDeposit: "Deposit for your acknowledged preliminary estimate",
     viewDeposit: "View deposit details",
     nextDepositWho: "Your coordinator will arrange this with you.",
     depositStageTitle: "Deposit arrangements",
@@ -89,7 +91,7 @@ const copy = {
     backToCase: "Go to my case",
     doneTitle: "Your treatment journey is now active",
     doneIntro: "Your RehletShifaa coordinator is starting the next stage of your treatment coordination and will contact you shortly.",
-    stepProposal: "Proposal accepted", stepProfile: "Profile completed", stepAccount: "Account secured", stepDeposit: "Deposit received",
+    stepProposal: "Preliminary estimate acknowledged", stepProfile: "Profile completed", stepAccount: "Account secured", stepDeposit: "Deposit received",
     portalIntro: "Sign in with the password you created to follow this case — and every other case you have with us — in one place.",
     viewJourney: "Sign in to my case", opening: "Opening…",
     caseLabel: "Case",
@@ -155,7 +157,7 @@ const copy = {
     readyTitle: "ملفك جاهز",
     readyIntro: "ملفك الطبي مُفعّل وحسابك جاهز. سجّل الدخول لمتابعة هذه الحالة وأي حالة أخرى مرتبطة بملفك.",
     nextStepLabel: "الخطوة التالية",
-    nextDeposit: "وديعة تقدير الرعاية الذي قبلته",
+    nextDeposit: "وديعة التنسيق لتقديرك المبدئي الذي أقررت به",
     viewDeposit: "عرض تفاصيل الوديعة",
     nextDepositWho: "سيرتّب منسّقك ذلك معك.",
     depositStageTitle: "ترتيبات الوديعة",
@@ -164,7 +166,7 @@ const copy = {
     backToCase: "الذهاب إلى حالتي",
     doneTitle: "رحلتك العلاجية نشطة الآن",
     doneIntro: "بدأ منسق رحلة شفاء المرحلة التالية من تنسيق علاجك وسيتواصل معك قريبًا.",
-    stepProposal: "تم قبول العرض", stepProfile: "اكتمل الملف", stepAccount: "تم تأمين الحساب", stepDeposit: "تم استلام الوديعة",
+    stepProposal: "تم الإقرار بالتقدير المبدئي", stepProfile: "اكتمل الملف", stepAccount: "تم تأمين الحساب", stepDeposit: "تم استلام الوديعة",
     portalIntro: "سجّل الدخول بكلمة المرور التي أنشأتها لمتابعة هذه الحالة — وكل حالاتك معنا — في مكان واحد.",
     viewJourney: "تسجيل الدخول إلى حالتي", opening: "جارٍ الفتح…",
     caseLabel: "الحالة",
@@ -199,7 +201,7 @@ const CONSENT_TEXT: Record<string, { en: string; ar: string }> = {
     ar: "أوافق على مشاركة معلوماتي عبر الحدود مع مقدمي الرعاية المعالجين.",
   },
   DEPOSIT_CANCELLATION_TERMS: {
-    en: "I have read and accept the coordination deposit, cancellation and refund terms.",
+    en: DEPOSIT_TERMS_CONSENT,
     ar: "قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد.",
   },
   MEDICAL_INFORMATION_SHARING: {
@@ -625,10 +627,21 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
             <ul className="space-y-3">
               {prefill.requiredConsents.map(type => {
                 const checked = consents.includes(type);
+                // The patient accepts deposit terms only with those terms in front of them, on this page.
+                const depositTermsConsent = type === "DEPOSIT_CANCELLATION_TERMS";
+                const dep = prefill.deposit;
                 return (
                   <li key={type}>
+                    {depositTermsConsent && (
+                      <div className="mb-2">
+                        <CoordinationDepositTerms id="activation-deposit-terms" locale={locale} level={3}
+                          amount={dep.required && dep.amountDue != null ? money(dep.amountDue, dep.currency, locale) : null}
+                          currency={dep.required ? dep.currency : null} />
+                      </div>
+                    )}
                     <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-brand-50/50 p-4">
                       <input type="checkbox" className="mt-1 h-5 w-5 flex-none accent-brand-600" checked={checked}
+                             aria-describedby={depositTermsConsent ? "activation-deposit-terms" : undefined}
                              onChange={e => setConsents(v => e.target.checked ? [...v, type] : v.filter(x => x !== type))} />
                       <span className="text-sm leading-6 text-ink-700">{CONSENT_TEXT[type]?.[locale] ?? type}</span>
                     </label>

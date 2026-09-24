@@ -223,6 +223,112 @@ describe("ProposalSign", () => {
   });
 });
 
+/** Opens a document through the Check Case Status hand-over, so each case can shape the proposal it shows. */
+async function openDocument(doc: Record<string, unknown>, locale: "en" | "ar" = "en") {
+  const fetchMock = vi.fn(async (url: string) => {
+    const path = String(url);
+    if (path.endsWith("/view")) return { ok: true, status: 200, json: async () => doc } as Response;
+    return { ok: true, status: 200, json: async () => summary } as Response;
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "g", expiresAt: "2099-01-01T00:00:00Z" }));
+  render(<ProposalSign locale={locale} token="tok-1" />);
+  await screen.findByRole("heading", { level: 1 });
+  return fetchMock;
+}
+
+const finalQuote = { ...proposal, documentType: "FINAL_TREATMENT_QUOTE", depositDueDisplay: undefined, depositPaidDisplay: 820, totalExpected: 7900 };
+const pageText = () => document.body.textContent ?? "";
+
+describe("ProposalSign — approved pre-8C commercial copy", () => {
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); sessionStorage.clear(); });
+
+  it("shows the deposit, refund and cancellation terms before the patient can acknowledge", async () => {
+    await openDocument(proposal);
+    const terms = screen.getByRole("region", { name: "Coordination deposit, refunds and cancellation" });
+    expect(within(terms).getByText(/You pay this deposit after you acknowledge your preliminary estimate, before we make any appointments or bookings for you/)).toBeTruthy();
+    expect(within(terms).getByText(/Full refund if you cancel before we confirm any appointment or booking for you/)).toBeTruthy();
+    expect(within(terms).getByText(/No refund if you cancel, or do not attend, after we have confirmed/)).toBeTruthy();
+    expect(within(terms).getByText(/If you change provider, your deposit stays with your case/)).toBeTruthy();
+    expect(within(terms).getByText("$820")).toBeTruthy();
+    // Read before the decision, and tied to it.
+    const ack = screen.getByRole("checkbox");
+    expect(terms.compareDocumentPosition(ack) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(ack.getAttribute("aria-describedby")).toContain("deposit-terms");
+    // Never a fee, a treatment/hospital payment, or coordination starting before payment.
+    expect(pageText()).not.toMatch(/extra fee|hospital payment|treatment payment|credited to your final balance/i);
+    expect(screen.getByText(/We start coordinating your care once it is received/)).toBeTruthy();
+  });
+
+  it("presents a stored range with its expected figure, never the expected figure alone", async () => {
+    await openDocument({ ...proposal, totalMin: 7800, totalExpected: 8200, totalMax: 9400 });
+    expect(screen.getAllByText("Estimated range").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("$7,800 to $9,400").length).toBeGreaterThan(0);
+    const summaryBox = screen.getByLabelText("Estimate summary");
+    expect(within(summaryBox).getByText(/Expected/).textContent).toContain("$8,200");
+  });
+
+  it("calls the estimate non-binding, names only its real inputs, and explains the fixed exchange rate", async () => {
+    await openDocument({ ...proposal, assumptions: "Standard single-chamber device", fxRateDate: "2026-09-24" });
+    expect(screen.getAllByText(/This is a preliminary, non-binding estimate, not a final price or a price guarantee/).length).toBeGreaterThan(0);
+    const basis = screen.getByRole("region", { name: "What this estimate is based on" });
+    expect(within(basis).getByText("A remote review of the medical information you provided")).toBeTruthy();
+    expect(within(basis).getByText("The assumptions listed in this estimate")).toBeTruthy();
+    expect(within(basis).getByText("RehletShifaa's stored exchange rate on the date it was issued")).toBeTruthy();
+    expect(screen.getByText("Amounts in USD are converted using RehletShifaa's exchange rate for September 24, 2026. This rate is fixed for this estimate while it is valid. A new estimate or quote may use a different rate.")).toBeTruthy();
+    expect(pageText()).not.toMatch(/\blive\b|real-time|official rate|central bank/i);
+    // Included / not included, with no tax statement while taxes await a legal decision.
+    expect(screen.getByText("RehletShifaa's care coordination is included in this price.")).toBeTruthy();
+    expect(screen.getByText("Not included unless listed")).toBeTruthy();
+    expect(screen.getByText("Treatment of complications")).toBeTruthy();
+    expect(pageText()).not.toMatch(/\btax/i);
+  });
+
+  it("never presents stored placeholder terms or policy that is still undecided, and reading changes nothing", async () => {
+    const fetchMock = await openDocument({ ...proposal, excludedServices: "Services not explicitly included",
+      paymentTerms: "Payment schedule to be confirmed", refundTerms: "Subject to provider terms" });
+    expect(pageText()).not.toMatch(/Services not explicitly included|Payment schedule to be confirmed|Subject to provider terms/);
+    expect(pageText()).not.toMatch(/within 14 days|we will show you these charges|principal|\bagent\b|broker|medical provider/i);
+    // An estimate never becomes "accepted" or "binding".
+    expect(pageText()).not.toMatch(/accepted estimate|accepted care estimate|approved estimate|(?<!non-)binding|financial agreement/i);
+    // Rendering is read-only: nothing but the summary and the view is requested.
+    expect(fetchMock.mock.calls.map(call => String(call[0])).some(path => /decision|request-access|verify/.test(path))).toBe(false);
+  });
+
+  it("gives a final quote its own words: accept, confirmed services, not medical consent, fixed rate for the quote", async () => {
+    await openDocument({ ...finalQuote, fxRateDate: "2026-10-02" });
+    expect(screen.getByRole("heading", { name: "Your final treatment plan and quote" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Accept & continue" })).toBeTruthy();
+    expect(screen.getByText("I accept this final treatment plan and quote for the confirmed services listed, at the price shown.")).toBeTruthy();
+    expect(screen.getByText("Accepting this quote is not medical consent. Your treating doctor will ask for separate informed consent before treatment.")).toBeTruthy();
+    expect(screen.getByText(/Changes to the confirmed services need a revised quote, which you will be asked to accept/)).toBeTruthy();
+    expect(screen.getByText(/This rate is fixed for this quote while it is valid/)).toBeTruthy();
+    // None of the estimate's language, no deposit terms, no legal characterisation.
+    expect(pageText()).not.toMatch(/non-binding|may increase or decrease|financial agreement|(?<!non-)binding/i);
+    expect(screen.queryByRole("region", { name: "Coordination deposit, refunds and cancellation" })).toBeNull();
+    expect(screen.queryByText(/emergency treatment first|extra cost/i)).toBeNull();
+  });
+
+  it("says an expired estimate can no longer be acknowledged, and an expired quote can no longer be accepted", async () => {
+    await openDocument({ ...proposal, validUntil: "2020-01-01T00:00:00Z" });
+    expect(screen.getByText(/This estimate has expired and can no longer be acknowledged/)).toBeTruthy();
+    expect(screen.getByText(/A later version may have different prices and exchange rate/)).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    cleanup(); sessionStorage.clear();
+    await openDocument({ ...finalQuote, validUntil: "2020-01-01T00:00:00Z" });
+    expect(screen.getByText(/This quote has expired and can no longer be accepted/)).toBeTruthy();
+  });
+
+  it("shows the approved English terms on the Arabic page, marked as awaiting their Arabic wording", async () => {
+    await openDocument(proposal, "ar");
+    const terms = document.getElementById("deposit-terms") as HTMLElement;
+    expect(terms).toBeTruthy();
+    expect(within(terms).getByText("تُعرض هذه الشروط بالإنجليزية إلى حين اعتماد صياغتها العربية.")).toBeTruthy();
+    const english = within(terms).getByText(/Full refund if you cancel before we confirm/).closest("[lang]");
+    expect(english?.getAttribute("lang")).toBe("en");
+  });
+});
+
 describe("composeProposalComment", () => {
   it("keeps a stable English topic for the coordinator and passes the patient's words through", () => {
     expect(composeProposalComment("COST", "  too high  ")).toBe("The estimated cost - too high");

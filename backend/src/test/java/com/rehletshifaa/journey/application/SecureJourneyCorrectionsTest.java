@@ -326,7 +326,8 @@ class SecureJourneyCorrectionsTest {
         journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("new-owner","Retried request"));
         journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("lead-subject","Taking it over myself"));
         assertThat(transferNotifications()).isEqualTo(1);assertThat(transferEmails()).isEqualTo(1);
-        assertThat(journey.assignmentHistory(created.caseId())).extracting(AssignmentHistoryEntry::reason).startsWith("Taking it over myself","Retried request","Leave coverage for the patient's cardiology follow-up");
+        // Every transfer keeps its reason. These three can share one clock tick, and history orders equal instants by id, so order is not asserted.
+        assertThat(journey.assignmentHistory(created.caseId())).extracting(AssignmentHistoryEntry::reason).contains("Taking it over myself","Retried request","Leave coverage for the patient's cardiology follow-up");
     }
     private long transferNotifications(){return jdbc.queryForObject("SELECT count(*) FROM staff_notifications WHERE event_type='CASE_OWNERSHIP_TRANSFERRED'",Long.class);}
     private long transferEmails(){return jdbc.queryForObject("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE 'work-email:ownership-transfer:%'",Long.class);}
@@ -696,6 +697,18 @@ class SecureJourneyCorrectionsTest {
         assertThat(view.items()).allSatisfy(item->assertThat(item.description()).doesNotContain("-"));
     }
 
+    @Test void thePatientViewNamesTheDayOfTheFrozenRateAndReadingItChangesNoStoredTerms() throws Exception {
+        var ctx=releasedProposal();
+        var before=jdbc.queryForMap("SELECT payment_terms,refund_terms,disclaimers,excluded_services,fx_rate,fx_rate_date FROM proposal_versions WHERE id=?",ctx.versionId);
+        var view=journey.viewProposal(ctx.token,ctx.grant);
+        em.flush();
+        // F4: the patient is told which day's stored rate is fixed on this document.
+        assertThat(before.get("fx_rate_date")).isNotNull();
+        assertThat(view.fxRateDate()).isEqualTo(jdbc.queryForObject("SELECT fx_rate_date FROM proposal_versions WHERE id=?",java.time.LocalDate.class,ctx.versionId));
+        // Rendering never rewrites the historical record of what the version said.
+        assertThat(jdbc.queryForMap("SELECT payment_terms,refund_terms,disclaimers,excluded_services,fx_rate,fx_rate_date FROM proposal_versions WHERE id=?",ctx.versionId)).isEqualTo(before);
+    }
+
     // ---- The acknowledgement is a server-side precondition, not a checkbox ----
 
     @Test void continuingWithoutTheAcknowledgementIsRefusedEvenWhenTheApiIsCalledDirectly() throws Exception {
@@ -723,7 +736,7 @@ class SecureJourneyCorrectionsTest {
         assertThat(row.get("acknowledged")).isEqualTo(true);
         assertThat(row.get("acknowledged_at")).isNotNull();
         // The wording version is stamped by the server, so evidence cannot be shaped by the caller.
-        assertThat(row.get("acknowledgement_version")).isEqualTo("proposal-ack-2026-09");
+        assertThat(row.get("acknowledgement_version")).isEqualTo("proposal-ack-2026-09-25");
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
     }
 

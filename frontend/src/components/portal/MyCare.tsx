@@ -264,12 +264,12 @@ function copy(ar: boolean) {
     reviewProposal: "Review proposal", replyInMessages: "Reply in Messages", requested: "What we need from you", provided: "provided",
     deposit: "Coordination deposit", received: "Received", requestedBy: "Requested by your coordinator", replyBy: "Please reply by",
     depositStatus: { REQUESTED: "Arranging", PARTIALLY_PAID: "Partly received", PAID: "Deposit received", WAIVED: "Waived", REFUNDED: "Refunded", CANCELLED: "Cancelled" } as Record<string, string>,
-    depositNote: { REQUESTED: "Your coordinator will send you the payment instructions.", PARTIALLY_PAID: "Your coordinator will confirm the remaining amount.", PAID: "Thank you — credited to your final balance.", WAIVED: "No deposit is needed for your case.", REFUNDED: "The deposit has been returned to you." } as Record<string, string>,
+    depositNote: { REQUESTED: "Your coordinator will send you the payment instructions.", PARTIALLY_PAID: "Your coordinator will confirm the remaining amount.", PAID: "Thank you — it will be deducted from the price in your final treatment plan and quote.", WAIVED: "No deposit is needed for your case.", REFUNDED: "The deposit has been returned to you." } as Record<string, string>,
     journey: "Your care journey", done: "done", current: "current",
     phases: ["Case received", "Coordinator review", "Consultant review", "Your proposal", "Coordination deposit", "Treatment", "Follow-up"],
     proposal: "Your proposal", updated: "Updated version", viewProposal: "View proposal",
     documentType: { PRELIMINARY_ESTIMATE: "Preliminary care estimate", FINAL_TREATMENT_QUOTE: "Final treatment plan and quote" } as Record<string, string>,
-    estimateBasis: "Based on the current recommendation and included services. The final treatment and price may change after an in-person assessment.",
+    estimateBasis: "This is a preliminary, non-binding estimate, not a final price or a price guarantee. Your treatment and its price may increase or decrease after your treating doctor examines you in person.",
     proposalStatus: { READY: "Ready to review", ACCEPTED: "Acknowledged", DECLINED: "Declined", EXPIRED: "Expired" } as Record<string, string>,
     yourCoordinator: "Your coordinator", coordinatorHint: "Your point of contact throughout your care journey.", coordinatorPending: "Your coordinator will introduce themselves shortly.", message: "Message",
     documentsTitle: "Documents you shared", documentsHint: "The documents attached to this case. To add one, use the secure link your coordinator sends you.", noDocuments: "You have not shared any documents yet.",
@@ -314,8 +314,8 @@ function stepCopy(code: string, ar: boolean, ctx: { patientAction?: PatientActio
       ["We are preparing your proposal", "Your coordinator is putting together the treatment plan and its estimated cost.", "You will receive the proposal to review in your own time."],
       ["نجهّز عرضك", "يجمع منسقك خطة العلاج وتكلفتها التقديرية.", "ستصلك خطة العلاج لتراجعها في وقتك."]);
     case "WAIT_DEPOSIT_ARRANGEMENT": return pick(
-      ["Deposit arrangements", "Your proposal has been accepted. We are arranging the coordination deposit details and will send you the payment instructions.", "Once the deposit is confirmed, your coordinator starts arranging your treatment."],
-      ["ترتيبات الوديعة", "تم قبول عرضك. نرتّب تفاصيل وديعة التنسيق وسنرسل لك تعليمات الدفع.", "بعد تأكيد الوديعة، يبدأ منسقك ترتيب علاجك."]);
+      ["Deposit arrangements", "You acknowledged your preliminary estimate. We are arranging the coordination deposit details and will send you the payment instructions.", "Once the deposit is received, your coordinator starts arranging your treatment."],
+      ["ترتيبات الوديعة", "تم الإقرار بتقديرك المبدئي. نرتّب تفاصيل وديعة التنسيق وسنرسل لك تعليمات الدفع.", "بعد تأكيد الوديعة، يبدأ منسقك ترتيب علاجك."]);
     case "WAIT_COORDINATION": return pick(
       ["We are arranging your treatment", "Your coordinator is organising your appointments and, where agreed, the practical side of your trip.", "You will receive your dates and arrival details."],
       ["نرتّب علاجك", "ينظّم منسقك مواعيدك، وحيثما اتُّفق، الجوانب العملية لرحلتك.", "ستصلك المواعيد وتفاصيل الوصول."]);

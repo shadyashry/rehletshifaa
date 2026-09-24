@@ -40,7 +40,10 @@ describe("MyCare", () => {
     // Current step: what is happening, no action, what happens next.
     expect(screen.getByRole("heading", { name: "Deposit arrangements" })).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("No action is required from you right now.");
-    expect(screen.getByText(/Once the deposit is confirmed/)).toBeTruthy();
+    expect(screen.getByText(/Once the deposit is received/)).toBeTruthy();
+    // The patient acknowledged an estimate; nothing says a proposal was accepted.
+    expect(screen.getByText(/You acknowledged your preliminary estimate/)).toBeTruthy();
+    expect(screen.queryByText(/has been accepted/)).toBeNull();
     // No fake workflow CTA of any kind.
     expect(screen.queryByRole("button", { name: /continue|pay|check status|refresh/i })).toBeNull();
     // Deposit: USD 500, arranging, and no pay button.
@@ -109,7 +112,8 @@ describe("MyCare", () => {
   it("names the financial stage truthfully: preliminary estimate with its basis, no technical version, separate coordination deposit", () => {
     renderCare({ proposal: { ...proposal, versionNumber: 3, documentType: "PRELIMINARY_ESTIMATE" } });
     const estimate = screen.getByRole("region", { name: "Preliminary care estimate" });
-    expect(within(estimate).getByText(/may change after an in-person assessment/)).toBeTruthy();
+    expect(within(estimate).getByText(/preliminary, non-binding estimate, not a final price or a price guarantee/)).toBeTruthy();
+    expect(within(estimate).getByText(/may increase or decrease after your treating doctor examines you in person/)).toBeTruthy();
     expect(within(estimate).getByText(/Updated version/)).toBeTruthy();
     expect(screen.queryByText(/Version 3|v3/)).toBeNull();
     // The deposit is its own thing — never presented as the treatment price.
@@ -118,7 +122,7 @@ describe("MyCare", () => {
     cleanup();
     renderCare({ proposal: { ...proposal, documentType: "FINAL_TREATMENT_QUOTE" } });
     const quote = screen.getByRole("region", { name: "Final treatment plan and quote" });
-    expect(within(quote).queryByText(/may change after/)).toBeNull();
+    expect(within(quote).queryByText(/non-binding|may increase or decrease/)).toBeNull();
     expect(within(quote).queryByText(/Updated version/)).toBeNull();
   });
 

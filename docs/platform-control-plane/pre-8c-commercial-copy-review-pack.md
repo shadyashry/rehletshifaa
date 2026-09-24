@@ -1,5 +1,8 @@
 # Pre-8C commercial copy review pack (COPY-2)
 
+> **2026-09-25:** the review returned. Decisions, remaining legal/business items and F1–F4 status are recorded in
+> [pre-8c-commercial-copy-decisions.md](pre-8c-commercial-copy-decisions.md). This pack is kept as the pre-review record.
+
 Date: 2026-09-24 · Status: **LEGAL/BUSINESS COPY REVIEW REQUIRED — nothing here is approved policy.** Phase 8C entry waits
 for this review.
 

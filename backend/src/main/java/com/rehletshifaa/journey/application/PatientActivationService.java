@@ -249,7 +249,7 @@ public class PatientActivationService {
             // Idempotent: a replay (or a consent already on file) inserts nothing.
             jdbc.sql("INSERT INTO consent_records(id,patient_id,case_id,consent_type,policy_version,language,exact_text,purpose,scope,channel,captured_by,effective_from,created_at) "
                             + "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM consent_records WHERE patient_id=? AND consent_type=? AND revoked_at IS NULL AND (case_id IS NULL OR case_id=?))")
-                    .params(UUID.randomUUID(), patientId, caseId, type, "v1", language, consentText(type, language),
+                    .params(UUID.randomUUID(), patientId, caseId, type, consentPolicyVersion(type), language, consentText(type, language),
                             "Care coordination onboarding", "Care coordination onboarding", "ONBOARDING_LINK", "SECURE_LINK",
                             timestamp(now), timestamp(now), patientId, type, caseId)
                     .update();
@@ -405,6 +405,10 @@ public class PatientActivationService {
         if (!digits.startsWith("+")) digits = "+" + digits;
         return digits.length() <= 1 ? null : digits;
     }
+    /** Deposit-terms consent names the terms version the patient was shown; the other consents stay on v1. */
+    static String consentPolicyVersion(String type) {
+        return "DEPOSIT_CANCELLATION_TERMS".equals(type) ? PaymentService.DEPOSIT_TERMS_VERSION : "v1";
+    }
     private static String consentText(String type, String language) {
         boolean ar = "ar".equals(language);
         return switch (type) {
@@ -412,8 +416,10 @@ public class PatientActivationService {
                     : "I consent to RehletShifaa processing my personal and health data to coordinate my care.";
             case "CROSS_BORDER_CARE" -> ar ? "أوافق على نقل بياناتي ومشاركتها عبر الحدود لأغراض تنسيق العلاج."
                     : "I consent to my data being transferred across borders for the purpose of coordinating treatment.";
-            case "DEPOSIT_CANCELLATION_TERMS" -> ar ? "أقر بشروط وديعة التنسيق وسياسة الإلغاء والاسترداد."
-                    : "I acknowledge the coordination deposit terms and the cancellation and refund policy.";
+            // The exact checkbox wording the activation page shows beside the displayed deposit terms. The Arabic
+            // label is unchanged pending the native Arabic review; the terms themselves are shown in English.
+            case "DEPOSIT_CANCELLATION_TERMS" -> ar ? "قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد."
+                    : "I have read the coordination deposit, refund and cancellation terms shown above and accept them.";
             case "MEDICAL_INFORMATION_SHARING" -> ar ? "أوافق على مشاركة معلوماتي الطبية مع الاستشاريين ومقدمي الرعاية المعنيين."
                     : "I consent to sharing my medical information with the treating consultants and providers.";
             case "TELECONSULTATION" -> ar ? "أوافق على إجراء الاستشارات عن بُعد عند الاقتضاء."

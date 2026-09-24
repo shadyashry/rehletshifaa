@@ -1,5 +1,44 @@
 # Platform Control Plane — verification status
 
+## Pre-8C commercial copy closure verification — 2026-09-25 (Claude Code)
+
+- **Backend focused:**
+  - `PatientActivationJourneyTest` +3:
+    - the deposit-terms consent stores the exact checkbox text and `deposit-terms-2026-09-25`, while other consents keep
+      their versions;
+    - a new deposit component has neutral terms text with no refund window, and its refund class is unchanged
+      (`NON_REFUNDABLE`, F2 blocked);
+    - reading a historical deposit never rewrites its terms.
+  - `SecureJourneyCorrectionsTest` +1: the public view carries `fxRateDate` equal to the stored release day, and viewing
+    changes no stored terms. Acknowledgement version assertion is now `proposal-ack-2026-09-25`.
+  - The OPS-1 transfer test no longer asserts order between same-instant history entries. It failed intermittently (2 of 4
+    runs) because history orders equal `assigned_at` by random UUID; after the fix it passed 4 consecutive runs.
+- **Backend full** `mvn -o test`: **537 tests, 0 failures, 0 errors, 1 skipped** (pre-8C: 533).
+- **Frontend:** `pnpm typecheck` clean. `pnpm test`: **421 tests / 44 files** (pre-8C: 410/43).
+  - `ProposalSign.test` +7:
+    - deposit terms shown before acknowledgement and tied to the checkbox;
+    - range + expected;
+    - non-binding statement, real basis inputs and fixed-rate sentence, with no live/real-time/official/tax claims;
+    - no placeholders, invented policy, binding/accepted-estimate wording or writes on render;
+    - final-quote accept, not medical consent, no estimate language;
+    - expiry wording (acknowledged vs accepted);
+    - Arabic page shows the English terms with the pending-Arabic notice.
+  - `ProfileActivation.test` +2: terms right above the approved consent (`aria-describedby`); next step names the
+    acknowledged preliminary estimate.
+  - New `PatientProposalDecision.test` +2: signed-in estimate shows the terms before acknowledgement; final quote shows none.
+  - `MyCare.test` assertions updated to the approved wording.
+  - Provider Workspace suites unchanged and green.
+  - Lint on changed files: no new findings. All eight are at HEAD: five errors and two warnings in `Portal.tsx`, plus an
+    unused test helper argument.
+- **E2E, rebuilt tunnel stack** (canonical `up -d --build backend frontend`): new `e2e/pre8c-commercial-copy.spec.ts`
+  **6/6**. Synthetic data; every business call mocked; any unmocked API call refused and asserted absent.
+  - Estimate at EN desktop 1440 and mobile 375: terms above the checkbox, range, fixed-rate sentence, no placeholders, no
+    horizontal scroll.
+  - Final quote (EN), expired estimate, activation consent (EN).
+  - Arabic mobile, right-to-left: English terms with the notice.
+  - Screenshots in `test-results/pre8c-commercial-copy/` (untracked). **No dev records written.**
+- **Not run:** J-1 / OPS-1 signed-in walk-through (this session does not sign in with real dev credentials); Phase 8C testing.
+
 ## Pre-8C closure verification — 2026-09-24 (Claude Code)
 
 - Backend focused: `JourneyDefinitionIntegrationTest` **9/9** (+`governanceReasonsPersistPerActionAndReadBack`);

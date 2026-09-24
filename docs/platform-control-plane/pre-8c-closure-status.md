@@ -143,5 +143,71 @@ production intake = OFF. Routing rollout unchanged.**
 3. No Critical issue open. **High (legal, pending review):** F1 consent to unseen deposit terms; F2 contradictory deposit refund
    data. Both are policy decisions, not engineering defects to fix unilaterally.
 
-### PRE-8C TECHNICAL CLOSURE: YES
+### PRE-8C TECHNICAL CLOSURE (2026-09-24): YES
 ### PHASE 8C ENTRY: NO — HUMAN COPY REVIEWS PENDING
+
+---
+
+## 15. Commercial copy closure — 2026-09-25 (Claude Code)
+
+Base `f3ce109`. The business/legal review of COPY-2 returned. Decisions record:
+[pre-8c-commercial-copy-decisions.md](pre-8c-commercial-copy-decisions.md). This session applied only what was approved for
+implementation, left legally open items open, and did not start Phase 8C. **Journey production intake OFF** (no change under
+`journey/api`, `coordination/**` or `application.yml`). No migration. No historical row changed.
+
+### Implemented
+
+- **F1** (subject to final legal copy wording): the approved short-form coordination deposit, refund, cancellation and
+  how-to-pay terms (`frontend/src/lib/commercial-terms.ts`, `CoordinationDepositTerms`) are shown inline:
+  - on the preliminary estimate, before acknowledgement, in both the secure-link document and the signed-in My Care drawer;
+  - above the activation consent, with the approved checkbox copy (`aria-describedby` ties the checkbox to the terms).
+
+  The consent record stores that exact text with `policy_version = deposit-terms-2026-09-25` (other consents stay `v1`). The
+  acknowledgement evidence version is now `proposal-ack-2026-09-25`.
+- **Terminology:** *accepted care estimate*, *Proposal accepted* and *Your proposal has been accepted* now say the patient
+  acknowledged the preliminary estimate (activation, My Care, legacy status card). Final quote button: *Accept final treatment
+  plan and quote*.
+- **Estimate copy:** non-binding statement; the real basis inputs; "may increase or decrease"; a final quote comes before any
+  non-emergency treatment. Included = listed services + RehletShifaa care coordination; the approved *Not included unless
+  listed* list; no tax statement. A stored range is shown as *Estimated range X to Y* with *Expected Z* (main total, summary
+  and sticky bar).
+- **Final quote:** factual acceptance wording (no *financial agreement*, no *binding*); changes need a revised quote; the
+  not-medical-consent sentence; the approved payment paragraph (no claim that the balance gates treatment). The estimate's "may
+  change" basis line is no longer shown on a final quote.
+- **Expiry:** an estimate *can no longer be acknowledged*; a quote *can no longer be accepted*. A later version may have
+  different prices and exchange rate.
+- **F4:** `PublicProposalView.fxRateDate` (additive) feeds the approved sentence naming the rate day and saying the rate is
+  fixed for this estimate or quote while it is valid. Short form on the deposit terms. No live, real-time or official claim.
+- **F3 (partial):** new preliminary estimates store the approved payment facts in `payment_terms`. They no longer store refund
+  terms, placeholder exclusions or the English-only disclaimer. Stored placeholders are never rendered to patients (legacy
+  rows keep them).
+- **Deposit text:** new deposit components get neutral terms text pointing to the displayed terms. "Refundable before
+  coordination begins" is no longer written. General disclaimers appear once, in the proposal document footer.
+
+### Deliberately not done (open)
+
+- **F2 BLOCKED — LEGAL DECISION STILL REQUIRED.** *Conditional refund eligibility is not represented accurately by the current
+  model.* No `CONDITIONAL` value and no `PARTIALLY_REFUNDABLE` misuse. The refund class of new components is unchanged
+  (`NON_REFUNDABLE`) and historical deposit rows are untouched.
+- Also open:
+  - final-quote validity (still 14 days);
+  - refund processing time and method;
+  - provider cancellation charges;
+  - the emergency-cost clause;
+  - taxes;
+  - the legally payable currency and bank fees;
+  - principal-vs-agent wording;
+  - other-jurisdiction and governing-language questions.
+- **Arabic:** no Arabic legal wording was written. Arabic pages show the English terms and FX sentence with an Arabic notice.
+  Six factual Arabic fixes are recorded as X5–X10 in the [Arabic pack](pre-8c-arabic-review-pack.md) §6a for the native
+  reviewer.
+- The signed-in drawer shows the terms without an amount, because its payload has no anticipated deposit (follow-up).
+- J-1 / OPS-1 signed-in walk-through: not performed. This session does not sign in to dev with real credentials. It stays a next
+  action for a person with dev credentials.
+
+### Verification
+
+See [test-status.md](test-status.md) (2026-09-25 entry).
+
+### COPY CLOSURE TECHNICAL PASS: YES
+### PHASE 8C ENTRY: NO — F2 / refund enforceability, provider cancellation charges, final-quote validity, principal-vs-agent wording, tax/currency legal wording and native Arabic approval remain open
