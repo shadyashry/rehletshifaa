@@ -61,12 +61,12 @@ describe("Page header standard", () => {
     vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/access/roles?offset=0": [], "/admin/access/permissions": [] }, caps));
     render(<AccessGovernance locale="en" view="users" />);
     await waitFor(() => expect(h1()).toEqual(["People"]));
-    expect(await screen.findByRole("link", { name: "Access summary" })).toHaveAttribute("href", "/en/portal/control-center/access/effective");
+    // UX-5: the Access Summary lives inside the person page; the old Effective access URL opens People.
+    expect(await screen.findByLabelText(/Find a person/)).toBeVisible();
     cleanup();
     render(<AccessGovernance locale="en" view="effective" />);
-    await waitFor(() => expect(h1()).toEqual(["Access summary"]));
-    expect(screen.getByText(/^Can this person…\?/)).toBeVisible();
-    expect(trail()).toEqual(["Control Center", "Access & Governance", "People", "Access summary"]);
+    await waitFor(() => expect(h1()).toEqual(["People"]));
+    expect(trail()).toEqual(["Control Center", "Access & Governance", "People"]);
     cleanup();
     render(<AccessGovernance locale="en" view="roles" />);
     expect(await screen.findByRole("link", { name: "Permission reference" })).toHaveAttribute("href", "/en/portal/control-center/access/permissions");

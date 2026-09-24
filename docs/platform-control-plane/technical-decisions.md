@@ -393,3 +393,18 @@ Implementation sequence: V36/domain/repository; permission cutover and configura
 - **Wizard milestones are views over readiness, not new states.** Step completion is computed only from backend readiness fields; resume lands on the first incomplete milestone; nothing is persisted client-side.
 - **`MemberView.displayName` is the only backend change**: administrators cannot operate on account identifiers. Resolution is read-only and fail-soft (an undecryptable legacy value is shown as unnamed).
 - **Cross-organization lists fan out per organization** (bounded by the caller's own organizations) instead of adding aggregate endpoints; recorded as debt, not hidden.
+
+## 28. UX-5 — provider role versions and access reads — 2026-09-24 (Claude Code)
+
+- **Invitation versions are an explicit, reviewed mapping, never "latest".** `ProviderOrganizationService.ROLE_VERSIONS`
+  now names Consultant/Associate v5 and Practice manager v3; historical assignments stay on the version they were given.
+- **A corrected provider version is seeded, not published through the UI**, because `publish()` approves cutovers only
+  for `journey.*` while credential/price/availability grants need an approved cutover. V51 follows the V34/V35 pattern
+  (new version ids, ENGINEERING publisher, cutover rows for every gated key); no published version is edited.
+- **Default realm role PATIENT is kept**: representative access and existing-account link resolution rely on it; removal
+  first needs explicit grants in those flows (Phase 8D / identity).
+- **"Can this person…?" is answered on a resource, not a page-wide list**: `/admin/access/check` evaluates the existing
+  `AuthorizationService` on the organization or on one clinician (owner resolved server-side) across channels, so SELF and
+  MANAGES grants are answered truthfully. The UI words the answer; it never evaluates access.
+- **Organization-row price authorization (M-4) is not changed here**: fixing it removes the only path to organization
+  default prices, which is a business decision on ownership → Phase 8D.

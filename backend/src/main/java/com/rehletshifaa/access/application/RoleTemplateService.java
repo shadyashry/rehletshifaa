@@ -19,7 +19,17 @@ public class RoleTemplateService {
             AccessAuditRepository audit, Clock clock) {
         this.roles=roles; this.catalog=catalog; this.authorization=authorization; this.audit=audit; this.clock=clock;
     }
-    public List<RoleTemplate> list(int offset) { authorization.require("access.role.view"); return roles.list(ResourceContext.PLATFORM,offset); }
+    /** Roles with their governance status, so the catalogue can say what is in use and what is being changed without opening each role. */
+    public List<RoleListItem> list(int offset) {
+        authorization.require("access.role.view");
+        return roles.list(ResourceContext.PLATFORM,offset).stream().map(r->{
+            var versions=roles.versions(r.id());
+            var current=versions.stream().filter(authorization::published).findFirst();
+            var draft=versions.stream().filter(v->v.status()==RoleTemplateVersion.Status.DRAFT||v.status()==RoleTemplateVersion.Status.VALIDATED).findFirst();
+            return new RoleListItem(r.id(),r.key(),r.name(),r.description(),r.purpose(),r.family(),r.systemTemplate(),r.status(),
+                    current.map(RoleTemplateVersion::number).orElse(null),current.map(RoleTemplateVersion::effectiveFrom).orElse(null),draft.map(v->v.status().name()).orElse(null));
+        }).toList();
+    }
     public List<PermissionDefinition> permissions() { authorization.require("access.role.view"); return catalog.all(); }
     public Detail detail(UUID id) {
         authorization.require("access.role.view");
@@ -116,6 +126,9 @@ public class RoleTemplateService {
     static void invalid(String message) { throw new ApiException(400,"INVALID_ACCESS_CONFIGURATION",message); }
     private static ApiException notFound() { return new ApiException(404,"VERSION_NOT_FOUND","Role version not found"); }
     private static void immutable() { throw new ApiException(409,"PUBLISHED_VERSION_IMMUTABLE","Create a new draft to change a published role"); }
+    /** {@code currentVersion}: the newest published, in-effect version (null when none); {@code draftStatus}: DRAFT/VALIDATED when a change is being prepared. */
+    public record RoleListItem(UUID id,String key,String name,String description,String purpose,String family,boolean systemTemplate,String status,
+            Integer currentVersion,Instant currentSince,String draftStatus) {}
     public record Create(String name,String description,String purpose,ActorType actorType,ChannelEntitlement channel) {}
     public record Edit(long revision,List<RolePermissionGrant> grants,String reason) {}
     public record Change(long revision,String reason) {}

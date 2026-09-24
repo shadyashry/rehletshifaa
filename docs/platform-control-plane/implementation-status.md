@@ -1,5 +1,29 @@
 # Platform Control Plane — implementation status
 
+## UX-5 — Access & Governance, role-version alignment, person-centred access — 2026-09-24 (Claude Code)
+
+Scope stayed inside UX-5: no credential-lifecycle, Care Coordination or Commercial/Journey redesign, no Phase 8C. Journey
+production intake OFF. No authorization-model change, no new executable permission or scope type, no Keycloak change.
+Full record: [ux-5-access-governance-status.md](ux-5-access-governance-status.md).
+
+- **People** (`/access/users`; `/access/effective` opens the same page): search by name/email/organization; one person
+  page — *Account & workspaces* (identity system, read-only; provider memberships as My Practice), *Business access* (one
+  card per role and organization; give in three steps; remove with consequence copy and reason), *Access Summary* (*Can
+  this person…?* answered by the backend) and *Changing or ending access* (existing separate steps only).
+- **Roles:** in-use / change-in-progress status in the list; role page (Overview · allows · where · restrictions ·
+  versions · advanced); *Edit a copy*; *Retire version* copy corrected (access ends immediately); wizard change note once,
+  reason at publish, maker/checker stated, simulation with the person picker. **Audit:** who acted / action / date filters.
+- **M-2:** new memberships → Consultant/Associate **v5** (V51, credential + own price/schedule, full cutover; consultant
+  without org-wide relationship management) and Practice manager **v3**. v4 credential defect = missing cutover rows.
+  Historical assignments pinned. **M-5:** default PATIENT retained (representatives and existing-account link resolution
+  depend on it). **M-4**, M-1 residual, M-3 → Phase 8D.
+- Backend: `GET /admin/access/people/access`, `GET /admin/access/check`, audit filters (`actor`, `action`, `from`, `to`),
+  role list status fields; provider port `organizationName` / `clinician`; `ROLE_VERSIONS`; migration **V51** (seed only).
+- Verification: see test-status.md.
+
+### UX-5 COMPLETE: YES
+### UX-6 READY: YES
+
 ## UX-4 — Provider Workspace, V-3 provider case read, V-11 self read — 2026-09-24 (Claude Code)
 
 Scope stayed inside UX-4: no Access & Governance, credential lifecycle, Coordination or Commercial/Journey redesign, no

@@ -34,7 +34,12 @@ public class AccessGovernanceController {
     @PostMapping("/relationships/{id}/revoke") public void revokeRelationship(@PathVariable UUID id,@RequestParam String subject,@RequestParam UUID organization,@RequestBody RoleTemplateService.Change command) { relationships.revoke(subject,organization,id,command); }
     @GetMapping("/effective-access") public Object effective(@RequestParam @Size(min=1,max=255) String subject,@RequestParam UUID organization) { return queries.effective(subject,organization); }
     @GetMapping("/workspace-roles") public Object workspaceRoles(@RequestParam @Size(min=1,max=255) String subject) { return queries.workspaceRoles(subject); }
+    @GetMapping("/people/access") public Object person(@RequestParam @Size(min=1,max=255) String subject) { return queries.person(subject); }
+    @GetMapping("/check") public Object check(@RequestParam @Size(min=1,max=255) String subject,@RequestParam @Size(min=1,max=120) String permission,@RequestParam UUID organization,@RequestParam(required=false) UUID clinician) { return queries.check(subject,permission,organization,clinician); }
     @PostMapping("/simulate") public Object simulate(@RequestBody AccessQueryService.Simulation command) { return queries.simulate(command); }
-    @GetMapping("/audit") public Object audit(@RequestParam(defaultValue="0") @Min(0) @Max(100000) int offset) { return queries.audit(offset); }
+    @GetMapping("/audit") public Object audit(@RequestParam(defaultValue="0") @Min(0) @Max(100000) int offset,@RequestParam(required=false) @Size(max=255) String actor,
+            @RequestParam(required=false) @Size(max=60) String action,@RequestParam(required=false) java.time.Instant from,@RequestParam(required=false) java.time.Instant to) {
+        return queries.audit(offset,actor,action,from,to);
+    }
     public record Draft(UUID baseVersionId,String reason) {}
 }

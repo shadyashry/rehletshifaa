@@ -1,5 +1,35 @@
 # Platform Control Plane — verification status
 
+## UX-5 access & governance verification — 2026-09-24 (Claude Code)
+
+- Backend: new `AccessGovernanceUx5IntegrationTest` **10/10** (invitation versions: Consultant/Associate v5, Practice
+  manager v3, owner/assistant unchanged; consultant/associate/practice-manager/assistant/owner capabilities against the
+  matrix; historical v3 pinned and v4 `INVALID_CONFIGURATION` pinned; published version immutable, *Edit a copy*,
+  maker cannot publish, stale revision; person access; check allowed/denied/SELF/held scopes; temporal validity; reads
+  need `access.effective_access.view`; audit filters). Full offline regression `mvn -o test`: **519 tests, 0 failures,
+  0 errors, 1 skipped** (UX-4: 509). A first full run had 1 failure in `NotificationOutboxDeliveryTest.
+  aClaimHandedBackBeforeAnySendIsDueAgainAtOnce…` (clock-sensitive, untouched code); it passed alone and in the full rerun.
+- Flyway: **V51** (seed only: two role versions, grants, cutovers); applied on the live PostgreSQL (`success=t`), both v5
+  versions carry 4 approved cutovers and consultant v5 has no `provider.relationship.manage`.
+- Frontend: `pnpm typecheck` clean; `pnpm test` **345 tests / 46 files** (UX-4: 336). `AccessGovernance.test.tsx` rewritten
+  (20): person search → four sections, identity workspaces read-only with source tags and the default-PATIENT note,
+  identity-system-unavailable wording, one card per role (where/validity/status/source, keys under technical details),
+  temporal/ended states and "no business role" ≠ "no access", Give access in three steps (body asserted), Remove dialog
+  (consequence copy, reason, only this role's assignments revoked), Access Summary allowed + denied from backend answers,
+  lifecycle section without "delete person", Arabic RTL, token renewal; Roles list status, role page sections + *Edit a
+  copy* + maker notice, change note on save and reason at publish, retire consequence, Arabic wizard steps, permission
+  reference, fail closed + recoverable error; Audit readable history and filters. `PageHeaders.test.tsx` updated
+  (Effective access URL opens People).
+- E2E: `access-governance.spec.ts` updated to the new wizard (continue prepared change, check, simulation via the person
+  picker, reason at publish): **2/2 passed** against the rebuilt tunnel stack (EN, AR; desktop + 390 px, no overflow).
+- **Live review (limited, not Phase 8C):** canonical tunnel rebuild; scratch Playwright script (not committed), synthetic
+  session, mocked reads, writes refused. 15 views — EN desktop: staff person (realm + platform role), provider person,
+  Access Summary result, revoke confirmation, roles, role page, role wizard, audit; EN 390 px: persons, Give access; AR:
+  persons, roles, role page. No overflow, one `main`, one h1, zero writes, no app errors (only the Cloudflare beacon CSP
+  notice from the environment). **Found and fixed:** the person picker's identifier fallback was a nested `<form>` inside
+  the role wizard/audit filters (browser dropped it, so *Open* submitted the wizard; jsdom did not show it); Arabic role
+  page showed the reviewer notice instead of the role purpose.
+
 ## UX-4 provider workspace verification — 2026-09-24 (Claude Code)
 
 - Backend: new `ProviderWorkspaceIntegrationTest` **14/14** (V-3 field shape, assignment states PENDING/ACTIVE vs

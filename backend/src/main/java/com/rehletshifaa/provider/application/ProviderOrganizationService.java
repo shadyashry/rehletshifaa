@@ -20,12 +20,17 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
 @Service
 public class ProviderOrganizationService {
+    /**
+     * The published version each NEW membership receives. Existing assignments stay pinned to the version they were
+     * granted. UX-5 (M-2): Practice Manager v3 adds the clinician-scoped (MANAGES) price, service and schedule grants;
+     * Consultant/Associate v5 (V51) combine the credential cutover with own price/schedule view.
+     */
     private static final Map<String,UUID> ROLE_VERSIONS=Map.of(
             "PROVIDER_OPERATIONS_MANAGER",uuid("34000001-0000-0000-0000-000000000004"),
             "ORGANIZATION_OWNER",uuid("32000001-0000-0000-0000-000000000011"),
-            "PRACTICE_MANAGER",uuid("32000001-0000-0000-0000-000000000012"),
-            "CONSULTANT",uuid("34000001-0000-0000-0000-000000000013"),
-            "ASSOCIATE_DOCTOR",uuid("34000001-0000-0000-0000-000000000014"),
+            "PRACTICE_MANAGER",uuid("35000001-0000-0000-0000-000000000012"),
+            "CONSULTANT",uuid("51000001-0000-0000-0000-000000000013"),
+            "ASSOCIATE_DOCTOR",uuid("51000001-0000-0000-0000-000000000014"),
             "CONSULTANT_ASSISTANT",uuid("32000001-0000-0000-0000-000000000015"));
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;

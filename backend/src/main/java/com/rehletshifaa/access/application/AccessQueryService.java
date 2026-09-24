@@ -98,6 +98,87 @@ public class AccessQueryService {
         audit.record(actor.subject(),organization.toString(),"EFFECTIVE_ACCESS_REVIEWED","SUCCESS","Subject access inspected");
         return new EffectiveAccess(subject,organization,assignments.membership(subject,organization).orElse(null),sources,relationships.list(subject,organization),decisions);
     }
+    /**
+     * UX-5 People page: one person's RehletShifaa business access in every organization, with organization and role
+     * names, so the page never has to know organizations up front. Read-only; revoked assignments are omitted. The
+     * identity-system roles stay a separate read ({@link #workspaceRoles}).
+     */
+    public PersonAccess person(String subject) {
+        var actor=authorization.require("access.effective_access.view");
+        RoleTemplateService.text(subject,255);
+        Instant now=clock.instant();
+        Map<UUID,List<AssignmentView>> byOrganization=new LinkedHashMap<>();
+        Map<UUID,RoleTemplate> templates=new HashMap<>();
+        for(var a:assignments.allForSubject(subject)) {
+            var version=roles.version(a.versionId()).orElse(null);
+            if(version==null) continue;
+            var role=templates.computeIfAbsent(version.templateId(),id->roles.get(id,ResourceContext.PLATFORM,false));
+            String state=a.status().equals("ACTIVE")?(a.effectiveFrom().isAfter(now)?"SCHEDULED":a.effectiveTo()!=null&&!a.effectiveTo().isAfter(now)?"ENDED":"ACTIVE"):a.status();
+            byOrganization.computeIfAbsent(a.organizationId(),k->new ArrayList<>()).add(new AssignmentView(a.id(),role.id(),role.key(),role.name(),version.id(),version.number(),
+                    version.status().name(),a.scope(),a.targetType(),a.targetId(),a.status(),state,a.effectiveFrom(),a.effectiveTo(),a.source(),a.revision()));
+        }
+        boolean truncated=byOrganization.size()>MAX_CAPABILITY_ORGANIZATIONS;
+        var organizations=byOrganization.entrySet().stream().limit(MAX_CAPABILITY_ORGANIZATIONS).map(e->{
+            boolean platform=ResourceContext.PLATFORM.equals(e.getKey());
+            var related=relationships.list(subject,e.getKey()).stream().filter(r->!r.status().equals("REVOKED")).map(r->new RelationshipView(r.id(),r.type(),r.targetType(),r.targetId(),
+                    "CLINICIAN".equals(r.targetType())?clinicianName(e.getKey(),r.targetId()):null,r.status(),r.effectiveFrom(),r.effectiveTo())).toList();
+            return new OrganizationAccess(e.getKey(),platform,platform?null:providerAuthority.organizationName(e.getKey()).orElse(null),
+                    assignments.membership(subject,e.getKey()).orElse(null),e.getValue(),related);
+        }).toList();
+        audit.record(actor.subject(),ResourceContext.PLATFORM.toString(),"PERSON_ACCESS_REVIEWED","SUCCESS","Person business access inspected");
+        return new PersonAccess(subject,organizations,truncated);
+    }
+    /**
+     * UX-5 Access Summary: "Can this person …?" for one permission, at the platform, an organization, or one clinician
+     * in an organization (so self- and relationship-scoped grants are answered truthfully). The answer is the existing
+     * AuthorizationService decision over the channels the capability is used through; nothing here grants anything.
+     */
+    public Check check(String subject,String permission,UUID organization,UUID clinician) {
+        var actor=authorization.require("access.effective_access.view");
+        RoleTemplateService.text(subject,255);RoleTemplateService.text(permission,120);
+        if(organization==null) RoleTemplateService.invalid("Choose where to check");
+        catalog.find(permission).orElseThrow(()->new com.rehletshifaa.shared.api.ApiException(400,"UNREGISTERED_PERMISSION","Choose a registered permission"));
+        ResourceContext context;ProviderOrganizationAuthorityPort.Clinician target=null;
+        if(ResourceContext.PLATFORM.equals(organization)) {
+            if(clinician!=null) RoleTemplateService.invalid("A clinician belongs to a provider organization");
+            context=ResourceContext.platform();
+        } else {
+            boolean verified=providerAuthority.verifiedOrganization(organization);
+            if(clinician!=null) {
+                target=providerAuthority.clinician(organization,clinician).orElseThrow(()->new com.rehletshifaa.shared.api.ApiException(404,"CLINICIAN_NOT_FOUND","Clinician not found in this organization"));
+                context=new ResourceContext(organization,verified,"CLINICIAN",target.practitionerId().toString(),target.subject(),false);
+            } else context=new ResourceContext(organization,verified,"PROVIDER_ORGANIZATION",organization.toString(),null,false);
+        }
+        var person=actor.subject().equals(subject)?actor:new AccessIdentity.Identity(subject,Instant.EPOCH);
+        AuthorizationDecision best=null;boolean recent=false;
+        for(var channel:ChannelEntitlement.values()) {
+            var decision=authorization.decide(person,permission,context,channel);
+            if(!decision.allowed()&&decision.reason()==AuthorizationDecision.Reason.RECENT_AUTHENTICATION_REQUIRED) {
+                var fresh=authorization.decide(new AccessIdentity.Identity(subject,clock.instant()),permission,context,channel);
+                if(fresh.allowed()) { decision=fresh;recent=true; }
+            }
+            if(decision.allowed()) { best=decision;break; }
+            if(best==null||best.reason()==AuthorizationDecision.Reason.NO_MATCHING_GRANT) best=decision;
+        }
+        final var answer=best;
+        String roleName=answer.roleVersionId()==null?null:roles.version(answer.roleVersionId()).map(v->roles.get(v.templateId(),ResourceContext.PLATFORM,false).name()).orElse(null);
+        Instant validUntil=answer.assignmentId()==null?null:assignments.assignments(subject,organization).stream().filter(a->a.id().equals(answer.assignmentId())).map(RoleAssignment::effectiveTo).filter(Objects::nonNull).findFirst().orElse(null);
+        // Where the person does hold this permission (active assignments, published versions), to explain a scope denial.
+        Set<ScopeType> held=new TreeSet<>();
+        for(var a:assignments.assignments(subject,organization)) {
+            if(!authorization.active(a)) continue;
+            roles.version(a.versionId()).filter(authorization::published).ifPresent(v->roles.grants(v.id()).stream()
+                    .filter(g->g.permission().equals(permission)&&g.scope()==a.scope()).forEach(g->held.add(g.scope())));
+        }
+        audit.record(actor.subject(),organization.toString(),"ACCESS_CHECKED",best.allowed()?"ALLOW":"DENY",permission+":"+best.reason());
+        return new Check(best.allowed(),best.reason().name(),permission,organization,
+                ResourceContext.PLATFORM.equals(organization)?null:providerAuthority.organizationName(organization).orElse(null),
+                target==null?null:target.practitionerId(),target==null?null:target.displayName(),roleName,best.scope(),best.relationship(),validUntil,recent,List.copyOf(held));
+    }
+    private String clinicianName(UUID organization,String targetId) {
+        try { return providerAuthority.clinician(organization,UUID.fromString(targetId)).map(ProviderOrganizationAuthorityPort.Clinician::displayName).orElse(null); }
+        catch(IllegalArgumentException notAClinician) { return null; }
+    }
     public AuthorizationDecision simulate(Simulation input) {
         var actor=authorization.require("access.role.simulate");
         RoleTemplateService.text(input.subject(),255);
@@ -129,7 +210,14 @@ public class AccessQueryService {
         audit.record(actor.subject(),ResourceContext.PLATFORM.toString(),"ACCESS_SIMULATED",decision.allowed()?"ALLOW":"DENY",decision.permission()+":"+decision.reason());
         return decision;
     }
-    public List<AccessAuditRepository.Entry> audit(int offset) { authorization.require("access.audit.view");return audit.list(offset); }
+    public List<AccessAuditRepository.Entry> audit(int offset) { return audit(offset,null,null,null,null); }
+    /** Append-only history, newest first; optional filters narrow by who acted, the action and a time window. */
+    public List<AccessAuditRepository.Entry> audit(int offset,String actor,String action,Instant from,Instant to) {
+        authorization.require("access.audit.view");
+        if(action!=null&&!action.isBlank()&&!action.matches("[A-Z_]{1,60}")) RoleTemplateService.invalid("Choose a listed action");
+        return audit.list(offset,blank(actor),blank(action),from,to);
+    }
+    private static String blank(String value) { return value==null||value.isBlank()?null:value.trim(); }
     private ResourceContext providerContext(UUID organization) {
         return providerAuthority.verifiedOrganization(organization)
                 ? new ResourceContext(organization,true,"PROVIDER",organization.toString(),null,false) : null;
@@ -138,6 +226,15 @@ public class AccessQueryService {
     public record WorkspaceRoleView(String subject,String source,boolean available,String accountStatus,List<String> roles) {}
     public record Source(RoleAssignment assignment,String roleName,RoleTemplateVersion version,List<RolePermissionGrant> grants) {}
     public record EffectiveAccess(String subject,UUID organizationId,RoleAssignmentRepository.Membership membership,List<Source> sources,List<ResourceRelationship> relationships,List<AuthorizationDecision> decisions) {}
+    public record PersonAccess(String subject,List<OrganizationAccess> organizations,boolean truncated) {}
+    public record OrganizationAccess(UUID organizationId,boolean platform,String organizationName,RoleAssignmentRepository.Membership membership,
+            List<AssignmentView> assignments,List<RelationshipView> relationships) {}
+    /** {@code state}: ACTIVE, SCHEDULED (starts later), ENDED (end date passed) or the stored status (PENDING …). */
+    public record AssignmentView(UUID id,UUID roleId,String roleKey,String roleName,UUID versionId,int versionNumber,String versionStatus,ScopeType scope,
+            String targetType,String targetId,String status,String state,Instant effectiveFrom,Instant effectiveTo,String source,long revision) {}
+    public record RelationshipView(UUID id,RelationshipType type,String targetType,String targetId,String targetName,String status,Instant effectiveFrom,Instant effectiveTo) {}
+    public record Check(boolean allowed,String reason,String permission,UUID organizationId,String organizationName,UUID clinicianId,String clinicianName,
+            String roleName,ScopeType scope,RelationshipType relationship,Instant validUntil,boolean recentAuthentication,List<ScopeType> heldScopes) {}
     public record Simulation(String subject,String permission,String resourceType,String resourceId,UUID draftVersionId) {
         public Simulation(String subject,String permission,String resourceType,String resourceId) { this(subject,permission,resourceType,resourceId,null); }
     }

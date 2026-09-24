@@ -23,9 +23,16 @@ public class AccessAuditRepository {
         jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,'ACCESS_GOVERNANCE',?,'CAPABILITY','AccessGovernance',?,?,?,?,?)")
                 .params(UUID.randomUUID(),actor,entity,action,outcome,reason,timestamp(clock.instant())).update();
     }
-    public List<Entry> list(int offset) {
-        return jdbc.sql("SELECT actor_subject,entity_id,action,outcome,reason,occurred_at FROM audit_events WHERE event_type='ACCESS_GOVERNANCE' ORDER BY occurred_at DESC,id DESC LIMIT 100 OFFSET ?")
-                .param(offset).query((r,n)->new Entry(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getTimestamp(6).toInstant())).list();
+    public List<Entry> list(int offset) { return list(offset,null,null,null,null); }
+    public List<Entry> list(int offset,String actor,String action,Instant from,Instant to) {
+        StringBuilder sql=new StringBuilder("SELECT actor_subject,entity_id,action,outcome,reason,occurred_at FROM audit_events WHERE event_type='ACCESS_GOVERNANCE'");
+        List<Object> params=new ArrayList<>();
+        if(actor!=null) { sql.append(" AND actor_subject=?");params.add(actor); }
+        if(action!=null) { sql.append(" AND action=?");params.add(action); }
+        if(from!=null) { sql.append(" AND occurred_at>=?");params.add(timestamp(from)); }
+        if(to!=null) { sql.append(" AND occurred_at<?");params.add(timestamp(to)); }
+        sql.append(" ORDER BY occurred_at DESC,id DESC LIMIT 100 OFFSET ?");params.add(offset);
+        return jdbc.sql(sql.toString()).params(params).query((r,n)->new Entry(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getTimestamp(6).toInstant())).list();
     }
     public record Entry(String actor, String entity, String action, String outcome, String reason, Instant occurredAt) {}
     public boolean editedVersion(String actor, UUID version) {

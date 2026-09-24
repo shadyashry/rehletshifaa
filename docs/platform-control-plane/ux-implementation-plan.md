@@ -251,7 +251,7 @@ restructure, journeys) is **P1/P2** and lands in UX-2 … UX-8.
 | **UX-2 Shell / Navigation / Home / Terminology** — **COMPLETE** (§16) | App shell without public footer; §2 IA and labels; permission-gated nav; attention-only Home; admin-only redirect to CC; Margin & Deposit route in CC; old-route redirects; EN terminology; AR draft labels behind review | Page restructures |
 | **UX-3 Clinician Directory & Consultant Setup** — **COMPLETE** (§17) | One Clinicians directory (engagement + capability); Add Consultant screen; Consultant Setup checklist (§4); clinician page family with model-specific sections; clinician Schedule (retire Availability hub); organization default prices on the organization; membership confirmation in Organization › People + Home | Provider Workspace |
 | **UX-4 Provider Workspace / Personas** — decisions frozen in UX-4A (§18); **COMPLETE** (§19) | Persona landing from existing memberships/capabilities; §1-B contents; *Manage organization* entry; patient/case data only as permitted by the approved P0-9 matrix; V-3 assigned-case summary read and V-11 self read | Keycloak role provisioning, new authorization, any FUTURE / NOT CURRENTLY SUPPORTABLE matrix row |
-| **UX-5 Access & Governance** | People (merge User access + Effective access), Access summary, Roles, Audit, permission reference; reason at publish; person picker; access-removal/offboarding summary | Changing the realm-role/platform-role split |
+| **UX-5 Access & Governance** — **COMPLETE** (§20) | People (merge User access + Effective access), Access summary, Roles, Audit, permission reference; reason at publish; person picker; access-removal/offboarding summary | Changing the realm-role/platform-role split |
 | **UX-6 Credentials & Provider Readiness** | Credential Reviews workspace (typed rows incl. Direct approvals); derived lifecycle labels (§6); decision history where supported; organization Setup and profile edit (existing `PUT /admin/providers/{id}`); Ready-to-activate wording | Reminders, revocation, privileging |
 | **UX-7 Care Coordination** | Staff Portal Team queue with authoritative Assign/Transfer, names + case numbers; Coordination Setup (Pools & People, Clinician Preferences, Rules); Advanced (Preview routing recommendation, simulation, history); no org-picker hop | Routing-mode changes |
 | **UX-8 Commercial / Care Journeys / Portal polish** | Price Lists overview, Exchange Rates, Margin & Deposit polish; financial truthfulness copy (audit §31.8 E); Journeys publish checklist, Advanced engine detail, reason at submit, *Retire version* copy; staff/patient portal polish; representative context | Online payment, Journey production intake |
@@ -285,7 +285,7 @@ representative authority · Phase 8C/8D work.
 | V-3 | **Resolved in UX-1: no** provider persona has a case-read path. **UX-4A: APPROVED DIRECTION** — one assignment-scoped, read-only, server-shaped summary read (identity summary, status, proposal stage; no clinical or commercial content) keyed on the caller's own `case_assignments` row; never `CaseWorkspace`. Empty in practice until provider clinicians can be assigned — [ux-4-provider-workspace-decisions.md](ux-4-provider-workspace-decisions.md) §8 | UX-4 — **implemented** (§19): `GET /provider-workspace/cases` |
 | V-4 | A renewal revision can be submitted while an earlier VERIFIED revision is effective, and the earlier one stays effective (per technical-decisions §13.7). UX-1: submission has no state guard, so "Submit renewal" is offered for an expired credential; effectiveness of the earlier revision still to verify | UX-6 |
 | V-5 | **Resolved in UX-3: yes.** One bounded read `GET /admin/providers/clinicians` (stored setup facts + status-level credential summary, no readiness computation) replaced a 1 + O + 3C fan-out; see ux-3-clinicians-setup-status.md §11–12 | UX-3 |
-| V-6 | Offboarding: membership deactivation, legacy staff/practitioner disable, role revoke and organization status are separate; no dedicated clinician offboarding command was found (OFFBOARDED is only guarded) | UX-5; Phase 8D |
+| V-6 | Offboarding: membership deactivation, legacy staff/practitioner disable, role revoke and organization status are separate; no dedicated clinician offboarding command was found (OFFBOARDED is only guarded). **UX-5: mapped** (ux-5 record §13); People offers only the separate existing steps; gaps (provider member account disable, OFFBOARDED, reassignment) → Phase 8D | UX-5 — **mapped**; Phase 8D |
 | V-7 | **Resolved in UX-1.** Every fetcher now routes `REAUTHENTICATION_REQUIRED` through one helper: explained before (shared `ErrorNotice`) or after (return notice) the sign-in round trip; a form cannot be restored after the reload (architecture limit, stated to the user) | Phase 8D (independent check) |
 | V-8 | Which proposal/consent actions a `PATIENT_REPRESENTATIVE` may take | UX-8 |
 | V-9 | Arabic glossary validated by a native healthcare-operations reviewer | Before Phase 8C |
@@ -377,3 +377,26 @@ UX-4A decisions are unchanged.
   price/schedule or MANAGES setup grants; v4 lacks the credential cutover), assistant schedule grant not executable,
   MANAGES price routes accept organization-wide price changes (not offered in the workspace), default PATIENT role.
 - **UX-5 READY: YES.**
+
+## 20. UX-5 outcome — Access & Governance (2026-09-24)
+
+UX-5 is complete — record: [ux-5-access-governance-status.md](ux-5-access-governance-status.md).
+
+- **People** answers who / where they can sign in / what business access / where and why / how to change it: one person
+  page with *Account & workspaces* (identity system, read-only, the workspace each role opens; provider memberships as My
+  Practice), *Business access* (one card per role and organization: where it applies in words, validity, status, source;
+  give/remove with consequence copy and reason), *Access Summary* (*Can this person…?* answered by the backend) and
+  *Changing or ending access* (only existing lifecycle steps; no "delete person"). Search by name, email or organization.
+- **Roles** stays first-class: in-use/draft status, role page sections, *Edit a copy*, truthful *Retire version* (access
+  is removed immediately), wizard with the change note supplied once and the reason asked at publish, maker/checker
+  stated, simulation with the person picker under Advanced. **Audit** filters by who acted, action and date.
+- **M-2 resolved:** new memberships receive Consultant **v5** / Associate **v5** (V51: credential + own price/schedule,
+  cutover approved; consultant without organization-wide relationship management) and Practice manager **v3** (MANAGES
+  prices/schedule). The v4 credential defect is missing cutover rows. Historical assignments stay pinned.
+- **M-5 retained deliberately:** patient representatives and existing-account link resolution depend on the default
+  PATIENT role; the People page explains it. **M-4** and the M-1 residual go to Phase 8D (not fixable by role
+  configuration; not reachable from any UI).
+- Backend: read additions only (`/admin/access/people/access`, `/admin/access/check`, audit filters, role-list status) and
+  one additive seed migration; no write API, no authorization-model change.
+- **UX-6 READY: YES** — what remains for UX-6 is credential/readiness UX; the access findings left open are Phase 8D items
+  with no UI exposure.
