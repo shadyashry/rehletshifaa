@@ -11,7 +11,7 @@ const me = (allowed: string[]) => vi.mocked(apiFetchAs).mockImplementation(async
   new Response(JSON.stringify(path === "/admin/access/me" ? allowed.map((permission) => ({ permission, allowed: true, recentAuthentication: false })) : {}), { status: 200 }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-describe("Signed-in account without a care-portal role (interim, until the Provider Workspace)", () => {
+describe("Signed-in account without a care-portal role or provider practice", () => {
   it("points a capability-only provider person to the areas their role opens — never 'no access'", async () => {
     me(["provider.view", "credential.view"]);
     render(<NoPortalWorkspace locale="en" />);

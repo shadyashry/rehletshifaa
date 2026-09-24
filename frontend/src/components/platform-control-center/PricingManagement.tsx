@@ -33,7 +33,23 @@ function money(amount: string, currency: string, locale: Locale) {
  * Service prices for one clinician — an embeddable panel (consultant workspace, onboarding working-setup step,
  * Commercial setup › Pricing). The backend resolves which level applies; the panel only shows that result.
  */
-export function PricingManagement({ locale, organizationId, practitionerId, onChanged, showOrder = true }: { locale: Locale; organizationId: string; practitionerId: string; onChanged?: () => void; showOrder?: boolean }) {
+export function PricingManagement({ locale, organizationId, practitionerId, onChanged, showOrder = true, decisions, clinicianScopeOnly = false, appliedOnly = false }: {
+  locale: Locale; organizationId: string; practitionerId: string; onChanged?: () => void; showOrder?: boolean;
+  /**
+   * Decisions for THIS clinician from the Provider Workspace self read (V-11). `/admin/access/me` cannot report self- or
+   * MANAGES-scoped grants, so without this a clinician or practice manager would be shown "no access". Navigation only:
+   * every price call is still authorized by the backend.
+   */
+  decisions?: Decision[];
+  /**
+   * Provider Workspace (practice manager): offer changes to this clinician's own price versions only. The backend also
+   * accepts organization-wide price changes through a managed clinician's route; that is broader than the approved
+   * workspace exposure (prices of the clinicians they manage), so it is not offered here.
+   */
+  clinicianScopeOnly?: boolean;
+  /** Provider Workspace (the clinician's own view): only the price versions in effect — no drafts or approval prompts. */
+  appliedOnly?: boolean;
+}) {
   const t = ccCopy[locale];
   const { user, loading: authLoading, signIn } = useAuth();
   const [onboarding, setOnboarding] = useState<Onboarding | null>(null);
@@ -50,6 +66,8 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
 
   const allowed = (key: string) => can.some((d) => d.permission === key && d.allowed);
   const base = `/admin/providers/${organizationId}/clinicians/${practitionerId}`;
+  // A stable key, so a re-rendered parent passing an equal decision list does not reload the prices.
+  const provided = decisions ? JSON.stringify(decisions) : null;
 
   const api = useCallback(async <T,>(path: string, method = "GET", body?: unknown): Promise<T> => {
     if (!user) throw new Error(t.denied);
@@ -67,7 +85,7 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
     if (!user) { setLoading(false); return; }
     setLoading(true); setError("");
     try {
-      const decisions: Decision[] = await apiFetchAs(user.access_token, "/admin/access/me").then((r) => (r.ok ? r.json() : []));
+      const decisions: Decision[] = provided ? JSON.parse(provided) : await apiFetchAs(user.access_token, "/admin/access/me").then((r) => (r.ok ? r.json() : []));
       setCan(decisions);
       if (decisions.some((d) => d.permission === "price_list.view" && d.allowed)) {
         const [ob, rows] = await Promise.all([api<Onboarding>("/onboarding"), api<PriceView[]>("/prices")]);
@@ -80,13 +98,15 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
         setEffective(Object.fromEntries(resolved));
       }
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
-  }, [api, user, t.error]);
+  }, [api, user, t.error, provided]);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const clinicianScope = onboarding?.clinicianType === "CONSULTANT" ? "CONSULTANT" : onboarding?.clinicianType === "ASSOCIATE_DOCTOR" ? "ASSOCIATE_DOCTOR" : null;
-  const scopeOptions = ["ORGANIZATION", ...(clinicianScope ? [clinicianScope] : [])];
+  const scopeOptions = clinicianScopeOnly ? (clinicianScope ? [clinicianScope] : []) : ["ORGANIZATION", ...(clinicianScope ? [clinicianScope] : [])];
+  /** A version the caller may act on here: everything, or — clinician-scope-only — never an organization-wide price. */
+  const actionable = (p: PriceView) => !clinicianScopeOnly || p.scopeType !== "ORGANIZATION";
 
-  const openCreate = () => { setForm({ serviceCode: "", serviceName: "", category: "", scopeType: "ORGANIZATION", amount: "", currency: "EGP", effectiveFrom: "", effectiveTo: "", consultantApprovalRequired: false }); setEditing(null); setCreating(true); };
+  const openCreate = () => { setForm({ serviceCode: "", serviceName: "", category: "", scopeType: scopeOptions[0] ?? "ORGANIZATION", amount: "", currency: "EGP", effectiveFrom: "", effectiveTo: "", consultantApprovalRequired: false }); setEditing(null); setCreating(true); };
   const openEdit = (p: PriceView) => { setForm({ serviceCode: p.serviceCode, serviceName: p.serviceName, category: p.category ?? "", scopeType: p.scopeType, amount: p.amount, currency: p.currency, effectiveFrom: p.effectiveFrom.slice(0, 10), effectiveTo: p.effectiveTo ? p.effectiveTo.slice(0, 10) : "", consultantApprovalRequired: p.consultantApprovalRequired }); setEditing(p); setCreating(true); };
 
   const submitForm = async (e: React.FormEvent) => {
@@ -108,7 +128,7 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
   const retire = async (p: PriceView) => { setBusy(true); setError(""); try { await api(`/prices/${p.id}/retire?revision=${p.revision}`, "POST"); setRetiring(null); await refresh(); onChanged?.(); } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); } };
 
   const grouped = Object.entries(
-    prices.reduce<Record<string, PriceView[]>>((acc, p) => { (acc[p.serviceCode] ??= []).push(p); return acc; }, {})
+    (appliedOnly ? prices.filter((p) => p.status === "ACTIVE") : prices).reduce<Record<string, PriceView[]>>((acc, p) => { (acc[p.serviceCode] ??= []).push(p); return acc; }, {})
   ).sort(([a], [b]) => a.localeCompare(b));
 
   const scopeOrder = { ORGANIZATION: 0, CONSULTANT: 1, ASSOCIATE_DOCTOR: 1 } as const;
@@ -127,7 +147,7 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
           <ol className="cc-inheritance" aria-label={ar ? "ترتيب الأسعار" : "Price order"}>
             {levels.map((l, i) => <li key={l}><strong>{i + 1}. {priceScopeLabel(l, locale)}</strong><span>{l === "ORGANIZATION" ? (ar ? "يُطبَّق على كل أطباء المؤسسة" : "Applies to every clinician in the organization") : (ar ? "يحل محل السعر الافتراضي لهذا الطبيب فقط" : "Replaces the default for this clinician only")}</span></li>)}
           </ol></>}
-          {allowed("price_list.manage") && !creating && <div className="cc-section-actions" style={{ marginBottom: 16 }}><button type="button" onClick={openCreate}><Plus size={16} aria-hidden />{t.newPrice}</button></div>}
+          {allowed("price_list.manage") && scopeOptions.length > 0 && !creating && <div className="cc-section-actions" style={{ marginBottom: 16 }}><button type="button" onClick={openCreate}><Plus size={16} aria-hidden />{t.newPrice}</button></div>}
 
           {creating && (
             <form className="cc-card" onSubmit={submitForm} style={{ margin: "16px 0" }} aria-label={t.newPrice}>
@@ -184,7 +204,7 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
                           {p.consultantApprovalRequired && (
                             <p className="cc-meta">{p.consultantApprovedBy ? t.consultantApproved : t.consultantApprovalPending}</p>
                           )}
-                          {p.status === "DRAFT" && (
+                          {p.status === "DRAFT" && actionable(p) && (
                             <div className="cc-step-actions">
                               {allowed("price_list.manage") && <button type="button" className="cc-secondary" onClick={() => openEdit(p)}>{t.edit}</button>}
                               {p.consultantApprovalRequired && !p.consultantApprovedBy && (
@@ -195,7 +215,7 @@ export function PricingManagement({ locale, organizationId, practitionerId, onCh
                               {allowed("price_list.publish") && <button type="button" disabled={busy || (p.consultantApprovalRequired && !p.consultantApprovedBy)} onClick={() => void publish(p)}>{t.publish}</button>}
                             </div>
                           )}
-                          {p.status === "ACTIVE" && allowed("price_list.publish") && (
+                          {p.status === "ACTIVE" && allowed("price_list.publish") && actionable(p) && (
                             <div className="cc-step-actions">
                               {retiring === p.id ? (
                                 <div className="cc-card" role="group" aria-label={t.retireConfirmTitle}>

@@ -1,5 +1,33 @@
 # Platform Control Plane — implementation status
 
+## UX-4 — Provider Workspace, V-3 provider case read, V-11 self read — 2026-09-24 (Claude Code)
+
+Scope stayed inside UX-4: no Access & Governance, credential lifecycle, Coordination or Commercial/Journey redesign, no
+Phase 8C. Journey production intake OFF. No migration, no authorization-model or role-version change, no Keycloak role.
+Full record: [ux-4-provider-workspace-status.md](ux-4-provider-workspace-status.md).
+
+- **My Practice** (`/portal/practice`): provider-side landing with persona-appropriate sections composed from V-11
+  decisions (Home · My cases · My credentials · My schedule · My prices · My clinicians — each only when the backend
+  would serve it); *Manage organization* for owners/practice managers; truthful empty states; mobile stacked cards; RTL.
+- **Landing:** accounts without a staff workspace that have a provider practice land in My Practice — including the
+  identity-system default `PATIENT` role every account carries; staff get a Staff Portal ↔ My Practice switch.
+- **V-3** `GET /api/v1/provider-workspace/cases` (`ProviderCaseSummaryService`): own PENDING/ACTIVE clinician
+  assignments via an active provider membership; case number, patient display name, case status, own assignment, proposal
+  stage/document type; paged (20), no total, `no-store`.
+- **V-11** `GET /api/v1/provider-workspace/me` (`ProviderWorkspaceService`): self-only, bounded practices, roles, own
+  clinician, S-REL and managed clinicians, with existing `AuthorizationService` decisions on the same resources the
+  endpoints use.
+- Existing price/schedule panels accept V-11 decisions (`decisions`); in the workspace own prices are view-only
+  (`appliedOnly`) and practice-manager price editing is clinician-scoped (`clinicianScopeOnly`).
+- **Findings for UX-5 / Phase 8D** (status §8): role-version drift (invitations assign Consultant/Associate v3 and
+  Practice manager v2; v4 lacks the credential cutover), assistant schedule grant not executable, MANAGES price routes
+  accept organization-wide price changes, default PATIENT role on provider accounts.
+- **Verification:** backend focused 14/14, full **509 tests, 0 failures, 1 skipped**; frontend typecheck clean,
+  **336 tests / 46 files**; live sanity 19 views (EN/AR, desktop/mobile), three defects found and fixed.
+
+### UX-4 COMPLETE: YES
+### UX-5 READY: YES
+
 ## UX-3 — Clinicians directory, clinician page family, Consultant Setup — 2026-09-24 (Claude Code)
 
 Scope stayed inside UX-3: no Provider Workspace, Access, credential lifecycle, Coordination or Journey redesign, no

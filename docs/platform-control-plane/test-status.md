@@ -1,5 +1,27 @@
 # Platform Control Plane — verification status
 
+## UX-4 provider workspace verification — 2026-09-24 (Claude Code)
+
+- Backend: new `ProviderWorkspaceIntegrationTest` **14/14** (V-3 field shape, assignment states PENDING/ACTIVE vs
+  DECLINED/ENDED/non-clinician rows, associate vs supervisor, manager/assistant/owner/member/stranger get nothing,
+  cross-organization and revoked membership, Direct assignment excluded, paging without totals, proposal stage; V-11 self
+  only, organization isolation, staff-role organizations excluded, per-persona decisions with parity against
+  `AuthorizationService`, relationship revocation, hidden navigation is not the control). Full offline regression
+  `mvn -o -q test`: **509 tests, 0 failures, 0 errors, 1 skipped** (UX-3: 495). Flyway unchanged (no migration).
+- Frontend: `pnpm typecheck` clean. `pnpm test` **336 tests / 46 files** (UX-3: 314 / 45). New
+  `ProviderWorkspace.test.tsx` (18: personas A–F, case summaries and paging, view-only own schedule/prices,
+  clinician-scoped practice-manager prices, Direct-doctor link, practice selector and focus, Arabic, failed read, fallback,
+  model rules); `PortalEntry.test.tsx` +4 (default-PATIENT provider landing with no patient reads, `?workspace=care`,
+  staff switch, plain patient). Stability: 12 consecutive full runs — 11 clean, 1 run with a single failure whose name was
+  not captured and which did not recur in the following 10 runs (recorded as environment timing; re-check in Phase 8C).
+- ESLint (touched files): no new findings; pre-existing `set-state-in-effect` findings in `Portal.tsx` and the price /
+  schedule panels unchanged; new hooks use the codebase's existing targeted disables.
+- **Live sanity (limited, not Phase 8C):** canonical base + tunnel rebuild; temporary Playwright script (not committed),
+  synthetic session with the real default `PATIENT` role (and `COORDINATOR` for the mixed persona), mocked reads, writes
+  refused (none attempted). 19 views EN/AR desktop/mobile: no overflow, one `main`, one h1, no errors, no writes. Found
+  and fixed: patient reads during the `/portal` hop, *My Care* switch shown to all providers, organization-wide price
+  actions offered to a practice manager.
+
 ## UX-3 clinicians & setup verification — 2026-09-24 (Claude Code)
 
 - Frontend `pnpm typecheck` clean. `pnpm test` **314 tests / 45 files, 0 failures**, three consecutive full runs.

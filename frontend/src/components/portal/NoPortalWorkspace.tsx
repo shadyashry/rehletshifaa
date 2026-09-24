@@ -6,9 +6,9 @@ import { useControlCenterAccess } from "@/components/platform-control-center/con
 import { ccHref, openableSections, pick } from "@/components/platform-control-center/control-center-nav";
 
 /**
- * Interim landing (until the Provider Workspace, UX-4) for a signed-in account with no care-portal role — typically
- * a provider-side person whose access is a RehletShifaa business role rather than an identity-system portal role.
- * It never says "no access" to someone who has access: it lists the Control Center areas the caller's own
+ * Landing for a signed-in account with no care-portal role and no provider practice (people who work with a provider
+ * organization land in the Provider Workspace instead) — typically a RehletShifaa business role held without an
+ * identity-system portal role. It never says "no access" to someone who has access: it lists the Control Center areas the caller's own
  * capabilities open, exactly as the Control Center navigation would, and shows no case or patient data.
  */
 export function NoPortalWorkspace({ locale }: { locale: Locale }) {

@@ -346,3 +346,6 @@
   .cc-setup-section{padding:12px}
   .cc-setup-actions>*{flex:1 1 auto;min-height:44px}
 }
+
+/* Provider Workspace: existing Control Center panels embedded in a workspace page (no app shell around them). */
+.cc.cc-embedded{display:block;min-height:0;background:transparent}

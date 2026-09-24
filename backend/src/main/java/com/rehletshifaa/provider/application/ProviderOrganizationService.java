@@ -258,7 +258,7 @@ public class ProviderOrganizationService {
                 .params(subject,organization).query((r,n)->new MemberView(r.getString(1),r.getString(2),r.getObject(3,UUID.class),r.getString(4),instant(r,"effective_from"),instant(r,"effective_to"),r.getString(7),r.getLong(8),memberRoles(subject,organization),memberName(subject,organization,r.getObject(3,UUID.class)))).optional().orElseThrow(()->new ApiException(404,"MEMBERSHIP_NOT_FOUND","Provider membership not found"));
     }
     /** Read-only display name so administrators see people rather than account identifiers: practitioner profile, else the invitation or staff record. */
-    private String memberName(String subject,UUID organization,UUID practitioner) {
+    String memberName(String subject,UUID organization,UUID practitioner) {
         if(practitioner!=null) {
             var name=jdbc.sql("SELECT display_name FROM practitioner_profiles WHERE id=?").param(practitioner).query(String.class).optional();
             if(name.isPresent()&&!name.get().isBlank()) return name.get();

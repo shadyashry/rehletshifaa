@@ -1,6 +1,7 @@
 "use client";
 
 import { NoPortalWorkspace } from "./NoPortalWorkspace";
+import { practiceHref, useProviderPractice } from "@/components/provider-workspace/provider-workspace-model";
 import { ReauthenticationReturnNotice } from "@/components/ReauthenticationNotices";
 import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -81,6 +82,16 @@ export function Portal({locale}:{locale:Locale}){
   const controlCenterOnly=!!user&&!available.length&&portalRoles(roles).length>0;
   const controlCenter=useControlCenterEntry(locale);const router=useRouter();
   useEffect(()=>{if(controlCenterOnly)router.replace(ccHref(locale));},[controlCenterOnly,router,locale]);
+  // Provider Workspace (UX-4): someone who works with a provider organization and has no RehletShifaa staff workspace
+  // lands in My Practice. Identity-system accounts carry the default PATIENT role, so "only patient" does not mean "a
+  // patient": `?workspace=care` (the My Practice switch) and patient entry links keep My Care reachable.
+  const workforce=available.some(role=>role!=="patient");
+  const practice=useProviderPractice(!!user&&!controlCenterOnly);
+  const hasPractice=!!practice.view?.practices.length;
+  const[careEntry]=useState(()=>{if(typeof window==="undefined")return false;const q=new URLSearchParams(window.location.search);return q.get("workspace")==="care"||["activate","link","case","continue"].some(k=>q.has(k));});
+  const providerLanding=!!user&&!workforce&&hasPractice&&!careEntry;
+  const deferPatient=!workforce&&!careEntry&&(practice.loading||hasPractice);
+  useEffect(()=>{if(providerLanding)router.replace(practiceHref(locale));},[providerLanding,router,locale]);
   const[active,setActive]=useState<RoleKey|undefined>();const[cases,setCases]=useState<CaseView[]>([]);const[myTasks,setMyTasks]=useState<Task[]>([]);const[workspace,setWorkspace]=useState<Workspace|null>(null);const[documents,setDocuments]=useState<CaseDocument[]>([]);const[doctors,setDoctors]=useState<VerifiedDoctor[]>([]);const[categories,setCategories]=useState<CareCategory[]>([]);const[staff,setStaff]=useState<StaffMember[]>([]);const[share,setShare]=useState<{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null>(null);const[doctorProfile,setDoctorProfile]=useState<DoctorProfile|null>(null);const[coordinatorProfile,setCoordinatorProfile]=useState<StaffProfile|null>(null);const[catalog,setCatalog]=useState<CatalogService[]>([]);const[fxRates,setFxRates]=useState<FxRate[]>([]);const[busy,setBusy]=useState(false);const[notice,setNotice]=useState("");const[error,setError]=useState("");
   const [preferences,setPreferences]=useState<Preferences>({displayName:null,locale:null});
   const [queueState,setQueueState]=useState<QueueState>(initialQueue);
@@ -92,12 +103,13 @@ export function Portal({locale}:{locale:Locale}){
   const refresh=useCallback(async()=>{if(!currentRole||["admin","identity"].includes(currentRole))return;setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}},[currentRole,api,t.error]);
   useEffect(()=>{if(!user)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[user,api]);
   useEffect(()=>{
-    if(!currentRole||["admin","identity"].includes(currentRole)){setQueueLoading(false);return;}
+    // A provider person on the way to My Practice (see providerLanding) never loads a patient queue.
+    if(!currentRole||["admin","identity"].includes(currentRole)||deferPatient){setQueueLoading(false);return;}
     let cancelled=false;setQueueLoading(true);setCases([]);setMyTasks([]);setError("");
     void Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),["coordinator","doctor","operations","finance","patient"].includes(currentRole)?api<Task[]>("/work/mine"):Promise.resolve([])])
       .then(([nextCases,nextTasks])=>{if(!cancelled){setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}}).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:t.error);}).finally(()=>{if(!cancelled)setQueueLoading(false);});
     return()=>{cancelled=true;};
-  },[currentRole,api,t.error]);
+  },[currentRole,api,t.error,deferPatient]);
   // One-shot entry flags. ?signin=1 (header "Sign in", "use your saved details") and ?continue=1 (returning
   // from identity-provider account setup, where a Keycloak session already exists) start sign-in at once so
   // the patient never has to find a button. The flag is stripped from the return path first: a cancelled or
@@ -108,7 +120,7 @@ export function Portal({locale}:{locale:Locale}){
   // activates the account, and the answer says which case is current and whether an "is this you?" question waits.
   const [linkToken,setLinkToken]=useState<string|null>(()=>typeof window==="undefined"?null:new URLSearchParams(window.location.search).get("link"));
   const [landed,setLanded]=useState(false);
-  useEffect(()=>{if(!user||!roles.some(r=>["PATIENT","PATIENT_REPRESENTATIVE"].includes(r)))return;const params=new URLSearchParams(window.location.search);const link=params.get("link");if(link){params.delete("link");window.history.replaceState({},"",`${window.location.pathname}${params.toString()?`?${params}`:""}`);}void api<{linked:boolean;currentCaseId:string|null;accountStatus:string}>("/patient/account/session",{method:"POST"}).then(session=>{if(!params.get("case")&&session.currentCaseId&&!link){const url=new URL(window.location.href);url.searchParams.set("case",session.currentCaseId);window.history.replaceState({},"",url);}}).catch(()=>{}).finally(()=>setLanded(true));},[user,roles,api]);
+  useEffect(()=>{if(!user||deferPatient||!roles.some(r=>["PATIENT","PATIENT_REPRESENTATIVE"].includes(r)))return;const params=new URLSearchParams(window.location.search);const link=params.get("link");if(link){params.delete("link");window.history.replaceState({},"",`${window.location.pathname}${params.toString()?`?${params}`:""}`);}void api<{linked:boolean;currentCaseId:string|null;accountStatus:string}>("/patient/account/session",{method:"POST"}).then(session=>{if(!params.get("case")&&session.currentCaseId&&!link){const url=new URL(window.location.href);url.searchParams.set("case",session.currentCaseId);window.history.replaceState({},"",url);}}).catch(()=>{}).finally(()=>setLanded(true));},[user,roles,api,deferPatient]);
   // Complete account activation when the patient returns from the activation link (?activate=token).
   useEffect(()=>{if(!user||!roles.some(r=>["PATIENT","PATIENT_REPRESENTATIVE"].includes(r)))return;const token=new URLSearchParams(window.location.search).get("activate");if(!token)return;void api(`/patient/account/activate`,{method:"POST",body:JSON.stringify({activationToken:token})}).then(()=>{setNotice(t.activated);window.history.replaceState({},"",window.location.pathname);void refresh();}).catch(e=>setError(e instanceof Error?e.message:t.error));},[user,roles,api,refresh,t.activated,t.error]);
   useEffect(()=>{if(currentRole!=="doctor")return;void api<DoctorProfile>("/doctor/me").then(setDoctorProfile).catch(()=>setDoctorProfile(null));void api<CatalogService[]>("/doctor/catalog").then(setCatalog).catch(()=>setCatalog([]));void api<FxRate[]>("/doctor/fx-rates").then(setFxRates).catch(()=>setFxRates([]));},[currentRole,api]);
@@ -166,6 +178,8 @@ export function Portal({locale}:{locale:Locale}){
   }
   if(loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
   if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح مركز التحكم…":"Opening the Control Center…"}/>;
+  if(user&&!workforce&&!careEntry&&practice.loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
+  if(providerLanding)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح عيادتي…":"Opening My Practice…"}/>;
   if(!user)return <PortalFrame title={t.title} subtitle={t.subtitle}><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]"><div className="card p-6 sm:p-8"><p className="eyebrow">{locale==="ar"?"مساحة خاصة ومحمية":"Private, protected space"}</p><h2 className="title mt-3">{locale==="ar"?"سجّل الدخول للوصول إلى حالتك":"Sign in to open your case"}</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-ink-600">{locale==="ar"?"للمرضى الذين أكملوا ملفهم وفعّلوا حسابهم، وللفريق الطبي والتنسيقي. بعد الدخول تصل مباشرة إلى حالتك الحالية وخطوتها التالية.":"For patients who completed their profile and set up their account, and for the care team. After signing in you land directly on your current case and its next step."}</p><div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn-primary" onClick={()=>void signIn()}>{t.signIn}</button><a className="btn-secondary" href={locale==="ar"?"/en/portal":"/ar/portal"} lang={locale==="ar"?"en":"ar"}>{locale==="ar"?"English":"العربية"}</a></div><p className="mt-5 border-t border-line pt-4 text-sm leading-6 text-ink-500">{locale==="ar"?"أرسلت حالتك ولم تفعّل حسابك بعد؟ ":"Sent a case but haven't set up your account yet? "}<a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/track-case`}>{locale==="ar"?"تابع حالتك عبر الرابط الآمن":"Check your case status with your secure link"}</a>{locale==="ar"?" — أما الحساب فتُنشئه عند إكمال ملفك بعد قبول العرض.":" — your account is created when you complete your profile after accepting a proposal."}</p></div><aside className="surface-muted p-6"><h2 className="font-bold text-brand-900">{locale==="ar"?"حماية الوصول":"Secure access"}</h2><ul className="mt-4 space-y-3 text-sm leading-6 text-ink-600"><li>✓ {locale==="ar"?"تسجيل دخول موحّد وآمن":"Secure single sign-on"}</li><li>✓ {locale==="ar"?"صلاحيات منفصلة لكل دور":"Role-specific access"}</li><li>✓ {locale==="ar"?"المستندات الطبية ليست عامة":"Medical files are never public"}</li></ul><p className="mt-5 border-t border-line pt-4 text-xs leading-5 text-ink-500">{locale==="ar"?"إذا لم تتمكن من الدخول، تواصل مع منسقك أو مسؤول النظام دون مشاركة كلمة المرور.":"If you cannot sign in, contact your coordinator or system administrator without sharing your password."}</p></aside></div></PortalFrame>;
   const profile=user.profile as {name?:string;preferred_username?:string;email?:string;sub?:string};
   const accountName=profile.name??profile.preferred_username??profile.email??profile.sub??"";
@@ -180,7 +194,7 @@ export function Portal({locale}:{locale:Locale}){
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>void openCaseById(caseId)}/>}
     {isPatientRole&&workspace&&<PatientNav locale={locale} view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
     <PortalAccount locale={locale} name={displayName} email={profile.email} role={currentRole?roleLabel(currentRole,locale):""} api={api} signOut={signOut} preferences={preferences} onSaved={value=>{setPreferences(value);setNotice(t.success);}} patient={isPatientRole} controlCenter={controlCenter}/>
-    {available.length>1&&<div className="mb-8 flex flex-wrap gap-2">{available.map(role=><button key={role} className={currentRole===role?"btn-primary":"btn-secondary"} onClick={()=>{setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}}>{roleLabel(role,locale)}</button>)}</div>}
+    {(available.length>1||hasPractice)&&<div className="mb-8 flex flex-wrap gap-2">{hasPractice&&<a className="btn-secondary" href={practiceHref(locale)}>{locale==="ar"?"عيادتي":"My Practice"}</a>}{available.length>1&&available.map(role=><button key={role} className={currentRole===role?"btn-primary":"btn-secondary"} onClick={()=>{setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}}>{roleLabel(role,locale)}</button>)}</div>}
     <ReauthenticationReturnNotice locale={locale} className="mb-4 rounded-xl bg-brand-50 p-4 text-brand-800"/>
     {!available.length&&<NoPortalWorkspace locale={locale}/>}
     {linkToken&&currentRole==="patient"&&<AccountLinkRequest locale={locale} token={linkToken} api={api} onResolved={()=>{setLinkToken(null);restored.current=false;void refresh();}}/>}

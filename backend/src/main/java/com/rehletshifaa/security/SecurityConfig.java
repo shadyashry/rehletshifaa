@@ -23,6 +23,7 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/admin/coordination/**").authenticated()
         .requestMatchers("/api/v1/admin/access/**").authenticated()
         .requestMatchers("/api/v1/admin/providers/**","/api/v1/admin/providers").authenticated()
+        .requestMatchers(HttpMethod.GET,"/api/v1/provider-workspace/**").authenticated()
         .requestMatchers("/api/v1/admin/**").hasAnyRole("CREDENTIALING_ADMIN","SYSTEM_ADMIN","AUDITOR")
         .requestMatchers(HttpMethod.GET,"/api/v1/documents/*/download","/api/v1/documents/*/view").authenticated()
         .requestMatchers(HttpMethod.GET,"/api/v1/cases/*/documents").authenticated()

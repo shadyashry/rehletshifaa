@@ -250,7 +250,7 @@ restructure, journeys) is **P1/P2** and lands in UX-2 … UX-8.
 | **UX-1 Truthfulness & Safety** — **COMPLETE** (§15) | P0-1 interim landing, P0-2 … P0-8, P0-10; P0-9 written data matrix; small reads: professional profile, credential revision facts, person realm roles, and (approved fourth) the caller's own capability read. Same pages, truthful states | New IA, new pages, directory merge |
 | **UX-2 Shell / Navigation / Home / Terminology** — **COMPLETE** (§16) | App shell without public footer; §2 IA and labels; permission-gated nav; attention-only Home; admin-only redirect to CC; Margin & Deposit route in CC; old-route redirects; EN terminology; AR draft labels behind review | Page restructures |
 | **UX-3 Clinician Directory & Consultant Setup** — **COMPLETE** (§17) | One Clinicians directory (engagement + capability); Add Consultant screen; Consultant Setup checklist (§4); clinician page family with model-specific sections; clinician Schedule (retire Availability hub); organization default prices on the organization; membership confirmation in Organization › People + Home | Provider Workspace |
-| **UX-4 Provider Workspace / Personas** — decisions frozen in UX-4A (§18) | Persona landing from existing memberships/capabilities; §1-B contents; *Manage organization* entry; patient/case data only as permitted by the approved P0-9 matrix; V-3 assigned-case summary read and V-11 self read | Keycloak role provisioning, new authorization, any FUTURE / NOT CURRENTLY SUPPORTABLE matrix row |
+| **UX-4 Provider Workspace / Personas** — decisions frozen in UX-4A (§18); **COMPLETE** (§19) | Persona landing from existing memberships/capabilities; §1-B contents; *Manage organization* entry; patient/case data only as permitted by the approved P0-9 matrix; V-3 assigned-case summary read and V-11 self read | Keycloak role provisioning, new authorization, any FUTURE / NOT CURRENTLY SUPPORTABLE matrix row |
 | **UX-5 Access & Governance** | People (merge User access + Effective access), Access summary, Roles, Audit, permission reference; reason at publish; person picker; access-removal/offboarding summary | Changing the realm-role/platform-role split |
 | **UX-6 Credentials & Provider Readiness** | Credential Reviews workspace (typed rows incl. Direct approvals); derived lifecycle labels (§6); decision history where supported; organization Setup and profile edit (existing `PUT /admin/providers/{id}`); Ready-to-activate wording | Reminders, revocation, privileging |
 | **UX-7 Care Coordination** | Staff Portal Team queue with authoritative Assign/Transfer, names + case numbers; Coordination Setup (Pools & People, Clinician Preferences, Rules); Advanced (Preview routing recommendation, simulation, history); no org-picker hop | Routing-mode changes |
@@ -282,7 +282,7 @@ representative authority · Phase 8C/8D work.
 |---|---|---|
 | V-1 | Direct retirement criteria: provider path reaches ACTIVE (commercial acceptance exists), routing/assignment uses provider eligibility, price parity, V33 legacy mappings reviewed/adopted, no case-history loss | Product, before any retirement |
 | V-2 | Persona can be derived from existing memberships/capabilities (`/admin/access/me` + membership role types) without a Keycloak role. **UX-4A:** direction frozen with V-11 (labels from membership role types; sections from capabilities) | UX-4 start |
-| V-3 | **Resolved in UX-1: no** provider persona has a case-read path. **UX-4A: APPROVED DIRECTION** — one assignment-scoped, read-only, server-shaped summary read (identity summary, status, proposal stage; no clinical or commercial content) keyed on the caller's own `case_assignments` row; never `CaseWorkspace`. Empty in practice until provider clinicians can be assigned — [ux-4-provider-workspace-decisions.md](ux-4-provider-workspace-decisions.md) §8 | UX-4 |
+| V-3 | **Resolved in UX-1: no** provider persona has a case-read path. **UX-4A: APPROVED DIRECTION** — one assignment-scoped, read-only, server-shaped summary read (identity summary, status, proposal stage; no clinical or commercial content) keyed on the caller's own `case_assignments` row; never `CaseWorkspace`. Empty in practice until provider clinicians can be assigned — [ux-4-provider-workspace-decisions.md](ux-4-provider-workspace-decisions.md) §8 | UX-4 — **implemented** (§19): `GET /provider-workspace/cases` |
 | V-4 | A renewal revision can be submitted while an earlier VERIFIED revision is effective, and the earlier one stays effective (per technical-decisions §13.7). UX-1: submission has no state guard, so "Submit renewal" is offered for an expired credential; effectiveness of the earlier revision still to verify | UX-6 |
 | V-5 | **Resolved in UX-3: yes.** One bounded read `GET /admin/providers/clinicians` (stored setup facts + status-level credential summary, no readiness computation) replaced a 1 + O + 3C fan-out; see ux-3-clinicians-setup-status.md §11–12 | UX-3 |
 | V-6 | Offboarding: membership deactivation, legacy staff/practitioner disable, role revoke and organization status are separate; no dedicated clinician offboarding command was found (OFFBOARDED is only guarded) | UX-5; Phase 8D |
@@ -290,7 +290,7 @@ representative authority · Phase 8C/8D work.
 | V-8 | Which proposal/consent actions a `PATIENT_REPRESENTATIVE` may take | UX-8 |
 | V-9 | Arabic glossary validated by a native healthcare-operations reviewer | Before Phase 8C |
 | V-10 | "Clinicians" = physicians only today (`CONSULTANT`, `ASSOCIATE_DOCTOR`) → Arabic الأطباء; revisit if non-physician types are added | UX-2 |
-| V-11 | `/admin/access/me` (capability read, fixed in UX-1) reports org-scoped grants only at organization level; self- and relationship-scoped grants are not claimed. **UX-4A: APPROVED DIRECTION** — one self-only, bounded read of memberships, own relationships and existing-`AuthorizationService` decisions on own/managed clinician resources; navigation only — decisions record §9 | UX-4 |
+| V-11 | `/admin/access/me` (capability read, fixed in UX-1) reports org-scoped grants only at organization level; self- and relationship-scoped grants are not claimed. **UX-4A: APPROVED DIRECTION** — one self-only, bounded read of memberships, own relationships and existing-`AuthorizationService` decisions on own/managed clinician resources; navigation only — decisions record §9 | UX-4 — **implemented** (§19): `GET /provider-workspace/me` |
 
 ## 15. UX-1 outcome (2026-09-23)
 
@@ -358,3 +358,22 @@ UX-4A is complete — record: [ux-4-provider-workspace-decisions.md](ux-4-provid
   approval needs (`price_list.manage` SELF). Practice Manager/assistant/owner case views are future rows and are omitted.
 - **UX-4 READY: YES**, scoped to rows served by existing grants plus V-3/V-11. Provider clinicians still receive no
   cases (activation fail-closed), so "My cases" ships as a truthful empty state.
+
+## 19. UX-4 outcome — Provider Workspace (2026-09-24)
+
+UX-4 is complete — record: [ux-4-provider-workspace-status.md](ux-4-provider-workspace-status.md). The matrix and the
+UX-4A decisions are unchanged.
+
+- **My Practice** (`/portal/practice`) is the provider-side landing: a portal workspace page with its own section
+  navigation, never the Control Center shell. Sections come from V-11 decisions only; *Manage organization* is offered to
+  owners and practice managers holding an administration decision.
+- **V-3** `GET /api/v1/provider-workspace/cases`: own PENDING/ACTIVE clinician assignments through an active provider
+  membership, S-ID + S-STATUS + S-PROP only, paged, no total, `no-store`. Empty in practice (activation fail-closed).
+- **V-11** `GET /api/v1/provider-workspace/me`: self-only practices, roles, own clinician, S-REL, managed clinicians and
+  existing `AuthorizationService` decisions on the same resources/channels the endpoints use. Navigation only.
+- Landing handles the identity-system default `PATIENT` role on provider accounts; staff who also work with a provider
+  switch between Staff Portal and My Practice.
+- Found and recorded for UX-5 / Phase 8D (status §8): role-version drift (invitations assign versions without own
+  price/schedule or MANAGES setup grants; v4 lacks the credential cutover), assistant schedule grant not executable,
+  MANAGES price routes accept organization-wide price changes (not offered in the workspace), default PATIENT role.
+- **UX-5 READY: YES.**

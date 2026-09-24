@@ -23,7 +23,11 @@ function toLocalInput(iso: string) { const d = new Date(iso); const pad = (n: nu
  * Weekly availability and exceptions for one clinician — an embeddable panel shown inside the consultant workspace,
  * the onboarding wizard's working-setup step and Commercial setup › Availability.
  */
-export function AvailabilityManagement({ locale, organizationId, practitionerId, onChanged }: { locale: Locale; organizationId: string; practitionerId: string; onChanged?: () => void }) {
+export function AvailabilityManagement({ locale, organizationId, practitionerId, onChanged, decisions }: {
+  locale: Locale; organizationId: string; practitionerId: string; onChanged?: () => void;
+  /** Decisions for THIS clinician from the Provider Workspace self read (V-11); see PricingManagement. Navigation only. */
+  decisions?: Decision[];
+}) {
   const t = ccCopy[locale];
   const { user, loading: authLoading, signIn } = useAuth();
   const [schedule, setSchedule] = useState<ScheduleView | null>(null);
@@ -41,6 +45,7 @@ export function AvailabilityManagement({ locale, organizationId, practitionerId,
   const allowed = (key: string) => can.some((d) => d.permission === key && d.allowed);
   const canManage = allowed("availability.manage") || allowed("availability.manage_self");
   const base = `/admin/providers/${organizationId}/clinicians/${practitionerId}`;
+  const provided = decisions ? JSON.stringify(decisions) : null;
 
   const api = useCallback(async <T,>(path: string, method = "GET", body?: unknown): Promise<T> => {
     if (!user) throw new Error(t.denied);
@@ -58,14 +63,14 @@ export function AvailabilityManagement({ locale, organizationId, practitionerId,
     if (!user) { setLoading(false); return; }
     setLoading(true); setError("");
     try {
-      const decisions: Decision[] = await apiFetchAs(user.access_token, "/admin/access/me").then((r) => (r.ok ? r.json() : []));
+      const decisions: Decision[] = provided ? JSON.parse(provided) : await apiFetchAs(user.access_token, "/admin/access/me").then((r) => (r.ok ? r.json() : []));
       setCan(decisions);
       if (decisions.some((d) => d.permission === "availability.view" && d.allowed)) {
         const [sc, ef] = await Promise.all([api<ScheduleView>("/availability"), api<EffectiveAvailability>("/availability/effective")]);
         setSchedule(sc); setEffective(ef);
       }
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
-  }, [api, user, t.error]);
+  }, [api, user, t.error, provided]);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const openAddSlot = () => { setSlotForm({ dayOfWeek: 1, startTime: "09:00", endTime: "17:00", timeZone: "Africa/Cairo", serviceCode: "", consultationMode: "", location: "", effectiveFrom: new Date().toISOString().slice(0, 10), effectiveTo: "" }); setEditingSlot(null); setAddingSlot(true); };

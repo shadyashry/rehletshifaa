@@ -54,3 +54,45 @@ describe("One way into the Control Center", () => {
     expect(screen.queryByRole("link", { name: "Control Center" })).not.toBeInTheDocument();
   });
 });
+
+describe("Provider Workspace landing (UX-4)", () => {
+  const practice = { practices: [{ organizationId: "org-a", organizationName: "Al Noor Practice", organizationStatus: "ONBOARDING", roles: ["CONSULTANT"], clinician: null, relationships: [], managedClinicians: [], managedCliniciansTruncated: false, organizationCapabilities: [] }], truncated: false };
+  afterEach(() => window.history.replaceState({}, "", "/"));
+
+  it("sends a provider person to My Practice even though the identity system gave the account its default PATIENT role", async () => {
+    auth.roles = ["PATIENT"];
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/provider-workspace/me": practice }, []));
+    render(<Portal locale="en" />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/en/portal/practice"));
+    expect(screen.getByText("Opening My Practice…")).toBeVisible();
+    expect(screen.queryByText("No active case yet")).not.toBeInTheDocument();
+    // The hop loads no patient data for a provider person.
+    expect(vi.mocked(apiFetchAs).mock.calls.map(([, path]) => path).filter((p) => String(p).startsWith("/patient") || p === "/work/mine")).toEqual([]);
+  });
+
+  it("keeps My Care reachable from the workspace switch, with My Practice one link away", async () => {
+    auth.roles = ["PATIENT"];
+    window.history.replaceState({}, "", "/en/portal?workspace=care");
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/provider-workspace/me": practice, "POST /patient/account/session": { linked: false, currentCaseId: null, accountStatus: "ACTIVE" }, "/patient/cases": [], "/work/mine": [] }, []));
+    render(<Portal locale="en" />);
+    expect(await screen.findByRole("link", { name: "My Practice" })).toHaveAttribute("href", "/en/portal/practice");
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("keeps RehletShifaa staff in their workspace and offers My Practice as a switch", async () => {
+    auth.roles = ["COORDINATOR"];
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/provider-workspace/me": practice, "/coordinator/cases": [], "/work/mine": [] }, []));
+    render(<Portal locale="en" />);
+    expect(await screen.findByRole("link", { name: "My Practice" })).toHaveAttribute("href", "/en/portal/practice");
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("leaves a patient without any provider relationship in My Care", async () => {
+    auth.roles = ["PATIENT"];
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/provider-workspace/me": { practices: [], truncated: false }, "POST /patient/account/session": { linked: false, currentCaseId: null, accountStatus: "ACTIVE" }, "/patient/cases": [], "/work/mine": [] }, []));
+    render(<Portal locale="en" />);
+    expect(await screen.findByText("No active case yet")).toBeVisible();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(screen.queryByRole("link", { name: "My Practice" })).not.toBeInTheDocument();
+  });
+});
