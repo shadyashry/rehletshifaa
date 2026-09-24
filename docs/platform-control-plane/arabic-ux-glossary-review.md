@@ -8,6 +8,9 @@ How to use: for each row, confirm the current Arabic, or write the replacement i
 **Decision** need a product/legal choice, not only wording. Where two screens use different Arabic for the same concept today,
 both are listed so the reviewer can choose one.
 
+**Pre-8C (2026-09-24):** the decisions needed before Phase 8C are condensed in
+[pre-8c-arabic-review-pack.md](pre-8c-arabic-review-pack.md) — review that first; this file stays the full inventory.
+
 Sources: UX-0 draft glossary (audit §31.7) and the Arabic lists in the UX-2 … UX-7 records, plus the terms UX-8 introduced.
 
 ## 1. Highest-impact decisions (review first)

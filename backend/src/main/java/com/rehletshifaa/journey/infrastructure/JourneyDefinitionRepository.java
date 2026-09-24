@@ -47,9 +47,9 @@ public class JourneyDefinitionRepository {
         changed(jdbc.sql("UPDATE journey_versions SET status=?,validation_summary=?,simulation_summary=?,published_at=?,retired_at=?,revision=revision+1 WHERE id=? AND revision=?")
             .params(status.name(),validation,simulation,timestamp(status==Status.PUBLISHED?clock.instant():v.publishedAt()),timestamp(status==Status.RETIRED?clock.instant():v.retiredAt()),v.id(),v.revision()).update());
     }
-    public List<com.rehletshifaa.access.infrastructure.AccessAuditRepository.Entry> history(UUID definition,int offset) {
-        return jdbc.sql("SELECT actor_subject,entity_id,action,outcome,reason,occurred_at FROM audit_events WHERE (entity_id=? OR entity_id IN (SELECT CAST(id AS VARCHAR) FROM journey_versions WHERE definition_id=?)) AND (action LIKE 'JOURNEY_%' OR action='ACCESS_DENIED') ORDER BY occurred_at DESC,id DESC LIMIT 100 OFFSET ?")
-            .params(definition.toString(),definition,offset).query((r,n)->new com.rehletshifaa.access.infrastructure.AccessAuditRepository.Entry(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getTimestamp(6).toInstant())).list();
+    public List<com.rehletshifaa.journey.application.JourneyDefinitionService.HistoryEntry> history(UUID definition,int offset) {
+        return jdbc.sql("SELECT actor_subject,entity_id,action,outcome,reason,governance_reason,occurred_at FROM audit_events WHERE (entity_id=? OR entity_id IN (SELECT CAST(id AS VARCHAR) FROM journey_versions WHERE definition_id=?)) AND (action LIKE 'JOURNEY_%' OR action='ACCESS_DENIED') ORDER BY occurred_at DESC,id DESC LIMIT 100 OFFSET ?")
+            .params(definition.toString(),definition,offset).query((r,n)->new com.rehletshifaa.journey.application.JourneyDefinitionService.HistoryEntry(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getTimestamp(7).toInstant())).list();
     }
     /** When anything last happened to this journey or its versions (the newest journey audit event), for list summaries. */
     public Instant lastActivity(UUID definition){

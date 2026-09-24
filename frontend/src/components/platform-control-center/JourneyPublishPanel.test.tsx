@@ -44,6 +44,7 @@ describe("Approval & publishing", () => {
     expect(within(dialog).getByText(/Version 3 becomes a published version of International Care Journey/)).toBeVisible();
     expect(within(dialog).getByText(/Production intake is off.*Publishing a version does not turn it on/)).toBeVisible();
     expect(within(dialog).getByText(/Cases already on an earlier version stay on it/)).toBeVisible();
+    expect(within(dialog).getByText(/Saved in the journey history with this action/)).toBeVisible();
     const confirm = within(dialog).getByRole("button", { name: "Yes, publish version" });
     expect(confirm).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText(/Why are you publishing/), { target: { value: "Reviewed with operations" } });

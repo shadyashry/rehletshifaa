@@ -88,7 +88,8 @@ for (const locale of ["en", "ar"] as const) test(`Staff Portal team queue, trans
   await drawer.getByRole("radio", { name: /Sara Ahmed/ }).check();
   await drawer.getByRole("textbox").fill(en ? "Leave coverage" : "تغطية إجازة");
   await drawer.getByRole("button", { name: en ? "Review transfer" : "مراجعة النقل" }).click();
-  await expect(drawer.getByText(en ? /is not notified automatically/ : /لا يُرسَل إشعار تلقائي/)).toBeVisible();
+  // OPS-1: the review states the real notification behaviour (in-app + work email after the transfer completes).
+  await expect(drawer.getByText(en ? /gets a Staff Portal notification and a work email after the transfer is completed/ : /إشعارًا في بوابة الموظفين ورسالة على بريد العمل بعد اكتمال النقل/)).toBeVisible();
   await shot("transfer-review-desktop");
   await page.setViewportSize({ width: 390, height: 844 });
   await sane(page); await shot("transfer-review-mobile");

@@ -39,6 +39,37 @@ class JourneyDefinitionIntegrationTest {
   assertThat(s.liveVersion()).isEqualTo(1);assertThat(s.livePublishedAt()).isNotNull();assertThat(s.publishedVersions()).isEqualTo(1);assertThat(s.draftVersion()).isEqualTo(2);assertThat(s.draftStatus()).isEqualTo("DRAFT");assertThat(s.versions()).isEqualTo(2);
   assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_events",Long.class)).isEqualTo(audits);
   jdbc.update("DELETE FROM permission_version_cutovers WHERE role_version_id=?",MANAGER);assertThatThrownBy(service::summaries).hasMessageContaining("not allowed");}
+ /** J-1: the reason given for each governed action is stored with that action's audit event and read back by history. */
+ @Test void governanceReasonsPersistPerActionAndReadBack()throws Exception{
+  jdbc.update("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,'ACCESS_GOVERNANCE','legacy','CAPABILITY','AccessGovernance','pending','JOURNEY_DRAFT_UPDATED','SUCCESS','revision=1',?)",UUID.randomUUID(),java.sql.Timestamp.from(clock.instant().minusSeconds(3600)));
+  var d=service.create();UUID id=d.definition().id();var v=d.versions().getFirst();
+  jdbc.update("UPDATE audit_events SET entity_id=? WHERE entity_id='pending'",v.id().toString());
+  v=service.edit(id,v.id(),new Edit(0,"  تعديل المسار — first draft ✓  ",JourneyGraphTest.linear()));
+  long rev=v.revision();UUID vid=v.id();assertThatThrownBy(()->service.edit(id,vid,new Edit(rev-1,"Stale attempt",JourneyGraphTest.branch()))).hasMessageContaining("changed");
+  v=service.validate(id,v.id(),new Change(v.revision(),"Checked the draft")).version();
+  v=service.simulate(id,v.id(),new Simulate(v.revision(),"Tested the path",Map.of())).version();
+  v=service.submit(id,v.id(),new Change(v.revision(),"Ready for an independent review"));
+  signIn("checker");var p=service.publish(id,v.id(),new Change(v.revision(),"Approved for synthetic use"));
+  signIn("maker");var next=service.cloneVersion(id,p.id(),new Change(p.revision(),"Start the next change"));
+  next=service.edit(id,next.id(),new Edit(next.revision(),"First edit of v2",JourneyGraphTest.branch()));
+  next=service.edit(id,next.id(),new Edit(next.revision(),"Second edit of v2",JourneyGraphTest.linear()));
+  signIn("checker");service.retire(id,p.id(),new Change(service.version(id,p.id()).revision(),"Withdrawn after review"));
+  var history=service.history(id,0);
+  java.util.function.BiFunction<String,UUID,List<String>> reasons=(action,entity)->history.stream().filter(e->e.action().equals(action)&&e.entity().equals(entity.toString())).map(HistoryEntry::changeReason).toList();
+  assertThat(reasons.apply("JOURNEY_DRAFT_UPDATED",p.id())).containsExactly("تعديل المسار — first draft ✓",null);
+  assertThat(reasons.apply("JOURNEY_VALIDATED",p.id())).containsExactly("Checked the draft");
+  assertThat(reasons.apply("JOURNEY_SIMULATED",p.id())).containsExactly("Tested the path");
+  assertThat(reasons.apply("JOURNEY_SUBMITTED",p.id())).containsExactly("Ready for an independent review");
+  assertThat(reasons.apply("JOURNEY_PUBLISHED",p.id())).containsExactly("Approved for synthetic use");
+  assertThat(reasons.apply("JOURNEY_RETIRED",p.id())).containsExactly("Withdrawn after review");
+  assertThat(reasons.apply("JOURNEY_VERSION_CREATED",next.id())).containsExactly("Start the next change");
+  assertThat(reasons.apply("JOURNEY_DRAFT_UPDATED",next.id())).containsExactlyInAnyOrder("First edit of v2","Second edit of v2");
+  assertThat(reasons.apply("JOURNEY_CREATED",id)).containsExactly((String)null);
+  assertThat(history).noneMatch(e->"Stale attempt".equals(e.changeReason()));
+  assertThat(history.stream().filter(e->e.action().equals("JOURNEY_PUBLISHED")).findFirst().orElseThrow().reason()).startsWith("graph=").doesNotContain("Approved");
+  assertThat(history.stream().filter(e->e.action().equals("JOURNEY_PUBLISHED")).findFirst().orElseThrow().actor()).isEqualTo("checker");
+  var body=mvc.perform(get("/api/v1/admin/journeys/"+id+"/history").with(jwt().jwt(j->j.subject("maker").claim("auth_time",clock.instant())))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+  assertThat(body).contains("\"changeReason\":\"تعديل المسار — first draft ✓\"").contains("\"changeReason\":\"Withdrawn after review\"").contains("\"changeReason\":null");}
  @Test void staleDraftAndInvalidation(){var d=service.create();var v=d.versions().getFirst();UUID id=d.definition().id();service.edit(id,v.id(),new Edit(0,"First",JourneyGraphTest.linear()));assertThatThrownBy(()->service.edit(id,v.id(),new Edit(0,"Stale",JourneyGraphTest.branch()))).hasMessageContaining("changed");var tested=service.simulate(id,v.id(),new Simulate(1,"Dry run",Map.of()));var edited=service.edit(id,v.id(),new Edit(tested.version().revision(),"Revise",JourneyGraphTest.branch()));assertThat(edited.validationSummary()).isNull();assertThat(edited.simulationSummary()).isNull();assertThatThrownBy(()->service.submit(id,v.id(),change(edited.revision()))).hasMessageContaining("simulation");}
  @Test void noProductionSideEffects(){var before=counts();var d=service.create();var v=d.versions().getFirst();service.edit(d.definition().id(),v.id(),new Edit(0,"Graph",JourneyGraphTest.branch()));var r=service.simulate(d.definition().id(),v.id(),new Simulate(1,"Synthetic",Map.of("PROPOSAL_ACCEPTED",true)));assertThat(r.result().outcome()).isEqualTo("COMPLETED");assertThat(counts()).isEqualTo(before);assertThat(r.version().simulationSummary()).isEqualTo("COMPLETED");}
  Map<String,Long> counts(){Map<String,Long> out=new LinkedHashMap<>();for(String t:List.of("medical_cases","case_tasks","case_assignments","notification_outbox"))out.put(t,jdbc.queryForObject("SELECT COUNT(*) FROM "+t,Long.class));return out;}

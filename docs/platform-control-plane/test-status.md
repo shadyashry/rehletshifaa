@@ -1,5 +1,20 @@
 # Platform Control Plane — verification status
 
+## Pre-8C closure verification — 2026-09-24 (Claude Code)
+
+- Backend focused: `JourneyDefinitionIntegrationTest` **9/9** (+`governanceReasonsPersistPerActionAndReadBack`);
+  `SecureJourneyCorrectionsTest#transfer*` **2/2** (+`transferNotifiesOnlyTheNewOwnerOnceAndOnlyWhenItCommits`: one
+  notification + one queued email for the new owner, none for the old owner, none on unauthorized/refused/rolled-back
+  (savepoint) transfers, none on retry or self-transfer, no patient/clinical/reason text; history intact).
+- Backend full `mvn -o test`: **533 tests, 0 failures, 0 errors, 1 skipped** (UX-8: 531).
+- Flyway: **V52** applied on dev Postgres 17 (51 → 52; `governance_reason varchar(500)` nullable); H2 via the test suite.
+- Frontend: `pnpm typecheck` clean; `pnpm test` **410 tests / 43 files** (UX-8: 407; +2 journey history reason EN/AR, +1
+  self-transfer copy; transfer and publish-hint assertions updated). Lint on changed files: no new findings vs HEAD.
+- E2E against the rebuilt tunnel stack (synthetic session, reads mocked, writes blocked and asserted empty):
+  `ux8-commercial-journeys.spec.ts` + `care-coordination.spec.ts` **10/10** (history reasons EN/AR; truthful transfer
+  notification copy EN/AR). No dev records written.
+- Not run: signed-in live walk-through on dev (needs real credentials); Phase 8C formal testing.
+
 ## UX-8 commercial / journeys / portal polish verification — 2026-09-24 (Claude Code)
 
 - **Test inventory check** (UX-6 386/48 → UX-7 383/42): seven coordination test files were consolidated into

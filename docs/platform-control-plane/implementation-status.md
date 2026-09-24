@@ -1,5 +1,23 @@
 # Platform Control Plane — implementation status
 
+## Pre-8C closure — J-1, OPS-1, COPY-1, COPY-2 — 2026-09-24 (Claude Code)
+
+No Phase 8C, Journey production intake OFF, routing rollout unchanged. Full record:
+[pre-8c-closure-status.md](pre-8c-closure-status.md).
+
+- **J-1:** `V52__journey_governance_reason.sql` (nullable `audit_events.governance_reason`); `AccessAuditRepository.record`
+  overload; `JourneyDefinitionService` stores the reason of each governed action; `HistoryEntry.changeReason` via
+  `GET /admin/journeys/{id}/history` (`reason` stays technical detail). History UI shows *Version N* + reason or *Reason
+  not recorded*; hints say the reason is saved in the history.
+- **OPS-1:** `JourneyService.reassignCoordinator` → `StaffWorkService.notifyStaff` (`CASE_OWNERSHIP_TRANSFERRED`, key
+  `ownership-transfer:<assignment>`, in-app + work email on the outbox, same transaction); not for self-transfer or an
+  unchanged owner. No patient data, clinical text or transfer reason in the notification. `TransferOwnership` copy updated.
+- **Review packs:** [pre-8c-arabic-review-pack.md](pre-8c-arabic-review-pack.md),
+  [pre-8c-commercial-copy-review-pack.md](pre-8c-commercial-copy-review-pack.md).
+
+### PRE-8C TECHNICAL CLOSURE: YES
+### PHASE 8C ENTRY: NO — HUMAN COPY REVIEWS PENDING
+
 ## UX-8 — Commercial, Care Journeys, portal polish, Organization profile — 2026-09-24 (Claude Code)
 
 Presentation/structure only: no Phase 8C, Journey production intake OFF, no routing rollout change, no migration, no

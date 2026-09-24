@@ -15,6 +15,8 @@ import type { Decision, JourneyCutoverStatus, JourneyDetail, JourneyHistoryEntry
 import "./journey-designer.css";
 
 const TONE: Record<string, Tone> = { PUBLISHED: "success", RETIRED: "neutral", PENDING_APPROVAL: "warning", SIMULATED: "info", VALIDATED: "info", DRAFT: "neutral" };
+/** Governed actions that ask the person for a reason (J-1: stored with the action since V52; older entries have none). */
+const REASONED = new Set(["JOURNEY_VERSION_CREATED", "JOURNEY_DRAFT_UPDATED", "JOURNEY_VALIDATED", "JOURNEY_SIMULATED", "JOURNEY_SUBMITTED", "JOURNEY_RETURNED", "JOURNEY_PUBLISHED", "JOURNEY_RETIRED"]);
 const when = (iso: string | null | undefined, locale: Locale) => (iso ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "—");
 
 /**
@@ -139,12 +141,16 @@ export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Loca
               <summary>{t.history}</summary>
               {!history ? <p role="status">{t.loading}</p> : !history.length ? <p className="cc-empty">{t.historyEmpty}</p> : (
                 <ul className="cc-journey-steps" aria-label={t.history}>
-                  {history.map((h, i) => (
-                    <li key={i}>
-                      <div><strong>{historyActionLabel(h.action, locale)}</strong>{h.outcome !== "SUCCESS" && <> · <span className="cc-meta">{t.historyOutcome[h.outcome] ?? h.outcome}</span></>}</div>
-                      <span className="cc-meta">{when(h.occurredAt, locale)}</span>
-                    </li>
-                  ))}
+                  {history.map((h, i) => {
+                    const version = versions.find((v) => v.id === h.entity);
+                    return (
+                      <li key={i}>
+                        <div><strong>{historyActionLabel(h.action, locale)}</strong>{version && <> · {t.versionNumber} {version.number}</>}{h.outcome !== "SUCCESS" && <> · <span className="cc-meta">{t.historyOutcome[h.outcome] ?? h.outcome}</span></>}</div>
+                        <span className="cc-meta">{when(h.occurredAt, locale)}</span>
+                        {REASONED.has(h.action) && <span className="cc-row-sub">{h.changeReason ? <>{t.historyReason}: <bdi>{h.changeReason}</bdi></> : t.reasonNotRecorded}</span>}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </details>

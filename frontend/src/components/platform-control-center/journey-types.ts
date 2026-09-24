@@ -61,7 +61,8 @@ export type JourneyDetail = { definition: JourneyDefinition; versions: JourneyVe
 export type JourneyValidationResult = { version: JourneyVersion; result: JourneyValidation };
 export type JourneySimulationResult = { version: JourneyVersion; result: JourneySimulation };
 
-export type JourneyHistoryEntry = { actor: string; entity: string; action: string; outcome: string; reason: string | null; occurredAt: string };
+/** `reason` is the technical detail the system recorded (Advanced only); `changeReason` is what the person said (J-1), null when none was recorded. */
+export type JourneyHistoryEntry = { actor: string; entity: string; action: string; outcome: string; reason: string | null; changeReason: string | null; occurredAt: string };
 
 export type JourneyCapability = {
   key: string;

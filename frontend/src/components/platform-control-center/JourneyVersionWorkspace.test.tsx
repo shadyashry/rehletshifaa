@@ -15,6 +15,12 @@ const published = { id: "v-1", definitionId: "def-1", number: 1, status: "PUBLIS
 const draft = { id: "v-2", definitionId: "def-1", number: 2, status: "PENDING_APPROVAL", revision: 0, createdBy: "owner", graph, graphHash: "h2", validationSummary: null, simulationSummary: "COMPLETED", publishedAt: null, retiredAt: null, runtimeDeployment: "NOT_DEPLOYED" };
 const detail = (versions: unknown[]) => ({ definition: { id: "def-1", key: "INTERNATIONAL_CARE", name: "International Care Journey", createdAt: "2026-09-01T00:00:00Z" }, versions });
 let versions: unknown[] = [];
+const history = [
+  { actor: "kc-123", entity: "v-2", action: "JOURNEY_DRAFT_UPDATED", outcome: "SUCCESS", reason: "revision=1", changeReason: "تعديل خطوة الاستقبال", occurredAt: "2026-09-03T00:00:00Z" },
+  { actor: "kc-123", entity: "v-1", action: "JOURNEY_PUBLISHED", outcome: "SUCCESS", reason: "graph=h1; runtime=DEPLOYED", changeReason: "Approved after operations review", occurredAt: "2026-09-02T00:00:00Z" },
+  { actor: "kc-123", entity: "v-1", action: "JOURNEY_SUBMITTED", outcome: "SUCCESS", reason: "revision=4", changeReason: null, occurredAt: "2026-09-01T00:00:00Z" },
+  { actor: "kc-123", entity: "def-1", action: "JOURNEY_CREATED", outcome: "SUCCESS", reason: "Canonical platform journey", changeReason: null, occurredAt: "2026-08-31T00:00:00Z" },
+];
 const paths = () => vi.mocked(apiFetchAs).mock.calls.map(([, p]) => p);
 
 beforeEach(() => {
@@ -23,7 +29,7 @@ beforeEach(() => {
     if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify([{ permission: "journey.view", allowed: true }, { permission: "journey.create", allowed: true }]), { status: 200 });
     if (path === "/admin/journeys/def-1") return new Response(JSON.stringify(detail(versions)), { status: 200 });
     if (path === "/admin/journey-cutover") return new Response(JSON.stringify({ productionIntakeEnabled: false, runtimeEnabled: false }), { status: 200 });
-    if (path === "/admin/journeys/def-1/history?offset=0") return new Response(JSON.stringify([{ actor: "kc-123", entity: "v-1", action: "JOURNEY_PUBLISHED", outcome: "SUCCESS", reason: "graph=h1; runtime=DEPLOYED", occurredAt: "2026-09-01T00:00:00Z" }]), { status: 200 });
+    if (path === "/admin/journeys/def-1/history?offset=0") return new Response(JSON.stringify(history), { status: 200 });
     if (path === "/admin/journeys/def-1/versions/v-1/runtime") return new Response(JSON.stringify({ journeyVersionId: "v-1", status: "DEPLOYED", compilerVersion: "flowable-1", artifactHash: "art-9" }), { status: 200 });
     if (path.endsWith("/clone") && init?.method === "POST") return new Response(JSON.stringify({ ...draft, id: "v-3" }), { status: 200 });
     return new Response(JSON.stringify({}), { status: 200 });
@@ -63,7 +69,31 @@ describe("Journey detail", () => {
     const history = (await screen.findByText("History")).closest("details")!;
     history.open = true; fireEvent(history, new Event("toggle"));
     expect(await within(history).findByText("Published")).toBeVisible();
-    expect(within(history).queryByText(/kc-123|graph=h1/)).not.toBeInTheDocument();
+    expect(within(history).queryByText(/kc-123|graph=h1|revision=/)).not.toBeInTheDocument();
+  });
+
+  it("shows the reason saved with each governed action, and says when an older entry has none (J-1)", async () => {
+    render(<JourneyVersionWorkspace locale="en" definitionId="def-1" />);
+    const history = (await screen.findByText("History")).closest("details")!;
+    history.open = true; fireEvent(history, new Event("toggle"));
+    const items = within(await within(history).findByRole("list")).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent(/Draft saved · Version 2.*Reason: تعديل خطوة الاستقبال/);
+    expect(items[1]).toHaveTextContent(/Published · Version 1.*Reason: Approved after operations review/);
+    expect(items[2]).toHaveTextContent(/Sent for approval · Version 1.*Reason not recorded$/);
+    expect(items[2]).not.toHaveTextContent("Reason: ");
+    // Creating the journey never asks for a reason, so no reason line is shown for it.
+    expect(items[3]).toHaveTextContent("Journey created");
+    expect(items[3]).not.toHaveTextContent(/Reason/);
+  });
+
+  it("shows saved reasons in Arabic too", async () => {
+    render(<JourneyVersionWorkspace locale="ar" definitionId="def-1" />);
+    const history = (await screen.findByText("السجل")).closest("details")!;
+    history.open = true; fireEvent(history, new Event("toggle"));
+    const items = within(await within(history).findByRole("list")).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("السبب: تعديل خطوة الاستقبال");
+    expect(items[2]).toHaveTextContent("لم يُسجَّل سبب");
+    expect(items[2]).not.toHaveTextContent("السبب:");
   });
 
   it("offers Edit a copy only when no change is in progress, asking why", async () => {
@@ -76,6 +106,7 @@ describe("Journey detail", () => {
     const dialog = screen.getByRole("dialog", { name: "Edit a copy" });
     expect(within(dialog).getByText(/The published version stays as it is/)).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "Edit a copy" })).toBeDisabled();
+    expect(within(dialog).getByText(/Saved in the journey history with this action/)).toBeVisible();
   });
 
   it("links each version to its page", async () => {

@@ -19,9 +19,14 @@ public class AccessAuditRepository {
     public void denied(String actor, String entity, String permission, String reason) {
         record(actor,entity,"ACCESS_DENIED","DENY",permission+":"+reason);
     }
-    public void record(String actor, String entity, String action, String outcome, String reason) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,'ACCESS_GOVERNANCE',?,'CAPABILITY','AccessGovernance',?,?,?,?,?)")
-                .params(UUID.randomUUID(),actor,entity,action,outcome,reason,timestamp(clock.instant())).update();
+    public void record(String actor, String entity, String action, String outcome, String reason) { record(actor,entity,action,outcome,reason,null); }
+    /**
+     * {@code reason} is the system's technical detail; {@code governanceReason} is what the person said when they made the
+     * change (J-1: governed Journey actions), kept separately so neither has to be parsed out of the other.
+     */
+    public void record(String actor, String entity, String action, String outcome, String reason, String governanceReason) {
+        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,entity_type,entity_id,action,outcome,reason,governance_reason,occurred_at) VALUES(?,'ACCESS_GOVERNANCE',?,'CAPABILITY','AccessGovernance',?,?,?,?,?,?)")
+                .params(UUID.randomUUID(),actor,entity,action,outcome,reason,governanceReason,timestamp(clock.instant())).update();
     }
     public List<Entry> list(int offset) { return list(offset,null,null,null,null); }
     public List<Entry> list(int offset,String actor,String action,Instant from,Instant to) {

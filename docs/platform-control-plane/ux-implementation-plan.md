@@ -467,3 +467,18 @@ handoff: [arabic-ux-glossary-review.md](arabic-ux-glossary-review.md).
 - Follow-ups before/around 8C: **OPS-1** (notify the new owner on transfer — direction YES), **J-1**, legal copy review of the
   estimate basis and patient deposit terms, native Arabic review (V-9).
 - **PHASE 8C READY: YES.**
+
+## 24. Pre-8C closure (2026-09-24)
+
+Record: [pre-8c-closure-status.md](pre-8c-closure-status.md).
+
+- **J-1 done:** every governed Journey reason (change note on save/check/test/send/return, *Edit a copy*, publish, retire) is
+  stored with its audit event (V52 `audit_events.governance_reason`) and shown in Versions & history; older entries say
+  *Reason not recorded*.
+- **OPS-1 done:** a completed *Transfer case ownership* notifies the new owner (Staff Portal + work email via the existing
+  outbox, same transaction, idempotent); the drawer says so.
+- **COPY-1 prepared:** [pre-8c-arabic-review-pack.md](pre-8c-arabic-review-pack.md) — **ARABIC REVIEW REQUIRED**.
+- **COPY-2 prepared:** [pre-8c-commercial-copy-review-pack.md](pre-8c-commercial-copy-review-pack.md) — **LEGAL/BUSINESS COPY
+  REVIEW REQUIRED** (incl. F1 consent to unseen deposit terms, F2 contradictory deposit refund data).
+- **PRE-8C TECHNICAL CLOSURE: YES. PHASE 8C ENTRY: NO — HUMAN COPY REVIEWS PENDING.** Phase 8C starts only after both
+  reviews are returned and the approved copy changes are applied.

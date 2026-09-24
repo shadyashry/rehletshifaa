@@ -35,11 +35,24 @@ describe("Transfer case ownership (Staff Portal)", () => {
     expect(review).toHaveTextContent("Sara Ahmed becomes the case owner (the responsible coordinator).");
     expect(review).toHaveTextContent("Open coordinator work on this case moves to Sara Ahmed.");
     expect(review).toHaveTextContent("Consultant, Operations and Finance assignments and their work.");
-    expect(review).toHaveTextContent("Sara Ahmed is not notified automatically");
+    expect(review).toHaveTextContent("Sara Ahmed gets a Staff Portal notification and a work email after the transfer is completed. The email carries only the case number.");
+    expect(review).not.toHaveTextContent(/SMS|WhatsApp|not notified/);
     expect(mutate).not.toHaveBeenCalled();
     fireEvent.click(within(review).getByRole("button", { name: "Transfer ownership" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("Ownership transferred to Sara Ahmed. Nobody was notified automatically.");
+    expect(await screen.findByRole("status")).toHaveTextContent("Ownership transferred to Sara Ahmed. They have been notified in the Staff Portal and by work email.");
     expect(mutate).toHaveBeenCalledWith("/coordinator/cases/case-1/coordinator-assignment", { assigneeSubject: "kc-sara", reason: "Leave coverage" });
+  });
+
+  it("says nobody is notified when the lead takes the case themselves (OPS-1)", async () => {
+    const mutate = vi.fn().mockResolvedValue({ id: "a-2", status: "ACTIVE" });
+    render(<TransferOwnership locale="en" caseId="case-1" caseNumber="RS-1" currentOwner="kc-owner" currentOwnerName="Omar Nabil" mySubject="kc-lead" staff={staff} busy={false} mutate={mutate} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("radio", { name: /Mohamed Ali \(you\)/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Reason/ }), { target: { value: "Taking it over" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review transfer" }));
+    const review = screen.getByRole("region", { name: "Review before transferring" });
+    expect(review).toHaveTextContent("You are taking the case yourself, so no notification is sent.");
+    fireEvent.click(within(review).getByRole("button", { name: "Transfer ownership" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("You are now the owner of this case. No notification was sent.");
   });
 
   it("stays on the review when the backend refuses, and explains an empty team truthfully", async () => {

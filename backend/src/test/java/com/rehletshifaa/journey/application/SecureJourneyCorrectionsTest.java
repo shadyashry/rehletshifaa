@@ -276,7 +276,7 @@ class SecureJourneyCorrectionsTest {
         assertThat(owner(operationsWork)).isEqualTo("operations-subject");
         assertThat(owner(doneWork)).isEqualTo("coordinator-subject");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_role='COORDINATOR' AND visibility_scope='INTERNAL' AND status IN ('OPEN','IN_PROGRESS') AND (owner_subject IS NULL OR owner_subject<>'replacement-coordinator')",Long.class,created.caseId())).isZero();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_notifications WHERE recipient_subject='replacement-coordinator'",Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_notifications WHERE recipient_subject='replacement-coordinator' AND event_type='CASE_OWNERSHIP_TRANSFERRED'",Long.class)).isEqualTo(1);
         var history=journey.assignmentHistory(created.caseId());
         assertThat(history.getFirst().role()).isEqualTo("COORDINATOR");assertThat(history.getFirst().assigneeName()).isEqualTo("Replacement Coordinator");assertThat(history.getFirst().status()).isEqualTo("ACTIVE");
         assertThat(history.getFirst().assignedByKind()).isEqualTo("PERSON");assertThat(history.getFirst().assignedByName()).isEqualTo("Team Lead");assertThat(history.getFirst().reason()).isEqualTo("Leave coverage");
@@ -284,6 +284,53 @@ class SecureJourneyCorrectionsTest {
         authenticate("doctor-subject","DOCTOR");
         assertThatThrownBy(()->journey.assignmentHistory(created.caseId())).isInstanceOf(ApiException.class);
     }
+    /** OPS-1: a completed transfer notifies the new owner once (in-app + queued work email); nothing else notifies anyone. */
+    @Test void transferNotifiesOnlyTheNewOwnerOnceAndOnlyWhenItCommits() {
+        var created=cases.create(new CreateCaseRequest("Ops", "Transferee","Kenya","+254700000031","Private clinical history","en",true,null,null,null));
+        cases.submit(created.caseId()); em.flush(); em.clear();
+        authenticate("coordinator-subject","COORDINATOR");
+        journey.claimCoordinatorCase(created.caseId(),"pod");
+        for(String[] person:new String[][]{{"new-owner","COORDINATOR","New Owner"},{"lead-subject","COORDINATOR_LEAD","Team Lead"},{"coordinator-subject","COORDINATOR","Original Coordinator"},{"disabled-coordinator","COORDINATOR","Disabled Coordinator"}})
+            jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),person[0],person[1],crypto.encrypt(person[2]),Instant.now(),Instant.now());
+        jdbc.update("UPDATE staff_members SET manager_subject='lead-subject' WHERE external_subject IN ('coordinator-subject','new-owner','disabled-coordinator')");
+        jdbc.update("UPDATE staff_members SET disabled_at=?,invitation_status='DISABLED' WHERE external_subject='disabled-coordinator'",java.sql.Timestamp.from(Instant.now()));
+        String caseNumber=jdbc.queryForObject("SELECT case_number FROM medical_cases WHERE id=?",String.class,created.caseId());
+        // Unauthorized and refused transfers notify nobody.
+        authenticate("coordinator-subject","COORDINATOR");
+        assertThatThrownBy(()->journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("new-owner","Not my call"))).isInstanceOf(ApiException.class);
+        authenticate("lead-subject","COORDINATOR_LEAD");
+        assertThatThrownBy(()->journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("disabled-coordinator","Coverage"))).isInstanceOf(ApiException.class);
+        assertThat(transferNotifications()).isZero();assertThat(transferEmails()).isZero();
+        // A transfer that rolls back leaves no notification and no queued email behind.
+        jdbc.execute("SAVEPOINT ops1");
+        journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("new-owner","Rolled back"));
+        assertThat(transferNotifications()).isEqualTo(1);
+        jdbc.execute("ROLLBACK TO SAVEPOINT ops1");
+        assertThat(transferNotifications()).isZero();assertThat(transferEmails()).isZero();
+        assertThat(caseOwner(created.caseId())).isEqualTo("coordinator-subject");
+        // The committed transfer: owner changes, the new owner gets exactly one notification and one queued work email.
+        journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("new-owner","Leave coverage for the patient's cardiology follow-up"));
+        assertThat(caseOwner(created.caseId())).isEqualTo("new-owner");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_notifications WHERE event_type='CASE_OWNERSHIP_TRANSFERRED' AND recipient_subject='new-owner' AND case_id=?",Long.class,created.caseId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_notifications WHERE event_type='CASE_OWNERSHIP_TRANSFERRED' AND recipient_subject<>'new-owner'",Long.class)).isZero();
+        assertThat(transferEmails()).isEqualTo(1);
+        var stored=jdbc.queryForMap("SELECT title,context FROM staff_notifications WHERE event_type='CASE_OWNERSHIP_TRANSFERRED'");
+        String title=crypto.decrypt(((String)stored.get("title")).substring(4)),context=crypto.decrypt(((String)stored.get("context")).substring(4));
+        assertThat(title).isEqualTo("A case has been transferred to you");
+        assertThat(context).contains(caseNumber).contains("Original Coordinator").contains("Team Lead")
+            .doesNotContain("Ops").doesNotContain("Transferee").doesNotContain("+254700000031").doesNotContain("Private clinical history").doesNotContain("cardiology");
+        String email=jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key LIKE 'work-email:ownership-transfer:%'",String.class);
+        String clear=email.startsWith("enc:")?crypto.decrypt(email.substring(4)):email;
+        assertThat(clear).contains(caseNumber).doesNotContain("Transferee").doesNotContain("+254700000031").doesNotContain("cardiology");
+        // Repeating the same transfer (a retried request) and a lead taking the case themselves notify nobody new.
+        journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("new-owner","Retried request"));
+        journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("lead-subject","Taking it over myself"));
+        assertThat(transferNotifications()).isEqualTo(1);assertThat(transferEmails()).isEqualTo(1);
+        assertThat(journey.assignmentHistory(created.caseId())).extracting(AssignmentHistoryEntry::reason).startsWith("Taking it over myself","Retried request","Leave coverage for the patient's cardiology follow-up");
+    }
+    private long transferNotifications(){return jdbc.queryForObject("SELECT count(*) FROM staff_notifications WHERE event_type='CASE_OWNERSHIP_TRANSFERRED'",Long.class);}
+    private long transferEmails(){return jdbc.queryForObject("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE 'work-email:ownership-transfer:%'",Long.class);}
+    private String caseOwner(UUID caseId){return jdbc.queryForObject("SELECT assignee_subject FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE'",String.class,caseId);}
     private UUID workItem(UUID caseId,String owner,String role,String status){UUID id=UUID.randomUUID();jdbc.update("INSERT INTO case_tasks(id,case_id,task_type,title,owner_subject,owner_role,visibility_scope,priority,status,blocking,created_by,created_at,updated_at,version) VALUES(?,?,'OTHER','Fixture work',?,?,'INTERNAL','NORMAL',?,FALSE,'TEST',?,?,0)",id,caseId,owner,role,status,java.sql.Timestamp.from(Instant.now()),java.sql.Timestamp.from(Instant.now()));return id;}
     private String owner(UUID task){return jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE id=?",String.class,task);}
 

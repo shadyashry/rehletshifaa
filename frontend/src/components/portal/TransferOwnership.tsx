@@ -15,7 +15,8 @@ type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown
  *
  * <p>What the copy promises is what the backend does: the new coordinator becomes the case owner, open coordinator
  * work on the case moves with the ownership, other roles' work and completed work are untouched, the history keeps
- * both owners and the reason, and nobody is notified automatically.
+ * both owners and the reason, and — once the transfer is committed — the new owner gets a Staff Portal notification and a work
+ * email carrying only the case number (OPS-1). Nobody is notified when a lead takes the case themselves.
  */
 export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, currentOwnerName, mySubject, staff, busy, mutate, onClose }: {
   locale: Locale; caseId: string; caseNumber: string; currentOwner?: string; currentOwnerName?: string; mySubject?: string;
@@ -30,8 +31,9 @@ export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, cu
     c1: (n: string) => <>يصبح <bdi>{n}</bdi> مالك الحالة (المنسق المسؤول).</>, c2: (n: string) => <>ينتقل عمل التنسيق المفتوح على هذه الحالة إلى <bdi>{n}</bdi>.</>,
     c3: "يفقد المالك السابق الوصول إلى الحالة ما لم يكن قائد فريق المالك الجديد.",
     s1: "تعيينات الاستشاري والعمليات والمالية وعملهم.", s2: "مرحلة الحالة والعمل المكتمل.", s3: "سجل التعيينات يحتفظ بالمالك السابق وبالسبب.",
-    n1: (n: string) => <>لا يُرسَل إشعار تلقائي إلى <bdi>{n}</bdi> — أبلغه بالتسليم.</>,
-    confirm: "نقل الملكية", done: (n: string) => <>تم نقل الملكية إلى <bdi>{n}</bdi>. لم يُرسَل إشعار تلقائي.</>, close: "إغلاق",
+    n1: (n: string) => <>يتلقى <bdi>{n}</bdi> إشعارًا في بوابة الموظفين ورسالة على بريد العمل بعد اكتمال النقل. لا تتضمن الرسالة سوى رقم الحالة.</>,
+    nSelf: "أنت من يتولى الحالة، لذلك لا يُرسَل إشعار.",
+    confirm: "نقل الملكية", done: (n: string) => <>تم نقل الملكية إلى <bdi>{n}</bdi>. أُبلغ في بوابة الموظفين وعلى بريد العمل.</>, doneSelf: "أصبحت مالك هذه الحالة. لم يُرسَل إشعار.", close: "إغلاق",
   } : {
     intro: "The coordinator you choose becomes the owner of this case and responsible for it.", find: "Find a coordinator", coordinator: "New coordinator", you: "(you)", lead: "Team lead",
     none: "No coordinators report to you yet. A system administrator adds coordinators to your reporting team before cases can be transferred.", noMatch: "No coordinator on your team matches that name.",
@@ -40,8 +42,9 @@ export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, cu
     c1: (n: string) => <><bdi>{n}</bdi> becomes the case owner (the responsible coordinator).</>, c2: (n: string) => <>Open coordinator work on this case moves to <bdi>{n}</bdi>.</>,
     c3: "The previous owner loses access to the case unless they lead the new owner's team.",
     s1: "Consultant, Operations and Finance assignments and their work.", s2: "The case stage and completed work.", s3: "Assignment history keeps the previous owner and your reason.",
-    n1: (n: string) => <><bdi>{n}</bdi> is not notified automatically — let them know about the handover.</>,
-    confirm: "Transfer ownership", done: (n: string) => <>Ownership transferred to <bdi>{n}</bdi>. Nobody was notified automatically.</>, close: "Close",
+    n1: (n: string) => <><bdi>{n}</bdi> gets a Staff Portal notification and a work email after the transfer is completed. The email carries only the case number.</>,
+    nSelf: "You are taking the case yourself, so no notification is sent.",
+    confirm: "Transfer ownership", done: (n: string) => <>Ownership transferred to <bdi>{n}</bdi>. They have been notified in the Staff Portal and by work email.</>, doneSelf: "You are now the owner of this case. No notification was sent.", close: "Close",
   };
   const [query, setQuery] = useState("");
   const [assignee, setAssignee] = useState("");
@@ -57,6 +60,8 @@ export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, cu
   const shown = coordinators.filter((person) => person.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const chosen = coordinators.find((person) => person.subject === assignee);
   const name = chosen?.name ?? "";
+  // The backend notifies the new owner only when it is someone other than the person transferring (OPS-1).
+  const self = assignee !== "" && assignee === mySubject;
 
   const transfer = async () => {
     const saved = await mutate(`/coordinator/cases/${caseId}/coordinator-assignment`, { assigneeSubject: assignee, reason: reason.trim() });
@@ -64,7 +69,7 @@ export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, cu
   };
 
   if (step === "done") return <div className="space-y-4">
-    <p ref={result} tabIndex={-1} role="status" className="rounded-xl bg-brand-50 p-4 text-sm text-brand-800 outline-none">{t.done(name)}</p>
+    <p ref={result} tabIndex={-1} role="status" className="rounded-xl bg-brand-50 p-4 text-sm text-brand-800 outline-none">{self ? t.doneSelf : t.done(name)}</p>
     <button type="button" className="btn-secondary w-full justify-center" onClick={onClose}>{t.close}</button>
   </div>;
 
@@ -88,7 +93,7 @@ export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, cu
     </div>
     <div>
       <h4 className="text-sm font-bold text-ink-800">{t.notify}</h4>
-      <p className="mt-1 text-sm text-ink-700">{t.n1(name)}</p>
+      <p className="mt-1 text-sm text-ink-700">{self ? t.nSelf : t.n1(name)}</p>
     </div>
     <div className="flex flex-wrap justify-end gap-2">
       <button type="button" className="btn-secondary" disabled={busy} onClick={() => setStep("choose")}>{t.back}</button>

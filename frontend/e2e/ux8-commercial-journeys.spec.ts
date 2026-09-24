@@ -38,7 +38,7 @@ const fixtures: Record<string, unknown> = {
   "/admin/journeys/summaries": [{ ...definition, liveVersion: 1, livePublishedAt: "2026-09-10T08:00:00Z", publishedVersions: 1, draftVersion: 2, draftStatus: "PENDING_APPROVAL", versions: 2, lastActivityAt: "2026-09-23T15:30:00Z" }],
   "/admin/journeys/def-1": { definition, versions },
   "/admin/journey-cutover": { productionIntakeEnabled: false, runtimeEnabled: false },
-  "/admin/journeys/def-1/history": [{ actor: "kc-checker", entity: "v-1", action: "JOURNEY_PUBLISHED", outcome: "SUCCESS", reason: "graph=9f2c1a", occurredAt: "2026-09-10T08:00:00Z" }, { actor: "kc-maker", entity: "v-2", action: "JOURNEY_SUBMITTED", outcome: "SUCCESS", reason: "revision=2", occurredAt: "2026-09-23T15:30:00Z" }],
+  "/admin/journeys/def-1/history": [{ actor: "kc-checker", entity: "v-1", action: "JOURNEY_PUBLISHED", outcome: "SUCCESS", reason: "graph=9f2c1a", changeReason: "Approved after operations review", occurredAt: "2026-09-10T08:00:00Z" }, { actor: "kc-maker", entity: "v-2", action: "JOURNEY_SUBMITTED", outcome: "SUCCESS", reason: "revision=2", changeReason: null, occurredAt: "2026-09-23T15:30:00Z" }],
   "/admin/journeys/registry": [{ key: "ASSIGN_CONSULTANT", label: "Assign Consultant", actors: ["COORDINATOR"], stage: "STAFF_TASK", sourceContract: "x", permissionReferences: [] }],
   "/admin/journeys/registry/metadata": { actorTypes: ["PATIENT", "COORDINATOR", "SYSTEM"], stageTypes: ["START", "STAFF_TASK", "END"], conditionFacts: ["CLINICAL_ACCEPTED", "DEPOSIT_SATISFIED"], maxNodes: 200, maxEdges: 400, cyclePolicy: "ACYCLIC_ONLY", runtimeDeployment: "NOT_DEPLOYED" },
   "/provider-workspace/me": { practices: [{ organizationId: "org-1", organizationName: "Al Noor Hospital", organizationStatus: "ONBOARDING", roles: ["CONSULTANT"], relationships: [], managedClinicians: [], managedCliniciansTruncated: false,
@@ -142,6 +142,11 @@ for (const locale of ["en", "ar"] as const) test(`Care Journeys: list, detail, c
   await page.setViewportSize({ width: 390, height: 844 });
   await sane(page); await shot("journey-detail-mobile");
   await page.setViewportSize({ width: 1280, height: 900 });
+  // J-1: the reason saved with each governed action shows in History; older entries say none was recorded.
+  await page.getByText(en ? "History" : "السجل", { exact: true }).click();
+  await expect(page.getByText(en ? "Reason: Approved after operations review" : "السبب: Approved after operations review")).toBeVisible();
+  await expect(page.getByText(en ? "Reason not recorded" : "لم يُسجَّل سبب", { exact: true })).toBeVisible();
+  await shot("journey-history-reasons-desktop");
   await page.getByText(en ? "Advanced — technical details" : "متقدم — تفاصيل تقنية").click();
   await expect(page.getByText(/a7e41c0d/)).toBeVisible();
   await shot("journey-advanced-desktop");
