@@ -16,10 +16,15 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
@@ -28,7 +33,18 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional
 class SecureJourneyCorrectionsTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases; @Autowired ProposalExpiryService expiry; @Autowired AccountActivationService accountActivations; @Autowired CredentialExpiryService credentialExpiry; @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
-    @AfterEach void clear(){SecurityContextHolder.clearContext();}
+    /** System time plus an offset a test can advance, so writes that must be ordered never share a clock tick. */
+    @TestBean Clock clock;
+    static Clock clock(){return new AdvanceableClock();}
+    static final class AdvanceableClock extends Clock {
+        private volatile Duration offset=Duration.ZERO;
+        void advance(Duration by){offset=offset.plus(by);} void reset(){offset=Duration.ZERO;}
+        @Override public Instant instant(){return Clock.systemUTC().instant().plus(offset);}
+        @Override public ZoneId getZone(){return ZoneOffset.UTC;}
+        @Override public Clock withZone(ZoneId zone){throw new UnsupportedOperationException();}
+    }
+    private void tick(){((AdvanceableClock)clock).advance(Duration.ofSeconds(1));}
+    @AfterEach void clear(){SecurityContextHolder.clearContext();((AdvanceableClock)clock).reset();}
 
     // ---- Core product decision: OTP timing + verification does not change status ----
 
@@ -323,8 +339,9 @@ class SecureJourneyCorrectionsTest {
         String clear=email.startsWith("enc:")?crypto.decrypt(email.substring(4)):email;
         assertThat(clear).contains(caseNumber).doesNotContain("Transferee").doesNotContain("+254700000031").doesNotContain("cardiology");
         // Repeating the same transfer (a retried request) and a lead taking the case themselves notify nobody new.
-        journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("new-owner","Retried request"));
-        journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("lead-subject","Taking it over myself"));
+        // History orders by assigned_at, so each transfer gets its own clock tick.
+        tick();journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("new-owner","Retried request"));
+        tick();journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("lead-subject","Taking it over myself"));
         assertThat(transferNotifications()).isEqualTo(1);assertThat(transferEmails()).isEqualTo(1);
         // Every transfer keeps its reason. These three can share one clock tick, and history orders equal instants by id, so order is not asserted.
         assertThat(journey.assignmentHistory(created.caseId())).extracting(AssignmentHistoryEntry::reason).contains("Taking it over myself","Retried request","Leave coverage for the patient's cardiology follow-up");
