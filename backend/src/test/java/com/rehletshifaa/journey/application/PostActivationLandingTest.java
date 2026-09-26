@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.*;
 class PostActivationLandingTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired PatientAccountService accounts; @Autowired PaymentService payment;
-    @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---- scenarios 2, 3, 5, 6, 9: the deposit stage right after activation ----
@@ -252,7 +252,8 @@ class PostActivationLandingTest {
     private void acknowledge(UUID caseId, String whatsapp) throws Exception {
         String token = statusToken(caseId);
         publicCases.requestAccess(token); em.flush();
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='CASE_ACCESS' AND destination=? ORDER BY created_at DESC LIMIT 1", String.class, whatsapp));
+        // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
+        String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN case_access_challenges ch ON o.idempotency_key='case-access:'||ch.id JOIN case_access_links l ON l.id=ch.link_id WHERE l.token_hash=? AND o.destination=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), whatsapp));
         String code = json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
         String grant = publicCases.verify(token, code).grant();
         var handoff = publicCases.proposalAccess(token, grant); em.flush();
@@ -261,7 +262,7 @@ class PostActivationLandingTest {
     }
 
     private String statusToken(UUID caseId) throws Exception {
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='CASE_STATUS_LINK' AND idempotency_key IN (SELECT 'case-status:'||id FROM case_access_links WHERE case_id=? AND purpose='STATUS') ORDER BY created_at DESC LIMIT 1", String.class, caseId));
+        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='CASE_STATUS_LINK' AND idempotency_key IN (SELECT 'case-status:'||id FROM case_access_links WHERE case_id=? AND purpose='STATUS') ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1", String.class, caseId));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("token");
     }
 

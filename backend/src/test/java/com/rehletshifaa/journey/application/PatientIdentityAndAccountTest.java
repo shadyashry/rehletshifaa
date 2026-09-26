@@ -45,7 +45,7 @@ class PatientIdentityAndAccountTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired PatientActivationService activation; @Autowired PatientAccountService account;
     @Autowired PatientIdentityPort identityPort; LocalPatientIdentitySimulator identity;
-    @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
 
     @BeforeEach void reset() { identity = (LocalPatientIdentitySimulator) identityPort; identity.reset(); }
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
@@ -91,7 +91,7 @@ class PatientIdentityAndAccountTest {
         assertThat(jdbc.queryForObject("SELECT email FROM case_submission_contacts WHERE case_id=?", String.class, created.caseId())).isEqualTo("omar@local.test");
         // Communication still works — it goes to the submitter's channel.
         cases.submit(created.caseId()); em.flush();
-        assertThat(jdbc.queryForObject("SELECT destination FROM notification_outbox WHERE notification_type='CASE_STATUS_LINK' AND idempotency_key LIKE 'case-status:%' ORDER BY created_at DESC LIMIT 1", String.class)).isEqualTo("+201000000004");
+        assertThat(jdbc.queryForObject("SELECT destination FROM notification_outbox WHERE notification_type='CASE_STATUS_LINK' AND idempotency_key LIKE 'case-status:%' ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1", String.class)).isEqualTo("+201000000004");
     }
 
     @Test void aSharedWhatsAppNumberIsAcceptedAndNeverMergesPatients() {
@@ -419,7 +419,7 @@ class PatientIdentityAndAccountTest {
         return id;
     }
     private String linkToken(UUID patientId) throws Exception {
-        String stored = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o WHERE o.notification_type='ACCOUNT_LINK' AND o.idempotency_key LIKE ? ORDER BY o.created_at DESC LIMIT 1", String.class, "account-link:" + patientId + ":%"));
+        String stored = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o WHERE o.notification_type='ACCOUNT_LINK' AND o.idempotency_key LIKE ? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, "account-link:" + patientId + ":%"));
         return json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
     }
     private void finishSetup(String subject) {
@@ -435,14 +435,14 @@ class PatientIdentityAndAccountTest {
     private Ctx accepted(CreateCaseRequest request) throws Exception {
         var ctx = releasePreliminary(request);
         journey.requestProposalAccess(ctx.token, "WHATSAPP"); em.flush();
-        var g = journey.verifyProposalAccess(ctx.token, proposalCode("WHATSAPP"));
+        var g = journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "WHATSAPP"));
         journey.decideProposalPublic(ctx.token, g.grant(), new PublicProposalDecisionRequest(g.grant(), "ACKNOWLEDGED", null, true));
         em.flush(); SecurityContextHolder.clearContext();
         return new Ctx(ctx.caseId(), ctx.versionId(), onboardingTokenFor(ctx.caseId()), ctx.caseNumber());
     }
     private String grant(Ctx ctx) throws Exception {
         publicCases.requestAccess(ctx.token, "WHATSAPP"); em.flush();
-        var g = publicCases.verify(ctx.token, accessCode());
+        var g = publicCases.verify(ctx.token, accessCode(ctx.token));
         SecurityContextHolder.clearContext();
         return g.grant();
     }
@@ -476,16 +476,17 @@ class PatientIdentityAndAccountTest {
         return new Ctx(created.caseId(), proposal.versionId(), raw, created.caseNumber());
     }
     private String onboardingTokenFor(UUID caseId) throws Exception {
-        String key = jdbc.queryForObject("SELECT idempotency_key FROM notification_outbox WHERE notification_type='PROFILE_ACTIVATION' AND idempotency_key IN (SELECT 'onboarding:'||id FROM case_access_links WHERE case_id=? AND purpose='ONBOARDING') ORDER BY created_at DESC LIMIT 1", String.class, caseId);
+        String key = jdbc.queryForObject("SELECT idempotency_key FROM notification_outbox WHERE notification_type='PROFILE_ACTIVATION' AND idempotency_key IN (SELECT 'onboarding:'||id FROM case_access_links WHERE case_id=? AND purpose='ONBOARDING') ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1", String.class, caseId);
         String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, key));
         return json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
     }
-    private String accessCode() throws Exception {
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key IN (SELECT 'case-access:'||id FROM case_access_challenges WHERE consumed_at IS NULL AND revoked_at IS NULL) ORDER BY created_at DESC LIMIT 1", String.class));
+    // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
+    private String accessCode(String token) throws Exception {
+        String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN case_access_challenges ch ON o.idempotency_key='case-access:'||ch.id JOIN case_access_links l ON l.id=ch.link_id WHERE l.token_hash=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token)));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
     }
-    private String proposalCode(String channel) throws Exception {
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PROPOSAL_ACCESS' AND channel=? ORDER BY created_at DESC LIMIT 1", String.class, channel));
+    private String proposalCode(String token, String channel) throws Exception {
+        String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id JOIN proposal_share_tokens st ON st.id=ch.share_token_id WHERE st.token_hash=? AND o.channel=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), channel));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
     }
     private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }
