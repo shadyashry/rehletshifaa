@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(properties="spring.task.scheduling.enabled=false")
 @Transactional
 class SecureJourneyCorrectionsTest {
-    @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases; @Autowired ProposalExpiryService expiry; @Autowired AccountActivationService accountActivations; @Autowired CredentialExpiryService credentialExpiry; @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases; @Autowired ProposalExpiryService expiry; @Autowired AccountActivationService accountActivations; @Autowired CredentialExpiryService credentialExpiry; @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     /** System time plus an offset a test can advance, so writes that must be ordered never share a clock tick. */
     @TestBean Clock clock;
     static Clock clock(){return new AdvanceableClock();}
@@ -63,7 +63,7 @@ class SecureJourneyCorrectionsTest {
         var created=cases.create(new CreateCaseRequest("Verify", "Patient","Kenya","+254700000011","Reports","en",true,null,null,null));
         var submitted=cases.submit(created.caseId()); em.flush(); em.clear();
         publicCases.requestAccess(submitted.statusToken());em.flush();
-        String code=caseAccessCode("+254700000011");
+        String code=caseAccessCode(submitted.statusToken(),"+254700000011");
         var grant=publicCases.verify(submitted.statusToken(),code);
         publicCases.view(submitted.statusToken(),grant.grant());
         assertThat(status(created.caseId())).isEqualTo("RECEIVED");
@@ -90,7 +90,7 @@ class SecureJourneyCorrectionsTest {
         journey.transition(created.caseId(),new TransitionRequest("INFORMATION_REQUIRED","Please add the missing report",version)); em.flush();
         String token=informationActionToken(created.caseId());
         publicCases.requestAccess(token); em.flush();
-        String code=caseAccessCode("+254700000012");
+        String code=caseAccessCode(token,"+254700000012");
         var grant=publicCases.verify(token,code);
         assertThat(publicCases.view(token,grant.grant()).actionRequired()).isTrue();
         publicCases.respond(token,new InformationResponseRequest(grant.grant(),"The requested report has been added","en",null));
@@ -195,7 +195,7 @@ class SecureJourneyCorrectionsTest {
         assertThat(internal).isFalse();
         String stored=jdbc.queryForObject("SELECT body FROM case_messages WHERE case_id=? AND thread_type='PATIENT_COORDINATOR' ORDER BY created_at DESC LIMIT 1",String.class,ctx.caseId);
         assertThat(stored).startsWith("enc:").doesNotContain("Visible to patient");
-        String notification=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='SECURE_MESSAGE' ORDER BY created_at DESC LIMIT 1",String.class));
+        String notification=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='SECURE_MESSAGE' ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1",String.class));
         assertThat(notification).doesNotContain("Visible to patient");
     }
 
@@ -950,11 +950,12 @@ class SecureJourneyCorrectionsTest {
 
     private void seedDoctor(){UUID id=UUID.randomUUID();jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",id,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),id,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());}
     private void seedStaff(){jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"operations-subject","OPERATIONS",crypto.encrypt("Operations One"),Instant.now(),Instant.now());jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",UUID.randomUUID(),"finance-subject","FINANCE",crypto.encrypt("Finance One"),Instant.now(),Instant.now());}
-    private String caseAccessCode(String dest) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='CASE_ACCESS' AND destination=? ORDER BY created_at DESC LIMIT 1",String.class,dest));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}
-    private String proposalAccessCode(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PROPOSAL_ACCESS' AND destination IN (SELECT p.whatsapp_number FROM patient_profiles p JOIN medical_cases c ON c.patient_id=p.id WHERE c.id=?) ORDER BY created_at DESC LIMIT 1",String.class,caseId));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}
+    // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
+    private String caseAccessCode(String token,String dest) throws Exception {String raw=payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN case_access_challenges ch ON o.idempotency_key='case-access:'||ch.id JOIN case_access_links l ON l.id=ch.link_id WHERE l.token_hash=? AND o.destination=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1",String.class,intakeLifecycle.hash(token),dest));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}
+    private String proposalAccessCode(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id WHERE ch.case_id=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1",String.class,caseId));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}
     /** Internal binding credential: nothing emails it any more, so the test asks the owning service for one. */
     private String activationToken(UUID caseId){UUID patientId=jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?",UUID.class,caseId);return accountActivations.issue(patientId,caseId);}
-    private String informationActionToken(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PATIENT_ACTION' AND idempotency_key LIKE 'patient-action:%' ORDER BY created_at DESC LIMIT 1",String.class));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("token");}
+    private String informationActionToken(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PATIENT_ACTION' AND idempotency_key IN (SELECT 'patient-action:'||id FROM case_access_links WHERE case_id=? AND purpose='INFORMATION_RESPONSE') ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1",String.class,caseId));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("token");}
     private String payload(String stored){return stored.startsWith("enc:")?crypto.decrypt(stored.substring(4)):stored;}
     private int count(String sql,Object... args){Integer n=jdbc.queryForObject(sql,Integer.class,args);return n==null?0:n;}
     private String status(UUID caseId){return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?",String.class,caseId);}

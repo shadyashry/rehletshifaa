@@ -40,7 +40,7 @@ class CoordinatorCaseActionsTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired PatientActivationService activation; @Autowired PaymentService payment; @Autowired CaseActionService caseActions;
     @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff;
-    @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---------- stale work ----------
@@ -241,7 +241,7 @@ class CoordinatorCaseActionsTest {
         // The patient verifies the new number through a secure status link: the last gate falls.
         String token = publicCases.issueStatusLink(ctx.caseId, "en", "case-status", "status:" + ctx.caseId);
         publicCases.requestAccess(token, "WHATSAPP"); em.flush();
-        publicCases.verify(token, code("CASE_ACCESS", "WHATSAPP")); em.flush();
+        publicCases.verify(token, caseAccessCode(token)); em.flush();
         assertThat(status(ctx.caseId)).isEqualTo("TRAVEL_COORDINATION");
 
         // Replayed events change nothing: no second transition, work item, notification or handoff audit.
@@ -339,7 +339,7 @@ class CoordinatorCaseActionsTest {
         String token = json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
         SecurityContextHolder.clearContext();
         journey.requestProposalAccess(token, "WHATSAPP"); em.flush();
-        var g = journey.verifyProposalAccess(token, code("PROPOSAL_ACCESS", "WHATSAPP"));
+        var g = journey.verifyProposalAccess(token, proposalCode(token, "WHATSAPP"));
         journey.decideProposalPublic(token, g.grant(), new PublicProposalDecisionRequest(g.grant(), "ACKNOWLEDGED", null, true));
         em.flush(); SecurityContextHolder.clearContext();
         String caseNumber = jdbc.queryForObject("SELECT case_number FROM medical_cases WHERE id=?", String.class, rec.caseId());
@@ -353,7 +353,7 @@ class CoordinatorCaseActionsTest {
 
     private String grant(Ctx ctx) throws Exception {
         publicCases.requestAccess(ctx.token, "WHATSAPP"); em.flush();
-        var g = publicCases.verify(ctx.token, code("CASE_ACCESS", "WHATSAPP"));
+        var g = publicCases.verify(ctx.token, caseAccessCode(ctx.token));
         SecurityContextHolder.clearContext();
         return g.grant();
     }
@@ -386,12 +386,17 @@ class CoordinatorCaseActionsTest {
     }
 
     private String onboardingTokenFor(UUID caseId) throws Exception {
-        String key = jdbc.queryForObject("SELECT idempotency_key FROM notification_outbox WHERE notification_type='PROFILE_ACTIVATION' AND idempotency_key IN (SELECT 'onboarding:'||id FROM case_access_links WHERE case_id=? AND purpose='ONBOARDING' AND revoked_at IS NULL) ORDER BY created_at DESC LIMIT 1", String.class, caseId);
+        String key = jdbc.queryForObject("SELECT idempotency_key FROM notification_outbox WHERE notification_type='PROFILE_ACTIVATION' AND idempotency_key IN (SELECT 'onboarding:'||id FROM case_access_links WHERE case_id=? AND purpose='ONBOARDING' AND revoked_at IS NULL) ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1", String.class, caseId);
         String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, key));
         return json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
     }
-    private String code(String type, String channel) throws Exception {
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type=? AND channel=? ORDER BY created_at DESC LIMIT 1", String.class, type, channel));
+    // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
+    private String caseAccessCode(String token) throws Exception {
+        String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN case_access_challenges ch ON o.idempotency_key='case-access:'||ch.id JOIN case_access_links l ON l.id=ch.link_id WHERE l.token_hash=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token)));
+        return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
+    }
+    private String proposalCode(String token, String channel) throws Exception {
+        String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id JOIN proposal_share_tokens st ON st.id=ch.share_token_id WHERE st.token_hash=? AND o.channel=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), channel));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
     }
     private void authenticate(String subject, String... roles) {

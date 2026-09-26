@@ -35,7 +35,7 @@ class PatientConversionLayerTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired OnboardingService onboarding; @Autowired IdentityVerificationService identity; @Autowired PaymentService payment;
     @Autowired AccountActivationService accountActivations;
-    @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---------- Contact verification vs account activation vs identity ----------
@@ -43,7 +43,7 @@ class PatientConversionLayerTest {
     @Test void whatsappOtpSetsPhoneVerifiedOnly() throws Exception {
         var ctx = releasePreliminary();
         journey.requestProposalAccess(ctx.token, "WHATSAPP"); em.flush();
-        journey.verifyProposalAccess(ctx.token, proposalCode("WHATSAPP"));
+        journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "WHATSAPP"));
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNotNull();
         assertThat(verifiedAt(ctx.caseId, "email_verified_at")).isNull();
     }
@@ -51,7 +51,7 @@ class PatientConversionLayerTest {
     @Test void emailOtpSetsEmailVerifiedOnly() throws Exception {
         var ctx = releasePreliminary();
         journey.requestProposalAccess(ctx.token, "EMAIL"); em.flush();
-        journey.verifyProposalAccess(ctx.token, proposalCode("EMAIL"));
+        journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "EMAIL"));
         assertThat(verifiedAt(ctx.caseId, "email_verified_at")).isNotNull();
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull();
     }
@@ -61,7 +61,7 @@ class PatientConversionLayerTest {
         // set phone_verified_at — the old conflation bug that this regression guards against.
         var ctx = releasePreliminary();
         journey.requestProposalAccess(ctx.token, "EMAIL"); em.flush();
-        var grant = journey.verifyProposalAccess(ctx.token, proposalCode("EMAIL"));
+        var grant = journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "EMAIL"));
         journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "ACKNOWLEDGED", null, true)); em.flush();
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull();
         authenticate("patient-subject-a", "PATIENT");
@@ -73,7 +73,7 @@ class PatientConversionLayerTest {
         var ctx = releasePreliminary();
         journey.requestProposalAccess(ctx.token); em.flush(); // no channel => default WhatsApp
         assertThat(activeChannel(ctx.caseId)).isEqualTo("WHATSAPP");
-        journey.verifyProposalAccess(ctx.token, proposalCode("WHATSAPP"));
+        journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "WHATSAPP"));
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNotNull();
     }
 
@@ -97,7 +97,7 @@ class PatientConversionLayerTest {
     @Test void switchingChannelInvalidatesPriorChallenge() throws Exception {
         var ctx = releasePreliminary();
         journey.requestProposalAccess(ctx.token, "WHATSAPP"); em.flush();
-        String firstCode = proposalCode("WHATSAPP");
+        String firstCode = proposalCode(ctx.token, "WHATSAPP");
         journey.requestProposalAccess(ctx.token, "EMAIL"); em.flush();
         // The prior WhatsApp challenge was revoked when the email challenge was minted.
         assertThatThrownBy(() -> journey.verifyProposalAccess(ctx.token, firstCode)).isInstanceOf(ApiException.class);
@@ -133,7 +133,7 @@ class PatientConversionLayerTest {
     @Test void declineDoesNotCreateOnboarding() throws Exception {
         var ctx = releasePreliminary();
         journey.requestProposalAccess(ctx.token, "WHATSAPP"); em.flush();
-        var grant = journey.verifyProposalAccess(ctx.token, proposalCode("WHATSAPP"));
+        var grant = journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "WHATSAPP"));
         journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "DECLINED", null)); em.flush();
         assertThat(count("SELECT count(*) FROM patient_onboardings WHERE case_id=?", ctx.caseId)).isZero();
     }
@@ -316,7 +316,7 @@ class PatientConversionLayerTest {
 
     private void acknowledge(Ctx ctx) throws Exception {
         journey.requestProposalAccess(ctx.token, "WHATSAPP"); em.flush();
-        var grant = journey.verifyProposalAccess(ctx.token, proposalCode("WHATSAPP"));
+        var grant = journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "WHATSAPP"));
         journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "ACKNOWLEDGED", null, true)); em.flush();
         SecurityContextHolder.clearContext();
     }
@@ -367,7 +367,8 @@ class PatientConversionLayerTest {
     private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }
     private void seedStaff() { if (count("SELECT count(*) FROM staff_members WHERE external_subject=?", "operations-subject") > 0) return; jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "operations-subject", "OPERATIONS", crypto.encrypt("Operations One"), Instant.now(), Instant.now()); jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "finance-subject", "FINANCE", crypto.encrypt("Finance One"), Instant.now(), Instant.now()); }
 
-    private String proposalCode(String channel) throws Exception { String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PROPOSAL_ACCESS' AND channel=? ORDER BY created_at DESC LIMIT 1", String.class, channel)); return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code"); }
+    // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
+    private String proposalCode(String token, String channel) throws Exception { String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id JOIN proposal_share_tokens st ON st.id=ch.share_token_id WHERE st.token_hash=? AND o.channel=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), channel)); return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code"); }
     private String activeChannel(UUID caseId) { return jdbc.queryForObject("SELECT delivery_channel FROM proposal_access_challenges WHERE case_id=? AND revoked_at IS NULL AND consumed_at IS NULL", String.class, caseId); }
     /** The binding credential is internal now - no customer message carries it, so the test asks for it directly. */
     private String activationToken(UUID caseId) { UUID patientId = jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?", UUID.class, caseId); return accountActivations.issue(patientId, caseId); }

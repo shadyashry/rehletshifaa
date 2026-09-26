@@ -39,7 +39,7 @@ class PatientActivationJourneyTest {
     @Autowired PatientActivationService activation; @Autowired PaymentService payment; @Autowired PatientAccountService account;
     @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort; com.rehletshifaa.identity.LocalPatientIdentitySimulator identity;
     @org.junit.jupiter.api.BeforeEach void simulator() { identity = (com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort; identity.reset(); }
-    @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---------- secure continuation link ----------
@@ -437,7 +437,7 @@ class PatientActivationJourneyTest {
         var ctx = releasePreliminary(whatsapp, email);
         patientsBefore = count("SELECT count(*) FROM patient_profiles");
         journey.requestProposalAccess(ctx.token, "WHATSAPP"); em.flush();
-        var g = journey.verifyProposalAccess(ctx.token, proposalCode("WHATSAPP"));
+        var g = journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "WHATSAPP"));
         journey.decideProposalPublic(ctx.token, g.grant(), new PublicProposalDecisionRequest(g.grant(), "ACKNOWLEDGED", null, true));
         em.flush(); SecurityContextHolder.clearContext();
         return new Ctx(ctx.caseId(), ctx.versionId(), onboardingTokenFor(ctx.caseId()), ctx.caseNumber());
@@ -446,7 +446,7 @@ class PatientActivationJourneyTest {
     /** Verify the one-time code on the onboarding link and return the short-lived grant. */
     private String grant(Ctx ctx) throws Exception {
         publicCases.requestAccess(ctx.token, "WHATSAPP"); em.flush();
-        var g = publicCases.verify(ctx.token, accessCode());
+        var g = publicCases.verify(ctx.token, accessCode(ctx.token));
         SecurityContextHolder.clearContext();
         return g.grant();
     }
@@ -507,20 +507,21 @@ class PatientActivationJourneyTest {
     }
 
     private String onboardingToken() throws Exception {
-        String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PROFILE_ACTIVATION' ORDER BY created_at DESC LIMIT 1", String.class));
+        String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PROFILE_ACTIVATION' ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1", String.class));
         return json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
     }
     private String onboardingTokenFor(UUID caseId) throws Exception {
-        String key = jdbc.queryForObject("SELECT idempotency_key FROM notification_outbox WHERE notification_type='PROFILE_ACTIVATION' AND idempotency_key IN (SELECT 'onboarding:'||id FROM case_access_links WHERE case_id=? AND purpose='ONBOARDING') ORDER BY created_at DESC LIMIT 1", String.class, caseId);
+        String key = jdbc.queryForObject("SELECT idempotency_key FROM notification_outbox WHERE notification_type='PROFILE_ACTIVATION' AND idempotency_key IN (SELECT 'onboarding:'||id FROM case_access_links WHERE case_id=? AND purpose='ONBOARDING') ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1", String.class, caseId);
         String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, key));
         return json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
     }
-    private String accessCode() throws Exception {
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='CASE_ACCESS' ORDER BY created_at DESC LIMIT 1", String.class));
+    // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
+    private String accessCode(String token) throws Exception {
+        String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN case_access_challenges ch ON o.idempotency_key='case-access:'||ch.id JOIN case_access_links l ON l.id=ch.link_id WHERE l.token_hash=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token)));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
     }
-    private String proposalCode(String channel) throws Exception {
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PROPOSAL_ACCESS' AND channel=? ORDER BY created_at DESC LIMIT 1", String.class, channel));
+    private String proposalCode(String token, String channel) throws Exception {
+        String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id JOIN proposal_share_tokens st ON st.id=ch.share_token_id WHERE st.token_hash=? AND o.channel=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), channel));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
     }
     private UUID patientId(UUID caseId) { return jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?", UUID.class, caseId); }

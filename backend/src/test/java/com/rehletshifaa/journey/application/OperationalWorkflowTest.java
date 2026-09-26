@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.*;
 class OperationalWorkflowTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired PatientActionService patientActions; @Autowired StaffWorkService work;
-    @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---------------- request more information ----------------
@@ -103,7 +103,7 @@ class OperationalWorkflowTest {
 
         String token = actionToken();
         publicCases.requestAccess(token); em.flush();
-        var grant = publicCases.verify(token, accessCode("+254700000031"));
+        var grant = publicCases.verify(token, accessCode(token, "+254700000031"));
         PublicCaseStatus view = publicCases.view(token, grant.grant());
         assertThat(view.actionRequired()).isTrue();
         assertThat(view.action().items()).extracting(PatientActionItemView::label).containsExactly("Current medication");
@@ -133,7 +133,7 @@ class OperationalWorkflowTest {
 
         String token = actionToken();
         publicCases.requestAccess(token); em.flush();
-        var grant = publicCases.verify(token, accessCode("+254700000031"));
+        var grant = publicCases.verify(token, accessCode(token, "+254700000031"));
         assertThatThrownBy(() -> publicCases.respond(token, new InformationResponseRequest(grant.grant(), "Here you go", "en", List.of())))
                 .isInstanceOf(FieldValidationException.class);
         assertThat(waitingOn(caseId)).isEqualTo("PATIENT"); // still the patient's move
@@ -154,7 +154,7 @@ class OperationalWorkflowTest {
         UUID foreignItem = jdbc.queryForObject("SELECT i.id FROM patient_action_items i JOIN case_tasks t ON t.id=i.task_id WHERE t.case_id=?", UUID.class, other);
         String token = actionTokenFor(first);
         publicCases.requestAccess(token); em.flush();
-        var grant = publicCases.verify(token, accessCode("+254700000031"));
+        var grant = publicCases.verify(token, accessCode(token, "+254700000031"));
         // The foreign item id is simply not part of this action: the required item stays unanswered.
         assertThatThrownBy(() -> publicCases.respond(token, new InformationResponseRequest(grant.grant(), "x", "en",
                 List.of(new ItemResponse(foreignItem, "tampered", null))))).isInstanceOf(FieldValidationException.class);
@@ -168,7 +168,7 @@ class OperationalWorkflowTest {
         em.flush(); SecurityContextHolder.clearContext();
         String token = actionToken();
         publicCases.requestAccess(token); em.flush();
-        var grant = publicCases.verify(token, accessCode("+254700000031"));
+        var grant = publicCases.verify(token, accessCode(token, "+254700000031"));
         publicCases.respond(token, new InformationResponseRequest(grant.grant(), "All good", "en", null)); em.flush();
         assertThatThrownBy(() -> publicCases.respond(token, new InformationResponseRequest(grant.grant(), "again", "en", null)))
                 .isInstanceOf(ApiException.class);
@@ -536,15 +536,16 @@ class OperationalWorkflowTest {
     }
 
     private String actionToken() throws Exception {
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PATIENT_ACTION' ORDER BY created_at DESC LIMIT 1", String.class));
+        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PATIENT_ACTION' ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1", String.class));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("token");
     }
     private String actionTokenFor(UUID caseId) throws Exception {
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PATIENT_ACTION' AND idempotency_key IN (SELECT 'patient-action:'||id FROM case_access_links WHERE case_id=? AND purpose='INFORMATION_RESPONSE') ORDER BY created_at DESC LIMIT 1", String.class, caseId));
+        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PATIENT_ACTION' AND idempotency_key IN (SELECT 'patient-action:'||id FROM case_access_links WHERE case_id=? AND purpose='INFORMATION_RESPONSE') ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1", String.class, caseId));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("token");
     }
-    private String accessCode(String destination) throws Exception {
-        String raw = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='CASE_ACCESS' AND destination=? ORDER BY created_at DESC LIMIT 1", String.class, destination));
+    // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
+    private String accessCode(String token, String destination) throws Exception {
+        String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN case_access_challenges ch ON o.idempotency_key='case-access:'||ch.id JOIN case_access_links l ON l.id=ch.link_id WHERE l.token_hash=? AND o.destination=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), destination));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
     }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }
