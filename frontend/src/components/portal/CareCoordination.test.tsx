@@ -10,7 +10,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const staff = [
   { subject: "kc-owner", name: "Omar Nabil", role: "COORDINATOR" },
   { subject: "kc-sara", name: "Sara Ahmed", role: "COORDINATOR" },
-  { subject: "kc-lead", name: "Mohamed Ali", role: "COORDINATOR_LEAD" },
+  { subject: "kc-lead", name: "Mohamed Ali", role: "COORDINATOR" },
   { subject: "kc-ops", name: "Ops Person", role: "OPERATIONS" },
 ];
 

@@ -11,7 +11,7 @@ import { FocusTrapDialog } from "./FocusTrapDialog";
 import { Section, StatusBadge } from "./cc-ui";
 import type { Tone } from "./admin-labels";
 import { historyActionLabel, journeyCopy, journeyStatusLabel } from "./journey-copy";
-import type { Decision, JourneyCutoverStatus, JourneyDetail, JourneyHistoryEntry, JourneyReadiness, JourneyVersion } from "./journey-types";
+import type { JourneyCutoverStatus, JourneyDetail, JourneyHistoryEntry, JourneyReadiness, JourneyVersion } from "./journey-types";
 import "./journey-designer.css";
 
 const TONE: Record<string, Tone> = { PUBLISHED: "success", RETIRED: "neutral", PENDING_APPROVAL: "warning", SIMULATED: "info", VALIDATED: "info", DRAFT: "neutral" };
@@ -26,19 +26,18 @@ const when = (iso: string | null | undefined, locale: Locale) => (iso ? new Intl
  */
 export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Locale; definitionId: string }) {
   const t = journeyCopy[locale];
-  const { user, loading: authLoading, signIn } = useAuth();
+  const { user, me, loading: authLoading, signIn } = useAuth();
   const [detail, setDetail] = useState<JourneyDetail | null>(null);
   const [intake, setIntake] = useState<JourneyCutoverStatus | "error" | null>(null);
   const [runtime, setRuntime] = useState<Record<string, JourneyReadiness | "error"> | null>(null);
   const [history, setHistory] = useState<JourneyHistoryEntry[] | null>(null);
-  const [can, setCan] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [cloning, setCloning] = useState<JourneyVersion | null>(null);
   const [reason, setReason] = useState("");
 
-  const allowed = (key: string) => can.some((d) => d.permission === key && d.allowed);
+  const allowed = (key: string) => !!me?.permissions.includes(key);
 
   const api = useCallback(async <T,>(path: string, method = "GET", body?: unknown): Promise<T> => {
     if (!user) throw new Error(t.denied);
@@ -55,16 +54,15 @@ export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Loca
 
   const refresh = useCallback(async () => {
     if (!user) { setLoading(false); return; }
+    if (!me) return; // wait for /api/v1/me before deciding what the caller may read
     setLoading(true); setError(""); setRuntime(null);
     try {
-      const decisions = await apiFetchAs(user.access_token, "/admin/access/me").then((r) => (r.ok ? r.json() : []));
-      setCan(decisions);
-      if ((decisions as Decision[]).some((d) => d.permission === "journey.view" && d.allowed)) {
+      if (me?.permissions.includes("JOURNEY_READ")) {
         const [d, cutover] = await Promise.all([api<JourneyDetail>(base), api<JourneyCutoverStatus>("/admin/journey-cutover").catch(() => "error" as const)]);
         setDetail(d); setIntake(cutover);
       }
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
-  }, [api, user, t.error, base]);
+  }, [api, user, me, t.error, base]);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const loadHistory = async () => {

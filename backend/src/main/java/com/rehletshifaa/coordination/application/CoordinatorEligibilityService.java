@@ -1,28 +1,50 @@
 package com.rehletshifaa.coordination.application;
 
-import com.rehletshifaa.access.application.*;
-import com.rehletshifaa.access.domain.*;
 import com.rehletshifaa.coordination.domain.Routing.*;
 import com.rehletshifaa.coordination.infrastructure.CoordinationRepository;
+import com.rehletshifaa.workforce.application.WorkforceDirectory;
 import org.springframework.stereotype.Service;
-import java.time.*;
+
+import java.time.Instant;
 import java.util.*;
 
+/**
+ * Who may receive a case's coordination work: an active person holding the Coordinator role, a member of an active
+ * care-coordination team serving the case's care area, with capacity (and on duty, and speaking the language, when the
+ * policy requires it). Every excluded person is reported with the reasons.
+ */
 @Service
 public class CoordinatorEligibilityService {
-    private final CoordinationRepository repo; private final AuthorizationService auth;
-    public CoordinatorEligibilityService(CoordinationRepository repo,AuthorizationService auth){this.repo=repo;this.auth=auth;}
-    public List<Candidate> evaluate(CaseFacts c,Policy p,Instant at){List<Team> teams=repo.teams(c.organizationId());List<Candidate> result=new ArrayList<>();for(Capacity capacity:repo.capacities(c.organizationId())){
-        List<String> exclusions=new ArrayList<>();List<UUID> memberships=new ArrayList<>();
-        for(Team t:teams)if(t.configuration().active()&&(t.configuration().careAreas().isEmpty()||t.configuration().careAreas().contains(c.careArea())))
-            if(repo.members(t.id()).stream().anyMatch(m->m.subject().equals(capacity.subject())&&m.active()&&CoordinationConfigurationService.effective(m.effectiveFrom(),m.effectiveTo(),at)))memberships.add(t.id());
-        var grant=auth.decide(new AccessIdentity.Identity(capacity.subject(),null),"assignment.receive",new ResourceContext(c.organizationId(),true,"CASE",c.id().toString(),capacity.subject(),false),ChannelEntitlement.API);
-        if(!grant.allowed())grant=auth.decide(new AccessIdentity.Identity(capacity.subject(),null),"assignment.receive",new ResourceContext(c.organizationId(),true,"CASE",c.id().toString(),capacity.subject(),false),ChannelEntitlement.ADMIN_WEB);
-        if(!grant.allowed())exclusions.add("ACCESS_OR_MEMBERSHIP_DENIED");if(!repo.staffEnabled(capacity.subject()))exclusions.add("STAFF_DISABLED");if(memberships.isEmpty())exclusions.add("NO_ACTIVE_TEAM");
-        if(!capacity.careAreas().isEmpty()&&!capacity.careAreas().contains(c.careArea()))exclusions.add("CARE_AREA_MISMATCH");
-        boolean language=capacity.languages().stream().anyMatch(l->l.equalsIgnoreCase(c.language()));if(p.configuration().mandatoryLanguage()&&!language)exclusions.add("LANGUAGE_MISMATCH");
-        if(p.configuration().requireOnDuty()&&!capacity.onDuty())exclusions.add("OFF_DUTY");long load=repo.workload(capacity.subject(),c.id());
-        if(capacity.maximum()<=load)exclusions.add("AT_CAPACITY");
-        result.add(new Candidate(capacity.subject(),memberships.stream().sorted().toList(),capacity.maximum(),load,capacity.onDuty(),language,repo.lastAutomatic(capacity.subject()),List.copyOf(exclusions)));
-    }return List.copyOf(result);}
+    private final CoordinationRepository repo;
+    private final WorkforceDirectory workforce;
+
+    public CoordinatorEligibilityService(CoordinationRepository repo, WorkforceDirectory workforce) {
+        this.repo = repo;
+        this.workforce = workforce;
+    }
+
+    public List<Candidate> evaluate(CaseFacts c, Policy p, Instant at) {
+        Map<UUID, Team> teams = new HashMap<>();
+        repo.teams().forEach(t -> teams.put(t.id(), t));
+        Map<String, List<UUID>> memberships = repo.memberships(at);
+        List<Candidate> result = new ArrayList<>();
+        for (Capacity capacity : repo.capacities()) {
+            List<String> exclusions = new ArrayList<>();
+            List<UUID> serving = memberships.getOrDefault(capacity.subject(), List.of()).stream()
+                    .filter(id -> teams.containsKey(id) && teams.get(id).active())
+                    .filter(id -> teams.get(id).careAreas().isEmpty() || teams.get(id).careAreas().contains(c.careArea()))
+                    .sorted().toList();
+            if (!workforce.holds(capacity.subject(), "COORDINATOR")) exclusions.add("NOT_AN_ACTIVE_COORDINATOR");
+            if (serving.isEmpty()) exclusions.add("NO_ACTIVE_TEAM");
+            if (!capacity.careAreas().isEmpty() && !capacity.careAreas().contains(c.careArea())) exclusions.add("CARE_AREA_MISMATCH");
+            boolean language = capacity.languages().stream().anyMatch(l -> l.equalsIgnoreCase(c.language()));
+            if (p.configuration().mandatoryLanguage() && !language) exclusions.add("LANGUAGE_MISMATCH");
+            if (p.configuration().requireOnDuty() && !capacity.onDuty()) exclusions.add("OFF_DUTY");
+            long load = repo.workload(capacity.subject(), c.id());
+            if (capacity.maximum() <= load) exclusions.add("AT_CAPACITY");
+            result.add(new Candidate(capacity.subject(), serving, capacity.maximum(), load, capacity.onDuty(), language,
+                    repo.lastAutomatic(capacity.subject()), List.copyOf(exclusions)));
+        }
+        return List.copyOf(result);
+    }
 }

@@ -2,8 +2,11 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
 import com.rehletshifaa.journey.api.WorkDtos.*;
-import com.rehletshifaa.security.ActorContext;
-import com.rehletshifaa.security.ActorRole;
+import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,15 +48,15 @@ public class StaffWorkService {
     private static final Set<String> WAITING = Set.of("STAFF", "PATIENT", "CONSULTANT", "HOSPITAL", "TRAVEL_TEAM", "PAYMENT", "EXTERNAL", "NONE");
 
     private final JdbcClient jdbc;
-    private final ActorContext actors;
+    private final Authority authority;
     private final IntakeLifecycleService intake;
     private final CryptoService crypto;
     private final Clock clock;
     private final String teamMailbox;
 
-    public StaffWorkService(JdbcClient jdbc, ActorContext actors, IntakeLifecycleService intake, CryptoService crypto,
+    public StaffWorkService(JdbcClient jdbc, Authority authority, IntakeLifecycleService intake, CryptoService crypto,
                             Clock clock, @Value("${app.mail.coordinator}") String teamMailbox) {
-        this.jdbc = jdbc; this.actors = actors; this.intake = intake; this.crypto = crypto;
+        this.jdbc = jdbc; this.authority = authority; this.intake = intake; this.crypto = crypto;
         this.clock = clock; this.teamMailbox = teamMailbox;
     }
 
@@ -129,8 +132,7 @@ public class StaffWorkService {
     /** Work assigned to me right now, newest priority first, with the context needed to act. */
     @Transactional(readOnly = true)
     public List<WorkItemView> myWork() {
-        var actor = actors.require(ActorRole.COORDINATOR, ActorRole.COORDINATOR_LEAD, ActorRole.DOCTOR,
-                ActorRole.OPERATIONS, ActorRole.FINANCE, ActorRole.PATIENT);
+        var actor = authority.authorize(Permission.TASK_WORK);
         return jdbc.sql("SELECT t.id,t.case_id,t.task_type,t.title,t.description,t.priority,t.status,t.blocking,t.due_at,t.created_at,t.version,"
                         + "c.case_number,c.status case_status,c.waiting_on,c.care_category," + com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL + " patient_name,"
                         + "(SELECT count(*) FROM medical_documents d WHERE d.case_id=c.id AND d.status<>'REJECTED') document_count,"
@@ -171,7 +173,7 @@ public class StaffWorkService {
 
     @Transactional(readOnly = true)
     public NotificationFeed myNotifications() {
-        var actor = actors.current();
+        var actor = com.rehletshifaa.authority.application.Principal.current();
         List<NotificationView> items = jdbc.sql("SELECT n.id,n.case_id,n.task_id,n.event_type,n.title,n.context,n.created_at,n.read_at,c.case_number "
                         + "FROM staff_notifications n LEFT JOIN medical_cases c ON c.id=n.case_id WHERE n.recipient_subject=? "
                         + "ORDER BY n.created_at DESC LIMIT 30")
@@ -184,7 +186,7 @@ public class StaffWorkService {
     /** Marking a notification read is purely an inbox action — the related work item stays open. */
     @Transactional
     public int markRead(UUID id) {
-        var actor = actors.current();
+        var actor = com.rehletshifaa.authority.application.Principal.current();
         Instant now = clock.instant();
         if (id != null) {
             jdbc.sql("UPDATE staff_notifications SET read_at=? WHERE id=? AND recipient_subject=? AND read_at IS NULL")
@@ -218,7 +220,7 @@ public class StaffWorkService {
     /**
      * Work email to the person the work belongs to, in their own role's words. The recipient is resolved
      * from the directory that holds their role — consultants live in {@code practitioner_profiles}, everyone
-     * else in {@code staff_members} — so a consultant's assignment can never be addressed to a coordinator.
+     * else in the workforce model — so a consultant's assignment can never be addressed to a coordinator.
      *
      * <p>Only coordinator work may fall back to the shared coordination mailbox (it is that team's inbox);
      * a consultant, Operations or Finance member without a stored work address keeps the in-app
@@ -252,12 +254,15 @@ public class StaffWorkService {
      * in the staff directory; with no hint, whichever directory knows the subject answers.
      */
     private Recipient resolveRecipient(String subject, String roleHint) {
-        boolean doctor = ActorRole.DOCTOR.name().equals(roleHint);
-        Recipient staff = doctor ? null : jdbc.sql("SELECT email_encrypted,staff_role FROM staff_members WHERE external_subject=?").param(subject)
-                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")), rs.getString("staff_role"))).optional().orElse(null);
+        boolean doctor = "DOCTOR".equals(roleHint);
+        Recipient staff = doctor ? null : jdbc.sql("SELECT p.email_encrypted,(SELECT CASE WHEN COUNT(*)=1 THEN MIN(a.role_key) ELSE NULL END "
+                        + "FROM workforce_role_assignments a WHERE a.subject=p.subject AND a.status='ACTIVE') role_key "
+                        + "FROM workforce_people p WHERE p.subject=?").param(subject)
+                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")),
+                        roleHint == null || roleHint.isBlank() ? rs.getString("role_key") : roleHint)).optional().orElse(null);
         if (staff != null) return staff;
         Recipient practitioner = jdbc.sql("SELECT email_encrypted FROM practitioner_profiles WHERE external_subject=?").param(subject)
-                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")), ActorRole.DOCTOR.name())).optional().orElse(null);
+                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")), "DOCTOR")).optional().orElse(null);
         if (practitioner != null) return practitioner;
         return new Recipient(null, roleHint);
     }
@@ -365,7 +370,7 @@ public class StaffWorkService {
     /** Coordinator names come from the staff directory; a subject is never handed to the interface. */
     private String staffDisplayName(String subject) {
         if (subject == null || subject.isBlank()) return null;
-        return jdbc.sql("SELECT display_name_encrypted FROM staff_members WHERE external_subject=?").param(subject)
+        return jdbc.sql("SELECT display_name_encrypted FROM workforce_people WHERE subject=?").param(subject)
                 .query(String.class).optional().map(crypto::decrypt).orElse(null);
     }
 

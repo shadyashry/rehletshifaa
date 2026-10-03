@@ -36,9 +36,10 @@ describe("ClinicalReviewPanel", () => {
     // The old competing CTAs are gone from the page surface.
     for (const gone of ["Accept", "Complete Task", "Start Review", "Return to coordinator"])
       expect(screen.queryByRole("button", { name: gone })).toBeNull();
-    // The four exceptional outcomes exist, but only as options inside one disclosure.
+    // The three exceptional outcomes exist, but only as options inside one disclosure. Referrals have their own flow.
     expect(screen.getByText("Other clinical outcome")).toBeTruthy();
-    for (const outcome of ["Request additional information", "Request second opinion", "Return without recommendation", "Not clinically suitable"])
+    expect(screen.queryByRole("radio", { name: /Request second opinion/ })).toBeNull();
+    for (const outcome of ["Request additional information", "Return without recommendation", "Not clinically suitable"])
       expect(screen.getByRole("radio", { name: new RegExp(outcome) })).toBeTruthy();
   });
 
@@ -152,14 +153,14 @@ describe("ClinicalReviewPanel", () => {
 
   it("requires a clinical reason before an exceptional outcome is sent", () => {
     const { mutate } = setup();
-    fireEvent.click(screen.getByRole("radio", { name: /Request second opinion/ }));
-    const confirm = screen.getByRole("button", { name: "Request second opinion" });
+    fireEvent.click(screen.getByRole("radio", { name: /Return without recommendation/ }));
+    const confirm = screen.getByRole("button", { name: "Return to coordinator" });
     expect(confirm.hasAttribute("disabled")).toBe(true);
 
-    fireEvent.change(screen.getByLabelText("Clinical reason"), { target: { value: "Electrophysiology opinion needed" } });
-    fireEvent.click(screen.getByRole("button", { name: "Request second opinion" }));
+    fireEvent.change(screen.getByLabelText("Clinical reason"), { target: { value: "Needs a different care pathway" } });
+    fireEvent.click(screen.getByRole("button", { name: "Return to coordinator" }));
     expect(mutate).toHaveBeenCalledWith("/doctor/cases/case-1/review-decision", {
-      decision: "REASSIGN", risksAndLimitations: "Electrophysiology opinion needed",
+      decision: "RETURN_TO_COORDINATOR", risksAndLimitations: "Needs a different care pathway",
     });
   });
 

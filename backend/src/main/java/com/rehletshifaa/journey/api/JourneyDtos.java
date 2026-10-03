@@ -49,7 +49,6 @@ public final class JourneyDtos {
      * carries no priority or attention status, so nothing here is persisted for the UI's benefit.
      */
     public record StaffCaseCardView(CaseView caseSummary,UUID assignmentId,String assignmentStatus,long openTaskCount,long overdueTaskCount,long documentCount,long blockingOverdueCount,long highPriorityCount,Instant nextDueAt,boolean patientResponsePending) {}
-    public record StaffInviteRequest(@NotBlank @Size(max=160)String name,@NotBlank @Email @Size(max=254)String email,@NotBlank @Pattern(regexp="COORDINATOR|COORDINATOR_LEAD|OPERATIONS|OPERATIONS_LEAD|FINANCE|FINANCE_LEAD")String role,@Pattern(regexp="en|ar")String locale) {}
     // catalogServiceId set => the service was picked from the consultant's approved catalog (no Finance approval);
     // null => a manually entered service (Finance approval required before the quote can reach the patient).
     // quotedCost/quotedCurrency are read-side only: the same line expressed in the recommendation's proposal
@@ -144,7 +143,7 @@ public final class JourneyDtos {
     public record FxRateView(String currency,BigDecimal rate,LocalDate rateDate,String source) {}
     public record FxOverrideRequest(@NotNull @DecimalMin("0.00000001")BigDecimal rate,LocalDate date) {}
     /** providerCredentialing: the practitioner is enrolled under provider credentialing (ProviderCredentialEligibility.adopted), so Direct approval writes are refused. */
-    public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus,String email,String accountStatus,Instant invitedAt,boolean providerCredentialing) {}
+    public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus,String email,String accountStatus,Instant invitedAt) {}
     public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,boolean active,int version,String createdBy,LocalDate validFrom) {}
     public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate) {}
     // Deposit + payment sub-workflow (offline record-only in this build).

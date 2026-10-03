@@ -7,11 +7,11 @@ import type { JourneyVersion } from "./journey-types";
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 const v = (o: Partial<JourneyVersion>) => ({ id: "v-3", definitionId: "def-1", number: 3, status: "PENDING_APPROVAL", revision: 4, createdBy: "maker", simulationSummary: "COMPLETED", graph: { nodes: [], edges: [] }, graphHash: "h", validationSummary: null, publishedAt: null, retiredAt: null, runtimeDeployment: "NOT_DEPLOYED", ...o } as JourneyVersion);
-const all = ["journey.submit", "journey.edit_draft", "journey.publish", "journey.approve", "journey.retire"].map((permission) => ({ permission, allowed: true }));
+const all = ["JOURNEY_EDIT", "JOURNEY_APPROVE"];
 const renderPanel = (version: JourneyVersion, props: Partial<Parameters<typeof JourneyPublishPanel>[0]> = {}) => {
   const onDecide = vi.fn(async () => true); const onLoadIntake = vi.fn(); const onSubmit = vi.fn();
   render(<JourneyPublishPanel locale="en" version={version} journeyName="International Care Journey" versions={[v({ id: "v-1", number: 1, status: "PUBLISHED" }), version]} materialChanges={null}
-    can={all} busy={false} reason="Adds the travel step" currentUser="checker" intake={{ productionIntakeEnabled: false }} onLoadIntake={onLoadIntake} onSubmit={onSubmit} onReturnToDraft={vi.fn()} onDecide={onDecide} {...props} />);
+    permissions={all} busy={false} reason="Adds the travel step" currentUser="checker" intake={{ productionIntakeEnabled: false }} onLoadIntake={onLoadIntake} onSubmit={onSubmit} onReturnToDraft={vi.fn()} onDecide={onDecide} {...props} />);
   return { onDecide, onLoadIntake, onSubmit };
 };
 
@@ -31,7 +31,7 @@ describe("Approval & publishing", () => {
   });
 
   it("needs both publish and approve to offer publishing", () => {
-    renderPanel(v({}), { can: all.filter((d) => d.permission !== "journey.approve") });
+    renderPanel(v({}), { permissions: ["JOURNEY_EDIT"] });
     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
     expect(screen.getByText(/needs both the publish and approve permissions/)).toBeVisible();
   });
@@ -66,7 +66,7 @@ describe("Approval & publishing", () => {
   });
 
   it("says when no published version would remain after retirement", () => {
-    render(<JourneyPublishPanel locale="en" version={v({ status: "PUBLISHED" })} journeyName="J" versions={[v({ status: "PUBLISHED" })]} materialChanges={null} can={all} busy={false} reason=""
+    render(<JourneyPublishPanel locale="en" version={v({ status: "PUBLISHED" })} journeyName="J" versions={[v({ status: "PUBLISHED" })]} materialChanges={null} permissions={all} busy={false} reason=""
       intake={null} onLoadIntake={vi.fn()} onSubmit={vi.fn()} onReturnToDraft={vi.fn()} onDecide={vi.fn(async () => true)} />);
     fireEvent.click(screen.getByRole("button", { name: "Retire version…" }));
     expect(screen.getByText(/No published version would remain/)).toBeVisible();

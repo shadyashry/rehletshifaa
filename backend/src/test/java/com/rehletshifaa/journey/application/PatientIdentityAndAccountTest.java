@@ -1,5 +1,7 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.authority.domain.Role;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.casemanagement.api.CaseDtos.*;
@@ -184,7 +186,7 @@ class PatientIdentityAndAccountTest {
         // Case data is read-only for the profile step and the case list shows the canonical (corrected) name.
         assertThat(jdbc.queryForObject("SELECT condition_description FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo(concernBefore);
         assertThat(jdbc.queryForObject("SELECT care_category FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("cardiology");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.coordinatorQueue()).filteredOn(c -> c.id().equals(ctx.caseId)).extracting(CaseView::patientName).containsExactly("Link Patient");
     }
 
@@ -250,10 +252,10 @@ class PatientIdentityAndAccountTest {
         UUID pending = patientId(created.caseId());
         String token = linkToken(pending);
         // A different account cannot use the link, even with the token.
-        authenticateWithEmail("intruder", "intruder@local.test", "PATIENT");
+        authenticateWithEmail("intruder", "intruder@local.test", Role.PATIENT);
         assertThatThrownBy(() -> account.linkRequest(token)).isInstanceOf(ApiException.class);
         // The owner of the address sees the question and answers "this is me".
-        authenticateWithEmail(subject, "ahmed22@local.test", "PATIENT");
+        authenticateWithEmail(subject, "ahmed22@local.test", Role.PATIENT);
         var view = account.linkRequest(token);
         assertThat(view.caseNumber()).isEqualTo(created.caseNumber());
         var resolved = account.resolveLinkRequest(token, new AccountLinkResolution("SAME_PATIENT", null)); em.flush();
@@ -281,7 +283,7 @@ class PatientIdentityAndAccountTest {
         UUID layla = patientId(ctx.caseId);
         assertThat(jdbc.queryForObject("SELECT external_subject FROM patient_profiles WHERE id=?", String.class, layla)).isNull();
 
-        authenticateWithEmail(subject, "omar23@local.test", "PATIENT");
+        authenticateWithEmail(subject, "omar23@local.test", Role.PATIENT);
         account.resolveLinkRequest(linkToken(layla), new AccountLinkResolution("REPRESENTATIVE", "PARENT")); em.flush();
         assertThat(patientId(ctx.caseId)).isEqualTo(layla); // still her own case, her own patient
         assertThat(layla).isNotEqualTo(omar);
@@ -318,7 +320,7 @@ class PatientIdentityAndAccountTest {
         int patients = count("SELECT count(*) FROM patient_profiles");
         int mails = identity.setupMails().size();
 
-        authenticate(subject, "PATIENT");
+        authenticate(subject, Role.PATIENT);
         var next = account.startNewCase(new NewCaseForPatientRequest("Follow-up knee pain", "orthopedics", false, true)); em.flush();
         assertThat(patientId(next.caseId())).isEqualTo(patientId(ctx.caseId));
         assertThat(count("SELECT count(*) FROM patient_profiles")).isEqualTo(patients);
@@ -370,7 +372,7 @@ class PatientIdentityAndAccountTest {
         String subject = subjectOf(ctx.caseId);
         assertThat(identity.setupMails().get(0).redirectPath()).isEqualTo("/en/portal?case=" + ctx.caseId + "&continue=1");
         identity.completeSetup(subject);
-        authenticateWithEmail(subject, "land33@local.test", "PATIENT");
+        authenticateWithEmail(subject, "land33@local.test", Role.PATIENT);
         var session = account.session(); em.flush();
         assertThat(session.currentCaseId()).isEqualTo(ctx.caseId);
         assertThat(session.accountStatus()).isEqualTo("ACTIVE");
@@ -393,7 +395,7 @@ class PatientIdentityAndAccountTest {
         assertThat(pre.legacyFullName()).isEqualTo("Maria da Silva Santos");
         assertThat(pre.givenName()).isNull(); assertThat(pre.familyName()).isNull();
         // Display still works from the preserved legacy name until then.
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.coordinatorQueue()).filteredOn(c -> c.id().equals(ctx.caseId)).extracting(CaseView::patientName).containsExactly("Maria da Silva Santos");
         SecurityContextHolder.clearContext();
         activation.activate(ctx.token, g, profile("Maria", "da Silva Santos", "maria40@local.test", "+254700000040", "PATIENT")); em.flush();
@@ -425,7 +427,7 @@ class PatientIdentityAndAccountTest {
     private void finishSetup(String subject) {
         identity.completeSetup(subject);
         String email = identity.findBySubject(subject).map(PatientIdentityPort.IdentityUser::email).orElse(null);
-        authenticateWithEmail(subject, email, "PATIENT");
+        authenticateWithEmail(subject, email, Role.PATIENT);
         account.session(); em.flush();
     }
     private String subjectOf(UUID caseId) { return jdbc.queryForObject("SELECT external_subject FROM patient_profiles WHERE id=?", String.class, patientId(caseId)); }
@@ -450,25 +452,25 @@ class PatientIdentityAndAccountTest {
         var created = cases.create(request);
         cases.submit(created.caseId()); em.flush(); em.clear();
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "ready", v));
         seedDoctor(); seedStaff();
         var doctorAssignment = journey.assign(created.caseId(), new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "cardiac-pod", "Clinical review"));
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(created.caseId(), doctorAssignment.id(), new AssignmentDecisionRequest(true, null));
         var review = journey.saveClinicalReview(created.caseId(), new ClinicalReviewRequest("Reviewed", "SUITABLE", null, "Imaging", "Recommended intervention", "Alt", "Risks", "Seq", "7 days", "Follow-up"));
         journey.approveClinicalReview(created.caseId(), review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",
                 UUID.randomUUID(), review.id(), "Consultant treatment package", new BigDecimal("1000.00"), "EGP", 0, new BigDecimal("1000.00"), true);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var proposal = journey.createProposal(created.caseId(), new ProposalDraftRequest(review.id(), "en", "Plan", "EGP", "Incl", "Excl", "Deposit", "Refund", "Not consent", Instant.now().plusSeconds(86400), List.of(new ProposalItemRequest("MEDICAL", "Treatment package", BigDecimal.ONE, new BigDecimal("1000.00"), false, 0)), null));
         var operationsAssignment = journey.assign(created.caseId(), new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", "cardiac-pod", "Ops"));
         var financeAssignment = journey.assign(created.caseId(), new AssignmentRequest("finance-subject", "FINANCE", "PRIMARY", "cardiac-pod", "Finance"));
-        authenticate("operations-subject", "OPERATIONS"); journey.decideAssignment(created.caseId(), operationsAssignment.id(), new AssignmentDecisionRequest(true, null), com.rehletshifaa.security.ActorRole.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
-        authenticate("finance-subject", "FINANCE"); journey.decideAssignment(created.caseId(), financeAssignment.id(), new AssignmentDecisionRequest(true, null), com.rehletshifaa.security.ActorRole.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
-        authenticate("coordinator-subject", "COORDINATOR"); journey.releaseProposal(created.caseId(), proposal.versionId());
+        authenticate("operations-subject", Role.OPERATIONS); journey.decideAssignment(created.caseId(), operationsAssignment.id(), new AssignmentDecisionRequest(true, null), com.rehletshifaa.authority.domain.Role.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
+        authenticate("finance-subject", Role.FINANCE); journey.decideAssignment(created.caseId(), financeAssignment.id(), new AssignmentDecisionRequest(true, null), com.rehletshifaa.authority.domain.Role.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
+        authenticate("coordinator-subject", Role.COORDINATOR); journey.releaseProposal(created.caseId(), proposal.versionId());
         em.flush();
         String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, "proposal-ready:" + proposal.versionId()));
         String raw = json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
@@ -490,14 +492,14 @@ class PatientIdentityAndAccountTest {
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
     }
     private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }
-    private void seedStaff() { if (count("SELECT count(*) FROM staff_members WHERE external_subject=?", "operations-subject") > 0) return; jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "operations-subject", "OPERATIONS", crypto.encrypt("Operations One"), Instant.now(), Instant.now()); jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "finance-subject", "FINANCE", crypto.encrypt("Finance One"), Instant.now(), Instant.now()); }
-    private void authenticate(String subject, String... roles) { authenticateWithEmail(subject, null, roles); }
-    private void authenticateWithEmail(String subject, String email, String... roles) {
-        var builder = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond())
+    private void seedStaff() { if (count("SELECT count(*) FROM workforce_people WHERE subject=?", "operations-subject") > 0) return; com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "operations-subject", "OPERATIONS", crypto.encrypt("Operations One")); com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-subject", "FINANCE", crypto.encrypt("Finance One")); }
+    private void authenticate(String subject, Role... roles) { authenticateWithEmail(subject, null, roles); }
+    private void authenticateWithEmail(String subject, String email, Role... roles) {
+        for (Role role : roles) com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, subject, role);
+        var builder = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond()).claim("acr", "2")
                 .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600));
         if (email != null) builder.claim("email", email).claim("email_verified", true);
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(builder.build(),
-                Arrays.stream(roles).map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList()));
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(builder.build(), List.of(), subject));
     }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }
     private int count(String sql, Object... args) { Integer n = jdbc.queryForObject(sql, Integer.class, args); return n == null ? 0 : n; }

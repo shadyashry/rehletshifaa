@@ -1,5 +1,7 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.authority.domain.Role;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
@@ -43,7 +45,7 @@ class OperationalWorkflowTest {
 
     @Test void requestingInformationCreatesAStructuredPatientActionAndMovesResponsibility() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(caseId, new InformationRequestCommand("Please confirm your current medication.",
                 List.of(new RequestedItem("INFORMATION", "CURRENT_MEDICATION", "Current medication", true),
                         new RequestedItem("DOCUMENT", "ECHO_REPORT", "Latest Echo report", true)), true, null, "en"));
@@ -59,7 +61,7 @@ class OperationalWorkflowTest {
 
     @Test void aNonBlockingRequestMovesResponsibilityWithoutChangingTheStage() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(caseId, new InformationRequestCommand("Any preferred treatment dates?",
                 List.of(new RequestedItem("INFORMATION", "PREFERRED_DATES", "Preferred treatment dates", false)), false, null, "en"));
         em.flush();
@@ -69,21 +71,21 @@ class OperationalWorkflowTest {
 
     @Test void anEmptyRequestIsRejected() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThatThrownBy(() -> journey.requestInformation(caseId, new InformationRequestCommand(" ", List.of(), true, null, "en")))
                 .isInstanceOf(FieldValidationException.class);
     }
 
     @Test void aCoordinatorWhoDoesNotOwnTheCaseCannotRequestInformation() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("other-coordinator", "COORDINATOR");
+        authenticate("other-coordinator", Role.COORDINATOR);
         assertThatThrownBy(() -> journey.requestInformation(caseId, new InformationRequestCommand("Send documents", List.of(), true, null, "en")))
                 .isInstanceOf(ApiException.class);
     }
 
     @Test void repeatingTheRequestDoesNotDuplicateThePatientActionOrItsItems() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var command = new InformationRequestCommand("Please confirm your current medication.",
                 List.of(new RequestedItem("INFORMATION", "CURRENT_MEDICATION", "Current medication", true)), true, null, "en");
         journey.requestInformation(caseId, command); em.flush();
@@ -96,7 +98,7 @@ class OperationalWorkflowTest {
 
     @Test void thePatientSeesOnlyWhatWasRequestedAndAnsweringReturnsTheCaseToTheCoordinator() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(caseId, new InformationRequestCommand("Please confirm your current medication.",
                 List.of(new RequestedItem("INFORMATION", "CURRENT_MEDICATION", "Current medication", true)), true, null, "en"));
         em.flush(); SecurityContextHolder.clearContext();
@@ -126,7 +128,7 @@ class OperationalWorkflowTest {
 
     @Test void aMissingRequiredAnswerIsRejectedByTheBackend() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(caseId, new InformationRequestCommand("Upload the report",
                 List.of(new RequestedItem("DOCUMENT", "ECHO_REPORT", "Latest Echo report", true)), true, null, "en"));
         em.flush(); SecurityContextHolder.clearContext();
@@ -141,12 +143,12 @@ class OperationalWorkflowTest {
 
     @Test void anAnswerCannotBeWrittenIntoAnotherCasesRequest() throws Exception {
         UUID first = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(first, new InformationRequestCommand("First case",
                 List.of(new RequestedItem("INFORMATION", "CURRENT_MEDICATION", "Current medication", true)), true, null, "en"));
         em.flush();
         UUID other = ownedCase("+254700000032", "second@local.test");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(other, new InformationRequestCommand("Second case",
                 List.of(new RequestedItem("INFORMATION", "CURRENT_MEDICATION", "Current medication", true)), true, null, "en"));
         em.flush(); SecurityContextHolder.clearContext();
@@ -163,7 +165,7 @@ class OperationalWorkflowTest {
 
     @Test void aUsedActionLinkCannotBeReplayed() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(caseId, new InformationRequestCommand("Anything else to add?", List.of(), false, null, "en"));
         em.flush(); SecurityContextHolder.clearContext();
         String token = actionToken();
@@ -179,7 +181,7 @@ class OperationalWorkflowTest {
 
     @Test void aBlockingPatientActionOutranksALaterStageChange() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(caseId, new InformationRequestCommand("Upload the report",
                 List.of(new RequestedItem("DOCUMENT", "ECHO_REPORT", "Latest Echo report", true)), true, null, "en"));
         em.flush();
@@ -213,7 +215,7 @@ class OperationalWorkflowTest {
 
     @Test void aCoordinatorCanRecordAWhatsAppAnswerWithProvenance() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(caseId, new InformationRequestCommand("Current medication?",
                 List.of(new RequestedItem("INFORMATION", "CURRENT_MEDICATION", "Current medication", true)), true, null, "en"));
         em.flush();
@@ -239,7 +241,7 @@ class OperationalWorkflowTest {
                 "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-2:" + caseId, false));
         em.flush();
 
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         List<WorkItemView> mine = work.myWork();
         assertThat(mine).extracting(WorkItemView::title).contains("Review patient information").doesNotContain("Not mine");
         WorkItemView item = mine.stream().filter(w -> "REVIEW".equals(w.type())).findFirst().orElseThrow();
@@ -253,7 +255,7 @@ class OperationalWorkflowTest {
         work.openWorkItem(new NewWorkItem(caseId, "REVIEW", "Review patient information", "Context", "coordinator-subject",
                 "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, true));
         em.flush();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         NotificationFeed feed = work.myNotifications();
         assertThat(feed.unread()).isEqualTo(1);
         assertThat(feed.items()).singleElement().satisfies(n -> {
@@ -278,7 +280,7 @@ class OperationalWorkflowTest {
 
     @Test void anOrdinaryStatusChangeDoesNotNotifyAnybody() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         long version = journey.workspace(caseId).caseSummary().version();
         journey.transition(caseId, new TransitionRequest("READY_FOR_CONSULTANT", "Ready", version)); em.flush();
         assertThat(status(caseId)).isEqualTo("READY_FOR_CONSULTANT");
@@ -290,7 +292,7 @@ class OperationalWorkflowTest {
         work.openWorkItem(new NewWorkItem(caseId, "REVIEW", "Private work", null, "coordinator-subject",
                 "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, false));
         em.flush();
-        authenticate("other-coordinator", "COORDINATOR");
+        authenticate("other-coordinator", Role.COORDINATOR);
         assertThat(work.myNotifications().items()).isEmpty();
         assertThat(work.myWork()).isEmpty();
     }
@@ -307,7 +309,7 @@ class OperationalWorkflowTest {
                 null, "coordinator-subject", "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "signal-2:" + caseId, false));
         em.flush();
 
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var card = journey.coordinatorCaseCards().stream().filter(c -> c.caseSummary().id().equals(caseId)).findFirst().orElseThrow();
         assertThat(card.openTaskCount()).isEqualTo(2);
         assertThat(card.overdueTaskCount()).isEqualTo(1);
@@ -320,7 +322,7 @@ class OperationalWorkflowTest {
 
     @Test void aQuietCaseReportsNoOutstandingSignals() throws Exception {
         UUID caseId = ownedCase();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var card = journey.coordinatorCaseCards().stream().filter(c -> c.caseSummary().id().equals(caseId)).findFirst().orElseThrow();
         assertThat(card.openTaskCount()).isZero();
         assertThat(card.blockingOverdueCount()).isZero();
@@ -336,7 +338,7 @@ class OperationalWorkflowTest {
         UUID caseId = readyForConsultant();
         // The work email goes to the consultant's own address, in the consultant's words — never to the coordination mailbox.
         jdbc.update("UPDATE practitioner_profiles SET email_encrypted=? WHERE external_subject=?", crypto.encrypt("doctor.one@local.test"), "doctor-subject");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review"));
         em.flush();
 
@@ -351,7 +353,7 @@ class OperationalWorkflowTest {
     @Test void reassigningDoesNotLeaveTheOldConsultantWithStaleWork() throws Exception {
         UUID caseId = readyForConsultant();
         seedSecondDoctor();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review"));
         journey.assign(caseId, new AssignmentRequest("second-doctor", "DOCTOR", "PRIMARY", "pod", "Second opinion"));
         em.flush();
@@ -363,7 +365,7 @@ class OperationalWorkflowTest {
         UUID caseId = readyForConsultant();
         UUID assignment = assignConsultant(caseId);
 
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null)); em.flush();
 
         assertThat(status(caseId)).isEqualTo("CONSULTANT_REVIEW");
@@ -371,7 +373,7 @@ class OperationalWorkflowTest {
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CLINICAL_REVIEW' AND owner_subject=? AND status='OPEN'", caseId, "doctor-subject")).isEqualTo(1);
         assertThat(waitingOn(caseId)).isEqualTo("CONSULTANT");
         // The accepted case is now clinical involvement, so it belongs to My Cases.
-        assertThat(journey.assignedCases(com.rehletshifaa.security.ActorRole.DOCTOR)).extracting(CaseView::id).contains(caseId);
+        assertThat(journey.assignedCases(com.rehletshifaa.authority.domain.Role.CONSULTANT)).extracting(CaseView::id).contains(caseId);
 
         journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null)); em.flush();
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='CLINICAL_REVIEW'", caseId)).isEqualTo(1);
@@ -380,8 +382,8 @@ class OperationalWorkflowTest {
     @Test void aPendingAssignmentIsWorkNotYetOneOfMyCases() throws Exception {
         UUID caseId = readyForConsultant();
         assignConsultant(caseId);
-        authenticate("doctor-subject", "DOCTOR");
-        assertThat(journey.assignedCases(com.rehletshifaa.security.ActorRole.DOCTOR)).extracting(CaseView::id).doesNotContain(caseId);
+        authenticate("doctor-subject", Role.CONSULTANT);
+        assertThat(journey.assignedCases(com.rehletshifaa.authority.domain.Role.CONSULTANT)).extracting(CaseView::id).doesNotContain(caseId);
         assertThat(work.myWork()).extracting(WorkItemView::type).contains("CONSULTANT_ASSIGNMENT");
     }
 
@@ -389,7 +391,7 @@ class OperationalWorkflowTest {
         UUID caseId = readyForConsultant();
         UUID assignment = assignConsultant(caseId);
         seedSecondDoctor();
-        authenticate("second-doctor", "DOCTOR");
+        authenticate("second-doctor", Role.CONSULTANT);
         assertThatThrownBy(() -> journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null)))
                 .isInstanceOf(ApiException.class);
         assertThat(status(caseId)).isEqualTo("CONSULTANT_ASSIGNMENT_PENDING");
@@ -398,7 +400,7 @@ class OperationalWorkflowTest {
     @Test void decliningHandsTheCaseBackToTheCoordinatorWithRealWork() throws Exception {
         UUID caseId = readyForConsultant();
         UUID assignment = assignConsultant(caseId);
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(false, "Outside my subspecialty")); em.flush();
 
         assertThat(status(caseId)).isEqualTo("READY_FOR_CONSULTANT");
@@ -415,7 +417,7 @@ class OperationalWorkflowTest {
     @Test void theAssignmentViewNeverExposesAnIdentitySubject() throws Exception {
         UUID caseId = readyForConsultant();
         assignConsultant(caseId);
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         var assignments = journey.workspace(caseId).assignments();
         var consultant = assignments.stream().filter(a -> "DOCTOR".equals(a.assigneeRole())).findFirst().orElseThrow();
         assertThat(consultant.assigneeName()).isEqualTo("Doctor One");
@@ -426,7 +428,7 @@ class OperationalWorkflowTest {
     @Test void workItemsCarryTheCaseIdentityStaffNeedBeforeOpeningAnything() throws Exception {
         UUID caseId = readyForConsultant();
         assignConsultant(caseId); em.flush();
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         var assignment = work.myWork().stream().filter(w -> "CONSULTANT_ASSIGNMENT".equals(w.type())).findFirst().orElseThrow();
         assertThat(assignment.caseNumber()).isNotBlank();
         assertThat(assignment.patientName()).isEqualTo("Consultant Patient");
@@ -442,7 +444,7 @@ class OperationalWorkflowTest {
     @Test void listingNotificationsNeverMarksThemRead() throws Exception {
         UUID caseId = readyForConsultant();
         assignConsultant(caseId); em.flush();
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
 
         assertThat(work.myNotifications().unread()).isEqualTo(1);
         work.myNotifications(); work.myNotifications(); // polling must not mutate state
@@ -457,7 +459,7 @@ class OperationalWorkflowTest {
         UUID second = readyForConsultant("+254700000041", "second@local.test");
         assignConsultant(second); em.flush();
 
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         var feed = work.myNotifications();
         assertThat(feed.unread()).isEqualTo(2);
         assertThat(work.markRead(feed.items().get(0).id())).isEqualTo(1);
@@ -484,7 +486,7 @@ class OperationalWorkflowTest {
         var created = cases.create(new CreateCaseRequest("Consultant", "Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         seedDoctorProfile();seedCoordinatorProfile();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.claimCoordinatorCase(created.caseId(), "pod");
         long version = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "Ready", version));
@@ -493,16 +495,15 @@ class OperationalWorkflowTest {
     }
 
     private UUID assignConsultant(UUID caseId) {
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         UUID id = journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review")).id();
         em.flush(); SecurityContextHolder.clearContext();
         return id;
     }
 
     private void seedCoordinatorProfile() {
-        if (count("SELECT count(*) FROM staff_members WHERE external_subject=?", "coordinator-subject") > 0) return;
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",
-                UUID.randomUUID(), "coordinator-subject", "COORDINATOR", crypto.encrypt("Coordinator One"), Instant.now(), Instant.now());
+        if (count("SELECT count(*) FROM workforce_people WHERE subject=?", "coordinator-subject") > 0) return;
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "coordinator-subject", "COORDINATOR", crypto.encrypt("Coordinator One"));
     }
 
     private void seedDoctorProfile() {
@@ -529,7 +530,7 @@ class OperationalWorkflowTest {
     private UUID ownedCase(String whatsapp, String email) throws Exception {
         var created = cases.create(new CreateCaseRequest("Workflow", "Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi"));
         cases.submit(created.caseId()); em.flush(); em.clear();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.claimCoordinatorCase(created.caseId(), "pod"); // claiming moves the case into INTAKE_REVIEW
         em.flush(); SecurityContextHolder.clearContext();
         return created.caseId();
@@ -553,9 +554,5 @@ class OperationalWorkflowTest {
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
     private String waitingOn(UUID caseId) { return jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, caseId); }
     private int count(String sql, Object... args) { Integer n = jdbc.queryForObject(sql, Integer.class, args); return n == null ? 0 : n; }
-    private void authenticate(String subject, String role) {
-        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond())
-                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_" + role)), subject));
-    }
+    private void authenticate(String subject, Role role) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, role); }
 }

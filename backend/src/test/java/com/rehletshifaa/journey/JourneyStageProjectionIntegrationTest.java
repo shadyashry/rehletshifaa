@@ -1,6 +1,5 @@
 package com.rehletshifaa.journey;
 
-import com.rehletshifaa.access.application.*;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.journey.api.WorkDtos.ItemResponse;
@@ -36,9 +35,8 @@ class JourneyStageProjectionIntegrationTest {
     @Autowired JourneyProjectionService projections;
     @Autowired JourneyDefinitionService definitions;
     @Autowired PatientActionService patientActions;
-    @Autowired AccessBootstrapService bootstrap;
-    @Autowired RoleAssignmentService assignments;
     @Autowired CaseService cases;
+    @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;
     @Autowired PlatformTransactionManager manager;
@@ -55,14 +53,12 @@ class JourneyStageProjectionIntegrationTest {
                 node("end", StageType.END, "SYSTEM", null)),
             List.of(edge("start", "review"), edge("review", "provide"), edge("provide", "end")));
     }
-    static final UUID JOURNEY_WORK_PLATFORM = UUID.fromString("42000001-0000-0000-0000-000000000001");
 
     @BeforeAll void setup() {
         fixture = new JourneyDefinitionIntegrationTest();
-        fixture.service = definitions; fixture.bootstrap = bootstrap; fixture.assignments = assignments; fixture.jdbc = jdbc; fixture.clock = clock;
+        fixture.service = definitions; fixture.crypto = crypto; fixture.jdbc = jdbc; fixture.clock = clock;
         new TransactionTemplate(manager).executeWithoutResult(s -> fixture.setup());
         fixture.signIn("journey-owner");
-        fixture.grant("maker", JOURNEY_WORK_PLATFORM); // completeWorkItem now requires journey.work.execute, not journey.simulate
         fixture.signIn("maker");
         var d = definitions.create();
         var v = d.versions().getFirst();
@@ -256,9 +252,9 @@ class JourneyStageProjectionIntegrationTest {
         projections.sync(caseId);
         projections.completeWorkItem(caseId, "review", null);
         fixture.signIn("unassigned");
-        assertThatThrownBy(() -> projections.sync(caseId)).hasMessageContaining("not allowed");
-        assertThatThrownBy(() -> projections.completePatientAction(caseId, "provide", List.of(), null, null)).hasMessageContaining("not allowed");
-        fixture.signIn("journey-owner"); fixture.grant("other-maker", JourneyDefinitionIntegrationTest.MANAGER);
+        assertThatThrownBy(() -> projections.sync(caseId)).hasMessageContaining("do not include this action");
+        assertThatThrownBy(() -> projections.completePatientAction(caseId, "provide", List.of(), null, null)).hasMessageContaining("do not include this action");
+        fixture.grant("other-maker", com.rehletshifaa.authority.domain.Role.JOURNEY_MANAGER);
         fixture.signIn("other-maker");
         assertThatThrownBy(() -> projections.read(caseId)).hasMessageContaining("not found");
     }

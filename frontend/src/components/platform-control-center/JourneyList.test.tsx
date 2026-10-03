@@ -3,19 +3,18 @@ import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { JourneyList } from "./JourneyList";
 import { apiFetchAs } from "@/lib/api";
+import type { Me } from "@/lib/access";
+import { meWith } from "./test-support";
 
-vi.mock("@/components/AuthProvider", () => {
-  const auth = { user: { access_token: "test", profile: { sub: "owner" } }, loading: false, signIn: vi.fn() };
-  return { useAuth: () => auth };
-});
+const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "owner" } }, me: null as Me | null, loading: false, signIn: vi.fn() }));
+vi.mock("@/components/AuthProvider", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
 
 const summary = { id: "def-1", key: "INTERNATIONAL_CARE", name: "International Care Journey", createdAt: "2026-09-01T00:00:00Z", liveVersion: 2, livePublishedAt: "2026-09-10T00:00:00Z", publishedVersions: 1, draftVersion: 3, draftStatus: "PENDING_APPROVAL", versions: 3, lastActivityAt: "2026-09-20T00:00:00Z" };
-const serve = (rows: unknown[], caps = ["journey.view", "journey.create"]) => vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
-  if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify(caps.map((permission) => ({ permission, allowed: true }))), { status: 200 });
+const serve = (rows: unknown[], permissions = ["JOURNEY_READ", "JOURNEY_EDIT"]) => { auth.me = meWith(permissions); vi.mocked(apiFetchAs).mockImplementation(async (_token, path) => {
   if (path === "/admin/journeys/summaries") return new Response(JSON.stringify(rows), { status: 200 });
   return new Response(JSON.stringify({}), { status: 200 });
-});
+}); };
 beforeEach(() => { serve([summary]); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
@@ -59,7 +58,7 @@ describe("Care Journeys list", () => {
   });
 
   it("fails closed when the caller lacks journey.view", async () => {
-    vi.mocked(apiFetchAs).mockResolvedValue(new Response(JSON.stringify([{ permission: "journey.view", allowed: false }]), { status: 200 }));
+    serve([], []);
     render(<JourneyList locale="en" />);
     expect(await screen.findByText(/You do not have access/)).toBeVisible();
     expect(screen.queryByRole("button", { name: /New journey/ })).not.toBeInTheDocument();
@@ -69,7 +68,6 @@ describe("Care Journeys list", () => {
     vi.mocked(apiFetchAs).mockRejectedValue(new Error("boom"));
     render(<JourneyList locale="en" />);
     expect((await screen.findAllByRole("alert")).some((a) => a.textContent?.startsWith("boom"))).toBe(true);
-    expect(screen.getByText("Some sections couldn't be loaded.")).toBeVisible();
     expect(screen.getAllByRole("button", { name: /Refresh/ })[0]).toBeEnabled();
     expect(screen.queryByRole("button", { name: /New journey/ })).not.toBeInTheDocument();
   });

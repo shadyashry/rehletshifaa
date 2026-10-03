@@ -89,7 +89,7 @@ export type JourneySimulate = { revision: number; reason: string; facts: Record<
 
 export type JourneyReadiness = { journeyVersionId: string; status: "DEPLOYED" | "NOT_DEPLOYED"; compilerVersion: string | null; artifactHash: string | null };
 
-export type Decision = { permission: string; allowed: boolean; reason?: string };
+
 
 export const CONTROL_STAGE_TYPES: readonly StageType[] = ["START", "END", "DECISION", "WAIT", "TIMER"];
 

@@ -4,26 +4,32 @@ import { useState, type FormEvent } from "react";
 import { ClipboardList, Link2, MessageSquareText, Plane, Send, UserRoundPlus, Users, XCircle } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
+import { EligibleConsultantPicker, ReferralConfirmation, type Load } from "@/components/portal/ConsultantRouting";
 
-type VerifiedDoctor = { subject: string; displayName: string; specialty?: string; subspecialty?: string; careCategory?: string };
 type CareCategory = { slug: string; nameEn: string; nameAr: string };
 type StaffMember = { subject: string; name: string; role: string };
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
 
 /**
  * The form that does the work behind the current action, and nothing else. It appears only when the
- * backend's current action is a FOCUS step with a form on this page (assigning a consultant, Operations
- * or Finance). Every other step either lives in its own panel (the proposal) or is somebody else's move.
+ * backend's current action is a FOCUS step with a form on this page (assigning a consultant, confirming a
+ * consultant referral, Operations or Finance). Every other step either lives in its own panel (the proposal)
+ * or is somebody else's move.
  */
-export function CoordinatorActionForm({ locale, code, caseId, version, careCategory, doctors, categories, staff, busy, mutate }: {
+export function CoordinatorActionForm({ locale, code, caseId, version, careCategory, categories, staff, busy, mutate, load }: {
   locale: Locale; code: string; caseId: string; version: number; careCategory?: string;
-  doctors: VerifiedDoctor[]; categories: CareCategory[]; staff: StaffMember[]; busy: boolean; mutate: Mutate;
+  categories: CareCategory[]; staff: StaffMember[]; busy: boolean; mutate: Mutate; load: Load;
 }) {
   const ar = locale === "ar";
   if (code === "ASSIGN_CONSULTANT")
     return <ActionFormShell id="case-actions" title={ar ? "تعيين استشاري معتمد" : "Assign a verified consultant"}
-                            hint={ar ? "أكّد مجال رعاية الحالة أو صححه. يظهر فقط الاستشاريون المعتمدون والمتاحون المطابقون للمجال." : "Confirm or correct the care area. Only matching, available, verified consultants are listed."}>
-      <ConsultantAssignment locale={locale} caseId={caseId} version={version} careCategory={careCategory} doctors={doctors} categories={categories} busy={busy} mutate={mutate}/>
+                            hint={ar ? "أكّد مجال رعاية الحالة أو صححه، ثم اختر استشاريًا بالاسم. يظهر فقط الاستشاريون المعتمدون والمتاحون ذوو الاعتمادات السارية المطابقون للمجال." : "Confirm or correct the care area, then choose a named consultant. Only available, verified consultants with current credentials who match the area are listed."}>
+      <ConsultantAssignment locale={locale} caseId={caseId} version={version} careCategory={careCategory} categories={categories} busy={busy} mutate={mutate} load={load}/>
+    </ActionFormShell>;
+  if (code === "CONFIRM_REFERRAL")
+    return <ActionFormShell id="case-actions" title={ar ? "تأكيد إحالة الاستشاري" : "Confirm the consultant referral"}
+                            hint={ar ? "لا يحصل أي استشاري على الحالة حتى تؤكد أنت ويقبل هو." : "No consultant gains the case until you confirm and they accept."}>
+      <ReferralConfirmation locale={locale} caseId={caseId} careCategory={careCategory} categories={categories} busy={busy} load={load} mutate={mutate}/>
     </ActionFormShell>;
   if (code === "ASSIGN_OPERATIONS" || code === "ASSIGN_FINANCE") {
     const role = code === "ASSIGN_OPERATIONS" ? "OPERATIONS" : "FINANCE";
@@ -43,8 +49,8 @@ function ActionFormShell({ id, title, hint, children }: { id: string; title: str
   </section>;
 }
 
-function ConsultantAssignment({ locale, caseId, version, careCategory, doctors, categories, busy, mutate }: {
-  locale: Locale; caseId: string; version: number; careCategory?: string; doctors: VerifiedDoctor[]; categories: CareCategory[]; busy: boolean; mutate: Mutate;
+function ConsultantAssignment({ locale, caseId, version, careCategory, categories, busy, mutate, load }: {
+  locale: Locale; caseId: string; version: number; careCategory?: string; categories: CareCategory[]; busy: boolean; mutate: Mutate; load: Load;
 }) {
   const ar = locale === "ar";
   const [category, setCategory] = useState(careCategory ?? "");
@@ -52,7 +58,6 @@ function ConsultantAssignment({ locale, caseId, version, careCategory, doctors, 
   // Reset the editable selections when the case or its stored care area changes underneath the form.
   const [syncKey, setSyncKey] = useState(`${caseId}|${careCategory ?? ""}`);
   if (syncKey !== `${caseId}|${careCategory ?? ""}`) { setSyncKey(`${caseId}|${careCategory ?? ""}`); setCategory(careCategory ?? ""); setConsultant(""); }
-  const consultants = doctors.filter(doc => doc.careCategory === category);
   // A corrected care area is saved as part of assigning, so there is never a separate "save" step.
   const assign = async () => {
     if (!consultant) return;
@@ -60,23 +65,17 @@ function ConsultantAssignment({ locale, caseId, version, careCategory, doctors, 
       const saved = await mutate(`/coordinator/cases/${caseId}/care-category`, { careCategory: category, expectedVersion: version, reason: careCategory ? "Coordinator corrected case care area" : "Coordinator classified case care area" }, "PUT");
       if (!saved) return;
     }
-    await mutate(`/coordinator/cases/${caseId}/assignments`, { assigneeSubject: consultant, assigneeRole: "DOCTOR", assignmentType: "PRIMARY", pod: null, reason: "Assigned to consultant" }).then(r => { if (r) setConsultant(""); });
+    await mutate(`/coordinator/cases/${caseId}/consultant-assignment`, { practitionerId: consultant, reason: "Assigned to consultant" }).then(r => { if (r) setConsultant(""); });
   };
-  return <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-    <label className="block text-sm font-bold">{ar ? "مجال رعاية الحالة" : "Case care area"}
+  return <div className="grid gap-3">
+    <label className="block max-w-sm text-sm font-bold">{ar ? "مجال رعاية الحالة" : "Case care area"}
       <select className="field mt-1.5" value={category} onChange={e => { setCategory(e.target.value); setConsultant(""); }} required>
         <option value="" disabled>{ar ? "اختر مجال الرعاية" : "Select a care area"}</option>
         {categories.map(cat => <option key={cat.slug} value={cat.slug}>{ar ? cat.nameAr : cat.nameEn}</option>)}
       </select>
     </label>
-    <label className="block text-sm font-bold">{ar ? "الاستشاري" : "Consultant"}
-      <select className="field mt-1.5" value={consultant} onChange={e => setConsultant(e.target.value)} disabled={!category} required>
-        <option value="" disabled>{ar ? "اختر استشاريًا مطابقًا" : "Select a matching consultant"}</option>
-        {consultants.map(doc => <option key={doc.subject} value={doc.subject}>{doc.displayName}{doc.subspecialty ? ` · ${doc.subspecialty}` : doc.specialty ? ` · ${doc.specialty}` : ""}</option>)}
-      </select>
-    </label>
-    <button type="button" className="btn-primary" disabled={!consultant || busy} onClick={() => void assign()}>{ar ? "تأكيد التعيين" : "Confirm assignment"}</button>
-    {category && consultants.length === 0 && <p className="text-sm text-ink-500 sm:col-span-3">{ar ? "لا يوجد استشاريون معتمدون متاحون لهذا المجال حاليًا." : "No verified consultants are currently available for this care area."}</p>}
+    {category && <EligibleConsultantPicker locale={locale} caseId={caseId} careArea={category} value={consultant} onChange={setConsultant} load={load}/>}
+    <div><button type="button" className="btn-primary" disabled={!consultant || busy} onClick={() => void assign()}>{ar ? "تأكيد التعيين" : "Confirm assignment"}</button></div>
   </div>;
 }
 

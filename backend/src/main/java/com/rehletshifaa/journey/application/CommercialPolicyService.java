@@ -1,8 +1,11 @@
 package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.journey.api.JourneyDtos.*;
-import com.rehletshifaa.security.ActorContext;
-import com.rehletshifaa.security.ActorRole;
+import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.cache.CacheNames;
 import org.springframework.cache.annotation.CacheEvict;
@@ -29,13 +32,13 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 @Service
 public class CommercialPolicyService {
     private final JdbcClient jdbc;
-    private final ActorContext actors;
+    private final Authority authority;
     private final Clock clock;
 
     public record Policy(UUID id, String name, String careCategory, BigDecimal marginRate, int version) {}
 
-    public CommercialPolicyService(JdbcClient jdbc, ActorContext actors, Clock clock) {
-        this.jdbc = jdbc; this.actors = actors; this.clock = clock;
+    public CommercialPolicyService(JdbcClient jdbc, Authority authority, Clock clock) {
+        this.jdbc = jdbc; this.authority = authority; this.clock = clock;
     }
 
     /**
@@ -53,7 +56,7 @@ public class CommercialPolicyService {
     }
 
     public List<CommercialPolicyView> list() {
-        actors.require(ActorRole.FINANCE, ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        authority.authorize(Permission.COMMERCIAL_POLICY_READ);
         return jdbc.sql("SELECT id,name,care_category,margin_rate,active,version,created_by,valid_from FROM commercial_policies ORDER BY care_category NULLS FIRST,version DESC")
                 .query((rs, n) -> new CommercialPolicyView(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("care_category"), rs.getBigDecimal("margin_rate"), rs.getBoolean("active"), rs.getInt("version"), rs.getString("created_by"), rs.getObject("valid_from", LocalDate.class))).list();
     }
@@ -62,7 +65,7 @@ public class CommercialPolicyService {
     @CacheEvict(cacheNames = CacheNames.COMMERCIAL_POLICY, allEntries = true)
     @Transactional
     public CommercialPolicyView configure(CommercialPolicyRequest request) {
-        var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.FINANCE, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.COMMERCIAL_POLICY_MANAGE);
         BigDecimal rate = request.marginRate();
         if (rate == null || rate.signum() < 0 || rate.compareTo(new BigDecimal("0.5")) > 0)
             throw new ApiException(400, "MARGIN_RATE_INVALID", "The margin rate must be between 0 and 0.5");
@@ -76,7 +79,7 @@ public class CommercialPolicyService {
         jdbc.sql("INSERT INTO commercial_policies(id,name,care_category,margin_rate,active,version,created_by,valid_from,created_at) VALUES(?,?,?,?,TRUE,?,?,?,?)")
                 .params(id, request.name() == null || request.name().isBlank() ? "Coordinated-care margin" : request.name().trim(), careCategory, rate, prev + 1, actor.subject(), LocalDate.now(clock), timestamp(clock.instant())).update();
         jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), "COMMERCIAL_POLICY_CONFIGURED", actor.subject(), actor.primaryRole(), null, "CommercialPolicy", id.toString(), "CONFIGURE", "SUCCESS", "rate=" + rate + " careCategory=" + careCategory, timestamp(clock.instant())).update();
+                .params(UUID.randomUUID(), "COMMERCIAL_POLICY_CONFIGURED", actor.subject(), actor.label(), null, "CommercialPolicy", id.toString(), "CONFIGURE", "SUCCESS", "rate=" + rate + " careCategory=" + careCategory, timestamp(clock.instant())).update();
         return jdbc.sql("SELECT id,name,care_category,margin_rate,active,version,created_by,valid_from FROM commercial_policies WHERE id=?").param(id)
                 .query((rs, n) -> new CommercialPolicyView(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("care_category"), rs.getBigDecimal("margin_rate"), rs.getBoolean("active"), rs.getInt("version"), rs.getString("created_by"), rs.getObject("valid_from", LocalDate.class))).single();
     }

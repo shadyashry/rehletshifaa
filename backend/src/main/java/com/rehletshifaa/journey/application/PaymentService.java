@@ -1,8 +1,11 @@
 package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.journey.api.JourneyDtos.*;
-import com.rehletshifaa.security.ActorContext;
-import com.rehletshifaa.security.ActorRole;
+import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -32,12 +35,12 @@ public class PaymentService {
     static final String DEPOSIT_TERMS_REFERENCE = "Deducted from the final treatment plan and quote price. Refund and cancellation terms: as shown to the patient ("
             + DEPOSIT_TERMS_VERSION + "). Refund classification awaits a legal decision.";
     private final JdbcClient jdbc;
-    private final ActorContext actors;
+    private final Authority authority;
     private final Clock clock;
     private final ApplicationEventPublisher events;
 
-    public PaymentService(JdbcClient jdbc, ActorContext actors, Clock clock, ApplicationEventPublisher events) {
-        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.events = events;
+    public PaymentService(JdbcClient jdbc, Authority authority, Clock clock, ApplicationEventPublisher events) {
+        this.jdbc = jdbc; this.authority = authority; this.clock = clock; this.events = events;
     }
 
     record DepositPolicy(UUID id, BigDecimal coordinationEgp, int version) {}
@@ -135,7 +138,7 @@ public class PaymentService {
     /** Offline confirmation: Finance records a receipt it has verified, with recent authentication. */
     @Transactional
     public DepositView recordReceipt(UUID caseId, UUID depositId, RecordReceiptRequest request) {
-        var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.FINANCE, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.PAYMENT_RECORD);
         DepositView view = confirmPayment(new ConfirmedPayment(caseId, depositId, "OFFLINE", request.providerReference(),
                 request.method(), request.amountEgp(), actor.subject(), request.idempotencyKey()));
         audit(actor, caseId, "DEPOSIT_PAYMENT_RECORDED", depositId, "amount=" + request.amountEgp());
@@ -144,7 +147,7 @@ public class PaymentService {
 
     @Transactional
     public DepositView recordRefund(UUID caseId, UUID depositId, RefundRequest request) {
-        var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.FINANCE, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.PAYMENT_RECORD);
         requireDeposit(caseId, depositId);
         appendEvent(caseId, depositId, "REFUND_RECORDED", request.amountEgp(), displayFor(depositId, request.amountEgp()), currencyOf(depositId), null, "OFFLINE", null, "RECORDED", actor.subject(), request.reason(), request.idempotencyKey());
         recomputeStatus(caseId, depositId);
@@ -154,14 +157,14 @@ public class PaymentService {
 
     // ---- deposit policy administration ----
     public List<DepositPolicyView> listPolicies() {
-        actors.require(ActorRole.FINANCE, ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        authority.authorize(Permission.COMMERCIAL_POLICY_READ);
         return jdbc.sql("SELECT id,name,care_category,coordination_deposit_egp,active,version,created_by,valid_from FROM deposit_policies ORDER BY care_category NULLS FIRST,version DESC")
                 .query((rs, n) -> new DepositPolicyView(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("care_category"), rs.getBigDecimal("coordination_deposit_egp"), rs.getBoolean("active"), rs.getInt("version"), rs.getString("created_by"), rs.getObject("valid_from", LocalDate.class))).list();
     }
 
     @Transactional
     public DepositPolicyView configurePolicy(DepositPolicyRequest request) {
-        var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.FINANCE, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.PAYMENT_RECORD);
         if (request.coordinationDepositEgp() == null || request.coordinationDepositEgp().signum() < 0) throw new ApiException(400, "DEPOSIT_AMOUNT_INVALID", "The coordination deposit must be zero or more");
         String careCategory = request.careCategory() == null || request.careCategory().isBlank() ? null : request.careCategory().trim();
         Integer prev = (careCategory == null
@@ -229,7 +232,7 @@ public class PaymentService {
      */
     @Transactional
     public DepositView waiveDeposit(UUID caseId, UUID depositId, String reason) {
-        var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.FINANCE, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.PAYMENT_RECORD);
         if (reason == null || reason.isBlank()) throw new ApiException(400, "WAIVER_REASON_REQUIRED", "A reason is required to waive a deposit");
         requireDeposit(caseId, depositId);
         int changed = jdbc.sql("UPDATE deposits SET waived_at=?,waived_by=?,waiver_reason=?,version=version+1 WHERE id=? AND waived_at IS NULL AND status<>'CANCELLED'")
@@ -269,8 +272,8 @@ public class PaymentService {
     }
     private String currencyOf(UUID depositId) { return jdbc.sql("SELECT currency FROM deposits WHERE id=?").param(depositId).query(String.class).optional().orElse("EGP"); }
     private static BigDecimal firstNonNull(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
-    private void audit(ActorContext.Actor actor, UUID caseId, String type, UUID entityId, String reason) {
+    private void audit(Actor actor, UUID caseId, String type, UUID entityId, String reason) {
         jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, actor.subject(), actor.primaryRole(), caseId, "Deposit", entityId.toString(), "PAYMENT", "SUCCESS", reason, timestamp(clock.instant())).update();
+                .params(UUID.randomUUID(), type, actor.subject(), actor.label(), caseId, "Deposit", entityId.toString(), "PAYMENT", "SUCCESS", reason, timestamp(clock.instant())).update();
     }
 }

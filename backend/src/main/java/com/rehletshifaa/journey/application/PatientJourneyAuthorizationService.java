@@ -1,7 +1,10 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.security.ActorContext;
-import com.rehletshifaa.security.ActorRole;
+import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -15,17 +18,17 @@ public class PatientJourneyAuthorizationService {
     public record Authorization(UUID caseId, String subject) {}
 
     private final JdbcClient jdbc;
-    private final ActorContext actors;
+    private final Authority authority;
     private final PublicCaseAccessService publicCases;
     private final JourneyService journeys;
 
-    public PatientJourneyAuthorizationService(JdbcClient jdbc, ActorContext actors,
+    public PatientJourneyAuthorizationService(JdbcClient jdbc, Authority authority,
             PublicCaseAccessService publicCases, JourneyService journeys) {
-        this.jdbc = jdbc; this.actors = actors; this.publicCases = publicCases; this.journeys = journeys;
+        this.jdbc = jdbc; this.authority = authority; this.publicCases = publicCases; this.journeys = journeys;
     }
 
     public Authorization authenticated(UUID caseId, UUID taskId) {
-        var actor = actors.requireRecentAuthentication(Duration.ofMinutes(10), ActorRole.PATIENT);
+        var actor = authority.authorize(Permission.PATIENT_DECIDE, Resource.ofCase(caseId));
         Integer owned = jdbc.sql("SELECT count(*) FROM case_tasks t JOIN medical_cases c ON c.id=t.case_id JOIN patient_profiles p ON p.id=c.patient_id WHERE t.id=? AND t.case_id=? AND t.visibility_scope='PATIENT_ACTION' AND p.external_subject=? AND p.merged_into_patient_id IS NULL")
                 .params(taskId, caseId, actor.subject()).query(Integer.class).single();
         if (owned == null || owned == 0) throw hidden();

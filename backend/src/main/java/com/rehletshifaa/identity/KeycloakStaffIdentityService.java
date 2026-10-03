@@ -17,11 +17,9 @@ import java.util.*;
 
 /** Least-privilege Keycloak integration for staff lifecycle; passwords never pass through this application. */
 @Service
-public class KeycloakStaffIdentityService implements IdentityProvisioningPort, IdentityWorkspaceRoleReader {
-    private static final List<String> INVITE_ACTIONS=List.of("VERIFY_EMAIL","UPDATE_PASSWORD");
+public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
+    private static final List<String> INVITE_ACTIONS=List.of("VERIFY_EMAIL","UPDATE_PASSWORD","CONFIGURE_TOTP");
     /** Workspace roles the portal understands; Keycloak defaults (offline_access, uma_authorization, default-roles-*) are not reported. */
-    private static final Set<String> WORKSPACE_ROLES=Set.of("PATIENT","PATIENT_REPRESENTATIVE","COORDINATOR","COORDINATOR_LEAD","DOCTOR","OPERATIONS","OPERATIONS_LEAD",
-        "FINANCE","FINANCE_LEAD","CREDENTIALING_ADMIN","SYSTEM_ADMIN","AUDITOR","PATIENT_IDENTITY_REVIEWER");
     private final RestClient http;
     private final ObjectMapper json;
     private final String baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl;
@@ -52,6 +50,7 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort, I
     }
 
     @Override public IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker){return invite(name,email,null,locale,operationMarker);}
+    @Override public IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker,String compatibilityRole){return invite(name,email,compatibilityRole,locale,operationMarker);}
 
     /** Legacy staff compatibility only; new business services use IdentityProvisioningPort. */
     public IdentityAccount invite(String name,String email,String role,String locale) {
@@ -70,12 +69,23 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort, I
             ResponseEntity<Void> response=http.post().uri(admin("/users")).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(user).retrieve().toBodilessEntity();
             String subject=subjectFrom(response.getHeaders().getLocation());
             try {if(role!=null)replaceStaffRole(subject,role);sendInvite(subject,locale);}
-            catch(RuntimeException failure){deleteQuietly(subject);throw failure;}
+            catch(RuntimeException failure){if(operationMarker==null||operationMarker.isBlank())deleteQuietly(subject);throw failure;}
             return new IdentityAccount(subject,normalized,"INVITED",Instant.now());
         } catch(RestClientResponseException e) {throw identityFailure(e,"Unable to create the staff identity account");}
     }
 
     @Override public Optional<IdentityAccount> recover(String operationMarker){requireConfigured();URI uri=UriComponentsBuilder.fromUriString(admin("/users")).queryParam("q","rehletshifaaProvisioningOperation:"+operationMarker).build().encode().toUri();try{List<Map<String,Object>> found=http.get().uri(uri).header("Authorization",bearer()).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});if(found==null||found.isEmpty())return Optional.empty();if(found.size()!=1)throw new ApiException(409,"AMBIGUOUS_IDENTITY_RECOVERY","Identity recovery returned more than one account");Map<String,Object> user=found.get(0);return Optional.of(new IdentityAccount(String.valueOf(user.get("id")),String.valueOf(user.get("email")),"INVITED",Instant.now()));}catch(RestClientResponseException e){throw identityFailure(e,"Unable to reconcile the identity account");}}
+
+    @Override public EmailResolution resolveVerifiedEmail(String email) {
+        requireConfigured();
+        String normalized=email.trim().toLowerCase(Locale.ROOT);
+        List<Map<String,Object>> found=findByEmail(normalized).stream()
+                .filter(user -> normalized.equalsIgnoreCase(String.valueOf(user.get("email"))))
+                .toList();
+        if(found.isEmpty()) return EmailResolution.none();
+        if(found.size()!=1 || !Boolean.TRUE.equals(found.get(0).get("emailVerified"))) return EmailResolution.reviewRequired();
+        return EmailResolution.unique(String.valueOf(found.get(0).get("id")), normalized);
+    }
 
     public void resend(String subject,String locale){requireConfigured();sendInvite(subject,locale);}
 
@@ -83,6 +93,12 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort, I
         requireConfigured();
         try {http.put().uri(admin("/users/"+encode(subject))).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(Map.of("enabled",enabled)).retrieve().toBodilessEntity();}
         catch(RestClientResponseException e){throw identityFailure(e,"Unable to update the identity account");}
+    }
+
+    @Override public void logout(String subject){
+        requireConfigured();
+        try {http.post().uri(admin("/users/"+encode(subject)+"/logout")).header("Authorization",bearer()).retrieve().toBodilessEntity();}
+        catch(RestClientResponseException e){throw identityFailure(e,"Unable to end the identity account sessions");}
     }
 
     public String status(String subject,String storedStatus){
@@ -95,18 +111,25 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort, I
         } catch(RuntimeException ignored){return storedStatus;}
     }
 
-    /** Read-only: effective (composite) realm roles, filtered to the portal workspaces. Never writes to the identity system. */
     @Override
-    public WorkspaceRoles workspaceRoles(String subject) {
-        if(clientSecret.isBlank())return WorkspaceRoles.unavailable();
+    public IdentityState identityState(String subject) {
+        if (clientSecret.isBlank()) return IdentityState.unavailable();
         try {
-            List<Map<String,Object>> mappings=http.get().uri(admin("/users/"+encode(subject)+"/role-mappings/realm/composite")).header("Authorization",bearer()).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});
-            List<String> roles=(mappings==null?List.<Map<String,Object>>of():mappings).stream().map(m->String.valueOf(m.get("name"))).filter(WORKSPACE_ROLES::contains).sorted().toList();
-            return new WorkspaceRoles(true,status(subject,null),roles);
+            Map<String,Object> user=http.get().uri(admin("/users/"+encode(subject))).header("Authorization",bearer())
+                    .retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});
+            if (user == null) return new IdentityState(true,false,false,false,false);
+            List<Map<String,Object>> credentials=http.get().uri(admin("/users/"+encode(subject)+"/credentials"))
+                    .header("Authorization",bearer()).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});
+            Set<String> types=(credentials==null?List.<Map<String,Object>>of():credentials).stream()
+                    .map(value->String.valueOf(value.get("type"))).collect(java.util.stream.Collectors.toSet());
+            boolean phishingResistant=types.contains("webauthn")||types.contains("webauthn-passwordless");
+            return new IdentityState(true,true,Boolean.TRUE.equals(user.get("enabled")),types.contains("otp")||phishingResistant,phishingResistant);
         } catch(RestClientResponseException e) {
-            return e.getStatusCode().value()==404?new WorkspaceRoles(true,"NOT_FOUND",List.of()):WorkspaceRoles.unavailable();
-        } catch(RuntimeException e) {return WorkspaceRoles.unavailable();}
+            if(e.getStatusCode().value()==404)return new IdentityState(true,false,false,false,false);
+            return IdentityState.unavailable();
+        } catch(RuntimeException e) { return IdentityState.unavailable(); }
     }
+
 
     private void replaceStaffRole(String subject,String role){
         Map<String,Object> staffRole=role(role);Map<String,Object> patientRole=role("PATIENT");
@@ -114,8 +137,35 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort, I
         http.method(HttpMethod.DELETE).uri(admin("/users/"+encode(subject)+"/role-mappings/realm")).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(List.of(patientRole)).retrieve().toBodilessEntity();
     }
 
+    @Override public void setCompatibilityRole(String subject,String role){requireConfigured();replaceStaffRole(subject,role);}
+
     private Map<String,Object> role(String name){
         return http.get().uri(admin("/roles/"+encode(name))).header("Authorization",bearer()).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});
+    }
+
+    @Override public void sendPasswordReset(String subject,String locale){
+        requireConfigured();
+        URI uri=UriComponentsBuilder.fromUriString(admin("/users/"+encode(subject)+"/execute-actions-email"))
+            .queryParam("client_id",webClientId).queryParam("redirect_uri",webBaseUrl+"/"+("ar".equals(locale)?"ar":"en")+"/portal")
+            .queryParam("lifespan",inviteLifespan).build().encode().toUri();
+        try {http.put().uri(uri).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(List.of("UPDATE_PASSWORD")).retrieve().toBodilessEntity();}
+        catch(RestClientResponseException e){throw identityFailure(e,"The password reset email could not be sent");}
+    }
+
+    /** Removes OTP and WebAuthn credentials and requires enrolment again at next sign-in. */
+    @Override public void resetMfa(String subject){
+        requireConfigured();
+        try {
+            List<Map<String,Object>> credentials=http.get().uri(admin("/users/"+encode(subject)+"/credentials")).header("Authorization",bearer())
+                .retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});
+            for(Map<String,Object> credential:credentials==null?List.<Map<String,Object>>of():credentials){
+                String type=String.valueOf(credential.get("type"));
+                if(type.equals("otp")||type.startsWith("webauthn"))
+                    http.delete().uri(admin("/users/"+encode(subject)+"/credentials/"+encode(String.valueOf(credential.get("id"))))).header("Authorization",bearer()).retrieve().toBodilessEntity();
+            }
+            http.put().uri(admin("/users/"+encode(subject))).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("requiredActions",List.of("CONFIGURE_TOTP"))).retrieve().toBodilessEntity();
+        } catch(RestClientResponseException e){throw identityFailure(e,"The MFA reset could not be completed");}
     }
 
     private void sendInvite(String subject,String locale){

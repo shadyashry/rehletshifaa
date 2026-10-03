@@ -5,7 +5,7 @@ import type { Locale } from "@/lib/i18n";
 import { FocusTrapDialog } from "./FocusTrapDialog";
 import { StatusBadge } from "./cc-ui";
 import { journeyCopy, journeyStatusLabel } from "./journey-copy";
-import type { Decision, JourneyCutoverStatus, JourneyVersion } from "./journey-types";
+import type { JourneyCutoverStatus, JourneyVersion } from "./journey-types";
 import type { JourneyDiffEntry } from "./journey-graph-utils";
 
 /**
@@ -15,14 +15,14 @@ import type { JourneyDiffEntry } from "./journey-graph-utils";
  * setting: this panel reads it (never changes it) and says that publishing does not turn it on.
  */
 export function JourneyPublishPanel({
-  locale, version, journeyName, versions, materialChanges, can, busy, reason, currentUser, intake, onLoadIntake, onSubmit, onReturnToDraft, onDecide,
+  locale, version, journeyName, versions, materialChanges, permissions, busy, reason, currentUser, intake, onLoadIntake, onSubmit, onReturnToDraft, onDecide,
 }: {
-  locale: Locale; version: JourneyVersion; journeyName: string; versions: JourneyVersion[]; materialChanges: JourneyDiffEntry[] | null; can: Decision[]; busy: boolean;
+  locale: Locale; version: JourneyVersion; journeyName: string; versions: JourneyVersion[]; materialChanges: JourneyDiffEntry[] | null; permissions: string[]; busy: boolean;
   reason: string; currentUser?: string; intake: JourneyCutoverStatus | "error" | null; onLoadIntake: () => void;
   onSubmit: () => void; onReturnToDraft: () => void; onDecide: (action: "publish" | "retire", reason: string) => Promise<boolean>;
 }) {
   const t = journeyCopy[locale];
-  const allowed = (key: string) => can.some((d) => d.permission === key && d.allowed);
+  const allowed = (key: string) => permissions.includes(key);
   const s = version.status;
   const checked = ["VALIDATED", "SIMULATED", "PENDING_APPROVAL", "PUBLISHED", "RETIRED"].includes(s);
   const tested = version.simulationSummary === "COMPLETED";

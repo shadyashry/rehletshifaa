@@ -1,5 +1,5 @@
 package com.rehletshifaa.journey.api;
-import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.CommercialPolicyService;import com.rehletshifaa.journey.application.PaymentService;import com.rehletshifaa.security.ActorRole;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
+import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.CommercialPolicyService;import com.rehletshifaa.journey.application.PaymentService;import jakarta.validation.Valid;import org.springframework.web.bind.annotation.*;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/finance") public class FinanceJourneyController{
  private final JourneyService service;private final CommercialPolicyService policies;private final PaymentService payment;public FinanceJourneyController(JourneyService service,CommercialPolicyService policies,PaymentService payment){this.service=service;this.policies=policies;this.payment=payment;}
@@ -11,9 +11,9 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/deposits/{depositId}/waiver")public DepositView waive(@PathVariable UUID caseId,@PathVariable UUID depositId,@Valid @RequestBody DepositWaiverRequest request){return payment.waiveDeposit(caseId,depositId,request.reason());}
  @GetMapping("/deposit-policies")public List<DepositPolicyView>depositPolicies(){return payment.listPolicies();}
  @PutMapping("/deposit-policies")public DepositPolicyView configureDepositPolicy(@Valid @RequestBody DepositPolicyRequest request){return payment.configurePolicy(request);}
- @GetMapping("/cases")public List<StaffCaseCardView>cases(){return service.assignedCaseCards(ActorRole.FINANCE);}
+ @GetMapping("/cases")public List<StaffCaseCardView>cases(){return service.assignedCaseCards(com.rehletshifaa.authority.domain.Role.FINANCE);}
  @GetMapping("/cases/{caseId}")public CaseWorkspace workspace(@PathVariable UUID caseId){return service.workspace(caseId);}
- @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@Valid @RequestBody AssignmentDecisionRequest request){return service.decideAssignment(caseId,assignmentId,request,ActorRole.FINANCE);}
+ @PostMapping("/cases/{caseId}/assignments/{assignmentId}")public IdResponse assignment(@PathVariable UUID caseId,@PathVariable UUID assignmentId,@Valid @RequestBody AssignmentDecisionRequest request){return service.decideAssignment(caseId,assignmentId,request,com.rehletshifaa.authority.domain.Role.FINANCE);}
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
  @PostMapping("/cases/{caseId}/messages/{messageId}/read")public IdResponse read(@PathVariable UUID caseId,@PathVariable UUID messageId){return service.markMessageRead(caseId,messageId);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/approve")public ProposalView approve(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.approveFinance(caseId,versionId);}

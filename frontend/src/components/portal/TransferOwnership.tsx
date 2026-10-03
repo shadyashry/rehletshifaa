@@ -56,7 +56,7 @@ export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, cu
 
   // Valid targets only: coordinators on the lead's own reporting team (the backend scopes the directory and refuses
   // anyone else), never the current owner. Disabled accounts are not in the directory.
-  const coordinators = useMemo(() => staff.filter((person) => (person.role === "COORDINATOR" || person.role === "COORDINATOR_LEAD") && person.subject !== currentOwner), [staff, currentOwner]);
+  const coordinators = useMemo(() => staff.filter((person) => person.role === "COORDINATOR" && person.subject !== currentOwner), [staff, currentOwner]);
   const shown = coordinators.filter((person) => person.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const chosen = coordinators.find((person) => person.subject === assignee);
   const name = chosen?.name ?? "";
@@ -116,7 +116,6 @@ export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, cu
             <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-line px-3 py-2 text-sm has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
               <input type="radio" name="transfer-assignee" className="h-4 w-4 accent-brand-600" value={person.subject} checked={assignee === person.subject} onChange={() => setAssignee(person.subject)} required/>
               <span className="min-w-0 flex-1 font-semibold text-ink-800"><bdi>{person.name}</bdi>{person.subject === mySubject ? ` ${t.you}` : ""}</span>
-              {person.role === "COORDINATOR_LEAD" && <span className="text-xs text-ink-500">{t.lead}</span>}
             </label>
           </li>)}
         </ul>}

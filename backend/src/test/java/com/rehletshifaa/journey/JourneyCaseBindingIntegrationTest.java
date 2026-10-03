@@ -1,6 +1,5 @@
 package com.rehletshifaa.journey;
 
-import com.rehletshifaa.access.application.*;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.journey.application.*;
@@ -27,9 +26,8 @@ class JourneyCaseBindingIntegrationTest {
     @Autowired JourneyCaseVerificationService verification;
     @Autowired JourneyDefinitionService definitions;
     @Autowired JourneyDeploymentRepository deployments;
-    @Autowired AccessBootstrapService bootstrap;
-    @Autowired RoleAssignmentService assignments;
     @Autowired CaseService cases;
+    @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;
     @Autowired PlatformTransactionManager manager;
@@ -39,7 +37,7 @@ class JourneyCaseBindingIntegrationTest {
 
     @BeforeAll void setup() {
         fixture=new JourneyDefinitionIntegrationTest();
-        fixture.service=definitions; fixture.bootstrap=bootstrap; fixture.assignments=assignments; fixture.jdbc=jdbc; fixture.clock=clock;
+        fixture.service=definitions; fixture.crypto = crypto; fixture.jdbc=jdbc; fixture.clock=clock;
         new TransactionTemplate(manager).executeWithoutResult(s->fixture.setup());
         var pending=fixture.prepare();
         fixture.signIn("checker");
@@ -105,17 +103,17 @@ class JourneyCaseBindingIntegrationTest {
     @Test void permissionScopeCreatorRelationshipAndReplayRemainProtected() {
         var command=command(); var bound=create(command);
         fixture.signIn("unassigned");
-        assertThatThrownBy(()->create(command)).hasMessageContaining("not allowed");
-        assertThatThrownBy(()->verification.start(bound.caseId())).hasMessageContaining("not allowed");
-        fixture.signIn("journey-owner"); fixture.grant("other-maker",JourneyDefinitionIntegrationTest.MANAGER);
+        assertThatThrownBy(()->create(command)).hasMessageContaining("do not include this action");
+        assertThatThrownBy(()->verification.start(bound.caseId())).hasMessageContaining("do not include this action");
+        fixture.grant("other-maker", com.rehletshifaa.authority.domain.Role.JOURNEY_MANAGER);
         fixture.signIn("other-maker");
         assertThatThrownBy(()->verification.read(bound.caseId())).hasMessageContaining("not found");
         assertThatThrownBy(()->verification.start(bound.caseId())).hasMessageContaining("not found");
         fixture.signIn("maker");
         new TransactionTemplate(manager).executeWithoutResult(tx->{
-            jdbc.update("UPDATE role_assignments SET scope_type='ORGANIZATION' WHERE subject='maker'");
-            assertThatThrownBy(()->create(command)).hasMessageContaining("not allowed");
-            assertThatThrownBy(()->verification.read(bound.caseId())).hasMessageContaining("not allowed");
+            jdbc.update("UPDATE workforce_role_assignments SET status='REVOKED' WHERE subject='maker'");
+            assertThatThrownBy(()->create(command)).hasMessageContaining("do not include this action");
+            assertThatThrownBy(()->verification.read(bound.caseId())).hasMessageContaining("do not include this action");
             tx.setRollbackOnly();
         });
     }

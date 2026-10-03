@@ -1,6 +1,6 @@
 "use client";
 
-import { UserManager, WebStorageStateStore, type User } from "oidc-client-ts";
+import { UserManager, WebStorageStateStore } from "oidc-client-ts";
 
 import { OIDC_AUTHORITY, OIDC_CLIENT_ID } from "@/lib/api";
 
@@ -24,29 +24,4 @@ export function authManager() {
     monitorSession: false,
   });
   return manager;
-}
-
-export function userRoles(user: User | null) {
-  const profile = user?.profile as RoleClaims | undefined;
-  const access = tokenClaims(user?.access_token);
-  return [...new Set([
-    ...(profile?.realm_access?.roles ?? []),
-    ...(profile?.roles ?? []),
-    ...(access?.realm_access?.roles ?? []),
-    ...(access?.roles ?? []),
-  ])];
-}
-
-type RoleClaims = { realm_access?: { roles?: string[] }; roles?: string[] };
-
-function tokenClaims(token?: string): RoleClaims | undefined {
-  if (!token) return undefined;
-  try {
-    const payload = token.split(".")[1];
-    if (!payload) return undefined;
-    const base64 = payload.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
-    return JSON.parse(globalThis.atob(base64)) as RoleClaims;
-  } catch {
-    return undefined;
-  }
 }

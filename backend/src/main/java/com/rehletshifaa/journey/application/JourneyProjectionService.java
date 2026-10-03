@@ -1,9 +1,9 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.access.application.AuthorizationService;
-import com.rehletshifaa.access.domain.ChannelEntitlement;
-import com.rehletshifaa.access.domain.ResourceContext;
-import com.rehletshifaa.access.infrastructure.AccessAuditRepository;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.journey.api.WorkDtos.ItemResponse;
 import com.rehletshifaa.journey.domain.JourneyModel.Node;
 import com.rehletshifaa.journey.domain.JourneyModel.StageType;
@@ -54,21 +54,20 @@ public class JourneyProjectionService {
     private final JourneyStageProjectionRepository projections;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final JourneyActionDispatcher dispatcher;
-    private final CoordinatorRoutingPort routing;
-    private final AuthorizationService authorization;
+    private final Authority authorization;
     private final PatientJourneyAuthorizationService patientAuthorization;
-    private final AccessAuditRepository audit;
+    private final GovernanceAuditLog audit;
     private final JourneyLiveShadowService liveShadow;
     private final boolean enabled;
 
     public JourneyProjectionService(JourneyCaseBindingRepository bindings, JourneyDefinitionRepository definitions,
             JourneyStageProjectionRepository projections, ObjectProvider<JourneyRuntimePort> runtimes,
-            JourneyActionDispatcher dispatcher, CoordinatorRoutingPort routing, AuthorizationService authorization,
-            PatientJourneyAuthorizationService patientAuthorization, AccessAuditRepository audit, JourneyLiveShadowService liveShadow,
+            JourneyActionDispatcher dispatcher, Authority authorization,
+            PatientJourneyAuthorizationService patientAuthorization, GovernanceAuditLog audit, JourneyLiveShadowService liveShadow,
             @Value("${app.journey.runtime.case-verification-enabled:false}") boolean verificationEnabled,
             @Value("${app.journey.runtime.production-intake-enabled:false}") boolean productionIntakeEnabled) {
         this.bindings = bindings; this.definitions = definitions; this.projections = projections; this.runtimes = runtimes;
-        this.dispatcher = dispatcher; this.routing = routing; this.authorization = authorization;
+        this.dispatcher = dispatcher; this.authorization = authorization;
         this.patientAuthorization = patientAuthorization;
         this.audit = audit; this.liveShadow = liveShadow;
         // Two independent callers now reach syncInternal: the journey.simulate verification harness and the
@@ -132,7 +131,7 @@ public class JourneyProjectionService {
         if (binding.engineReference() == null) throw conflict("Journey case has not started.");
         var projection = projections.lockLatest(caseId, nodeKey).orElseThrow(JourneyProjectionService::notFound);
         if (!Set.of("STAFF_TASK", "NOTIFICATION").contains(projection.stageType())) throw conflict("This Journey stage is not staff work.");
-        String subject = authorizeWork(caseId);
+        String subject = authorizeWork(binding);
         if ("COMPLETED".equals(projection.status())) return projections.forCase(caseId); // duplicate completion: no-op
         var version = definitions.version(binding.versionId());
         var node = node(version, nodeKey);
@@ -250,15 +249,17 @@ public class JourneyProjectionService {
     }
 
     private String authorize() {
-        return authorization.require("journey.simulate", ResourceContext.platform(), ChannelEntitlement.ADMIN_WEB, ChannelEntitlement.API).subject();
+        return authorization.require(Permission.JOURNEY_EDIT).subject();
     }
 
-    /** Real Journey+Access Governance intersection for business completion: resolves the case's actual resource scope. */
-    private String authorizeWork(UUID caseId) {
-        ResourceContext resource = routing.resolveOrganization(caseId)
-                .map(org -> new ResourceContext(org, true, "MedicalCase", caseId.toString(), null, false))
-                .orElseGet(ResourceContext::platform);
-        return authorization.require("journey.work.execute", resource, ChannelEntitlement.ADMIN_WEB, ChannelEntitlement.API).subject();
+    /**
+     * A verification case is driven by the Journey Manager who created it (JOURNEY_EDIT); a real case's projected work
+     * is completed by its case team, and the registered handler's own service enforces the specific action permission.
+     */
+    private String authorizeWork(JourneyCaseBindingRepository.Binding binding) {
+        var principal = com.rehletshifaa.authority.application.Principal.current();
+        if (binding.verificationBy(principal.subject())) return authorization.require(Permission.JOURNEY_EDIT).subject();
+        return authorization.require(Permission.CASE_READ, Resource.ofCase(binding.caseId())).subject();
     }
 
     private JourneyRuntimePort runtime() {

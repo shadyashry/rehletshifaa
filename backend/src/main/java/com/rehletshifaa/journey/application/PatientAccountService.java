@@ -10,8 +10,11 @@ import com.rehletshifaa.journey.api.JourneyDtos.AccountLinkRequestView;
 import com.rehletshifaa.journey.api.JourneyDtos.AccountLinkResolution;
 import com.rehletshifaa.journey.api.JourneyDtos.AccountSessionView;
 import com.rehletshifaa.journey.api.JourneyDtos.PatientProfileView;
-import com.rehletshifaa.security.ActorContext;
-import com.rehletshifaa.security.ActorRole;
+import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.util.PatientNames;
 import org.slf4j.Logger;
@@ -58,11 +61,11 @@ public class PatientAccountService {
     private final PatientIdentityPort identity;
     private final IntakeLifecycleService intake;
     private final com.rehletshifaa.casemanagement.application.CaseService caseService;
-    private final ActorContext actors;
+    private final Authority authority;
     private final Clock clock;
 
-    public PatientAccountService(JdbcClient jdbc, PatientIdentityPort identity, IntakeLifecycleService intake, com.rehletshifaa.casemanagement.application.CaseService caseService, ActorContext actors, Clock clock) {
-        this.jdbc = jdbc; this.identity = identity; this.intake = intake; this.caseService = caseService; this.actors = actors; this.clock = clock;
+    public PatientAccountService(JdbcClient jdbc, PatientIdentityPort identity, IntakeLifecycleService intake, com.rehletshifaa.casemanagement.application.CaseService caseService, Authority authority, Clock clock) {
+        this.jdbc = jdbc; this.identity = identity; this.intake = intake; this.caseService = caseService; this.authority = authority; this.clock = clock;
     }
 
     // ======================================================================
@@ -175,9 +178,9 @@ public class PatientAccountService {
      */
     @Transactional
     public AccountSessionView session() {
-        var actor = actors.require(ActorRole.PATIENT, ActorRole.PATIENT_REPRESENTATIVE);
+        var actor = authority.authorize(Permission.ACCOUNT_BINDING);
         Instant now = clock.instant();
-        var claim = actors.accountEmail().orElse(null);
+        var claim = com.rehletshifaa.authority.application.Principal.accountEmail().orElse(null);
         Optional<Account> bound = findBySubject(actor.subject());
         if (bound.isPresent()) {
             Account a = bound.get();
@@ -203,7 +206,8 @@ public class PatientAccountService {
      */
     @Transactional
     public com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseResponse startNewCase(com.rehletshifaa.casemanagement.api.CaseDtos.NewCaseForPatientRequest request) {
-        var actor = actors.require(ActorRole.PATIENT);
+        var actor = authority.authorize(Permission.PATIENT_SELF_SERVICE);
+        if (!actor.has(Role.PATIENT)) throw new ApiException(403, "PERMISSION_NOT_HELD", "Only the patient can start their own case");
         Account a = findBySubject(actor.subject()).orElseThrow(() -> new ApiException(409, "PATIENT_NOT_LINKED", "Your account is not linked to a patient profile yet"));
         if (!"ACTIVE".equals(a.accountStatus())) markActive(a.patientId(), clock.instant(), false);
         var created = caseService.createForExistingPatient(a.patientId(), request);
@@ -240,7 +244,7 @@ public class PatientAccountService {
     /** What the authenticated account owner is being asked to resolve. Only the address's own account may see it. */
     @Transactional(readOnly = true)
     public AccountLinkRequestView linkRequest(String token) {
-        var actor = actors.require(ActorRole.PATIENT, ActorRole.PATIENT_REPRESENTATIVE);
+        var actor = authority.authorize(Permission.ACCOUNT_BINDING);
         LinkRequest r = requireLink(token, actor);
         record C(String caseNumber, String givenName, String familyName, String fullName, String role, String relationship) {}
         C c = jdbc.sql("SELECT c.case_number,p.given_name,p.family_name,p.full_name,sc.contact_role,sc.relationship_to_patient FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id LEFT JOIN case_submission_contacts sc ON sc.case_id=c.id WHERE c.id=?")
@@ -255,7 +259,7 @@ public class PatientAccountService {
      */
     @Transactional
     public AccountLinkRequestView resolveLinkRequest(String token, AccountLinkResolution decision) {
-        var actor = actors.require(ActorRole.PATIENT, ActorRole.PATIENT_REPRESENTATIVE);
+        var actor = authority.authorize(Permission.ACCOUNT_BINDING);
         LinkRequest r = requireLink(token, actor);
         Instant now = clock.instant();
         if (r.resolution() != null) return linkRequest(token); // replay: already resolved, no side effects
@@ -364,13 +368,13 @@ public class PatientAccountService {
                 .params(timestamp(now), emailProven, timestamp(now), timestamp(now), timestamp(now), patientId).update();
     }
 
-    private LinkRequest requireLink(String token, ActorContext.Actor actor) {
+    private LinkRequest requireLink(String token, Actor actor) {
         LinkRequest r = jdbc.sql("SELECT id,patient_id,case_id,email,origin,expires_at,consumed_at,resolution,resolved_subject FROM patient_account_link_requests WHERE token_hash=?")
                 .param(intake.hash(token)).query(this::mapLink).optional().orElseThrow(() -> new ApiException(404, "ACCOUNT_LINK_INVALID", "This link is invalid or has expired"));
         if (r.resolution() == null && !r.expiresAt().isAfter(clock.instant())) throw new ApiException(410, "ACCOUNT_LINK_EXPIRED", "This link has expired");
         if (r.resolution() != null && !actor.subject().equals(r.resolvedSubject())) throw new ApiException(404, "ACCOUNT_LINK_INVALID", "This link is invalid or has expired");
         // Only the account that owns the address may act on it — the token alone is not enough.
-        var claim = actors.accountEmail().orElse(null);
+        var claim = com.rehletshifaa.authority.application.Principal.accountEmail().orElse(null);
         if (r.resolution() == null && (claim == null || !claim.email().equals(r.email()))) throw new ApiException(403, "ACCOUNT_LINK_WRONG_ACCOUNT", "Please sign in with the account that received this email");
         return r;
     }
@@ -381,7 +385,7 @@ public class PatientAccountService {
      */
     @Transactional(readOnly = true)
     public PatientProfileView myProfile() {
-        var actor = actors.require(ActorRole.PATIENT, ActorRole.PATIENT_REPRESENTATIVE);
+        var actor = authority.authorize(Permission.PATIENT_SELF_SERVICE);
         return jdbc.sql("SELECT given_name,family_name,full_name,preferred_name,date_of_birth,country,nationality,preferred_language,email,email_verified_at,whatsapp_number,phone_verified_at,account_status FROM patient_profiles WHERE external_subject=? AND merged_into_patient_id IS NULL")
                 .param(actor.subject())
                 .query((rs, n) -> new PatientProfileView(rs.getString("given_name"), rs.getString("family_name"),

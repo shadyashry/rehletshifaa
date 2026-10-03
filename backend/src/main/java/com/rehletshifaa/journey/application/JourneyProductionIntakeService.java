@@ -1,6 +1,6 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.access.infrastructure.AccessAuditRepository;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
 import com.rehletshifaa.journey.application.JourneyAdmissionDecisionService.CaseContext;
 import com.rehletshifaa.journey.application.JourneyAdmissionDecisionService.Decision;
@@ -58,14 +58,14 @@ public class JourneyProductionIntakeService {
     private final JourneyCaseAdmissionRepository admissions;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final JourneyProjectionService projections;
-    private final AccessAuditRepository audit;
+    private final GovernanceAuditLog audit;
     private final JdbcClient jdbc;
     private final TransactionTemplate separate;
     private final MeterRegistry meters;
 
     public JourneyProductionIntakeService(JourneyAdmissionDecisionService decisions, JourneyCutoverPolicy policy,
             JourneyDeploymentRepository deployments, JourneyCaseBindingRepository bindings, JourneyCaseAdmissionRepository admissions,
-            ObjectProvider<JourneyRuntimePort> runtimes, JourneyProjectionService projections, AccessAuditRepository audit,
+            ObjectProvider<JourneyRuntimePort> runtimes, JourneyProjectionService projections, GovernanceAuditLog audit,
             JdbcClient jdbc, PlatformTransactionManager transactions, MeterRegistry meters) {
         this.decisions = decisions; this.policy = policy; this.deployments = deployments; this.bindings = bindings;
         this.admissions = admissions; this.runtimes = runtimes; this.projections = projections; this.audit = audit; this.jdbc = jdbc;

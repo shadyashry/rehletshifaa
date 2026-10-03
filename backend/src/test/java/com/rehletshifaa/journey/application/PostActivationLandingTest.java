@@ -1,5 +1,7 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.authority.domain.Role;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
@@ -53,7 +55,7 @@ class PostActivationLandingTest {
         linkPatient(caseId, "patient-landing-a");
         markProfileActive(caseId); // activation completed the profile and the base consents
 
-        authenticate("patient-landing-a", "PATIENT");
+        authenticate("patient-landing-a", Role.PATIENT);
         CaseWorkspace ws = journey.workspace(caseId);
         assertThat(ws.caseSummary().status()).isEqualTo("ACCEPTED");
         // One authoritative step: a WAIT, never a "pay" or "continue" action the patient cannot act on.
@@ -86,16 +88,16 @@ class PostActivationLandingTest {
         acknowledge(caseId, "+254700000602");
         linkPatient(caseId, "patient-landing-b");
         markProfileActive(caseId);
-        authenticate("patient-landing-b", "PATIENT");
+        authenticate("patient-landing-b", Role.PATIENT);
         UUID depositId = journey.workspace(caseId).deposit().id();
         assertThat(journey.workspace(caseId).actions().currentAction().code()).isEqualTo("WAIT_DEPOSIT_ARRANGEMENT");
 
         seedStaff("finance-subject", "FINANCE");
-        authenticate("finance-subject", "FINANCE");
+        authenticate("finance-subject", Role.FINANCE);
         payment.recordReceipt(caseId, depositId, new RecordReceiptRequest(new BigDecimal("25000.00"), "BANK", "ref-1", "landing-b:" + caseId));
         em.flush();
 
-        authenticate("patient-landing-b", "PATIENT");
+        authenticate("patient-landing-b", Role.PATIENT);
         CaseWorkspace ws = journey.workspace(caseId);
         assertThat(ws.deposit().status()).isEqualTo("PAID");
         assertThat(ws.deposit().paidDisplay()).isEqualByComparingTo("500.00");
@@ -110,7 +112,7 @@ class PostActivationLandingTest {
         UUID caseId = ownedCase("+254700000603", "landing-c@local.test");
         UUID versionId = releasedUsdProposal(caseId);
         linkPatient(caseId, "patient-landing-c");
-        authenticate("patient-landing-c", "PATIENT");
+        authenticate("patient-landing-c", Role.PATIENT);
         CaseWorkspace ws = journey.workspace(caseId);
         assertThat(ws.actions().currentAction().code()).isEqualTo("REVIEW_PROPOSAL");
         assertThat(ws.actions().currentAction().kind()).isEqualTo("FOCUS");
@@ -121,12 +123,12 @@ class PostActivationLandingTest {
 
     @Test void anOpenInformationRequestOutranksEverythingElse() throws Exception {
         UUID caseId = ownedCase("+254700000604", "landing-d@local.test");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(caseId, new InformationRequestCommand("Please send your latest ECG.",
                 List.of(new RequestedItem("DOCUMENT", "ECG", "Latest ECG report", true)), true, null, "en"));
         em.flush();
         linkPatient(caseId, "patient-landing-d");
-        authenticate("patient-landing-d", "PATIENT");
+        authenticate("patient-landing-d", Role.PATIENT);
         CaseWorkspace ws = journey.workspace(caseId);
         assertThat(ws.actions().currentAction().code()).isEqualTo("PROVIDE_INFORMATION");
         assertThat(ws.actions().currentAction().kind()).isEqualTo("FOCUS");
@@ -138,14 +140,14 @@ class PostActivationLandingTest {
     @Test void whileTheTeamWorksTheStepNamesWhoseMoveItIs() throws Exception {
         UUID caseId = ownedCase("+254700000605", "landing-e@local.test");
         linkPatient(caseId, "patient-landing-e");
-        authenticate("patient-landing-e", "PATIENT");
+        authenticate("patient-landing-e", Role.PATIENT);
         assertThat(journey.workspace(caseId).actions().currentAction().code()).isEqualTo("WAIT_COORDINATOR_REVIEW");
         toClinicalRecommendation(caseId, "USD");
-        authenticate("patient-landing-e", "PATIENT");
+        authenticate("patient-landing-e", Role.PATIENT);
         assertThat(journey.workspace(caseId).actions().currentAction().code()).isEqualTo("WAIT_CONSULTANT_REVIEW");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.createProposal(caseId, draftRequest(approvedReview(caseId)));
-        authenticate("patient-landing-e", "PATIENT");
+        authenticate("patient-landing-e", Role.PATIENT);
         CaseWorkspace ws = journey.workspace(caseId);
         assertThat(ws.actions().currentAction().code()).isEqualTo("WAIT_PROPOSAL");
         assertThat(ws.actions().currentAction().kind()).isEqualTo("WAIT");
@@ -165,15 +167,15 @@ class PostActivationLandingTest {
         jdbc.update("UPDATE medical_cases SET updated_at=? WHERE id=?", Instant.now().plusSeconds(60), second.caseId());
         jdbc.update("UPDATE patient_profiles SET external_subject=?,account_status='ACTIVE',profile_status='ACTIVE' WHERE id=?", "patient-landing-f", patientId);
 
-        authenticate("patient-landing-f", "PATIENT");
+        authenticate("patient-landing-f", Role.PATIENT);
         assertThat(accounts.session().currentCaseId()).isEqualTo(second.caseId()); // most recently active
 
         // The older case now waits on the patient: it becomes the current one, whatever was touched last.
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.requestInformation(older, new InformationRequestCommand("Please confirm your medication.", List.of(), true, null, "en"));
         em.flush();
         jdbc.update("UPDATE medical_cases SET updated_at=? WHERE id=?", Instant.now().plusSeconds(120), second.caseId());
-        authenticate("patient-landing-f", "PATIENT");
+        authenticate("patient-landing-f", Role.PATIENT);
         AccountSessionView session = accounts.session();
         assertThat(session.linked()).isTrue();
         assertThat(session.accountStatus()).isEqualTo("ACTIVE");
@@ -185,7 +187,7 @@ class PostActivationLandingTest {
         UUID caseId = ownedCase("+254700000607", "landing-g@local.test");
         UUID patientId = jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?", UUID.class, caseId);
         jdbc.update("UPDATE patient_profiles SET external_subject=?,account_status='SETUP_PENDING' WHERE id=?", "patient-landing-g", patientId);
-        authenticate("patient-landing-g", "PATIENT");
+        authenticate("patient-landing-g", Role.PATIENT);
         AccountSessionView session = accounts.session();
         assertThat(session.accountStatus()).isEqualTo("ACTIVE");
         assertThat(session.currentCaseId()).isEqualTo(caseId);
@@ -197,7 +199,7 @@ class PostActivationLandingTest {
     @Test void theProfileCarriesAccountFactsAndNothingFromTheCase() throws Exception {
         UUID caseId = ownedCase("+254700000608", "landing-h@local.test");
         linkPatient(caseId, "patient-landing-h");
-        authenticate("patient-landing-h", "PATIENT");
+        authenticate("patient-landing-h", Role.PATIENT);
         PatientProfileView profile = accounts.myProfile();
         assertThat(profile.givenName()).isEqualTo("Landing");
         assertThat(profile.familyName()).isEqualTo("Patient");
@@ -208,7 +210,7 @@ class PostActivationLandingTest {
         assertThat(profile.whatsappNumber()).isEqualTo("+254700000608");
         assertThat(json.convertValue(profile, new TypeReference<Map<String, Object>>() {}).keySet())
                 .noneMatch(key -> key.toLowerCase().contains("case") || key.toLowerCase().contains("proposal") || key.toLowerCase().contains("deposit"));
-        authenticate("patient-nobody", "PATIENT");
+        authenticate("patient-nobody", Role.PATIENT);
         assertThatThrownBy(() -> accounts.myProfile()).isInstanceOf(ApiException.class);
     }
 
@@ -218,18 +220,18 @@ class PostActivationLandingTest {
         var created = cases.create(new CreateCaseRequest("Landing", "Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         seedDoctorProfile(); seedCoordinatorProfile();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.claimCoordinatorCase(created.caseId(), "pod");
         em.flush(); SecurityContextHolder.clearContext();
         return created.caseId();
     }
 
     private void toClinicalRecommendation(UUID caseId, String proposalCurrency) throws Exception {
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         long version = journey.workspace(caseId).caseSummary().version();
         if ("INTAKE_REVIEW".equals(status(caseId))) journey.transition(caseId, new TransitionRequest("READY_FOR_CONSULTANT", "Ready", version));
         UUID assignment = journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review")).id();
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null));
         UUID service = seedCatalogService("PACE-DUAL", "Dual chamber pacemaker implant", "Procedure", new BigDecimal("390000.00"));
         seedFxRate("USD", new BigDecimal("0.0200"));
@@ -240,7 +242,7 @@ class PostActivationLandingTest {
 
     private UUID releasedUsdProposal(UUID caseId) throws Exception {
         toClinicalRecommendation(caseId, "USD");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var proposal = journey.createProposal(caseId, draftRequest(approvedReview(caseId)));
         jdbc.update("UPDATE proposal_versions SET requires_finance_approval=FALSE WHERE id=?", proposal.versionId());
         journey.releaseProposal(caseId, proposal.versionId());
@@ -289,14 +291,12 @@ class PostActivationLandingTest {
     }
 
     private void seedCoordinatorProfile() {
-        if (count("SELECT count(*) FROM staff_members WHERE external_subject=?", "coordinator-subject") > 0) return;
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",
-                UUID.randomUUID(), "coordinator-subject", "COORDINATOR", crypto.encrypt("Coordinator One"), Instant.now(), Instant.now());
+        if (count("SELECT count(*) FROM workforce_people WHERE subject=?", "coordinator-subject") > 0) return;
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "coordinator-subject", "COORDINATOR", crypto.encrypt("Coordinator One"));
     }
     private void seedStaff(String subject, String role) {
-        if (count("SELECT count(*) FROM staff_members WHERE external_subject=?", subject) > 0) return;
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",
-                UUID.randomUUID(), subject, role, crypto.encrypt(role + " One"), Instant.now(), Instant.now());
+        if (count("SELECT count(*) FROM workforce_people WHERE subject=?", subject) > 0) return;
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, subject, role, crypto.encrypt(role + " One"));
     }
     private void seedDoctorProfile() {
         if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return;
@@ -328,9 +328,5 @@ class PostActivationLandingTest {
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
     private int count(String sql, Object... args) { Integer n = jdbc.queryForObject(sql, Integer.class, args); return n == null ? 0 : n; }
-    private void authenticate(String subject, String role) {
-        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond())
-                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_" + role)), subject));
-    }
+    private void authenticate(String subject, Role role) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, role); }
 }

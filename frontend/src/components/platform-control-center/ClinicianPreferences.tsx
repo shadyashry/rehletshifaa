@@ -30,7 +30,7 @@ export function ClinicianPreferences(ctx: CoordinationContext) {
     api<ConsultantRouting[]>(`${base}/consultants`).then((next) => { if (live) { setRows(next); setError(null); } }).catch((e) => { if (live) setError(e); });
     return () => { live = false; };
   }, [api, base, attempt]);
-  const manage = can("assignment.preference.manage");
+  const manage = can("ROUTING_CONFIGURE");
   const [now] = useState(() => Date.now());
 
   return <Section id="clinician-preferences" title={t.sections.preferences} description={t.prefIntro}>
@@ -78,7 +78,7 @@ function PreferenceDialog({ ctx, row, onClose, onDone }: { ctx: CoordinationCont
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [history, setHistory] = useState<Preference[] | null>(null);
-  const coordinators = people.filter((p) => p.account === "ACTIVE" && p.member);
+  const coordinators = people.filter((p) => p.account === "ACTIVE");
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setError(null);
     try {

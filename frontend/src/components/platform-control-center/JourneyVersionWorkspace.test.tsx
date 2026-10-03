@@ -3,11 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import "@testing-library/jest-dom/vitest";
 import { JourneyVersionWorkspace } from "./JourneyVersionWorkspace";
 import { apiFetchAs } from "@/lib/api";
+import type { Me } from "@/lib/access";
+import { meWith } from "./test-support";
 
-vi.mock("@/components/AuthProvider", () => {
-  const auth = { user: { access_token: "test", profile: { sub: "owner" } }, loading: false, signIn: vi.fn() };
-  return { useAuth: () => auth };
-});
+const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "owner" } }, me: null as Me | null, loading: false, signIn: vi.fn() }));
+vi.mock("@/components/AuthProvider", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
 
 const graph = { nodes: [], edges: [] };
@@ -25,8 +25,8 @@ const paths = () => vi.mocked(apiFetchAs).mock.calls.map(([, p]) => p);
 
 beforeEach(() => {
   versions = [published, draft];
+  auth.me = meWith(["JOURNEY_READ", "JOURNEY_EDIT"]);
   vi.mocked(apiFetchAs).mockImplementation(async (_token, path, init) => {
-    if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify([{ permission: "journey.view", allowed: true }, { permission: "journey.create", allowed: true }]), { status: 200 });
     if (path === "/admin/journeys/def-1") return new Response(JSON.stringify(detail(versions)), { status: 200 });
     if (path === "/admin/journey-cutover") return new Response(JSON.stringify({ productionIntakeEnabled: false, runtimeEnabled: false }), { status: 200 });
     if (path === "/admin/journeys/def-1/history?offset=0") return new Response(JSON.stringify(history), { status: 200 });

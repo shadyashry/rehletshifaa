@@ -40,7 +40,7 @@ export function RoutingRules(ctx: CoordinationContext) {
   const team = (id: string | null | undefined) => (id ? <bdi>{teamName(id)}</bdi> : <span className="cc-meta">{t.notSet}</span>);
 
   return <Section id="routing-rules" title={t.sections.rules} description={t.rulesIntro}
-    actions={can("assignment.policy.manage") && policies ? <button type="button" onClick={() => { setNotice(""); setPublishing(true); }}>{t.publish}</button> : undefined}>
+    actions={can("ROUTING_CONFIGURE") && policies ? <button type="button" onClick={() => { setNotice(""); setPublishing(true); }}>{t.publish}</button> : undefined}>
     <SuccessNotice>{notice}</SuccessNotice>
     <ErrorNotice error={error} locale={locale} action="load" onRetry={() => void load()} />
     {policies === null ? (!error && <p role="status">{t.loading}</p>) : <>
@@ -67,7 +67,7 @@ export function RoutingRules(ctx: CoordinationContext) {
           <li className="cc-step"><h4>2. {t.rulePreferred}</h4><p className="cc-meta">{t.rulePreferredWhy}</p></li>
           <li className="cc-step"><h4>3. {t.ruleTeams}</h4><p className="cc-meta">{t.ruleTeamsWhy}</p>
             <dl className="cc-facts">
-              <div><dt>{t.providerTeam}</dt><dd>{team(c.providerTeam)}</dd></div>
+
               <div><dt>{t.careAreaTeams}</dt><dd>{Object.keys(c.careAreaTeams).length ? Object.entries(c.careAreaTeams).map(([area, id]) => <span key={area} style={{ display: "block" }}>{careAreaLabel(area, locale)}: {team(id)}</span>) : <span className="cc-meta">{t.notSet}</span>}</dd></div>
               <div><dt>{t.defaultTeam}</dt><dd>{team(c.defaultTeam)}</dd></div>
               <div><dt>{t.policyFallback}</dt><dd>{team(c.fallbackTeam)}</dd></div>
@@ -93,7 +93,6 @@ function PublishDialog({ ctx, latest, base: seed, onClose, onDone }: { ctx: Coor
   const [now] = useState(() => Date.now());
   const [from, setFrom] = useState(earliest);
   const [to, setTo] = useState(plusYear(earliest));
-  const [providerTeam, setProviderTeam] = useState(seed?.providerTeam ?? "");
   const [careAreaTeams, setCareAreaTeams] = useState<Record<string, string>>(seed?.careAreaTeams ?? {});
   const [defaultTeam, setDefaultTeam] = useState(seed?.defaultTeam ?? "");
   const [fallbackTeam, setFallbackTeam] = useState(seed?.fallbackTeam ?? "");
@@ -113,7 +112,7 @@ function PublishDialog({ ctx, latest, base: seed, onClose, onDone }: { ctx: Coor
     try {
       await api(`${base}/policies`, { method: "POST", body: {
         expectedVersion: latest?.version ?? 0, from: versionStart(from, latest?.effectiveTo), to: versionEnd(to), reason,
-        configuration: { capacityWeight: Number(capacityWeight), languageWeight: Number(languageWeight), requireOnDuty, mandatoryLanguage, providerTeam: providerTeam || null, careAreaTeams: mapping, defaultTeam: defaultTeam || null, fallbackTeam: fallbackTeam || null, queueHours: Number(queueHours) },
+        configuration: { capacityWeight: Number(capacityWeight), languageWeight: Number(languageWeight), requireOnDuty, mandatoryLanguage, careAreaTeams: mapping, defaultTeam: defaultTeam || null, fallbackTeam: fallbackTeam || null, queueHours: Number(queueHours) },
       } });
       onDone();
     } catch (err) { setError(err); } finally { setBusy(false); }
@@ -131,7 +130,6 @@ function PublishDialog({ ctx, latest, base: seed, onClose, onDone }: { ctx: Coor
         <label className="cc-choice"><input type="checkbox" checked={requireOnDuty} onChange={(e) => setRequireOnDuty(e.target.checked)} /><span>{t.reqOnDuty}</span></label>
         <label className="cc-choice"><input type="checkbox" checked={mandatoryLanguage} onChange={(e) => setMandatoryLanguage(e.target.checked)} /><span>{t.reqLanguage}</span></label>
       </fieldset>
-      <Field label={t.providerTeam}>{teamSelect(providerTeam, setProviderTeam)}</Field>
       <fieldset className="cc-choices"><legend className="cc-field-label">{t.careAreaTeams}</legend>
         {CARE_AREAS.map((area) => <Field key={area} label={careAreaLabel(area, locale)}>{teamSelect(careAreaTeams[area] ?? "", (v) => setCareAreaTeams((m) => ({ ...m, [area]: v })))}</Field>)}
       </fieldset>

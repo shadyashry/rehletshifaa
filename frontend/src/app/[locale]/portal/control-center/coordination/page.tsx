@@ -1,9 +1,14 @@
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
-import { CareCoordinationOrganizations } from "@/components/platform-control-center/CareCoordinationOrganizations";
+import { CareCoordinationWorkspace } from "@/components/platform-control-center/CareCoordinationWorkspace";
 
-export default async function CareCoordinationOrganizationsPage({ params }: { params: Promise<{ locale: string }> }) {
+// Kept local: a server page must not import non-component values from a "use client" module.
+type Section = "teams" | "preferences" | "rules" | "advanced";
+const SECTIONS: Section[] = ["teams", "preferences", "rules", "advanced"];
+
+export default async function CoordinationSetupPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { locale } = await params;
+  const { tab } = await searchParams;
   if (!isLocale(locale)) notFound();
-  return <CareCoordinationOrganizations locale={locale} />;
+  return <CareCoordinationWorkspace locale={locale} initialSection={SECTIONS.find((s) => s === tab)} />;
 }

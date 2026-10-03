@@ -1,8 +1,11 @@
 package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.journey.api.JourneyDtos.*;
-import com.rehletshifaa.security.ActorContext;
-import com.rehletshifaa.security.ActorRole;
+import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -24,14 +27,14 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class OnboardingService {
-    private final JdbcClient jdbc; private final ActorContext actors; private final Clock clock; private final CustomerReadinessService readiness; private final IdentityVerificationService identity; private final org.springframework.context.ApplicationEventPublisher events;
+    private final JdbcClient jdbc; private final Authority authority; private final Clock clock; private final CustomerReadinessService readiness; private final IdentityVerificationService identity; private final org.springframework.context.ApplicationEventPublisher events;
     private static final Duration ONBOARDING_TTL = Duration.ofDays(45);
     private static final Set<String> ONBOARDING_CONSENTS = Set.of(
             "PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "MEDICAL_INFORMATION_SHARING", "TELECONSULTATION", "DEPOSIT_CANCELLATION_TERMS", "REPRESENTATIVE_AUTHORIZATION");
     private static final Set<String> PROGRESSED = Set.of("TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED");
 
-    public OnboardingService(JdbcClient jdbc, ActorContext actors, Clock clock, CustomerReadinessService readiness, IdentityVerificationService identity, org.springframework.context.ApplicationEventPublisher events) {
-        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.readiness = readiness; this.identity = identity; this.events = events;
+    public OnboardingService(JdbcClient jdbc, Authority authority, Clock clock, CustomerReadinessService readiness, IdentityVerificationService identity, org.springframework.context.ApplicationEventPublisher events) {
+        this.jdbc = jdbc; this.authority = authority; this.clock = clock; this.readiness = readiness; this.identity = identity; this.events = events;
     }
 
     /**
@@ -57,7 +60,7 @@ public class OnboardingService {
 
     /** Patient-facing onboarding for a case, lazily creating/legacy-exempting where safe. */
     @Transactional public OnboardingView myOnboarding(UUID caseId) {
-        var actor = actors.require(ActorRole.PATIENT, ActorRole.PATIENT_REPRESENTATIVE);
+        var actor = authority.authorize(Permission.PATIENT_SELF_SERVICE);
         requirePatientOnCase(caseId, actor);
         ensureRecord(caseId);
         return buildView(caseId);
@@ -68,7 +71,7 @@ public class OnboardingService {
 
     /** Choose who is onboarding (patient / guardian / representative / payer) and capture delegation. */
     @Transactional public OnboardingView setSubject(UUID caseId, OnboardingSubjectRequest request) {
-        var actor = actors.require(ActorRole.PATIENT, ActorRole.PATIENT_REPRESENTATIVE);
+        var actor = authority.authorize(Permission.PATIENT_SELF_SERVICE);
         UUID patientId = requirePatientOnCase(caseId, actor);
         Onboarding ob = requireOnboarding(caseId);
         if (ob.version() != request.expectedVersion()) throw new ApiException(409, "ONBOARDING_VERSION_CONFLICT", "Your onboarding was updated in another session");
@@ -87,13 +90,13 @@ public class OnboardingService {
                 jdbc.sql("INSERT INTO patient_representatives(id,patient_id,representative_subject,relationship,permissions,effective_from,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?)")
                         .params(UUID.randomUUID(), patientId, actor.subject(), request.relationship() == null ? request.subjectType() : request.relationship(), scope, timestamp(now), timestamp(expires), timestamp(now)).update();
         }
-        audit(caseId, "PATIENT_ONBOARDING_SUBJECT_SET", ob.id(), request.subjectType(), actor.subject(), actor.primaryRole());
+        audit(caseId, "PATIENT_ONBOARDING_SUBJECT_SET", ob.id(), request.subjectType(), actor.subject(), actor.label());
         return buildView(caseId);
     }
 
     /** Record an onboarding consent into the existing consent_records table (never a new consent table). */
     @Transactional public OnboardingView recordConsent(UUID caseId, OnboardingConsentRequest request) {
-        var actor = actors.require(ActorRole.PATIENT, ActorRole.PATIENT_REPRESENTATIVE);
+        var actor = authority.authorize(Permission.PATIENT_SELF_SERVICE);
         UUID patientId = requirePatientOnCase(caseId, actor);
         if (!ONBOARDING_CONSENTS.contains(request.consentType()))
             throw new ApiException(400, "INVALID_ONBOARDING_CONSENT", "That consent type is not part of onboarding");
@@ -102,14 +105,14 @@ public class OnboardingService {
                 .params(id, patientId, caseId, request.consentType(), request.policyVersion() == null ? "v1" : request.policyVersion(), request.language() == null ? "en" : request.language(),
                         request.exactText(), request.purpose() == null ? "Onboarding consent" : request.purpose(), request.scope() == null ? "Care coordination onboarding" : request.scope(),
                         "ONBOARDING_PORTAL", actor.subject(), timestamp(now), timestamp(now)).update();
-        audit(caseId, "ONBOARDING_CONSENT_CAPTURED", id, request.consentType(), actor.subject(), actor.primaryRole());
+        audit(caseId, "ONBOARDING_CONSENT_CAPTURED", id, request.consentType(), actor.subject(), actor.label());
         events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));
         return buildView(caseId);
     }
 
     /** Final review + submission. Completes onboarding only when every other readiness gate is satisfied. */
     @Transactional public OnboardingView submit(UUID caseId, OnboardingSubmitRequest request) {
-        var actor = actors.require(ActorRole.PATIENT, ActorRole.PATIENT_REPRESENTATIVE);
+        var actor = authority.authorize(Permission.PATIENT_SELF_SERVICE);
         requirePatientOnCase(caseId, actor);
         Onboarding ob = requireOnboarding(caseId);
         if (ob.version() != request.expectedVersion()) throw new ApiException(409, "ONBOARDING_VERSION_CONFLICT", "Your onboarding was updated in another session");
@@ -123,7 +126,7 @@ public class OnboardingService {
         int changed = jdbc.sql("UPDATE patient_onboardings SET state='COMPLETED',submitted_at=?,completed_at=?,updated_at=?,version=version+1 WHERE id=? AND version=?")
                 .params(timestamp(now), timestamp(now), timestamp(now), ob.id(), request.expectedVersion()).update();
         if (changed != 1) throw new ApiException(409, "ONBOARDING_VERSION_CONFLICT", "Your onboarding was updated in another session");
-        audit(caseId, "PATIENT_ONBOARDING_COMPLETED", ob.id(), null, actor.subject(), actor.primaryRole());
+        audit(caseId, "PATIENT_ONBOARDING_COMPLETED", ob.id(), null, actor.subject(), actor.label());
         events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));
         return buildView(caseId);
     }
@@ -169,7 +172,7 @@ public class OnboardingService {
     private Onboarding mapOnboarding(ResultSet rs, int n) throws SQLException {
         return new Onboarding(rs.getObject("id", UUID.class), rs.getString("state"), rs.getString("subject_type"), instN(rs, "started_at"), instN(rs, "contact_verified_at"), instN(rs, "identity_verified_at"), instN(rs, "submitted_at"), instN(rs, "completed_at"), instN(rs, "expires_at"), rs.getLong("version"));
     }
-    private UUID requirePatientOnCase(UUID caseId, ActorContext.Actor actor) {
+    private UUID requirePatientOnCase(UUID caseId, Actor actor) {
         return jdbc.sql("SELECT p.id FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=? AND (p.external_subject=? OR EXISTS(SELECT 1 FROM patient_representatives r WHERE r.patient_id=p.id AND r.representative_subject=? AND r.revoked_at IS NULL AND (r.expires_at IS NULL OR r.expires_at>?)))")
                 .params(caseId, actor.subject(), actor.subject(), timestamp(clock.instant())).query(UUID.class).optional()
                 .orElseThrow(() -> new ApiException(403, "CASE_ACCESS_DENIED", "This account is not authorized to access the case"));

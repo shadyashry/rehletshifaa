@@ -3,11 +3,6 @@ import com.rehletshifaa.journey.application.JourneyService;import com.rehletshif
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/admin") public class AdminJourneyController{
  private final JourneyService service;private final PricingCatalogService pricing;public AdminJourneyController(JourneyService service,PricingCatalogService pricing){this.service=service;this.pricing=pricing;}
- @PostMapping("/coordinators")public IdResponse createCoordinator(@Valid @RequestBody StaffInviteRequest request){return service.inviteStaff(request);}
- @PostMapping("/staff")public IdResponse createStaff(@Valid @RequestBody StaffInviteRequest request){return service.inviteStaff(request);}
- @PostMapping("/staff/{subject}/resend-invite")public IdResponse resendStaffInvite(@PathVariable String subject,@RequestParam(defaultValue="en")String locale){return service.resendStaffInvite(subject,locale);}
- @PostMapping("/staff/{subject}/disable")public IdResponse disableStaff(@PathVariable String subject){return service.setStaffEnabled(subject,false);}
- @PostMapping("/staff/{subject}/enable")public IdResponse enableStaff(@PathVariable String subject){return service.setStaffEnabled(subject,true);}
  @PostMapping("/practitioners")public IdResponse create(@Valid @RequestBody PractitionerRequest request){return service.createPractitioner(request);}
  @PostMapping("/practitioners/{id}/credentials")public IdResponse credential(@PathVariable UUID id,@Valid @RequestBody CredentialRequest request){return service.addCredential(id,request);}
  @PostMapping("/practitioners/{id}/decision")public IdResponse decision(@PathVariable UUID id,@RequestParam boolean approved,@RequestParam(required=false)String reason){return service.verifyPractitioner(id,approved,reason);}

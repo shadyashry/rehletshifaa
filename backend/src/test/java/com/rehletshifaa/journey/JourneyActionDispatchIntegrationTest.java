@@ -1,6 +1,7 @@
 package com.rehletshifaa.journey;
 
-import com.rehletshifaa.access.application.*;
+import com.rehletshifaa.authority.domain.Role;
+
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.coordination.application.AssignmentEngine;
 import com.rehletshifaa.coordination.application.CoordinationConfigurationService;
@@ -29,12 +30,10 @@ import static com.rehletshifaa.journey.application.JourneyDefinitionService.*;
 import static com.rehletshifaa.journey.JourneyGraphTest.*;
 
 /**
- * Phase 4B integration slice: registered domain action dispatch (item A), Phase 3 Assignment Engine
- * routing for projected Coordinator work (item B) and the real Journey + Access Governance authorization
- * intersection for completing that work (item C). Unlike {@link JourneyStageProjectionIntegrationTest}'s
- * purely synthetic cases, these cases are bound to a real provider organization/Consultant (mirroring
- * {@code CoordinationIntegrationTest}'s own fixture) so Phase 3 routing and organization-scoped
- * authorization are genuinely exercised, not merely stubbed.
+ * Registered domain action dispatch, care-coordination routing of projected Coordinator work, and the authority
+ * check for completing that work. Unlike {@link JourneyStageProjectionIntegrationTest}'s purely synthetic cases,
+ * these cases carry a real Consultant and workforce Coordinators, so routing and case-team authorization are
+ * genuinely exercised, not stubbed.
  */
 @SpringBootTest(properties={"spring.task.scheduling.enabled=false","app.journey.runtime.enabled=true",
         "app.journey.runtime.schema-update=true","app.journey.runtime.case-verification-enabled=true",
@@ -47,8 +46,6 @@ class JourneyActionDispatchIntegrationTest {
     @Autowired AssignmentEngine engine;
     @Autowired CoordinationConfigurationService config;
     @Autowired CoordinationRepository repo;
-    @Autowired AccessBootstrapService bootstrap;
-    @Autowired RoleAssignmentService assignments;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;
     @Autowired CryptoService crypto;
@@ -56,10 +53,6 @@ class JourneyActionDispatchIntegrationTest {
     Version version;
     JourneyDefinitionIntegrationTest fixture;
     final Instant past = Instant.now().minusSeconds(300), future = Instant.now().plusSeconds(86400);
-    static final UUID JOURNEY_WORK_PLATFORM = UUID.fromString("42000001-0000-0000-0000-000000000001");
-    static final UUID JOURNEY_WORK_ORGANIZATION = UUID.fromString("42000001-0000-0000-0000-000000000002");
-    static final UUID COORDINATION_MANAGER = UUID.fromString("36000001-0000-0000-0000-000000000008");
-    static final UUID COORDINATOR_RECEIVER = UUID.fromString("36000001-0000-0000-0000-000000000016");
 
     static Graph coordinatorGraph() {
         return new Graph(List.of(
@@ -92,10 +85,9 @@ class JourneyActionDispatchIntegrationTest {
 
     @BeforeAll void setup() {
         fixture = new JourneyDefinitionIntegrationTest();
-        fixture.service = definitions; fixture.bootstrap = bootstrap; fixture.assignments = assignments; fixture.jdbc = jdbc; fixture.clock = clock;
+        fixture.service = definitions; fixture.crypto = crypto; fixture.jdbc = jdbc; fixture.clock = clock;
         new TransactionTemplate(manager).executeWithoutResult(s -> fixture.setup());
         fixture.signIn("journey-owner");
-        fixture.grant("maker", JOURNEY_WORK_PLATFORM);
         fixture.signIn("maker");
         var d = definitions.create();
         var v = d.versions().getFirst();
@@ -108,7 +100,8 @@ class JourneyActionDispatchIntegrationTest {
         fixture.clear();
     }
     @BeforeEach void signIn() { fixture.signIn("maker"); }
-    @AfterEach void clear() { SecurityContextHolder.clearContext(); }
+    @BeforeEach void resetRouting() { com.rehletshifaa.coordination.CoordinationTestData.reset(jdbc); }
+    @AfterEach void clear() { SecurityContextHolder.clearContext(); com.rehletshifaa.coordination.CoordinationTestData.reset(jdbc); }
 
     CreateCaseRequest intake() { return new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null); }
     UUID admitAndStart() {
@@ -120,15 +113,9 @@ class JourneyActionDispatchIntegrationTest {
 
     // ---------------- Phase 3 provider/routing fixture (mirrors CoordinationIntegrationTest) ----------------
 
-    UUID organization() {
-        UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO provider_organizations(id,legal_name,display_name,organization_type,status,country_code,time_zone,default_currency,legacy_mapping_status,created_by,updated_by,created_at,updated_at,version) VALUES(?,'Test','Test','CLINIC','ONBOARDING','AE','Asia/Dubai','EGP','REVIEWED','TEST','TEST',?,?,0)", id, past, past);
-        return id;
-    }
-    UUID clinician(UUID organization) {
+    UUID clinician() {
         UUID id = UUID.randomUUID(); String subject = id.toString();
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,created_at,updated_at,version) VALUES(?,?,?,?,'UNDER_REVIEW','CONSULTANT','UNAVAILABLE',?,?,0)", id, subject, subject, subject, past, past);
-        jdbc.update("INSERT INTO clinician_onboardings(organization_id,practitioner_id,clinician_type,status,jurisdiction,created_by,updated_by,created_at,updated_at,version) VALUES(?,?,'CONSULTANT','OPERATIONAL_SETUP','AE','TEST','TEST',?,?,0)", organization, id, past, past);
         return id;
     }
     void bindDoctor(UUID caseId, UUID doctor) {
@@ -136,59 +123,51 @@ class JourneyActionDispatchIntegrationTest {
                 UUID.randomUUID(), caseId, doctor.toString(), past);
     }
     /** A Consultant who actually satisfies {@code JourneyService.assign}'s own eligibility query (verified, available, credentialed, matching care area). */
-    UUID verifiedConsultant(UUID organization, String careCategory) {
+    UUID verifiedConsultant(String careCategory) {
         UUID id = UUID.randomUUID(); String subject = id.toString();
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,'VERIFIED','CONSULTANT','AVAILABLE',?,?,?,0)",
                 id, subject, subject, subject, careCategory, past, past);
         jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,created_at) VALUES(?,?,'MEDICAL_LICENSE','VERIFIED',?)", UUID.randomUUID(), id, past);
-        jdbc.update("INSERT INTO clinician_onboardings(organization_id,practitioner_id,clinician_type,status,jurisdiction,created_by,updated_by,created_at,updated_at,version) VALUES(?,?,'CONSULTANT','OPERATIONAL_SETUP','AE','TEST','TEST',?,?,0)", organization, id, past, past);
         return id;
     }
-    /** Legacy `ActorContext`/`ActorRole` authorization is independent of Phase 1 grants; a caller invoking a legacy JourneyService method needs both. */
-    static void signInWithLegacyRole(String subject, String role) {
-        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond()).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_" + role)), subject));
+    void signInWithLegacyRole(String subject, Role role) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, role); }
+    void manager(String subject) { com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, subject, Role.CARE_COORDINATION_MANAGER); }
+    void coordinator(String subject) {
+        com.rehletshifaa.workforce.WorkforceTestData.staffWithEmail(jdbc, subject, "COORDINATOR", crypto.encrypt(subject), crypto.encrypt(subject + "@example.test"));
     }
-    void actor(String subject, UUID organization, UUID roleVersion) {
-        jdbc.update("INSERT INTO access_subjects(subject,active,revision) SELECT ?,TRUE,0 WHERE NOT EXISTS(SELECT 1 FROM access_subjects WHERE subject=?)", subject, subject);
-        jdbc.update("INSERT INTO access_memberships(subject,organization_id,status,effective_from,revision,created_by,reason) SELECT ?,?,'ACTIVE',?,0,'TEST','Test' WHERE NOT EXISTS(SELECT 1 FROM access_memberships WHERE subject=? AND organization_id=?)",
-                subject, organization, past, subject, organization);
-        jdbc.update("INSERT INTO role_assignments(id,subject,version_id,organization_id,scope_type,effective_from,status,source,assigned_by,reason,revision) VALUES(?,?,?,?,'ORGANIZATION',?,'ACTIVE','TEST','TEST','Test',0)", UUID.randomUUID(), subject, roleVersion, organization, past);
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,email_encrypted,created_at,updated_at,version) SELECT ?,?,'COORDINATOR',?,?,?,?,0 WHERE NOT EXISTS(SELECT 1 FROM staff_members WHERE external_subject=?)",
-                UUID.randomUUID(), subject, crypto.encrypt(subject), crypto.encrypt(subject + "@example.test"), past, past, subject);
+    UUID team() {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO workforce_teams(id,function_key,name,status,created_by,created_at,updated_at,revision) VALUES(?,'CARE_COORDINATION',?,'ACTIVE','TEST',?,?,0)", id, "Coordination " + id, past, past);
+        return id;
     }
-    void candidate(UUID org, String subject, UUID team, int max, boolean duty) {
-        actor(subject, org, COORDINATOR_RECEIVER);
-        config.saveMember(org, team, new Member(subject, past, null, true, false, -1), "Team member");
-        config.saveCapacity(org, new Capacity(subject, max, duty, Set.of("en"), Set.of(), -1), "Initial capacity");
+    void candidate(String subject, UUID team, int max, boolean duty) {
+        coordinator(subject);
+        jdbc.update("INSERT INTO workforce_team_memberships(id,team_id,subject,effective_from,status,created_by,reason,revision) VALUES(?,?,?,?,'ACTIVE','TEST','Member',0)", UUID.randomUUID(), team, subject, past);
+        config.saveCapacity(new Capacity(subject, max, duty, Set.of("en"), Set.of(), -1), "Initial capacity");
     }
-    PolicyConfig policy(UUID team) { return new PolicyConfig(80, 20, true, false, team, Map.of(), team, null, 24); }
+    PolicyConfig policy(UUID team) { return new PolicyConfig(80, 20, true, false, Map.of(), team, null, 24); }
 
     // ---------------- Assignment Engine routing (item B) ----------------
 
     @Test void preferredEligibleCoordinatorRoutesJourneyWorkItem() {
-        UUID org = organization(), consultant = clinician(org);
-        actor("routing-manager", org, COORDINATION_MANAGER);
+        UUID consultant = clinician();
+        manager("routing-manager");
         fixture.signIn("routing-manager");
-        UUID team = config.saveTeam(org, null, "Coordination", new TeamConfig(true, "Care coordination", Set.of(), Set.of(), "Asia/Dubai", null), 0, "Initial setup").id();
-        candidate(org, "routing-a", team, 10, true);
-        config.savePolicy(org, 0, past, future, policy(team), "Initial policy");
+        UUID team = team();
+        candidate("routing-a", team, 10, true);
+        config.savePolicy(0, past, future, policy(team), "Initial policy");
 
         fixture.signIn("maker");
         UUID caseId = admitAndStart();
         bindDoctor(caseId, consultant);
 
-        fixture.signIn("routing-manager");
-        engine.execute(org, caseId, new Command(UUID.randomUUID().toString(), 0, "SHADOW", null, null, "Reviewed", "TEST"));
-        Decision live = engine.execute(org, caseId, new Command(UUID.randomUUID().toString(), 1, "ACTIVATE", null, null, "Reviewed", "TEST"));
-        assertThat(live.selectedOwner()).isEqualTo("routing-a");
 
         var projected = syncAsMaker(caseId);
         UUID caseTaskId = projected.getFirst().caseTaskId();
         assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE id=?", String.class, caseTaskId)).isEqualTo("routing-a");
         assertThat(repo.owner(caseId)).isEqualTo("routing-a"); // Case Owner — same value, but a distinct fact from the WorkItem owner above
 
-        actor("routing-a", org, JOURNEY_WORK_ORGANIZATION);
+        coordinator("routing-a");
         fixture.signIn("routing-a");
         var completed = projections.completeWorkItem(caseId, "review", null);
         assertThat(completed).allMatch(p -> "COMPLETED".equals(p.status()));
@@ -197,22 +176,17 @@ class JourneyActionDispatchIntegrationTest {
     }
 
     @Test void noEligibleCoordinatorUsesExistingQueueFallback() {
-        UUID org = organization(), consultant = clinician(org);
-        actor("routing-manager", org, COORDINATION_MANAGER);
+        UUID consultant = clinician();
+        manager("routing-manager");
         fixture.signIn("routing-manager");
-        UUID team = config.saveTeam(org, null, "Coordination", new TeamConfig(true, "Care coordination", Set.of(), Set.of(), "Asia/Dubai", null), 0, "Initial setup").id();
-        candidate(org, "routing-b", team, 0, true); // zero capacity: nobody eligible
-        config.savePolicy(org, 0, past, future, policy(team), "Initial policy");
+        UUID team = team();
+        candidate("routing-b", team, 0, true); // zero capacity: nobody eligible
+        config.savePolicy(0, past, future, policy(team), "Initial policy");
 
         fixture.signIn("maker");
         UUID caseId = admitAndStart();
         bindDoctor(caseId, consultant);
 
-        fixture.signIn("routing-manager");
-        engine.execute(org, caseId, new Command(UUID.randomUUID().toString(), 0, "SHADOW", null, null, "Reviewed", "TEST"));
-        Decision live = engine.execute(org, caseId, new Command(UUID.randomUUID().toString(), 1, "ACTIVATE", null, null, "Reviewed", "TEST"));
-        assertThat(live.selectedOwner()).isNull();
-        assertThat(engine.queue(org)).hasSize(1); // Phase 3's own queue, unchanged
 
         var projected = syncAsMaker(caseId);
         UUID caseTaskId = projected.getFirst().caseTaskId();
@@ -230,18 +204,15 @@ class JourneyActionDispatchIntegrationTest {
     }
 
     @Test void retrySyncDoesNotDuplicateAssignmentOrWorkItem() {
-        UUID org = organization(), consultant = clinician(org);
-        actor("routing-manager", org, COORDINATION_MANAGER);
+        UUID consultant = clinician();
+        manager("routing-manager");
         fixture.signIn("routing-manager");
-        UUID team = config.saveTeam(org, null, "Coordination", new TeamConfig(true, "Care coordination", Set.of(), Set.of(), "Asia/Dubai", null), 0, "Initial setup").id();
-        candidate(org, "routing-a", team, 10, true);
-        config.savePolicy(org, 0, past, future, policy(team), "Initial policy");
+        UUID team = team();
+        candidate("routing-a", team, 10, true);
+        config.savePolicy(0, past, future, policy(team), "Initial policy");
         fixture.signIn("maker");
         UUID caseId = admitAndStart();
         bindDoctor(caseId, consultant);
-        fixture.signIn("routing-manager");
-        engine.execute(org, caseId, new Command(UUID.randomUUID().toString(), 0, "SHADOW", null, null, "Reviewed", "TEST"));
-        engine.execute(org, caseId, new Command(UUID.randomUUID().toString(), 1, "ACTIVATE", null, null, "Reviewed", "TEST"));
 
         var first = syncAsMaker(caseId);
         var second = syncAsMaker(caseId);
@@ -253,57 +224,59 @@ class JourneyActionDispatchIntegrationTest {
     // ---------------- Journey + Access Governance intersection (item C) ----------------
 
     @Test void journeyYesAccessYesAllows() {
-        UUID org = organization(), consultant = clinician(org);
+        UUID consultant = clinician();
         fixture.signIn("maker");
         UUID caseId = admitAndStart();
         bindDoctor(caseId, consultant);
         syncAsMaker(caseId);
-        actor("org-coordinator", org, JOURNEY_WORK_ORGANIZATION);
+        coordinator("org-coordinator");
+        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,'COORDINATOR','PRIMARY','ACTIVE','Fixture ownership','TEST',?,0)",
+                UUID.randomUUID(), caseId, "org-coordinator", past);
         fixture.signIn("org-coordinator");
         assertThat(projections.completeWorkItem(caseId, "review", null)).allMatch(p -> "COMPLETED".equals(p.status()));
     }
 
     @Test void journeyNoAccessYesDenies() {
-        UUID org = organization(), consultant = clinician(org);
+        UUID consultant = clinician();
         fixture.signIn("maker");
         UUID caseId = admitAndStart();
         bindDoctor(caseId, consultant);
         // no sync() yet: no open projection for "review" — Journey-state says no.
-        actor("org-coordinator-2", org, JOURNEY_WORK_ORGANIZATION);
+        coordinator("org-coordinator-2");
         fixture.signIn("org-coordinator-2");
         assertThatThrownBy(() -> projections.completeWorkItem(caseId, "review", null)).hasMessageContaining("No projected Journey stage");
     }
 
     @Test void journeyYesAccessNoDenies() {
-        UUID org = organization(), consultant = clinician(org);
+        UUID consultant = clinician();
         fixture.signIn("maker");
         UUID caseId = admitAndStart();
         bindDoctor(caseId, consultant);
         syncAsMaker(caseId);
         fixture.signIn("nobody"); // authenticated, zero grants
-        assertThatThrownBy(() -> projections.completeWorkItem(caseId, "review", null)).hasMessageContaining("not allowed");
+        assertThatThrownBy(() -> projections.completeWorkItem(caseId, "review", null)).hasMessageContaining("do not include this action");
     }
 
-    @Test void wrongProviderOrganizationDenies() {
-        UUID org = organization(), consultant = clinician(org);
-        UUID otherOrg = organization();
+    @Test void coordinatorOffTheCaseDenies() {
+        UUID consultant = clinician();
         fixture.signIn("maker");
         UUID caseId = admitAndStart();
         bindDoctor(caseId, consultant);
         syncAsMaker(caseId);
-        actor("outside-coordinator", otherOrg, JOURNEY_WORK_ORGANIZATION); // grant scoped to a DIFFERENT provider
+        coordinator("outside-coordinator"); // a Coordinator, but not on this case
         fixture.signIn("outside-coordinator");
-        assertThatThrownBy(() -> projections.completeWorkItem(caseId, "review", null)).hasMessageContaining("not allowed");
+        assertThatThrownBy(() -> projections.completeWorkItem(caseId, "review", null)).hasMessageContaining("not related to this record");
     }
 
-    @Test void wrongScopeDenies() {
-        // "maker" holds only the PLATFORM-scope grant; once the case resolves to a real provider, PLATFORM scope no longer matches.
-        UUID org = organization(), consultant = clinician(org);
+    @Test void anotherJourneyManagerCannotDriveSomeoneElsesVerificationCase() {
+        UUID consultant = clinician();
         fixture.signIn("maker");
         UUID caseId = admitAndStart();
         bindDoctor(caseId, consultant);
         syncAsMaker(caseId);
-        assertThatThrownBy(() -> projections.completeWorkItem(caseId, "review", null)).hasMessageContaining("not allowed");
+        fixture.grant("other-maker", com.rehletshifaa.authority.domain.Role.JOURNEY_MANAGER);
+        fixture.signIn("other-maker");
+        assertThatThrownBy(() -> projections.completeWorkItem(caseId, "review", null)).hasMessageContaining("do not include this action");
     }
 
     @Test void platformScopeStillAllowsAnUnboundCase() {
@@ -333,34 +306,29 @@ class JourneyActionDispatchIntegrationTest {
         fixture.signIn("checker");
         var assignVersion = definitions.publish(pending.definitionId(), pending.id(), fixture.change(pending.revision()));
 
-        UUID org = organization();
-        actor("routing-manager", org, COORDINATION_MANAGER);
+        manager("routing-manager");
         fixture.signIn("routing-manager");
-        UUID team = config.saveTeam(org, null, "Coordination", new TeamConfig(true, "Care coordination", Set.of(), Set.of(), "Asia/Dubai", null), 0, "Initial setup").id();
-        candidate(org, "routing-a", team, 10, true);
-        config.savePolicy(org, 0, past, future, policy(team), "Initial policy");
+        UUID team = team();
+        candidate("routing-a", team, 10, true);
+        config.savePolicy(0, past, future, policy(team), "Initial policy");
 
         fixture.signIn("maker");
         var bound = verification.create(assignVersion.definitionId(), assignVersion.id(),
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(),
                         new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology")));
         verification.start(bound.caseId());
-        UUID initialConsultant = clinician(org);
-        bindDoctor(bound.caseId(), initialConsultant); // provenance only, for Assignment Engine org resolution
+        UUID initialConsultant = clinician();
+        bindDoctor(bound.caseId(), initialConsultant); // the case's Consultant (routing preferences)
         jdbc.update("UPDATE medical_cases SET status='INTAKE_REVIEW' WHERE id=?", bound.caseId());
 
-        fixture.signIn("routing-manager");
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 0, "SHADOW", null, null, "Reviewed", "TEST"));
-        Decision live = engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 1, "ACTIVATE", null, null, "Reviewed", "TEST"));
-        assertThat(live.selectedOwner()).isEqualTo("routing-a");
 
         var projected = syncAsMaker(bound.caseId());
         UUID caseTaskId = projected.getFirst().caseTaskId();
         assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE id=?", String.class, caseTaskId)).isEqualTo("routing-a");
 
-        UUID targetConsultant = verifiedConsultant(org, "cardiology");
-        actor("routing-a", org, JOURNEY_WORK_ORGANIZATION);
-        signInWithLegacyRole("routing-a", "COORDINATOR");
+        UUID targetConsultant = verifiedConsultant("cardiology");
+        coordinator("routing-a");
+        signInWithLegacyRole("routing-a", Role.COORDINATOR);
         var completed = projections.completeWorkItem(bound.caseId(), "assign", Map.of("consultantSubject", targetConsultant.toString()), null);
         assertThat(completed).allMatch(p -> "COMPLETED".equals(p.status()));
         assertThat(jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, bound.caseId())).isEqualTo("CONSULTANT_ASSIGNMENT_PENDING");
@@ -418,10 +386,10 @@ class JourneyActionDispatchIntegrationTest {
         // "maker" holds journey.work.execute (PLATFORM, this case has no resolved provider) — Access
         // Governance allows — but signs in here with legacy ActorRole.COORDINATOR, not DOCTOR, so
         // JourneyService.reviewDecision's own independent check must still deny.
-        signInWithLegacyRole("maker", "COORDINATOR");
+        signInWithLegacyRole("maker", Role.COORDINATOR);
         var decision = new ReviewDecisionRequest("ACCEPT", "Recommended treatment", null, List.of(), "EGP");
         assertThatThrownBy(() -> projections.completeWorkItem(bound.caseId(), "clinical", Map.of(), decision, null))
-                .hasMessageContaining("not authorized");
+                .hasMessageContaining("do not include this action");
         assertThat(jdbc.queryForObject("SELECT status FROM journey_stage_projections WHERE case_id=? AND node_key='clinical'", String.class, bound.caseId())).isEqualTo("OPEN");
         assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE id=?", String.class, projected.getFirst().caseTaskId())).isEqualTo("OPEN");
     }
@@ -448,7 +416,7 @@ class JourneyActionDispatchIntegrationTest {
         jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,'COORDINATOR','PRIMARY','ACTIVE','Fixture ownership','TEST',?,0)",
                 UUID.randomUUID(), bound.caseId(), "maker", java.time.Instant.now().minusSeconds(60));
 
-        signInWithLegacyRole("maker", "COORDINATOR");
+        signInWithLegacyRole("maker", Role.COORDINATOR);
         var draft = new ProposalDraftRequest(UUID.randomUUID(), "en", null, "EGP", null, null, null, null, null,
                 java.time.Instant.now().plusSeconds(3600), List.of(), null);
         assertThatThrownBy(() -> projections.completeWorkItem(bound.caseId(), "prepare", Map.of(), draft, null))

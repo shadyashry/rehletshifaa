@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import java.util.UUID;
-/** Deployment opt-in; only explicitly adopted LIVE queues can be processed. */
+/** Deployment opt-in retry of automatically queued cases; a manager's explicit QUEUE stays parked. */
 @Component
 @ConditionalOnProperty(name="app.coordination.queue-retry.enabled",havingValue="true")
 public class CoordinationQueueRetry {
@@ -18,7 +18,7 @@ public class CoordinationQueueRetry {
      * permanently failing case must not end the pass and starve every case sorted after it.
      */
     @Scheduled(fixedDelayString="${app.coordination.queue-retry.delay-ms:60000}") public void retry(){
-        for(UUID id:repo.queuedCases()){
+        for(UUID id:repo.retryableQueue()){
             try{engine.retryQueued(id);}
             catch(RuntimeException e){log.warn("Coordination queue retry failed for case {} ({}); continuing with the rest of the queue",id,e.getClass().getSimpleName());}
         }

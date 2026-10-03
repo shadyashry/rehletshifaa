@@ -11,6 +11,27 @@ Before work:
 
 For the active commercial-workflow epic, read `docs/commercial-workflow-status.md` only when the task concerns that workflow. Read `docs/end-to-end-workflows.md` or `docs/architecture.md` only when necessary.
 
+## Interrupted Codex takeover
+
+If Codex stops unexpectedly because of a usage or context limit, resume from the repository state; do not restart
+the task from chat history and do not reset or discard uncommitted changes.
+
+The Markdown file Codex is currently working from and updating is:
+
+- `docs/platform-control-plane/section-1-implementation-status.md`
+
+For a takeover:
+
+1. Read `AGENTS.md` and the live implementation checkpoint above.
+2. Inspect `git status` and only the diffs relevant to the checkpoint's current/next slice.
+3. Treat existing modified and untracked files as in-progress Codex/user work and preserve them.
+4. Continue from **Next Section 1 slice**, verifying inherited work before extending it.
+5. Update the same checkpoint with delivered work, tests, open gaps, and the next exact action before stopping.
+
+Use `docs/platform-control-plane/platform-users-and-virtual-clinics-execution-plan.md` and
+`docs/platform-control-plane/platform-users-and-virtual-clinics-requirements.md` only for the sections needed by
+that next slice.
+
 ## Claude-specific operating mode
 
 Prefer **review/diagnosis first, targeted edits second**.

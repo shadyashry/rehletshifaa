@@ -10,54 +10,34 @@ import { useControlCenterAccess, type ControlCenterAccess } from "./control-cent
 import { useAdminApi, type AdminApi } from "./admin-api";
 import { NAV_GROUPS, ccHref, openableSections, pick } from "./control-center-nav";
 import { EmptyState } from "./cc-ui";
-import { addClinicianHref } from "./clinician-model";
+import { addConsultantHref } from "./consultant-model";
 
-type Org = { id: string; status: string };
 /** Where the waiting work is and how much of it; `partial` says the count covers only part of the data. */
 type Found = { count: number; href: string; partial?: boolean };
 /** One kind of waiting work, read from an endpoint the caller is already allowed to read. */
 type Source = { key: string; group: string; label: [string, string]; applies: (a: ControlCenterAccess) => boolean; find: (ctx: Ctx) => Promise<Found> };
-type Ctx = { api: AdminApi; locale: Locale; orgs: () => Promise<Org[]> };
+type Ctx = { api: AdminApi; locale: Locale };
 type Result = { source: Source; found?: Found; failed?: boolean };
 
-/** Membership reads fan out per organization; the Home page checks at most this many. */
-const MEMBER_SCAN_LIMIT = 25;
-const sum = (ns: number[]) => ns.reduce((a, b) => a + b, 0);
-/** Link straight to the one place the work is when there is exactly one, else to the list that holds it. */
-const one = (hits: string[], single: (id: string) => string, list: string) => (hits.length === 1 ? single(hits[0]) : list);
-
 /**
- * Every source of "needs attention" the Home page knows, in navigation order. Each is shown only to people whose
- * capabilities (or the backend's own legacy role gate) already let them read it and act on it; nothing is estimated.
+ * Every source of "needs attention" the Home page knows, in navigation order. Each is shown only to people who hold the
+ * permission to read it and act on it; nothing is estimated.
  */
 const SOURCES: Source[] = [
-  { key: "credentials", group: "reviews", label: ["Credentials waiting for review", "اعتمادات بانتظار المراجعة"], applies: (a) => a.can("credential.review"),
-    find: async ({ api, locale, orgs }) => {
-      const rows = await Promise.all((await orgs()).map(async (o) => [o.id, (await api<unknown[]>(`/admin/providers/${o.id}/credential-reviews`)).length] as const));
-      return { count: sum(rows.map(([, n]) => n)), href: one(rows.filter(([, n]) => n).map(([id]) => id), (id) => ccHref(locale, `/credentials?org=${id}`), ccHref(locale, "/credentials")) };
-    } },
-  { key: "direct", group: "reviews", label: ["Direct clinicians waiting for case approval", "أطباء مباشرون بانتظار اعتماد الحالات"], applies: (a) => a.legacy.admin,
-    find: async ({ api, locale }) => ({ count: (await api<{ credentialingStatus?: string; providerCredentialing?: boolean }[]>("/admin/practitioners")).filter((p) => p.credentialingStatus === "UNDER_REVIEW" && !p.providerCredentialing).length, href: ccHref(locale, "/credentials?view=direct") }) },
-  { key: "identity", group: "reviews", label: ["Identity checks waiting for a decision", "طلبات تحقق من الهوية بانتظار قرار"], applies: (a) => a.legacy.identityReviewer,
+  { key: "consultants", group: "consultants", label: ["Consultants waiting for case approval", "استشاريون بانتظار اعتماد الحالات"], applies: (a) => a.can("CREDENTIAL_DECIDE"),
+    find: async ({ api, locale }) => ({ count: (await api<{ credentialingStatus?: string }[]>("/admin/practitioners")).filter((p) => p.credentialingStatus === "UNDER_REVIEW").length, href: ccHref(locale, "/consultants") }) },
+  { key: "identity", group: "reviews", label: ["Identity checks waiting for a decision", "طلبات تحقق من الهوية بانتظار قرار"], applies: (a) => a.can("PATIENT_IDENTITY_REVIEW"),
     find: async ({ api, locale }) => ({ count: (await api<unknown[]>("/identity-review/queue")).length, href: ccHref(locale, "/identity-checks") }) },
-  { key: "orgs", group: "providers", label: ["Organizations still being set up", "جهات طبية ما زالت قيد الإعداد"], applies: (a) => a.can("provider.view"),
-    find: async ({ locale, orgs }) => {
-      const open = (await orgs()).filter((o) => ["DRAFT", "ONBOARDING", "READINESS_REVIEW"].includes(o.status)).map((o) => o.id);
-      return { count: open.length, href: one(open, (id) => ccHref(locale, `/providers/${id}?tab=setup`), ccHref(locale, "/providers")) };
-    } },
-  { key: "members", group: "providers", label: ["People waiting for membership activation", "أشخاص بانتظار تفعيل العضوية"], applies: (a) => a.can("provider.view"),
-    find: async ({ api, locale, orgs }) => {
-      const all = await orgs();
-      const rows = await Promise.all(all.slice(0, MEMBER_SCAN_LIMIT).map(async (o) => [o.id, (await api<{ members: { status: string }[] }>(`/admin/providers/${o.id}`)).members.filter((m) => m.status === "PENDING").length] as const));
-      return { count: sum(rows.map(([, n]) => n)), partial: all.length > MEMBER_SCAN_LIMIT, href: one(rows.filter(([, n]) => n).map(([id]) => id), (id) => ccHref(locale, `/providers/${id}?tab=people`), ccHref(locale, "/providers")) };
-    } },
-  { key: "staff", group: "operations", label: ["Staff invitations not yet accepted", "دعوات موظفين لم تُقبل بعد"], applies: (a) => a.legacy.admin,
-    find: async ({ api, locale }) => ({ count: (await api<{ accountStatus: string }[]>("/admin/staff-teams")).filter((m) => m.accountStatus === "INVITED").length, href: ccHref(locale, "/team") }) },
-  { key: "queue", group: "operations", label: ["Live-routed cases waiting for a coordinator", "حالات توجيه فعلي بانتظار منسق"], applies: (a) => a.can("assignment.queue.manage"),
-    find: async ({ api, locale }) => {
-      const rows = await Promise.all((await api<{ id: string }[]>("/admin/coordination/organizations")).map(async (o) => [o.id, (await api<unknown[]>(`/admin/coordination/${o.id}/queue`)).length] as const));
-      return { count: sum(rows.map(([, n]) => n)), href: one(rows.filter(([, n]) => n).map(([id]) => id), (id) => ccHref(locale, `/coordination/${id}?tab=advanced`), ccHref(locale, "/coordination")) };
-    } },
+  { key: "queue", group: "operations", label: ["Cases waiting for a coordinator", "حالات بانتظار منسق"], applies: (a) => a.can("ROUTING_ASSIGN"),
+    find: async ({ api, locale }) => ({ count: (await api<unknown[]>("/admin/coordination/queue")).length, href: ccHref(locale, "/coordination?tab=advanced") }) },
+  { key: "invitations", group: "workforce", label: ["Staff invitations not yet accepted", "دعوات موظفين لم تُقبل بعد"], applies: (a) => a.can("WORKFORCE_READ"),
+    find: async ({ api, locale }) => ({ count: (await api<{ invitations: { status: string }[] }>("/admin/platform-access/staff")).invitations.filter((i) => i.status === "QUEUED" || i.status === "SENT").length, href: ccHref(locale, "/people") }) },
+  { key: "staffing", group: "workforce", label: ["Staffing requests waiting for a decision", "طلبات توظيف بانتظار قرار"], applies: (a) => a.can("WORKFORCE_ADMINISTER"),
+    find: async ({ api, locale }) => ({ count: (await api<{ status: string }[]>("/admin/platform-access/staffing-requests")).filter((r) => r.status === "SUBMITTED").length, href: ccHref(locale, "/staffing-requests") }) },
+  { key: "administrators", group: "access", label: ["Administrator changes waiting for a second approver", "تغييرات مسؤولي النظام بانتظار موافقة ثانية"], applies: (a) => a.can("ACCESS_GOVERN"),
+    find: async ({ api, locale }) => ({ count: (await api<{ requests: { status: string }[] }>("/admin/platform-access/administrator-changes")).requests.filter((r) => r.status === "PENDING").length, href: ccHref(locale, "/administrators") }) },
+  { key: "mfa", group: "access", label: ["MFA reset requests waiting for approval", "طلبات إعادة تعيين التحقق بانتظار الموافقة"], applies: (a) => a.can("WORKFORCE_ADMINISTER"),
+    find: async ({ api, locale }) => ({ count: (await api<{ status: string }[]>("/admin/platform-access/mfa-reset-requests")).filter((r) => r.status === "PENDING").length, href: ccHref(locale, "/recertification") }) },
 ];
 
 /**
@@ -79,16 +59,15 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
     if (access.loading || !user) return;
     let live = true;
     setResults(null);
-    let orgList: Promise<Org[]> | undefined;
-    const ctx: Ctx = { api, locale, orgs: () => (orgList ??= api<Org[]>("/admin/providers")) };
+    const ctx: Ctx = { api, locale };
     void Promise.all(sources.map((source) => source.find(ctx).then((found): Result => ({ source, found }), (): Result => ({ source, failed: true }))))
       .then((r) => { if (live) setResults(r); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [access.loading, sourceKeys, user?.profile?.sub, locale, attempt]);
 
-  const canAddConsultant = access.can("provider.clinician.invite") || access.legacy.canManage;
-  const actions = canAddConsultant ? <Link className="cc-primary" href={addClinicianHref(locale)}><Plus size={16} aria-hidden />{ar ? "إضافة طبيب" : "Add clinician"}</Link> : undefined;
+  const canAddConsultant = access.can("CONSULTANT_ONBOARD");
+  const actions = canAddConsultant ? <Link className="cc-primary" href={addConsultantHref(locale)}><Plus size={16} aria-hidden />{ar ? "إضافة استشاري" : "Add consultant"}</Link> : undefined;
   const title = ar ? "مركز التحكم" : "Control Center";
   const intro = ar ? "ما يحتاج إلى متابعتك في المجالات التي تديرها." : "What needs your attention in the areas you manage.";
   const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="overview" title={title} intro={intro} actions={actions}>{body}</ControlCenterShell>;
@@ -125,7 +104,7 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
               <Link href={found!.href}>
                 <span className="cc-attention-count">{found!.count.toLocaleString(locale)}</span>
                 <span className="cc-attention-text"><strong>{pick(source.label, locale)}</strong>
-                  <span>{groupLabel(source.group)}{found!.partial ? (ar ? ` · في أول ${MEMBER_SCAN_LIMIT.toLocaleString(locale)} جهة فقط` : ` · first ${MEMBER_SCAN_LIMIT} organizations only`) : ""}</span></span>
+                  <span>{groupLabel(source.group)}</span></span>
                 <Next size={18} aria-hidden className="cc-attention-go" />
               </Link>
             </li>

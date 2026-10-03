@@ -1,5 +1,7 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.authority.domain.Role;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
@@ -67,7 +69,7 @@ class UatDefectCorrectionsTest {
 
         // Consultant recommendation recorded, proposal drafted but not released: "being prepared", never a draft id.
         toClinicalRecommendation(caseId, "USD");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var draft = journey.createProposal(caseId, draftRequest(approvedReview(caseId)));
         em.flush(); SecurityContextHolder.clearContext();
         PublicCaseStatus preparing = publicCases.view(token, grant);
@@ -120,14 +122,14 @@ class UatDefectCorrectionsTest {
     @Test void thePatientCasePageCarriesTheSameProposalAnswerAndOnlyTheOwnerCanReadIt() throws Exception {
         UUID caseId = ownedCase("+254700000505", "uat-c@local.test");
         linkPatient(caseId, "patient-c");
-        authenticate("patient-c", "PATIENT");
+        authenticate("patient-c", Role.PATIENT);
         CaseWorkspace before = journey.workspace(caseId);
         assertThat(before.patientProposal().state()).isEqualTo("NONE");
         assertThat(before.proposal()).isNull();
         SecurityContextHolder.clearContext();
 
         UUID versionId = releasedUsdProposal(caseId);
-        authenticate("patient-c", "PATIENT");
+        authenticate("patient-c", Role.PATIENT);
         CaseWorkspace after = journey.workspace(caseId);
         assertThat(after.patientProposal().state()).isEqualTo("READY");
         assertThat(after.patientProposal().action()).isEqualTo("REVIEW_PROPOSAL");
@@ -137,7 +139,7 @@ class UatDefectCorrectionsTest {
         assertThat(proposalAccess.state(caseId).versionId()).isEqualTo(versionId);
 
         // Another patient can neither read this case nor decide its proposal.
-        authenticate("patient-other", "PATIENT");
+        authenticate("patient-other", Role.PATIENT);
         assertThatThrownBy(() -> journey.workspace(caseId)).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> journey.decideProposal(caseId, versionId, new ProposalDecisionRequest("ACKNOWLEDGED", List.of(), null)))
                 .isInstanceOf(ApiException.class);
@@ -150,7 +152,7 @@ class UatDefectCorrectionsTest {
         UUID caseId = ownedCase("+254700000506", "uat-e@local.test");
         toClinicalRecommendation(caseId, "USD");
         // The coordinator's preparation view already quotes the consultant's EGP lines in USD at today's rate.
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         ClinicalReviewView review = journey.workspace(caseId).clinicalReviews().stream().filter(r -> "APPROVED".equals(r.status())).findFirst().orElseThrow();
         assertThat(review.proposalCurrency()).isEqualTo("USD");
         assertThat(review.quoteRate()).isEqualByComparingTo("0.0200");
@@ -181,7 +183,7 @@ class UatDefectCorrectionsTest {
     @Test void aForeignCurrencyProposalIsNotReleasedWithoutASnapshotRate() throws Exception {
         UUID caseId = ownedCase("+254700000507", "uat-e2@local.test");
         toClinicalRecommendation(caseId, "USD");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var proposal = journey.createProposal(caseId, draftRequest(approvedReview(caseId)));
         jdbc.update("UPDATE proposal_versions SET requires_finance_approval=FALSE WHERE id=?", proposal.versionId());
         jdbc.update("DELETE FROM fx_rates WHERE quote_currency='USD'");
@@ -217,11 +219,11 @@ class UatDefectCorrectionsTest {
 
     @Test void aNewCaseAndItsFirstAssignmentAreNormalPriorityNotHigh() throws Exception {
         UUID caseId = readyForConsultant("+254700000509", "uat-g@local.test");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.coordinatorCaseCards().stream().filter(c -> c.caseSummary().id().equals(caseId)).findFirst().orElseThrow().highPriorityCount()).isZero();
         journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review")); em.flush();
         assertThat(jdbc.queryForObject("SELECT priority FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT'", String.class, caseId)).isEqualTo("NORMAL");
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         assertThat(work.myWork()).filteredOn(w -> w.caseId().equals(caseId)).extracting(w -> w.priority()).containsExactly("NORMAL");
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND priority IN ('HIGH','URGENT')", caseId)).isZero();
     }
@@ -239,7 +241,7 @@ class UatDefectCorrectionsTest {
     @Test void aSubmissionWithoutAClinicalRecommendationIsRejected() throws Exception {
         UUID caseId = readyForConsultant("+254700000510", "uat-h@local.test");
         UUID assignment = assignConsultant(caseId);
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null));
         assertThatThrownBy(() -> journey.reviewDecision(caseId, new ReviewDecisionRequest("ACCEPT", "   ", "Some risks", List.of(), "USD")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("clinical recommendation");
@@ -280,7 +282,7 @@ class UatDefectCorrectionsTest {
         UUID caseId = readyForConsultant("+254700000513", "uat-j@local.test");
         setStaffEmail("coordinator-subject", "coordinator.j@local.test");
         UUID assignment = assignConsultant(caseId);
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null));
         UUID service = seedCatalogService("ECHO", "Echocardiogram", "Diagnostics", new BigDecimal("6500.00"));
         seedFxRate("USD", new BigDecimal("0.0200"));
@@ -303,7 +305,7 @@ class UatDefectCorrectionsTest {
         assertThat(mail.data().get("case")).isEqualTo(created.caseNumber());
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE case_id=?", created.caseId())).isZero();
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=?", created.caseId())).isZero();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.coordinatorQueue()).extracting(CaseView::id).contains(created.caseId());
         assertThat(journey.coordinatorQueue().stream().filter(c -> c.id().equals(created.caseId())).findFirst().orElseThrow().coordinatorSubject()).isNull();
     }
@@ -382,12 +384,30 @@ class UatDefectCorrectionsTest {
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key=?", "work-email:replay:" + caseId)).isEqualTo(1);
     }
 
+    @Test void multiRoleStaffEmailUsesTheWorkItemsRoleInsteadOfAnArbitraryHeldRole() throws Exception {
+        UUID caseId = ownedCase("+254700000529", "uat-multi-role@local.test");
+        setStaffEmail("coordinator-subject", "multi.role@local.test");
+        Instant now = Instant.now();
+        jdbc.update("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,status,source,assigned_by,reason,created_at,revision) "
+                        + "VALUES(?,'coordinator-subject','OPERATIONS',?,'ACTIVE','GRANT','TEST','Lean staffing',?,0)",
+                UUID.randomUUID(), now.minusSeconds(60), now);
+
+        work.openWorkItem(new NewWorkItem(caseId, "OPERATIONS_REVIEW", "Review operations", null,
+                "coordinator-subject", "OPERATIONS", false, null, "SYSTEM", "WORK_ASSIGNED",
+                "multi-role:" + caseId, true));
+        em.flush();
+
+        var mail = outboxRow("work-email:multi-role:" + caseId);
+        assertThat(mail.templateKey()).isEqualTo("staff-work-assigned");
+        assertThat(mail.data().get("role")).isEqualTo("OPERATIONS");
+    }
+
     // ================= M/N — coordinator after consultant assignment =================
 
     @Test void onceTheCaseIsWithTheConsultantTheCoordinatorKeepsUtilitiesButNoWorkflowCommands() throws Exception {
         UUID caseId = readyForConsultant("+254700000519", "uat-m@local.test");
         UUID assignment = assignConsultant(caseId);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         CaseWorkspace pending = journey.workspace(caseId);
         assertThat(pending.actions().waitingOn()).isEqualTo("CONSULTANT");
         assertThat(pending.actions().currentAction().code()).isEqualTo("WAIT_CONSULTANT");
@@ -402,9 +422,9 @@ class UatDefectCorrectionsTest {
         assertThatThrownBy(() -> journey.createProposal(caseId, draftRequest(UUID.randomUUID()))).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> journey.updateCareCategory(caseId, new CareCategoryUpdateRequest("orthopedics", version, "late"))).isInstanceOf(ApiException.class);
 
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null));
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         CaseWorkspace review = journey.workspace(caseId);
         assertThat(review.actions().waitingOn()).isEqualTo("CONSULTANT");
         assertThat(review.actions().currentAction().code()).isEqualTo("WAIT_CONSULTANT");
@@ -435,7 +455,7 @@ class UatDefectCorrectionsTest {
         var created = cases.create(new CreateCaseRequest("Uat", "Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         seedDoctorProfile(); seedCoordinatorProfile();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.claimCoordinatorCase(created.caseId(), "pod");
         em.flush(); SecurityContextHolder.clearContext();
         return created.caseId();
@@ -443,7 +463,7 @@ class UatDefectCorrectionsTest {
 
     private UUID readyForConsultant(String whatsapp, String email) throws Exception {
         UUID caseId = ownedCase(whatsapp, email);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         long version = journey.workspace(caseId).caseSummary().version();
         journey.transition(caseId, new TransitionRequest("READY_FOR_CONSULTANT", "Ready", version));
         em.flush(); SecurityContextHolder.clearContext();
@@ -451,7 +471,7 @@ class UatDefectCorrectionsTest {
     }
 
     private UUID assignConsultant(UUID caseId) {
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         UUID id = journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review")).id();
         em.flush(); SecurityContextHolder.clearContext();
         return id;
@@ -459,11 +479,11 @@ class UatDefectCorrectionsTest {
 
     /** Consultant accepts and records a recommendation with one catalogue service (390,000 EGP) in the given currency. */
     private void toClinicalRecommendation(UUID caseId, String proposalCurrency) throws Exception {
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         long version = journey.workspace(caseId).caseSummary().version();
         if ("INTAKE_REVIEW".equals(status(caseId))) journey.transition(caseId, new TransitionRequest("READY_FOR_CONSULTANT", "Ready", version));
         UUID assignment = journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review")).id();
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(caseId, assignment, new AssignmentDecisionRequest(true, null));
         UUID service = seedCatalogService("PACE-DUAL", "Dual chamber pacemaker implant", "Procedure", new BigDecimal("390000.00"));
         seedFxRate("USD", new BigDecimal("0.0200")); evictFxCache();
@@ -474,7 +494,7 @@ class UatDefectCorrectionsTest {
 
     private UUID releasedUsdProposal(UUID caseId) throws Exception {
         toClinicalRecommendation(caseId, "USD");
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var proposal = journey.createProposal(caseId, draftRequest(approvedReview(caseId)));
         jdbc.update("UPDATE proposal_versions SET requires_finance_approval=FALSE WHERE id=?", proposal.versionId());
         journey.releaseProposal(caseId, proposal.versionId());
@@ -515,9 +535,8 @@ class UatDefectCorrectionsTest {
     }
 
     private void seedCoordinatorProfile() {
-        if (count("SELECT count(*) FROM staff_members WHERE external_subject=?", "coordinator-subject") > 0) return;
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)",
-                UUID.randomUUID(), "coordinator-subject", "COORDINATOR", crypto.encrypt("Coordinator One"), Instant.now(), Instant.now());
+        if (count("SELECT count(*) FROM workforce_people WHERE subject=?", "coordinator-subject") > 0) return;
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "coordinator-subject", "COORDINATOR", crypto.encrypt("Coordinator One"));
     }
 
     private void seedDoctorProfile() {
@@ -529,7 +548,7 @@ class UatDefectCorrectionsTest {
                 UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now());
     }
 
-    private void setStaffEmail(String subject, String email) { jdbc.update("UPDATE staff_members SET email_encrypted=?,email_hash=? WHERE external_subject=?", crypto.encrypt(email), UUID.nameUUIDFromBytes(email.getBytes()).toString().replace("-", ""), subject); }
+    private void setStaffEmail(String subject, String email) { jdbc.update("UPDATE workforce_people SET email_encrypted=?,email_hash=? WHERE subject=?", crypto.encrypt(email), UUID.nameUUIDFromBytes(email.getBytes()).toString().replace("-", ""), subject); }
     private void setPractitionerEmail(String subject, String email) { jdbc.update("UPDATE practitioner_profiles SET email_encrypted=?,email_hash=? WHERE external_subject=?", crypto.encrypt(email), UUID.nameUUIDFromBytes(email.getBytes()).toString().replace("-", ""), subject); }
 
     private UUID seedCatalogService(String code, String name, String category, BigDecimal priceEgp) {
@@ -561,9 +580,5 @@ class UatDefectCorrectionsTest {
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
     private int count(String sql, Object... args) { Integer n = jdbc.queryForObject(sql, Integer.class, args); return n == null ? 0 : n; }
-    private void authenticate(String subject, String role) {
-        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond())
-                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_" + role)), subject));
-    }
+    private void authenticate(String subject, Role role) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, role); }
 }

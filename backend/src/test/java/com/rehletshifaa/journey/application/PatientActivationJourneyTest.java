@@ -1,5 +1,7 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.authority.domain.Role;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
@@ -372,7 +374,7 @@ class PatientActivationJourneyTest {
         // The patient creates the password in the provider, then signs in: the first authenticated entry
         // activates the account and the portal lists every case of the canonical patient.
         identity.completeSetup(subject);
-        authenticate(subject, "PATIENT");
+        authenticate(subject, Role.PATIENT);
         var session = account.session(); em.flush();
         assertThat(session.linked()).isTrue();
         assertThat(session.accountStatus()).isEqualTo("ACTIVE");
@@ -392,7 +394,7 @@ class PatientActivationJourneyTest {
         var handoff = activation.portalAccess(ctx.token, g); em.flush();
         assertThat(handoff.alreadyLinked()).isFalse();
         assertThat(handoff.activationToken()).isNotBlank();
-        authenticate("portal-patient-subject", "PATIENT");
+        authenticate("portal-patient-subject", Role.PATIENT);
         assertThat(journey.activateAccount(handoff.activationToken()).status()).isEqualTo("ACTIVATED");
         assertThat(journey.patientCases()).extracting(CaseView::caseNumber).contains(ctx.caseNumber);
         assertThatThrownBy(() -> journey.activateAccount(handoff.activationToken()))
@@ -455,7 +457,7 @@ class PatientActivationJourneyTest {
     private void finishAccountSetup(Ctx ctx) {
         String subject = jdbc.queryForObject("SELECT external_subject FROM patient_profiles WHERE id=?", String.class, patientId(ctx.caseId));
         identity.completeSetup(subject);
-        authenticate(subject, "PATIENT");
+        authenticate(subject, Role.PATIENT);
         account.session();
         SecurityContextHolder.clearContext();
     }
@@ -463,7 +465,7 @@ class PatientActivationJourneyTest {
     private void payPartOfDeposit(Ctx ctx, String key) {
         UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, ctx.caseId);
         BigDecimal total = jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId);
-        authenticate("finance-subject", "FINANCE");
+        authenticate("finance-subject", Role.FINANCE);
         payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(total.divide(new BigDecimal("2"), 2, java.math.RoundingMode.HALF_UP), "BANK", "ref-" + key, key + "-" + ctx.caseId));
         SecurityContextHolder.clearContext();
     }
@@ -471,7 +473,7 @@ class PatientActivationJourneyTest {
     private void settleDeposit(Ctx ctx, String key) {
         UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, ctx.caseId);
         BigDecimal total = jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId);
-        authenticate("finance-subject", "FINANCE");
+        authenticate("finance-subject", Role.FINANCE);
         payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(total, "BANK", "ref-" + key, key + "-" + ctx.caseId));
         SecurityContextHolder.clearContext();
     }
@@ -480,25 +482,25 @@ class PatientActivationJourneyTest {
         var created = cases.create(new CreateCaseRequest("Link", "Patient", "Kenya", whatsapp, "Cardiac reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "ready", v));
         seedDoctor(); seedStaff();
         var doctorAssignment = journey.assign(created.caseId(), new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "cardiac-pod", "Clinical review"));
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(created.caseId(), doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review = journey.saveClinicalReview(created.caseId(), new ClinicalReviewRequest("Reviewed", "SUITABLE", null, "Imaging", "Recommended intervention", "Alt", "Risks", "Seq", "7 days", "Follow-up"));
         journey.approveClinicalReview(created.caseId(), review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",
                 UUID.randomUUID(), review.id(), "Consultant treatment package", new BigDecimal("1000.00"), "EGP", 0, new BigDecimal("1000.00"), true);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var proposal = journey.createProposal(created.caseId(), new ProposalDraftRequest(review.id(), "en", "Plan", "EGP", "Incl", "Excl", "Deposit", "Refund", "Not consent", Instant.now().plusSeconds(86400), List.of(new ProposalItemRequest("MEDICAL", "Treatment package", BigDecimal.ONE, new BigDecimal("1000.00"), false, 0)), null));
         var operationsAssignment = journey.assign(created.caseId(), new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", "cardiac-pod", "Ops"));
         var financeAssignment = journey.assign(created.caseId(), new AssignmentRequest("finance-subject", "FINANCE", "PRIMARY", "cardiac-pod", "Finance"));
-        authenticate("operations-subject", "OPERATIONS"); journey.decideAssignment(created.caseId(), operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
-        authenticate("finance-subject", "FINANCE"); journey.decideAssignment(created.caseId(), financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
-        authenticate("coordinator-subject", "COORDINATOR"); journey.releaseProposal(created.caseId(), proposal.versionId());
+        authenticate("operations-subject", Role.OPERATIONS); journey.decideAssignment(created.caseId(), operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.authority.domain.Role.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
+        authenticate("finance-subject", Role.FINANCE); journey.decideAssignment(created.caseId(), financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.authority.domain.Role.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
+        authenticate("coordinator-subject", Role.COORDINATOR); journey.releaseProposal(created.caseId(), proposal.versionId());
         em.flush();
         String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, "proposal-ready:" + proposal.versionId()));
         String raw = json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
@@ -528,13 +530,8 @@ class PatientActivationJourneyTest {
     private String profileStatus(UUID caseId) { return jdbc.queryForObject("SELECT profile_status FROM patient_profiles WHERE id=?", String.class, patientId(caseId)); }
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
     private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }
-    private void seedStaff() { if (count("SELECT count(*) FROM staff_members WHERE external_subject=?", "operations-subject") > 0) return; jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "operations-subject", "OPERATIONS", crypto.encrypt("Operations One"), Instant.now(), Instant.now()); jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "finance-subject", "FINANCE", crypto.encrypt("Finance One"), Instant.now(), Instant.now()); }
-    private void authenticate(String subject, String... roles) {
-        var jwt = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond())
-                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,
-                Arrays.stream(roles).map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList()));
-    }
+    private void seedStaff() { if (count("SELECT count(*) FROM workforce_people WHERE subject=?", "operations-subject") > 0) return; com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "operations-subject", "OPERATIONS", crypto.encrypt("Operations One")); com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-subject", "FINANCE", crypto.encrypt("Finance One")); }
+    private void authenticate(String subject, Role... roles) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, roles); }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }
     private int count(String sql, Object... args) { Integer n = jdbc.queryForObject(sql, Integer.class, args); return n == null ? 0 : n; }
 }

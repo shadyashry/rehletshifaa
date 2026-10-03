@@ -5,58 +5,211 @@ import com.rehletshifaa.coordination.domain.Routing.*;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
-import java.time.*;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.*;
-import java.sql.*;
+
 import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
 @Repository
 public class CoordinationRepository {
+    public static final String FUNCTION = "CARE_COORDINATION";
+    private static final String ACTIVE_MEMBERSHIP = "m.status='ACTIVE' AND m.effective_from<=? AND (m.effective_to IS NULL OR m.effective_to>?)";
     private final JdbcClient jdbc;
     private final ObjectMapper json;
-    public CoordinationRepository(JdbcClient jdbc,ObjectMapper json){this.jdbc=jdbc;this.json=json;}
-    public String encode(Object value){try{return json.writeValueAsString(value);}catch(Exception e){throw new IllegalStateException(e);}}
-    public <T> T decode(String value,Class<T> type){try{return json.readValue(value,type);}catch(Exception e){throw new IllegalStateException("Invalid persisted routing data",e);}}
-    public void lock(){jdbc.sql("SELECT id FROM access_bootstrap WHERE id=1 FOR UPDATE").query(Integer.class).single();}
-    public boolean organization(UUID org,boolean lock){return jdbc.sql("SELECT id FROM provider_organizations WHERE id=? AND status NOT IN ('SUSPENDED','OFFBOARDED')"+(lock?" FOR UPDATE":"")).param(org).query(UUID.class).optional().isPresent();}
-    public void lockCase(UUID id){jdbc.sql("SELECT id FROM medical_cases WHERE id=? FOR UPDATE").param(id).query(UUID.class).optional().orElseThrow(()->new ApiException(404,"CASE_NOT_FOUND","Case was not found"));}
-    public boolean consultant(UUID org,UUID id){return count("SELECT COUNT(*) FROM clinician_onboardings WHERE organization_id=? AND practitioner_id=? AND clinician_type='CONSULTANT' AND status NOT IN ('OFFBOARDED','SUSPENDED')",org,id)>0;}
-    public List<Team> teams(UUID org){return jdbc.sql("SELECT * FROM coordinator_teams WHERE organization_id=? ORDER BY name,id").param(org).query((r,n)->new Team(r.getObject("id",UUID.class),org,r.getString("name"),decode(r.getString("configuration"),TeamConfig.class),r.getLong("revision"))).list();}
-    public void team(Team t,boolean create){if(create)update("INSERT INTO coordinator_teams(id,organization_id,name,configuration,revision) VALUES(?,?,?,?,0)",t.id(),t.organizationId(),t.name(),encode(t.configuration()));else stale(update("UPDATE coordinator_teams SET name=?,configuration=?,revision=revision+1 WHERE id=? AND organization_id=? AND revision=?",t.name(),encode(t.configuration()),t.id(),t.organizationId(),t.revision()));}
-    public List<Member> members(UUID team){return jdbc.sql("SELECT * FROM coordinator_memberships WHERE team_id=? ORDER BY subject").param(team).query((r,n)->new Member(r.getString("subject"),instant(r,"effective_from"),instant(r,"effective_to"),r.getBoolean("active"),r.getBoolean("team_lead"),r.getLong("revision"))).list();}
-    public void member(UUID team,Member m){if(count("SELECT COUNT(*) FROM coordinator_memberships WHERE team_id=? AND subject=?",team,m.subject())==0){if(m.revision()!=-1)stale(0);update("INSERT INTO coordinator_memberships(team_id,subject,effective_from,effective_to,active,team_lead) VALUES(?,?,?,?,?,?)",team,m.subject(),timestamp(m.effectiveFrom()),timestamp(m.effectiveTo()),m.active(),m.lead());}else stale(update("UPDATE coordinator_memberships SET effective_from=?,effective_to=?,active=?,team_lead=?,revision=revision+1 WHERE team_id=? AND subject=? AND revision=?",timestamp(m.effectiveFrom()),timestamp(m.effectiveTo()),m.active(),m.lead(),team,m.subject(),m.revision()));}
-    public List<Capacity> capacities(UUID org){return jdbc.sql("SELECT * FROM coordinator_capacity WHERE organization_id=? ORDER BY subject").param(org).query((r,n)->new Capacity(r.getString("subject"),r.getInt("maximum"),r.getBoolean("on_duty"),split(r.getString("languages")),split(r.getString("care_areas")),r.getLong("revision"))).list();}
-    public void capacity(UUID org,Capacity c){if(count("SELECT COUNT(*) FROM coordinator_capacity WHERE organization_id=? AND subject=?",org,c.subject())==0){if(c.revision()!=-1)stale(0);update("INSERT INTO coordinator_capacity(organization_id,subject,maximum,on_duty,languages,care_areas) VALUES(?,?,?,?,?,?)",org,c.subject(),c.maximum(),c.onDuty(),join(c.languages()),join(c.careAreas()));}else stale(update("UPDATE coordinator_capacity SET maximum=?,on_duty=?,languages=?,care_areas=?,revision=revision+1 WHERE organization_id=? AND subject=? AND revision=?",c.maximum(),c.onDuty(),join(c.languages()),join(c.careAreas()),org,c.subject(),c.revision()));}
-    public List<Policy> policies(UUID org){return jdbc.sql("SELECT * FROM coordination_policy_versions WHERE organization_id=? ORDER BY version_number DESC").param(org).query((r,n)->new Policy(r.getObject("id",UUID.class),org,r.getInt("version_number"),instant(r,"effective_from"),instant(r,"effective_to"),decode(r.getString("configuration"),PolicyConfig.class))).list();}
-    public void policy(Policy p,String actor,Instant now){update("INSERT INTO coordination_policy_versions(id,organization_id,version_number,effective_from,effective_to,configuration,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)",p.id(),p.organizationId(),p.version(),timestamp(p.effectiveFrom()),timestamp(p.effectiveTo()),encode(p.configuration()),actor,timestamp(now));}
-    public List<Preference> preferences(UUID org,UUID consultant){return jdbc.sql("SELECT * FROM consultant_routing_preferences WHERE organization_id=? AND consultant_id=? ORDER BY version_number DESC").params(org,consultant).query((r,n)->new Preference(r.getObject("id",UUID.class),org,consultant,r.getInt("version_number"),instant(r,"effective_from"),instant(r,"effective_to"),r.getString("coordinator_subject"),r.getObject("team_id",UUID.class),r.getObject("fallback_team_id",UUID.class))).list();}
-    public void preference(Preference p,String actor){update("INSERT INTO consultant_routing_preferences(id,organization_id,consultant_id,version_number,effective_from,effective_to,coordinator_subject,team_id,fallback_team_id,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)",p.id(),p.organizationId(),p.consultantId(),p.version(),timestamp(p.effectiveFrom()),timestamp(p.effectiveTo()),p.coordinator(),p.team(),p.fallbackTeam(),actor);}
-    public List<UUID[]> provenance(UUID caseId){return jdbc.sql("SELECT DISTINCT o.organization_id,o.practitioner_id FROM case_assignments a JOIN practitioner_profiles p ON p.external_subject=a.assignee_subject JOIN clinician_onboardings o ON o.practitioner_id=p.id WHERE a.case_id=? AND a.assignee_role='DOCTOR' AND a.status IN ('ACTIVE','PENDING') AND o.clinician_type='CONSULTANT' AND o.status NOT IN ('OFFBOARDED','SUSPENDED')").param(caseId).query((r,n)->new UUID[]{r.getObject(1,UUID.class),r.getObject(2,UUID.class)}).list();}
-    public boolean bound(UUID id){return count("SELECT COUNT(*) FROM coordination_case_routing WHERE case_id=?",id)>0;}
-    public void bind(UUID id,UUID org,UUID consultant){update("INSERT INTO coordination_case_routing(case_id,organization_id,consultant_id,mode) VALUES(?,?,?,'SHADOW')",id,org,consultant);}
-    public CaseFacts facts(UUID id){return jdbc.sql("SELECT r.*,c.care_category,c.preferred_language,c.status FROM coordination_case_routing r JOIN medical_cases c ON c.id=r.case_id WHERE r.case_id=?").param(id).query((r,n)->new CaseFacts(id,r.getObject("organization_id",UUID.class),r.getObject("consultant_id",UUID.class),r.getString("care_category"),r.getString("preferred_language"),owner(id),r.getString("mode"),r.getLong("revision"),r.getString("status"))).optional().orElseThrow(()->new ApiException(404,"ROUTING_NOT_FOUND","Routing scope was not found"));}
-    public String owner(UUID id){return jdbc.sql("SELECT assignee_subject FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' ORDER BY assigned_at DESC,id LIMIT 1").param(id).query(String.class).optional().orElse(null);}
-    public long workload(String subject,UUID excludedCase){return count("SELECT COUNT(DISTINCT a.case_id) FROM case_assignments a JOIN medical_cases c ON c.id=a.case_id WHERE a.assignee_subject=? AND a.assignee_role='COORDINATOR' AND a.assignment_type='PRIMARY' AND a.status='ACTIVE' AND c.status NOT IN ('CLOSED','CANCELLED') AND a.case_id<>?",subject,excludedCase);}
-    public boolean staffEnabled(String subject){return count("SELECT COUNT(*) FROM staff_members WHERE external_subject=? AND staff_role IN ('COORDINATOR','COORDINATOR_LEAD') AND disabled_at IS NULL AND (invitation_status IS NULL OR invitation_status<>'DISABLED')",subject)>0;}
-    public boolean queued(UUID caseId){return count("SELECT COUNT(*) FROM case_tasks WHERE case_id=? AND task_type='COORDINATION_ROUTING' AND status IN ('OPEN','IN_PROGRESS') AND owner_subject IS NULL",caseId)>0;}
-    public List<UUID> queuedCases(){return jdbc.sql("SELECT DISTINCT r.case_id FROM coordination_case_routing r JOIN case_tasks t ON t.case_id=r.case_id WHERE r.mode='LIVE' AND t.task_type='COORDINATION_ROUTING' AND t.status IN ('OPEN','IN_PROGRESS') AND t.owner_subject IS NULL AND t.coordination_queue_reason<>'MANUAL_QUEUE' ORDER BY r.case_id LIMIT 100").query(UUID.class).list();}
-    public Instant lastAutomatic(String subject){return jdbc.sql("SELECT MAX(assigned_at) FROM case_assignments WHERE assignee_subject=? AND assignee_role='COORDINATOR' AND assigned_by='ROUTING_ENGINE'").param(subject).query((r,n)->instant(r,1)).optional().orElse(null);}
-    public Optional<Decision> replay(UUID id,String actor,String key,String payload){return jdbc.sql("SELECT request_data,result_data FROM coordination_decisions WHERE case_id=? AND actor_subject=? AND command_key=?").params(id,actor,key).query((r,n)->{if(!r.getString(1).equals(payload))throw new ApiException(409,"IDEMPOTENCY_CONFLICT","Command key was already used for different input");return decode(r.getString(2),Decision.class);}).optional();}
-    public List<Decision> history(UUID org,UUID id){return jdbc.sql("SELECT result_data FROM coordination_decisions WHERE organization_id=? AND case_id=? ORDER BY created_at DESC,id DESC").params(org,id).query((r,n)->decode(r.getString(1),Decision.class)).list();}
-    public void decision(Decision d,UUID org,String actor,String key,String request){update("INSERT INTO coordination_decisions(id,case_id,organization_id,actor_subject,command_key,request_data,policy_id,result_data,created_at) VALUES(?,?,?,?,?,?,?,?,?)",d.id(),d.caseId(),org,actor,key,request,d.policyId(),encode(d),timestamp(d.evaluatedAt()));}
-    public void advance(CaseFacts c,String mode){stale(update("UPDATE coordination_case_routing SET mode=?,revision=revision+1 WHERE case_id=? AND revision=?",mode,c.id(),c.revision()));}
-    public void owner(CaseFacts c,String selected,String actor,String reason,Instant now){if(Objects.equals(c.owner(),selected))return;update("UPDATE case_assignments SET status='ENDED',ended_at=?,version=version+1 WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status IN ('ACTIVE','PENDING')",timestamp(now),c.id());if(selected!=null)update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,'COORDINATOR','PRIMARY','ACTIVE',?,?,?,?,0)",UUID.randomUUID(),c.id(),selected,reason,actor,timestamp(now),timestamp(now));
-        update("UPDATE case_tasks SET owner_subject=?,updated_at=?,version=version+1 WHERE case_id=? AND owner_role='COORDINATOR' AND visibility_scope='INTERNAL' AND status IN ('OPEN','IN_PROGRESS') AND (owner_subject IS NULL OR owner_subject=?)",selected,timestamp(now),c.id(),c.owner());
+
+    public CoordinationRepository(JdbcClient jdbc, ObjectMapper json) { this.jdbc = jdbc; this.json = json; }
+
+    public String encode(Object value) { try { return json.writeValueAsString(value); } catch (Exception e) { throw new IllegalStateException(e); } }
+    public <T> T decode(String value, Class<T> type) { try { return json.readValue(value, type); } catch (Exception e) { throw new IllegalStateException("Invalid persisted routing data", e); } }
+
+    public void lock() { jdbc.sql("SELECT id FROM coordination_routing_lock WHERE id=1 FOR UPDATE").query(Integer.class).single(); }
+    public void lockCase(UUID id) {
+        jdbc.sql("SELECT id FROM medical_cases WHERE id=? FOR UPDATE").param(id).query(UUID.class).optional()
+                .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
     }
-    public void queue(UUID task,UUID team,String reason,Instant now){update("UPDATE case_tasks SET coordination_team_id=?,coordination_queue_reason=?,coordination_queued_at=COALESCE(coordination_queued_at,?) WHERE id=?",team,reason,timestamp(now),task);}
-    public List<QueueItem> queue(UUID org){return jdbc.sql("SELECT t.*,r.revision routing_revision,c.case_number FROM case_tasks t JOIN coordination_case_routing r ON r.case_id=t.case_id JOIN medical_cases c ON c.id=t.case_id WHERE r.organization_id=? AND t.task_type='COORDINATION_ROUTING' AND t.status IN ('OPEN','IN_PROGRESS') AND t.owner_subject IS NULL ORDER BY t.due_at,t.id").param(org).query((r,n)->new QueueItem(r.getObject("case_id",UUID.class),r.getString("case_number"),r.getObject("id",UUID.class),r.getObject("coordination_team_id",UUID.class),r.getString("coordination_queue_reason"),instant(r,"coordination_queued_at"),instant(r,"due_at"),r.getLong("routing_revision"))).list();}
-    public List<String> subjects(UUID org){return jdbc.sql("SELECT subject FROM access_memberships WHERE organization_id=? ORDER BY subject").param(org).query(String.class).list();}
-    public List<OrganizationSummary> organizationsFor(String subject){return jdbc.sql("SELECT o.id,o.display_name,o.organization_type,o.status FROM provider_organizations o JOIN access_memberships m ON m.organization_id=o.id AND m.subject=? AND m.status='ACTIVE' WHERE o.status<>'OFFBOARDED' ORDER BY o.display_name").param(subject).query((r,n)->new OrganizationSummary(r.getObject("id",UUID.class),r.getString("display_name"),r.getString("organization_type"),r.getString("status"))).list();}
-    private int update(String sql,Object... args){return jdbc.sql(sql).params(args).update();}
-    private long count(String sql,Object... args){return jdbc.sql(sql).params(args).query(Long.class).single();}
-    private static Set<String> split(String s){return s.isBlank()?Set.of():Set.copyOf(Arrays.asList(s.split(",")));}
-    private static String join(Set<String> s){return String.join(",",new TreeSet<>(s));}
-    private static Instant instant(ResultSet r,String key)throws SQLException{Timestamp t=r.getTimestamp(key);return t==null?null:t.toInstant();}
-    private static Instant instant(ResultSet r,int key)throws SQLException{Timestamp t=r.getTimestamp(key);return t==null?null:t.toInstant();}
-    private static void stale(int changed){if(changed!=1)throw new ApiException(409,"STALE_ROUTING","Routing configuration changed; reload before saving");}
+
+    // ---- Teams (workforce teams of the care-coordination function, with their routing profile) ----
+    public List<Team> teams() {
+        return jdbc.sql("SELECT t.id,t.name,t.status,p.care_areas,p.languages,p.fallback_team_id,COALESCE(p.revision,-1) revision "
+                        + "FROM workforce_teams t LEFT JOIN coordination_team_profiles p ON p.team_id=t.id WHERE t.function_key=? ORDER BY t.name,t.id")
+                .param(FUNCTION).query((r, n) -> team(r)).list();
+    }
+    public Optional<Team> team(UUID id) { return teams().stream().filter(t -> t.id().equals(id)).findFirst(); }
+    public void profile(UUID team, TeamProfile p, long revision, String actor, Instant now) {
+        if (revision == -1) {
+            if (count("SELECT COUNT(*) FROM coordination_team_profiles WHERE team_id=?", team) > 0) stale(0);
+            update("INSERT INTO coordination_team_profiles(team_id,care_areas,languages,fallback_team_id,updated_by,updated_at,revision) VALUES(?,?,?,?,?,?,0)",
+                    team, join(p.careAreas()), join(p.languages()), p.fallbackTeam(), actor, timestamp(now));
+        } else {
+            stale(update("UPDATE coordination_team_profiles SET care_areas=?,languages=?,fallback_team_id=?,updated_by=?,updated_at=?,revision=revision+1 WHERE team_id=? AND revision=?",
+                    join(p.careAreas()), join(p.languages()), p.fallbackTeam(), actor, timestamp(now), team, revision));
+        }
+    }
+    /** Active memberships of care-coordination teams at {@code at}: subject → teams. */
+    public Map<String, List<UUID>> memberships(Instant at) {
+        Map<String, List<UUID>> result = new HashMap<>();
+        jdbc.sql("SELECT m.subject,m.team_id FROM workforce_team_memberships m JOIN workforce_teams t ON t.id=m.team_id "
+                        + "WHERE t.function_key=? AND t.status='ACTIVE' AND " + ACTIVE_MEMBERSHIP + " ORDER BY m.subject,m.team_id")
+                .params(FUNCTION, timestamp(at), timestamp(at))
+                .query((r, n) -> result.computeIfAbsent(r.getString(1), k -> new ArrayList<>()).add(r.getObject(2, UUID.class))).list();
+        return result;
+    }
+    public List<Object[]> personTeams(Instant at) {
+        return jdbc.sql("SELECT m.subject,m.team_id,m.effective_from,m.effective_to,EXISTS(SELECT 1 FROM workforce_lead_designations l WHERE l.team_id=m.team_id "
+                        + "AND l.subject=m.subject AND l.status='ACTIVE' AND l.effective_from<=? AND (l.effective_to IS NULL OR l.effective_to>?)) "
+                        + "FROM workforce_team_memberships m JOIN workforce_teams t ON t.id=m.team_id WHERE t.function_key=? AND " + ACTIVE_MEMBERSHIP + " ORDER BY m.subject,m.team_id")
+                .params(timestamp(at), timestamp(at), FUNCTION, timestamp(at), timestamp(at))
+                .query((r, n) -> new Object[]{r.getString(1), r.getObject(2, UUID.class), instant(r, 3), instant(r, 4), r.getBoolean(5)}).list();
+    }
+
+    // ---- Capacity ----
+    public List<Capacity> capacities() {
+        return jdbc.sql("SELECT * FROM coordinator_capacity ORDER BY subject").query((r, n) -> capacity(r)).list();
+    }
+    public void capacity(Capacity c, String actor, Instant now) {
+        if (c.revision() == -1) {
+            if (count("SELECT COUNT(*) FROM coordinator_capacity WHERE subject=?", c.subject()) > 0) stale(0);
+            update("INSERT INTO coordinator_capacity(subject,maximum,on_duty,languages,care_areas,updated_by,updated_at,revision) VALUES(?,?,?,?,?,?,?,0)",
+                    c.subject(), c.maximum(), c.onDuty(), join(c.languages()), join(c.careAreas()), actor, timestamp(now));
+        } else {
+            stale(update("UPDATE coordinator_capacity SET maximum=?,on_duty=?,languages=?,care_areas=?,updated_by=?,updated_at=?,revision=revision+1 WHERE subject=? AND revision=?",
+                    c.maximum(), c.onDuty(), join(c.languages()), join(c.careAreas()), actor, timestamp(now), c.subject(), c.revision()));
+        }
+    }
+
+    // ---- Policy and preferences ----
+    public List<Policy> policies() {
+        return jdbc.sql("SELECT * FROM coordination_policy_versions ORDER BY version_number DESC")
+                .query((r, n) -> new Policy(r.getObject("id", UUID.class), r.getInt("version_number"), instant(r, "effective_from"),
+                        instant(r, "effective_to"), decode(r.getString("configuration"), PolicyConfig.class))).list();
+    }
+    public void policy(Policy p, String actor, Instant now) {
+        update("INSERT INTO coordination_policy_versions(id,version_number,effective_from,effective_to,configuration,created_by,created_at) VALUES(?,?,?,?,?,?,?)",
+                p.id(), p.version(), timestamp(p.effectiveFrom()), timestamp(p.effectiveTo()), encode(p.configuration()), actor, timestamp(now));
+    }
+    public List<Preference> preferences(UUID consultant) {
+        return jdbc.sql("SELECT * FROM consultant_routing_preferences WHERE consultant_id=? ORDER BY version_number DESC").param(consultant)
+                .query((r, n) -> preference(r)).list();
+    }
+    public Map<UUID, List<Preference>> allPreferences() {
+        Map<UUID, List<Preference>> result = new HashMap<>();
+        jdbc.sql("SELECT * FROM consultant_routing_preferences ORDER BY consultant_id,version_number DESC")
+                .query((r, n) -> result.computeIfAbsent(r.getObject("consultant_id", UUID.class), k -> new ArrayList<>()).add(preference(r))).list();
+        return result;
+    }
+    public void preference(Preference p, String actor, Instant now) {
+        update("INSERT INTO consultant_routing_preferences(id,consultant_id,version_number,effective_from,effective_to,coordinator_subject,team_id,fallback_team_id,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                p.id(), p.consultantId(), p.version(), timestamp(p.effectiveFrom()), timestamp(p.effectiveTo()), p.coordinator(), p.team(), p.fallbackTeam(), actor, timestamp(now));
+    }
+    public boolean consultant(UUID id) {
+        return count("SELECT COUNT(*) FROM practitioner_profiles WHERE id=? AND practitioner_type='CONSULTANT'", id) > 0;
+    }
+    public List<Object[]> consultants() {
+        return jdbc.sql("SELECT id,display_name FROM practitioner_profiles WHERE practitioner_type='CONSULTANT' ORDER BY display_name,id")
+                .query((r, n) -> new Object[]{r.getObject(1, UUID.class), r.getString(2)}).list();
+    }
+
+    // ---- Cases ----
+    public CaseFacts facts(UUID id) {
+        return jdbc.sql("SELECT care_category,preferred_language,status FROM medical_cases WHERE id=?").param(id)
+                .query((r, n) -> new CaseFacts(id, consultantOf(id), r.getString(1), r.getString(2), owner(id), revision(id), r.getString(3))).optional()
+                .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
+    }
+    /** The case's primary Consultant (for routing preferences), if one is assigned or offered. */
+    private UUID consultantOf(UUID caseId) {
+        return jdbc.sql("SELECT p.id FROM case_assignments a JOIN practitioner_profiles p ON p.external_subject=a.assignee_subject WHERE a.case_id=? "
+                        + "AND a.assignee_role='DOCTOR' AND a.assignment_type='PRIMARY' AND a.status IN ('ACTIVE','PENDING') ORDER BY a.assigned_at DESC,a.id LIMIT 1")
+                .param(caseId).query(UUID.class).optional().orElse(null);
+    }
+    public String owner(UUID id) {
+        return jdbc.sql("SELECT assignee_subject FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' ORDER BY assigned_at DESC,id LIMIT 1")
+                .param(id).query(String.class).optional().orElse(null);
+    }
+    private long revision(UUID caseId) { return count("SELECT COUNT(*) FROM coordination_decisions WHERE case_id=?", caseId); }
+    public long workload(String subject, UUID excludedCase) {
+        return count("SELECT COUNT(DISTINCT a.case_id) FROM case_assignments a JOIN medical_cases c ON c.id=a.case_id WHERE a.assignee_subject=? AND a.assignee_role='COORDINATOR' "
+                + "AND a.assignment_type='PRIMARY' AND a.status='ACTIVE' AND c.status NOT IN ('CLOSED','CANCELLED') AND a.case_id<>?", subject, excludedCase);
+    }
+    public Instant lastAutomatic(String subject) {
+        return jdbc.sql("SELECT assigned_at FROM case_assignments WHERE assignee_subject=? AND assignee_role='COORDINATOR' AND assigned_by='ROUTING_ENGINE' ORDER BY assigned_at DESC LIMIT 1")
+                .param(subject).query((r, n) -> instant(r, 1)).optional().orElse(null);
+    }
+    public boolean queued(UUID caseId) {
+        return count("SELECT COUNT(*) FROM case_tasks WHERE case_id=? AND task_type='COORDINATION_ROUTING' AND status IN ('OPEN','IN_PROGRESS') AND owner_subject IS NULL", caseId) > 0;
+    }
+    /** Automatically queued cases a retry may resolve; a manager's explicit QUEUE stays parked until they resolve it. */
+    public List<UUID> retryableQueue() {
+        return jdbc.sql("SELECT DISTINCT case_id FROM case_tasks WHERE task_type='COORDINATION_ROUTING' AND status IN ('OPEN','IN_PROGRESS') "
+                + "AND owner_subject IS NULL AND coordination_queue_reason<>'MANUAL_QUEUE' ORDER BY case_id LIMIT 100").query(UUID.class).list();
+    }
+    public List<QueueItem> queue() {
+        return jdbc.sql("SELECT t.*,c.case_number FROM case_tasks t JOIN medical_cases c ON c.id=t.case_id WHERE t.task_type='COORDINATION_ROUTING' "
+                        + "AND t.status IN ('OPEN','IN_PROGRESS') AND t.owner_subject IS NULL ORDER BY t.due_at,t.id")
+                .query((r, n) -> {
+                    UUID caseId = r.getObject("case_id", UUID.class);
+                    return new QueueItem(caseId, r.getString("case_number"), r.getObject("id", UUID.class), r.getObject("coordination_team_id", UUID.class),
+                            r.getString("coordination_queue_reason"), instant(r, "coordination_queued_at"), instant(r, "due_at"), revision(caseId));
+                }).list();
+    }
+    public long routedCases() { return count("SELECT COUNT(DISTINCT case_id) FROM coordination_decisions"); }
+    public void queue(UUID task, UUID team, String reason, Instant now) {
+        update("UPDATE case_tasks SET coordination_team_id=?,coordination_queue_reason=?,coordination_queued_at=COALESCE(coordination_queued_at,?) WHERE id=?", team, reason, timestamp(now), task);
+    }
+    /** Replaces the case's primary Coordinator and moves their open coordinator work to the new owner. */
+    public void owner(CaseFacts c, String selected, String actor, String reason, Instant now) {
+        if (Objects.equals(c.owner(), selected)) return;
+        update("UPDATE case_assignments SET status='ENDED',ended_at=?,version=version+1 WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status IN ('ACTIVE','PENDING')",
+                timestamp(now), c.id());
+        if (selected != null)
+            update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,'COORDINATOR','PRIMARY','ACTIVE',?,?,?,?,0)",
+                    UUID.randomUUID(), c.id(), selected, reason, actor, timestamp(now), timestamp(now));
+        update("UPDATE case_tasks SET owner_subject=?,updated_at=?,version=version+1 WHERE case_id=? AND owner_role='COORDINATOR' AND visibility_scope='INTERNAL' "
+                + "AND status IN ('OPEN','IN_PROGRESS') AND (owner_subject IS NULL OR owner_subject=?)", selected, timestamp(now), c.id(), c.owner());
+    }
+
+    // ---- Decisions ----
+    public Optional<Decision> replay(UUID id, String actor, String key, String payload) {
+        return jdbc.sql("SELECT request_data,result_data FROM coordination_decisions WHERE case_id=? AND actor_subject=? AND command_key=?").params(id, actor, key)
+                .query((r, n) -> {
+                    if (!r.getString(1).equals(payload)) throw new ApiException(409, "IDEMPOTENCY_CONFLICT", "Command key was already used for different input");
+                    return decode(r.getString(2), Decision.class);
+                }).optional();
+    }
+    public List<Decision> history(UUID id) {
+        return jdbc.sql("SELECT result_data FROM coordination_decisions WHERE case_id=? ORDER BY created_at DESC,id DESC").param(id)
+                .query((r, n) -> decode(r.getString(1), Decision.class)).list();
+    }
+    public List<Object[]> recentDecisions(int limit) {
+        return jdbc.sql("SELECT c.case_number,d.actor_subject,d.result_data FROM coordination_decisions d JOIN medical_cases c ON c.id=d.case_id ORDER BY d.created_at DESC,d.id DESC LIMIT " + limit)
+                .query((r, n) -> new Object[]{r.getString(1), r.getString(2), decode(r.getString(3), Decision.class)}).list();
+    }
+    public void decision(Decision d, String actor, String key, String request) {
+        update("INSERT INTO coordination_decisions(id,case_id,actor_subject,command_key,request_data,policy_id,result_data,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                d.id(), d.caseId(), actor, key, request, d.policyId(), encode(d), timestamp(d.evaluatedAt()));
+    }
+
+    private Team team(ResultSet r) throws SQLException {
+        String areas = r.getString("care_areas"), languages = r.getString("languages");
+        return new Team(r.getObject("id", UUID.class), r.getString("name"), "ACTIVE".equals(r.getString("status")),
+                areas == null ? Set.of() : split(areas), languages == null ? Set.of() : split(languages),
+                r.getObject("fallback_team_id", UUID.class), r.getLong("revision"));
+    }
+    private Capacity capacity(ResultSet r) throws SQLException {
+        return new Capacity(r.getString("subject"), r.getInt("maximum"), r.getBoolean("on_duty"), split(r.getString("languages")), split(r.getString("care_areas")), r.getLong("revision"));
+    }
+    private Preference preference(ResultSet r) throws SQLException {
+        return new Preference(r.getObject("id", UUID.class), r.getObject("consultant_id", UUID.class), r.getInt("version_number"), instant(r, "effective_from"),
+                instant(r, "effective_to"), r.getString("coordinator_subject"), r.getObject("team_id", UUID.class), r.getObject("fallback_team_id", UUID.class));
+    }
+    private int update(String sql, Object... args) { return jdbc.sql(sql).params(args).update(); }
+    private long count(String sql, Object... args) { return jdbc.sql(sql).params(args).query(Long.class).single(); }
+    private static Set<String> split(String s) { return s.isBlank() ? Set.of() : Set.copyOf(Arrays.asList(s.split(","))); }
+    private static String join(Set<String> s) { return String.join(",", new TreeSet<>(s)); }
+    private static Instant instant(ResultSet r, String key) throws SQLException { Timestamp t = r.getTimestamp(key); return t == null ? null : t.toInstant(); }
+    private static Instant instant(ResultSet r, int key) throws SQLException { Timestamp t = r.getTimestamp(key); return t == null ? null : t.toInstant(); }
+    private static void stale(int changed) { if (changed != 1) throw new ApiException(409, "STALE_ROUTING", "Routing configuration changed; reload before saving"); }
 }

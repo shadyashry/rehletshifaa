@@ -25,10 +25,7 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
     private final JdbcClient jdbc; private final Clock clock; private final com.rehletshifaa.shared.crypto.CryptoService crypto;
     public LocalDemoDataSeeder(JdbcClient jdbc,Clock clock,com.rehletshifaa.shared.crypto.CryptoService crypto){this.jdbc=jdbc;this.clock=clock;this.crypto=crypto;}
     @Override public void run(ApplicationArguments args){Instant now=clock.instant();
-        jdbc.sql("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0) ON CONFLICT (external_subject) DO UPDATE SET display_name_encrypted=EXCLUDED.display_name_encrypted,updated_at=EXCLUDED.updated_at").params(UUID.randomUUID(),COORDINATOR_SUBJECT,"COORDINATOR_LEAD",crypto.encrypt("Layla Hassan"),timestamp(now),timestamp(now)).update();
-        jdbc.sql("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0) ON CONFLICT (external_subject) DO UPDATE SET staff_role=EXCLUDED.staff_role,display_name_encrypted=EXCLUDED.display_name_encrypted,updated_at=EXCLUDED.updated_at").params(UUID.randomUUID(),SECOND_COORDINATOR_SUBJECT,"COORDINATOR",crypto.encrypt("Omar Nasser"),timestamp(now),timestamp(now)).update();
-        seedStaff(OPERATIONS_SUBJECT,"OPERATIONS","Mariam Soliman",now);
-        seedStaff(FINANCE_SUBJECT,"FINANCE","Youssef Adel",now);
+        seedWorkforce(now);
         // One verified consultant per care category. The cardiology consultant reuses the
         // seeded doctor login (DOCTOR_SUBJECT) so the accept/review flow can be demonstrated.
         seedConsultant(DOCTOR_SUBJECT,"Dr Ahmed Alashry","General and Interventional Cardiology","Interventional cardiology","cardiology",now);
@@ -37,15 +34,57 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         // Work addresses of the QA identities (the realm's seeded logins), so work emails reach the person
         // the work belongs to — a consultant's assignment must be visible under the consultant's address in
         // Mailpit, never under the coordination team's. Only rows still without an address are touched.
-        seedStaffEmail(COORDINATOR_SUBJECT,"coordinator@local.test",now);
-        seedStaffEmail(SECOND_COORDINATOR_SUBJECT,"coordinator2@local.test",now);
-        seedStaffEmail(OPERATIONS_SUBJECT,"operations@local.test",now);
-        seedStaffEmail(FINANCE_SUBJECT,"finance@local.test",now);
         seedPractitionerEmail(DOCTOR_SUBJECT,"doctor@local.test",now);
     }
-    private void seedStaffEmail(String subject,String email,Instant now){
-        jdbc.sql("UPDATE staff_members SET email_encrypted=?,email_hash=?,updated_at=? WHERE external_subject=? AND email_hash IS NULL AND NOT EXISTS(SELECT 1 FROM staff_members s WHERE s.email_hash=?)")
-            .params(crypto.encrypt(email),emailHash(email),timestamp(now),subject,emailHash(email)).update();
+    public static final String ADMIN_SUBJECT="00000000-0000-0000-0000-000000000106";
+    private static final UUID COORDINATION_TEAM=UUID.fromString("00000000-0000-0000-0000-00000000c001");
+
+    /**
+     * Section 1 workforce model for the realm QA identities: one workforce person each, their database business
+     * roles, the seeded System Administrator (local only: its MFA evidence flag is seeded so the one demo admin is
+     * effective without a passkey ceremony), and one coordination team led by the coordinator. Idempotent.
+     */
+    private void seedWorkforce(Instant now){
+        seedPerson(COORDINATOR_SUBJECT,"Layla Hassan","coordinator@local.test",now,"COORDINATOR");
+        seedPerson(SECOND_COORDINATOR_SUBJECT,"Omar Nasser","coordinator2@local.test",now,"COORDINATOR");
+        seedPerson(OPERATIONS_SUBJECT,"Mariam Soliman","operations@local.test",now,"OPERATIONS");
+        seedPerson(FINANCE_SUBJECT,"Youssef Adel","finance@local.test",now,"FINANCE");
+        seedPerson(ADMIN_SUBJECT,"Credential Administrator","credential-admin@local.test",now,"CREDENTIAL_VERIFIER");
+        // IAM-17: the one technical client the backend uses, recorded with an owner and scopes; it holds no business role.
+        jdbc.sql("INSERT INTO service_accounts(client_id,owner_subject,purpose,scopes,secret_rotated_at,status,registered_by,registered_at,revision) "
+                +"VALUES('staff-identity-admin',?,'Keycloak user administration for workforce and consultant identity operations','realm-management: manage-users view-users query-users view-realm',?,'ACTIVE','local-demo-seeder',?,0) ON CONFLICT (client_id) DO NOTHING")
+            .params(ADMIN_SUBJECT,timestamp(now),timestamp(now)).update();
+        jdbc.sql("UPDATE workforce_people SET mfa_enrolled=TRUE WHERE subject=?").param(ADMIN_SUBJECT).update();
+        jdbc.sql("INSERT INTO platform_role_assignments(id,subject,role_key,effective_from,status,assigned_by,reason,created_at,revision) "
+                +"SELECT ?,?,'SYSTEM_ADMINISTRATOR',?,'ACTIVE','local-demo-seeder','Local demo administrator',?,0 "
+                +"WHERE NOT EXISTS(SELECT 1 FROM platform_role_assignments WHERE subject=? AND role_key='SYSTEM_ADMINISTRATOR')")
+            .params(UUID.randomUUID(),ADMIN_SUBJECT,timestamp(now),timestamp(now),ADMIN_SUBJECT).update();
+        jdbc.sql("INSERT INTO workforce_teams(id,function_key,name,status,created_by,created_at,updated_at,revision) VALUES(?,'CARE_COORDINATION','Coordination team','ACTIVE','local-demo-seeder',?,?,0) ON CONFLICT (id) DO NOTHING")
+            .params(COORDINATION_TEAM,timestamp(now),timestamp(now)).update();
+        for(String subject:new String[]{COORDINATOR_SUBJECT,SECOND_COORDINATOR_SUBJECT})
+            jdbc.sql("INSERT INTO workforce_team_memberships(id,team_id,subject,effective_from,status,created_by,reason,revision) SELECT ?,?,?,?,'ACTIVE','local-demo-seeder','Local demo team',0 "
+                    +"WHERE NOT EXISTS(SELECT 1 FROM workforce_team_memberships WHERE team_id=? AND subject=?)")
+                .params(UUID.randomUUID(),COORDINATION_TEAM,subject,timestamp(now),COORDINATION_TEAM,subject).update();
+        jdbc.sql("INSERT INTO workforce_lead_designations(id,team_id,subject,effective_from,status,created_by,reason,revision) SELECT ?,?,?,?,'ACTIVE','local-demo-seeder','Local demo lead',0 "
+                +"WHERE NOT EXISTS(SELECT 1 FROM workforce_lead_designations WHERE team_id=? AND subject=?)")
+            .params(UUID.randomUUID(),COORDINATION_TEAM,COORDINATOR_SUBJECT,timestamp(now),COORDINATION_TEAM,COORDINATOR_SUBJECT).update();
+        if(jdbc.sql("SELECT COUNT(*) FROM workforce_current_managers WHERE function_key='CARE_COORDINATION' AND staff_subject=?").param(SECOND_COORDINATOR_SUBJECT).query(Long.class).single()==0){
+            UUID line=UUID.randomUUID();
+            jdbc.sql("INSERT INTO workforce_reporting_lines(id,function_key,staff_subject,manager_subject,effective_from,status,created_by,reason,revision) VALUES(?,'CARE_COORDINATION',?,?,?,'ACTIVE','local-demo-seeder','Local demo reporting line',0)")
+                .params(line,SECOND_COORDINATOR_SUBJECT,COORDINATOR_SUBJECT,timestamp(now)).update();
+            jdbc.sql("INSERT INTO workforce_current_managers(function_key,staff_subject,manager_subject,reporting_line_id) VALUES('CARE_COORDINATION',?,?,?)")
+                .params(SECOND_COORDINATOR_SUBJECT,COORDINATOR_SUBJECT,line).update();
+        }
+    }
+    private void seedPerson(String subject,String name,String email,Instant now,String role){
+        jdbc.sql("INSERT INTO access_subjects(subject,active,revision) VALUES(?,TRUE,0) ON CONFLICT (subject) DO NOTHING").param(subject).update();
+        jdbc.sql("INSERT INTO workforce_people(subject,display_name_encrypted,email_encrypted,email_hash,lifecycle_status,activated_at,created_at,updated_at,revision) "
+                +"VALUES(?,?,?,?,'ACTIVE',?,?,?,0) ON CONFLICT (subject) DO NOTHING")
+            .params(subject,crypto.encrypt(name),crypto.encrypt(email),emailHash(email),timestamp(now),timestamp(now),timestamp(now)).update();
+        jdbc.sql("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,status,source,assigned_by,reason,created_at,revision) "
+                +"SELECT ?,?,?,?,'ACTIVE','GRANT','local-demo-seeder','Local demo role',?,0 "
+                +"WHERE NOT EXISTS(SELECT 1 FROM workforce_role_assignments WHERE subject=? AND role_key=? AND status='ACTIVE')")
+            .params(UUID.randomUUID(),subject,role,timestamp(now),timestamp(now),subject,role).update();
     }
     private void seedPractitionerEmail(String subject,String email,Instant now){
         jdbc.sql("UPDATE practitioner_profiles SET email_encrypted=?,email_hash=?,updated_at=? WHERE external_subject=? AND email_hash IS NULL AND NOT EXISTS(SELECT 1 FROM practitioner_profiles p WHERE p.email_hash=?)")
@@ -55,10 +94,6 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
     private static String emailHash(String email){
         try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(email.trim().toLowerCase(java.util.Locale.ROOT).getBytes(java.nio.charset.StandardCharsets.UTF_8)));}
         catch(Exception e){throw new IllegalStateException("Unable to hash seed email",e);}
-    }
-    private void seedStaff(String subject,String role,String name,Instant now){
-        jdbc.sql("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0) ON CONFLICT (external_subject) DO UPDATE SET staff_role=EXCLUDED.staff_role,display_name_encrypted=EXCLUDED.display_name_encrypted,updated_at=EXCLUDED.updated_at")
-            .params(UUID.randomUUID(),subject,role,crypto.encrypt(name),timestamp(now),timestamp(now)).update();
     }
     private void seedConsultant(String subject,String name,String specialty,String subspecialty,String category,Instant now){
         jdbc.sql("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,registration_number,specialty,subspecialty,care_category,practitioner_type,qualifications,languages,approved_procedures,contract_status,availability_status,expected_review_hours,credentialing_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0) ON CONFLICT (external_subject) DO UPDATE SET display_name=EXCLUDED.display_name,legal_name=EXCLUDED.legal_name,specialty=EXCLUDED.specialty,subspecialty=EXCLUDED.subspecialty,care_category=EXCLUDED.care_category,practitioner_type=EXCLUDED.practitioner_type,contract_status='ACTIVE',availability_status='AVAILABLE',expected_review_hours=EXCLUDED.expected_review_hours,credentialing_status='VERIFIED',updated_at=EXCLUDED.updated_at")

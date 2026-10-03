@@ -1,7 +1,6 @@
 package com.rehletshifaa.journey;
 
-import com.rehletshifaa.access.application.*;
-import com.rehletshifaa.access.infrastructure.AccessAuditRepository;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
@@ -62,10 +61,9 @@ class JourneyCutoverIntegrationTest {
     @Autowired JourneyCutoverPolicy configuredPolicy;
     @Autowired JourneyCutoverStatusService status;
     @Autowired ObjectProvider<JourneyRuntimePort> runtimes;
-    @Autowired AccessAuditRepository audit;
-    @Autowired AccessBootstrapService bootstrap;
-    @Autowired RoleAssignmentService assignments;
+    @Autowired GovernanceAuditLog audit;
     @Autowired CaseService cases;
+    @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @Autowired JdbcTemplate jdbc;
     @Autowired JdbcClient jdbcClient;
     @Autowired Clock clock;
@@ -78,7 +76,7 @@ class JourneyCutoverIntegrationTest {
 
     @BeforeAll void setup() {
         fixture = new JourneyDefinitionIntegrationTest();
-        fixture.service = definitions; fixture.bootstrap = bootstrap; fixture.assignments = assignments; fixture.jdbc = jdbc; fixture.clock = clock;
+        fixture.service = definitions; fixture.crypto = crypto; fixture.jdbc = jdbc; fixture.clock = clock;
         new TransactionTemplate(manager).executeWithoutResult(s -> fixture.setup());
         fixture.signIn("maker");
         var d = definitions.create();
@@ -376,14 +374,10 @@ class JourneyCutoverIntegrationTest {
                 post("/api/v1/admin/journey-cutover/policies/cardiology-pilot/enable")))
             mvc.perform(request.with(jwt().jwt(t -> t.subject("maker").claim("auth_time", clock.instant()))))
                     .andExpect(r -> assertThat(r.getResponse().getStatus()).isIn(403, 404, 405));
-        // Tenant-scoped (ORGANIZATION) journey.view does not satisfy the PLATFORM read.
-        fixture.signIn("journey-owner");
-        UUID tenant = UUID.randomUUID();
-        fixture.grant("tenant-viewer", JourneyDefinitionIntegrationTest.MANAGER);
+        // Reading the cutover needs JOURNEY_READ; any other signed-in account is refused.
+        fixture.grant("tenant-viewer", com.rehletshifaa.authority.domain.Role.JOURNEY_MANAGER);
         mvc.perform(get("/api/v1/admin/journey-cutover").with(jwt().jwt(t -> t.subject("tenant-viewer").claim("auth_time", clock.instant())))).andExpect(status().isOk()); // PLATFORM grant: allowed
-        tx(() -> jdbc.update("INSERT INTO access_memberships(subject,organization_id,status,effective_from,created_by,reason) VALUES('tenant-viewer',?,'ACTIVE',?,'ENGINEERING','Tenant isolation fixture')", tenant, clock.instant().minusSeconds(60)));
-        tx(() -> jdbc.update("UPDATE role_assignments SET organization_id=?,scope_type='ORGANIZATION' WHERE subject='tenant-viewer'", tenant));
         fixture.clear();
-        mvc.perform(get("/api/v1/admin/journey-cutover").with(jwt().jwt(t -> t.subject("tenant-viewer").claim("auth_time", clock.instant())))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/journey-cutover").with(jwt().jwt(t -> t.subject("no-journey-role").claim("auth_time", clock.instant())))).andExpect(status().isForbidden());
     }
 }

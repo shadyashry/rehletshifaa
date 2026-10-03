@@ -99,7 +99,11 @@ app:
       commercial-policy: ${CACHE_TTL_COMMERCIAL_POLICY:10m}
   security:
     enabled: ${APP_SECURITY_ENABLED:false}
-    allowed-client-id: ${OIDC_ALLOWED_CLIENT_ID:rehletshifaa-web}
+    api-audience: ${OIDC_API_AUDIENCE:rehletshifaa-api}
+    allowed-authorized-parties: ${OIDC_ALLOWED_AUTHORIZED_PARTIES:rehletshifaa-web}
+    # Keycloak Level of Authentication values: password=1, OTP MFA=2, WebAuthn/passkey=3.
+    mfa-acr-values: ${MFA_ACR_VALUES:2,3}
+    phishing-resistant-acr-values: ${PHISHING_RESISTANT_ACR_VALUES:3}
   claim:
     pepper: ${CLAIM_TOKEN_PEPPER:local-development-pepper-only}
     expiry-seconds: ${CLAIM_TOKEN_EXPIRY_SECONDS:900}
@@ -117,6 +121,20 @@ app:
     # keycloak | simulator | auto (real provider whenever a client secret is configured)
     mode: ${IDENTITY_ADMIN_MODE:auto}
     setup-lifespan-seconds: ${PATIENT_SETUP_LIFESPAN_SECONDS:86400}
+  identity-operations:
+    poll-milliseconds: ${IDENTITY_OPERATION_POLL_MILLISECONDS:5000}
+    initial-delay-milliseconds: ${IDENTITY_OPERATION_INITIAL_DELAY_MILLISECONDS:5000}
+    max-attempts: ${IDENTITY_OPERATION_MAX_ATTEMPTS:8}
+  identity-reconciliation:
+    cron: ${IDENTITY_RECONCILIATION_CRON:0 20 2 * * *}
+    # Set a new unique value for every restore. The workforce gate clears only after POST_RESTORE passes.
+    restore-id: ${APP_IDENTITY_RESTORE_ID:}
+  practice-manager:
+    invitation-lifetime-days: ${PRACTICE_MANAGER_INVITATION_LIFETIME_DAYS:7}
+    invitation-expiry-delay-milliseconds: ${PRACTICE_MANAGER_INVITATION_EXPIRY_DELAY_MILLISECONDS:900000}
+    invitation-expiry-initial-delay-milliseconds: ${PRACTICE_MANAGER_INVITATION_EXPIRY_INITIAL_DELAY_MILLISECONDS:120000}
+    lifecycle-reconciliation-delay-milliseconds: ${PRACTICE_MANAGER_RECONCILIATION_DELAY_MILLISECONDS:300000}
+    lifecycle-reconciliation-initial-delay-milliseconds: ${PRACTICE_MANAGER_RECONCILIATION_INITIAL_DELAY_MILLISECONDS:180000}
   cors.allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000}
   crypto:
     pii-key: ${PII_ENCRYPTION_KEY:rehletshifaa-local-dev-only-change-me}
@@ -146,6 +164,12 @@ app:
   notifications:
     mode: ${NOTIFICATIONS_MODE:noop}
     poll-milliseconds: ${NOTIFICATION_POLL_MILLISECONDS:5000}
+  governance:
+    notifications:
+      # Comma-separated security/governance distribution addresses. No credentials or raw evidence are included.
+      email-destinations: ${GOVERNANCE_NOTIFICATION_EMAILS:}
+  executive-analytics:
+    small-cohort-threshold: ${EXECUTIVE_ANALYTICS_SMALL_COHORT_THRESHOLD:5}
   credentials:
     reminder-days: ${CREDENTIAL_REMINDER_DAYS:30,7,1}
   whatsapp:

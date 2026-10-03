@@ -27,6 +27,8 @@ class NotificationOutboxDeliveryTest {
     @Autowired Clock clock;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
 
+    // Committed rows left by other suites must not crowd this test's rows out of a bounded claim.
+    @org.junit.jupiter.api.BeforeEach void isolate() { jdbc.update("UPDATE notification_outbox SET next_attempt_at=? WHERE idempotency_key NOT LIKE 'outbox-test:%' AND status IN ('PENDING','PROCESSING')", java.sql.Timestamp.from(clock.instant().plus(java.time.Duration.ofDays(3650)))); }
     @AfterEach void clear() { jdbc.update("DELETE FROM notification_outbox WHERE idempotency_key LIKE 'outbox-test:%'"); }
 
     @Test void claimingLeasesTheMessageSoAConcurrentWorkerCannotSendItTwice() {

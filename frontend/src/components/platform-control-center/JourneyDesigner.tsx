@@ -9,7 +9,7 @@ import { apiFetchAs } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { journeyCopy, journeyStatusLabel, stageTypeLabel } from "./journey-copy";
-import type { Decision, JourneyCapability, JourneyCutoverStatus, JourneyDetail, JourneyGraph, JourneyRegistryMetadata, JourneySimulation, JourneyValidation, JourneyVersion } from "./journey-types";
+import type { JourneyCapability, JourneyCutoverStatus, JourneyDetail, JourneyGraph, JourneyRegistryMetadata, JourneySimulation, JourneyValidation, JourneyVersion } from "./journey-types";
 import { JourneyGraphCanvas } from "./JourneyGraphCanvas";
 import { JourneyNodeInspector } from "./JourneyNodeInspector";
 import { JourneyValidationPanel } from "./JourneyValidationPanel";
@@ -25,14 +25,13 @@ class ApiCodeError extends Error { code?: string; constructor(message: string, c
 
 export function JourneyDesigner({ locale, definitionId, versionId, initialTab }: { locale: Locale; definitionId: string; versionId: string; initialTab?: Tab }) {
   const t = journeyCopy[locale];
-  const { user, loading: authLoading, signIn } = useAuth();
+  const { user, me, loading: authLoading, signIn } = useAuth();
 
   const [detail, setDetail] = useState<JourneyDetail | null>(null);
   const [savedGraph, setSavedGraph] = useState<JourneyGraph | null>(null);
   const [graph, setGraph] = useState<JourneyGraph | null>(null);
   const [registry, setRegistry] = useState<JourneyCapability[]>([]);
   const [registryMeta, setRegistryMeta] = useState<JourneyRegistryMetadata | null>(null);
-  const [can, setCan] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -48,7 +47,7 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
   const [compareId, setCompareId] = useState("");
   const [listMode, setListMode] = useState(false);
 
-  const allowed = (key: string) => can.some((d) => d.permission === key && d.allowed);
+  const allowed = (key: string) => !!me?.permissions.includes(key);
 
   const api = useCallback(async <T,>(path: string, method = "GET", body?: unknown): Promise<T> => {
     if (!user) throw new Error(t.denied);
@@ -67,11 +66,10 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
 
   const refresh = useCallback(async () => {
     if (!user) { setLoading(false); return; }
+    if (!me) return; // wait for /api/v1/me before deciding what the caller may read
     setLoading(true); setError(""); setStale(false);
     try {
-      const decisions = await apiFetchAs(user.access_token, "/admin/access/me").then((r) => (r.ok ? r.json() : []));
-      setCan(decisions);
-      if ((decisions as Decision[]).some((d) => d.permission === "journey.view" && d.allowed)) {
+      if (me?.permissions.includes("JOURNEY_READ")) {
         const [d, reg, meta] = await Promise.all([
           api<JourneyDetail>("/" + definitionId),
           api<JourneyCapability[]>("/registry"),
@@ -82,7 +80,7 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
         if (v) { setSavedGraph(v.graph); setGraph(v.graph); }
       }
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
-  }, [api, user, t.error, definitionId, versionId]);
+  }, [api, user, me, t.error, definitionId, versionId]);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const dirty = useMemo(() => JSON.stringify(graph) !== JSON.stringify(savedGraph), [graph, savedGraph]);
@@ -276,7 +274,7 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
 
           {tab === "publish" && (
             <JourneyPublishPanel
-              locale={locale} version={version} journeyName={detail.definition.name} versions={detail.versions} materialChanges={materialChanges} can={can} busy={busy}
+              locale={locale} version={version} journeyName={detail.definition.name} versions={detail.versions} materialChanges={materialChanges} permissions={me?.permissions ?? []} busy={busy}
               reason={reason} currentUser={user?.profile?.sub} intake={intake} onLoadIntake={() => void loadIntake()}
               onSubmit={() => void submit()} onReturnToDraft={() => void returnToDraft()} onDecide={decide}
             />

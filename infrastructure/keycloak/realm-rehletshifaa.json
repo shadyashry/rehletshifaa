@@ -22,65 +22,165 @@
   "registrationAllowed": false,
   "resetPasswordAllowed": true,
   "loginWithEmailAllowed": true,
-  "defaultRoles": [
-    "PATIENT"
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "defaultRoles": [],
+  "webAuthnPolicyRpEntityName": "RehletShifaa",
+  "webAuthnPolicySignatureAlgorithms": [
+    "ES256",
+    "RS256"
   ],
-  "roles": {
-    "realm": [
-      {
-        "name": "PATIENT"
-      },
-      {
-        "name": "PATIENT_REPRESENTATIVE"
-      },
-      {
-        "name": "COORDINATOR"
-      },
-      {
-        "name": "COORDINATOR_LEAD"
-      },
-      {
-        "name": "DOCTOR"
-      },
-      {
-        "name": "OPERATIONS"
-      },
-      {
-        "name": "OPERATIONS_LEAD",
-        "composite": true,
-        "composites": {
-          "realm": [
-            "OPERATIONS"
-          ]
-        }
-      },
-      {
-        "name": "FINANCE"
-      },
-      {
-        "name": "FINANCE_LEAD",
-        "composite": true,
-        "composites": {
-          "realm": [
-            "FINANCE"
-          ]
-        }
-      },
-      {
-        "name": "CREDENTIALING_ADMIN"
-      },
-      {
-        "name": "SYSTEM_ADMIN"
-      },
-      {
-        "name": "AUDITOR"
-      },
-      {
-        "name": "PATIENT_IDENTITY_REVIEWER",
-        "description": "Reviews patient legal-identity proofing (distinct from practitioner CREDENTIALING_ADMIN)"
+  "webAuthnPolicyRpId": "",
+  "webAuthnPolicyAttestationConveyancePreference": "none",
+  "webAuthnPolicyAuthenticatorAttachment": "not specified",
+  "webAuthnPolicyRequireResidentKey": "not specified",
+  "webAuthnPolicyUserVerificationRequirement": "required",
+  "webAuthnPolicyCreateTimeout": 60,
+  "webAuthnPolicyAvoidSameAuthenticatorRegister": true,
+  "webAuthnPolicyAcceptableAaguids": [],
+  "browserFlow": "rehletshifaa-browser-step-up",
+  "authenticatorConfig": [
+    {
+      "alias": "rehletshifaa-loa-1",
+      "config": {
+        "loa-condition-level": "1",
+        "loa-max-age": "36000"
       }
-    ]
-  },
+    },
+    {
+      "alias": "rehletshifaa-loa-2",
+      "config": {
+        "loa-condition-level": "2",
+        "loa-max-age": "600"
+      }
+    },
+    {
+      "alias": "rehletshifaa-loa-3",
+      "config": {
+        "loa-condition-level": "3",
+        "loa-max-age": "600"
+      }
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "rehletshifaa-browser-step-up",
+      "description": "Browser sign-in with password, OTP MFA and WebAuthn passkey step-up levels",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "flowAlias": "rehletshifaa-browser-authentication"
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-browser-authentication",
+      "description": "Ordered cumulative levels of authentication",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 10,
+          "flowAlias": "rehletshifaa-loa-1-flow"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "flowAlias": "rehletshifaa-loa-2-flow"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 30,
+          "flowAlias": "rehletshifaa-loa-3-flow"
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-loa-1-flow",
+      "description": "LoA 1: username and password",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "authenticatorConfig": "rehletshifaa-loa-1",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10
+        },
+        {
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-loa-2-flow",
+      "description": "LoA 2: time-based one-time password MFA",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "authenticatorConfig": "rehletshifaa-loa-2",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-loa-3-flow",
+      "description": "LoA 3: WebAuthn passkey after password and OTP",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "authenticatorConfig": "rehletshifaa-loa-3",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10
+        },
+        {
+          "authenticator": "webauthn-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20
+        }
+      ]
+    }
+  ],
   "clients": [
     {
       "clientId": "rehletshifaa-web",
@@ -100,6 +200,13 @@
       "attributes": {
         "pkce.code.challenge.method": "S256"
       },
+      "defaultClientScopes": [
+        "web-origins",
+        "basic",
+        "acr",
+        "profile",
+        "email"
+      ],
       "protocolMappers": [
         {
           "name": "auth-time",
@@ -113,6 +220,17 @@
             "access.token.claim": "true",
             "claim.name": "auth_time",
             "jsonType.label": "long"
+          }
+        },
+        {
+          "name": "rehletshifaa-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "rehletshifaa-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
           }
         }
       ]
@@ -143,9 +261,6 @@
           "value": "Patient123!",
           "temporary": false
         }
-      ],
-      "realmRoles": [
-        "PATIENT"
       ]
     },
     {
@@ -162,10 +277,6 @@
           "value": "Coordinator123!",
           "temporary": false
         }
-      ],
-      "realmRoles": [
-        "COORDINATOR",
-        "COORDINATOR_LEAD"
       ]
     },
     {
@@ -182,9 +293,6 @@
           "value": "Coordinator123!",
           "temporary": false
         }
-      ],
-      "realmRoles": [
-        "COORDINATOR"
       ]
     },
     {
@@ -201,9 +309,6 @@
           "value": "Doctor123!",
           "temporary": false
         }
-      ],
-      "realmRoles": [
-        "DOCTOR"
       ]
     },
     {
@@ -220,9 +325,6 @@
           "value": "Operations123!",
           "temporary": false
         }
-      ],
-      "realmRoles": [
-        "OPERATIONS"
       ]
     },
     {
@@ -239,9 +341,6 @@
           "value": "Finance123!",
           "temporary": false
         }
-      ],
-      "realmRoles": [
-        "FINANCE"
       ]
     },
     {
@@ -258,10 +357,6 @@
           "value": "Admin123!",
           "temporary": false
         }
-      ],
-      "realmRoles": [
-        "CREDENTIALING_ADMIN",
-        "SYSTEM_ADMIN"
       ]
     },
     {

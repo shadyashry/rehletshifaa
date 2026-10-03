@@ -2,8 +2,8 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.journey.api.WorkDtos.PatientActionView;
-import com.rehletshifaa.security.ActorContext;
-import com.rehletshifaa.security.ActorRole;
+import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -71,7 +71,7 @@ public class CaseActionService {
     // ---------------- the contract the page renders ----------------
 
     @Transactional
-    public CaseActionsView resolve(UUID caseId, ActorContext.Actor actor) {
+    public CaseActionsView resolve(UUID caseId, Actor actor) {
         Facts f = facts(caseId);
         closeObsoleteWork(caseId, f.status());
         PatientActionView patientAction = patientActions.openAction(caseId);
@@ -81,10 +81,10 @@ public class CaseActionService {
         String waitingOn = reconcileWaitingOn(caseId, f.status(), blockers, patientAction, mine);
         String waitingReason = jdbc.sql("SELECT waiting_reason FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
 
-        boolean patient = actor.has(ActorRole.PATIENT) || actor.has(ActorRole.PATIENT_REPRESENTATIVE);
+        boolean patient = actor.role() == Role.PATIENT || actor.role() == Role.PATIENT_REPRESENTATIVE;
         if (patient) return patientView(caseId, f, waitingOn, waitingReason, patientAction, blockers);
 
-        boolean coordinator = actor.has(ActorRole.COORDINATOR) || actor.has(ActorRole.COORDINATOR_LEAD);
+        boolean coordinator = actor.role() == Role.COORDINATOR;
         boolean owned = coordinator && actor.subject().equals(f.coordinatorSubject());
         CurrentActionView current = currentAction(caseId, f, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
         List<String> available = coordinator && owned ? availableActions(caseId, f, patientAction, blockers)
@@ -147,7 +147,7 @@ public class CaseActionService {
         return none();
     }
 
-    private CurrentActionView currentAction(UUID caseId, Facts f, ActorContext.Actor actor, boolean coordinator, boolean owned,
+    private CurrentActionView currentAction(UUID caseId, Facts f, Actor actor, boolean coordinator, boolean owned,
                                             WorkItem mine, PatientActionView patientAction, List<BlockerView> blockers, boolean patientBlocked) {
         if (coordinator && !owned)
             return "RECEIVED".equals(f.status()) && f.coordinatorSubject() == null ? simple("CLAIM_CASE", "CLAIM") : simple("VIEW_ONLY", "NONE");
@@ -164,7 +164,7 @@ public class CaseActionService {
     }
 
     /** Only reached when nothing is assigned: describe the stage honestly, including "nothing to do yet". */
-    private CurrentActionView stageFallback(UUID caseId, Facts f, ActorContext.Actor actor, boolean coordinator) {
+    private CurrentActionView stageFallback(UUID caseId, Facts f, Actor actor, boolean coordinator) {
         String s = f.status();
         if (coordinator) {
             if (CONSULTANT_ASSIGNABLE.contains(s)) return simple("ASSIGN_CONSULTANT", "FOCUS");
@@ -179,14 +179,14 @@ public class CaseActionService {
             }
             return none();
         }
-        if (actor.has(ActorRole.DOCTOR) && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
+        if (actor.role() == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
         Proposal proposal = latestProposal(caseId);
-        if (actor.has(ActorRole.OPERATIONS)) {
+        if (actor.role() == Role.OPERATIONS) {
             if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
             if ("PROPOSAL_PREPARATION".equals(s) && f.travelPackage() && proposal != null && !proposal.operationsDone()
                     && "CLINICALLY_APPROVED".equals(proposal.status())) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
         }
-        if (actor.has(ActorRole.FINANCE) && "PROPOSAL_PREPARATION".equals(s) && proposal != null && proposal.requiresFinance()
+        if (actor.role() == Role.FINANCE && "PROPOSAL_PREPARATION".equals(s) && proposal != null && proposal.requiresFinance()
                 && !proposal.financeDone() && (!f.travelPackage() || proposal.operationsDone())
                 && Set.of("CLINICALLY_APPROVED", "OPERATIONS_COMPLETED").contains(proposal.status()))
             return simple("APPROVE_COMMERCIAL_TERMS", "FOCUS");
@@ -350,9 +350,9 @@ public class CaseActionService {
                 work.decryptText(rs.getString("description")), due == null ? null : due.toInstant(), rs.getLong("version"));
     }
 
-    private boolean pendingAssignment(UUID caseId, ActorContext.Actor actor) {
+    private boolean pendingAssignment(UUID caseId, Actor actor) {
         Integer n = jdbc.sql("SELECT count(*) FROM case_assignments WHERE case_id=? AND assignee_subject=? AND assignee_role=? AND status='PENDING'")
-                .params(caseId, actor.subject(), actor.primaryRole()).query(Integer.class).single();
+                .params(caseId, actor.subject(), actor.label()).query(Integer.class).single();
         return n != null && n > 0;
     }
 

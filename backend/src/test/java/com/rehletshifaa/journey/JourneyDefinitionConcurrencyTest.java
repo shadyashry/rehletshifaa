@@ -1,6 +1,5 @@
 package com.rehletshifaa.journey;
 
-import com.rehletshifaa.access.application.*;
 import com.rehletshifaa.journey.application.JourneyDefinitionService;
 import com.rehletshifaa.journey.domain.JourneyModel.Version;
 import com.rehletshifaa.shared.api.ApiException;
@@ -18,9 +17,9 @@ import static com.rehletshifaa.journey.application.JourneyDefinitionService.*;
 
 @SpringBootTest(properties={"spring.task.scheduling.enabled=false","spring.datasource.url=jdbc:h2:mem:journey-races;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=15000"})
 class JourneyDefinitionConcurrencyTest {
- @Autowired JourneyDefinitionService service;@Autowired AccessBootstrapService bootstrap;@Autowired RoleAssignmentService assignments;@Autowired JdbcTemplate jdbc;@Autowired Clock clock;@Autowired PlatformTransactionManager transactions;
+ @Autowired JourneyDefinitionService service;@Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;@Autowired JdbcTemplate jdbc;@Autowired Clock clock;@Autowired PlatformTransactionManager transactions;
  @Test void concurrentEditsAndCloneAndAuditRollback()throws Exception{
-  var f=new JourneyDefinitionIntegrationTest();f.service=service;f.bootstrap=bootstrap;f.assignments=assignments;f.jdbc=jdbc;f.clock=clock;
+  var f=new JourneyDefinitionIntegrationTest();f.service=service;f.crypto=crypto;f.jdbc=jdbc;f.clock=clock;
   var tx=new TransactionTemplate(transactions);tx.executeWithoutResult(s->f.setup());
   var d=service.create();var v=d.versions().getFirst();
   var edits=race(f,()->service.edit(d.definition().id(),v.id(),new Edit(0,"Concurrent edit",JourneyGraphTest.linear())));
