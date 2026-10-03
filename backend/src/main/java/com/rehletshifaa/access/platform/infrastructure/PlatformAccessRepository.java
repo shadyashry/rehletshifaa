@@ -59,9 +59,14 @@ public class PlatformAccessRepository {
     }
 
     public boolean overlappingAdministratorAssignment(String subject, Instant from, Instant to) {
+        if (to == null) {
+            return jdbc.sql("SELECT COUNT(*) FROM platform_role_assignments WHERE subject=? AND role_key=? AND status='ACTIVE' "
+                            + "AND (effective_to IS NULL OR effective_to>?)")
+                    .params(subject, SYSTEM_ADMINISTRATOR, timestamp(from)).query(Long.class).single() > 0;
+        }
         return jdbc.sql("SELECT COUNT(*) FROM platform_role_assignments WHERE subject=? AND role_key=? AND status='ACTIVE' "
-                        + "AND (? IS NULL OR effective_from<?) AND (effective_to IS NULL OR effective_to>?)")
-                .params(subject, SYSTEM_ADMINISTRATOR, timestamp(to), timestamp(to), timestamp(from)).query(Long.class).single() > 0;
+                        + "AND effective_from<? AND (effective_to IS NULL OR effective_to>?)")
+                .params(subject, SYSTEM_ADMINISTRATOR, timestamp(to), timestamp(from)).query(Long.class).single() > 0;
     }
 
     public List<String> effectiveAdministrators(Instant at) {

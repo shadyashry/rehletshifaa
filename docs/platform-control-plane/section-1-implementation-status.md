@@ -929,11 +929,18 @@ operator procedures and offline evidence are now delivered on top of the clean-c
   migrations. Full offline backend: **541 tests, 0 failures, 0 errors, 1 intentional skip**. Full frontend:
   **273 PASS**; frontend typecheck: PASS.
 
-**Next exact action:** preserve the inherited worktree and review the final targeted diff/status before commit. For
-release evidence, configure monitored governance notification destinations and run the clean-environment
-commissioning, passkey owner workspace, administrator replacement, normal transfer and unavailable-owner recovery
-journeys in isolated production-equivalent infrastructure using the new runbook. Do not substitute a production
-ownership change for the isolated recovery drill.
+**OSA-8 CORE OWNER-GOVERNANCE REHEARSAL COMPLETE (2026-10-04):** the retained isolated production-equivalent
+evidence is `evidence/2026-10-04-owner-governance-rehearsal.md`. A fresh Compose project with real Keycloak TOTP and
+WebAuthn/LoA 3 completed clean commissioning, owner workspace access, administrator removal/reappointment, OD-02
+unavailable-owner recovery, immediate stale-owner denial, normal three-party transfer back and notification
+delivery. Final PostgreSQL invariants were one current owner, two effective administrators and completed
+commissioning/recovery/transfer records. The run exposed and corrected one PostgreSQL-only nullable-parameter defect
+in indefinite administrator/workforce role overlap checks; the policy and architecture did not change.
+
+**Next exact action:** retain real Keycloak/mail/tunnel evidence for the Practice Manager consent flow. Separately,
+complete the wider OPS-03 backup/data/document restore drill and the remaining OSA-8 assurance activities (external
+notification channel evidence, no-waiver quarterly exercise, threat-model/penetration review). Do not substitute a
+production ownership change for an isolated drill.
 
 Business/operator/tester guide: `platform-users-roles-hierarchy-onboarding-and-test-guide.md` describes the user
 model, hierarchy, who grants whom, current Control Center screens, onboarding/lifecycle flows, authentication rules,
@@ -953,8 +960,8 @@ Open gates (do not claim complete):
 - **Practice Manager consent flow IMPLEMENTATION COMPLETE (2026-09-28):** the consent state machine, MFA-bound
   exact-identity acceptance, durable identity operation, re-consent/revocation/suspension rules, isolation tests and
   frontend journey are implemented and pass offline. Real Keycloak/mail/tunnel release evidence is not yet retained.
-- **OD-02 IMPLEMENTATION COMPLETE (2026-09-28):** multi-party recovery, evidence, cooling-off/waiver, immediate
-  relationship transition, notifications, negative tests and runbook are delivered. The first isolated
-  production-equivalent recovery rehearsal remains OSA-8 operational release evidence.
+- **OD-02 COMPLETE, INCLUDING ISOLATED REHEARSAL (2026-10-04):** multi-party recovery, evidence,
+  cooling-off/waiver, immediate relationship transition, notifications, negative tests and runbook are delivered.
+  The first isolated production-equivalent recovery rehearsal passed with real Keycloak LoA 3 and retained evidence.
 - Known pre-existing flaky history remains documented under Verification: OTP selection ties and the notification
   outbox hand-back test. Neither was observed in this implementation's focused or full-suite runs.

@@ -49,9 +49,14 @@ public class WorkforceRoleAssignmentStore {
     }
 
     public boolean overlapping(String subject, String role, Instant from, Instant to) {
+        if (to == null) {
+            return jdbc.sql("SELECT COUNT(*) FROM workforce_role_assignments WHERE subject=? AND role_key=? AND status='ACTIVE' "
+                            + "AND (effective_to IS NULL OR effective_to>?)")
+                    .params(subject, role, timestamp(from)).query(Long.class).single() > 0;
+        }
         return jdbc.sql("SELECT COUNT(*) FROM workforce_role_assignments WHERE subject=? AND role_key=? AND status='ACTIVE' "
-                        + "AND (? IS NULL OR effective_from<?) AND (effective_to IS NULL OR effective_to>?)")
-                .params(subject, role, timestamp(to), timestamp(to), timestamp(from)).query(Long.class).single() > 0;
+                        + "AND effective_from<? AND (effective_to IS NULL OR effective_to>?)")
+                .params(subject, role, timestamp(to), timestamp(from)).query(Long.class).single() > 0;
     }
 
     /**
@@ -59,14 +64,17 @@ public class WorkforceRoleAssignmentStore {
      * {@code SYSTEM_ADMINISTRATOR} assignment. Returns the first violated rule reason.
      */
     public Optional<String> conflict(String subject, String role, Instant from, Instant to) {
-        return jdbc.sql("SELECT c.rule_reason FROM workforce_role_conflicts c JOIN ("
+        String base = "SELECT c.rule_reason FROM workforce_role_conflicts c JOIN ("
                         + "SELECT role_key,effective_from,effective_to FROM workforce_role_assignments WHERE subject=? AND status='ACTIVE' "
                         + "UNION ALL SELECT role_key,effective_from,effective_to FROM platform_role_assignments WHERE subject=? AND status='ACTIVE'"
                         + ") held ON held.role_key=c.conflicting_role_key "
-                        + "WHERE c.role_key=? AND (? IS NULL OR held.effective_from<?) AND (held.effective_to IS NULL OR held.effective_to>?) "
-                        + "ORDER BY c.conflicting_role_key")
-                .params(subject, subject, role, timestamp(to), timestamp(to), timestamp(from)).query(String.class).list()
-                .stream().findFirst();
+                        + "WHERE c.role_key=? ";
+        if (to == null) {
+            return jdbc.sql(base + "AND (held.effective_to IS NULL OR held.effective_to>?) ORDER BY c.conflicting_role_key")
+                    .params(subject, subject, role, timestamp(from)).query(String.class).list().stream().findFirst();
+        }
+        return jdbc.sql(base + "AND held.effective_from<? AND (held.effective_to IS NULL OR held.effective_to>?) ORDER BY c.conflicting_role_key")
+                .params(subject, subject, role, timestamp(to), timestamp(from)).query(String.class).list().stream().findFirst();
     }
 
     /** Current or scheduled (not ended) active assignment of the role, from any source. */
