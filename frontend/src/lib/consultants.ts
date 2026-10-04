@@ -1,6 +1,7 @@
 import type { Locale } from "./i18n";
+import { attachedConsultants, ATTACHED_CONSULTANT_SLUGS } from "./attached-consultants";
 
-export const CONSULTANT_SLUGS = ["ahmed-alashry", "hanan-elshoura", "hossam-kibba"] as const;
+export const CONSULTANT_SLUGS = ["ahmed-alashry", "hanan-elshoura", "hossam-kibba", ...ATTACHED_CONSULTANT_SLUGS] as const;
 export type ConsultantSlug = (typeof CONSULTANT_SLUGS)[number];
 
 export type ConsultantProfile = {
@@ -30,6 +31,8 @@ export type ConsultantProfile = {
   verification: string;
   externalLinks?: readonly { label: string; href: string }[];
   /** An approved portrait (consistent chest-up crop on a neutral ground). Until one exists the monogram is shown. */
+  achievements?: readonly string[];
+  sourceFile?: string;
   portrait?: { src: string; alt: string };
 };
 
@@ -46,7 +49,7 @@ export const consultantUi = {
     viewProfile: "View full profile",
     viewProfileOf: (name: string) => `View ${name}'s full profile`,
     clinicalExpertise: "Clinical expertise",
-    verifiedRole: "Verified professional role",
+    verifiedRole: "Professional distinction",
     meetConsultant: "Meet the consultant",
     focus: "Clinical focus",
     qualifications: "Qualifications",
@@ -68,7 +71,7 @@ export const consultantUi = {
     viewProfile: "عرض الملف الكامل",
     viewProfileOf: (name: string) => `عرض الملف الكامل: ${name}`,
     clinicalExpertise: "الخبرة السريرية",
-    verifiedRole: "دور مهني موثّق",
+    verifiedRole: "تميز مهني",
     meetConsultant: "تعرّف على الاستشاري",
     focus: "مجالات التركيز السريري",
     qualifications: "المؤهلات",
@@ -284,9 +287,9 @@ const profiles: Record<Locale, readonly ConsultantProfile[]> = {
 };
 
 export function getConsultants(locale: Locale): readonly ConsultantProfile[] {
-  return profiles[locale];
+  return [...profiles[locale], ...attachedConsultants[locale]];
 }
 
 export function getConsultant(locale: Locale, slug: string): ConsultantProfile | undefined {
-  return profiles[locale].find((profile) => profile.slug === slug);
+  return getConsultants(locale).find((profile) => profile.slug === slug);
 }

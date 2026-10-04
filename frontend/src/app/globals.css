@@ -76,18 +76,27 @@
   --color-accent-warm: #b59c6c; /* warm rules and the hospitality journey line: visible on champagne, never loud */
   --color-accent-sand: #d3c2a0; /* legacy alias of accent-warm */
   --color-border-subtle: #e6ebea; /* hairlines on pearl */
-  --color-border-card: #dce7e4; /* one soft gray-teal edge shared by the three care-area cards */
-  --color-card-cardiology: #f9fdfc; /* care-area undertones — every card lighter than the pearl canvas (#fbfaf7), ≈2% tint: teal-pearl, cool pearl, ivory-pearl */
-  --color-card-rehab: #fafcfd;
-  --color-card-ortho: #fdfbf8;
-  --color-card-cardiology-hover: #f4faf8; /* hover: one quiet step, never a colour change */
-  --color-card-rehab-hover: #f5f9fb;
-  --color-card-ortho-hover: #fbf8f3;
-  --color-well-cardiology: #e3f1ed; /* icon wells carry the specialty cue: pale teal, blue-gray, ivory-champagne */
-  --color-well-rehab: #e6eff3;
-  --color-well-ortho: #f3eee3;
-  --color-well-rehab-ring: #cfdde3;
-  --color-well-ortho-ring: #e6dcc6;
+  --color-border-card: #dce7e4; /* one soft gray-teal edge shared by the care-area cards */
+  /* Care-area body systems: a muted tint per system for icon wells (well), their hairline (ring) and the
+     drawn marks — wheel arcs, index dots, watermarks (line). A cue only; the cards themselves stay white. */
+  --color-system-heart-well: #e3f1ed;
+  --color-system-heart-ring: #c9dfda;
+  --color-system-heart-line: #4fa9a1;
+  --color-system-neuro-well: #e6eff3;
+  --color-system-neuro-ring: #cfdde3;
+  --color-system-neuro-line: #6f9bb0;
+  --color-system-movement-well: #f3eee3;
+  --color-system-movement-ring: #e6dcc6;
+  --color-system-movement-line: #b59c6c;
+  --color-system-digestive-well: #edf2e6;
+  --color-system-digestive-ring: #d8e2c9;
+  --color-system-digestive-line: #8fa56d;
+  --color-system-surgery-well: #ecebf4;
+  --color-system-surgery-ring: #d8d5e7;
+  --color-system-surgery-line: #8f86b5;
+  --color-system-women-well: #f6ebe8;
+  --color-system-women-ring: #ead6d0;
+  --color-system-women-line: #c48b7d;
   --color-border-clinical: #c9dfda; /* hairlines on the clinical mist */
   --color-text-heading: #24404a; /* = brand-900 / ink-900 */
   --color-text-body: #3a545d; /* = ink-600 */
@@ -514,6 +523,22 @@
   .skip-link:focus-visible {
     top: 1rem;
   }
+}
+
+/* Care network (Care Areas hero): the spokes draw out from the case once, the case node breathes slowly. */
+@keyframes care-spoke-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes care-node-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes care-pulse {
+  0% { transform: scale(1); opacity: 0.45; }
+  70%, 100% { transform: scale(1.55); opacity: 0; }
 }
 
 @keyframes journey-scene-in {

@@ -484,9 +484,7 @@
   "careAreasPage": {
     "eyebrow": "Care areas",
     "title": "Choose the care area closest to your need",
-    "intro": "RehletShifaa coordinates Consultant-led care across three areas.",
-    "reassurance": "Not sure where your case fits? Send us your case and your coordinator will route it to the right Consultant.",
-    "ctaBody": "Send what you already have and we'll guide you to the right care area.",
+    "intro": "Consultant-led review across {count} care areas, each led by named, verified senior Consultants. Explore by body system — or send your case and we will route it for you.",
     "tabsLabel": "Care areas",
     "tabs": {
       "cardiology": "Cardiology",
@@ -497,6 +495,75 @@
       "label": "Consultant introduction",
       "title": "A short talk from your consultant — coming soon",
       "note": "A named consultant will introduce this care area and explain how your case is reviewed. The recorded talk will appear here."
+    },
+    "stats": {
+      "areas": "Care areas",
+      "consultants": "Verified Consultants",
+      "languagesValue": "AR · EN",
+      "languages": "Coordination languages"
+    },
+    "explore": "Explore the care areas",
+    "map": {
+      "label": "Care areas arranged around your case",
+      "center": "Your case",
+      "jump": "Go to {area}"
+    },
+    "atlas": {
+      "eyebrow": "The care atlas",
+      "title": "{count} care areas, organised by body system",
+      "intro": "Each care area is led by verified Consultants who own the clinical decision. Choose the one closest to your need — or let your coordinator choose for you.",
+      "index": "Jump to a body system",
+      "areasOne": "1 care area",
+      "areasMany": "{n} care areas",
+      "consultantsOne": "1 Consultant",
+      "consultantsTwo": "2 Consultants",
+      "consultantsMany": "{n} Consultants"
+    },
+    "systems": {
+      "heart": {
+        "title": "Heart & circulation",
+        "body": "Coronary, structural and rhythm care, with arterial, venous and aortic disease."
+      },
+      "neuro": {
+        "title": "Brain, nerves & recovery",
+        "body": "Neurovascular intervention and specialist rehabilitation, including swallowing."
+      },
+      "movement": {
+        "title": "Bones & joints",
+        "body": "Joint replacement, sports injuries, arthroscopy and spine assessment."
+      },
+      "digestive": {
+        "title": "Digestive & liver",
+        "body": "Liver and bowel medicine, with advanced endoscopy."
+      },
+      "surgery": {
+        "title": "Surgery & reconstruction",
+        "body": "General, laparoscopic and metabolic surgery, with plastic and reconstructive care."
+      },
+      "women": {
+        "title": "Women’s health",
+        "body": "Obstetrics, gynecology, maternal health and pelvic surgery."
+      }
+    },
+    "router": {
+      "eyebrow": "Not sure where you fit?",
+      "title": "You don’t need to choose a care area",
+      "body": "Many cases cross more than one specialty. Send what you already have — your coordinator reads it and routes it to the right Consultant.",
+      "note": "No treatment or travel commitment.",
+      "steps": [
+        {
+          "title": "Share your reports",
+          "body": "Scans, lab results and letters — whatever you already have."
+        },
+        {
+          "title": "Coordinator review",
+          "body": "Your coordinator reads your case and identifies the right care area."
+        },
+        {
+          "title": "Matched Consultant",
+          "body": "A verified senior Consultant reviews your case and owns the clinical decision."
+        }
+      ]
     }
   },
   "rheumatology": {
