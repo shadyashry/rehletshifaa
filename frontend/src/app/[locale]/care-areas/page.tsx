@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
-import { ArrowRight, Activity, Bone, HeartPulse } from "lucide-react";
-import Link from "next/link";
+import { ArrowDown, ArrowRight } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { CtaPanel } from "@/components/CtaPanel";
+import { CareAreaCard } from "@/components/care-areas/CareAreaCard";
+import { SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
+import { CareNetwork } from "@/components/care-areas/CareNetwork";
+import { CaseRouter } from "@/components/care-areas/CaseRouter";
 import { PageHero } from "@/components/PageHero";
-import { CARE_AREA_SLUGS } from "@/lib/care-areas";
+import { TrackedLink } from "@/components/TrackedLink";
+import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -13,77 +16,143 @@ import { pageMetadata } from "@/lib/metadata";
 
 type Props = { params: Promise<{ locale: string }> };
 
-const ICONS = [HeartPulse, Activity, Bone] as const;
-/** One card family, three near-white undertones — teal-pearl, cool pearl, ivory-pearl — and a matching icon-well tint. */
-const SURFACES = [
-  { card: "bg-card-cardiology hover:bg-card-cardiology-hover", well: "bg-well-cardiology ring-border-clinical" },
-  { card: "bg-card-rehab hover:bg-card-rehab-hover", well: "bg-well-rehab ring-well-rehab-ring" },
-  { card: "bg-card-ortho hover:bg-card-ortho-hover", well: "bg-well-ortho ring-well-ortho-ring" },
-] as const;
+const fill = (template: string, values: Record<string, string | number>) =>
+  template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const d = getDictionary(locale);
-  return pageMetadata(locale, "care-areas", d.careAreasPage.title, d.careAreasPage.intro);
+  const count = careAreaAtlas(locale, d).length;
+  return pageMetadata(locale, "care-areas", d.careAreasPage.title, fill(d.careAreasPage.intro, { count }));
 }
 
 /**
- * The selection page: three care areas of equal standing in one card family — a near-white undertone per
- * specialty (a 2–3% tint, never a coloured card), a soft gray-teal hairline, a small tinted icon well and
- * one text action — so no specialty reads as the platform's real business. The cards share a subgrid, so icon, title, description and action sit on the same rows in
- * every card whatever the title's length. One quiet reassurance line under the intro and one warm,
- * unsaturated closing panel; nothing else.
+ * The care-areas selection page, organised as a care atlas: a hero whose visual is the platform's promise
+ * (one case at the centre, every specialty around it, grouped by body system), the atlas itself — numbered
+ * body systems, each with its care-area cards and the named Consultants behind them — and a closing
+ * router that tells the undecided patient they never have to choose. Counts are derived, never typed.
  */
 export default async function CareAreas({ params }: Props) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const d = getDictionary(locale);
   const page = d.careAreasPage;
+  const areas = careAreaAtlas(locale, d);
+  const systems = careAtlasSystems(areas, d);
+  const consultantCount = new Set(areas.flatMap((area) => area.consultants.map((profile) => profile.slug))).size;
+
+  const consultantsLabel = (n: number) =>
+    fill(n === 1 ? page.atlas.consultantsOne : n === 2 ? page.atlas.consultantsTwo : page.atlas.consultantsMany, { n });
+  const areasLabel = (n: number) => (n === 1 ? page.atlas.areasOne : fill(page.atlas.areasMany, { n }));
+
+  const stats = [
+    { value: String(areas.length), label: page.stats.areas },
+    { value: String(consultantCount), label: page.stats.consultants },
+    { value: page.stats.languagesValue, label: page.stats.languages },
+  ];
 
   return (
     <>
-      <PageHero tone="pearl" eyebrow={page.eyebrow} title={page.title} intro={page.intro}>
-        <p className="flex max-w-[60ch] items-start gap-3 text-[0.95rem] leading-6 text-ink-700">
-          <span aria-hidden className="mt-3 h-px w-6 flex-none bg-brand-400" />
-          {page.reassurance}
-        </p>
+      <PageHero
+        tone="pearl"
+        eyebrow={page.eyebrow}
+        title={page.title}
+        intro={fill(page.intro, { count: areas.length })}
+        aside={<CareNetwork areas={areas} rtl={locale === "ar"} label={page.map.label} center={page.map.center} jump={page.map.jump} />}
+      >
+        <dl className="grid max-w-[34rem] grid-cols-3 divide-x divide-border-subtle border-y border-border-subtle rtl:divide-x-reverse">
+          {stats.map((stat) => (
+            <div key={stat.label} className="flex flex-col-reverse gap-1 px-3 py-4 first:ps-0 sm:px-5">
+              <dt className="text-[0.75rem] leading-4 text-ink-500 sm:text-[0.8125rem] sm:leading-5">{stat.label}</dt>
+              <dd className="text-[1.5rem] font-semibold leading-none tracking-[-0.02em] text-brand-900 tabular-nums sm:text-[1.875rem]">{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
+          <TrackedLink event="send_case_cta_clicked" className="btn-primary w-full sm:w-auto" href={localeHref(locale, "send-my-case")}>
+            {d.common.send}
+            <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
+          </TrackedLink>
+          <a href="#atlas" className="link-cta justify-center text-[0.95rem] sm:justify-start">
+            {page.explore}
+            <ArrowDown size={16} aria-hidden="true" />
+          </a>
+        </div>
       </PageHero>
 
-      <section className="bg-surface-pearl pt-12 md:pt-14">
-        <ul className="container-site grid gap-4 sm:gap-5 lg:grid-cols-3 lg:grid-rows-[auto_auto_minmax(0,1fr)_auto] lg:gap-x-6 lg:gap-y-0">
-          {d.home.areas.map((area, index) => {
-            const Icon = ICONS[index] ?? HeartPulse;
-            const surface = SURFACES[index] ?? SURFACES[0];
-            const href = localeHref(locale, CARE_AREA_SLUGS[index]);
-            return (
-              <li
-                key={area.title}
-                className={`group relative flex flex-col rounded-[14px] border border-border-card p-6 transition-[background-color,border-color,transform] duration-200 hover:-translate-y-px hover:border-brand-400 has-[a:focus-visible]:border-brand-500 motion-reduce:transform-none sm:p-7 lg:grid lg:row-span-4 lg:grid-rows-subgrid ${surface.card}`}
+      <section id="atlas" aria-labelledby="atlas-title" className="scroll-mt-20 bg-surface-pearl pb-6 pt-14 md:pt-20">
+        <div className="container-site">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-end lg:gap-16">
+            <div>
+              <p className="eyebrow">{page.atlas.eyebrow}</p>
+              <h2 id="atlas-title" className="mt-3 max-w-[22ch] text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal sm:text-[2.25rem]">
+                {fill(page.atlas.title, { count: areas.length })}
+              </h2>
+            </div>
+            <p className="max-w-[52ch] text-[1rem] leading-7 text-ink-600">{page.atlas.intro}</p>
+          </div>
+
+          <nav aria-label={page.atlas.index} className="mt-8 flex flex-wrap gap-2">
+            {systems.map((system) => (
+              <a
+                key={system.key}
+                href={`#system-${system.key}`}
+                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border-card bg-surface-default px-4 text-[0.875rem] font-medium text-ink-700 transition-colors hover:border-brand-400 hover:text-brand-800"
               >
-                {/* Below the three-column layout the icon sits beside the title; from lg the wrapper dissolves and both join the subgrid. */}
-                <div className="flex items-center gap-3.5 lg:contents">
-                  <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-full text-brand-800 ring-1 ${surface.well}`}>
-                    <Icon size={19} strokeWidth={1.7} />
-                  </span>
-                  <h2 className="text-[1.125rem] font-semibold leading-[1.3] tracking-[-0.008em] text-brand-900 [text-wrap:balance] sm:text-[1.1875rem] lg:mt-4">{area.title}</h2>
-                </div>
-                <p className="mt-3 max-w-[52ch] text-[0.95rem] leading-6 text-ink-600 sm:text-[1rem] sm:leading-7 lg:mt-2">{area.body}</p>
-                <Link
-                  href={href}
-                  aria-label={`${d.home.areasAction} — ${area.title}`}
-                  className="link-cta mt-3 min-h-11 text-[0.95rem] after:absolute after:inset-0 lg:mt-4"
+                <span aria-hidden className={`h-2 w-2 rounded-full ${SYSTEM_STYLES[system.key].dot}`} />
+                {system.title}
+                <span className="text-ink-400 tabular-nums">{system.areas.length}</span>
+              </a>
+            ))}
+          </nav>
+
+          <div className="mt-10 md:mt-12">
+            {systems.map((system, index) => {
+              const style = SYSTEM_STYLES[system.key];
+              const people = system.areas.reduce((sum, area) => sum + area.consultants.length, 0);
+              return (
+                <section
+                  key={system.key}
+                  id={`system-${system.key}`}
+                  aria-labelledby={`system-${system.key}-title`}
+                  className="grid scroll-mt-24 gap-6 border-t border-border-subtle py-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12 lg:py-12"
                 >
-                  {d.home.areasAction}
-                  <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100 transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                  <div className="lg:sticky lg:top-28 lg:self-start">
+                    <div className="flex items-center gap-4 lg:block">
+                      <p aria-hidden className="text-[2.5rem] font-semibold leading-none tracking-[-0.03em] text-brand-600/40 tabular-nums lg:text-[3.25rem]">
+                        {String(index + 1).padStart(2, "0")}
+                      </p>
+                      <span aria-hidden className={`h-[3px] w-10 rounded-full lg:mt-5 lg:block ${style.dot}`} />
+                    </div>
+                    <h3 id={`system-${system.key}-title`} className="mt-4 text-[1.375rem] font-semibold leading-tight tracking-[-0.015em] text-brand-900 rtl:leading-snug rtl:tracking-normal sm:text-[1.5rem]">
+                      {system.title}
+                    </h3>
+                    <p className="mt-2 max-w-[40ch] text-[0.95rem] leading-6 text-ink-600">{system.body}</p>
+                    <p className="mt-3 text-[0.8125rem] font-medium leading-5 text-ink-500">
+                      {areasLabel(system.areas.length)} · {consultantsLabel(people)}
+                    </p>
+                  </div>
+                  <ul className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+                    {system.areas.map((area) => (
+                      <CareAreaCard
+                        key={area.slug}
+                        area={area}
+                        href={localeHref(locale, area.slug)}
+                        action={d.home.areasAction}
+                        consultantsLabel={consultantsLabel(area.consultants.length)}
+                        wide={system.areas.length === 1}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+        </div>
       </section>
 
-      <CtaPanel variant="quiet" locale={locale} title={d.home.finalTitle} body={page.ctaBody} button={d.common.send} />
+      <CaseRouter locale={locale} copy={page.router} button={d.common.send} />
     </>
   );
 }
