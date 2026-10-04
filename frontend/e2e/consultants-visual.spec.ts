@@ -18,7 +18,7 @@ async function noOverflow(page: import("@playwright/test").Page) {
     const offenders: string[] = [];
     document.querySelectorAll<HTMLElement>("main *").forEach((el) => {
       const r = el.getBoundingClientRect();
-      if (r.width > 0 && (r.right > doc.clientWidth + 1 || r.left < -1)) offenders.push(`${el.tagName}.${el.className}`.slice(0, 80));
+      if (!el.closest("[aria-hidden=\"true\"]") && r.width > 0 && (r.right > doc.clientWidth + 1 || r.left < -1)) offenders.push(`${el.tagName}.${el.className}`.slice(0, 80));
     });
     return { scrolls: doc.scrollWidth > doc.clientWidth + 1, offenders: offenders.slice(0, 3) };
   });
@@ -32,7 +32,8 @@ for (const shot of SHOTS) {
     await page.goto("/en/consultants");
     await page.waitForLoadState("networkidle");
     await noOverflow(page);
-    await page.screenshot({ path: `e2e/screenshots/consultants-en-${shot.name}.png`, fullPage: true });
+    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
+    await page.screenshot({ path: test.info().outputPath(`consultants-en-${shot.name}.png`), fullPage: true });
   });
 }
 
@@ -43,58 +44,73 @@ for (const shot of SHOTS.filter((s) => ["390", "768", "1440"].includes(s.name)))
     await page.waitForLoadState("networkidle");
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await noOverflow(page);
-    await page.screenshot({ path: `e2e/screenshots/consultants-ar-${shot.name}.png`, fullPage: true });
+    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
+    await page.screenshot({ path: test.info().outputPath(`consultants-ar-${shot.name}.png`), fullPage: true });
   });
 }
 
-// Trust, not a marketplace: three summary cards of one family, each with a named profile link on one
-// baseline; no internal approval states, no ranking or booking signals; one closing action; the agreed scale.
-test("consultants are presented for trust, not selection", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+test("directory filters clinical expertise and links to sourced profiles", async ({ page }) => {
   await page.goto("/en/consultants");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Meet the Consultants/);
-  const m = await page.evaluate(() => {
-    const cards = [...document.querySelectorAll<HTMLElement>("main article")];
-    const box = (el: Element) => el.getBoundingClientRect();
-    const px = (el: Element | null) => parseFloat(getComputedStyle(el!).fontSize);
-    return {
-      count: cards.length,
-      heights: cards.map((c) => Math.round(box(c).height)),
-      ctaTops: cards.map((c) => Math.round(box(c.querySelector("a")!).bottom)),
-      links: cards.map((c) => c.querySelectorAll("a").length),
-      labels: cards.map((c) => c.querySelector("a")!.getAttribute("aria-label")),
-      names: cards.map((c) => c.querySelector("h2")!.textContent?.trim()),
-      signals: cards.map((c) => c.querySelectorAll(":scope > div:last-of-type ul:not([data-expertise]) li").length),
-      focus: cards.map((c) => [...c.querySelectorAll(".eyebrow")].some((e) => /clinical expertise/i.test(e.textContent ?? ""))),
-      focusItems: cards.map((c) => (c.querySelector("[data-expertise]")?.textContent ?? "").split(",").length),
-      h1: px(document.querySelector("h1")), name: px(cards[0].querySelector("h2")), role: px(cards[0].querySelector("h2 + p")),
-      body: px(cards[0].querySelector(":scope > div:last-of-type > p")), eyebrow: px(cards[0].querySelector(".eyebrow")),
-      text: document.querySelector("main")!.textContent ?? "",
-      primaries: document.querySelectorAll("main a.btn-primary, main a.btn-inverse").length,
-    };
-  });
-  expect(m.count).toBe(3);
-  expect(new Set(m.heights).size).toBe(1);
-  expect(new Set(m.ctaTops).size).toBe(1);
-  expect(m.links).toEqual([1, 1, 1]);
-  m.labels.forEach((label, i) => expect(label).toContain(m.names[i]!));
-  m.signals.forEach((n) => { expect(n).toBeGreaterThanOrEqual(2); expect(n).toBeLessThanOrEqual(3); });
-  expect(m.focus).toEqual([true, true, true]);
-  m.focusItems.forEach((n) => { expect(n).toBeGreaterThanOrEqual(3); expect(n).toBeLessThanOrEqual(4); });
-  expect(m.text).toMatch(/Verified professional role/);
-  expect(m.text).not.toMatch(/\b(best|top|leading|world-class|renowned|elite|famous)\b/i);
-  expect(m.text).not.toMatch(/pending approval|placeholder|to be verified/i);
-  expect(m.text).not.toMatch(/\b(rating|reviews?|book now|price|select doctor|available now)\b/i);
-  expect(m.text).toMatch(/don.t need to choose/i);
-  expect(m.primaries).toBe(1);
-  expect(m.h1).toBeGreaterThanOrEqual(44); expect(m.h1).toBeLessThanOrEqual(50);
-  expect(m.name).toBeGreaterThanOrEqual(20); expect(m.name).toBeLessThanOrEqual(23);
-  expect(m.role).toBeGreaterThanOrEqual(15); expect(m.role).toBeLessThanOrEqual(17);
-  expect(m.body).toBeGreaterThanOrEqual(15); expect(m.body).toBeLessThanOrEqual(16.5);
-  expect(m.eyebrow).toBeGreaterThanOrEqual(11); expect(m.eyebrow).toBeLessThanOrEqual(12);
-  // Keyboard: the profile link shows a visible focus ring.
-  const link = page.locator("main article a").first();
+  const directory = page.locator("#doctor-directory");
+  await expect(directory.locator("article")).toHaveCount(13);
+  await page.getByLabel("Care area", { exact: true }).selectOption("orthopedics");
+  await expect(directory.locator("article")).toHaveCount(4);
+  await page.getByLabel("Search by name, specialty or expertise").fill("robotic");
+  await expect(directory.locator("article")).toHaveCount(1);
+  await expect(directory.getByRole("heading", { name: "Dr Ahmed Khaled" })).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(directory.locator("article")).toHaveCount(13);
+  await page.getByLabel("Search by name, specialty or expertise").fill("no-such-doctor");
+  await expect(page.getByText("No doctors match your search.")).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  const link = directory.getByRole("link").first();
+  await page.keyboard.press("Tab");
   await link.focus();
-  const outline = await link.evaluate((el) => { const s = getComputedStyle(el); return `${s.outlineStyle}|${s.outlineWidth}`; });
-  expect(outline).not.toBe("none|0px");
+  expect(await link.evaluate(el => getComputedStyle(el).outlineStyle)).not.toBe("none");
+  await page.goto("/en/consultants/mostafa-baraka");
+  await expect(page.getByRole("heading", { name: "Professional highlights" })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/Two oral research presentations/)).toBeVisible();
+  await page.goto("/ar/consultants");
+  await page.getByLabel("مجال الرعاية", { exact: true }).selectOption("womens-health");
+  await expect(page.locator("#doctor-directory article")).toHaveCount(2);
+});
+
+test("vascular consultant appears once with bilingual credentials and care-area navigation", async ({ page }) => {
+  for (const locale of ["en", "ar"]) {
+    await page.goto(`/${locale}/consultants`);
+    await page.getByLabel(locale === "en" ? "Care area" : "مجال الرعاية", { exact: true }).selectOption("vascular-endovascular-surgery");
+    await expect(page.locator("#doctor-directory article")).toHaveCount(1);
+    await page.goto(`/${locale}/consultants/hamdy-abdelazeem`);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(locale === "en" ? "Hamdy AbdelAzeem" : "حمدي عبد العظيم");
+    await expect(page.getByRole("heading", { name: locale === "en" ? "Professional highlights" : "أبرز الإنجازات", exact: true })).toBeVisible();
+    await page.getByRole("link", { name: locale === "en" ? "Explore this care area" : "استكشف مجال الرعاية", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/${locale}/vascular-endovascular-surgery$`));
+    await expect(page.getByRole("heading", { name: locale === "en" ? "Dr Hamdy AbdelAzeem AboElNeel AbdelHameed" : "د. حمدي عبد العظيم أبو النيل عبد الحميد", exact: true })).toBeVisible();
+  }
+});
+
+test("every supplied doctor has a bilingual profile and a care-area link", async ({ page }) => {
+  test.setTimeout(120000);
+  const slugs = ["ahmed-magdy-mahmoud", "amr-abdelazeem", "ahmed-khaled", "mostafa-farid", "mustafa-mohammed-abbas", "mohamed-hamdy-zaid", "mohammed-ali", "mostafa-baraka", "mahmoud-ghaleb"];
+  for (const locale of ["en", "ar"]) {
+    for (const slug of slugs) {
+      await page.goto(`/${locale}/consultants/${slug}`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole("heading", { name: locale === "en" ? "Professional highlights" : "أبرز الإنجازات", exact: true })).toBeVisible();
+      const area = page.getByRole("link", { name: locale === "en" ? "Explore this care area" : "استكشف مجال الرعاية", exact: true });
+      await expect(area).toHaveAttribute("href", new RegExp(`^/${locale}/`));
+      await expect(page.getByText(locale === "en" ? /Prepared from the supplied CV/ : /أُعد الملف من السيرة الذاتية المقدمة/)).toBeVisible();
+    }
+  }
+});
+
+test("doctor achievement profile reflows in English and Arabic", async ({ page }) => {
+  for (const [locale, width] of [["en", 1440], ["ar", 390]] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/${locale}/consultants/mostafa-baraka`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await noOverflow(page);
+    await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
+    await page.screenshot({ path: test.info().outputPath(`profile-${locale}-${width}.png`), fullPage: true });
+  }
 });

@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { CARE_AREA_SLUGS } from "@/lib/care-areas";
+import { additionalCareAreas } from "@/lib/additional-care-areas";
 import { localeHref } from "@/lib/links";
 import { TrackedLink } from "@/components/TrackedLink";
 
@@ -86,6 +87,12 @@ export function CarePathways({ locale, d }: { locale: Locale; d: Dictionary }) {
             );
           })}
         </ul>
+        <div className="mt-6 border-t border-border-subtle pt-5">
+          <p className="text-sm font-semibold text-brand-900">{locale === "ar" ? "المزيد من مجالات الرعاية" : "More care areas"}</p>
+          <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+            {additionalCareAreas(locale).map(area => <li key={area.slug}><Link className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-brand-700 underline underline-offset-4" href={localeHref(locale, area.slug)}>{area.title}<ArrowRight size={14} aria-hidden="true" className="rtl:-scale-x-100" /></Link></li>)}
+          </ul>
+        </div>
       </div>
     </section>
   );

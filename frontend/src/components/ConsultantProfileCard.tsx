@@ -187,7 +187,7 @@ export function ConsultantSpotlight({ profile, locale }: { profile: ConsultantPr
             <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
           </Link>
         </div>
-        <div className="group mt-2 md:mt-0"><ExpertiseMap expertise={profile.expertise} label={ui.clinicalExpertise} /></div>
+        <div className="mt-6 rounded-xl bg-surface-clinical p-5 md:mt-0"><p className="eyebrow">{ui.clinicalExpertise}</p><ul className="mt-4 grid gap-3">{profile.focusAreas.map(area => <li key={area} className="border-s-2 border-brand-300 ps-3 text-sm leading-6 text-brand-900">{area}</li>)}</ul></div>
       </div>
     </article>
   );

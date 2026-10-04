@@ -9,6 +9,7 @@ import { track } from "@/lib/analytics";
 import { whatsappHref } from "@/lib/links";
 import { COUNTRIES, flagEmoji, type Country } from "@/lib/countries";
 import { apiUrl, apiFetchAs } from "@/lib/api";
+import { ADDITIONAL_CARE_AREAS, additionalCareAreas } from "@/lib/additional-care-areas";
 import { useAuth } from "@/components/AuthProvider";
 
 type CaseFor = "MYSELF" | "SOMEONE_ELSE";
@@ -17,7 +18,7 @@ type FormValues = {
   representativeName: string; representativeRelationship: Relationship | "";
   country: string; whatsappNumber: string; email: string; conditionDescription: string; consent: boolean;
 };
-type CareAreaKey = "" | "cardiology" | "rheumatology-rehabilitation" | "orthopedics";
+type CareAreaKey = "" | "cardiology" | "rheumatology-rehabilitation" | "orthopedics" | (typeof ADDITIONAL_CARE_AREAS)[number]["slug"];
 type FieldKey = keyof FormValues | "files" | "server";
 type Errors = Partial<Record<FieldKey, string>>;
 type CreateCaseResponse = { caseId: string; caseNumber: string; status: "DRAFT"; intakeGrant: string };
@@ -198,8 +199,9 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   }
 
   function describedCase(conditionDescription: string | undefined) {
-    const dictionaryKey = careArea === "rheumatology-rehabilitation" ? "rheumatology" : careArea;
-    const careLine = dictionaryKey ? `${d.form.category.summaryLabel}: ${d.form.category.options[dictionaryKey]}` : "";
+    const careLabel = additionalCareAreas(locale).find(area => area.slug === careArea)?.title
+      ?? (careArea === "rheumatology-rehabilitation" ? d.form.category.options.rheumatology : careArea === "cardiology" ? d.form.category.options.cardiology : careArea === "orthopedics" ? d.form.category.options.orthopedics : "");
+    const careLine = careLabel ? `${d.form.category.summaryLabel}: ${careLabel}` : "";
     return [careLine, conditionDescription].filter(Boolean).join("\n\n");
   }
 
@@ -298,7 +300,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   // Plain render helpers (not components): a component defined inside render remounts on every keystroke.
   function caseFields() {
     return <>
-      <div className="mt-4"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} <span className="font-normal text-ink-400">({d.form.optional})</span></span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option></select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
+      <div className="mt-4"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} <span className="font-normal text-ink-400">({d.form.optional})</span></span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option>{additionalCareAreas(locale).map(area => <option key={area.slug} value={area.slug}>{area.title}</option>)}</select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
       <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.description} <span className="font-normal text-ink-400">({d.form.optional})</span></span><textarea className="field min-h-28 resize-y" value={values.conditionDescription} maxLength={1900} onChange={e => update("conditionDescription", e.target.value)} /></label></div>
       <div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><span className="block text-sm font-bold text-ink-800">{d.form.files} <span className="font-normal text-ink-400">({d.form.optional})</span></span>{files.length>0&&<span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800">{files.length} {d.form.selected}</span>}</div><div className="overflow-hidden rounded-2xl border border-line bg-white"><label className="flex cursor-pointer items-center gap-4 border-b border-dashed border-line-strong bg-brand-50 p-5 transition hover:border-brand-600 hover:bg-brand-100/60"><span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-white text-accent-700 shadow-sm"><FileUp /></span><span className="min-w-0 flex-1"><strong className="block text-brand-800">{d.form.choose}</strong><span className="mt-1 block text-sm text-ink-500">{d.form.uploadHelp}</span></span><Plus className="flex-none text-brand-700"/><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => { onFiles(Array.from(e.currentTarget.files ?? []));e.currentTarget.value="";touch("files"); }} /></label>{files.length>0&&<ul className="grid gap-2 p-3 sm:grid-cols-2">{files.map((file,index)=><li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-mist/50 p-3"><FileText className="flex-none text-brand-600" size={20}/><span className="min-w-0 flex-1"><strong className="block truncate text-sm" title={file.name}>{file.name}</strong><span className="text-xs text-ink-500">{(file.size/1024/1024).toFixed(file.size<1024*1024?2:1)} MB</span></span><button type="button" className="rounded-lg p-2 text-ink-500 hover:bg-alert-50 hover:text-alert-800" aria-label={`${ar?"حذف":"Remove"} ${file.name}`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><Trash2 size={17}/></button></li>)}</ul>}</div>{fieldError("files") && <p className="error-text mt-2">{fieldError("files")}</p>}</div>
     </>;

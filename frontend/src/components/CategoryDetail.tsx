@@ -7,7 +7,7 @@ import { CategoryTabs } from "@/components/CategoryTabs";
 import { ConsultantSpotlight } from "@/components/ConsultantProfileCard";
 import { CtaPanel } from "@/components/CtaPanel";
 import { PageHero } from "@/components/PageHero";
-import { getConsultant, type ConsultantSlug } from "@/lib/consultants";
+import { getConsultant, getConsultants, type ConsultantSlug } from "@/lib/consultants";
 
 export type CategoryContent = {
   eyebrow: string;
@@ -29,6 +29,7 @@ export type CategoryContent = {
 export function CategoryDetail({ locale, d, content, consultantSlug }: { locale: Locale; d: Dictionary; content: CategoryContent; consultantSlug: ConsultantSlug }) {
   const tabs = careAreaTabs(locale, d);
   const consultant = getConsultant(locale, consultantSlug);
+  const consultants = consultant ? getConsultants(locale).filter(p => p.careAreaHref === consultant.careAreaHref) : [];
 
   return (
     <>
@@ -43,7 +44,7 @@ export function CategoryDetail({ locale, d, content, consultantSlug }: { locale:
 
       <section className="section">
         <div className="container-site">
-          {consultant ? <ConsultantSpotlight profile={consultant} locale={locale} /> : null}
+          <div className="grid gap-5">{consultants.map(profile => <ConsultantSpotlight key={profile.slug} profile={profile} locale={locale} />)}</div>
           <div className="mt-10 grid gap-6 lg:grid-cols-2">
             {content.sections.map((section) => (
               <div key={section.title} className="card p-6 sm:p-7">

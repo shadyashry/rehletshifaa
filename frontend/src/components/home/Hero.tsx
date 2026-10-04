@@ -60,6 +60,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
               alt={stillAlt}
               fill
               priority
+              unoptimized
               sizes="(min-width: 1024px) 560px, (min-width: 640px) 728px, 100vw"
               className="object-cover object-[50%_58%]"
             />

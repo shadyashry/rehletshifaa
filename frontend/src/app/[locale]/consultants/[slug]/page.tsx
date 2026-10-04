@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ArrowLeft, ArrowRight, BadgeCheck, Check, ExternalLink, MapPin } from "lucide-react";
+import { ArrowLeft, ArrowRight, Award, BadgeCheck, Check, ExternalLink, MapPin } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -48,7 +48,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
             <h1 className="display mt-4">{profile.name}</h1>
             <p className="mt-4 text-lg font-bold leading-7 text-accent-800">{profile.credentials}</p>
             <div className="mt-5 flex flex-wrap gap-2">
-              {profile.achievementBadges.map((badge) => <span className="inline-flex items-center gap-2 rounded-full border border-accent-200 bg-white px-3.5 py-2 text-sm font-bold text-brand-800 shadow-sm" key={badge}><BadgeCheck size={16} className="text-accent-700" aria-hidden="true" />{badge}</span>)}
+              {profile.achievementBadges.map((badge) => <span className="inline-flex items-center gap-2 rounded-full border border-accent-200 bg-white px-3.5 py-2 text-sm font-bold text-brand-800 shadow-sm" key={badge}><Award size={16} className="text-accent-700" aria-hidden="true" />{badge}</span>)}
             </div>
             <p className="mt-3 text-lg leading-8 text-ink-700">{profile.role}</p>
             <p className="mt-3 flex items-center gap-2 text-sm text-ink-500"><MapPin size={16} aria-hidden="true" />{profile.location}</p>
@@ -59,9 +59,10 @@ export default async function ConsultantProfilePage({ params }: Props) {
       </div>
     </section>
 
+    {profile.achievements?.length ? <section className="border-b border-border-subtle bg-surface-clinical py-10 md:py-12"><div className="container-site"><p className="eyebrow">{locale === "ar" ? "مسيرة مهنية وأكاديمية" : "Career & academic contributions"}</p><h2 className="headline mt-3">{locale === "ar" ? "أبرز الإنجازات" : "Professional highlights"}</h2><ul className="mt-7 grid gap-6 md:grid-cols-3">{profile.achievements.map((achievement, index) => <li className="border-s-2 border-brand-400 ps-5" key={achievement}><span className="text-sm font-semibold text-brand-600" aria-hidden="true">0{index + 1}</span><p className="mt-3 text-base leading-7 text-brand-900">{achievement}</p></li>)}</ul></div></section> : null}
     <section className="section">
       <div className="container-site grid gap-6 lg:grid-cols-2">
-        {([[ui.focus, profile.focusAreas], [ui.qualifications, profile.qualifications], [ui.appointments, profile.appointments], [ui.standing, profile.professionalStanding]] as const).map(([title, items]) => <article className="card p-6 sm:p-8" key={title}><h2 className="text-2xl font-bold text-brand-900">{title}</h2><DetailList items={items} /></article>)}
+        {([[ui.focus, profile.focusAreas], [ui.qualifications, profile.qualifications], [(profile.sourceFile ? (locale === "ar" ? "المناصب الواردة في السيرة الذاتية" : "Appointments in the supplied CV") : ui.appointments), profile.appointments], [ui.standing, profile.professionalStanding]] as const).map(([title, items]) => <article className="card p-6 sm:p-8" key={title}><h2 className="text-2xl font-bold text-brand-900">{title}</h2><DetailList items={items} /></article>)}
       </div>
       <div className="container-site mt-7">
         <div className="rounded-2xl border border-line bg-wash-aqua p-5 text-sm leading-6 text-ink-700">

@@ -9,9 +9,8 @@ import { JourneyVideo } from "./JourneyVideo";
 
 /**
  * The process as one care journey: four numbered moments joined by the flowing connector, and beside
- * them the one film, always as a composed poster (play, "Watch how it works", duration) that opens the
- * player in a lightbox — never a raw native player idling on the page. Desktop: journey left, poster
- * right (≈44% of the section); phone and tablet: the journey, then the poster, then the one action.
+ * them the film as a visible inline player with its poster, native playback controls and duration.
+ * Desktop: journey left, film right (≈44% of the section); phone and tablet: journey, then film.
  */
 export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
   const v = d.home.video;
@@ -51,7 +50,7 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
           </ol>
 
           <div className="w-full sm:mx-auto sm:max-w-[620px] lg:mx-0 lg:max-w-none">
-            <JourneyVideo src={source} poster={poster} label={v.label} watch={v.watch} duration={v.duration} dialogTitle={v.dialogTitle} close={v.close} />
+            <JourneyVideo src={source} poster={poster} label={v.label} watch={v.watch} duration={v.duration} />
           </div>
         </div>
 
