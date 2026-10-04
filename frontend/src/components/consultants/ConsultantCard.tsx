@@ -32,7 +32,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
         {signals.length > 0 ? (
           <p className={`flex min-w-0 flex-wrap gap-1 ${featured ? "max-w-[55%] justify-end md:max-w-full md:justify-center" : "max-w-[65%] justify-end"}`}>
             {signals.map((signal) => (
-              <bdi key={signal} title={signal} className="block max-w-[11rem] truncate sm:max-w-[13rem] rounded-md bg-surface-default/90 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-[0.04em] text-brand-800 ring-1 ring-border-card rtl:tracking-normal">
+              <bdi key={signal} title={signal} className="block max-w-[11rem] truncate sm:max-w-[13rem] rounded-md bg-surface-default/90 px-2 py-0.5 text-[0.75rem] font-semibold tracking-[0.04em] text-brand-800 ring-1 ring-border-card rtl:tracking-normal">
                 {signal}
               </bdi>
             ))}
@@ -45,7 +45,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
           <CareAreaIcon name={icon} size={14} strokeWidth={1.8} />
           {profile.careAreaLabel}
         </p>
-        <NameHeading className={`mt-1.5 font-semibold leading-[1.3] tracking-[-0.01em] text-brand-900 [text-wrap:balance] rtl:tracking-normal ${featured ? "text-[1.375rem] md:text-[1.75rem]" : "text-[1.1875rem]"}`}>{profile.name}</NameHeading>
+        <NameHeading className={`mt-1.5 font-semibold leading-[1.3] tracking-[-0.01em] text-brand-900 [text-wrap:balance] rtl:tracking-normal ${featured ? "text-[1.375rem] md:text-[1.75rem]" : "text-[1.25rem]"}`}>{profile.name}</NameHeading>
         {profile.specialty !== profile.careAreaLabel ? <p className="mt-1 text-[0.9375rem] leading-6 text-ink-500">{profile.specialty}</p> : null}
 
         <p className="mt-4 flex gap-2.5 text-[0.9375rem] leading-6 text-ink-700">
@@ -55,7 +55,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
 
         {profile.distinction && (!featured || profile.distinction !== profile.role) ? (
           <div className="mt-4 border-s-2 border-brand-400 ps-3.5">
-            <p className="inline-flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-ink-500 rtl:normal-case rtl:tracking-normal">
+            <p className="inline-flex items-center gap-1.5 text-[0.75rem] font-semibold uppercase tracking-[0.08em] text-ink-500 rtl:normal-case rtl:tracking-normal">
               <Award size={13} aria-hidden="true" />
               {labels.distinction}
             </p>
@@ -64,7 +64,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
         ) : null}
 
         <div className="mt-5">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-ink-500 rtl:normal-case rtl:tracking-normal">{labels.focus}</p>
+          <p className="text-[0.75rem] font-semibold uppercase tracking-[0.08em] text-ink-500 rtl:normal-case rtl:tracking-normal">{labels.focus}</p>
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {(featured ? profile.focusAreas : profile.focusAreas.slice(0, 3)).map((focus) => (
               <li key={focus} className="inline-flex items-start gap-1.5 rounded-lg border border-border-subtle bg-surface-pearl px-2.5 py-1 text-[0.8125rem] leading-5 text-ink-700">

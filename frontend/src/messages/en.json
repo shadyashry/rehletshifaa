@@ -36,7 +36,7 @@
     "profile": "View Consultant Profile",
     "emergency": "Emergency symptoms? RehletShifaa is not an emergency service. Call your local emergency number or seek urgent care now.",
     "emergencyLabel": "Emergency",
-    "medicalNotice": "RehletShifaa coordinates access to medical review and care. Information provided through the platform does not replace emergency care or a complete clinical assessment. Final medical decisions are made by the treating consultant following appropriate evaluation.",
+    "medicalNotice": "RehletShifaa coordinates access to medical review and care. Information provided through the platform does not replace emergency care or a complete clinical assessment. Final medical decisions are made by the treating Consultant following appropriate evaluation.",
     "privacy": "Privacy Policy",
     "terms": "Terms of Use",
     "disclaimer": "Medical Disclaimer",
@@ -70,7 +70,7 @@
     "video": {
       "eyebrow": "Your journey, explained",
       "title": "See what happens after you start",
-      "intro": "Discover how RehletShifaa turns your medical reports into a consultant-led care journey, with one dedicated coordinator guiding every step from review to treatment and follow-up.",
+      "intro": "Discover how RehletShifaa turns your medical reports into a Consultant-led care journey, with one dedicated coordinator guiding every step from review to treatment and follow-up.",
       "watch": "Watch how it works",
       "duration": "53 sec",
       "dialogTitle": "How it works",
@@ -96,7 +96,7 @@
       ]
     },
     "areasEyebrow": "What we care for",
-    "areasTitle": "Where we can help",
+    "areasTitle": "{count} care areas, one coordinated path",
     "areas": [
       {
         "title": "Cardiology",
@@ -129,7 +129,7 @@
     "beforeBody": "Where medically possible, RehletShifaa helps you understand the proposed next steps and expected arrangements before deciding to travel.",
     "trustEyebrow": "Privacy and clinical governance",
     "trustTitle": "How your information is handled",
-    "trustIntro": "A few clear rules guide every case.",
+    "trustIntro": "Your information stays private, and you stay in control.",
     "trust": [
       {
         "title": "Consultants make clinical decisions",
@@ -152,7 +152,7 @@
     "finalBody": "Send what you already have. We'll guide you through the next step.",
     "finalNote": "Starting a case does not commit you to treatment or travel.",
     "slogan": "You see the full picture first. The decision stays yours.",
-    "areasIntro": "Consultant-led review across {count} care areas, organised by body system. Every area is led by named, verified Consultants.",
+    "areasIntro": "Organised by body system, each led by named, verified Consultants — or send your case and we will route it for you.",
     "areasAction": "View care area",
     "cardiologyFacets": ["Coronary", "Structural heart", "Heart rhythm"],
     "consultantsPromise": {
@@ -220,7 +220,7 @@
   "cardiology": {
     "eyebrow": "Consultant-led cardiac pathways",
     "title": "Advanced Cardiac Care, Guided by Your Case",
-    "intro": "You don't need to choose a cardiac specialty yourself. Send your medical information and RehletShifaa will help direct your case to the appropriate consultant.",
+    "intro": "You don't need to choose a cardiac specialty yourself. Send your medical information and RehletShifaa will help direct your case to the appropriate Consultant.",
     "exploreAction": "Explore cardiac care areas",
     "coronaryTitle": "Coronary Arteries & Interventional Cardiology",
     "coronaryItems": [
@@ -249,7 +249,7 @@
       "Transcatheter Tricuspid Valve Replacement",
       "Bicaval Valve Implantation"
     ],
-    "suitability": "Suitability for any procedure is determined only after consultant review.",
+    "suitability": "Suitability for any procedure is determined only after Consultant review.",
     "rhythmTitle": "Heart Rhythm & Cardiac Devices",
     "rhythmItems": [
       "Pacemaker",
@@ -265,7 +265,7 @@
     ],
     "examples": "Patients may contact RehletShifaa if",
     "finalTitle": "Not Sure Where Your Condition Fits?",
-    "finalBody": "That's completely fine. You do not need to select a specialty. Send your reports and we'll help direct your case to the appropriate consultant."
+    "finalBody": "That's completely fine. You do not need to select a specialty. Send your reports and we'll help direct your case to the appropriate Consultant."
   },
   "consultants": {
     "eyebrow": "Appropriate expertise for each case",
@@ -606,9 +606,9 @@
   "rheumatology": {
     "eyebrow": "Consultant-led rehabilitation & dysphagia care",
     "title": "Dysphagia Rehabilitation & Physical Medicine",
-    "intro": "A rare, focused service for adults and children with swallowing (dysphagia) difficulties — alongside broader rehabilitation, physical medicine and rheumatology. Send your reports and RehletShifaa will help direct your case to the appropriate consultant.",
+    "intro": "A rare, focused service for adults and children with swallowing (dysphagia) difficulties — alongside broader rehabilitation, physical medicine and rheumatology. Send your reports and RehletShifaa will help direct your case to the appropriate Consultant.",
     "highlight": "A rare, specialised service — Adult & Pediatric Dysphagia (swallowing) Rehabilitation.",
-    "videoTitle": "Meet your rehabilitation & dysphagia consultant — coming soon",
+    "videoTitle": "Meet your rehabilitation & dysphagia Consultant — coming soon",
     "sections": [
       {
         "title": "Adult & Pediatric Dysphagia Rehabilitation",
@@ -640,15 +640,15 @@
         ]
       }
     ],
-    "note": "Your treatment and therapy plan is decided by the consultant after review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
+    "note": "Your treatment and therapy plan is decided by the Consultant after review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
     "finalTitle": "Not Sure Where Your Condition Fits?",
-    "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate consultant."
+    "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate Consultant."
   },
   "orthopedics": {
     "eyebrow": "Consultant-led orthopedic care",
     "title": "Orthopedics & Joint Surgery",
-    "intro": "From joint replacement to sports injuries and spine evaluation — send your reports and RehletShifaa will help direct your case to the appropriate consultant.",
-    "videoTitle": "Meet your orthopedics consultant — coming soon",
+    "intro": "From joint replacement to sports injuries and spine evaluation — send your reports and RehletShifaa will help direct your case to the appropriate Consultant.",
+    "videoTitle": "Meet your orthopedics Consultant — coming soon",
     "sections": [
       {
         "title": "Joint Replacement",
@@ -678,9 +678,9 @@
         ]
       }
     ],
-    "note": "Suitability for any procedure is determined only after consultant review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
+    "note": "Suitability for any procedure is determined only after Consultant review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
     "finalTitle": "Not Sure Where Your Condition Fits?",
-    "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate consultant."
+    "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate Consultant."
   },
   "consultantsPage": {
     "stats": {

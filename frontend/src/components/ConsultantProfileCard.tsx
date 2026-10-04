@@ -8,7 +8,7 @@ import type { ConsultantProfile } from "@/lib/consultants";
  * and never an internal approval state shown to patients. Decorative beside the visible name.
  */
 export function ConsultantPortrait({ profile, size = "md" }: { profile: ConsultantProfile; size?: "sm" | "md" | "lg" }) {
-  const box = size === "lg" ? "h-28 w-28 text-[1.75rem]" : size === "md" ? "h-14 w-14 text-[1.1rem]" : "h-12 w-12 text-[0.95rem]";
+  const box = size === "lg" ? "h-28 w-28 text-[1.75rem]" : size === "md" ? "h-14 w-14 text-[1.1rem]" : "h-12 w-12 text-[0.9375rem]";
   if (profile.portrait) {
     return (
       <span className={`relative block flex-none overflow-hidden rounded-full bg-surface-clinical ring-1 ring-border-clinical ${box}`}>
@@ -35,7 +35,7 @@ const Dot = () => <span className="h-2 w-2 flex-none rounded-full border border-
 export function ExpertiseMap({ expertise, label }: { expertise: ConsultantProfile["expertise"]; label: string }) {
   const [top, start, end, bottom] = expertise.areas;
   const text = "text-[0.875rem] font-medium leading-[1.15rem] text-brand-900 xl:text-[0.8125rem]";
-  const anchor = "max-w-[8.5rem] rounded-full [hyphens:auto] [overflow-wrap:break-word] bg-brand-600 px-3 py-1.5 text-center text-[0.8rem] font-semibold leading-4 text-white transition-colors group-hover:bg-brand-700";
+  const anchor = "max-w-[8.5rem] rounded-full [hyphens:auto] [overflow-wrap:break-word] bg-brand-600 px-3 py-1.5 text-center text-[0.8125rem] font-semibold leading-4 text-white transition-colors group-hover:bg-brand-700";
   return (
     <div className="mt-4 min-w-0">
       <p className="eyebrow">{label}</p>

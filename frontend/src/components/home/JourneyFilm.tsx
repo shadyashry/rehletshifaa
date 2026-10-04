@@ -38,12 +38,12 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
                 {index < last && (
                   <JourneyLine className="absolute start-[4px] top-9 h-[calc(100%-2.25rem)] w-6 rtl:-scale-x-100 sm:start-[6px] sm:w-7" />
                 )}
-                <span aria-hidden className="journey-marker relative z-[1] flex-none sm:h-9 sm:w-9 sm:text-[0.8rem]">
+                <span aria-hidden className="journey-marker relative z-[1] flex-none sm:h-9 sm:w-9 sm:text-[0.8125rem]">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <div className="min-w-0 pt-1">
                   <h3 className="text-[1.0625rem] font-semibold leading-6 text-brand-900 min-[360px]:text-[1.125rem] lg:text-[1.25rem] lg:leading-7">{step.title}</h3>
-                  <p className="mt-1 max-w-[46ch] text-[0.95rem] leading-6 text-ink-600 lg:text-[1rem] lg:leading-7">{step.body}</p>
+                  <p className="mt-1 max-w-[46ch] text-[0.9375rem] leading-6 text-ink-600 lg:text-[1rem] lg:leading-7">{step.body}</p>
                 </div>
               </li>
             ))}
@@ -56,7 +56,7 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
 
         {/* The conversion point after the journey. Hidden where the header already carries the action. */}
         <div className="mt-6 flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-t border-border-subtle pt-4 sm:mt-8 sm:pt-5 lg:hidden">
-          <p className="text-[0.95rem] font-semibold text-brand-900">{d.home.howReady}</p>
+          <p className="text-[0.9375rem] font-semibold text-brand-900">{d.home.howReady}</p>
           <TrackedLink event="send_case_cta_clicked" className="btn-primary" href={localeHref(locale, "send-my-case")}>
             {d.home.primaryAction}
             <ArrowRight size={17} aria-hidden="true" className="rtl:-scale-x-100" />

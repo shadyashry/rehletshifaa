@@ -90,7 +90,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
                 {d.common.send}
                 <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
               </TrackedLink>
-              <a href="#area-consultants" className="link-cta justify-center text-[0.95rem] sm:justify-start">
+              <a href="#area-consultants" className="link-cta justify-center text-[0.9375rem] sm:justify-start">
                 {t.meet}
                 <ArrowDown size={16} aria-hidden="true" />
               </a>
@@ -121,7 +121,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
               <div className="mt-1 flex items-center gap-3 border-t border-border-subtle bg-surface-pearl px-6 py-4">
                 <span className="flex -space-x-2 rtl:space-x-reverse">
                   {area.consultants.slice(0, 4).map((profile) => (
-                    <span key={profile.slug} className={`grid h-9 w-9 place-items-center rounded-full text-[0.68rem] font-semibold tracking-[0.03em] text-brand-800 ring-2 ring-surface-pearl ${style.well}`}>
+                    <span key={profile.slug} className={`grid h-9 w-9 place-items-center rounded-full text-[0.75rem] font-semibold tracking-[0.03em] text-brand-800 ring-2 ring-surface-pearl ${style.well}`}>
                       {profile.initials}
                     </span>
                   ))}
@@ -157,7 +157,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
                 </div>
                 <ul className={`mt-5 grid gap-x-5 gap-y-2.5 ${scope.length === 1 ? "sm:grid-cols-2" : ""}`}>
                   {section.items.map((item) => (
-                    <li key={item} className="flex gap-2.5 text-[0.95rem] leading-6 text-ink-700">
+                    <li key={item} className="flex gap-2.5 text-[0.9375rem] leading-6 text-ink-700">
                       <Check size={16} strokeWidth={2.2} aria-hidden="true" className="mt-1 flex-none text-brand-600" />
                       {item}
                     </li>
@@ -179,7 +179,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
               </article>
             ))}
           </div>
-          <p className="mt-6 flex max-w-[80ch] items-start gap-3 rounded-[14px] border-s-4 border-brand-500 bg-surface-default px-5 py-4 text-[0.95rem] font-medium leading-7 text-brand-900 ring-1 ring-border-subtle">
+          <p className="mt-6 flex max-w-[80ch] items-start gap-3 rounded-[14px] border-s-4 border-brand-500 bg-surface-default px-5 py-4 text-[0.9375rem] font-medium leading-7 text-brand-900 ring-1 ring-border-subtle">
             {note}
           </p>
         </div>
@@ -222,7 +222,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
               <p className="eyebrow">{t.relatedEyebrow}</p>
               <h2 id="related-title" className="mt-3 text-[1.5rem] font-semibold leading-tight tracking-[-0.015em] text-brand-900 rtl:tracking-normal sm:text-[1.75rem]">{t.relatedTitle}</h2>
             </div>
-            <Link href={localeHref(locale, "care-areas")} className="link-cta text-[0.95rem]">
+            <Link href={localeHref(locale, "care-areas")} className="link-cta text-[0.9375rem]">
               {t.allAreas}
               <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
             </Link>

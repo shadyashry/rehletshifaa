@@ -37,18 +37,18 @@ export function AccountMenu({ labels, signInHref, statusHref }: { labels: Labels
         hidden={!open}
         className="absolute end-0 top-full z-10 mt-3 w-[19.5rem] rounded-[18px] border border-border-subtle bg-surface-default p-2 shadow-[0_28px_56px_-28px_rgba(28,51,58,0.5)] motion-safe:animate-[care-menu-in_0.18s_ease-out]"
       >
-        <p className="px-3 pb-1 pt-2 text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:text-[0.8rem] rtl:normal-case rtl:tracking-normal">{labels.heading}</p>
+        <p className="px-3 pb-1 pt-2 text-[0.8125rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:text-[0.8125rem] rtl:normal-case rtl:tracking-normal">{labels.heading}</p>
         <Link href={signInHref} className={row}>
           <span aria-hidden className={well}><LogIn size={16} strokeWidth={1.9} className="rtl:-scale-x-100" /></span>
           <span className="min-w-0">
-            <span className="block text-[0.95rem] font-semibold text-brand-900 group-hover:text-brand-700">{labels.signIn}</span>
+            <span className="block text-[0.9375rem] font-semibold text-brand-900 group-hover:text-brand-700">{labels.signIn}</span>
             <span className="block text-[0.8125rem] leading-5 text-ink-500">{labels.signInBody}</span>
           </span>
         </Link>
         <Link href={statusHref} className={row}>
           <span aria-hidden className={well}><ClipboardCheck size={16} strokeWidth={1.9} /></span>
           <span className="min-w-0">
-            <span className="block text-[0.95rem] font-semibold text-brand-900 group-hover:text-brand-700">{labels.status}</span>
+            <span className="block text-[0.9375rem] font-semibold text-brand-900 group-hover:text-brand-700">{labels.status}</span>
             <span className="block text-[0.8125rem] leading-5 text-ink-500">{labels.statusBody}</span>
           </span>
         </Link>

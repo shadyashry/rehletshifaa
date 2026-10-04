@@ -70,7 +70,7 @@ export default async function CareAreas({ params }: Props) {
             {d.common.send}
             <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
           </TrackedLink>
-          <a href="#atlas" className="link-cta justify-center text-[0.95rem] sm:justify-start">
+          <a href="#atlas" className="link-cta justify-center text-[0.9375rem] sm:justify-start">
             {page.explore}
             <ArrowDown size={16} aria-hidden="true" />
           </a>
@@ -124,7 +124,7 @@ export default async function CareAreas({ params }: Props) {
                     <h3 id={`system-${system.key}-title`} className="mt-4 text-[1.375rem] font-semibold leading-tight tracking-[-0.015em] text-brand-900 rtl:leading-snug rtl:tracking-normal sm:text-[1.5rem]">
                       {system.title}
                     </h3>
-                    <p className="mt-2 max-w-[40ch] text-[0.95rem] leading-6 text-ink-600">{system.body}</p>
+                    <p className="mt-2 max-w-[40ch] text-[0.9375rem] leading-6 text-ink-600">{system.body}</p>
                     <p className="mt-3 text-[0.8125rem] font-medium leading-5 text-ink-500">
                       {areasLabel(system.areas.length)} · {consultantsLabel(people)}
                     </p>

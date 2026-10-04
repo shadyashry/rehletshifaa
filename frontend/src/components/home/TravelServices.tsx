@@ -48,12 +48,12 @@ export function TravelServices({ d }: { d: Dictionary }) {
               </span>
               <div className="min-w-0 pt-1 lg:pt-3.5">
                 <h3 className="text-[1.0625rem] font-semibold leading-6 text-brand-900 lg:text-[1.125rem]">{item.title}</h3>
-                <p className="mt-0.5 max-w-[40ch] text-[0.95rem] leading-6 text-ink-600 lg:max-w-[24ch]">{item.body}</p>
+                <p className="mt-0.5 max-w-[40ch] text-[0.9375rem] leading-6 text-ink-600 lg:max-w-[24ch]">{item.body}</p>
               </div>
             </li>
           ))}
         </ol>
-        <p className="mt-5 text-[0.9rem] leading-6 text-ink-500">{t.note}</p>
+        <p className="mt-5 text-[0.875rem] leading-6 text-ink-500">{t.note}</p>
       </div>
     </section>
   );

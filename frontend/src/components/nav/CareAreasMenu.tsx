@@ -56,7 +56,7 @@ export function CareAreasMenu({ systems, labels, overviewHref, sendHref, activeH
                 const style = SYSTEM_STYLES[system.key];
                 return (
                   <div key={system.key}>
-                    <p className="flex items-center gap-2 text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:text-[0.8rem] rtl:normal-case rtl:tracking-normal">
+                    <p className="flex items-center gap-2 text-[0.8125rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:text-[0.8125rem] rtl:normal-case rtl:tracking-normal">
                       <span aria-hidden className={`h-2 w-2 rounded-full ${style.dot}`} />
                       {system.title}
                     </p>
@@ -83,7 +83,7 @@ export function CareAreasMenu({ systems, labels, overviewHref, sendHref, activeH
 
             <aside className="flex flex-col rounded-[16px] bg-surface-clinical p-5 ring-1 ring-border-clinical">
               <Link href={overviewHref} className="group rounded-xl bg-surface-default p-4 ring-1 ring-border-clinical transition-colors hover:ring-brand-300">
-                <span className="flex items-center justify-between gap-3 text-[0.98rem] font-semibold text-brand-900">
+                <span className="flex items-center justify-between gap-3 text-[1rem] font-semibold text-brand-900">
                   {labels.overview}
                   <ArrowRight size={16} aria-hidden="true" className="text-brand-600 transition-transform group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
                 </span>
@@ -92,7 +92,7 @@ export function CareAreasMenu({ systems, labels, overviewHref, sendHref, activeH
                 </span>
               </Link>
               <div className="mt-5 border-t border-border-clinical pt-5">
-                <p className="text-[0.98rem] font-semibold leading-6 text-brand-900">{labels.notSureTitle}</p>
+                <p className="text-[1rem] font-semibold leading-6 text-brand-900">{labels.notSureTitle}</p>
                 <p className="mt-1 text-[0.875rem] leading-6 text-ink-600">{labels.notSureBody}</p>
                 <Link href={sendHref} className="link-cta mt-2 text-[0.9375rem]">
                   {labels.send}

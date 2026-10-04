@@ -52,18 +52,18 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
       <div className="container-site py-8 sm:grid sm:grid-cols-2 sm:gap-10 sm:py-12 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] lg:gap-10 lg:py-14">
         <div className="max-w-sm sm:col-span-2 lg:col-span-1">
           <Logo label={d.common.brand} accent={d.common.brandAccent} arabicLabel={d.common.brandArabic} arabicAccent={d.common.brandArabicAccent} size={44} />
-          <p className="mt-3 max-w-[36ch] text-[0.95rem] leading-6 text-ink-600 sm:mt-4">{d.footer.description}</p>
+          <p className="mt-3 max-w-[36ch] text-[0.9375rem] leading-6 text-ink-600 sm:mt-4">{d.footer.description}</p>
         </div>
 
         {/* Phone: disclosures. */}
         <div className="mt-5 border-t border-sand-200 sm:hidden">
           {groups.map((group) => (
             <details key={group.title} className="group border-b border-sand-200">
-              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 text-[0.9rem] font-semibold text-brand-900 [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 text-[0.875rem] font-semibold text-brand-900 [&::-webkit-details-marker]:hidden">
                 {group.title}
                 <ChevronDown size={18} aria-hidden="true" className="text-ink-400 transition-transform group-open:rotate-180" />
               </summary>
-              <ul className="grid gap-2.5 pb-4 text-[0.95rem]">{group.items}</ul>
+              <ul className="grid gap-2.5 pb-4 text-[0.9375rem]">{group.items}</ul>
             </details>
           ))}
         </div>
@@ -71,10 +71,10 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
         {/* Tablet and desktop: columns. */}
         {groups.map((group) => (
           <div key={group.title} className="hidden sm:block">
-            <h2 className="text-[0.78rem] font-semibold uppercase tracking-[0.12em] text-brand-900 rtl:text-[0.85rem] rtl:normal-case rtl:tracking-normal">
+            <h2 className="text-[0.8125rem] font-semibold uppercase tracking-[0.12em] text-brand-900 rtl:text-[0.875rem] rtl:normal-case rtl:tracking-normal">
               {group.title}
             </h2>
-            <ul className="mt-4 grid gap-3 text-[0.95rem]">{group.items}</ul>
+            <ul className="mt-4 grid gap-3 text-[0.9375rem]">{group.items}</ul>
           </div>
         ))}
       </div>

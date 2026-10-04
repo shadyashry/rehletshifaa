@@ -37,7 +37,7 @@ function DetailCard({ icon, title, children }: { icon: ReactNode; title: string;
     <article className="rounded-[18px] border border-border-card bg-surface-default p-6 shadow-[0_1px_2px_rgba(36,64,74,0.04)] sm:p-7">
       <div className="flex items-center gap-3">
         <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-surface-clinical text-brand-700 ring-1 ring-border-clinical">{icon}</span>
-        <h2 className="text-[1.1875rem] font-semibold leading-snug text-brand-900">{title}</h2>
+        <h2 className="text-[1.25rem] font-semibold leading-snug text-brand-900">{title}</h2>
       </div>
       <div className="mt-5">{children}</div>
     </article>
@@ -117,7 +117,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
                 ))}
               </p>
 
-              <div className="mt-5 grid gap-2 text-[0.98rem] leading-7 text-ink-700">
+              <div className="mt-5 grid gap-2 text-[1rem] leading-7 text-ink-700">
                 <p className="flex gap-2.5"><GraduationCap size={19} aria-hidden="true" className="mt-1 flex-none text-brand-600" />{profile.role}</p>
                 <p className="flex items-center gap-2.5 text-[0.9375rem] text-ink-500"><MapPin size={17} aria-hidden="true" className="flex-none text-brand-600" />{profile.location}</p>
               </div>
@@ -137,8 +137,8 @@ export default async function ConsultantProfilePage({ params }: Props) {
                 <div className="flex gap-3 rounded-[14px] bg-surface-clinical p-4 ring-1 ring-border-clinical">
                   <Award size={20} aria-hidden="true" className="mt-0.5 flex-none text-brand-700" />
                   <div>
-                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:text-[0.8rem] rtl:normal-case rtl:tracking-normal">{ui.verifiedRole}</p>
-                    <p className="mt-1 text-[0.98rem] font-semibold leading-6 text-brand-900">{profile.distinction}</p>
+                    <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:text-[0.8125rem] rtl:normal-case rtl:tracking-normal">{ui.verifiedRole}</p>
+                    <p className="mt-1 text-[1rem] font-semibold leading-6 text-brand-900">{profile.distinction}</p>
                   </div>
                 </div>
               ) : null}
@@ -176,7 +176,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
             <DetailCard icon={<Stethoscope size={19} strokeWidth={1.8} />} title={ui.focus}>
               <ul className="grid gap-2.5">
                 {profile.focusAreas.map((item) => (
-                  <li key={item} className="flex gap-3 text-[0.98rem] leading-7 text-ink-700">
+                  <li key={item} className="flex gap-3 text-[1rem] leading-7 text-ink-700">
                     <span aria-hidden className={`mt-2.5 h-2 w-2 flex-none rounded-full ${style.dot}`} />
                     {item}
                   </li>
@@ -200,7 +200,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
                     <span className={`relative grid h-9 w-[3.375rem] flex-none place-items-center rounded-full text-[0.75rem] font-semibold tabular-nums ${item.year ? "bg-brand-700 text-white" : "bg-surface-clinical text-brand-700 ring-1 ring-border-clinical"}`}>
                       {item.year ?? "—"}
                     </span>
-                    <p className="pt-1 text-[0.98rem] leading-7 text-ink-700">{item.text}</p>
+                    <p className="pt-1 text-[1rem] leading-7 text-ink-700">{item.text}</p>
                   </li>
                 ))}
               </ol>
@@ -208,7 +208,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
             <DetailCard icon={<Building2 size={19} strokeWidth={1.8} />} title={profile.sourceFile ? t.cvAppointments : ui.appointments}>
               <ul className="grid gap-2.5">
                 {profile.appointments.map((item) => (
-                  <li key={item} className="flex gap-3 text-[0.98rem] leading-7 text-ink-700">
+                  <li key={item} className="flex gap-3 text-[1rem] leading-7 text-ink-700">
                     <span aria-hidden className="mt-2.5 h-2 w-2 flex-none rounded-full bg-brand-400" />
                     {item}
                   </li>
@@ -220,7 +220,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
           <div className="flex flex-col gap-3 rounded-[18px] border border-border-clinical bg-surface-clinical p-5 sm:flex-row sm:items-start sm:gap-4 sm:p-6 lg:col-span-2">
             <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-surface-default text-brand-700 ring-1 ring-border-clinical"><BadgeCheck size={19} strokeWidth={1.8} /></span>
             <div className="min-w-0">
-              <p className="text-[0.98rem] font-semibold text-brand-900">{t.sourcesTitle}</p>
+              <p className="text-[1rem] font-semibold text-brand-900">{t.sourcesTitle}</p>
               <p className="mt-1 text-[0.9375rem] leading-6 text-ink-600">{profile.verification}</p>
               {profile.externalLinks?.length ? (
                 <div className="mt-3 flex flex-wrap gap-4">
@@ -247,7 +247,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
                   {sameSystem.length ? t.relatedTitle.replace("{system}", systemTitle) : t.relatedFallback}
                 </h2>
               </div>
-              <Link href={localeHref(locale, "consultants")} className="link-cta text-[0.95rem]">
+              <Link href={localeHref(locale, "consultants")} className="link-cta text-[0.9375rem]">
                 {t.allConsultants}
                 <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
               </Link>

@@ -9,7 +9,7 @@ const PEOPLE_ICONS = [UserRound, UserRoundCog, UserRoundSearch] as const;
  * Privacy and clinical governance. The narrow column carries the heading, one line and the section's one
  * visual — "who works with your case": the case in private storage, the three people who work with it
  * (you, your coordinator, your Consultant) on the care-journey line, and the one thing it never is: public.
- * The wide column sets the four commitments as quiet numbered cards. Every statement describes behaviour
+ * The wide column sets the four commitments as quiet cards (unnumbered: they are rules, not steps). Every statement describes behaviour
  * the platform actually implements; no certifications, statistics or endorsements are claimed, and the
  * diagram names who works with a case without claiming that nobody else in operations can.
  */
@@ -25,14 +25,14 @@ export function TrustSection({ d }: { d: Dictionary }) {
           <p className="mt-3 max-w-[40ch] text-[1.0625rem] leading-7 text-ink-600 sm:mt-4">{d.home.trustIntro}</p>
 
           <figure className="mt-7 rounded-[18px] border border-border-card bg-surface-default p-5 shadow-[0_24px_48px_-40px_rgba(36,64,74,0.5)] sm:p-6">
-            <figcaption className="text-[0.75rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:text-[0.8rem] rtl:normal-case rtl:tracking-normal">{access.title}</figcaption>
+            <figcaption className="text-[0.75rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:text-[0.8125rem] rtl:normal-case rtl:tracking-normal">{access.title}</figcaption>
 
             <div className="mt-4 flex items-center gap-3.5 rounded-[14px] bg-brand-700 px-4 py-3.5 text-white">
               <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-white/12 ring-1 ring-white/25">
                 <FileLock2 size={19} strokeWidth={1.7} />
               </span>
               <div className="min-w-0">
-                <p className="text-[0.98rem] font-semibold leading-6">{access.case}</p>
+                <p className="text-[1rem] font-semibold leading-6">{access.case}</p>
                 <p className="text-[0.8125rem] leading-5 text-white/80">{access.storage}</p>
               </div>
             </div>
@@ -49,7 +49,7 @@ export function TrustSection({ d }: { d: Dictionary }) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-[0.9375rem] font-semibold leading-5 text-brand-900">{name}</p>
-                      <p className="text-[0.8125rem] leading-5 text-ink-500">{role}</p>
+                      <p className="hidden text-[0.8125rem] leading-5 text-ink-500 sm:block">{role}</p>
                     </div>
                     <Check size={16} strokeWidth={2.4} aria-hidden="true" className="flex-none text-brand-600" />
                   </li>
@@ -85,13 +85,10 @@ export function TrustSection({ d }: { d: Dictionary }) {
                   >
                     <Icon size={21} strokeWidth={1.7} />
                   </span>
-                  <span aria-hidden className="hidden text-[0.8125rem] font-semibold tabular-nums sm:inline tracking-[0.08em] text-brand-600/60">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
                 </div>
                 <div className="min-w-0 sm:mt-5">
                   <h3 className="text-[1.0625rem] font-semibold leading-snug text-brand-900 [text-wrap:balance] sm:text-[1.125rem]">{item.title}</h3>
-                  <p className="mt-1 text-[0.95rem] leading-6 text-ink-600 sm:mt-2 sm:text-[1rem] sm:leading-7">{item.body}</p>
+                  <p className="mt-1 text-[0.9375rem] leading-6 text-ink-600 sm:mt-2 sm:text-[1rem] sm:leading-7">{item.body}</p>
                 </div>
               </li>
             );

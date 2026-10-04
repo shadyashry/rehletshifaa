@@ -76,7 +76,7 @@ export default async function Consultants({ params }: Props) {
             {d.common.send}
             <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
           </TrackedLink>
-          <a href="#consultant-panel" className="link-cta justify-center text-[0.95rem] sm:justify-start">
+          <a href="#consultant-panel" className="link-cta justify-center text-[0.9375rem] sm:justify-start">
             {page.explore}
             <ArrowDown size={16} aria-hidden="true" />
           </a>

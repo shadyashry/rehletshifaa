@@ -223,9 +223,9 @@
 
   .eyebrow {
     color: var(--color-accent-700);
-    font-size: 0.72rem;
+    font-size: 0.8125rem; /* 13px: the smallest label on the public site — readable for every patient */
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     line-height: 1.4;
   }
@@ -348,7 +348,7 @@
     background: transparent;
     color: var(--color-brand-700);
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.9375rem;
     white-space: nowrap;
     transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
   }
@@ -357,7 +357,7 @@
   .site-header .btn-primary {
     min-height: 2.75rem;
     padding: 0.55rem 1.1rem;
-    font-size: 0.95rem;
+    font-size: 0.9375rem;
     border-radius: 0.7rem;
   }
 
@@ -391,7 +391,7 @@
     border-radius: 9999px;
     background: var(--color-surface-elevated);
     color: var(--color-brand-800);
-    font-size: 0.78rem;
+    font-size: 0.8125rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     box-shadow: inset 0 0 0 1.75px var(--color-brand-600);
@@ -639,7 +639,7 @@
   .section { padding-block: 2.5rem; }
   .section-tight { padding-block: 1.5rem; }
 
-  .eyebrow { font-size: 0.75rem; letter-spacing: 0.09em; }
+  .eyebrow { font-size: 0.8125rem; letter-spacing: 0.08em; }
   .display { font-size: 2rem; line-height: 1.1; }
   /* 26px on a 320 screen, 28px from ~390: headings introduce a section, they do not fill it. */
   .headline { font-size: clamp(1.625rem, 1.054rem + 2.86vw, 1.75rem); line-height: 1.18; }
@@ -651,14 +651,14 @@
   .btn-inverse {
     min-height: 2.875rem;
     padding: 0.6rem 1.2rem;
-    font-size: 0.95rem;
+    font-size: 0.9375rem;
   }
 
   [dir="rtl"] .display { font-size: 1.75rem; line-height: 1.3; }
   [dir="rtl"] .headline { font-size: clamp(1.5rem, 1rem + 2.5vw, 1.625rem); line-height: 1.38; }
   [dir="rtl"] .title { font-size: 1.1rem; }
   [dir="rtl"] .lead { font-size: 0.98rem; line-height: 1.8; }
-  [dir="rtl"] .eyebrow { font-size: 0.8rem; letter-spacing: 0; }
+  [dir="rtl"] .eyebrow { font-size: 0.875rem; letter-spacing: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

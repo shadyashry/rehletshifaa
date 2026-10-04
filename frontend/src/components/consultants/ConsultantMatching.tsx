@@ -66,11 +66,11 @@ export function ConsultantMatching({ stages, criteria, matched, initials, label 
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {initials.map((mark, index) =>
                 index === 0 ? (
-                  <span key={`${mark}-${index}`} className="relative grid h-9 w-9 place-items-center rounded-full bg-brand-700 text-[0.68rem] font-semibold tracking-[0.03em] text-white ring-4 ring-brand-100">
+                  <span key={`${mark}-${index}`} className="relative grid h-9 w-9 place-items-center rounded-full bg-brand-700 text-[0.75rem] font-semibold tracking-[0.03em] text-white ring-4 ring-brand-100">
                     {mark}
                   </span>
                 ) : (
-                  <span key={`${mark}-${index}`} className="grid h-9 w-9 place-items-center rounded-full bg-surface-pearl text-[0.68rem] font-semibold tracking-[0.03em] text-ink-400 ring-1 ring-border-subtle">
+                  <span key={`${mark}-${index}`} className="grid h-9 w-9 place-items-center rounded-full bg-surface-pearl text-[0.75rem] font-semibold tracking-[0.03em] text-ink-400 ring-1 ring-border-subtle">
                     {mark}
                   </span>
                 ),

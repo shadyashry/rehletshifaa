@@ -32,7 +32,7 @@ export function CtaPanel({
           <div className="grid items-center gap-5 rounded-[14px] border border-sand-200 bg-surface-warm px-6 py-6 md:grid-cols-[minmax(0,1fr)_auto] md:gap-10 md:px-9 md:py-7">
             <div>
               <h2 className="text-[1.375rem] font-semibold leading-tight tracking-[-0.015em] text-brand-900 rtl:leading-snug rtl:tracking-normal sm:text-[1.5rem]">{title}</h2>
-              <p className="mt-1.5 max-w-[52ch] text-[0.95rem] leading-6 text-ink-600 sm:text-[1rem] sm:leading-7">{body}</p>
+              <p className="mt-1.5 max-w-[52ch] text-[0.9375rem] leading-6 text-ink-600 sm:text-[1rem] sm:leading-7">{body}</p>
             </div>
             <TrackedLink event="send_case_cta_clicked" className="btn-primary w-full md:w-auto" href={localeHref(locale, "send-my-case")}>
               {button}
@@ -53,7 +53,7 @@ export function CtaPanel({
               <h2 className="text-[1.375rem] font-semibold leading-tight tracking-[-0.02em] rtl:leading-snug rtl:tracking-normal sm:text-[1.5rem] lg:text-[1.75rem]">
                 {title}
               </h2>
-              <p className="mt-1.5 max-w-xl text-[0.95rem] leading-6 text-white sm:text-[1rem] sm:leading-7">{body}</p>
+              <p className="mt-1.5 max-w-xl text-[0.9375rem] leading-6 text-white sm:text-[1rem] sm:leading-7">{body}</p>
             </div>
             <div className="md:text-end">
               <TrackedLink event="send_case_cta_clicked" className="btn-inverse w-full md:w-auto" href={localeHref(locale, "send-my-case")}>

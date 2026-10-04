@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Clock3, Languages, ShieldCheck, Stethoscope } from "lucide-react";
+import { ArrowRight, Check, HandHeart, Languages, Stethoscope, UserRoundCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -25,14 +25,17 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
     : "A patient listening as a Consultant calmly explains his medical report, with the care coordinator present";
 
   const trust = arabic
-    ? [[Stethoscope, "مراجعة بقيادة استشاري"], [Clock3, "خطوات واضحة قبل السفر"], [Languages, "دعم عربي وإنجليزي"], [ShieldCheck, "تداول خاص للمستندات"]] as const
-    : [[Stethoscope, "Consultant-led review"], [Clock3, "Clear steps before travel"], [Languages, "Arabic & English support"], [ShieldCheck, "Private document handling"]] as const;
+    ? [[Stethoscope, "مراجعة بقيادة استشاري"], [UserRoundCheck, "منسّق واحد طوال الرحلة"], [Languages, "بالعربية والإنجليزية"], [HandHeart, "لا التزام عند البدء"]] as const
+    : [[Stethoscope, "Consultant-led review"], [UserRoundCheck, "One coordinator throughout"], [Languages, "Arabic & English"], [HandHeart, "No commitment to start"]] as const;
 
   return (
     <section className="bg-surface-pearl">
       <div className="container-site grid gap-8 py-8 sm:gap-9 sm:py-10 lg:grid-cols-[minmax(0,53fr)_minmax(0,47fr)] lg:items-center lg:gap-16 lg:py-16">
         <div className="max-w-[34rem]">
-          <p className="eyebrow">{d.home.eyebrow}</p>
+          <p className="flex items-center gap-2 text-[0.9375rem] font-semibold leading-6 text-brand-700">
+            <span aria-hidden className="h-1.5 w-1.5 flex-none rounded-full bg-brand-400" />
+            {d.home.eyebrow}
+          </p>
           <h1 className="display mt-2.5 [text-wrap:balance] sm:mt-3">{d.home.title}</h1>
           <p className="lead mt-4 max-w-[52ch] sm:mt-5">{d.home.intro}</p>
 
@@ -42,13 +45,13 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
               {d.home.primaryAction}
               <ArrowRight size={17} aria-hidden="true" className="rtl:-scale-x-100" />
             </TrackedLink>
-            <Link className="link-cta text-[0.95rem] sm:hidden" href="#how-it-works">{d.home.watchJourney}</Link>
+            <Link className="link-cta text-[0.9375rem] sm:hidden" href="#how-it-works">{d.home.watchJourney}</Link>
             <Link className="btn-secondary hidden sm:inline-flex" href="#how-it-works">{d.home.watchJourney}</Link>
           </div>
 
-          <div className="mt-7 border-t border-border-subtle pt-5 sm:mt-8">
-            <p className="text-[0.95rem] font-semibold leading-6 text-brand-800">{d.home.slogan}</p>
-            <p className="mt-1 max-w-[56ch] text-[0.85rem] leading-5 text-ink-500">{d.home.preliminaryNotice}</p>
+          <div className="mt-7 border-s-[3px] border-brand-400 ps-4 sm:mt-8">
+            <p className="text-[1.0625rem] font-semibold leading-7 text-brand-900 [text-wrap:balance]">{d.home.slogan}</p>
+            <p className="mt-1 max-w-[56ch] text-[0.875rem] leading-6 text-ink-500">{d.home.preliminaryNotice}</p>
           </div>
         </div>
 
@@ -66,7 +69,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
             />
           </div>
           <figcaption className="relative z-[1] -mt-5 mx-4 rounded-[12px] border border-border-subtle bg-surface-elevated px-4 py-3.5 shadow-[0_10px_30px_-24px_rgba(28,51,58,0.35)] sm:mx-8 sm:px-5 sm:py-4 lg:mx-6">
-            <p className="text-[0.9rem] font-semibold text-brand-900">{d.home.heroCardTitle}</p>
+            <p className="text-[0.875rem] font-semibold text-brand-900">{d.home.heroCardTitle}</p>
             <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
               {d.home.prepareItems.map((item) => (
                 <li key={item} className="flex items-center gap-1.5 text-[0.875rem] leading-6 text-ink-600">
@@ -75,7 +78,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
                 </li>
               ))}
             </ul>
-            <p className="mt-1 text-[0.85rem] leading-5 text-ink-500">{d.home.reassurance}</p>
+            <p className="mt-1 text-[0.875rem] leading-5 text-ink-500">{d.home.reassurance}</p>
           </figcaption>
         </figure>
       </div>

@@ -88,7 +88,7 @@ export function CareNetwork({ areas, rtl, label, center, jump }: {
         <span aria-hidden className="absolute inset-0 rounded-full bg-brand-400 motion-safe:animate-[care-pulse_3.6s_ease-out_infinite]" />
         <span className="relative grid h-full w-full place-content-center justify-items-center gap-1 rounded-full bg-brand-700 text-center text-white shadow-[0_14px_30px_-14px_rgba(31,107,115,0.7)] ring-4 ring-surface-pearl">
           <FileHeart aria-hidden className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.6} />
-          <span className="px-2 text-[0.72rem] font-semibold leading-tight sm:text-[0.8125rem]">{center}</span>
+          <span className="px-2 text-[0.8125rem] font-semibold leading-tight sm:text-[0.8125rem]">{center}</span>
         </span>
       </div>
 
@@ -106,7 +106,7 @@ export function CareNetwork({ areas, rtl, label, center, jump }: {
           >
             <span aria-hidden className={`absolute inset-[3px] rounded-full opacity-70 ${system.well}`} />
             <CareAreaIcon name={area.icon} className="relative h-[18px] w-[18px] sm:h-5 sm:w-5" strokeWidth={1.7} />
-            <span aria-hidden className="absolute left-1/2 top-full mt-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-full bg-surface-pearl/85 px-1.5 text-[0.72rem] font-medium leading-5 text-ink-600 transition-colors group-hover/node:text-brand-800 sm:block">
+            <span aria-hidden className="absolute left-1/2 top-full mt-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-full bg-surface-pearl/85 px-1.5 text-[0.8125rem] font-medium leading-5 text-ink-600 transition-colors group-hover/node:text-brand-800 sm:block">
               {area.short}
             </span>
           </a>

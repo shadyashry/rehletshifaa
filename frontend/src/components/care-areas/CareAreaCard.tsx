@@ -36,8 +36,8 @@ export function CareAreaCard({ area, href, action, consultantsLabel, wide }: {
         <CareAreaIcon name={area.icon} size={22} strokeWidth={1.7} />
       </span>
 
-      <h4 className="mt-5 text-[1.1875rem] font-semibold leading-[1.3] tracking-[-0.01em] text-brand-900 [text-wrap:balance] rtl:tracking-normal sm:text-[1.25rem]">{area.title}</h4>
-      <p className={`mt-2 text-[0.95rem] leading-6 text-ink-600 sm:text-[1rem] sm:leading-7 ${wide ? "max-w-[62ch]" : ""}`}>{area.body}</p>
+      <h4 className="mt-5 text-[1.25rem] font-semibold leading-[1.3] tracking-[-0.01em] text-brand-900 [text-wrap:balance] rtl:tracking-normal sm:text-[1.25rem]">{area.title}</h4>
+      <p className={`mt-2 text-[0.9375rem] leading-6 text-ink-600 sm:text-[1rem] sm:leading-7 ${wide ? "max-w-[62ch]" : ""}`}>{area.body}</p>
 
       <p className="mt-4 flex flex-wrap gap-1.5">
         {area.facets.map((facet) => (
@@ -54,18 +54,18 @@ export function CareAreaCard({ area, href, action, consultantsLabel, wide }: {
             <div className="flex items-center gap-2.5">
               <span aria-hidden className="flex -space-x-2 rtl:space-x-reverse">
                 {shown.map((profile) => (
-                  <span key={profile.slug} className={`grid h-8 w-8 place-items-center rounded-full text-[0.68rem] font-semibold tracking-[0.03em] text-brand-800 ring-2 ring-surface-default ${system.well}`}>
+                  <span key={profile.slug} className={`grid h-8 w-8 place-items-center rounded-full text-[0.75rem] font-semibold tracking-[0.03em] text-brand-800 ring-2 ring-surface-default ${system.well}`}>
                     {profile.initials}
                   </span>
                 ))}
                 {more > 0 ? (
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-surface-pearl text-[0.68rem] font-semibold text-ink-600 ring-2 ring-surface-default">+{more}</span>
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-surface-pearl text-[0.75rem] font-semibold text-ink-600 ring-2 ring-surface-default">+{more}</span>
                 ) : null}
               </span>
               <span className="text-[0.8125rem] font-medium leading-5 text-ink-500">{consultantsLabel}</span>
             </div>
           ) : <span />}
-          <Link href={href} className="link-cta min-h-11 text-[0.95rem] after:absolute after:inset-0">
+          <Link href={href} className="link-cta min-h-11 text-[0.9375rem] after:absolute after:inset-0">
             {action}
             <span className="sr-only"> — {area.title}</span>
             <ArrowRight size={16} aria-hidden="true" className="transition-transform group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
