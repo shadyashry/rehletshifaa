@@ -656,6 +656,61 @@ WF-09 removal of `COORDINATOR_LEAD` bypasses; and a Control Center UI.
   secure-journey and patient-activation classes passed on immediate focused rerun; the notification hand-back test
   still fails independently and is not changed by this slice.
 
+## Claude QA and fix pass — handoff to Codex (2026-10-04, commits `04e2175`, `0879859`, pushed)
+
+Detail: `qa-deep-test-report-2026-10-04.md` (§2 findings, §7 fixes, §8 ownership UI). Everything below is committed on
+`codex/platform-control-plane`. Backend: 544 tests, 0 failures, 0 errors, 1 skipped (`mvn -o -q test`). Frontend:
+`pnpm typecheck` PASS; the only red Vitest file is the known `ProposalSign.test.tsx` (11, unrelated).
+
+### Test infrastructure (read first)
+- Since A8, every step-up `Permission` needs `acr` in `app.security.mfa-acr-values` (2,3), and a System
+  Administrator needs 3. Test sign-ins without an `acr` claim are now refused. 44 tests had silently gone red for this
+  reason. They were fixed in the access-hygiene, staff-lifecycle, role-assignment, journey-definition and
+  patient-identity suites.
+  - **Rule:** every new test JWT sets `acr` ("2" for staff, "3" when the actor holds `SYSTEM_ADMINISTRATOR` or is the
+    owner).
+- New regression suites:
+  - `qa/PlatformUsersDeepQaTest` (13): the whole onboarding chain, SoD/escalation, step-up matrix, lifecycle ×
+    authority, WF-12, re-invite, owner decisions, owner/admin separation, and the full ownership handover.
+  - `qa/JourneyGovernanceDeepQaTest` (8).
+  - `IdentityOperationReinviteExecutionTest` (3).
+  - Frontend: `JourneyDesignerQa.test.tsx` (12) and `GovernancePages.test.tsx` (7).
+- After changing a main API, run `rm -rf target/test-classes` before compiling tests.
+
+### Behaviour and contract changes
+
+| Area | Change | Where |
+|---|---|---|
+| Re-invite (QA-01) | `invite()` on an address whose person is CANCELLED/EXPIRED/OFFBOARDED reuses that person and identity (`email_hash` is UNIQUE). It inserts a new invitation, then `reopenForInvitation` sets it SENT, puts the person back to INVITED with access off and MFA evidence cleared, and adds roles (source INVITATION). It returns `subject` and revision 1. A pending identity operation for the subject gives 409 `IDENTITY_OPERATION_PENDING`. Audit: `STAFF_REINVITED`. `emailInUse` now ignores closed lifecycles. | `StaffLifecycleService.reinvite`, `StaffLifecycleStore` |
+| Re-invite operation | There is no new operation type (V55 untouched). `IdentityOperationRequested.reinvite` produces `RESEND_INVITE` with payload `reopen=true`, `resetMfa=true|false` (true for OFFBOARDED). The executor runs `setEnabled(true)`, then `resetMfa`, then `resend`. A plain resend is unchanged. | `IdentityOperationExecutor` (`Payload` gained `reopen`, `resetMfa`) |
+| Owner decides admin changes (QA-02) | `approve`/`reject` of administrator change requests accept the **current owner** via `GovernanceAuthentication.requireRecentPhishingResistant()` (no role needed); otherwise `ACCESS_GOVERN`. `request()` stays admin-only. `overview()` is readable by the owner and now returns `names` (subject → display name). | `PlatformAccessGovernanceService` |
+| QA-14 | `@Transactional` sat on the `Overview` record, so `request()` had no transaction. It is now on `request()`. | same |
+| `/me` | The owner always gets `CONTROL_CENTER`. A named incoming owner of a PENDING_ACCEPTANCE transfer gets `CONTROL_CENTER` plus pending action `ACCEPT_PLATFORM_OWNERSHIP`. | `EffectiveAccessService` |
+| Owner/admin separation (QA-03) | 409 `OWNER_ADMINISTRATOR_SEPARATION_REQUIRED`: transfer initiate/accept/verify when the incoming owner holds any active or scheduled admin assignment; admin APPOINT request or approval naming the current owner. | `PlatformOwnerTransferService`, `PlatformAccessGovernanceService` |
+| Ownership read and stop | `GET /owner-transfers` returns `Ownership{currentOwner, viewerIsOwner, viewerIsAdministrator, canInitiate, transfers[TransferView{…, canAccept, canVerify, canWithdraw, canDecline}]}`. Readable by the owner, `ACCESS_GOVERN` holders and the incoming owner (only their own); expired pending transfers show as EXPIRED. `POST /owner-transfers/{id}/reject {revision, reason}` sets REJECTED, decided by who calls (see note below). Initiate also accepts `incomingOwnerEmail`, resolved via `WorkforceDirectory.subjectByEmailHash`: 404 `OWNER_CANDIDATE_NOT_FOUND`. | `PlatformOwnerTransferService/Store/Controller` |
+| SLA (QA-04) | `JourneyGraphValidator.SLA_SUPPORTED=false`, so any node SLA is error `SLA_NOT_SUPPORTED` (the compiler guard remains). Metadata gains `slaSupported`. | validator, `JourneyDefinitionService.RegistryMetadata` |
+| Metadata (QA-05) | `cyclePolicy` is now `GOVERNED_RECOVERY_LOOPS`. | `JourneyDefinitionService` |
+| Prerequisites (QA-06) | `JourneyStageRegistry.Capability` gained `dependsOn` (replacing nothing; the record shape changed). A must-happen-before data-flow over all paths emits **warning** `ACTION_PREREQUISITE`. It is a warning because ordinary case actions remain available for journey-bound cases; making it blocking needs that product decision first. | registry, validator |
+| Frontend journey | Return-to-draft is gated on `JOURNEY_APPROVE` (QA-07). The map (`JourneyGraphCanvas`) is a drag-and-drop editor when editable (QA-08): palette drop/click, `onConnect` via `connectByDrag` rules, `onDelete`, session-only positions. Warnings render in the warning style. The SLA editor is hidden unless `slaSupported`. | `JourneyGraphCanvas`, `JourneyDesigner`, `journey-graph-utils.connectByDrag` |
+| Frontend governance | The Administrators page is open to the owner with decide-only actions. New **Platform Ownership** page `/control-center/ownership` (nav key `ownership`), with a Home attention item. `isReauthenticationCode` also treats `PHISHING_RESISTANT_AUTHENTICATION_REQUIRED` as a sign-in prompt. | `GovernancePages`, `control-center-nav`, `ControlCenterOverview`, `lib/reauthentication` |
+
+Note on `reject`: it records `PLATFORM_OWNER_TRANSFER_WITHDRAWN` when the current owner calls it,
+`PLATFORM_OWNER_TRANSFER_DECLINED` when the incoming owner calls it before accepting, and
+`PLATFORM_OWNER_TRANSFER_VERIFICATION_REFUSED` when an independent `ACCESS_GOVERN` holder calls it at
+PENDING_VERIFICATION. Anyone else gets 403 `OWNER_TRANSFER_PARTY_REQUIRED`.
+
+No migration was added or edited. The dev DB does not need recreating.
+
+### Open, not defects (need a decision or a feature; do not start without one)
+- **QA-09:** `TEAM_MANAGE` exists only for Care Coordination and Consultant Operations, so Operations, Finance and the
+  other functions cannot have teams, leads or `SUPERVISED` scope.
+- **QA-10:** live admission still needs `JOURNEY_RUNTIME_ENABLED`, `…PRODUCTION_INTAKE_ENABLED` and a cutover policy,
+  plus a restart. Dev has none of them, no journey, and no Journey Manager or Approver.
+- **QA-11:** SOD-05 and the STF-04/05 review queue (`IDENTITY_REVIEW_REQUIRED` is a dead end).
+- **QA-12:** the Care Coordination Manager has no `CASE_READ`.
+- **QA-13:** UAT seeds are missing for the Journey, Auditor, Support and Identity-review roles.
+- The incoming owner must already be a workforce person. OD-02 recovery is still unavailable.
+
 ## Next Section 1 slice
 
 **Resume here (2026-09-26, direction changed):** the owner rejected mapping onto legacy structures. Build the
@@ -890,8 +945,10 @@ authority and authentication-strength cutover:
     - focused live Playwright replay/disable journey: **1 PASS** in 1.7 minutes; frontend typecheck: PASS. The normal
       backend configuration was restored and is healthy without the temporary restore-id override.
 
-**Next exact action:** Section 1 slices A1–A8 and their requested live identity evidence are complete at this
-checkpoint. Preserve the worktree and review the final targeted diff/status. Do not start the Practice Manager
+**Next exact action:** Section 1 slices A1–A8, the 2026-10-04 Claude QA/fix pass and the Platform Ownership page are
+complete and pushed. Read "Claude QA and fix pass — handoff to Codex" above before touching access, journey-designer or
+test fixtures (the `acr` rule). Pick the next item only from its open list, once the owner decides it. Preserve the
+worktree and review the final targeted diff/status. Do not start the Practice Manager
 identity path until its consent state machine exists, and do not implement OD-02 recovery without the required
 product/operational decision. Run broader backend or full live-tunnel verification only if requested before commit.
 
