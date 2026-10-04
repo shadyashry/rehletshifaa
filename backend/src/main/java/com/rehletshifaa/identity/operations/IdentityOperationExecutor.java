@@ -38,7 +38,6 @@ public class IdentityOperationExecutor {
                 succeed(operation);
             }
             case CREATE_STAFF, CREATE_PRACTITIONER -> create(operation);
-            case RESOLVE_PRACTICE_MANAGER -> resolvePracticeManager(operation);
         }
     }
 
@@ -61,23 +60,6 @@ public class IdentityOperationExecutor {
                     payload.compatibilityRole());
         }
         completion.created(operation, account.subject());
-    }
-
-    private void resolvePracticeManager(IdentityOperationStore.Operation operation) {
-        Payload payload = payload(operation);
-        var resolution = identities.resolveVerifiedEmail(payload.email());
-        if (resolution.status() == IdentityProvisioningPort.EmailResolution.Status.REVIEW_REQUIRED) {
-            completion.practiceManagerIdentityConflict(operation);
-            return;
-        }
-        if (resolution.status() == IdentityProvisioningPort.EmailResolution.Status.UNIQUE_VERIFIED) {
-            completion.practiceManagerIdentityReady(operation, resolution.subject());
-            return;
-        }
-        var recovered = identities.recover(operation.idempotencyKey());
-        IdentityProvisioningPort.IdentityAccount account = recovered.orElseGet(() -> identities.inviteTracked(
-                payload.name(), payload.email(), payload.locale(), operation.idempotencyKey()));
-        completion.practiceManagerIdentityReady(operation, account.subject());
     }
 
     private Payload payload(IdentityOperationStore.Operation operation) {

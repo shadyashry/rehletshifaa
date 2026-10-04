@@ -7,7 +7,7 @@ import java.util.UUID;
 public record IdentityOperationRequested(UUID id, String idempotencyKey, String targetSubject, Type type,
                                          String requestedBy, String reason, String correlationId,
                                          String targetType, UUID targetId, Map<String,String> payload) {
-    public enum Type { CREATE_STAFF, CREATE_PRACTITIONER, RESOLVE_PRACTICE_MANAGER, RESEND_INVITE, ENABLE_USER, DISABLE_USER_AND_LOGOUT, RESET_PASSWORD, RESET_MFA }
+    public enum Type { CREATE_STAFF, CREATE_PRACTITIONER, RESEND_INVITE, ENABLE_USER, DISABLE_USER_AND_LOGOUT, RESET_PASSWORD, RESET_MFA }
 
     /** SUP-02/SUP-03: a password-reset email or an MFA reset (credentials removed, sessions ended). */
     public static IdentityOperationRequested reset(UUID id, String key, String subject, Type type, String requestedBy,
@@ -32,8 +32,7 @@ public record IdentityOperationRequested(UUID id, String idempotencyKey, String 
 
     public static IdentityOperationRequested create(UUID id, String key, Type type, String requestedBy,
             String reason, String targetType, UUID targetId, Map<String,String> payload) {
-        if (type != Type.CREATE_STAFF && type != Type.CREATE_PRACTITIONER && type != Type.RESOLVE_PRACTICE_MANAGER)
-            throw new IllegalArgumentException("Not a create or resolution operation");
+        if (type != Type.CREATE_STAFF && type != Type.CREATE_PRACTITIONER) throw new IllegalArgumentException("Not a create operation");
         return new IdentityOperationRequested(id, key, null, type, requestedBy, reason, id.toString(), targetType, targetId, payload);
     }
 }

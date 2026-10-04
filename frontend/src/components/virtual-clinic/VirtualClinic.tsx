@@ -46,7 +46,7 @@ const copy = {
     teamLead: "Practice managers help with administration only. They never see patients, cases, medical documents, messages or clinical decisions.",
     noManagers: "No practice managers yet.", invite: "Invite a practice manager", name: "Full name", email: "Work email", invitePerson: "Send invitation",
     permissions: { SCHEDULE: "Manage schedule", PROFILE: "Prepare public profile", SERVICES: "Prepare services & prices" } as Record<ClinicPermission, string>,
-    savePermissions: "Save permissions", revoke: "Revoke access", reinstate: "Request renewed consent", revoked: "Revoked", activeManager: "Active", invitedManager: "Awaiting acceptance", pendingConsent: "Pending renewed consent", resendInvitation: "Resend invitation", cancelInvitation: "Cancel invitation",
+    savePermissions: "Save permissions", revoke: "Revoke access", reinstate: "Reinstate", revoked: "Revoked", activeManager: "Active",
     historyLead: "Every change made in your virtual clinic, and who made it.", noHistory: "No changes recorded yet.", you: "Consultant", manager: "Practice manager",
   },
   ar: {
@@ -81,7 +81,7 @@ const copy = {
     teamLead: "يساعد مديرو العيادة في الأعمال الإدارية فقط، ولا يرون المرضى أو الحالات أو المستندات الطبية أو الرسائل أو القرارات السريرية.",
     noManagers: "لا يوجد مديرو عيادة بعد.", invite: "دعوة مدير عيادة", name: "الاسم الكامل", email: "البريد الإلكتروني للعمل", invitePerson: "إرسال الدعوة",
     permissions: { SCHEDULE: "إدارة الجدول", PROFILE: "إعداد الملف العام", SERVICES: "إعداد الخدمات والأسعار" } as Record<ClinicPermission, string>,
-    savePermissions: "حفظ الصلاحيات", revoke: "إلغاء الوصول", reinstate: "طلب موافقة جديدة", revoked: "ملغى", activeManager: "نشط", invitedManager: "بانتظار القبول", pendingConsent: "بانتظار موافقة جديدة", resendInvitation: "إعادة إرسال الدعوة", cancelInvitation: "إلغاء الدعوة",
+    savePermissions: "حفظ الصلاحيات", revoke: "إلغاء الوصول", reinstate: "إعادة التفعيل", revoked: "ملغى", activeManager: "نشط",
     historyLead: "كل تغيير في عيادتك الافتراضية ومن أجراه.", noHistory: "لا توجد تغييرات مسجّلة بعد.", you: "الاستشاري", manager: "مدير العيادة",
   },
 };
@@ -396,14 +396,13 @@ function Team({ t, clinic, locale, base, run }: { t: Copy; clinic: Clinic; local
     <section className="card p-4 sm:p-5" aria-label={t.sections.team}>
       {clinic.managers.length === 0 ? <p className="text-sm text-ink-500">{t.noManagers}</p> :
         <ul className="divide-y divide-line">{clinic.managers.map(m => {
-          const perms = drafts[m.id] ?? m.pendingPermissions ?? m.permissions;
+          const perms = drafts[m.id] ?? m.permissions;
           const active = m.status === "ACTIVE";
-          const invited = m.status === "INVITED";
           return <li key={m.id} className="py-3 text-sm">
-            <p><strong>{m.name}</strong>{m.email ? ` · ${m.email}` : ""} · {invited ? t.invitedManager : active ? t.activeManager : t.revoked}{m.pendingPermissions ? ` · ${t.pendingConsent}` : ""}</p>
+            <p><strong>{m.name}</strong>{m.email ? ` · ${m.email}` : ""} · {active ? t.activeManager : t.revoked}</p>
             <div className="mt-2 flex flex-wrap gap-4">{PERMISSIONS.map(p => <label key={p} className="flex items-center gap-1.5"><input type="checkbox" checked={perms.includes(p)} onChange={() => toggle(m.id, perms, p)}/>{t.permissions[p]}</label>)}</div>
             <div className="mt-2 flex flex-wrap gap-2">
-              {invited ? <><button type="button" className="btn-secondary" onClick={() => void run(`${base}/invitations/${m.id}/resend`, "POST", { expectedVersion: m.version })}>{t.resendInvitation}</button><button type="button" className="btn-secondary" onClick={() => void run(`${base}/invitations/${m.id}/cancel`, "POST", { expectedVersion: m.version })}>{t.cancelInvitation}</button></> : <button type="button" className="btn-secondary" disabled={!!m.pendingPermissions} onClick={() => void run(`${base}/managers/${m.id}`, "PUT", { permissions: perms, active: true, expectedVersion: m.version })}>{active ? t.savePermissions : t.reinstate}</button>}
+              <button type="button" className="btn-secondary" onClick={() => void run(`${base}/managers/${m.id}`, "PUT", { permissions: perms, active: true, expectedVersion: m.version })}>{active ? t.savePermissions : t.reinstate}</button>
               {active && <button type="button" className="btn-secondary" onClick={() => void run(`${base}/managers/${m.id}`, "PUT", { permissions: [], active: false, expectedVersion: m.version })}>{t.revoke}</button>}
             </div>
           </li>;

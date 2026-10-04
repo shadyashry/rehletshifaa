@@ -17,12 +17,15 @@ export function LocaleSwitch({
   ariaLabel,
   className = "",
   onClick,
+  tone = "light",
 }: {
   locale: Locale;
   label: string;
   ariaLabel: string;
   className?: string;
   onClick?: () => void;
+  /** "dark": on the ink utility bar. */
+  tone?: "light" | "dark";
 }) {
   const pathname = usePathname();
   const target = alternateLocale(locale);
@@ -34,7 +37,7 @@ export function LocaleSwitch({
       lang={target}
       aria-label={ariaLabel}
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-ink-600 transition-colors hover:bg-brand-50 hover:text-brand-700 ${className}`}
+      className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${tone === "dark" ? "text-white/85 hover:bg-white/10 hover:text-white" : "text-ink-600 hover:bg-brand-50 hover:text-brand-700"} ${className}`}
     >
       <Languages size={17} aria-hidden="true" />
       {label}

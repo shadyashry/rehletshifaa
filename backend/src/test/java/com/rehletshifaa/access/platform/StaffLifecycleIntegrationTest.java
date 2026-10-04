@@ -99,27 +99,6 @@ class StaffLifecycleIntegrationTest {
     }
 
     @Test
-    void invitationAndJobChangePreserveCompatibleMultipleRolesIndependently() {
-        var invitation = staff.invite(new Invite("Lean Operator", "lean.operator@example.test", "en",
-                List.of("COORDINATOR", "OPERATIONS"), "Lean staffing"));
-        assertThat(invitation.roles()).containsExactly("COORDINATOR", "OPERATIONS");
-
-        var managerInvitation = staff.invite(new Invite("Cross Function Manager", "cross.manager@example.test", "en",
-                List.of("CONSULTANT_OPERATIONS_MANAGER", "CARE_COORDINATION_MANAGER"), "Lean management"));
-        assertThat(managerInvitation.roles()).containsExactly("CONSULTANT_OPERATIONS_MANAGER", "CARE_COORDINATION_MANAGER");
-
-        new WorkforceTestData(jdbc, crypto, clock.instant()).person("multi-role-mover", "COORDINATOR", "FINANCE");
-        var changed = staff.changeJob("multi-role-mover", new JobChange(0, List.of(), List.of("COORDINATOR"),
-                "Leaves coordination but keeps finance"));
-        assertThat(changed.roles()).containsExactly("FINANCE");
-        var held = authority.held(new com.rehletshifaa.authority.application.Principal("multi-role-mover", clock.instant(), null));
-        assertThat(held.roles()).contains(com.rehletshifaa.authority.domain.Role.FINANCE)
-                .doesNotContain(com.rehletshifaa.authority.domain.Role.COORDINATOR);
-        assertThat(held.platformPermissions()).contains(com.rehletshifaa.authority.domain.Permission.COMMERCIAL_POLICY_READ)
-                .doesNotContain(com.rehletshifaa.authority.domain.Permission.COORDINATION_QUEUE);
-    }
-
-    @Test
     void cancelledAndExpiredInvitationsCloseThePersonAndQueueIdentityDisablement() {
         var cancelled = staff.invite(new Invite("C", "c@example.test", "en", List.of("FINANCE"), "r"));
         complete(cancelled.id(), "cancelled-subject");
@@ -137,23 +116,17 @@ class StaffLifecycleIntegrationTest {
 
     @Test
     void disableEndsAuthorityImmediatelyAndRestoreNeverReopensOffboarding() {
-        new WorkforceTestData(jdbc, crypto, clock.instant()).person("worker", "FINANCE", "COORDINATOR");
+        new WorkforceTestData(jdbc, crypto, clock.instant()).person("worker", "FINANCE");
         var disabled = staff.disable("worker", new Change(0, "Security review"));
         assertThat(disabled.lifecycle()).isEqualTo("SIGNIN_DISABLED");
-        assertThat(authority.held(new com.rehletshifaa.authority.application.Principal("worker", clock.instant(), null)).roles())
-                .as("a stale identity token retains only the non-business account-holder baseline")
-                .containsExactly(com.rehletshifaa.authority.domain.Role.ACCOUNT_HOLDER);
+        assertThat(authority.held(new com.rehletshifaa.authority.application.Principal("worker", clock.instant(), null)).roles()).doesNotContain(com.rehletshifaa.authority.domain.Role.FINANCE);
         assertThat(disableQueued("worker")).isTrue();
         assertCode("SELF_LIFECYCLE_CHANGE", () -> staff.disable(admin, new Change(0, "Self")));
 
         var restored = staff.restore("worker", new Change(disabled.revision(), "Review closed"));
-        assertThat(authority.held(new com.rehletshifaa.authority.application.Principal("worker", clock.instant(), null)).roles())
-                .contains(com.rehletshifaa.authority.domain.Role.FINANCE, com.rehletshifaa.authority.domain.Role.COORDINATOR);
+        assertThat(authority.held(new com.rehletshifaa.authority.application.Principal("worker", clock.instant(), null)).roles()).contains(com.rehletshifaa.authority.domain.Role.FINANCE);
 
         staff.startOffboarding("worker", new Change(restored.revision(), "Leaving"));
-        assertThat(authority.held(new com.rehletshifaa.authority.application.Principal("worker", clock.instant(), null)).roles())
-                .as("offboarding removes every workforce business role on the next decision")
-                .containsExactly(com.rehletshifaa.authority.domain.Role.ACCOUNT_HOLDER);
         long revision = jdbc.queryForObject("SELECT revision FROM workforce_people WHERE subject='worker'", Long.class);
         assertCode("INVALID_LIFECYCLE_TRANSITION", () -> staff.restore("worker", new Change(revision, "Undo")));
     }
@@ -224,7 +197,7 @@ class StaffLifecycleIntegrationTest {
     }
 
     private void authenticate(String subject) {
-        var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", clock.instant()).claim("acr", "3").build();
+        var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", clock.instant()).build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(token, List.of()));
     }
 }

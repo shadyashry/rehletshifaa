@@ -33,13 +33,6 @@ public final class TestPrincipals {
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(token, List.of(), subject));
     }
 
-    public static void signInWithEmail(String subject, String email, boolean verified, String acr) {
-        Instant now = Instant.now();
-        var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject)
-                .claim("auth_time", now).claim("acr", acr).claim("email", email).claim("email_verified", verified).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(token, List.of(), subject));
-    }
-
     /** Records the facts for {@code roles} (idempotently) and signs in as {@code subject}. */
     public static void signIn(JdbcTemplate jdbc, CryptoService crypto, String subject, Role... roles) {
         for (Role role : roles) grant(jdbc, crypto, subject, role);

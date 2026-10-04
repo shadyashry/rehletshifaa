@@ -5,10 +5,11 @@ import { notFound } from "next/navigation";
 import { CaseRouter } from "@/components/care-areas/CaseRouter";
 import { ConsultantMatching } from "@/components/consultants/ConsultantMatching";
 import { ConsultantPanel, type PanelEntry } from "@/components/consultants/ConsultantPanel";
+import { HeroStats } from "@/components/HeroStats";
 import { PageHero } from "@/components/PageHero";
 import { TrackedLink } from "@/components/TrackedLink";
 import { CARE_SYSTEMS, careAreaMeta } from "@/lib/care-area-catalog";
-import { consultantUi, getConsultants } from "@/lib/consultants";
+import { consultantUi, getConsultants, universityFacultySlugs } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -45,11 +46,10 @@ export default async function Consultants({ params }: Props) {
   });
   const systems = CARE_SYSTEMS.filter((key) => entries.some((entry) => entry.system === key)).map((key) => ({ key, title: d.careAreasPage.systems[key].title }));
 
-  // Facts, derived — the English roles are the source of record for academic appointments in both locales.
-  const academic = new Set(getConsultants("en").filter((p) => /professor|lecturer/i.test(p.role)).map((p) => p.slug));
+  const faculty = universityFacultySlugs();
   const stats = [
     { value: entries.length, label: page.stats.consultants },
-    { value: entries.filter((entry) => academic.has(entry.profile.slug)).length, label: page.stats.faculty },
+    { value: entries.filter((entry) => faculty.has(entry.profile.slug)).length, label: page.stats.faculty },
     { value: new Set(entries.map((entry) => entry.profile.careAreaHref)).size, label: page.stats.areas },
   ];
 
@@ -70,14 +70,7 @@ export default async function Consultants({ params }: Props) {
           />
         }
       >
-        <dl className="grid max-w-[34rem] grid-cols-3 divide-x divide-border-subtle border-y border-border-subtle rtl:divide-x-reverse">
-          {stats.map((stat) => (
-            <div key={stat.label} className="flex flex-col-reverse gap-1 px-3 py-4 first:ps-0 sm:px-5">
-              <dt className="text-[0.75rem] leading-4 text-ink-500 sm:text-[0.8125rem] sm:leading-5">{stat.label}</dt>
-              <dd className="text-[1.5rem] font-semibold leading-none tracking-[-0.02em] text-brand-900 tabular-nums sm:text-[1.875rem]">{stat.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <HeroStats stats={stats} />
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
           <TrackedLink event="send_case_cta_clicked" className="btn-primary w-full sm:w-auto" href={localeHref(locale, "send-my-case")}>
             {d.common.send}

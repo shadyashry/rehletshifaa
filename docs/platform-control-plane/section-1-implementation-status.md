@@ -845,110 +845,10 @@ authority and authentication-strength cutover:
     - focused live Playwright replay/disable journey: **1 PASS** in 1.7 minutes; frontend typecheck: PASS. The normal
       backend configuration was restored and is healthy without the temporary restore-id override.
 
-**PRACTICE MANAGER CONSENT AND IDENTITY PATH IMPLEMENTATION COMPLETE (2026-09-28)** — the previously gated
-per-Consultant delegation path now has its application-owned consent state machine:
-- V64 adds hashed, single-use, configured-seven-day invitations; immutable delegation history; recorded inviter,
-  requested permission set, accepting subject, MFA ACR and acceptance timestamp; and Consultant lifecycle state.
-- Invitations grant no authority. Acceptance requires the exact resolved subject, the verified invited email and
-  recent MFA. Exact verified existing identities are adopted; ambiguous or unverified identity matches fail closed
-  for review. Identity lookup/create runs through the durable identity-operation worker, not the business
-  transaction.
-- Delegations remain separate per Consultant and are limited to `SCHEDULE`, `PROFILE` and `SERVICES`. Permission
-  widening and reinstatement remain pending until renewed acceptance; narrowing and revocation take effect
-  immediately. Revocation of one Consultant's delegation does not affect another.
-- Invitation cancellation, expiry and resend are implemented. Resend rotates the token, retires undelivered older
-  outbox messages and extends the configured expiry. Consultant disable/offboarding/credential or lifecycle loss
-  removes effective authority immediately and the scheduled reconciliation records suspension/restoration.
-- The acceptance page requests step-up sign-in, displays the proposed permissions and states the clinical-data
-  isolation boundary. Backend negative tests deny case, document, message, task, referral, patient and credential
-  access even with guessed identifiers.
-- Verification:
-  - empty H2 schema applied all **64** migrations;
-  - consent/virtual-clinic focused backend: **16 PASS**;
-  - authority, durable identity, patient-account and negative-boundary focused backend: **40 PASS**;
-  - invitation/virtual-clinic frontend components: **7 PASS**; frontend typecheck: PASS;
-  - full offline backend suite after repairing stale MFA test identities: **525 tests, 0 failures, 0 errors,
-    1 intentional skip**; the final resend/outbox hardening was followed by **5/5** consent tests passing.
-- The stable tunnel stack and a real Keycloak/mail delivery journey were not run for this slice; existing-identity
-  adoption is covered through the Keycloak adapter contract with a mocked provider boundary. No live environment
-  or identity-store state was changed.
-
-**WORKFORCE MULTI-ROLE AUTHORIZATION REVIEW COMPLETE (2026-09-28)** — targeted code, schema, API, UI and test
-review confirmed that ordinary workforce roles are independent assignments and that the lean combinations
-`COORDINATOR + OPERATIONS` and `CONSULTANT_OPERATIONS_MANAGER + CARE_COORDINATION_MANAGER` are supported. The
-database conflict table remains the authoritative compatibility policy; Compliance/Audit conflicts with every
-other catalogue role, and Support conflicts with System Administrator. System Administrator remains outside
-ordinary assignment/invitation storage and uses maker/checker governance; Platform Account Owner remains a
-separate relationship. Effective authority is database-resolved per request and still applies lifecycle, access,
-function, reporting, case-assignment and protected-action restrictions. One isolated non-authorization defect was
-fixed: staff work email routing now honors the work item's explicit role for a multi-role recipient, and uses the
-generic staff classification rather than choosing an arbitrary role when no hint exists. Regression coverage was
-added for the exact lean combinations, multi-role invitation/change, unassigned-case denial, disable/offboarding,
-independent role removal, function-specific `TEAM_MANAGE`, the UI ordinary-role selector boundary, and multi-role
-notification routing. Focused backend: **51 PASS**; focused frontend: **8 PASS**; frontend typecheck: PASS.
-
-**OWNER AND SYSTEM ADMINISTRATOR TARGET ARCHITECTURE IMPLEMENTED (2026-09-28)** — OSA-1 through OSA-8 code,
-operator procedures and offline evidence are now delivered on top of the clean-cutover authority model:
-- `OwnerPolicy` is a fixed code policy derived only from the singleton current-owner relationship. It adds the
-  `OWNER` workspace, executive read permissions and narrow governance decisions without granting case, clinical,
-  workforce-administration, team, payment or journey-mutation authority. Authority is reread from database state on
-  every request, so transfer/access disablement revokes a stale token immediately.
-- V65 adds idempotent, one-shot commissioning for exactly one owner and two distinct initial administrators;
-  invitation-bound participant acceptance with recent passkeys; immutable decisions; and the OD-02 recovery request
-  and evidence state machine. Final commissioning invokes the existing atomic bootstrap primitive and creates the
-  administrator workforce dependency without seed data/manual SQL.
-- Current owner or a different effective administrator may decide later administrator changes. Approval rechecks
-  current database lifecycle/access and live Keycloak enabled/passkey evidence; immutable decisions record
-  `approver_type`; the owner does not become an administrator.
-- `/api/v1/owner/**` is a typed, read-only executive boundary for overview, revenue, journeys, consultants,
-  operations, workforce, patient experience, risk/compliance and governance. Every metric has a code-owned bilingual
-  definition, fixed sources/formula/privacy/freshness/ownership, bounded periods and configurable small-cohort
-  suppression. Responses are no-store and contain aggregate/governance data, not clinical narrative, documents,
-  payment instruments or operational mutation controls.
-- `/{locale}/portal/owner` provides a bilingual owner workspace, separate from care workspaces, with freshness/period
-  labels, administrator request decisions and normal transfer initiation. Commissioning acceptance is at the
-  invitation-bound `/{locale}/portal/governance/commissioning`; there is no first-owner registration form.
-- OD-02 unavailable-owner recovery requires initiating Administrator A, confirming Administrator B, an independent
-  deployment/security operator evidence step, exact successor passkey acceptance and a 24-hour cooling-off unless a
-  recorded emergency waiver exists. It reuses the normal serialized owner transition and never weakens the
-  two-administrator quorum.
-- Privileged commissioning, administrator, transfer and recovery events enqueue minimal durable
-  `governance-event` notifications to configured governance channels. The comprehensive twelve-procedure release,
-  recovery, restore, notification and quarterly-review runbook is
-  `owner-and-administrator-operations-runbook.md`.
-- Privileged workforce disable/offboarding and approved MFA-reset paths now emit the same durable governance
-  notifications. Denied owner/governance HTTP requests are recorded without request payloads. Expired owner
-  transfers and recoveries are closed, audited and notified by the governance scheduler; a completed normal
-  transfer or recovery invalidates conflicting pending ownership paths under the governance lock.
-- Live identity checks execute before, never inside, the serialized database mutation transaction for
-  commissioning, administrator appointment, normal owner transfer and unavailable-owner recovery.
-- Focused verification added for pending-state no-authority, exact participants, one-owner/two-admin commissioning,
-  owner-only policy and negative domain permissions, owner approval without admin authority, stale-token transfer
-  revocation, transfer/recovery rejection and expiry, all typed dashboards/metric contracts/suppression, recovery
-  quorum/evidence, notification rows, denial audit, and bilingual owner/commissioning UX. H2 applied all 65
-  migrations. Full offline backend: **541 tests, 0 failures, 0 errors, 1 intentional skip**. Full frontend:
-  **273 PASS**; frontend typecheck: PASS.
-
-**OSA-8 CORE OWNER-GOVERNANCE REHEARSAL COMPLETE (2026-10-04):** the retained isolated production-equivalent
-evidence is `evidence/2026-10-04-owner-governance-rehearsal.md`. A fresh Compose project with real Keycloak TOTP and
-WebAuthn/LoA 3 completed clean commissioning, owner workspace access, administrator removal/reappointment, OD-02
-unavailable-owner recovery, immediate stale-owner denial, normal three-party transfer back and notification
-delivery. Final PostgreSQL invariants were one current owner, two effective administrators and completed
-commissioning/recovery/transfer records. The run exposed and corrected one PostgreSQL-only nullable-parameter defect
-in indefinite administrator/workforce role overlap checks; the policy and architecture did not change.
-
-**PRACTICE MANAGER LIVE CONSENT REHEARSAL COMPLETE (2026-10-04):** retained evidence is
-`evidence/2026-10-04-practice-manager-consent-live.md`. The named-tunnel stack completed real Keycloak account setup,
-TOTP/ACR 2 acceptance, Mailpit delivery, clinic-only scope, unrelated-case denial, permission widening held pending
-renewed consent, renewed acceptance, revocation and immediate stale-token denial. PostgreSQL retained both accepted
-invitations at ACR 2 and immutable `ACCEPTED → PERMISSIONS_ACCEPTED → REVOKED` history. The run corrected two
-targeted gaps without changing the architecture: direct API invitations now idempotently establish a missing clinic
-row for a newly added Consultant, and the pre-acceptance Practice Manager journey explicitly requests ordinary MFA
-ACR 2 instead of the fail-closed owner/administrator ACR 3 default.
-
-**Next exact action:** complete the wider OPS-03 backup/data/document restore drill. Separately, complete the
-remaining OSA-8 assurance activities (external notification channel evidence, no-waiver quarterly exercise,
-threat-model/penetration review). Do not substitute a production ownership change for an isolated drill.
+**Next exact action:** Section 1 slices A1–A8 and their requested live identity evidence are complete at this
+checkpoint. Preserve the worktree and review the final targeted diff/status. Do not start the Practice Manager
+identity path until its consent state machine exists, and do not implement OD-02 recovery without the required
+product/operational decision. Run broader backend or full live-tunnel verification only if requested before commit.
 
 Business/operator/tester guide: `platform-users-roles-hierarchy-onboarding-and-test-guide.md` describes the user
 model, hierarchy, who grants whom, current Control Center screens, onboarding/lifecycle flows, authentication rules,
@@ -961,16 +861,12 @@ Open business decisions (do not block):
 
 Open gates (do not claim complete):
 - **G1 COMPLETE (2026-09-27):** implementation/import validation, live System Administrator OTP/WebAuthn/LoA 1–3
-  evidence, controlled two-administrator bootstrap and ordinary three-party owner-transfer rehearsal are retained.
+  evidence, the controlled two-administrator bootstrap, and the ordinary three-party owner-transfer rehearsal are
+  retained. This does not implement OD-02 recovery.
 - **IDO-06 COMPLETE (2026-09-27):** live manual and `POST_RESTORE` comparisons, a scheduler-originated daily-job and
   alert review, the activated-block/passing-release rehearsal, and the OPS-04 durable replay/inactive-lifecycle
   disable proof are retained. The wider OPS-03 backup/data/document restore drill is separate launch evidence.
-- **Practice Manager consent flow COMPLETE (2026-10-04):** the consent state machine, MFA-bound exact-identity
-  acceptance, durable identity operation, re-consent/revocation/suspension rules, isolation tests and frontend
-  journey are implemented. Real Keycloak/mail/named-tunnel evidence now proves ACR 2 acceptance, isolation,
-  permission re-consent and immediate stale-token denial after revocation.
-- **OD-02 COMPLETE, INCLUDING ISOLATED REHEARSAL (2026-10-04):** multi-party recovery, evidence,
-  cooling-off/waiver, immediate relationship transition, notifications, negative tests and runbook are delivered.
-  The first isolated production-equivalent recovery rehearsal passed with real Keycloak LoA 3 and retained evidence.
+- **Practice Manager consent flow:** the identity path remains gated until its consent state machine exists.
+- **OD-02:** recovery remains unavailable.
 - Known pre-existing flaky history remains documented under Verification: OTP selection ties and the notification
-  outbox hand-back test. Neither was observed in this implementation's focused or full-suite runs.
+  outbox hand-back test. Neither was observed in this takeover's focused runs; the full backend suite was not rerun.

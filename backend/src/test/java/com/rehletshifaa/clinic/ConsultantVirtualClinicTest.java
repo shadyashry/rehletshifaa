@@ -7,7 +7,6 @@ import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.clinic.api.ClinicDtos.*;
 import com.rehletshifaa.clinic.application.ConsultantCapabilityService;
 import com.rehletshifaa.clinic.application.VirtualClinicService;
-import com.rehletshifaa.clinic.application.PracticeManagerDelegationService;
 import com.rehletshifaa.identity.IdentityProvisioningPort.IdentityAccount;
 import com.rehletshifaa.identity.KeycloakStaffIdentityService;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
@@ -48,7 +47,6 @@ import static org.mockito.Mockito.when;
 class ConsultantVirtualClinicTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired ConsultantReferralService referrals;
     @Autowired VirtualClinicService clinics; @Autowired ConsultantCapabilityService capabilities;
-    @Autowired PracticeManagerDelegationService managers;
     @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @MockBean KeycloakStaffIdentityService identities;
 
@@ -227,7 +225,7 @@ class ConsultantVirtualClinicTest {
         authenticate("doctor-a", Role.CONSULTANT);
         var clinic = clinics.clinic(doctorA);
         assertThat(clinic.relation()).isEqualTo("OWNER");
-        var pm = inviteAndAccept(doctorA, List.of("SERVICES"));
+        var pm = clinics.inviteManager(doctorA, new ManagerInviteRequest("Mona PM", "pm@example.test", List.of("SERVICES"), "en"));
         assertThat(pm.permissions()).containsExactly("SERVICES");
 
         authenticate("pm-subject", Role.PATIENT); // a delegated account holds no staff role at all
@@ -269,7 +267,7 @@ class ConsultantVirtualClinicTest {
 
     @Test void aStaleChangeCannotOverwriteANewerPriceAndApprovalCanBeSwitchedOff() {
         authenticate("doctor-a", Role.CONSULTANT);
-        inviteAndAccept(doctorA, List.of("SERVICES"));
+        clinics.inviteManager(doctorA, new ManagerInviteRequest("Mona PM", "pm@example.test", List.of("SERVICES"), "en"));
         var own = clinics.proposeServiceChange(doctorA, new ServiceChangeRequest(null, "CREATE", "FU", "Follow-up consultation", "FOLLOW_UP_CONSULTATION",
                 null, null, null, null, new BigDecimal("1500.00"), null, null, null));
         assertThat(own.status()).isEqualTo("APPLIED"); // the consultant's own change is its own approval
@@ -293,7 +291,7 @@ class ConsultantVirtualClinicTest {
 
     @Test void theConsultantApprovesThePublicProfileAndControlsAvailability() {
         authenticate("doctor-a", Role.CONSULTANT);
-        inviteAndAccept(doctorA, List.of("PROFILE", "SCHEDULE"));
+        clinics.inviteManager(doctorA, new ManagerInviteRequest("Mona PM", "pm@example.test", List.of("PROFILE", "SCHEDULE"), "en"));
         long v = clinics.clinic(doctorA).version();
 
         authenticate("pm-subject", Role.PATIENT);
@@ -321,19 +319,15 @@ class ConsultantVirtualClinicTest {
     @Test void aPracticeManagerNeverReachesCasesAndLosesTheClinicWhenRevoked() throws Exception {
         UUID caseId = underReviewBy("doctor-a", doctorA);
         authenticate("doctor-a", Role.CONSULTANT);
-        var pm = inviteAndAccept(doctorA, List.of("SCHEDULE", "PROFILE", "SERVICES"));
+        var pm = clinics.inviteManager(doctorA, new ManagerInviteRequest("Mona PM", "pm@example.test", List.of("SCHEDULE", "PROFILE", "SERVICES"), "en"));
 
         authenticate("pm-subject", Role.PATIENT);
         assertThatThrownBy(() -> journey.workspace(caseId)).isInstanceOf(ApiException.class).extracting("status").isEqualTo(403);
         assertThatThrownBy(() -> journey.assertCanReadDocument(caseId)).isInstanceOf(ApiException.class).extracting("status").isEqualTo(403);
         assertThatThrownBy(() -> referrals.forConsultant(caseId)).isInstanceOf(ApiException.class).extracting("status").isEqualTo(403);
-        assertThatThrownBy(() -> journey.message(caseId, new MessageRequest("PATIENT_COORDINATOR", "guessed case", "en", false))).isInstanceOf(ApiException.class).extracting("status").isEqualTo(403);
-        assertThatThrownBy(() -> journey.completeTask(caseId, UUID.randomUUID(), new CompleteTaskRequest("guessed task", 0L))).isInstanceOf(ApiException.class).extracting("status").isEqualTo(403);
-        assertThatThrownBy(journey::patientCases).isInstanceOf(ApiException.class).extracting("status").isEqualTo(403);
-        assertThatThrownBy(() -> journey.addCredential(doctorA, new CredentialRequest("LICENSE", "guessed", "guessed", null, null, null))).isInstanceOf(ApiException.class).extracting("status").isEqualTo(403);
 
         authenticate("doctor-a", Role.CONSULTANT);
-        managers.change(doctorA, pm.id(), new ManagerUpdateRequest(List.of(), false, pm.version()));
+        clinics.updateManager(doctorA, pm.id(), new ManagerUpdateRequest(List.of(), false, pm.version()));
         authenticate("pm-subject", Role.PATIENT);
         assertThat(clinics.mine()).isEmpty();
         assertThatThrownBy(() -> clinics.clinic(doctorA)).isInstanceOf(ApiException.class).extracting("code").isEqualTo("PERMISSION_NOT_HELD");
@@ -348,23 +342,6 @@ class ConsultantVirtualClinicTest {
         jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",
                 UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now());
         return id;
-    }
-
-    private ManagerView inviteAndAccept(UUID practitionerId, List<String> permissions) {
-        authenticate("doctor-a", Role.CONSULTANT);
-        clinics.clinic(practitionerId);
-        ManagerView invited = managers.invite(practitionerId, new ManagerInviteRequest("Mona PM", "pm@example.test", permissions, "en"));
-        jdbc.update("UPDATE practice_manager_invitations SET identity_resolution_status='READY',resolved_subject='pm-subject' WHERE id=?", invited.id());
-        String encrypted = jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class,
-                "practice-manager-invitation:" + invited.id());
-        try {
-            String clear = crypto.decrypt(encrypted.substring(4));
-            String token = new com.fasterxml.jackson.databind.ObjectMapper().readTree(clear).get("token").asText();
-            com.rehletshifaa.authority.TestPrincipals.signInWithEmail("pm-subject", "pm@example.test", true, "2");
-            ManagerView accepted = managers.accept(new AcceptManagerInvitationRequest(token));
-            authenticate("doctor-a", Role.CONSULTANT);
-            return accepted;
-        } catch (Exception failure) { throw new IllegalStateException(failure); }
     }
 
     private UUID readyCase() throws Exception {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { CategoryDetail } from "@/components/CategoryDetail";
+import { CareAreaDetail } from "@/components/care-areas/CareAreaDetail";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { pageMetadata } from "@/lib/metadata";
@@ -19,5 +19,16 @@ export default async function Rheumatology({ params }: Props) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const d = getDictionary(locale);
-  return <CategoryDetail locale={locale} d={d} content={d.rheumatology} consultantSlug="hanan-elshoura" />;
+  const content = d.rheumatology;
+  return (
+    <CareAreaDetail
+      locale={locale}
+      d={d}
+      slug="rheumatology-rehabilitation"
+      scope={content.sections}
+      note={content.note}
+      highlight={content.highlight}
+      closing={{ title: content.finalTitle, body: content.finalBody }}
+    />
+  );
 }

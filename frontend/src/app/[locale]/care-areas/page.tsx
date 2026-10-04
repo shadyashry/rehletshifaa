@@ -6,9 +6,11 @@ import { CareAreaCard } from "@/components/care-areas/CareAreaCard";
 import { SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import { CareNetwork } from "@/components/care-areas/CareNetwork";
 import { CaseRouter } from "@/components/care-areas/CaseRouter";
+import { HeroStats } from "@/components/HeroStats";
 import { PageHero } from "@/components/PageHero";
 import { TrackedLink } from "@/components/TrackedLink";
 import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
+import { universityFacultySlugs } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -40,16 +42,17 @@ export default async function CareAreas({ params }: Props) {
   const page = d.careAreasPage;
   const areas = careAreaAtlas(locale, d);
   const systems = careAtlasSystems(areas, d);
-  const consultantCount = new Set(areas.flatMap((area) => area.consultants.map((profile) => profile.slug))).size;
 
   const consultantsLabel = (n: number) =>
     fill(n === 1 ? page.atlas.consultantsOne : n === 2 ? page.atlas.consultantsTwo : page.atlas.consultantsMany, { n });
   const areasLabel = (n: number) => (n === 1 ? page.atlas.areasOne : fill(page.atlas.areasMany, { n }));
 
+  const consultantSlugs = new Set(areas.flatMap((area) => area.consultants.map((profile) => profile.slug)));
+  const faculty = universityFacultySlugs();
   const stats = [
-    { value: String(areas.length), label: page.stats.areas },
-    { value: String(consultantCount), label: page.stats.consultants },
-    { value: page.stats.languagesValue, label: page.stats.languages },
+    { value: areas.length, label: page.stats.areas },
+    { value: consultantSlugs.size, label: page.stats.consultants },
+    { value: [...consultantSlugs].filter((slug) => faculty.has(slug)).length, label: page.stats.faculty },
   ];
 
   return (
@@ -61,14 +64,7 @@ export default async function CareAreas({ params }: Props) {
         intro={fill(page.intro, { count: areas.length })}
         aside={<CareNetwork areas={areas} rtl={locale === "ar"} label={page.map.label} center={page.map.center} jump={page.map.jump} />}
       >
-        <dl className="grid max-w-[34rem] grid-cols-3 divide-x divide-border-subtle border-y border-border-subtle rtl:divide-x-reverse">
-          {stats.map((stat) => (
-            <div key={stat.label} className="flex flex-col-reverse gap-1 px-3 py-4 first:ps-0 sm:px-5">
-              <dt className="text-[0.75rem] leading-4 text-ink-500 sm:text-[0.8125rem] sm:leading-5">{stat.label}</dt>
-              <dd className="text-[1.5rem] font-semibold leading-none tracking-[-0.02em] text-brand-900 tabular-nums sm:text-[1.875rem]">{stat.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <HeroStats stats={stats} />
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
           <TrackedLink event="send_case_cta_clicked" className="btn-primary w-full sm:w-auto" href={localeHref(locale, "send-my-case")}>
             {d.common.send}

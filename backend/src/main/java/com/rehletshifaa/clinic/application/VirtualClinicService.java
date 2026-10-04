@@ -1,6 +1,7 @@
 package com.rehletshifaa.clinic.application;
 
 import com.rehletshifaa.clinic.api.ClinicDtos.*;
+import com.rehletshifaa.identity.IdentityProvisioningPort;
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.application.Resource;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.*;
@@ -48,13 +51,13 @@ public class VirtualClinicService {
     private final JdbcClient jdbc;
     private final Authority authority;
     private final ConsultantEligibilityService eligibility;
-    private final PracticeManagerDelegationService managers;
+    private final IdentityProvisioningPort identities;
     private final CryptoService crypto;
     private final Clock clock;
 
     public VirtualClinicService(JdbcClient jdbc, Authority authority, ConsultantEligibilityService eligibility,
-                                PracticeManagerDelegationService managers, CryptoService crypto, Clock clock) {
-        this.jdbc = jdbc; this.authority = authority; this.eligibility = eligibility; this.managers = managers;
+                                IdentityProvisioningPort identities, CryptoService crypto, Clock clock) {
+        this.jdbc = jdbc; this.authority = authority; this.eligibility = eligibility; this.identities = identities;
         this.crypto = crypto; this.clock = clock;
     }
 
@@ -85,9 +88,7 @@ public class VirtualClinicService {
         // A manager's access ends with the consultant's account: a disabled consultant's clinic is closed to delegates.
         var delegation = jdbc.sql("SELECT m.can_manage_schedule,m.can_manage_profile,m.can_manage_services FROM practice_managers m "
                         + "JOIN practitioner_profiles p ON p.id=m.practitioner_id WHERE m.practitioner_id=? AND m.manager_subject=? "
-                        + "AND m.status='ACTIVE' AND p.account_status='ACTIVE' AND p.disabled_at IS NULL "
-                        + "AND p.consultant_lifecycle_status NOT IN ('SUSPENDED','OFFBOARDING','OFFBOARDED') "
-                        + "AND p.credentialing_status NOT IN ('SUSPENDED','REJECTED','EXPIRED')")
+                        + "AND m.status='ACTIVE' AND p.account_status<>'DISABLED' AND p.disabled_at IS NULL")
                 .params(practitionerId, actor.subject())
                 .query((rs, n) -> permissions(rs)).optional();
         if (delegation.isEmpty()) throw new ApiException(403, "CLINIC_ACCESS_DENIED", "This account does not have access to this virtual clinic");
@@ -123,9 +124,7 @@ public class VirtualClinicService {
                     .list();
         jdbc.sql("SELECT p.id,p.display_name,m.can_manage_schedule,m.can_manage_profile,m.can_manage_services FROM practice_managers m "
                         + "JOIN practitioner_profiles p ON p.id=m.practitioner_id WHERE m.manager_subject=? AND m.status='ACTIVE' "
-                        + "AND p.account_status='ACTIVE' AND p.disabled_at IS NULL "
-                        + "AND p.consultant_lifecycle_status NOT IN ('SUSPENDED','OFFBOARDING','OFFBOARDED') "
-                        + "AND p.credentialing_status NOT IN ('SUSPENDED','REJECTED','EXPIRED') ORDER BY p.display_name")
+                        + "AND p.account_status<>'DISABLED' AND p.disabled_at IS NULL ORDER BY p.display_name")
                 .param(actor.subject())
                 .query((rs, n) -> out.add(new ClinicSummary(rs.getObject("id", UUID.class), rs.getString("display_name"), "PRACTICE_MANAGER", List.copyOf(permissions(rs)))))
                 .list();
@@ -200,7 +199,11 @@ public class VirtualClinicService {
     }
 
     private List<ManagerView> managers(UUID practitionerId) {
-        return managers.forClinic(practitionerId);
+        return jdbc.sql("SELECT * FROM practice_managers WHERE practitioner_id=? ORDER BY status,invited_at").param(practitionerId)
+                .query((rs, n) -> new ManagerView(rs.getObject("id", UUID.class), crypto.decrypt(rs.getString("display_name_encrypted")),
+                        rs.getString("email_encrypted") == null ? null : crypto.decrypt(rs.getString("email_encrypted")), rs.getString("status"),
+                        List.copyOf(permissions(rs)), instant(rs, "invited_at"), rs.getLong("version")))
+                .list();
     }
 
     /** The clinic's change history. Consultant only: it names who changed what. */
@@ -487,6 +490,52 @@ public class VirtualClinicService {
                 rs.getString("status"), rs.getString("admin_note"), rs.getLong("version"));
     }
 
+    // ================= practice managers =================
+
+    @Transactional
+    public ManagerView inviteManager(UUID practitionerId, ManagerInviteRequest request) {
+        ClinicActor who = access(practitionerId);
+        requireOwner(who);
+        authority.authorize(Permission.CLINIC_APPROVE, Resource.ofClinic(practitionerId));
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        long existing = jdbc.sql("SELECT COUNT(*) FROM practice_managers WHERE practitioner_id=? AND email_hash=?").params(practitionerId, hash(email)).query(Long.class).single();
+        if (existing > 0) throw new ApiException(409, "PRACTICE_MANAGER_EXISTS", "This person is already listed as a practice manager; update or reinstate them instead");
+        var account = identities.invite(request.name().trim(), email, "ar".equals(request.locale()) ? "ar" : "en");
+        if (account.subject().equals(who.actor().subject())) throw new ApiException(409, "PRACTICE_MANAGER_IS_CONSULTANT", "You cannot be your own practice manager");
+        UUID id = UUID.randomUUID();
+        Instant now = clock.instant();
+        Set<String> granted = new HashSet<>(request.permissions());
+        jdbc.sql("INSERT INTO practice_managers(id,practitioner_id,manager_subject,display_name_encrypted,email_encrypted,email_hash,status,can_manage_schedule,can_manage_profile,"
+                        + "can_manage_services,invited_by,invited_at,updated_at,version) VALUES(?,?,?,?,?,?,'ACTIVE',?,?,?,?,?,?,0)")
+                .params(id, practitionerId, account.subject(), crypto.encrypt(request.name().trim()), crypto.encrypt(email), hash(email),
+                        granted.contains(SCHEDULE), granted.contains(PROFILE), granted.contains(SERVICES), who.actor().subject(), timestamp(now), timestamp(now))
+                .update();
+        audit(who, "CLINIC_MANAGER_INVITED", "CREATE", "Practice manager " + id + " permissions " + new TreeSet<>(granted));
+        return manager(practitionerId, id);
+    }
+
+    @Transactional
+    public ManagerView updateManager(UUID practitionerId, UUID managerId, ManagerUpdateRequest request) {
+        ClinicActor who = access(practitionerId);
+        requireOwner(who);
+        authority.authorize(Permission.CLINIC_APPROVE, Resource.ofClinic(practitionerId));
+        Set<String> granted = new HashSet<>(request.permissions());
+        Instant now = clock.instant();
+        int changed = jdbc.sql("UPDATE practice_managers SET can_manage_schedule=?,can_manage_profile=?,can_manage_services=?,status=?,revoked_by=?,revoked_at=?,updated_at=?,version=version+1 "
+                        + "WHERE id=? AND practitioner_id=? AND version=?")
+                .params(granted.contains(SCHEDULE), granted.contains(PROFILE), granted.contains(SERVICES), request.active() ? "ACTIVE" : "REVOKED",
+                        request.active() ? null : who.actor().subject(), request.active() ? null : timestamp(now), timestamp(now), managerId, practitionerId, request.expectedVersion())
+                .update();
+        if (changed != 1) throw conflict();
+        audit(who, request.active() ? "CLINIC_MANAGER_UPDATED" : "CLINIC_MANAGER_REVOKED", request.active() ? "UPDATE" : "REVOKE",
+                "Practice manager " + managerId + " permissions " + new TreeSet<>(granted));
+        return manager(practitionerId, managerId);
+    }
+
+    private ManagerView manager(UUID practitionerId, UUID id) {
+        return managers(practitionerId).stream().filter(m -> m.id().equals(id)).findFirst().orElseThrow();
+    }
+
     // ================= helpers =================
 
     private void bumpClinic(UUID practitionerId, long expectedVersion, String set, Object... values) {
@@ -541,6 +590,14 @@ public class VirtualClinicService {
 
     private static LocalDate localDate(ResultSet rs, String column) throws SQLException {
         return rs.getObject(column, LocalDate.class);
+    }
+
+    private static String hash(String email) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(email.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private record ClinicRow(String publicName, String publicHeadline, String publicBio, String publicLanguages, Instant publishedAt,

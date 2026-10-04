@@ -64,6 +64,6 @@ public class EffectiveAccessService {
         if (person != null && "INVITED".equals(person.lifecycleStatus())) pending.add("ACTIVATE_ACCOUNT");
         return new MeView(principal.subject(), now, held.roles(), held.platformPermissions(),
                 held.platformPermissions().stream().filter(Permission::stepUp).collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new)), held.workspaces(), held.managedFunctions(),
-                held.workspaces().contains(Workspace.OWNER), platformRoles, person, List.copyOf(pending));
+                owners.findCurrentOwner().filter(principal.subject()::equals).isPresent(), platformRoles, person, List.copyOf(pending));
     }
 }

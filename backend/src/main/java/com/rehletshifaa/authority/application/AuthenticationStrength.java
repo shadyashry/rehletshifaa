@@ -27,8 +27,6 @@ public class AuthenticationStrength {
         return principal.authenticatedWithin(window, now) && mfaAcrValues.contains(normalize(principal.acr()));
     }
 
-    public boolean mfa(Principal principal) { return mfaAcrValues.contains(normalize(principal.acr())); }
-
     public boolean recentPhishingResistant(Principal principal, Duration window, Instant now) {
         return principal.authenticatedWithin(window, now) && phishingResistant(principal);
     }

@@ -7,8 +7,6 @@ import com.rehletshifaa.access.platform.application.WorkforceRoleAssignmentServi
 import com.rehletshifaa.access.platform.application.WorkforceRoleAssignmentService.Grant;
 import com.rehletshifaa.access.platform.application.WorkforceRoleAssignmentService.Revoke;
 import com.rehletshifaa.access.platform.infrastructure.PlatformAccessRepository;
-import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.application.Principal;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.workforce.application.WorkforceFacts;
@@ -42,7 +40,6 @@ class WorkforceRoleAssignmentIntegrationTest {
     @Autowired PlatformAccessGovernanceService governance;
     @Autowired PlatformAccessRepository repository;
     @Autowired WorkforceFacts facts;
-    @Autowired Authority authority;
     @Autowired JdbcTemplate jdbc;
     @Autowired CryptoService crypto;
     @Autowired Clock clock;
@@ -74,25 +71,6 @@ class WorkforceRoleAssignmentIntegrationTest {
                 .containsExactly("CARE_COORDINATION", "FINANCE");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE entity_id=? AND action='WORKFORCE_ROLE_GRANTED'",
                 Integer.class, granted.id().toString())).isOne();
-    }
-
-    @Test
-    void leanStaffingRoleCombinationsAreAcceptedWithoutCreatingImplicitManagementAuthority() {
-        assignments.grant(new Grant(member, "OPERATIONS", clock.instant(), null, "Covers operations desk"));
-        assertThat(authority.held(new Principal(member, clock.instant(), null)).roles())
-                .contains(com.rehletshifaa.authority.domain.Role.COORDINATOR,
-                        com.rehletshifaa.authority.domain.Role.OPERATIONS);
-        assertThat(authority.held(new Principal(member, clock.instant(), null)).managedFunctions()).isEmpty();
-
-        String managerSubject = "roles-cross-function-manager";
-        new WorkforceTestData(jdbc, crypto, clock.instant()).person(managerSubject, "CONSULTANT_OPERATIONS_MANAGER");
-        assignments.grant(new Grant(managerSubject, "CARE_COORDINATION_MANAGER", clock.instant(), null,
-                "Manages both lean functions"));
-
-        var held = authority.held(new Principal(managerSubject, clock.instant(), null));
-        assertThat(held.roles()).contains(com.rehletshifaa.authority.domain.Role.CONSULTANT_OPERATIONS_MANAGER,
-                com.rehletshifaa.authority.domain.Role.CARE_COORDINATION_MANAGER);
-        assertThat(held.managedFunctions()).containsExactly("CARE_COORDINATION", "CONSULTANT_OPERATIONS");
     }
 
     @Test
@@ -176,7 +154,7 @@ class WorkforceRoleAssignmentIntegrationTest {
     }
 
     private void authenticate(String subject) {
-        var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", clock.instant()).claim("acr", "3").build();
+        var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", clock.instant()).build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(token,
                 List.of()));
     }

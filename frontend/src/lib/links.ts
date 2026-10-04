@@ -19,12 +19,13 @@ export function swapLocale(pathname: string, next: Locale): string {
   return `/${segments.join("/")}`;
 }
 
+/** Public destinations in reading order — what (care areas), who (Consultants), how — then the status check.
+ *  Home is the wordmark's job, so it is not repeated as a tab. */
 export function primaryNav(locale: Locale, d: Dictionary): readonly NavItem[] {
   return [
-    { href: localeHref(locale), label: d.nav.home },
     { href: localeHref(locale, "care-areas"), label: d.nav.careAreas },
-    { href: localeHref(locale, "how-it-works"), label: d.nav.how },
     { href: localeHref(locale, "consultants"), label: d.nav.consultants },
+    { href: localeHref(locale, "how-it-works"), label: d.nav.how },
     { href: localeHref(locale, "track-case"), label: d.nav.portal },
   ];
 }

@@ -46,27 +46,15 @@ public class PlatformAccessRepository {
         return jdbc.sql("SELECT COUNT(*) FROM workforce_people WHERE subject=?").param(subject).query(Long.class).single() == 1;
     }
 
-    public boolean administratorCandidateEligible(String subject) {
-        return jdbc.sql("SELECT COUNT(*) FROM workforce_people p JOIN access_subjects s ON s.subject=p.subject "
-                        + "WHERE p.subject=? AND p.lifecycle_status='ACTIVE' AND p.mfa_enrolled=TRUE "
-                        + "AND p.phishing_resistant_mfa_enrolled=TRUE AND s.active=TRUE")
-                .param(subject).query(Long.class).single() == 1;
-    }
-
     public boolean governanceInitialized() {
         return jdbc.sql("SELECT COUNT(*) FROM platform_role_assignments WHERE role_key=?")
                 .param(SYSTEM_ADMINISTRATOR).query(Long.class).single() > 0;
     }
 
     public boolean overlappingAdministratorAssignment(String subject, Instant from, Instant to) {
-        if (to == null) {
-            return jdbc.sql("SELECT COUNT(*) FROM platform_role_assignments WHERE subject=? AND role_key=? AND status='ACTIVE' "
-                            + "AND (effective_to IS NULL OR effective_to>?)")
-                    .params(subject, SYSTEM_ADMINISTRATOR, timestamp(from)).query(Long.class).single() > 0;
-        }
         return jdbc.sql("SELECT COUNT(*) FROM platform_role_assignments WHERE subject=? AND role_key=? AND status='ACTIVE' "
-                        + "AND effective_from<? AND (effective_to IS NULL OR effective_to>?)")
-                .params(subject, SYSTEM_ADMINISTRATOR, timestamp(to), timestamp(from)).query(Long.class).single() > 0;
+                        + "AND (? IS NULL OR effective_from<?) AND (effective_to IS NULL OR effective_to>?)")
+                .params(subject, SYSTEM_ADMINISTRATOR, timestamp(to), timestamp(to), timestamp(from)).query(Long.class).single() > 0;
     }
 
     public List<String> effectiveAdministrators(Instant at) {
@@ -129,29 +117,20 @@ public class PlatformAccessRepository {
                 .params(id, type, subject, assignment == null ? null : assignment.id(), assignment == null ? null : assignment.revision(),
                         timestamp(from), timestamp(to), actor, reason, timestamp(now), timestamp(expiresAt)).update();
         return new ChangeRequest(id, type, subject, assignment == null ? null : assignment.id(), assignment == null ? null : assignment.revision(),
-                from, to, "PENDING", actor, reason, expiresAt, 0, null, null, null, null);
+                from, to, "PENDING", actor, expiresAt, 0);
     }
 
     public ChangeRequest requestForUpdate(UUID id) {
-        return jdbc.sql("SELECT r.*,CAST(NULL AS VARCHAR) AS decided_by,CAST(NULL AS VARCHAR) AS approver_type,"
-                        + "CAST(NULL AS VARCHAR) AS decision_reason,CAST(NULL AS TIMESTAMP WITH TIME ZONE) AS decided_at "
-                        + "FROM privileged_access_change_requests r WHERE r.id=? FOR UPDATE").param(id).query(this::mapRequest).optional()
+        return jdbc.sql("SELECT * FROM privileged_access_change_requests WHERE id=? FOR UPDATE").param(id).query(this::mapRequest).optional()
                 .orElseThrow(() -> new ApiException(404, "CHANGE_REQUEST_NOT_FOUND", "Privileged change request not found"));
     }
 
-    public ChangeRequest request(UUID id) {
-        return jdbc.sql("SELECT r.*,d.decided_by,d.approver_type,d.reason AS decision_reason,d.decided_at "
-                        + "FROM privileged_access_change_requests r LEFT JOIN privileged_access_change_decisions d ON d.request_id=r.id WHERE r.id=?")
-                .param(id).query(this::mapRequest).optional()
-                .orElseThrow(() -> new ApiException(404, "CHANGE_REQUEST_NOT_FOUND", "Privileged change request not found"));
-    }
-
-    public void decide(UUID id, long revision, String decision, String actor, String approverType, String reason, Instant now) {
+    public void decide(UUID id, long revision, String decision, String actor, String reason, Instant now) {
         if (jdbc.sql("UPDATE privileged_access_change_requests SET status=?,revision=revision+1 WHERE id=? AND revision=? AND status='PENDING'")
                 .params(decision, id, revision).update() != 1)
             throw new ApiException(409, "STALE_CHANGE_REQUEST", "The privileged change request changed; reload and try again");
-        jdbc.sql("INSERT INTO privileged_access_change_decisions(request_id,decision,decided_by,reason,decided_at,approver_type) VALUES(?,?,?,?,?,?)")
-                .params(id, decision, actor, reason, timestamp(now), approverType).update();
+        jdbc.sql("INSERT INTO privileged_access_change_decisions(request_id,decision,decided_by,reason,decided_at) VALUES(?,?,?,?,?)")
+                .params(id, decision, actor, reason, timestamp(now)).update();
     }
 
     /** Current and scheduled System Administrator assignments, earliest first. */
@@ -163,9 +142,7 @@ public class PlatformAccessRepository {
 
     /** Pending requests first, then the most recent decided ones (bounded). */
     public List<ChangeRequest> recentRequests(int limit) {
-        return jdbc.sql("SELECT r.*,d.decided_by,d.approver_type,d.reason AS decision_reason,d.decided_at "
-                        + "FROM privileged_access_change_requests r LEFT JOIN privileged_access_change_decisions d ON d.request_id=r.id "
-                        + "ORDER BY CASE WHEN r.status='PENDING' THEN 0 ELSE 1 END,r.expires_at DESC,r.id LIMIT " + limit)
+        return jdbc.sql("SELECT * FROM privileged_access_change_requests ORDER BY CASE WHEN status='PENDING' THEN 0 ELSE 1 END,expires_at DESC,id LIMIT " + limit)
                 .query(this::mapRequest).list();
     }
 
@@ -183,9 +160,7 @@ public class PlatformAccessRepository {
         return new ChangeRequest(rs.getObject("id", UUID.class), rs.getString("change_type"), rs.getString("subject"),
                 rs.getObject("assignment_id", UUID.class), (Long) rs.getObject("assignment_revision"), rs.getTimestamp("effective_from").toInstant(),
                 rs.getTimestamp("effective_to") == null ? null : rs.getTimestamp("effective_to").toInstant(), rs.getString("status"),
-                rs.getString("requested_by"), rs.getString("request_reason"), rs.getTimestamp("expires_at").toInstant(), rs.getLong("revision"),
-                rs.getString("decided_by"), rs.getString("approver_type"), rs.getString("decision_reason"),
-                rs.getTimestamp("decided_at") == null ? null : rs.getTimestamp("decided_at").toInstant());
+                rs.getString("requested_by"), rs.getTimestamp("expires_at").toInstant(), rs.getLong("revision"));
     }
 
     public record Assignment(UUID id, String subject, Instant effectiveFrom, Instant effectiveTo, long revision) {}
@@ -193,7 +168,6 @@ public class PlatformAccessRepository {
     public record SubjectFacts(boolean workforcePerson, String lifecycleStatus, boolean mfaEnrolled,
                                boolean accessSubjectActive, List<Assignment> administratorAssignments) {}
     public record ChangeRequest(UUID id, String type, String subject, UUID assignmentId, Long assignmentRevision,
-                                Instant effectiveFrom, Instant effectiveTo, String status, String requestedBy, String requestReason,
-                                Instant expiresAt, long revision, String decidedBy, String approverType,
-                                String decisionReason, Instant decidedAt) {}
+                                Instant effectiveFrom, Instant effectiveTo, String status, String requestedBy,
+                                Instant expiresAt, long revision) {}
 }

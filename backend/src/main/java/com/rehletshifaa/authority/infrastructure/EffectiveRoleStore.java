@@ -41,13 +41,9 @@ public class EffectiveRoleStore {
                         + "AND p.lifecycle_status='ACTIVE' AND p.mfa_enrolled=TRUE AND s.active=TRUE",
                 subject, timestamp(now), timestamp(now)) > 0)
             roles.add(Role.SYSTEM_ADMINISTRATOR);
-        if (count("SELECT COUNT(*) FROM practitioner_profiles WHERE external_subject=? AND account_status='ACTIVE' AND disabled_at IS NULL "
-                + "AND consultant_lifecycle_status NOT IN ('SUSPENDED','OFFBOARDING','OFFBOARDED')", subject) > 0)
+        if (count("SELECT COUNT(*) FROM practitioner_profiles WHERE external_subject=? AND account_status<>'DISABLED' AND disabled_at IS NULL", subject) > 0)
             roles.add(Role.CONSULTANT);
-        if (count("SELECT COUNT(*) FROM practice_managers m JOIN practitioner_profiles p ON p.id=m.practitioner_id "
-                + "WHERE m.manager_subject=? AND m.status='ACTIVE' AND p.account_status='ACTIVE' AND p.disabled_at IS NULL "
-                + "AND p.consultant_lifecycle_status NOT IN ('SUSPENDED','OFFBOARDING','OFFBOARDED') "
-                + "AND p.credentialing_status NOT IN ('SUSPENDED','REJECTED','EXPIRED')", subject) > 0)
+        if (count("SELECT COUNT(*) FROM practice_managers WHERE manager_subject=? AND status='ACTIVE'", subject) > 0)
             roles.add(Role.PRACTICE_MANAGER);
         if (count("SELECT COUNT(*) FROM patient_profiles WHERE external_subject=?", subject) > 0)
             roles.add(Role.PATIENT);
@@ -59,16 +55,13 @@ public class EffectiveRoleStore {
 
     /** OWN_CLINIC: the clinic belongs to the subject's own enabled consultant profile. */
     public boolean ownsClinic(UUID practitionerId, String subject) {
-        return count("SELECT COUNT(*) FROM practitioner_profiles WHERE id=? AND external_subject=? AND account_status='ACTIVE' "
-                + "AND disabled_at IS NULL AND consultant_lifecycle_status NOT IN ('SUSPENDED','OFFBOARDING','OFFBOARDED')", practitionerId, subject) > 0;
+        return count("SELECT COUNT(*) FROM practitioner_profiles WHERE id=? AND external_subject=? AND account_status<>'DISABLED' "
+                + "AND disabled_at IS NULL", practitionerId, subject) > 0;
     }
 
     /** DELEGATED_CLINIC: the subject holds an accepted delegation for the clinic. */
     public boolean delegated(UUID practitionerId, String subject) {
-        return count("SELECT COUNT(*) FROM practice_managers m JOIN practitioner_profiles p ON p.id=m.practitioner_id "
-                        + "WHERE m.practitioner_id=? AND m.manager_subject=? AND m.status='ACTIVE' AND p.account_status='ACTIVE' "
-                        + "AND p.disabled_at IS NULL AND p.consultant_lifecycle_status NOT IN ('SUSPENDED','OFFBOARDING','OFFBOARDED') "
-                        + "AND p.credentialing_status NOT IN ('SUSPENDED','REJECTED','EXPIRED')",
+        return count("SELECT COUNT(*) FROM practice_managers WHERE practitioner_id=? AND manager_subject=? AND status='ACTIVE'",
                 practitionerId, subject) > 0;
     }
 

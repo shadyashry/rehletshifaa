@@ -87,7 +87,6 @@ test("the phone composition is deliberate: header, scale, and a connected journe
       header: box("header").height, logo: box("header a[aria-label] > span").width, menu: Math.min(summary.width, summary.height),
       h1: px("h1"), h2: px("#how-it-works h2"), step: px("#how-it-works h3"), body: px("#how-it-works li p"),
       how: box("#how-it-works ol").bottom - box("#how-it-works").top, steps: document.querySelectorAll("#how-it-works ol > li").length,
-      players: [...document.querySelectorAll("#how-it-works video")].filter((v) => v.getClientRects().length > 0).length,
       markers: document.querySelectorAll("#how-it-works ol > li > span[aria-hidden]:not([class*='absolute'])").length,
     };
   });
@@ -98,22 +97,21 @@ test("the phone composition is deliberate: header, scale, and a connected journe
   expect(m.h2).toBeGreaterThanOrEqual(26); expect(m.h2).toBeLessThanOrEqual(30);
   expect(m.step).toBeGreaterThanOrEqual(18); expect(m.step).toBeLessThanOrEqual(20);
   expect(m.body).toBeGreaterThanOrEqual(15); expect(m.body).toBeLessThanOrEqual(16);
-  // Heading and four connected steps fit in roughly one phone screen; the film follows as a compact poster
-  // card that opens a lightbox — never an embedded native player on a phone — and the action closes the section.
+  // Heading and four connected steps fit in roughly one phone screen; the film follows as a composed poster
+  // with one play control (no bare native control bar), and the action closes the section.
   expect(m.how).toBeLessThanOrEqual(760);
   expect(m.steps).toBe(4);
   expect(m.markers).toBe(4); // one numbered marker per step — never a circle plus a separate number
-  expect(m.players).toBe(0);
-  const watch = page.locator("#how-it-works").getByRole("button", { name: /Watch how it works/ });
+  const video = page.locator("#how-it-works video");
+  await expect(video).not.toHaveAttribute("controls", "");
+  const watch = page.locator("#how-it-works").getByRole("button", { name: /Play the film/ });
   await expect(watch).toBeVisible();
   const journeyCta = page.locator("#how-it-works").getByRole("link", { name: /^Start my case$/ });
   await expect(journeyCta).toBeVisible();
-  // The lightbox traps focus, closes on Escape and hands focus back to the poster card.
+  // The play control is keyboard-operable and hands over to the inline player's native controls.
   await watch.focus(); await page.keyboard.press("Enter");
-  await expect(page.locator("dialog[open] video")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.locator("dialog[open]")).toHaveCount(0);
-  await expect(watch).toBeFocused();
+  await expect(watch).toHaveCount(0);
+  await expect(video).toHaveAttribute("controls", "");
   // The menu control is reachable and labelled; the language switch lives inside the menu on a phone.
   const menu = page.locator("header summary");
   await expect(menu).toHaveAttribute("aria-label", /menu/i);
@@ -156,12 +154,36 @@ test("the homepage offers Sign in as a quiet entry, distinct from Check case sta
   const signIn = header.getByRole("link", { name: /^Sign in$/ });
   await expect(signIn).toBeVisible();
   await expect(signIn).toHaveAttribute("href", /\/en\/portal\?signin=1$/);
-  // Three distinct destinations for three distinct situations.
-  await expect(header.getByRole("link", { name: /^Check case status$/ })).toHaveAttribute("href", /\/en\/track-case$/);
+  // Three distinct destinations for three distinct situations; the status check lives in the utility bar.
+  const utility = page.getByRole("navigation", { name: "Patient services" });
+  await expect(utility.getByRole("link", { name: /^Check case status$/ })).toHaveAttribute("href", /\/en\/track-case$/);
+  await expect(utility.getByRole("link", { name: /Talk to a Patient Coordinator/ })).toHaveAttribute("href", /wa\.me|whatsapp/);
+  await expect(utility.getByRole("link", { name: /Switch language/ })).toBeVisible();
   await expect(header.getByRole("link", { name: /^Start my case$/ })).toHaveAttribute("href", /\/en\/send-my-case$/);
   // Sign in is not a second dominant CTA.
   expect(await signIn.evaluate((el) => el.className.includes("btn-primary"))).toBe(false);
   expect(await header.locator("a.btn-primary:visible").count()).toBe(1);
+});
+
+test("the Care Areas menu opens the atlas, is keyboard-operable and closes on Escape", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/en");
+  const nav = page.getByRole("navigation", { name: "Primary navigation" });
+  await expect(nav.getByRole("link", { name: /^Home$/ })).toHaveCount(0);
+  const trigger = nav.getByRole("button", { name: /^Care Areas$/ });
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await trigger.focus(); await page.keyboard.press("Enter");
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  const panel = page.locator(`[id="${await trigger.getAttribute("aria-controls")}"]`);
+  await expect(panel.getByRole("link", { name: /^View all care areas/ })).toHaveAttribute("href", /\/en\/care-areas$/);
+  await expect(panel.locator("ul a")).toHaveCount(9);
+  await page.keyboard.press("Escape");
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await panel.getByRole("link", { name: "Orthopedics" }).click();
+  await expect(page).toHaveURL(/\/en\/orthopedics$/);
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
 });
 
 test("the mobile menu exposes Start my case, Sign in and Check case status with touch-sized targets", async ({ page }) => {

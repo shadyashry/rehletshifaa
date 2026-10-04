@@ -9,7 +9,7 @@ import { JourneyVideo } from "./JourneyVideo";
 
 /**
  * The process as one care journey: four numbered moments joined by the flowing connector, and beside
- * them the film as a visible inline player with its poster, native playback controls and duration.
+ * them the film inline: a composed poster with one play control, native controls once it plays.
  * Desktop: journey left, film right (≈44% of the section); phone and tablet: journey, then film.
  */
 export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
@@ -50,7 +50,7 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
           </ol>
 
           <div className="w-full sm:mx-auto sm:max-w-[620px] lg:mx-0 lg:max-w-none">
-            <JourneyVideo src={source} poster={poster} label={v.label} watch={v.watch} duration={v.duration} />
+            <JourneyVideo src={source} poster={poster} label={v.label} watch={v.watch} duration={v.duration} play={d.home.videoPlay} />
           </div>
         </div>
 

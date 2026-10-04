@@ -5,7 +5,7 @@
  */
 
 export type Workspace =
-  | "OWNER" | "CONTROL_CENTER" | "COORDINATION" | "OPERATIONS" | "FINANCE" | "CREDENTIALING" | "IDENTITY_REVIEW"
+  | "CONTROL_CENTER" | "COORDINATION" | "OPERATIONS" | "FINANCE" | "CREDENTIALING" | "IDENTITY_REVIEW"
   | "JOURNEY_GOVERNANCE" | "SUPPORT" | "CONSULTANT" | "CLINIC_DELEGATE" | "PATIENT";
 
 export type TeamFact = { teamId: string; function: string; name: string; lead: boolean };

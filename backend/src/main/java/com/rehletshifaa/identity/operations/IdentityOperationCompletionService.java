@@ -30,24 +30,6 @@ public class IdentityOperationCompletionService {
         if (!store.succeeded(operation, subject)) throw new ApiException(409, "IDENTITY_OPERATION_CONFLICT", "Identity operation changed while completing");
     }
 
-    @Transactional
-    public void practiceManagerIdentityReady(IdentityOperationStore.Operation operation, String subject) {
-        int changed = jdbc.sql("UPDATE practice_manager_invitations SET identity_resolution_status='READY',resolved_subject=?,updated_at=?,version=version+1 " +
-                        "WHERE id=? AND status='INVITED' AND identity_resolution_status='PENDING'")
-                .params(subject, timestamp(clock.instant()), operation.targetId()).update();
-        if (changed != 1) throw new ApiException(409, "INVITATION_IDENTITY_CONFLICT", "The invitation no longer matches this operation");
-        if (!store.succeeded(operation, subject)) throw new ApiException(409, "IDENTITY_OPERATION_CONFLICT", "Identity operation changed while completing");
-    }
-
-    @Transactional
-    public void practiceManagerIdentityConflict(IdentityOperationStore.Operation operation) {
-        int changed = jdbc.sql("UPDATE practice_manager_invitations SET identity_resolution_status='REVIEW_REQUIRED',updated_at=?,version=version+1 " +
-                        "WHERE id=? AND status='INVITED' AND identity_resolution_status='PENDING'")
-                .params(timestamp(clock.instant()), operation.targetId()).update();
-        if (changed != 1) throw new ApiException(409, "INVITATION_IDENTITY_CONFLICT", "The invitation no longer matches this operation");
-        if (!store.succeeded(operation)) throw new ApiException(409, "IDENTITY_OPERATION_CONFLICT", "Identity operation changed while completing");
-    }
-
     /**
      * STF-01/02: the identity now exists, so the invited person and their invited roles are recorded. The person is
      * INVITED with inactive platform access; the roles take effect only after activation with MFA.

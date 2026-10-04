@@ -9,10 +9,6 @@ import com.rehletshifaa.identity.KeycloakStaffIdentityService;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.workforce.WorkforceTestData;
-import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.application.Principal;
-import com.rehletshifaa.authority.application.Resource;
-import com.rehletshifaa.authority.domain.Permission;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +39,6 @@ class PlatformOwnerTransferIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired CryptoService crypto;
     @Autowired Clock clock;
-    @Autowired Authority authority;
     @MockitoBean KeycloakStaffIdentityService identities;
 
     private final String owner = "owner-transfer-current";
@@ -85,9 +80,6 @@ class PlatformOwnerTransferIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM platform_account_owner_relationships WHERE subject=? AND status='ENDED'", Integer.class, owner)).isOne();
         assertThat(jdbc.queryForObject("SELECT accepted_by FROM platform_owner_transfer_acceptances WHERE request_id=?", String.class, initiated.id())).isEqualTo(incoming);
         assertThat(jdbc.queryForObject("SELECT verified_by FROM platform_owner_transfer_verifications WHERE request_id=?", String.class, initiated.id())).isEqualTo(adminOne);
-        assertThat(authority.decide(new Principal(owner, clock.instant(), "3"), Permission.EXECUTIVE_OVERVIEW_VIEW, Resource.platform()).granted())
-                .as("a stale token for the previous owner cannot retain database-owned authority").isFalse();
-        assertThat(authority.decide(new Principal(incoming, clock.instant(), "3"), Permission.EXECUTIVE_OVERVIEW_VIEW, Resource.platform()).granted()).isTrue();
     }
 
     @Test
@@ -115,19 +107,6 @@ class PlatformOwnerTransferIntegrationTest {
         authenticate(incoming, clock.instant(), "3");
         assertThatThrownBy(() -> transfers.initiate(new Initiate("another-owner", "Not the current owner")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("current Platform Account Owner");
-    }
-
-    @Test
-    void expiredTransferClosesWithoutChangingOwner() {
-        authenticate(owner, clock.instant(), "3");
-        var initiated = transfers.initiate(new Initiate(incoming, "Planned succession timed out"));
-        jdbc.update("UPDATE platform_owner_transfer_requests SET initiated_at=?,expires_at=? WHERE id=?",
-                clock.instant().minusSeconds(7200), clock.instant().minusSeconds(1), initiated.id());
-
-        assertThat(transfers.expireDue()).isOne();
-        assertThat(jdbc.queryForObject("SELECT status FROM platform_owner_transfer_requests WHERE id=?", String.class, initiated.id()))
-                .isEqualTo("EXPIRED");
-        assertThat(currentOwner()).isEqualTo(owner);
     }
 
     private String currentOwner() {

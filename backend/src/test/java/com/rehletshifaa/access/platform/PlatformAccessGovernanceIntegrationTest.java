@@ -7,8 +7,6 @@ import com.rehletshifaa.access.platform.application.PlatformAccessGovernanceServ
 import com.rehletshifaa.access.platform.infrastructure.PlatformAccessRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
-import com.rehletshifaa.identity.IdentityProvisioningPort;
-import com.rehletshifaa.identity.KeycloakStaffIdentityService;
 import com.rehletshifaa.workforce.WorkforceTestData;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +19,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -30,7 +27,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = "spring.task.scheduling.enabled=false")
 @Transactional
@@ -40,13 +36,11 @@ class PlatformAccessGovernanceIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired CryptoService crypto;
     @Autowired Clock clock;
-    @MockitoBean KeycloakStaffIdentityService identities;
 
     private final String adminOne = "platform-admin-one";
     private final String adminTwo = "platform-admin-two";
     private final String adminThree = "platform-admin-three";
     private final String candidate = "platform-admin-candidate";
-    private final String owner = "platform-account-owner-approver";
 
     @BeforeEach
     void setUp() {
@@ -55,17 +49,11 @@ class PlatformAccessGovernanceIntegrationTest {
         insertStaff(adminTwo, "Admin Two");
         insertStaff(adminThree, "Admin Three");
         insertStaff(candidate, "Candidate");
-        jdbc.update("UPDATE workforce_people SET mfa_enrolled=TRUE,phishing_resistant_mfa_enrolled=TRUE WHERE subject IN (?,?,?,?)", adminOne, adminTwo, adminThree, candidate);
-        var verified = new IdentityProvisioningPort.IdentityState(true, true, true, true, true);
-        when(identities.identityState(candidate)).thenReturn(verified);
+        jdbc.update("UPDATE workforce_people SET mfa_enrolled=TRUE WHERE subject IN (?,?,?,?)", adminOne, adminTwo, adminThree, candidate);
         Instant now = clock.instant().minusSeconds(60);
         repository.insertAssignment(adminOne, now, null, "TEST", "Initial administrator", now);
         repository.insertAssignment(adminTwo, now, null, "TEST", "Independent administrator", now);
         repository.insertAssignment(adminThree, now, null, "TEST", "Independent checker", now);
-        jdbc.update("INSERT INTO access_subjects(subject,active,revision) VALUES(?,TRUE,0)", owner);
-        UUID ownerRelationship = UUID.randomUUID();
-        jdbc.update("INSERT INTO platform_account_owner_relationships(id,subject,effective_from,status,created_by,reason,revision) VALUES(?, ?, ?,'ACTIVE','TEST','Owner approval test',0)", ownerRelationship, owner, now);
-        jdbc.update("INSERT INTO platform_account_owner_current(id,relationship_id) VALUES(1,?)", ownerRelationship);
     }
 
     @AfterEach void clearAuthentication() { SecurityContextHolder.clearContext(); }
@@ -129,19 +117,6 @@ class PlatformAccessGovernanceIntegrationTest {
         assertThat(List.of(AdministratorChange.class.getRecordComponents()).stream().map(component -> component.getName()))
                 .containsExactly("type", "subject", "effectiveFrom", "effectiveTo", "reason")
                 .noneMatch(name -> name.toLowerCase().contains("organization") || name.toLowerCase().contains("provider"));
-    }
-
-    @Test
-    void currentOwnerCanIndependentlyApproveAnAdministratorWithoutReceivingAdministratorAuthority() {
-        var request = governance.request(new AdministratorChange(ChangeType.APPOINT, candidate,
-                clock.instant(), null, "Restore administrator resilience"));
-        authenticate(owner, clock.instant());
-        var approved = governance.approve(request.id(), new Decision(request.revision(), "Owner independently approved eligible candidate"));
-        assertThat(approved.status()).isEqualTo("APPROVED");
-        assertThat(repository.effectiveAdministrator(candidate, clock.instant())).isTrue();
-        assertThat(repository.effectiveAdministrator(owner, clock.instant())).isFalse();
-        assertThat(jdbc.queryForObject("SELECT approver_type FROM privileged_access_change_decisions WHERE request_id=?", String.class, request.id()))
-                .isEqualTo("PLATFORM_ACCOUNT_OWNER");
     }
 
     private void insertStaff(String subject, String name) {

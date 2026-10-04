@@ -4,8 +4,6 @@ import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.access.platform.infrastructure.PlatformAccessRepository;
-import com.rehletshifaa.access.platform.infrastructure.PlatformOwnerTransferStore;
-import com.rehletshifaa.access.platform.infrastructure.GovernanceNotificationOutbox;
 import com.rehletshifaa.access.platform.infrastructure.StaffLifecycleStore;
 import com.rehletshifaa.access.platform.infrastructure.StaffLifecycleStore.Blocker;
 import com.rehletshifaa.access.platform.infrastructure.StaffLifecycleStore.Invitation;
@@ -55,8 +53,6 @@ public class StaffLifecycleService {
     private final WorkforceRoleAssignmentService assignments;
     private final PlatformAccessRepository access;
     private final PlatformAccessGovernanceService governance;
-    private final PlatformOwnerTransferStore owners;
-    private final GovernanceNotificationOutbox notifications;
     private final Authority authority;
     private final IdentityProvisioningPort identityProvider;
     private final ApplicationEventPublisher events;
@@ -67,17 +63,13 @@ public class StaffLifecycleService {
 
     public StaffLifecycleService(StaffLifecycleStore store, WorkforceRoleAssignmentStore roles, WorkforceRoleAssignmentService assignments,
             PlatformAccessRepository access,
-            PlatformAccessGovernanceService governance, PlatformOwnerTransferStore owners,
-            GovernanceNotificationOutbox notifications, Authority authority,
-            IdentityProvisioningPort identityProvider, ApplicationEventPublisher events, GovernanceAuditLog audit,
+            PlatformAccessGovernanceService governance, Authority authority,             IdentityProvisioningPort identityProvider, ApplicationEventPublisher events, GovernanceAuditLog audit,
             CryptoService crypto, Clock clock, @Value("${app.staff.invitation-lifetime-days:7}") long invitationDays) {
         this.store = store;
         this.roles = roles;
         this.assignments = assignments;
         this.access = access;
         this.governance = governance;
-        this.owners = owners;
-        this.notifications = notifications;
         this.authority = authority;
 
         this.identityProvider = identityProvider;
@@ -219,13 +211,10 @@ public class StaffLifecycleService {
         governance.lockLifecycleGovernance();
         Person person = current(subject, command.revision());
         if (!"ACTIVE".equals(person.lifecycle())) throw new ApiException(409, "INVALID_LIFECYCLE_TRANSITION", "Only active people can be disabled");
-        boolean privileged = privileged(subject, now);
         store.transition(person, "SIGNIN_DISABLED", false, reason, now);
         governance.assertAdministratorInvariant();
         queueState(subject, false, actor, reason);
         audit.record(actor, subject, "STAFF_SIGNIN_DISABLED", "SUCCESS", "lifecycle=SIGNIN_DISABLED", reason);
-        if (privileged) notifications.enqueue("PRIVILEGED_IDENTITY_DISABLED", subject + ":" + person.revision(),
-                "A privileged identity was disabled through workforce lifecycle governance.", now);
         return view(store.personForUpdate(subject), now);
     }
 
@@ -257,13 +246,10 @@ public class StaffLifecycleService {
         Person person = current(subject, command.revision());
         if (!Set.of("ACTIVE", "SIGNIN_DISABLED").contains(person.lifecycle()))
             throw new ApiException(409, "INVALID_LIFECYCLE_TRANSITION", "Only active or disabled people can be offboarded");
-        boolean privileged = privileged(subject, now);
         store.transition(person, "OFFBOARDING", false, reason, now);
         governance.assertAdministratorInvariant();
         queueState(subject, false, actor, reason);
         audit.record(actor, subject, "STAFF_OFFBOARDING_STARTED", "SUCCESS", "lifecycle=OFFBOARDING", reason);
-        if (privileged) notifications.enqueue("PRIVILEGED_IDENTITY_OFFBOARDING_STARTED", subject + ":" + person.revision(),
-                "Offboarding began for a privileged identity.", now);
         return new Offboarding(subject, "OFFBOARDING", store.offboardingBlockers(subject));
     }
 
@@ -396,10 +382,6 @@ public class StaffLifecycleService {
 
     private static void stale() {
         throw new ApiException(409, "STALE_STAFF_RECORD", "The staff record changed; reload and try again");
-    }
-
-    private boolean privileged(String subject, Instant now) {
-        return access.effectiveAdministrator(subject, now) || owners.findCurrentOwner().filter(subject::equals).isPresent();
     }
 
     private static String text(String value, int max, String message) {

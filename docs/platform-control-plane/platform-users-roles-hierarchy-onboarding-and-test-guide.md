@@ -116,9 +116,9 @@ reporting relationships.
 
 | Target action | Initiator | Required approver/decision maker | Key controls |
 |---|---|---|---|
-| Initial owner and first administrators | Deployment operator starts controlled commissioning | Exact owner and two administrator nominees each accept | No subjects committed in source; passkeys required; atomic bootstrap cannot be rerun |
+| Initial owner and first administrators | Deployment operator using controlled bootstrap | One-shot controlled operation | No subjects committed in source; bootstrap cannot be rerun |
 | Transfer Platform Account Owner | Current owner | Incoming owner accepts; a different System Administrator verifies | Three distinct actors, recent phishing-resistant MFA, immutable evidence |
-| Appoint/remove System Administrator | Existing System Administrator | A different effective System Administrator or current owner | Maker/checker, recent phishing-resistant MFA, live candidate recheck, expiry/revision checks, last-admin protection |
+| Appoint/remove System Administrator | Existing System Administrator | A different effective System Administrator | Maker/checker, recent phishing-resistant MFA, expiry/revision checks, last-admin protection |
 | Invite internal workforce | System Administrator | No second approver for ordinary roles | Recent MFA, invitation grants no authority until activation |
 | Add/remove ordinary workforce role | System Administrator | No second approver | Compatibility/SoD checks, reason, revision and audit |
 | Request new hire/job change/team move/removal | Manager of that function | System Administrator executes or rejects | Request remains separate from the actual access change |
@@ -139,8 +139,6 @@ Navigation is permission-sensitive, so users see only the sections their effecti
 
 | Screen | Path | Main users | Purpose |
 |---|---|---|---|
-| Owner workspace | `/{locale}/portal/owner` | Current Platform Account Owner | Read-only executive analytics, administrator decisions and ownership transfer |
-| Commissioning acceptance | `/{locale}/portal/governance/commissioning` | Exact initial owner/admin nominees | One-time, invitation-bound responsibility acceptance; not a registration form |
 | Control Center Home | `/{locale}/portal/control-center` | Any Control Center user | Work requiring attention and links to permitted areas |
 | People | `/{locale}/portal/control-center/people` | System Administrator; auditor read-only | Invite staff, change ordinary roles, disable/restore sign-in, offboard |
 | Teams | `/{locale}/portal/control-center/teams` | Function managers; workforce readers | Create teams, membership, leads and direct reporting lines |
@@ -168,18 +166,14 @@ is denied by the backend.
 
 ### 6.1 First-time platform governance
 
-The first owner and initial administrator set are created through controlled commissioning, not an ordinary
-employee invitation or registration screen. The deployment operator starts the bounded session; the exact owner and
-two administrator nominees each accept at `/{locale}/portal/governance/commissioning` with a recent passkey. The
-final acceptance invokes the atomic one-shot bootstrap primitive. After that one-time event:
+The first owner and initial administrator set are created through the controlled deployment bootstrap, not a normal
+business screen. After that one-time event:
 
 1. Maintain at least two effective System Administrators so maker/checker actions remain possible.
 2. Use **Access & Governance → Administrators** for every later administrator appointment/removal.
 3. Use the ordinary owner-transfer process for ownership changes; do not edit the database or Keycloak roles.
 
-Unavailable-owner recovery uses OD-02 multi-party control: Administrator A initiates, Administrator B confirms, an
-independent deployment/security operator verifies sealed evidence, and the exact successor accepts before cooling
-off and completion. No single actor can complete it. Follow `owner-and-administrator-operations-runbook.md`.
+Emergency owner/platform recovery is OD-02 and is not currently implemented.
 
 ### 6.2 Invite an internal workforce person
 
@@ -480,7 +474,6 @@ Complete at the Section 1 checkpoint:
 - database-owned workforce roles and scoped relationships;
 - workforce invite, role, lifecycle, hierarchy, staffing, support and access-review surfaces;
 - System Administrator maker/checker and owner-transfer governance;
-- controlled greenfield commissioning, owner executive/governance workspace and OD-02 owner recovery;
 - database-versus-Keycloak reconciliation and restore-wide sign-in gate;
 - durable identity-operation retry/replay controls;
 - live MFA, WebAuthn and restore evidence.
@@ -489,8 +482,7 @@ Not complete or intentionally deferred:
 
 - **Practice Manager consent flow:** acceptance, existing-identity adoption, MFA proof and permission re-consent are
   gated; the current legacy invitation path is not production acceptance evidence.
-- **Production recovery evidence:** OD-02 implementation and its runbook are delivered; the production-equivalent
-  quarterly rehearsal and sealed-credential exercise remain operational release evidence, not a code gap.
+- **OD-02 emergency platform recovery:** requires an approved dual-control operational design.
 - **OD-07 patient-specific appointment administration by Practice Managers:** deferred; launch Practice Managers
   have no patient or case access.
 - **OPS-03 wider restore assurance:** PostgreSQL, Keycloak, MinIO/document and full data restore drill is separate

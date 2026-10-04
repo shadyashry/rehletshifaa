@@ -13,7 +13,7 @@ import { TrackedLink } from "./TrackedLink";
  * every legal link stays one tap away and the medical notice stays readable at 13px.
  */
 export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
-  const explore = primaryNav(locale, d).slice(1, 4);
+  const explore = primaryNav(locale, d).slice(0, 3);
   const legal = legalNav(locale, d);
   const year = new Date().getFullYear();
 

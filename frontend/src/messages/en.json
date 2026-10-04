@@ -11,7 +11,22 @@
     "portal": "Check case status",
     "signIn": "Sign in",
     "signInHint": "For patients who already activated their account",
-    "staff": "Staff sign in"
+    "staff": "Staff sign in",
+    "careAreasMenu": {
+      "open": "Show care areas",
+      "overview": "View all care areas",
+      "overviewBody": "{areas} care areas across {systems} body systems",
+      "notSureTitle": "Not sure which area fits?",
+      "notSureBody": "Send what you have. Your coordinator routes your case to the right Consultant."
+    },
+    "utilityTagline": "Specialist care in Egypt — one coordinator, every step of the way",
+    "account": {
+      "trigger": "My case",
+      "heading": "Already started a case?",
+      "signInBody": "For patients who already activated their account",
+      "statusBody": "With your Case ID and WhatsApp number"
+    },
+    "coordinatorShort": "Coordinator"
   },
   "common": {
     "brand": "RehletShifaa",
@@ -138,7 +153,7 @@
     "finalBody": "Send what you already have. We'll guide you through the next step.",
     "finalNote": "Starting a case does not commit you to treatment or travel.",
     "slogan": "You see the full picture first. The decision stays yours.",
-    "areasIntro": "Start with the area closest to your need. If you are not sure, send your case and your coordinator will direct it.",
+    "areasIntro": "Consultant-led review across {count} care areas, organised by body system. Every area is led by named, verified Consultants.",
     "areasAction": "View care area",
     "cardiologyFacets": ["Coronary", "Structural heart", "Heart rhythm"],
     "consultantsPromise": {
@@ -170,6 +185,30 @@
       ],
       "note": "Arranged after your medical proposal, and only if you want it.",
       "packageLabel": "Coordinated by our team"
+    },
+    "areasConsultantsOne": "1 Consultant",
+    "areasConsultantsTwo": "2 Consultants",
+    "areasConsultantsMany": "{n} Consultants",
+    "panel": {
+      "title": "The Consultants behind your care",
+      "body": "Senior specialists, verified before any case is matched to them.",
+      "consultants": "Verified Consultants",
+      "faculty": "University faculty",
+      "areas": "Care areas",
+      "link": "Meet the Consultants"
+    },
+    "videoPlay": "Play the film",
+    "trustAccess": {
+      "title": "Who works with your case",
+      "case": "Your case",
+      "storage": "Private storage · short-lived links",
+      "people": [
+        ["You", "You decide what is shared"],
+        ["Your coordinator", "Organises your case"],
+        ["Your Consultant", "Owns the clinical decision"]
+      ],
+      "never": "Never public",
+      "neverBody": "No public links, no listing"
     }
   },
   "footer": {
@@ -499,8 +538,7 @@
     "stats": {
       "areas": "Care areas",
       "consultants": "Verified Consultants",
-      "languagesValue": "AR · EN",
-      "languages": "Coordination languages"
+      "faculty": "University faculty"
     },
     "explore": "Explore the care areas",
     "map": {
@@ -714,5 +752,40 @@
         }
       ]
     }
+  },
+  "careAreaDetail": {
+    "careAreas": "Care areas",
+    "meet": "Meet the Consultants",
+    "stats": {
+      "consultants": "Verified Consultants",
+      "faculty": "University faculty",
+      "focus": "Clinical focus areas"
+    },
+    "snapshotLed": "Led by",
+    "scopeEyebrow": "What we review",
+    "scopeTitle": "What this care area covers",
+    "scopeIntro": "Not every condition is listed. Send your reports anyway — your coordinator confirms the right Consultant.",
+    "focusTitle": "Clinical focus of our Consultants",
+    "signsFallback": "You might contact us if",
+    "consultantsEyebrow": "The Consultants",
+    "consultantsTitle": "Who leads {area}",
+    "consultantsIntro": "Verified senior specialists. Your coordinator matches your case to the most appropriate one.",
+    "relatedEyebrow": "Keep exploring",
+    "relatedTitle": "Other care areas",
+    "sameSystem": "Also in {system}",
+    "allAreas": "View all care areas"
+  },
+  "consultantProfile": {
+    "verified": "Verified profile",
+    "requestReview": "Request a case review",
+    "highlightsEyebrow": "Career & academic contributions",
+    "highlights": "Professional highlights",
+    "timeline": "Qualifications timeline",
+    "cvAppointments": "Appointments in the supplied CV",
+    "sourcesTitle": "Profile sources",
+    "relatedEyebrow": "Same body system",
+    "relatedTitle": "Other Consultants in {system}",
+    "relatedFallback": "More Consultants",
+    "allConsultants": "Meet all Consultants"
   }
 }

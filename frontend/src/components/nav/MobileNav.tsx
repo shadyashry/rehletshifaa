@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, UserRound, X } from "lucide-react";
+import { MessageCircle, Menu, UserRound, X } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 import { localeHref, type NavItem } from "@/lib/links";
@@ -23,6 +23,8 @@ type MobileNavProps = {
     language: string;
     languageAria: string;
   };
+  /** The coordinator on WhatsApp — the desktop utility bar's contact, carried into the phone menu. */
+  contact?: { label: string; href: string };
 };
 
 /**
@@ -30,7 +32,7 @@ type MobileNavProps = {
  * are needed, so the whole interaction stays small. The panel closes on Escape
  * and whenever a link inside it is followed.
  */
-export function MobileNav({ locale, items, labels }: MobileNavProps) {
+export function MobileNav({ locale, items, labels, contact }: MobileNavProps) {
   const panelId = useId();
   const pathname = usePathname();
   const detailsRef = useRef<HTMLDetailsElement>(null);
@@ -96,7 +98,13 @@ export function MobileNav({ locale, items, labels }: MobileNavProps) {
               </Link>
             ))}
           </nav>
-          <div className="mt-1 border-t border-line pt-2">
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2">
+            {contact ? (
+              <a href={contact.href} target="_blank" rel="noopener noreferrer" onClick={close} className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-semibold text-brand-700 hover:bg-brand-50">
+                <MessageCircle size={17} aria-hidden="true" />
+                {contact.label}
+              </a>
+            ) : null}
             <LocaleSwitch
               locale={locale}
               label={labels.language}

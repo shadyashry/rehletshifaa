@@ -32,10 +32,7 @@ export type ServiceChange = {
   decidedAt?: string | null; decisionReason?: string | null; appliedRevision?: number | null; version: number;
 };
 export type Slot = { id: string; startsAt: string; endsAt: string; mode: "VIDEO" | "IN_PERSON"; status: string; note?: string | null; version: number };
-export type Manager = { id: string; name: string; email?: string | null; status: string; permissions: ClinicPermission[];
-  pendingPermissions?: ClinicPermission[] | null; invitedAt: string; acceptedAt?: string | null; expiresAt?: string | null; version: number };
-export type ManagerInvitation = { id: string; practitionerId: string; consultantName: string; status: string;
-  identityResolutionStatus: string; permissions: ClinicPermission[]; invitedAt: string; expiresAt: string; version: number };
+export type Manager = { id: string; name: string; email?: string | null; status: string; permissions: ClinicPermission[]; invitedAt: string; version: number };
 export type Clinic = {
   practitionerId: string; relation: "OWNER" | "PRACTICE_MANAGER"; permissions: ClinicPermission[]; professional: Professional; publicProfile: PublicProfile;
   draft?: ProfileDraft | null; managerChangesRequireApproval: boolean; services: ClinicService[]; pendingChanges: ServiceChange[]; slots: Slot[];

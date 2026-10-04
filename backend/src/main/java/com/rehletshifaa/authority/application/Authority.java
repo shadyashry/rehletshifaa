@@ -1,7 +1,6 @@
 package com.rehletshifaa.authority.application;
 
 import com.rehletshifaa.authority.domain.Permission;
-import com.rehletshifaa.authority.domain.OwnerPolicy;
 import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.authority.domain.RolePolicy;
 import com.rehletshifaa.authority.domain.RolePolicy.Grant;
@@ -34,16 +33,14 @@ public class Authority {
     private final WorkforceDirectory workforce;
     private final Clock clock;
     private final AuthenticationStrength authenticationStrength;
-    private final PlatformOwnership ownership;
 
     public Authority(EffectiveRoleStore roles, CaseRelationships cases, WorkforceDirectory workforce, Clock clock,
-            AuthenticationStrength authenticationStrength, PlatformOwnership ownership) {
+            AuthenticationStrength authenticationStrength) {
         this.roles = roles;
         this.cases = cases;
         this.workforce = workforce;
         this.clock = clock;
         this.authenticationStrength = authenticationStrength;
-        this.ownership = ownership;
     }
 
     /** {@code granted=false} carries the refusal code and the reason; {@code role}/{@code scope} name the grant used. */
@@ -82,15 +79,6 @@ public class Authority {
         Instant now = clock.instant();
         Set<Role> effective = roles.roles(principal.subject(), now);
         List<Grant> candidates = RolePolicy.grantsFor(permission).stream().filter(g -> effective.contains(g.role())).toList();
-        boolean owner = ownership.isCurrentOwner(principal.subject(), now);
-        if (candidates.isEmpty() && owner && OwnerPolicy.grants(permission)) {
-            if (permission.stepUp()) {
-                if (!authenticationStrength.recentPhishingResistant(principal, STEP_UP, now))
-                    return new Decision(false, permission, null, Scope.PLATFORM, "REAUTHENTICATION_REQUIRED",
-                            "Use a recent WebAuthn passkey sign-in to confirm this owner governance action");
-            }
-            return new Decision(true, permission, null, Scope.PLATFORM, "GRANTED", "Granted by current Platform Account Owner relationship");
-        }
         if (candidates.isEmpty())
             return new Decision(false, permission, null, null, "PERMISSION_NOT_HELD",
                     "Your roles do not include this action (" + permission + ")");
@@ -119,10 +107,6 @@ public class Authority {
         Set<Permission> platform = EnumSet.noneOf(Permission.class);
         Set<Workspace> workspaces = EnumSet.noneOf(Workspace.class);
         Set<String> managed = new TreeSet<>();
-        if (ownership.isCurrentOwner(principal.subject(), now)) {
-            platform.addAll(OwnerPolicy.permissions());
-            workspaces.add(Workspace.OWNER);
-        }
         for (Grant grant : RolePolicy.grants()) {
             if (!effective.contains(grant.role())) continue;
             if (grant.scope() == Scope.PLATFORM) platform.add(grant.permission());

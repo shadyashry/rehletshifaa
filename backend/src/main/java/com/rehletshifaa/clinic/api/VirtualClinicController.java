@@ -3,7 +3,6 @@ package com.rehletshifaa.clinic.api;
 import com.rehletshifaa.clinic.api.ClinicDtos.*;
 import com.rehletshifaa.clinic.application.ConsultantCapabilityService;
 import com.rehletshifaa.clinic.application.VirtualClinicService;
-import com.rehletshifaa.clinic.application.PracticeManagerDelegationService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,9 +17,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/clinics")
 public class VirtualClinicController {
     private final VirtualClinicService clinics;
-    private final PracticeManagerDelegationService managers;
 
-    public VirtualClinicController(VirtualClinicService clinics, PracticeManagerDelegationService managers) { this.clinics = clinics; this.managers = managers; }
+    public VirtualClinicController(VirtualClinicService clinics) { this.clinics = clinics; }
 
     @GetMapping("/mine") public List<ClinicSummary> mine() { return clinics.mine(); }
     @GetMapping("/{practitionerId}") public ClinicView clinic(@PathVariable UUID practitionerId) { return clinics.clinic(practitionerId); }
@@ -42,10 +40,6 @@ public class VirtualClinicController {
     @PutMapping("/{practitionerId}/slots/{slotId}") public SlotView updateSlot(@PathVariable UUID practitionerId, @PathVariable UUID slotId, @Valid @RequestBody SlotRequest request) { return clinics.updateSlot(practitionerId, slotId, request); }
     @PostMapping("/{practitionerId}/slots/{slotId}/cancel") public SlotView cancelSlot(@PathVariable UUID practitionerId, @PathVariable UUID slotId, @Valid @RequestBody VersionedRequest request) { return clinics.cancelSlot(practitionerId, slotId, request); }
 
-    @PostMapping("/{practitionerId}/managers") public ManagerView invite(@PathVariable UUID practitionerId, @Valid @RequestBody ManagerInviteRequest request) { return managers.invite(practitionerId, request); }
-    @PutMapping("/{practitionerId}/managers/{managerId}") public ManagerView updateManager(@PathVariable UUID practitionerId, @PathVariable UUID managerId, @Valid @RequestBody ManagerUpdateRequest request) { return managers.change(practitionerId, managerId, request); }
-    @PostMapping("/invitations/accept") public ManagerView accept(@Valid @RequestBody AcceptManagerInvitationRequest request) { return managers.accept(request); }
-    @GetMapping("/invitations/mine") public List<ManagerInvitationView> invitations() { return managers.mine(); }
-    @PostMapping("/{practitionerId}/invitations/{invitationId}/cancel") public void cancel(@PathVariable UUID practitionerId, @PathVariable UUID invitationId, @Valid @RequestBody VersionedRequest request) { managers.cancel(practitionerId, invitationId, request); }
-    @PostMapping("/{practitionerId}/invitations/{invitationId}/resend") public ManagerView resend(@PathVariable UUID practitionerId, @PathVariable UUID invitationId, @Valid @RequestBody VersionedRequest request) { return managers.resend(practitionerId, invitationId, request); }
+    @PostMapping("/{practitionerId}/managers") public ManagerView invite(@PathVariable UUID practitionerId, @Valid @RequestBody ManagerInviteRequest request) { return clinics.inviteManager(practitionerId, request); }
+    @PutMapping("/{practitionerId}/managers/{managerId}") public ManagerView updateManager(@PathVariable UUID practitionerId, @PathVariable UUID managerId, @Valid @RequestBody ManagerUpdateRequest request) { return clinics.updateManager(practitionerId, managerId, request); }
 }

@@ -12,8 +12,6 @@ public interface IdentityProvisioningPort {
     default IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker){return invite(name,email,locale);}
     default IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker,String compatibilityRole){return inviteTracked(name,email,locale,operationMarker);}
     default java.util.Optional<IdentityAccount> recover(String operationMarker){return java.util.Optional.empty();}
-    /** Exact identity-provider email resolution. Ambiguous or unverified matches fail closed in the business flow. */
-    default EmailResolution resolveVerifiedEmail(String email) { return EmailResolution.none(); }
     void setCompatibilityRole(String subject, String role);
     void resend(String subject, String locale);
     void setEnabled(String subject, boolean enabled);
@@ -29,11 +27,5 @@ public interface IdentityProvisioningPort {
     record IdentityState(boolean available, boolean exists, boolean enabled, boolean mfaEnrolled,
                          boolean phishingResistantMfaEnrolled) {
         public static IdentityState unavailable() { return new IdentityState(false, false, false, false, false); }
-    }
-    record EmailResolution(Status status, String subject, String email) {
-        public enum Status { NONE, UNIQUE_VERIFIED, REVIEW_REQUIRED }
-        public static EmailResolution none() { return new EmailResolution(Status.NONE, null, null); }
-        public static EmailResolution unique(String subject, String email) { return new EmailResolution(Status.UNIQUE_VERIFIED, subject, email); }
-        public static EmailResolution reviewRequired() { return new EmailResolution(Status.REVIEW_REQUIRED, null, null); }
     }
 }

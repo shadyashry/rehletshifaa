@@ -43,12 +43,7 @@ class AuthorityIntegrationTest {
     void setUp() {
         new WorkforceTestData(jdbc, crypto, clock.instant())
                 .person("a-owner", "COORDINATOR").person("a-lead", "COORDINATOR").person("a-other", "COORDINATOR")
-                .person("a-multi", "COORDINATOR", "OPERATIONS")
                 .person("a-admin").administrator("a-admin").person("a-auditor", "COMPLIANCE_AUDITOR");
-        UUID ownerRelationship = UUID.randomUUID();
-        jdbc.update("INSERT INTO access_subjects(subject,active,revision) VALUES('a-platform-owner',TRUE,0)");
-        jdbc.update("INSERT INTO platform_account_owner_relationships(id,subject,effective_from,status,created_by,reason,revision) VALUES(?,'a-platform-owner',?,'ACTIVE','test','Owner policy test',0)", ownerRelationship, clock.instant().minusSeconds(60));
-        jdbc.update("INSERT INTO platform_account_owner_current(id,relationship_id) VALUES(1,?)", ownerRelationship);
         WorkforceTestData.leadTeam(jdbc, "CARE_COORDINATION", "a-lead", "a-owner");
         Instant now = clock.instant();
         UUID patient = UUID.randomUUID();
@@ -70,9 +65,6 @@ class AuthorityIntegrationTest {
         assertThat(decide("a-lead", Permission.CASE_READ, Resource.ofCase(caseId)).scope().name()).isEqualTo("SUPERVISED");
         assertThat(decide("a-lead", Permission.CASE_COORDINATE, Resource.ofCase(caseId)).code()).isEqualTo("OUT_OF_SCOPE");
         assertThat(decide("a-other", Permission.CASE_READ, Resource.ofCase(caseId)).code()).isEqualTo("OUT_OF_SCOPE");
-        assertThat(decide("a-multi", Permission.CASE_READ, Resource.ofCase(caseId)).code())
-                .as("holding two case-capable roles never replaces an explicit case or supervised relationship")
-                .isEqualTo("OUT_OF_SCOPE");
         assertThat(decide("a-lead", Permission.TASK_SUPERVISE, Resource.ofCase(caseId, "a-owner")).granted()).isTrue();
         assertThat(decide("a-lead", Permission.TASK_SUPERVISE, Resource.ofCase(caseId, "a-other")).granted()).isFalse();
     }
@@ -83,20 +75,6 @@ class AuthorityIntegrationTest {
         assertThat(decide("a-auditor", Permission.CASE_READ, Resource.ofCase(caseId)).code()).isEqualTo("PERMISSION_NOT_HELD");
         assertThat(decide("a-admin", Permission.WORKFORCE_ADMINISTER, Resource.platform()).granted()).isTrue();
         assertThat(decide("a-auditor", Permission.WORKFORCE_ADMINISTER, Resource.platform()).granted()).isFalse();
-    }
-
-    @Test
-    void ownerRelationshipGrantsOnlyFixedExecutiveAndGovernanceCapabilitiesAndRevokesOnNextRequest() {
-        Principal owner = new Principal("a-platform-owner", clock.instant(), "3");
-        assertThat(authority.held(owner).workspaces()).containsExactly(Workspace.OWNER);
-        assertThat(authority.decide(owner, Permission.EXECUTIVE_REVENUE_VIEW, Resource.platform()).granted()).isTrue();
-        assertThat(authority.decide(owner, Permission.ADMINISTRATOR_CHANGE_APPROVE, Resource.platform()).granted()).isTrue();
-        assertThat(authority.decide(owner, Permission.CASE_READ, Resource.ofCase(caseId)).code()).isEqualTo("PERMISSION_NOT_HELD");
-        assertThat(authority.decide(owner, Permission.WORKFORCE_ADMINISTER, Resource.platform()).code()).isEqualTo("PERMISSION_NOT_HELD");
-        assertThat(authority.decide(owner, Permission.PAYMENT_RECORD, Resource.ofCase(caseId)).code()).isEqualTo("PERMISSION_NOT_HELD");
-
-        jdbc.update("UPDATE access_subjects SET active=FALSE,revision=revision+1 WHERE subject='a-platform-owner'");
-        assertThat(authority.decide(owner, Permission.EXECUTIVE_REVENUE_VIEW, Resource.platform()).code()).isEqualTo("PERMISSION_NOT_HELD");
     }
 
     @Test

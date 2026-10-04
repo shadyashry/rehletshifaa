@@ -41,11 +41,7 @@ public final class ClinicDtos {
                                     Instant proposedAt, String decidedByName, Instant decidedAt, String decisionReason,
                                     Integer appliedRevision, long version) {}
     public record SlotView(UUID id, Instant startsAt, Instant endsAt, String mode, String status, String note, long version) {}
-    public record ManagerView(UUID id, String name, String email, String status, List<String> permissions,
-                              List<String> pendingPermissions, Instant invitedAt, Instant acceptedAt, Instant expiresAt, long version) {}
-    public record ManagerInvitationView(UUID id, UUID practitionerId, String consultantName, String status,
-                                        String identityResolutionStatus, List<String> permissions,
-                                        Instant invitedAt, Instant expiresAt, long version) {}
+    public record ManagerView(UUID id, String name, String email, String status, List<String> permissions, Instant invitedAt, long version) {}
     public record ClinicView(UUID practitionerId, String relation, List<String> permissions, ProfessionalView professional,
                              PublicProfileView publicProfile, ProfileDraftView draft, boolean managerChangesRequireApproval,
                              List<ServiceView> services, List<ServiceChangeView> pendingChanges, List<SlotView> slots,
@@ -76,7 +72,6 @@ public final class ClinicDtos {
                                        @Pattern(regexp = "en|ar") String locale) {}
     public record ManagerUpdateRequest(@NotNull List<@Pattern(regexp = "SCHEDULE|PROFILE|SERVICES") String> permissions,
                                        boolean active, long expectedVersion) {}
-    public record AcceptManagerInvitationRequest(@NotBlank @Size(max = 200) String token) {}
     public record CapabilityRequest(@NotBlank @Pattern(regexp = "CARE_AREA|SUBSPECIALTY|PROCEDURE|AGE_GROUP|LANGUAGE") String type,
                                     @NotBlank @Size(max = 120) @Pattern(regexp = "[A-Za-z0-9._-]+") String code,
                                     @NotBlank @Size(max = 200) String label) {}

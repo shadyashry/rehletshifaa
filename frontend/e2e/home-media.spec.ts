@@ -14,6 +14,8 @@ for (const locale of ["en", "ar"] as const) {
     const video = page.locator("#how-it-works video");
     await expect(video).toBeVisible();
     await expect(video).toHaveAttribute("src", new RegExp(`journey-${locale}\\.mp4`));
+    // A composed poster first; native controls appear once the play control is pressed.
+    await page.locator("#how-it-works").getByRole("button", { name: locale === "en" ? /Play the film/ : /تشغيل الفيلم/ }).click();
     await expect(video).toHaveAttribute("controls", "");
     await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).readyState), { timeout: 15000 }).toBeGreaterThanOrEqual(1).catch(async error => {
       console.log(await video.evaluate(element => { const media = element as HTMLVideoElement; return { ready: media.readyState, error: media.error?.message, code: media.error?.code, state: media.networkState, source: media.currentSrc }; }));

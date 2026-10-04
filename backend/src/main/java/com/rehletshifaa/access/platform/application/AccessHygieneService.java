@@ -9,8 +9,6 @@ import com.rehletshifaa.access.platform.infrastructure.AccessHygieneStore.Item;
 import com.rehletshifaa.access.platform.infrastructure.AccessHygieneStore.MfaReset;
 import com.rehletshifaa.access.platform.infrastructure.AccessHygieneStore.ServiceAccount;
 import com.rehletshifaa.access.platform.infrastructure.PlatformAccessRepository;
-import com.rehletshifaa.access.platform.infrastructure.PlatformOwnerTransferStore;
-import com.rehletshifaa.access.platform.infrastructure.GovernanceNotificationOutbox;
 import com.rehletshifaa.access.platform.infrastructure.StaffLifecycleStore;
 import com.rehletshifaa.identity.operations.IdentityOperationRequested;
 import com.rehletshifaa.shared.api.ApiException;
@@ -45,8 +43,6 @@ public class AccessHygieneService {
     private final StaffLifecycleStore people;
     private final PlatformAccessRepository access;
     private final PlatformAccessGovernanceService governance;
-    private final PlatformOwnerTransferStore owners;
-    private final GovernanceNotificationOutbox notifications;
     private final Authority authority;
     private final ApplicationEventPublisher events;
     private final GovernanceAuditLog audit;
@@ -54,15 +50,11 @@ public class AccessHygieneService {
     private final Clock clock;
 
     public AccessHygieneService(AccessHygieneStore store, StaffLifecycleStore people, PlatformAccessRepository access,
-            PlatformAccessGovernanceService governance, PlatformOwnerTransferStore owners,
-            GovernanceNotificationOutbox notifications, Authority authority,
-            ApplicationEventPublisher events, GovernanceAuditLog audit, CryptoService crypto, Clock clock) {
+            PlatformAccessGovernanceService governance, Authority authority,             ApplicationEventPublisher events, GovernanceAuditLog audit, CryptoService crypto, Clock clock) {
         this.store = store;
         this.people = people;
         this.access = access;
         this.governance = governance;
-        this.owners = owners;
-        this.notifications = notifications;
         this.authority = authority;
 
         this.events = events;
@@ -175,15 +167,12 @@ public class AccessHygieneService {
             return store.mfaResetForUpdate(id);
         }
         store.decideMfaReset(request, "APPROVED", actor, reason, now);
-        boolean privileged = privileged(request.subject(), now);
         store.clearMfaEvidence(request.subject());
         governance.assertAdministratorInvariant();
         UUID op = UUID.randomUUID();
         events.publishEvent(IdentityOperationRequested.reset(op, "mfa-reset:" + id, request.subject(),
                 IdentityOperationRequested.Type.RESET_MFA, actor, "Approved MFA reset", "en"));
         audit.record(actor, id.toString(), "MFA_RESET_APPROVED", "SUCCESS", "subject=" + request.subject(), reason);
-        if (privileged) notifications.enqueue("PRIVILEGED_MFA_RESET_APPROVED", id.toString(),
-                "An MFA reset was approved for a privileged identity.", now);
         return store.mfaResetForUpdate(id);
     }
 
@@ -288,13 +277,10 @@ public class AccessHygieneService {
                 continue;
             }
             var person = people.personForUpdate(subject);
-            boolean privileged = privileged(subject, now);
             people.transition(person, "SIGNIN_DISABLED", false, "Dormant: no sign-in for 90 days", now);
             UUID op = UUID.randomUUID();
             events.publishEvent(IdentityOperationRequested.state(op, "dormancy:" + op, subject, false, "system", "Dormant account"));
             audit.record("system", subject, "STAFF_DORMANCY_DISABLED", "SUCCESS", "no sign-in for 90 days");
-            if (privileged) notifications.enqueue("PRIVILEGED_IDENTITY_DORMANCY_DISABLED", subject + ":" + now,
-                    "A privileged identity was disabled by the dormancy policy.", now);
             disabled++;
         }
         governance.assertAdministratorInvariant();
@@ -367,10 +353,6 @@ public class AccessHygieneService {
 
     private static void stale() {
         throw new ApiException(409, "STALE_RECORD", "The record changed; reload and try again");
-    }
-
-    private boolean privileged(String subject, Instant now) {
-        return access.effectiveAdministrator(subject, now) || owners.findCurrentOwner().filter(subject::equals).isPresent();
     }
 
     private static String text(String value, int max, String message) {

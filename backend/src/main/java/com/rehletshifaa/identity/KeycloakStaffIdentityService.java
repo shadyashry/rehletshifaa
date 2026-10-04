@@ -76,17 +76,6 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
 
     @Override public Optional<IdentityAccount> recover(String operationMarker){requireConfigured();URI uri=UriComponentsBuilder.fromUriString(admin("/users")).queryParam("q","rehletshifaaProvisioningOperation:"+operationMarker).build().encode().toUri();try{List<Map<String,Object>> found=http.get().uri(uri).header("Authorization",bearer()).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});if(found==null||found.isEmpty())return Optional.empty();if(found.size()!=1)throw new ApiException(409,"AMBIGUOUS_IDENTITY_RECOVERY","Identity recovery returned more than one account");Map<String,Object> user=found.get(0);return Optional.of(new IdentityAccount(String.valueOf(user.get("id")),String.valueOf(user.get("email")),"INVITED",Instant.now()));}catch(RestClientResponseException e){throw identityFailure(e,"Unable to reconcile the identity account");}}
 
-    @Override public EmailResolution resolveVerifiedEmail(String email) {
-        requireConfigured();
-        String normalized=email.trim().toLowerCase(Locale.ROOT);
-        List<Map<String,Object>> found=findByEmail(normalized).stream()
-                .filter(user -> normalized.equalsIgnoreCase(String.valueOf(user.get("email"))))
-                .toList();
-        if(found.isEmpty()) return EmailResolution.none();
-        if(found.size()!=1 || !Boolean.TRUE.equals(found.get(0).get("emailVerified"))) return EmailResolution.reviewRequired();
-        return EmailResolution.unique(String.valueOf(found.get(0).get("id")), normalized);
-    }
-
     public void resend(String subject,String locale){requireConfigured();sendInvite(subject,locale);}
 
     public void setEnabled(String subject,boolean enabled){

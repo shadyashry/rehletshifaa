@@ -1,97 +1,74 @@
-import { ArrowRight, Activity, Bone, HeartPulse } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
+import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
+import { TrackedLink } from "@/components/TrackedLink";
+import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
-import { CARE_AREA_SLUGS } from "@/lib/care-areas";
-import { additionalCareAreas } from "@/lib/additional-care-areas";
 import { localeHref } from "@/lib/links";
-import { TrackedLink } from "@/components/TrackedLink";
 
 /**
- * The care areas as an editorial portfolio, not three equal tiles: Cardiology — the platform's first and
- * deepest area — holds the wider column on the clinical mist, its three approved sub-areas named under
- * the title, and the other two stand beside it on the elevated surface at the same voice, the same action
- * and the same restraint. Flat surfaces, hairline edges, one arrow per area. Phone: a stack, Cardiology
- * first.
+ * The care areas as a compact atlas — the homepage preview of the Care Areas page. Every area has equal
+ * standing (no featured specialty): six body-system panels, each with a tinted header and its areas as
+ * link rows that name how many Consultants lead them. The same systems, tints and icons as the Care
+ * Areas page and the Consultants panel, so the three read as one system.
  */
-const ICONS = [HeartPulse, Activity, Bone] as const;
-
 export function CarePathways({ locale, d }: { locale: Locale; d: Dictionary }) {
-  const arrow = <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100 transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />;
+  const areas = careAreaAtlas(locale, d);
+  const systems = careAtlasSystems(areas, d);
+  const consultants = (n: number) =>
+    n === 1 ? d.home.areasConsultantsOne : n === 2 ? d.home.areasConsultantsTwo : d.home.areasConsultantsMany.replace("{n}", String(n));
 
   return (
-    <section className="bg-surface-pearl pb-[clamp(2.5rem,2rem+2vw,4.25rem)] pt-[clamp(1.75rem,1.25rem+1.6vw,2.75rem)]">
+    <section aria-labelledby="home-areas-title" className="bg-surface-pearl pb-[clamp(2.75rem,2rem+2.2vw,4.5rem)] pt-[clamp(2rem,1.5rem+1.8vw,3.25rem)]">
       <div className="container-site">
-        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-1 sm:gap-y-3">
-          <div className="max-w-xl">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-end lg:gap-16">
+          <div>
             <p className="eyebrow">{d.home.areasEyebrow}</p>
-            <h2 className="headline mt-2">{d.home.areasTitle}</h2>
+            <h2 id="home-areas-title" className="headline mt-2">{d.home.areasTitle}</h2>
+            <p className="mt-3 max-w-[56ch] text-[1rem] leading-7 text-ink-600">{d.home.areasIntro.replace("{count}", String(areas.length))}</p>
           </div>
-          <TrackedLink event="send_case_cta_clicked" className="link-cta text-[0.95rem]" href={localeHref(locale, "care-areas")}>
+          <TrackedLink event="send_case_cta_clicked" className="link-cta text-[0.95rem] lg:justify-self-end" href={localeHref(locale, "care-areas")}>
             {d.common.explore}
             <ArrowRight size={15} aria-hidden="true" className="rtl:-scale-x-100" />
           </TrackedLink>
         </div>
 
-        <ul className="mt-6 grid gap-4 sm:mt-8 lg:mt-9 lg:grid-cols-[minmax(0,55fr)_minmax(0,45fr)] lg:grid-rows-2 lg:gap-5">
-          {d.home.areas.map((area, index) => {
-            const Icon = ICONS[index] ?? HeartPulse;
-            const href = localeHref(locale, CARE_AREA_SLUGS[index]);
-
-            if (index === 0) {
-              return (
-                <li key={area.title} className="group relative flex flex-col justify-center rounded-[14px] bg-surface-clinical p-6 ring-1 ring-border-clinical transition-shadow hover:ring-brand-300 sm:p-7 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:px-9 lg:py-8">
-                  <div className="flex items-center gap-4">
-                    <span aria-hidden className="grid h-11 w-11 flex-none place-items-center rounded-full bg-surface-elevated text-brand-700 ring-1 ring-border-clinical lg:h-12 lg:w-12">
-                      <Icon size={20} strokeWidth={1.7} />
-                    </span>
-                    <h3 className="text-[1.5rem] font-semibold leading-[1.2] tracking-[-0.015em] text-brand-900 sm:text-[1.75rem] lg:text-[1.875rem]">
-                      {area.title}
-                    </h3>
-                  </div>
-                  <div className="mt-4 lg:mt-5">
-                    {/* The area's approved sub-areas, as one quiet line of labels. */}
-                    <ul className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.8rem] font-semibold uppercase leading-5 tracking-[0.08em] text-brand-700 rtl:text-[0.9rem] rtl:normal-case rtl:tracking-normal">
-                      {d.home.cardiologyFacets.map((facet, i, all) => (
-                        <li key={facet} className="flex items-center gap-x-2.5">
-                          {facet}
-                          {i < all.length - 1 && <span aria-hidden className="h-1 w-1 rounded-full bg-brand-400" />}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-3 max-w-[52ch] text-[1rem] leading-7 text-ink-600 sm:text-[1.0625rem]">{area.body}</p>
-                    <Link href={href} className="link-cta mt-3 text-[0.95rem] after:absolute after:inset-0 sm:mt-4">
-                      {d.home.areasAction}
-                      {arrow}
-                    </Link>
-                  </div>
-                </li>
-              );
-            }
-
+        <div className="mt-7 grid gap-4 sm:mt-8 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+          {systems.map((system) => {
+            const style = SYSTEM_STYLES[system.key];
             return (
-              <li key={area.title} className="group relative flex flex-col rounded-[12px] bg-surface-elevated p-6 ring-1 ring-border-subtle transition-shadow hover:ring-brand-300 lg:col-start-2">
-                <div className="flex items-center gap-3.5">
-                  <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-full bg-surface-sage text-brand-600">
-                    <Icon size={18} strokeWidth={1.7} />
-                  </span>
-                  <h3 className="text-[1.125rem] font-semibold leading-[1.3] text-brand-900 lg:text-[1.2rem] lg:tracking-[-0.008em]">{area.title}</h3>
+              <section key={system.key} aria-labelledby={`home-system-${system.key}`} className="flex flex-col overflow-hidden rounded-[16px] border border-border-card bg-surface-default shadow-[0_1px_2px_rgba(36,64,74,0.04)]">
+                <div className={`flex items-start gap-3 px-5 pb-4 pt-5 ${style.soft}`}>
+                  <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 flex-none rounded-full ${style.dot}`} />
+                  <div className="min-w-0">
+                    <h3 id={`home-system-${system.key}`} className="text-[1.0625rem] font-semibold leading-6 text-brand-900">{system.title}</h3>
+                    <p className="mt-0.5 text-[0.875rem] leading-5 text-ink-600">{system.body}</p>
+                  </div>
                 </div>
-                <p className="mt-2.5 max-w-[56ch] text-[0.95rem] leading-6 text-ink-600 lg:text-[1rem] lg:leading-[1.6]">{area.body}</p>
-                <Link href={href} className="link-cta mt-auto min-h-11 pt-1 text-[0.95rem] after:absolute after:inset-0">
-                  {d.home.areasAction}
-                  {arrow}
-                </Link>
-              </li>
+                <ul className="flex flex-1 flex-col divide-y divide-border-subtle">
+                  {system.areas.map((area) => (
+                    <li key={area.slug} className="flex-1">
+                      <Link
+                        href={localeHref(locale, area.slug)}
+                        className="group flex h-full min-h-[4.25rem] items-center gap-3.5 px-5 py-3.5 transition-colors hover:bg-surface-pearl focus-visible:bg-surface-pearl focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600"
+                      >
+                        <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-xl text-brand-800 ring-1 ${style.well} ${style.ring}`}>
+                          <CareAreaIcon name={area.icon} size={19} strokeWidth={1.7} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[0.98rem] font-semibold leading-snug text-brand-900 group-hover:text-brand-700">{area.title}</span>
+                          {area.consultants.length > 0 ? <span className="mt-0.5 block text-[0.8125rem] leading-5 text-ink-500">{consultants(area.consultants.length)}</span> : null}
+                        </span>
+                        <ArrowRight size={16} aria-hidden="true" className="flex-none text-brand-600 transition-transform group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             );
           })}
-        </ul>
-        <div className="mt-6 border-t border-border-subtle pt-5">
-          <p className="text-sm font-semibold text-brand-900">{locale === "ar" ? "المزيد من مجالات الرعاية" : "More care areas"}</p>
-          <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-            {additionalCareAreas(locale).map(area => <li key={area.slug}><Link className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-brand-700 underline underline-offset-4" href={localeHref(locale, area.slug)}>{area.title}<ArrowRight size={14} aria-hidden="true" className="rtl:-scale-x-100" /></Link></li>)}
-          </ul>
         </div>
       </div>
     </section>

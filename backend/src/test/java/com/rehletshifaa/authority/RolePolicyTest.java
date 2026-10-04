@@ -1,7 +1,6 @@
 package com.rehletshifaa.authority;
 
 import com.rehletshifaa.authority.domain.Permission;
-import com.rehletshifaa.authority.domain.OwnerPolicy;
 import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.authority.domain.RolePolicy;
 import com.rehletshifaa.authority.domain.Scope;
@@ -22,7 +21,7 @@ class RolePolicyTest {
 
     @Test
     void everyPermissionIsHeldBySomeRole() {
-        assertThat(Arrays.stream(Permission.values()).filter(p -> RolePolicy.grantsFor(p).isEmpty() && !OwnerPolicy.grants(p))).isEmpty();
+        assertThat(Arrays.stream(Permission.values()).filter(p -> RolePolicy.grantsFor(p).isEmpty())).isEmpty();
     }
 
     @Test

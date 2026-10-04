@@ -28,11 +28,11 @@ export function ConsultantCard({ profile, system, icon, href, labels }: {
         <CareAreaIcon name={icon} strokeWidth={0.8} className={`pointer-events-none absolute end-3 top-3 -z-10 h-24 w-24 opacity-[0.16] ${style.line}`} />
         <ConsultantPortrait profile={profile} />
         {signals.length > 0 ? (
-          <p className="flex flex-wrap justify-end gap-1">
+          <p className="flex min-w-0 max-w-[65%] flex-wrap justify-end gap-1">
             {signals.map((signal) => (
-              <span key={signal} className="rounded-md bg-surface-default/90 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-[0.04em] text-brand-800 ring-1 ring-border-card">
+              <bdi key={signal} title={signal} className="block max-w-[11rem] truncate sm:max-w-[13rem] rounded-md bg-surface-default/90 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-[0.04em] text-brand-800 ring-1 ring-border-card rtl:tracking-normal">
                 {signal}
-              </span>
+              </bdi>
             ))}
           </p>
         ) : null}

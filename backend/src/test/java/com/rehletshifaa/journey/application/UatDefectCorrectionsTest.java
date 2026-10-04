@@ -384,24 +384,6 @@ class UatDefectCorrectionsTest {
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key=?", "work-email:replay:" + caseId)).isEqualTo(1);
     }
 
-    @Test void multiRoleStaffEmailUsesTheWorkItemsRoleInsteadOfAnArbitraryHeldRole() throws Exception {
-        UUID caseId = ownedCase("+254700000529", "uat-multi-role@local.test");
-        setStaffEmail("coordinator-subject", "multi.role@local.test");
-        Instant now = Instant.now();
-        jdbc.update("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,status,source,assigned_by,reason,created_at,revision) "
-                        + "VALUES(?,'coordinator-subject','OPERATIONS',?,'ACTIVE','GRANT','TEST','Lean staffing',?,0)",
-                UUID.randomUUID(), now.minusSeconds(60), now);
-
-        work.openWorkItem(new NewWorkItem(caseId, "OPERATIONS_REVIEW", "Review operations", null,
-                "coordinator-subject", "OPERATIONS", false, null, "SYSTEM", "WORK_ASSIGNED",
-                "multi-role:" + caseId, true));
-        em.flush();
-
-        var mail = outboxRow("work-email:multi-role:" + caseId);
-        assertThat(mail.templateKey()).isEqualTo("staff-work-assigned");
-        assertThat(mail.data().get("role")).isEqualTo("OPERATIONS");
-    }
-
     // ================= M/N — coordinator after consultant assignment =================
 
     @Test void onceTheCaseIsWithTheConsultantTheCoordinatorKeepsUtilitiesButNoWorkflowCommands() throws Exception {

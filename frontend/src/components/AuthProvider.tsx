@@ -10,7 +10,7 @@ import { reauthenticationAcr, type Me } from "@/lib/access";
  * `user` is the identity session; `me` is what the platform says this person holds (`GET /api/v1/me`), read once per
  * signed-in subject. `roles` is `me.roles` for convenience. `meFailed` means the read failed — never "no access".
  */
-type AuthValue={user:User|null;me:Me|null;roles:string[];loading:boolean;meFailed:boolean;refreshMe:()=>void;signIn:(reauthenticate?:boolean,returnTo?:string,requiredAcr?:"2"|"3")=>Promise<void>;signOut:()=>Promise<void>};
+type AuthValue={user:User|null;me:Me|null;roles:string[];loading:boolean;meFailed:boolean;refreshMe:()=>void;signIn:(reauthenticate?:boolean,returnTo?:string)=>Promise<void>;signOut:()=>Promise<void>};
 const Context=createContext<AuthValue|null>(null);
 export function AuthProvider({children}:{children:React.ReactNode}){
   const [user,setUser]=useState<User|null>(null);const[loading,setLoading]=useState(true);
@@ -33,7 +33,7 @@ export function AuthProvider({children}:{children:React.ReactNode}){
   const me=current?result.me:null;const meFailed=current&&result.failed;const meLoading=!!key&&!current;
   const refreshMe=useCallback(()=>setAttempt(n=>n+1),[]);
   // returnTo defaults to the current page; callers that arrive via a one-shot flag (?signin=1, ?continue=1) strip it first so a cancelled sign-in cannot loop.
-  const signIn=useCallback(async(reauthenticate=false,returnTo?:string,requiredAcr?:"2"|"3")=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,...(reauthenticate?{acr_values:requiredAcr??reauthenticationAcr(me)}:{})},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[me]);
+  const signIn=useCallback(async(reauthenticate=false,returnTo?:string)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,...(reauthenticate?{acr_values:reauthenticationAcr(me)}:{})},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[me]);
   const signOut=useCallback(async()=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";await authManager().signoutRedirect({post_logout_redirect_uri:`${window.location.origin}/${locale}/portal`});},[]);
   const value=useMemo(()=>({user,me,roles:me?.roles??[],loading:loading||meLoading,meFailed,refreshMe,signIn,signOut}),[user,me,loading,meLoading,meFailed,refreshMe,signIn,signOut]);
   return <Context.Provider value={value}>{children}</Context.Provider>;

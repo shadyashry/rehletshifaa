@@ -10,7 +10,6 @@ import com.rehletshifaa.identity.IdentityProvisioningPort;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -26,20 +25,18 @@ public class PlatformOwnerTransferService {
     private final GovernanceAuthentication authentication;
     private final IdentityProvisioningPort identities;
     private final Clock clock;
-    private final TransactionTemplate transactions;
 
     public PlatformOwnerTransferService(PlatformOwnerTransferStore store, PlatformAccessRepository access, Authority authority,
-            GovernanceAuthentication authentication, IdentityProvisioningPort identities, Clock clock,
-            TransactionTemplate transactions) {
+            GovernanceAuthentication authentication, IdentityProvisioningPort identities, Clock clock) {
         this.store = store;
         this.access = access;
         this.authority = authority;
         this.authentication = authentication;
         this.identities = identities;
         this.clock = clock;
-        this.transactions = transactions;
     }
 
+    @Transactional
     public Transfer initiate(Initiate command) {
         var actor = authentication.requireRecentPhishingResistant();
         String incoming = subject(command.incomingOwnerSubject());
@@ -48,47 +45,34 @@ public class PlatformOwnerTransferService {
             throw new ApiException(403, "CURRENT_OWNER_REQUIRED", "Only the current Platform Account Owner can initiate a transfer");
         verifyEligibleIdentity(incoming);
         Instant now = clock.instant();
-        return required(transactions.execute(status -> store.create(actor.subject(), incoming, command.reason().trim(), now, now.plus(REQUEST_LIFETIME))));
+        return store.create(actor.subject(), incoming, command.reason().trim(), now, now.plus(REQUEST_LIFETIME));
     }
 
+    @Transactional
     public Transfer accept(UUID requestId, Decision command) {
         var actor = authentication.requireRecentPhishingResistant();
         text(command.reason(), "Give a reason for accepting platform ownership");
-        Transfer transfer = store.byId(requestId);
+        Transfer transfer = store.forUpdate(requestId);
         pending(transfer, command.revision(), "PENDING_ACCEPTANCE");
         if (!actor.subject().equals(transfer.incomingOwner()))
             throw new ApiException(403, "INCOMING_OWNER_REQUIRED", "Only the named incoming owner can accept this transfer");
         verifyEligibleIdentity(actor.subject());
-        return required(transactions.execute(status -> {
-            Transfer locked = store.forUpdate(requestId);
-            pending(locked, command.revision(), "PENDING_ACCEPTANCE");
-            return store.accept(locked, actor.subject(), command.reason().trim(), clock.instant());
-        }));
+        return store.accept(transfer, actor.subject(), command.reason().trim(), clock.instant());
     }
 
+    @Transactional
     public Transfer verify(UUID requestId, Decision command) {
         var actor = authentication.requireRecentPhishingResistant();
         text(command.reason(), "Give an independent verification reason");
         Instant now = clock.instant();
+        access.lockGovernance();
         authority.require(Permission.ACCESS_GOVERN);
-        Transfer transfer = store.byId(requestId);
+        Transfer transfer = store.forUpdate(requestId);
         pending(transfer, command.revision(), "PENDING_VERIFICATION");
         if (actor.subject().equals(transfer.currentOwner()) || actor.subject().equals(transfer.incomingOwner()))
             throw new ApiException(409, "INDEPENDENT_OWNER_VERIFIER_REQUIRED", "A System Administrator distinct from both owners must verify the transfer");
         verifyEligibleIdentity(transfer.incomingOwner());
-        return required(transactions.execute(status -> {
-            access.lockGovernance();
-            if (!access.effectiveAdministrator(actor.subject(), now))
-                throw new ApiException(403, "PRIVILEGED_APPROVER_REQUIRED", "An effective System Administrator must verify the transfer");
-            Transfer locked = store.forUpdate(requestId);
-            pending(locked, command.revision(), "PENDING_VERIFICATION");
-            return store.complete(locked, actor.subject(), command.reason().trim(), now);
-        }));
-    }
-
-    @Transactional
-    public int expireDue() {
-        return store.expireDue(clock.instant());
+        return store.complete(transfer, actor.subject(), command.reason().trim(), now);
     }
 
     private void pending(Transfer transfer, long revision, String expectedStatus) {
@@ -118,8 +102,6 @@ public class PlatformOwnerTransferService {
         if (value == null || value.isBlank() || value.trim().length() > 1000)
             throw new ApiException(400, "INVALID_REQUEST", message);
     }
-
-    private static <T> T required(T value) { return java.util.Objects.requireNonNull(value, "Owner transfer transaction returned no result"); }
 
     public record Initiate(String incomingOwnerSubject, String reason) {}
     public record Decision(long revision, String reason) {}

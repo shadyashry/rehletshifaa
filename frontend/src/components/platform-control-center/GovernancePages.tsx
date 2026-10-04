@@ -17,13 +17,13 @@ const toIso = (date: string) => (date ? new Date(`${date}T00:00:00`).toISOString
 
 // ---------------- Administrators ----------------
 
-type Overview = { administrators: AdministratorAssignment[]; requests: ChangeRequest[]; effectiveAdministratorCount: number; belowRecommendedAdministratorCount: boolean; governanceNotificationsConfigured: boolean };
+type Overview = { administrators: AdministratorAssignment[]; requests: ChangeRequest[] };
 
 /** Access › Administrators (ACCESS_GOVERN): System Administrator appointments and removals, each approved by a second administrator. */
 export function AdministratorsPage({ locale }: { locale: Locale }) {
   const [requesting, setRequesting] = useState(false);
   return <WorkforcePage locale={locale} active="administrators" title={t(locale, "Administrators", "مسؤولو النظام")}
-    intro={t(locale, "Every System Administrator change needs an independent System Administrator or current owner to approve it. The last administrator can never be removed.", "كل تغيير في مسؤولي النظام يحتاج إلى موافقة مسؤول مستقل أو مالك المنصة الحالي. لا يمكن إزالة آخر مسؤول.")}
+    intro={t(locale, "Every System Administrator change needs a second administrator's approval. The last administrator can never be removed.", "كل تغيير في مسؤولي النظام يحتاج إلى موافقة مسؤول ثانٍ. لا يمكن إزالة آخر مسؤول.")}
     allowed={(a) => a.can("ACCESS_GOVERN")}
     actions={() => <button type="button" onClick={() => setRequesting(true)}>{t(locale, "Request appointment", "طلب تعيين")}</button>}>
     {({ access, api }) => <Administrators locale={locale} access={access} api={api} requesting={requesting} setRequesting={setRequesting} />}
@@ -46,8 +46,6 @@ function Administrators({ locale, access, api, requesting, setRequesting }: { lo
   const decided = overview.data.requests.filter((r) => r.status !== "PENDING");
   return <>
     <SuccessNotice>{notice || null}</SuccessNotice>
-    {overview.data.belowRecommendedAdministratorCount && <p role="alert" className="cc-error">{t(locale, "Effective System Administrators are below the operational target of two. Appoint a replacement before another privileged account becomes unavailable.", "عدد مسؤولي النظام الفعّالين أقل من الهدف التشغيلي وهو اثنان. عيّن بديلًا قبل تعذّر حساب مميّز آخر.")}</p>}
-    {!overview.data.governanceNotificationsConfigured && <p role="alert" className="cc-error">{t(locale, "Governance notification destinations are not configured.", "وجهات إشعارات الحوكمة غير مهيأة.")}</p>}
     <Section id="admins" title={t(locale, "System Administrators", "مسؤولو النظام")}>
       <ul className="cc-list">{overview.data.administrators.map((a) => <li key={a.id}>
         <span><strong><bdi>{name(a.subject)}</bdi></strong></span>
@@ -60,7 +58,6 @@ function Administrators({ locale, access, api, requesting, setRequesting }: { lo
         <h3>{r.type === "APPOINT" ? t(locale, "Appoint", "تعيين") : t(locale, "Remove", "إزالة")} · <bdi>{name(r.subject)}</bdi></h3>
         <p className="cc-meta">{t(locale, "Effective", "يسري")} {when(r.effectiveFrom, locale)} · {t(locale, "Expires", "ينتهي الطلب")} {when(r.expiresAt, locale)}</p>
         <p className="cc-meta">{t(locale, "Requested by", "طلبه")} <bdi>{name(r.requestedBy)}</bdi></p>
-        <p className="cc-meta">{t(locale, "May be decided by a different System Administrator or the current Platform Account Owner.", "يمكن أن يقرره مسؤول نظام مختلف أو مالك حساب المنصة الحالي.")}</p>
         {r.requestedBy === me ? <p className="cc-meta">{t(locale, "Another administrator must decide your request.", "يجب أن يقرر طلبك مسؤول آخر.")}</p> : <div className="cc-step-actions">
           <button type="button" className="cc-small" onClick={() => setDialog({ kind: "approve", request: r })}>{t(locale, "Approve", "موافقة")}</button>
           <button type="button" className="cc-secondary cc-small cc-danger-button" onClick={() => setDialog({ kind: "reject", request: r })}>{t(locale, "Reject", "رفض")}</button>
@@ -68,7 +65,7 @@ function Administrators({ locale, access, api, requesting, setRequesting }: { lo
       </li>)}</ul>}
     </Section>
     {decided.length > 0 && <Section id="decided" title={t(locale, "Recent decisions", "القرارات الأخيرة")}>
-      <ul className="cc-list">{decided.map((r) => <li key={r.id}><span>{r.type === "APPOINT" ? t(locale, "Appoint", "تعيين") : t(locale, "Remove", "إزالة")} · <bdi>{name(r.subject)}</bdi><span className="cc-row-sub">{r.decidedBy ? <>{t(locale, "Decided by", "قرره")} <bdi>{name(r.decidedBy)}</bdi> · {r.approverType === "PLATFORM_ACCOUNT_OWNER" ? t(locale, "Platform Account Owner", "مالك حساب المنصة") : t(locale, "System Administrator", "مسؤول نظام")}{r.decidedAt ? ` · ${when(r.decidedAt, locale)}` : ""}</> : null}</span></span><span><StatusBadge tone={r.status === "APPROVED" ? "success" : "neutral"}>{r.status}</StatusBadge></span></li>)}</ul>
+      <ul className="cc-list">{decided.map((r) => <li key={r.id}><span>{r.type === "APPOINT" ? t(locale, "Appoint", "تعيين") : t(locale, "Remove", "إزالة")} · <bdi>{name(r.subject)}</bdi></span><span><StatusBadge tone={r.status === "APPROVED" ? "success" : "neutral"}>{r.status}</StatusBadge></span></li>)}</ul>
     </Section>}
     {requesting && <ActionDialog locale={locale} title={t(locale, "Request a System Administrator appointment", "طلب تعيين مسؤول نظام")} confirm={t(locale, "Submit for approval", "إرسال للموافقة")} onClose={() => setRequesting(false)}
       onSubmit={async (reason) => { await api(`${ADMIN}/administrator-changes`, json("POST", { type: "APPOINT", subject: appoint.subject, effectiveFrom: toIso(appoint.from), effectiveTo: toIso(appoint.to), reason })); done(t(locale, "Request submitted for a second approval.", "أُرسل الطلب لموافقة ثانية.")); }}>

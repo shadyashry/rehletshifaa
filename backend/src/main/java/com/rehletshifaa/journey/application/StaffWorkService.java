@@ -255,11 +255,9 @@ public class StaffWorkService {
      */
     private Recipient resolveRecipient(String subject, String roleHint) {
         boolean doctor = "DOCTOR".equals(roleHint);
-        Recipient staff = doctor ? null : jdbc.sql("SELECT p.email_encrypted,(SELECT CASE WHEN COUNT(*)=1 THEN MIN(a.role_key) ELSE NULL END "
-                        + "FROM workforce_role_assignments a WHERE a.subject=p.subject AND a.status='ACTIVE') role_key "
-                        + "FROM workforce_people p WHERE p.subject=?").param(subject)
-                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")),
-                        roleHint == null || roleHint.isBlank() ? rs.getString("role_key") : roleHint)).optional().orElse(null);
+        Recipient staff = doctor ? null : jdbc.sql("SELECT p.email_encrypted,(SELECT MIN(a.role_key) FROM workforce_role_assignments a "
+                        + "WHERE a.subject=p.subject AND a.status='ACTIVE') role_key FROM workforce_people p WHERE p.subject=?").param(subject)
+                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")), rs.getString("role_key"))).optional().orElse(null);
         if (staff != null) return staff;
         Recipient practitioner = jdbc.sql("SELECT email_encrypted FROM practitioner_profiles WHERE external_subject=?").param(subject)
                 .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")), "DOCTOR")).optional().orElse(null);

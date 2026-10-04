@@ -293,3 +293,8 @@ export function getConsultants(locale: Locale): readonly ConsultantProfile[] {
 export function getConsultant(locale: Locale, slug: string): ConsultantProfile | undefined {
   return getConsultants(locale).find((profile) => profile.slug === slug);
 }
+
+/** Consultants holding a university faculty appointment — the English role is the source of record for both locales. */
+export function universityFacultySlugs(): ReadonlySet<string> {
+  return new Set(getConsultants("en").filter((profile) => /professor|lecturer/i.test(profile.role)).map((profile) => profile.slug));
+}

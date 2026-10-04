@@ -1,13 +1,31 @@
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
+
+import { careAreaAtlas } from "@/lib/care-area-catalog";
+import { getConsultants, universityFacultySlugs } from "@/lib/consultants";
 import type { Dictionary } from "@/lib/dictionary";
+import type { Locale } from "@/lib/i18n";
+import { localeHref } from "@/lib/links";
+
+const SHOWN_MONOGRAMS = 5;
 
 /**
  * The claim the whole platform rests on — a named Consultant owns the clinical decision — set as an
  * editorial statement on the clinical mist: the statement in the 5-column, and in the 7-column three
  * principles announced by large, quiet numerals and set as small-capital headings. No rows, no cards,
- * no icons; the numerals, the alignment and the whitespace carry it.
+ * no icons; the numerals, the alignment and the whitespace carry it. Beneath, the evidence: the panel of
+ * verified Consultants as monograms with three derived facts and one way to meet them.
  */
-export function PromiseSection({ d, locale }: { d: Dictionary; locale: string }) {
+export function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale }) {
   const p = d.home.consultantsPromise;
+  const panel = d.home.panel;
+  const profiles = getConsultants(locale);
+  const faculty = universityFacultySlugs();
+  const facts = [
+    { value: profiles.length, label: panel.consultants },
+    { value: profiles.filter((profile) => faculty.has(profile.slug)).length, label: panel.faculty },
+    { value: careAreaAtlas(locale, d).length, label: panel.areas },
+  ];
   const principles = locale === "ar"
     ? [
         ["الاختصاص المناسب", "يُختار حسب الحاجة السريرية."],
@@ -42,6 +60,43 @@ export function PromiseSection({ d, locale }: { d: Dictionary; locale: string })
             </li>
           ))}
         </ol>
+
+        <div className="rounded-[18px] border border-border-clinical bg-surface-default/85 p-5 shadow-[0_24px_48px_-40px_rgba(36,64,74,0.5)] backdrop-blur-sm sm:p-6 lg:col-span-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8 lg:px-8 lg:py-7">
+          <div className="flex items-center gap-4">
+            <span aria-hidden className="flex flex-none -space-x-2 rtl:space-x-reverse">
+              {profiles.slice(0, SHOWN_MONOGRAMS).map((profile, index) => (
+                <span key={profile.slug} className={`grid h-11 w-11 place-items-center rounded-full text-[0.72rem] font-semibold tracking-[0.03em] ring-2 ring-surface-default ${index === 0 ? "bg-brand-700 text-white" : "bg-surface-clinical text-brand-800"}`}>
+                  {profile.initials}
+                </span>
+              ))}
+              {profiles.length > SHOWN_MONOGRAMS ? (
+                <span className="grid h-11 w-11 place-items-center rounded-full bg-surface-pearl text-[0.72rem] font-semibold text-ink-600 ring-2 ring-surface-default">+{profiles.length - SHOWN_MONOGRAMS}</span>
+              ) : null}
+            </span>
+            <div className="hidden min-w-0 sm:block">
+              <p className="text-[1.0625rem] font-semibold leading-6 text-brand-900">{panel.title}</p>
+              <p className="mt-0.5 text-[0.875rem] leading-5 text-ink-600 lg:hidden xl:block">{panel.body}</p>
+            </div>
+          </div>
+          <div className="mt-4 sm:hidden">
+            <p className="text-[1.0625rem] font-semibold leading-6 text-brand-900">{panel.title}</p>
+            <p className="mt-0.5 text-[0.875rem] leading-5 text-ink-600">{panel.body}</p>
+          </div>
+          <div className="mt-5 flex flex-col gap-4 border-t border-border-subtle pt-5 sm:flex-row sm:items-center sm:justify-between lg:mt-0 lg:border-t-0 lg:pt-0">
+            <dl className="grid grid-cols-3 divide-x divide-border-subtle rtl:divide-x-reverse">
+              {facts.map((fact) => (
+                <div key={fact.label} className="flex flex-col gap-1.5 px-3 first:ps-0 sm:px-5 lg:px-4">
+                  <dt className="order-last text-[0.75rem] leading-4 text-ink-500 sm:text-[0.8125rem]">{fact.label}</dt>
+                  <dd className="text-[1.5rem] font-semibold leading-none tracking-[-0.02em] text-brand-900 tabular-nums sm:text-[1.75rem]">{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
+            <Link href={localeHref(locale, "consultants")} className="link-cta flex-none text-[0.95rem]">
+              {panel.link}
+              <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   );
