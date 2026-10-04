@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { ArrowRight, Award, BadgeCheck, Building2, ChevronRight, ExternalLink, GraduationCap, MapPin, ShieldCheck, Stethoscope } from "lucide-react";
+import { ArrowRight, Award, BadgeCheck, BookOpen, Building2, ChevronRight, ExternalLink, FileText, GraduationCap, Landmark, MapPin, Presentation, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { CaseRouter } from "@/components/care-areas/CaseRouter";
 import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
+import { SpecialtyMotif } from "@/components/care-areas/SpecialtyMotif";
 import { ConsultantCard } from "@/components/consultants/ConsultantCard";
 import { ConsultantPortrait, ExpertiseMap } from "@/components/ConsultantProfileCard";
 import { TrackedLink } from "@/components/TrackedLink";
@@ -29,25 +30,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return profile ? pageMetadata(locale, `consultants/${slug}`, profile.name, profile.summary) : {};
 }
 
+/** The kind of contribution a highlight describes, for its icon: research, leadership, teaching, or a distinction. */
+function highlightIcon(text: string) {
+  if (/research|publish|journal|presentation|paper|نشر|بحث|مجلة/i.test(text)) return BookOpen;
+  if (/head|director|chair|lead|advis|consultant to|رئيس|مدير|مستشار/i.test(text)) return Landmark;
+  if (/train|instructor|faculty|teach|supervis|lectur|مدرب|تدريب|محاضر|إشراف/i.test(text)) return Presentation;
+  return Award;
+}
+
 /** Latest four-digit year in a qualification line, for the timeline; undefined when none is stated. */
 const yearOf = (text: string) => text.match(/(?:19|20)\d{2}/g)?.at(-1);
 
-function DetailCard({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+function DetailCard({ icon, title, children, band }: { icon: ReactNode; title: string; children: ReactNode; band?: string }) {
   return (
-    <article className="rounded-[18px] border border-border-card bg-surface-default p-6 shadow-[0_1px_2px_rgba(36,64,74,0.04)] sm:p-7">
-      <div className="flex items-center gap-3">
-        <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-surface-clinical text-brand-700 ring-1 ring-border-clinical">{icon}</span>
+    <article className="overflow-hidden rounded-[18px] border border-border-card bg-surface-default shadow-[0_1px_2px_rgba(36,64,74,0.04)]">
+      <div className={`flex items-center gap-3 px-6 pt-6 sm:px-7 ${band ? `${band} pb-5` : ""}`}>
+        <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-surface-default text-brand-700 ring-1 ring-border-clinical">{icon}</span>
         <h2 className="text-[1.25rem] font-semibold leading-snug text-brand-900">{title}</h2>
       </div>
-      <div className="mt-5">{children}</div>
+      <div className="px-6 pb-6 pt-5 sm:px-7">{children}</div>
     </article>
   );
 }
 
 /**
- * A Consultant's profile, as evidence rather than a sales page: an identity hero (monogram, verified mark,
+ * A Consultant's profile, as evidence rather than a sales page: an identity hero (monogram with the specialty mark,
  * care area, credential signals, role, location, summary, the two actions) beside the expertise map and
- * the one professional distinction; numbered professional highlights; clinical focus and standing; the
+ * the one professional distinction, over the specialty's own motif; highlights marked by kind; clinical focus and standing; the
  * qualifications as a dated timeline; appointments; the profile's sources; other Consultants in the same
  * body system; and the closing router — the patient still never has to choose.
  */
@@ -89,9 +98,8 @@ export default async function ConsultantProfilePage({ params }: Props) {
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <span className={`relative inline-block w-fit flex-none rounded-full p-1.5 ${style.well}`}>
                   <ConsultantPortrait profile={profile} size="lg" />
-                  <span className="absolute -bottom-0.5 -end-0.5 grid h-9 w-9 place-items-center rounded-full bg-brand-700 text-white ring-4 ring-surface-pearl" title={t.verified}>
-                    <BadgeCheck size={18} strokeWidth={2} aria-hidden="true" />
-                    <span className="sr-only">{t.verified}</span>
+                  <span className="absolute -bottom-0.5 -end-0.5 grid h-9 w-9 place-items-center rounded-full bg-brand-700 text-white ring-4 ring-surface-pearl" title={profile.careAreaLabel}>
+                    <CareAreaIcon name={meta.icon} size={17} strokeWidth={2} />
                   </span>
                 </span>
                 <div className="min-w-0">
@@ -105,8 +113,8 @@ export default async function ConsultantProfilePage({ params }: Props) {
               </div>
 
               <p className="mt-6 flex flex-wrap gap-1.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-700 px-3 py-1 text-[0.8125rem] font-semibold text-white">
-                  <BadgeCheck size={14} aria-hidden="true" />
+                <span title={t.reviewNote} className="inline-flex items-center gap-1.5 rounded-full bg-surface-default px-3 py-1 text-[0.8125rem] font-semibold text-brand-800 ring-1 ring-border-clinical">
+                  <FileText size={14} aria-hidden="true" className="text-brand-600" />
                   {t.verified}
                 </span>
                 {profile.achievementBadges.map((badge) => (
@@ -132,7 +140,21 @@ export default async function ConsultantProfilePage({ params }: Props) {
               </div>
             </div>
 
-            <aside className="rounded-[20px] border border-border-card bg-surface-default p-5 shadow-[0_30px_60px_-44px_rgba(36,64,74,0.6)] sm:p-6">
+            <aside className="overflow-hidden rounded-[20px] border border-border-card bg-surface-default shadow-[0_30px_60px_-44px_rgba(36,64,74,0.6)]">
+              {/* The specialty banner: the body system's own motif, tint and icon — each Consultant's page reads as their specialty. */}
+              <div className={`relative isolate flex h-28 items-end overflow-hidden px-5 pb-4 sm:px-6 ${style.soft}`}>
+                <SpecialtyMotif system={meta.system} className="absolute -end-10 -top-12 -z-10 h-56 w-[26rem] opacity-60 rtl:-scale-x-100" />
+                <span className="flex items-center gap-3">
+                  <span aria-hidden className={`grid h-11 w-11 place-items-center rounded-xl bg-surface-default text-brand-800 shadow-[0_8px_20px_-12px_rgba(36,64,74,0.6)] ring-1 ${style.ring}`}>
+                    <CareAreaIcon name={meta.icon} size={21} strokeWidth={1.7} />
+                  </span>
+                  <span>
+                    <span className="block text-[1rem] font-semibold leading-6 text-brand-900">{profile.careAreaLabel}</span>
+                    {systemTitle.toLocaleLowerCase() !== profile.careAreaLabel.toLocaleLowerCase() ? <span className="block text-[0.8125rem] leading-5 text-ink-500">{systemTitle}</span> : null}
+                  </span>
+                </span>
+              </div>
+              <div className="p-5 sm:p-6">
               {profile.distinction ? (
                 <div className="flex gap-3 rounded-[14px] bg-surface-clinical p-4 ring-1 ring-border-clinical">
                   <Award size={20} aria-hidden="true" className="mt-0.5 flex-none text-brand-700" />
@@ -143,7 +165,8 @@ export default async function ConsultantProfilePage({ params }: Props) {
                 </div>
               ) : null}
               <div className="mt-2">
-                <ExpertiseMap expertise={profile.expertise} label={ui.clinicalExpertise} />
+                <ExpertiseMap expertise={profile.expertise} label={ui.clinicalExpertise} icon={meta.icon} system={meta.system} />
+              </div>
               </div>
             </aside>
           </div>
@@ -155,17 +178,16 @@ export default async function ConsultantProfilePage({ params }: Props) {
           <div className="container-site">
             <p className="eyebrow">{t.highlightsEyebrow}</p>
             <h2 id="highlights-title" className="mt-3 text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 rtl:tracking-normal sm:text-[2rem]">{t.highlights}</h2>
-            <ol className="mt-8 grid gap-5 md:grid-cols-3">
-              {profile.achievements.map((achievement, index) => (
+            <ul className="mt-8 grid gap-5 md:grid-cols-3">
+              {profile.achievements.map((achievement) => (
                 <li key={achievement} className="relative rounded-[18px] border border-border-clinical bg-surface-default p-6">
                   <div className="flex items-center justify-between">
-                    <span aria-hidden className="grid h-10 w-10 place-items-center rounded-full bg-brand-700 text-white"><Award size={18} strokeWidth={1.8} /></span>
-                    <span aria-hidden className="text-[0.8125rem] font-semibold tabular-nums tracking-[0.08em] text-brand-600/60">{String(index + 1).padStart(2, "0")}</span>
+                    {(() => { const Icon = highlightIcon(achievement); return <span aria-hidden className="grid h-10 w-10 place-items-center rounded-full bg-brand-700 text-white"><Icon size={18} strokeWidth={1.8} /></span>; })()}
                   </div>
                   <p className="mt-4 text-[1rem] leading-7 text-brand-900">{achievement}</p>
                 </li>
               ))}
-            </ol>
+            </ul>
           </div>
         </section>
       ) : null}
@@ -173,7 +195,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
       <section className="bg-surface-pearl py-14 md:py-16">
         <div className="container-site grid gap-5 lg:grid-cols-2">
           <div className="grid content-start gap-5">
-            <DetailCard icon={<Stethoscope size={19} strokeWidth={1.8} />} title={ui.focus}>
+            <DetailCard icon={<CareAreaIcon name={meta.icon} size={19} strokeWidth={1.8} />} title={ui.focus} band={style.soft}>
               <ul className="grid gap-2.5">
                 {profile.focusAreas.map((item) => (
                   <li key={item} className="flex gap-3 text-[1rem] leading-7 text-ink-700">
@@ -205,7 +227,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
                 ))}
               </ol>
             </DetailCard>
-            <DetailCard icon={<Building2 size={19} strokeWidth={1.8} />} title={profile.sourceFile ? t.cvAppointments : ui.appointments}>
+            <DetailCard icon={<Building2 size={19} strokeWidth={1.8} />} title={ui.appointments}>
               <ul className="grid gap-2.5">
                 {profile.appointments.map((item) => (
                   <li key={item} className="flex gap-3 text-[1rem] leading-7 text-ink-700">
@@ -252,12 +274,13 @@ export default async function ConsultantProfilePage({ params }: Props) {
                 <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
               </Link>
             </div>
-            <ul className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <ul className={`mt-7 grid gap-5 ${related.length === 1 ? "" : "md:grid-cols-2 xl:grid-cols-3"}`}>
               {related.map((p) => {
                 const m = careAreaMeta(p.careAreaHref) ?? meta;
                 return (
                   <li key={p.slug}>
                     <ConsultantCard
+                      featured={related.length === 1}
                       profile={p}
                       system={m.system}
                       icon={m.icon}

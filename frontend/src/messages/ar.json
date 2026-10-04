@@ -780,16 +780,16 @@
     "ledBy": "بقيادة"
   },
   "consultantProfile": {
-    "verified": "ملف موثّق",
+    "verified": "ملف مستند إلى السيرة الذاتية",
     "requestReview": "ابدأ مراجعة حالتي",
     "highlightsEyebrow": "مسيرة مهنية وأكاديمية",
     "highlights": "أبرز الإنجازات",
     "timeline": "المسار الأكاديمي",
-    "cvAppointments": "المناصب الواردة في السيرة الذاتية",
     "sourcesTitle": "مصادر الملف",
     "relatedEyebrow": "جهاز الجسم نفسه",
     "relatedTitle": "استشاريون آخرون في {system}",
     "relatedFallback": "استشاريون آخرون",
-    "allConsultants": "تعرّف على جميع الاستشاريين"
+    "allConsultants": "تعرّف على جميع الاستشاريين",
+    "reviewNote": "تُراجع المؤهلات قبل التوجيه السريري"
   }
 }

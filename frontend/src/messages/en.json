@@ -780,16 +780,16 @@
     "ledBy": "Led by"
   },
   "consultantProfile": {
-    "verified": "Verified profile",
+    "verified": "CV-sourced profile",
     "requestReview": "Request a case review",
     "highlightsEyebrow": "Career & academic contributions",
     "highlights": "Professional highlights",
     "timeline": "Qualifications timeline",
-    "cvAppointments": "Appointments in the supplied CV",
     "sourcesTitle": "Profile sources",
     "relatedEyebrow": "Same body system",
     "relatedTitle": "Other Consultants in {system}",
     "relatedFallback": "More Consultants",
-    "allConsultants": "Meet all Consultants"
+    "allConsultants": "Meet all Consultants",
+    "reviewNote": "Credentials are reviewed before clinical matching"
   }
 }

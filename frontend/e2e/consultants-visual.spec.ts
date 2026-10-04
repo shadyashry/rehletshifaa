@@ -115,3 +115,22 @@ test("doctor achievement profile reflows in English and Arabic", async ({ page }
     await page.screenshot({ path: test.info().outputPath(`profile-${locale}-${width}.png`), fullPage: true });
   }
 });
+
+test("every profile fits a phone, shows its specialty banner and never claims an unverified status", async ({ page }) => {
+  test.setTimeout(180000);
+  const slugs = ["ahmed-alashry", "hanan-elshoura", "hossam-kibba", "ahmed-magdy-mahmoud", "amr-abdelazeem", "ahmed-khaled", "mostafa-farid", "mustafa-mohammed-abbas", "mohamed-hamdy-zaid", "mohammed-ali", "mostafa-baraka", "mahmoud-ghaleb", "hamdy-abdelazeem"];
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const locale of ["en", "ar"]) {
+    for (const slug of slugs) {
+      await page.goto(`/${locale}/consultants/${slug}`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, `${locale}/${slug}`).toBeLessThanOrEqual(1);
+      await expect(page.locator("main aside svg").first()).toBeAttached();
+      if (locale === "en") {
+        await expect(page.getByText("Verified profile")).toHaveCount(0);
+        await expect(page.getByText("CV-sourced profile")).toBeVisible();
+      }
+    }
+  }
+});
