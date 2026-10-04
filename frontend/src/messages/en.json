@@ -644,5 +644,75 @@
     "note": "Suitability for any procedure is determined only after consultant review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
     "finalTitle": "Not Sure Where Your Condition Fits?",
     "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate consultant."
+  },
+  "consultantsPage": {
+    "stats": {
+      "consultants": "Verified Consultants",
+      "faculty": "University faculty",
+      "areas": "Care areas"
+    },
+    "explore": "Meet the panel",
+    "matching": {
+      "label": "How your case reaches a Consultant",
+      "criteria": [
+        "Care area",
+        "Clinical focus",
+        "Case complexity"
+      ],
+      "matched": "Matched"
+    },
+    "panel": {
+      "eyebrow": "The Consultant panel",
+      "title": "Senior specialists, organised by body system",
+      "intro": "Browse by body system, or search for a condition, procedure or name. Every profile is drawn from a supplied CV and checked before matching.",
+      "search": "Search by name, specialty or expertise",
+      "searchPlaceholder": "e.g. knee replacement, dysphagia, PCI",
+      "systems": "Filter by body system",
+      "all": "All",
+      "countOne": "1 Consultant",
+      "countMany": "{n} Consultants",
+      "empty": "No Consultants match your search.",
+      "emptyHint": "Try a broader term — or send your case and your coordinator will find the right Consultant.",
+      "reset": "Clear filters",
+      "distinction": "Professional distinction",
+      "focus": "Clinical focus"
+    },
+    "verification": {
+      "steps": [
+        {
+          "title": "CV and credentials supplied",
+          "body": "Each Consultant provides a current CV, qualifications and appointments."
+        },
+        {
+          "title": "Checked against official sources",
+          "body": "Degrees, board fellowships and appointments are checked with institutional sources."
+        },
+        {
+          "title": "Verified before matching",
+          "body": "Only verified Consultants are matched to a patient's case."
+        }
+      ],
+      "disclaimer": "Profiles draw on supplied CVs and the sources identified on each profile. The order of profiles is not a ranking, and no credential is an outcome guarantee."
+    },
+    "router": {
+      "eyebrow": "Not sure who to choose?",
+      "title": "You don’t need to choose a Consultant",
+      "body": "Send what you already have. Your coordinator reviews it and matches your case to the Consultant whose expertise fits it best.",
+      "note": "No treatment or travel commitment.",
+      "steps": [
+        {
+          "title": "Share your reports",
+          "body": "Scans, lab results and letters — whatever you already have."
+        },
+        {
+          "title": "Clinical matching",
+          "body": "Your coordinator matches your case by care area, clinical focus and complexity."
+        },
+        {
+          "title": "Your Consultant reviews",
+          "body": "A verified senior Consultant reviews your case and owns the clinical decision."
+        }
+      ]
+    }
   }
 }

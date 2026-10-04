@@ -42,11 +42,11 @@ export function CareAreaIcon({ name, ...props }: LucideProps & { name: CareAreaI
 }
 
 /** Static class names per body system, so Tailwind sees every token it has to generate. */
-export const SYSTEM_STYLES: Record<CareSystem, { well: string; ring: string; line: string; dot: string; stroke: string }> = {
-  heart: { well: "bg-system-heart-well", ring: "ring-system-heart-ring", line: "text-system-heart-line", dot: "bg-system-heart-line", stroke: "stroke-system-heart-line" },
-  neuro: { well: "bg-system-neuro-well", ring: "ring-system-neuro-ring", line: "text-system-neuro-line", dot: "bg-system-neuro-line", stroke: "stroke-system-neuro-line" },
-  movement: { well: "bg-system-movement-well", ring: "ring-system-movement-ring", line: "text-system-movement-line", dot: "bg-system-movement-line", stroke: "stroke-system-movement-line" },
-  digestive: { well: "bg-system-digestive-well", ring: "ring-system-digestive-ring", line: "text-system-digestive-line", dot: "bg-system-digestive-line", stroke: "stroke-system-digestive-line" },
-  surgery: { well: "bg-system-surgery-well", ring: "ring-system-surgery-ring", line: "text-system-surgery-line", dot: "bg-system-surgery-line", stroke: "stroke-system-surgery-line" },
-  women: { well: "bg-system-women-well", ring: "ring-system-women-ring", line: "text-system-women-line", dot: "bg-system-women-line", stroke: "stroke-system-women-line" },
+export const SYSTEM_STYLES: Record<CareSystem, { well: string; soft: string; ring: string; line: string; dot: string; stroke: string }> = {
+  heart: { well: "bg-system-heart-well", soft: "bg-system-heart-well/50", ring: "ring-system-heart-ring", line: "text-system-heart-line", dot: "bg-system-heart-line", stroke: "stroke-system-heart-line" },
+  neuro: { well: "bg-system-neuro-well", soft: "bg-system-neuro-well/50", ring: "ring-system-neuro-ring", line: "text-system-neuro-line", dot: "bg-system-neuro-line", stroke: "stroke-system-neuro-line" },
+  movement: { well: "bg-system-movement-well", soft: "bg-system-movement-well/50", ring: "ring-system-movement-ring", line: "text-system-movement-line", dot: "bg-system-movement-line", stroke: "stroke-system-movement-line" },
+  digestive: { well: "bg-system-digestive-well", soft: "bg-system-digestive-well/50", ring: "ring-system-digestive-ring", line: "text-system-digestive-line", dot: "bg-system-digestive-line", stroke: "stroke-system-digestive-line" },
+  surgery: { well: "bg-system-surgery-well", soft: "bg-system-surgery-well/50", ring: "ring-system-surgery-ring", line: "text-system-surgery-line", dot: "bg-system-surgery-line", stroke: "stroke-system-surgery-line" },
+  women: { well: "bg-system-women-well", soft: "bg-system-women-well/50", ring: "ring-system-women-ring", line: "text-system-women-line", dot: "bg-system-women-line", stroke: "stroke-system-women-line" },
 };

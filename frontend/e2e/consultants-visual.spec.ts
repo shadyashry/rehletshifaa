@@ -49,21 +49,22 @@ for (const shot of SHOTS.filter((s) => ["390", "768", "1440"].includes(s.name)))
   });
 }
 
-test("directory filters clinical expertise and links to sourced profiles", async ({ page }) => {
+test("panel filters by body system and search, and links to sourced profiles", async ({ page }) => {
   await page.goto("/en/consultants");
-  const directory = page.locator("#doctor-directory");
-  await expect(directory.locator("article")).toHaveCount(13);
-  await page.getByLabel("Care area", { exact: true }).selectOption("orthopedics");
-  await expect(directory.locator("article")).toHaveCount(4);
+  const panel = page.locator("#consultant-panel");
+  await expect(panel.locator("article")).toHaveCount(13);
+  await expect(page.getByRole("figure")).toContainText("Clinical matching");
+  await panel.getByRole("button", { name: /Bones & joints/ }).click();
+  await expect(panel.locator("article")).toHaveCount(4);
   await page.getByLabel("Search by name, specialty or expertise").fill("robotic");
-  await expect(directory.locator("article")).toHaveCount(1);
-  await expect(directory.getByRole("heading", { name: "Dr Ahmed Khaled" })).toBeVisible();
+  await expect(panel.locator("article")).toHaveCount(1);
+  await expect(panel.getByRole("heading", { name: "Dr Ahmed Khaled" })).toBeVisible();
   await page.getByRole("button", { name: "Clear filters" }).click();
-  await expect(directory.locator("article")).toHaveCount(13);
+  await expect(panel.locator("article")).toHaveCount(13);
   await page.getByLabel("Search by name, specialty or expertise").fill("no-such-doctor");
-  await expect(page.getByText("No doctors match your search.")).toBeVisible();
+  await expect(page.getByText("No Consultants match your search.")).toBeVisible();
   await page.getByRole("button", { name: "Clear filters" }).click();
-  const link = directory.getByRole("link").first();
+  const link = panel.getByRole("link").first();
   await page.keyboard.press("Tab");
   await link.focus();
   expect(await link.evaluate(el => getComputedStyle(el).outlineStyle)).not.toBe("none");
@@ -71,15 +72,15 @@ test("directory filters clinical expertise and links to sourced profiles", async
   await expect(page.getByRole("heading", { name: "Professional highlights" })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText(/Two oral research presentations/)).toBeVisible();
   await page.goto("/ar/consultants");
-  await page.getByLabel("مجال الرعاية", { exact: true }).selectOption("womens-health");
-  await expect(page.locator("#doctor-directory article")).toHaveCount(2);
+  await page.locator("#consultant-panel").getByRole("button", { name: /صحة المرأة/ }).click();
+  await expect(page.locator("#consultant-panel article")).toHaveCount(2);
 });
 
 test("vascular consultant appears once with bilingual credentials and care-area navigation", async ({ page }) => {
   for (const locale of ["en", "ar"]) {
     await page.goto(`/${locale}/consultants`);
-    await page.getByLabel(locale === "en" ? "Care area" : "مجال الرعاية", { exact: true }).selectOption("vascular-endovascular-surgery");
-    await expect(page.locator("#doctor-directory article")).toHaveCount(1);
+    await page.getByLabel(locale === "en" ? "Search by name, specialty or expertise" : "ابحث بالاسم أو التخصص أو الخبرة").fill(locale === "en" ? "Vascular Surgery" : "جراحة الأوعية");
+    await expect(page.locator("#consultant-panel article")).toHaveCount(1);
     await page.goto(`/${locale}/consultants/hamdy-abdelazeem`);
     await expect(page.getByRole("heading", { level: 1 })).toContainText(locale === "en" ? "Hamdy AbdelAzeem" : "حمدي عبد العظيم");
     await expect(page.getByRole("heading", { name: locale === "en" ? "Professional highlights" : "أبرز الإنجازات", exact: true })).toBeVisible();

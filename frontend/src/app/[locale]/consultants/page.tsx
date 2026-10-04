@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
-import { ArrowRight, GraduationCap } from "lucide-react";
-import Link from "next/link";
+import { ArrowDown, ArrowRight, BadgeCheck, FileText, ScanSearch } from "lucide-react";
 import { notFound } from "next/navigation";
-import { ConsultantDirectory } from "@/components/ConsultantDirectory";
-import { CtaPanel } from "@/components/CtaPanel";
+
+import { CaseRouter } from "@/components/care-areas/CaseRouter";
+import { ConsultantMatching } from "@/components/consultants/ConsultantMatching";
+import { ConsultantPanel, type PanelEntry } from "@/components/consultants/ConsultantPanel";
+import { PageHero } from "@/components/PageHero";
+import { TrackedLink } from "@/components/TrackedLink";
+import { CARE_SYSTEMS, careAreaMeta } from "@/lib/care-area-catalog";
 import { consultantUi, getConsultants } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
@@ -11,28 +15,127 @@ import { localeHref } from "@/lib/links";
 import { pageMetadata } from "@/lib/metadata";
 
 type Props = { params: Promise<{ locale: string }> };
+
+const VERIFY_ICONS = [FileText, ScanSearch, BadgeCheck] as const;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   return pageMetadata(locale, "consultants", consultantUi[locale].pageTitle, consultantUi[locale].pageIntro);
 }
+
+/**
+ * The Consultants page is a trust page, not a marketplace. The hero shows how a case reaches a Consultant
+ * (the patient never has to pick); the panel lists every verified Consultant grouped by the same body
+ * systems as the Care Areas atlas, with search and filters; then how profiles are verified, and the
+ * closing router. No featured row, ratings or rankings — the order of profiles carries no meaning.
+ */
 export default async function Consultants({ params }: Props) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const d = getDictionary(locale);
-  const doctors = getConsultants(locale);
-  const ar = locale === "ar";
-  const areaCount = new Set(doctors.map(p => p.careAreaHref)).size;
-  return <>
-    <section className="relative overflow-hidden border-b border-brand-800 bg-brand-900 text-white">
-      <div aria-hidden="true" className="pointer-events-none absolute -end-24 -top-24 h-96 w-96 rounded-full border-[48px] border-white/5" />
-      <div className="container-site relative grid gap-10 py-14 md:py-20 lg:grid-cols-[1.4fr_0.6fr] lg:items-center">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">{ar ? "فريقنا الطبي" : "Our medical team"}</p><h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl">{ar ? "خبرة تخصصية.\nرعاية تتمحور حولك." : "Specialist expertise.\nCare centred on you."}</h1><p className="mt-6 max-w-2xl text-lg leading-8 text-white/85">{ar ? "تعرّف على الأطباء وخبراتهم السريرية وإسهاماتهم الأكاديمية. نوجّه حالتك إلى التخصص المناسب وفق احتياجك الطبي." : "Meet the doctors, explore their clinical focus and discover their academic contributions. Your case is matched to the appropriate expertise according to clinical need."}</p><div className="mt-8 flex flex-wrap items-center gap-5"><a href="#doctor-directory" className="inline-flex min-h-12 items-center gap-3 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-brand-900">{ar ? "استكشف الفريق" : "Explore the team"}<ArrowRight size={17} aria-hidden="true" className="rtl:-scale-x-100" /></a><Link href={localeHref(locale, "send-my-case")} className="inline-flex min-h-12 items-center gap-2 text-sm font-semibold text-white underline underline-offset-4">{ar ? "أرسل حالتك للمراجعة" : "Start your case review"}</Link></div></div>
-        <div className="rounded-2xl border border-white/20 bg-white/5 p-7"><GraduationCap size={30} aria-hidden="true" className="text-white/80" /><p className="mt-4 text-lg font-semibold">{ar ? "خبرات متعددة. مسار رعاية واحد." : "Many disciplines. One care journey."}</p><dl className="mt-6 grid grid-cols-2 gap-6 border-t border-white/20 pt-6"><div><dt className="text-sm text-white/75">{ar ? "الأطباء" : "Doctors"}</dt><dd className="mt-2 text-4xl font-semibold">{doctors.length}</dd></div><div><dt className="text-sm text-white/75">{ar ? "مجالات الرعاية" : "Care areas"}</dt><dd className="mt-2 text-4xl font-semibold">{areaCount}</dd></div></dl><p className="mt-6 text-sm leading-6 text-white/80">{ar ? "لا تحتاج إلى اختيار طبيب قبل البدء؛ يعتمد التوجيه على احتياج حالتك." : "You don’t need to choose a doctor before you start. Clinical matching follows your case needs."}</p></div>
-      </div>
-    </section>
-    <ConsultantDirectory profiles={doctors} locale={locale} />
-    <div className="container-site py-8"><p className="max-w-4xl text-sm leading-6 text-ink-600">{ar ? "تستند الملفات إلى السير الذاتية المقدمة والمصادر المحددة في كل ملف. إبراز المؤهلات لا يمثل تصنيفاً للأطباء أو ضماناً للنتائج. تخضع المؤهلات للتدقيق قبل التوجيه السريري." : "Profiles draw on supplied CVs and the sources identified on each profile. Featured credentials do not represent a doctor ranking or an outcome guarantee. Credentials are reviewed before clinical matching."}</p></div>
-    <CtaPanel locale={locale} title={d.consultants.finalTitle} body={d.consultants.finalBody} button={d.common.send} />
-  </>;
+  const ui = consultantUi[locale];
+  const page = d.consultantsPage;
+  const profiles = getConsultants(locale);
+
+  const entries: PanelEntry[] = profiles.flatMap((profile) => {
+    const meta = careAreaMeta(profile.careAreaHref);
+    if (!meta) return [];
+    return [{ profile, ...meta, href: localeHref(locale, `consultants/${profile.slug}`), viewOf: ui.viewProfileOf(profile.name) }];
+  });
+  const systems = CARE_SYSTEMS.filter((key) => entries.some((entry) => entry.system === key)).map((key) => ({ key, title: d.careAreasPage.systems[key].title }));
+
+  // Facts, derived — the English roles are the source of record for academic appointments in both locales.
+  const academic = new Set(getConsultants("en").filter((p) => /professor|lecturer/i.test(p.role)).map((p) => p.slug));
+  const stats = [
+    { value: entries.length, label: page.stats.consultants },
+    { value: entries.filter((entry) => academic.has(entry.profile.slug)).length, label: page.stats.faculty },
+    { value: new Set(entries.map((entry) => entry.profile.careAreaHref)).size, label: page.stats.areas },
+  ];
+
+  return (
+    <>
+      <PageHero
+        tone="pearl"
+        eyebrow={ui.eyebrow}
+        title={ui.pageTitle}
+        intro={ui.pageIntro}
+        aside={
+          <ConsultantMatching
+            label={page.matching.label}
+            stages={ui.matching}
+            criteria={page.matching.criteria}
+            matched={page.matching.matched}
+            initials={entries.map((entry) => entry.profile.initials)}
+          />
+        }
+      >
+        <dl className="grid max-w-[34rem] grid-cols-3 divide-x divide-border-subtle border-y border-border-subtle rtl:divide-x-reverse">
+          {stats.map((stat) => (
+            <div key={stat.label} className="flex flex-col-reverse gap-1 px-3 py-4 first:ps-0 sm:px-5">
+              <dt className="text-[0.75rem] leading-4 text-ink-500 sm:text-[0.8125rem] sm:leading-5">{stat.label}</dt>
+              <dd className="text-[1.5rem] font-semibold leading-none tracking-[-0.02em] text-brand-900 tabular-nums sm:text-[1.875rem]">{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
+          <TrackedLink event="send_case_cta_clicked" className="btn-primary w-full sm:w-auto" href={localeHref(locale, "send-my-case")}>
+            {d.common.send}
+            <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
+          </TrackedLink>
+          <a href="#consultant-panel" className="link-cta justify-center text-[0.95rem] sm:justify-start">
+            {page.explore}
+            <ArrowDown size={16} aria-hidden="true" />
+          </a>
+        </div>
+      </PageHero>
+
+      <section id="consultant-panel" aria-labelledby="panel-title" className="scroll-mt-20 bg-surface-pearl pb-16 pt-14 md:pb-20 md:pt-20">
+        <div className="container-site">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-end lg:gap-16">
+            <div>
+              <p className="eyebrow">{page.panel.eyebrow}</p>
+              <h2 id="panel-title" className="mt-3 max-w-[24ch] text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal sm:text-[2.25rem]">
+                {page.panel.title}
+              </h2>
+            </div>
+            <p className="max-w-[52ch] text-[1rem] leading-7 text-ink-600">{page.panel.intro}</p>
+          </div>
+          <ConsultantPanel entries={entries} systems={systems} locale={locale} copy={{ ...page.panel, view: ui.viewProfile }} />
+        </div>
+      </section>
+
+      <section aria-labelledby="verification-title" className="border-t border-border-subtle bg-surface-default py-16 md:py-20">
+        <div className="container-site grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+          <div>
+            <p className="eyebrow">{ui.verificationEyebrow}</p>
+            <h2 id="verification-title" className="mt-3 max-w-[22ch] text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal sm:text-[2.125rem]">
+              {ui.verificationTitle}
+            </h2>
+            <p className="mt-4 max-w-[48ch] text-[1rem] leading-7 text-ink-600">{ui.notice}</p>
+            <p className="mt-4 max-w-[52ch] text-[0.875rem] leading-6 text-ink-500">{page.verification.disclaimer}</p>
+          </div>
+          <ol className="divide-y divide-border-subtle rounded-[18px] border border-border-card bg-surface-pearl">
+            {page.verification.steps.map((step, index) => {
+              const Icon = VERIFY_ICONS[index] ?? BadgeCheck;
+              return (
+                <li key={step.title} className="flex gap-4 p-5 sm:gap-5 sm:p-6">
+                  <span aria-hidden className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-surface-default text-brand-700 ring-1 ring-border-clinical">
+                    <Icon size={21} strokeWidth={1.7} />
+                  </span>
+                  <div>
+                    <p className="text-[0.75rem] font-semibold tabular-nums tracking-[0.08em] text-brand-600 rtl:tracking-normal">0{index + 1}</p>
+                    <h3 className="mt-0.5 text-[1.0625rem] font-semibold leading-snug text-brand-900">{step.title}</h3>
+                    <p className="mt-1 text-[0.9375rem] leading-6 text-ink-600">{step.body}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      </section>
+
+      <CaseRouter locale={locale} copy={page.router} button={d.common.send} />
+    </>
+  );
 }

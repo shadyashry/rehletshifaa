@@ -33,6 +33,12 @@ const CATALOG: readonly CatalogEntry[] = [
   { slug: "womens-health", system: "women", icon: "women", short: { en: "Women’s health", ar: "صحة المرأة" }, facets: { en: ["Obstetrics", "Gynecology", "Pelvic surgery"], ar: ["التوليد", "أمراض النساء", "جراحات الحوض"] } },
 ];
 
+/** Body system and icon of a care area (by slug); undefined for an unknown slug. */
+export function careAreaMeta(slug: string): { system: CareSystem; icon: CareAreaIconName } | undefined {
+  const entry = CATALOG.find((item) => item.slug === slug);
+  return entry ? { system: entry.system, icon: entry.icon } : undefined;
+}
+
 export type AtlasArea = {
   slug: string;
   title: string;
