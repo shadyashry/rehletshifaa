@@ -26,7 +26,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
   const NameHeading = featured ? "h3" : "h4";
   return (
     <article className={`group relative isolate flex h-full flex-col overflow-hidden rounded-[18px] border border-border-card bg-surface-default shadow-[0_1px_2px_rgba(36,64,74,0.04)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_22px_44px_-28px_rgba(36,64,74,0.45)] has-[a:focus-visible]:border-brand-500 motion-reduce:transform-none ${featured ? "md:flex-row" : ""}`}>
-      <div className={`relative flex items-start justify-between gap-4 px-6 pb-5 pt-6 sm:px-7 ${style.soft} ${featured ? "md:w-60 md:flex-none md:flex-col md:items-center md:justify-center md:gap-6 md:py-10" : ""}`}>
+      <div className={`relative flex items-start justify-between gap-4 px-6 pb-5 pt-6 sm:px-7 ${style.soft} ${featured ? "flex-wrap md:w-60 md:flex-none md:flex-col md:flex-nowrap md:items-center md:justify-center md:gap-6 md:py-10" : ""}`}>
         <CareAreaIcon name={icon} strokeWidth={0.8} className={`pointer-events-none absolute end-3 top-3 -z-10 h-24 w-24 opacity-[0.16] ${style.line}`} />
         <ConsultantPortrait profile={profile} size={featured ? "lg" : "md"} />
         {signals.length > 0 ? (

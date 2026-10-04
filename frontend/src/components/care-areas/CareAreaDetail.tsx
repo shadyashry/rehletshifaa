@@ -187,7 +187,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
 
       {/* 3 — the Consultants */}
       <section id="area-consultants" aria-labelledby="area-consultants-title" className="scroll-mt-20 border-t border-border-subtle bg-surface-default py-14 md:py-20">
-        <div className={`container-site grid gap-8 ${singleConsultant ? "" : "lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12"}`}>
+        <div className={`container-site grid grid-cols-1 gap-8 ${singleConsultant ? "" : "lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12"}`}>
           <div className={singleConsultant ? "" : "lg:sticky lg:top-28 lg:self-start"}>
             <div>
               <p className="eyebrow">{t.consultantsEyebrow}</p>
@@ -197,7 +197,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
             </div>
             <p className={`mt-4 text-[1rem] leading-7 text-ink-600 ${singleConsultant ? "max-w-[70ch]" : "max-w-[44ch]"}`}>{t.consultantsIntro}</p>
           </div>
-          <ul className={`grid gap-5 ${singleConsultant ? "" : "md:grid-cols-2"}`}>
+          <ul className={`grid grid-cols-1 gap-5 ${singleConsultant ? "" : "md:grid-cols-2"}`}>
             {area.consultants.map((profile) => (
               <li key={profile.slug}>
                 <ConsultantCard
