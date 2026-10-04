@@ -1,13 +1,15 @@
 package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.journey.api.JourneyDtos.*;
-import com.rehletshifaa.security.ActorContext;
-import com.rehletshifaa.security.ActorRole;
+import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.currency.CurrencyService;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.identity.KeycloakStaffIdentityService;
-import com.rehletshifaa.provider.application.ProviderPricingCatalogPort;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,21 +29,21 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  * so a price change reflects on the doctor's page immediately.
  */
 @Service
-public class PricingCatalogService implements ProviderPricingCatalogPort {
+public class PricingCatalogService {
     private final JdbcClient jdbc;
-    private final ActorContext actors;
+    private final Authority authority;
     private final Clock clock;
     private final CurrencyService currency;
     private final CryptoService crypto;
     private final KeycloakStaffIdentityService identity;
 
-    public PricingCatalogService(JdbcClient jdbc, ActorContext actors, Clock clock, CurrencyService currency,CryptoService crypto,KeycloakStaffIdentityService identity) {
-        this.jdbc = jdbc; this.actors = actors; this.clock = clock; this.currency = currency;this.crypto=crypto;this.identity=identity;
+    public PricingCatalogService(JdbcClient jdbc, Authority authority, Clock clock, CurrencyService currency,CryptoService crypto,KeycloakStaffIdentityService identity) {
+        this.jdbc = jdbc; this.authority = authority; this.clock = clock; this.currency = currency;this.crypto=crypto;this.identity=identity;
     }
 
     // ---- Specialty templates (admin) ----
     public List<ServiceTemplateView> templates(String careCategory) {
-        actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         String sql = "SELECT id,care_category,name,reference_standard,guidance_note FROM service_templates WHERE active" +
                 (careCategory == null || careCategory.isBlank() ? "" : " AND care_category=?") + " ORDER BY care_category";
         var spec = (careCategory == null || careCategory.isBlank())
@@ -50,56 +52,33 @@ public class PricingCatalogService implements ProviderPricingCatalogPort {
     }
 
     public List<ServiceTemplateItemView> templateItems(UUID templateId) {
-        actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         return jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order,active FROM service_template_items WHERE template_id=? ORDER BY active DESC,sort_order,service_name")
                 .param(templateId)
                 .query((rs, n) -> templateItem(rs)).list();
     }
 
-    /**
-     * Phase 2C bridge into the established proposal catalogue. The provider service
-     * performs Access Governance and version publication before calling this method.
-     * Released proposals remain immutable because they already snapshot unit price,
-     * currency, FX and margin data; only future catalogue selections see this value.
-     */
-    @Transactional
-    @Override public UUID applyPublishedProviderPrice(UUID practitionerId,String serviceCode,String serviceName,String category,
-            BigDecimal priceEgp,String changedBy,Instant effectiveFrom,Instant effectiveTo) {
-        requirePractitioner(practitionerId);
-        UUID existing=jdbc.sql("SELECT id FROM consultant_service_catalog WHERE practitioner_id=? AND service_code=?")
-                .params(practitionerId,serviceCode).query(UUID.class).optional().orElse(null);
-        LocalDate validUntil=effectiveTo==null?null:effectiveTo.atZone(java.time.ZoneOffset.UTC).toLocalDate();
-        if(existing==null){existing=UUID.randomUUID();jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,valid_until,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)")
-                .params(existing,practitionerId,serviceCode,serviceName,category,priceEgp,true,validUntil,changedBy,timestamp(clock.instant()),timestamp(clock.instant())).update();}
-        else jdbc.sql("UPDATE consultant_service_catalog SET service_name=?,category=?,price_egp=?,active=TRUE,valid_until=?,updated_at=?,version=version+1 WHERE id=?")
-                .params(serviceName,category,priceEgp,validUntil,timestamp(clock.instant()),existing).update();
-        return existing;
-    }
-    @Override @Transactional public void retirePublishedProviderPrice(UUID legacyCatalogId,String changedBy) {
-        jdbc.sql("UPDATE consultant_service_catalog SET active=FALSE,updated_at=?,version=version+1 WHERE id=?")
-                .params(timestamp(clock.instant()),legacyCatalogId).update();
-    }
 
-    @Transactional public ServiceTemplateView updateTemplate(UUID id,ServiceTemplateUpdateRequest request){var actor=actors.require(ActorRole.SYSTEM_ADMIN);int changed=jdbc.sql("UPDATE service_templates SET name=?,reference_standard=?,guidance_note=?,updated_at=? WHERE id=? AND active").params(request.name().trim(),request.referenceStandard(),request.guidanceNote(),timestamp(clock.instant()),id).update();if(changed!=1)throw new ApiException(404,"TEMPLATE_NOT_FOUND","The care-area template was not found");audit(actor,"SERVICE_TEMPLATE_UPDATED",id.toString());return templateById(id);}
-    @Transactional public ServiceTemplateItemView addTemplateItem(UUID templateId,ServiceTemplateItemRequest request){var actor=actors.require(ActorRole.SYSTEM_ADMIN);templateById(templateId);Integer exists=jdbc.sql("SELECT count(*) FROM service_template_items WHERE template_id=? AND service_code=?").params(templateId,request.serviceCode().trim()).query(Integer.class).single();if(exists!=null&&exists>0)throw new ApiException(409,"TEMPLATE_CODE_EXISTS","This service code already exists in the template");jdbc.sql("INSERT INTO service_template_items(id,template_id,service_code,service_name,category,suggested_price_egp,sort_order,active) VALUES(?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),templateId,request.serviceCode().trim(),request.serviceName().trim(),request.category(),request.suggestedPriceEgp(),request.sortOrder()==null?0:request.sortOrder(),request.active()==null||request.active()).update();audit(actor,"SERVICE_TEMPLATE_ITEM_CREATED",templateId.toString());return templateItemByCode(templateId,request.serviceCode().trim());}
-    @Transactional public ServiceTemplateItemView updateTemplateItem(UUID templateId,String code,ServiceTemplateItemRequest request){var actor=actors.require(ActorRole.SYSTEM_ADMIN);int changed=jdbc.sql("UPDATE service_template_items SET service_name=?,category=?,suggested_price_egp=?,sort_order=?,active=? WHERE template_id=? AND service_code=?").params(request.serviceName().trim(),request.category(),request.suggestedPriceEgp(),request.sortOrder()==null?0:request.sortOrder(),request.active()==null||request.active(),templateId,code).update();if(changed!=1)throw new ApiException(404,"TEMPLATE_ITEM_NOT_FOUND","The template service was not found");audit(actor,"SERVICE_TEMPLATE_ITEM_UPDATED",templateId+":"+code);return templateItemByCode(templateId,code);}
+    @Transactional public ServiceTemplateView updateTemplate(UUID id,ServiceTemplateUpdateRequest request){var actor=authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);int changed=jdbc.sql("UPDATE service_templates SET name=?,reference_standard=?,guidance_note=?,updated_at=? WHERE id=? AND active").params(request.name().trim(),request.referenceStandard(),request.guidanceNote(),timestamp(clock.instant()),id).update();if(changed!=1)throw new ApiException(404,"TEMPLATE_NOT_FOUND","The care-area template was not found");audit(actor,"SERVICE_TEMPLATE_UPDATED",id.toString());return templateById(id);}
+    @Transactional public ServiceTemplateItemView addTemplateItem(UUID templateId,ServiceTemplateItemRequest request){var actor=authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);templateById(templateId);Integer exists=jdbc.sql("SELECT count(*) FROM service_template_items WHERE template_id=? AND service_code=?").params(templateId,request.serviceCode().trim()).query(Integer.class).single();if(exists!=null&&exists>0)throw new ApiException(409,"TEMPLATE_CODE_EXISTS","This service code already exists in the template");jdbc.sql("INSERT INTO service_template_items(id,template_id,service_code,service_name,category,suggested_price_egp,sort_order,active) VALUES(?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),templateId,request.serviceCode().trim(),request.serviceName().trim(),request.category(),request.suggestedPriceEgp(),request.sortOrder()==null?0:request.sortOrder(),request.active()==null||request.active()).update();audit(actor,"SERVICE_TEMPLATE_ITEM_CREATED",templateId.toString());return templateItemByCode(templateId,request.serviceCode().trim());}
+    @Transactional public ServiceTemplateItemView updateTemplateItem(UUID templateId,String code,ServiceTemplateItemRequest request){var actor=authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);int changed=jdbc.sql("UPDATE service_template_items SET service_name=?,category=?,suggested_price_egp=?,sort_order=?,active=? WHERE template_id=? AND service_code=?").params(request.serviceName().trim(),request.category(),request.suggestedPriceEgp(),request.sortOrder()==null?0:request.sortOrder(),request.active()==null||request.active(),templateId,code).update();if(changed!=1)throw new ApiException(404,"TEMPLATE_ITEM_NOT_FOUND","The template service was not found");audit(actor,"SERVICE_TEMPLATE_ITEM_UPDATED",templateId+":"+code);return templateItemByCode(templateId,code);}
 
     // ---- Consultant catalog (admin managed) ----
     public List<PractitionerSummaryView> practitioners() {
-        actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
-        return jdbc.sql("SELECT id,external_subject,display_name,specialty,subspecialty,care_category,credentialing_status,availability_status,email_encrypted,account_status,invited_at,EXISTS(SELECT 1 FROM clinician_onboardings o WHERE o.practitioner_id=practitioner_profiles.id AND o.credential_policy_cutover_at IS NOT NULL) provider_credentialing FROM practitioner_profiles WHERE practitioner_type='CONSULTANT' ORDER BY display_name")
-                .query((rs, n) -> {String subject=rs.getString("external_subject"),stored=rs.getString("account_status");return new PractitionerSummaryView(rs.getObject("id", UUID.class), rs.getString("display_name"), rs.getString("specialty"), rs.getString("subspecialty"), rs.getString("care_category"), rs.getString("credentialing_status"), rs.getString("availability_status"),crypto.decrypt(rs.getString("email_encrypted")),identity.status(subject,stored),rs.getTimestamp("invited_at")==null?null:rs.getTimestamp("invited_at").toInstant(),rs.getBoolean("provider_credentialing"));}).list();
+        authority.authorize(Permission.CREDENTIAL_READ);
+        return jdbc.sql("SELECT id,external_subject,display_name,specialty,subspecialty,care_category,credentialing_status,availability_status,email_encrypted,account_status,invited_at FROM practitioner_profiles WHERE practitioner_type='CONSULTANT' ORDER BY display_name")
+                .query((rs, n) -> {String subject=rs.getString("external_subject"),stored=rs.getString("account_status");return new PractitionerSummaryView(rs.getObject("id", UUID.class), rs.getString("display_name"), rs.getString("specialty"), rs.getString("subspecialty"), rs.getString("care_category"), rs.getString("credentialing_status"), rs.getString("availability_status"),crypto.decrypt(rs.getString("email_encrypted")),identity.status(subject,stored),rs.getTimestamp("invited_at")==null?null:rs.getTimestamp("invited_at").toInstant());}).list();
     }
 
     public List<CatalogServiceView> practitionerCatalog(UUID practitionerId) {
-        actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         requirePractitioner(practitionerId);
         return catalogRows("SELECT * FROM consultant_service_catalog WHERE practitioner_id=? ORDER BY active DESC,category,service_name", practitionerId);
     }
 
     @Transactional
     public CatalogServiceView addCatalogService(UUID practitionerId, CatalogServiceRequest request) {
-        var actor = actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         requirePractitioner(practitionerId);
         Integer exists = jdbc.sql("SELECT count(*) FROM consultant_service_catalog WHERE practitioner_id=? AND service_code=?")
                 .params(practitionerId, request.serviceCode().trim()).query(Integer.class).single();
@@ -114,7 +93,7 @@ public class PricingCatalogService implements ProviderPricingCatalogPort {
 
     @Transactional
     public CatalogServiceView updateCatalogService(UUID practitionerId, UUID serviceId, CatalogServiceRequest request) {
-        var actor = actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         int changed = jdbc.sql("UPDATE consultant_service_catalog SET service_name=?,category=?,price_egp=?,active=?,valid_until=?,updated_at=?,version=version+1 WHERE id=? AND practitioner_id=?")
                 .params(request.serviceName().trim(), request.category(), request.priceEgp(),
                         request.active() == null || request.active(), request.validUntil(), timestamp(clock.instant()), serviceId, practitionerId).update();
@@ -125,7 +104,7 @@ public class PricingCatalogService implements ProviderPricingCatalogPort {
 
     @Transactional
     public void deactivateCatalogService(UUID practitionerId, UUID serviceId) {
-        var actor = actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         int changed = jdbc.sql("UPDATE consultant_service_catalog SET active=FALSE,updated_at=?,version=version+1 WHERE id=? AND practitioner_id=?")
                 .params(timestamp(clock.instant()), serviceId, practitionerId).update();
         if (changed != 1) throw new ApiException(404, "CATALOG_SERVICE_NOT_FOUND", "The catalog service was not found for this consultant");
@@ -139,7 +118,7 @@ public class PricingCatalogService implements ProviderPricingCatalogPort {
      */
     @Transactional
     public IdResponse seedFromTemplate(UUID practitionerId, UUID templateId) {
-        var actor = actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         String careArea = requirePractitionerCareArea(practitionerId);
         String templateArea = jdbc.sql("SELECT care_category FROM service_templates WHERE id=? AND active").param(templateId).query(String.class).optional()
                 .orElseThrow(() -> new ApiException(404, "TEMPLATE_NOT_FOUND", "The service template was not found"));
@@ -153,7 +132,7 @@ public class PricingCatalogService implements ProviderPricingCatalogPort {
     /** Derive a consultant's catalog from the template of their own care area. */
     @Transactional
     public IdResponse deriveFromCareArea(UUID practitionerId) {
-        var actor = actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         String careArea = requirePractitionerCareArea(practitionerId);
         UUID templateId = jdbc.sql("SELECT id FROM service_templates WHERE care_category=? AND active").param(careArea).query(UUID.class).optional()
                 .orElseThrow(() -> new ApiException(409, "NO_TEMPLATE_FOR_CARE_AREA", "No service template exists yet for the care area: " + careArea));
@@ -203,7 +182,7 @@ public class PricingCatalogService implements ProviderPricingCatalogPort {
      */
     @Transactional
     public CatalogImportResult importCatalog(UUID practitionerId, byte[] content, boolean commit) {
-        var actor = actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         requirePractitioner(practitionerId);
         List<String[]> table = parseCsv(new String(content, java.nio.charset.StandardCharsets.UTF_8));
         if (table.isEmpty()) throw new ApiException(400, "IMPORT_EMPTY", "The file is empty");
@@ -275,25 +254,26 @@ public class PricingCatalogService implements ProviderPricingCatalogPort {
 
     // ---- Doctor's own catalog (read) ----
     public List<CatalogServiceView> myCatalog() {
-        var actor = actors.require(ActorRole.DOCTOR);
+        var actor = authority.authorize(Permission.WORK_QUEUE_VIEW);
+        if (!actor.has(Role.CONSULTANT)) throw new ApiException(403, "PERMISSION_NOT_HELD", "Only consultants have a catalog");
         UUID practitionerId = jdbc.sql("SELECT id FROM practitioner_profiles WHERE external_subject=? AND credentialing_status='VERIFIED'")
                 .param(actor.subject()).query(UUID.class).optional()
                 .orElseThrow(() -> new ApiException(403, "DOCTOR_NOT_VERIFIED", "The doctor account is not linked to a verified practitioner profile"));
         LocalDate today = LocalDate.now(clock);
-        return catalogRows("SELECT * FROM consultant_service_catalog WHERE practitioner_id=? AND active AND (valid_until IS NULL OR valid_until>=?) ORDER BY category,service_name", practitionerId, today);
+        return catalogRows("SELECT * FROM consultant_service_catalog WHERE practitioner_id=? AND active AND (valid_until IS NULL OR valid_until>=?) AND (effective_from IS NULL OR effective_from<=?) ORDER BY category,service_name", practitionerId, today, today);
     }
 
     // ---- Exchange rates ----
     /** Effective rates for the currency switcher. Readable by any authenticated staff role. */
     public List<FxRateView> fxRates(LocalDate date) {
-        actors.require(ActorRole.DOCTOR, ActorRole.COORDINATOR, ActorRole.COORDINATOR_LEAD, ActorRole.OPERATIONS, ActorRole.FINANCE, ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        authority.authorize(Permission.REFERENCE_DATA_READ);
         LocalDate on = date == null ? LocalDate.now(clock) : date;
         return currency.effectiveRates(on).stream().map(r -> new FxRateView(r.currency(), r.rate(), r.rateDate(), r.source())).toList();
     }
 
     @Transactional
     public void setFxOverride(String currency, FxOverrideRequest request) {
-        var actor = actors.require(ActorRole.CREDENTIALING_ADMIN, ActorRole.SYSTEM_ADMIN);
+        var actor = authority.authorize(Permission.COMMERCIAL_POLICY_MANAGE);
         LocalDate date = request.date() == null ? LocalDate.now(clock) : request.date();
         this.currency.setOverride(currency, request.rate(), date, actor.subject());
         audit(actor, "FX_RATE_OVERRIDDEN", currency + "@" + date);
@@ -320,8 +300,8 @@ public class PricingCatalogService implements ProviderPricingCatalogPort {
         return catalogRows("SELECT * FROM consultant_service_catalog WHERE id=?", id).stream().findFirst()
                 .orElseThrow(() -> new ApiException(404, "CATALOG_SERVICE_NOT_FOUND", "The catalog service was not found"));
     }
-    private void audit(ActorContext.Actor actor, String type, String entityId) {
+    private void audit(Actor actor, String type, String entityId) {
         jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, actor.subject(), actor.primaryRole(), null, "PricingCatalog", entityId, "MANAGE", "SUCCESS", null, timestamp(clock.instant())).update();
+                .params(UUID.randomUUID(), type, actor.subject(), actor.label(), null, "PricingCatalog", entityId, "MANAGE", "SUCCESS", null, timestamp(clock.instant())).update();
     }
 }

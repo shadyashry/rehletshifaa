@@ -5,15 +5,28 @@
 Use this file as the default project context. Do **not** re-discover architecture or re-read broad docs unless the task requires it.
 
 Current working branch:
-- `codex/end-to-end-care-platform`
+- `codex/platform-control-plane`
 
 Current active epic:
-- Proposal-to-patient **commercial workflow**
-- Handoff/status: `docs/commercial-workflow-status.md`
-- Detailed workflows: `docs/end-to-end-workflows.md`
-- Architecture reference: `docs/architecture.md`
+- **Platform users, roles, access, hierarchy, and virtual clinics**
+- Live implementation checkpoint: `docs/platform-control-plane/section-1-implementation-status.md`
+- Execution plan: `docs/platform-control-plane/platform-users-and-virtual-clinics-execution-plan.md`
+- Requirements: `docs/platform-control-plane/platform-users-and-virtual-clinics-requirements.md`
 
-Read `docs/commercial-workflow-status.md` only for commercial-workflow tasks. Read `docs/end-to-end-workflows.md` or `docs/architecture.md` only when the requested change genuinely depends on them.
+Read the live implementation checkpoint first for this epic, then only the relevant execution-plan or requirements
+section. Read `docs/commercial-workflow-status.md` only for commercial-workflow tasks. Read
+`docs/end-to-end-workflows.md` or `docs/architecture.md` only when the requested change genuinely depends on them.
+
+## 1a. Codex-to-Claude continuity
+
+The live cross-agent handoff is `docs/platform-control-plane/section-1-implementation-status.md`. Keep its delivered
+work, verification, open gaps, and **Next Section 1 slice** accurate at meaningful slice boundaries so another agent
+can resume even if Codex stops because of a usage or context limit.
+
+If Claude takes over an interrupted Codex session, it must preserve the existing working tree, inspect `git status`
+and the targeted diff, read the live checkpoint, and continue from its next-slice section. It must not reset,
+discard, or assume ownership of uncommitted changes without first understanding them. The taking-over agent records
+new progress and verification in the same checkpoint file.
 
 ## 2. Stable development environment
 
@@ -171,9 +184,12 @@ Do not run full production builds or E2E suites for cosmetic/config-only changes
 
 ## 6. Database rules
 
-Flyway migrations are additive and immutable.
+Flyway migrations are additive and immutable once committed to `main`.
 - Never edit existing `V1`–`V15`.
 - Add `V16+`.
+- Pre-production (no environment holds data to keep, decided 2026-09-26): migrations not yet on `main` state the
+  final design and may be squashed or edited in place; the local dev database is then recreated. Do not add
+  data-migration, backfill, parity or compatibility layers for pre-production data — replace legacy directly.
 - Keep migrations H2-safe.
 - Use `TIMESTAMP WITH TIME ZONE`.
 - Avoid partial indexes.

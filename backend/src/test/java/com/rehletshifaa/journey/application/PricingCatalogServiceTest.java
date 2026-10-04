@@ -1,5 +1,7 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.authority.domain.Role;
+
 import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.shared.api.ApiException;
 import org.junit.jupiter.api.*;
@@ -25,6 +27,7 @@ class PricingCatalogServiceTest {
     @Autowired PricingCatalogService pricing;
     @Autowired JourneyService journey;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     private UUID seedVerifiedCardiologist() { return seedConsultant("doctor-subject", "cardiology"); }
@@ -38,7 +41,7 @@ class PricingCatalogServiceTest {
     @Test void seedsFromTemplateThenAdminEditReflectsOnDoctorPage() {
         UUID practitionerId = seedVerifiedCardiologist();
 
-        authenticate("admin-subject", "CREDENTIALING_ADMIN");
+        authenticate("admin-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
         ServiceTemplateView template = pricing.templates("cardiology").stream().findFirst().orElseThrow();
         assertThat(pricing.templateItems(template.id())).hasSize(11);
 
@@ -54,14 +57,14 @@ class PricingCatalogServiceTest {
         pricing.updateCatalogService(practitionerId, angio.id(),
                 new CatalogServiceRequest("CARD-ANGIO", "Diagnostic coronary angiography", "Procedures", new BigDecimal("90000.00"), true, null));
 
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         assertThat(pricing.myCatalog()).filteredOn(s -> s.serviceCode().equals("CARD-ANGIO"))
                 .singleElement().satisfies(s -> assertThat(s.priceEgp()).isEqualByComparingTo("90000.00"));
     }
 
     @Test void rejectsDuplicateServiceCode() {
         UUID practitionerId = seedVerifiedCardiologist();
-        authenticate("admin-subject", "CREDENTIALING_ADMIN");
+        authenticate("admin-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
         CatalogServiceRequest req = new CatalogServiceRequest("CUSTOM-1", "Custom service", "Procedures", new BigDecimal("1000.00"), true, null);
         pricing.addCatalogService(practitionerId, req);
         assertThatThrownBy(() -> pricing.addCatalogService(practitionerId, req))
@@ -70,7 +73,7 @@ class PricingCatalogServiceTest {
     }
 
     @Test void adminFxOverrideWinsAndShowsInEffectiveRates() {
-        authenticate("admin-subject", "CREDENTIALING_ADMIN");
+        authenticate("admin-subject", Role.FINANCE);
         pricing.setFxOverride("USD", new FxOverrideRequest(new BigDecimal("0.02000000"), null));
         assertThat(pricing.fxRates(null))
                 .anySatisfy(r -> { assertThat(r.currency()).isEqualTo("EGP"); assertThat(r.rate()).isEqualByComparingTo("1"); })
@@ -79,14 +82,14 @@ class PricingCatalogServiceTest {
 
     @Test void derivesFromOwnCareAreaTemplate() {
         UUID practitionerId = seedVerifiedCardiologist();
-        authenticate("admin-subject", "CREDENTIALING_ADMIN");
+        authenticate("admin-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
         assertThat(pricing.deriveFromCareArea(practitionerId).status()).contains("11");
         assertThat(pricing.practitionerCatalog(practitionerId)).hasSize(11);
     }
 
     @Test void rejectsTemplateFromDifferentCareArea() {
         UUID rheumaConsultant = seedConsultant("rheuma-subject", "rheumatology-rehabilitation");
-        authenticate("admin-subject", "CREDENTIALING_ADMIN");
+        authenticate("admin-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
         UUID cardiologyTemplate = pricing.templates("cardiology").stream().findFirst().orElseThrow().id();
         assertThatThrownBy(() -> pricing.seedFromTemplate(rheumaConsultant, cardiologyTemplate))
                 .isInstanceOf(ApiException.class)
@@ -94,7 +97,7 @@ class PricingCatalogServiceTest {
     }
 
     @Test void newConsultantAutomaticallyGetsOwnDerivedPriceList() {
-        authenticate("admin-subject", "CREDENTIALING_ADMIN");
+        authenticate("admin-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
         var created = journey.createPractitioner(new PractitionerRequest("Dr New", "Dr New", "doc-new-subject", null, "Cardiology", null, null, null, null, null, null, null, null, "AVAILABLE", null, "CONSULTANT", "cardiology"));
         // Each consultant starts with their own list, isolated from any other consultant's.
         assertThat(pricing.practitionerCatalog(created.id())).hasSize(11).allSatisfy(s -> assertThat(s.priceEgp()).isNotNull());
@@ -102,7 +105,7 @@ class PricingCatalogServiceTest {
 
     @Test void importsCsvAsPreviewThenCommit() {
         UUID practitionerId = seedVerifiedCardiologist();
-        authenticate("admin-subject", "CREDENTIALING_ADMIN");
+        authenticate("admin-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
         pricing.addCatalogService(practitionerId, new CatalogServiceRequest("CARD-CONSULT", "Consultation", "Consultation", new BigDecimal("3000.00"), true, null));
         String csv = "service_code,service_name,category,price_egp,active\n"
                 + "CARD-CONSULT,Consultation,Consultation,3500,true\n"   // UPDATE (price changed)
@@ -124,13 +127,9 @@ class PricingCatalogServiceTest {
 
     @Test void doctorCannotManageCatalog() {
         UUID practitionerId = seedVerifiedCardiologist();
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         assertThatThrownBy(() -> pricing.practitionerCatalog(practitionerId)).isInstanceOf(ApiException.class);
     }
 
-    private void authenticate(String subject, String role) {
-        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject(subject)
-                .claim("auth_time", Instant.now().getEpochSecond()).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_" + role)), subject));
-    }
+    private void authenticate(String subject, Role role) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, role); }
 }

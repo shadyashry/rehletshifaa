@@ -82,6 +82,16 @@ the function, assigning administrator, reason, and timestamps. The service enfor
 belong to the same function and that the selected manager has its `_LEAD` role. Multiple leads per
 function are supported, with recursive report lookup for supervisory case visibility.
 
+## Consultant virtual clinic
+
+The `clinic` module (`com.rehletshifaa.clinic`) owns the one-per-consultant virtual clinic, practice-manager
+delegations, consultation slots, governed service/price changes, structured consultant capabilities and the single
+consultant-eligibility rule (`ConsultantEligibilityService`). It depends only on `provider` (credential authority check),
+`identity`, `security` and `shared`; `journey` depends on it for assignment eligibility, and consultant referrals live
+in `journey` (`ConsultantReferralService`). It never uses provider organizations or memberships. Practice-manager
+authority is a database delegation checked per call — not a realm role — and grants no case access. Details:
+[consultant-virtual-clinic.md](consultant-virtual-clinic.md).
+
 ## Trust boundaries
 
 The browser is untrusted. MIME type, size, consent, case status, Turnstile token, and upload completion are verified server-side. Presigned URLs grant access to one random object key for a short period and do not grant bucket-list or read access.

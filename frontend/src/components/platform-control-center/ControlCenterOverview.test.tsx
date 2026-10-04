@@ -1,90 +1,86 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { ControlCenterOverview } from "./ControlCenterOverview";
 import { apiFetchAs } from "@/lib/api";
-import { failure, fakeApi, json, organization, providerDetail } from "./test-support";
+import type { Me } from "@/lib/access";
+import { failure, fakeApi, meWith } from "./test-support";
 
-const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "owner" } }, roles: [] as string[], loading: false, signIn: vi.fn(), signOut: vi.fn() }));
+const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "owner" } }, me: null as Me | null, roles: [] as string[], loading: false, meFailed: false, refreshMe: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
 vi.mock("@/components/AuthProvider", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); auth.roles = []; });
+afterEach(() => { cleanup(); vi.clearAllMocks(); auth.me = null; auth.meFailed = false; });
 
 const main = () => screen.getByRole("main");
 
 describe("Control Center Home answers 'What needs my attention?'", () => {
   it("lists only real waiting work, each linking straight to where it is done — no destination grid", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({
-      "/admin/providers": [organization], "/admin/providers/org-a": providerDetail,
-      "/admin/providers/org-a/credential-reviews": [{ id: "r1" }, { id: "r2" }],
-    }, ["provider.view", "credential.review", "provider.clinician.invite"]));
+    auth.me = meWith(["CREDENTIAL_READ", "CREDENTIAL_DECIDE", "CONSULTANT_ONBOARD"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/practitioners": [{ id: "p1", credentialingStatus: "UNDER_REVIEW" }, { id: "p2", credentialingStatus: "VERIFIED" }] }));
     render(<ControlCenterOverview locale="en" />);
-    const reviews = await screen.findByRole("link", { name: /Credentials waiting for review/ });
-    expect(reviews).toHaveTextContent("2");
-    // One organization holds the work, so the link opens that organization's queue, not a generic landing.
-    expect(reviews).toHaveAttribute("href", "/en/portal/control-center/credentials?org=org-a");
-    expect(screen.getByRole("link", { name: /Organizations still being set up/ })).toHaveAttribute("href", "/en/portal/control-center/providers/org-a?tab=setup");
-    expect(screen.getByRole("link", { name: /People waiting for membership activation/ })).toHaveAttribute("href", "/en/portal/control-center/providers/org-a?tab=people");
-    expect(screen.queryByText(/waiting for a coordinator/)).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Add clinician" })).toHaveAttribute("href", "/en/portal/control-center/providers/clinicians/new");
-    expect(screen.queryByRole("heading", { name: "What do you want to manage?" })).not.toBeInTheDocument();
-    // Every link in the page body is an attention item or the one primary action: nothing duplicates the sidebar.
-    expect(within(main()).getAllByRole("link").map((a) => a.textContent)).toHaveLength(4);
+    const waiting = await screen.findByRole("link", { name: /Consultants waiting for case approval/ });
+    expect(waiting).toHaveTextContent("1");
+    expect(waiting).toHaveAttribute("href", "/en/portal/control-center/consultants");
+    expect(screen.getByRole("link", { name: "Add consultant" })).toHaveAttribute("href", "/en/portal/control-center/consultants/new");
+    expect(within(main()).getAllByRole("link")).toHaveLength(2);
     expect(screen.getByRole("heading", { level: 1, name: "Control Center" })).toBeVisible();
   });
 
+  it("a system administrator sees workforce and governance work only", async () => {
+    auth.me = meWith(["WORKFORCE_READ", "WORKFORCE_ADMINISTER", "ACCESS_GOVERN", "AUDIT_READ"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({
+      "/admin/platform-access/staff": { people: [], invitations: [{ status: "SENT" }, { status: "QUEUED" }, { status: "ACCEPTED" }] },
+      "/admin/platform-access/staffing-requests": [{ status: "SUBMITTED" }],
+      "/admin/platform-access/administrator-changes": { administrators: [], requests: [{ status: "PENDING" }, { status: "APPROVED" }] },
+      "/admin/platform-access/mfa-reset-requests": [],
+    }));
+    render(<ControlCenterOverview locale="en" />);
+    expect(await screen.findByRole("link", { name: /Staff invitations not yet accepted/ })).toHaveTextContent("2");
+    expect(screen.getByRole("link", { name: /Staffing requests waiting for a decision/ })).toHaveAttribute("href", "/en/portal/control-center/staffing-requests");
+    expect(screen.getByRole("link", { name: /waiting for a second approver/ })).toHaveTextContent("1");
+    expect(screen.queryByText(/MFA reset requests/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Consultants waiting|coordinator/)).not.toBeInTheDocument();
+    const paths = vi.mocked(apiFetchAs).mock.calls.map(([, path]) => path);
+    expect(paths).not.toContain("/admin/practitioners");
+  });
+
   it("says 'You're all caught up.' and what was checked, never zero tiles", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers": [] }, ["provider.view", "credential.review"]));
+    auth.me = meWith(["ROUTING_READ", "ROUTING_ASSIGN"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/coordination/queue": [] }));
     render(<ControlCenterOverview locale="en" />);
     expect(await screen.findByText("You're all caught up.")).toBeVisible();
-    expect(screen.getByText("Nothing is waiting in Reviews & Safety, Providers.")).toBeVisible();
+    expect(screen.getByText("Nothing is waiting in Operations.")).toBeVisible();
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
-  it("is persona-aware: a journey manager sees no provider onboarding work and gets a calm pointer to their areas", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({}, ["journey.view"]));
+  it("is persona-aware: a journey manager gets a calm pointer to their areas and no reads", async () => {
+    auth.me = meWith(["JOURNEY_READ", "JOURNEY_EDIT"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({}));
     render(<ControlCenterOverview locale="en" />);
     expect(await screen.findByText("There's no waiting work to track here for your areas")).toBeVisible();
     expect(within(main()).getByRole("link", { name: "Journeys" })).toHaveAttribute("href", "/en/portal/control-center/journeys");
-    expect(screen.queryByRole("link", { name: "Add clinician" })).not.toBeInTheDocument();
-    expect(vi.mocked(apiFetchAs).mock.calls.map(([, path]) => path)).toEqual(["/admin/access/me", "/admin/access/me"]);
-  });
-
-  it("a credential reviewer sees review work only — no pricing or provider-setup items", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers": [organization], "/admin/providers/org-a/credential-reviews": [{ id: "r1" }] }, ["credential.review"]));
-    render(<ControlCenterOverview locale="en" />);
-    expect(await screen.findByRole("link", { name: /Credentials waiting for review/ })).toBeVisible();
-    expect(screen.queryByText(/Organizations still being set up|membership activation|Staff invitations/)).not.toBeInTheDocument();
+    expect(vi.mocked(apiFetchAs)).not.toHaveBeenCalled();
   });
 
   it("reports a count it could not read as not checked — not as zero and not as no access", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers": [organization], "/admin/providers/org-a/credential-reviews": failure(500, "REQUEST_FAILED") }, ["credential.review"]));
+    auth.me = meWith(["PATIENT_IDENTITY_REVIEW", "PATIENT_IDENTITY_READ"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/identity-review/queue": failure(500, "REQUEST_FAILED") }));
     render(<ControlCenterOverview locale="en" />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("Some waiting work couldn't be checked: Credentials waiting for review.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Some waiting work couldn't be checked: Identity checks waiting for a decision.");
     expect(screen.queryByText("You're all caught up.")).not.toBeInTheDocument();
-    expect(screen.queryByText(/access/i)).not.toBeInTheDocument();
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers": [organization], "/admin/providers/org-a/credential-reviews": [] }, ["credential.review"]));
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/identity-review/queue": [] }));
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("You're all caught up.")).toBeVisible();
   });
 
-  it("marks a count that covers only part of the data", async () => {
-    const orgs = Array.from({ length: 26 }, (_, i) => ({ ...organization, id: `org-${i}`, status: "ACTIVE" }));
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/admin/providers": orgs, ...Object.fromEntries(orgs.map((o) => [`/admin/providers/${o.id}`, providerDetail])) }, ["provider.view"]));
-    render(<ControlCenterOverview locale="en" />);
-    const pending = await screen.findByRole("link", { name: /People waiting for membership activation/ });
-    expect(pending).toHaveTextContent("25");
-    expect(pending).toHaveTextContent("first 25 organizations only");
-  });
-
-  it("tells an account without any area what to do, and a failed capability read is not 'no access'", async () => {
-    vi.mocked(apiFetchAs).mockImplementation(fakeApi({}, []));
+  it("tells an account without any area what to do, and a failed access read is not 'no access'", async () => {
+    auth.me = meWith([]);
     render(<ControlCenterOverview locale="ar" />);
     expect(await screen.findByText("لا توجد مجالات في مركز التحكم لحسابك")).toBeVisible();
     cleanup();
-    vi.mocked(apiFetchAs).mockImplementation(async () => json({}, 503));
+    auth.me = null; auth.meFailed = true;
     render(<ControlCenterOverview locale="en" />);
-    await waitFor(() => expect(within(main()).getByRole("alert")).toHaveTextContent("We couldn't check which areas you can use."));
+    expect(within(main()).getByRole("alert")).toHaveTextContent("We couldn't check which areas you can use.");
     expect(screen.queryByText(/No Control Center areas/)).not.toBeInTheDocument();
   });
 });

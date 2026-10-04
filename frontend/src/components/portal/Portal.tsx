@@ -1,7 +1,8 @@
 "use client";
 
 import { NoPortalWorkspace } from "./NoPortalWorkspace";
-import { practiceHref, useProviderPractice } from "@/components/provider-workspace/provider-workspace-model";
+import { useVirtualClinics, virtualClinicHref } from "@/components/virtual-clinic/virtual-clinic-model";
+import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { ReauthenticationReturnNotice } from "@/components/ReauthenticationNotices";
 import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,7 +32,7 @@ import { AccountLinkRequest } from "@/components/portal/AccountLinkRequest";
 import { ccHref } from "@/components/platform-control-center/control-center-nav";
 import { useControlCenterEntry } from "@/components/platform-control-center/ControlCenterNavigation";
 import type { Locale } from "@/lib/i18n";
-import { CONTROL_CENTER_ROLES, legacyAdministration, portalRoles, type PortalRoleKey as RoleKey } from "@/lib/portal-role-access";
+import { holds, leadsTeam, opensControlCenter, portalViews, type PortalView as RoleKey } from "@/lib/access";
 import { useRouter } from "next/navigation";
 import { apiFetchAs, SITE_URL } from "@/lib/api";
 import { scrollIntoView } from "@/lib/scroll";
@@ -41,6 +42,7 @@ type CaseView={id:string;caseNumber:string;waitingOn?:string|null;waitingReason?
 type StaffCaseResponse={caseSummary:CaseView;assignmentId?:string;assignmentStatus?:string;openTaskCount:number;overdueTaskCount:number;documentCount:number};
 type CatalogService={id:string;serviceCode:string;serviceName:string;category?:string;priceEgp:number;active:boolean};
 type FxRate={currency:string;rate:number;rateDate:string;source:string};
+const REFERRAL_ASSIGNMENTS=["TRANSFER","SECOND_OPINION"];const REFERRAL_CONFIRM_WORK=["CONFIRM_TRANSFER","CONFIRM_SECOND_OPINION"];
 type Assignment={id:string;assigneeSubject:string;assigneeName?:string|null;assigneeRole:string;assignmentType:string;status:string;assignedAt:string;version:number};
 type CaseDocument={documentId:string;fileName:string;contentType:string;sizeBytes:number;status:string;createdAt:string;confirmedAt?:string};
 type VerifiedDoctor={subject:string;displayName:string;specialty?:string;subspecialty?:string;availabilityStatus?:string;careCategory?:string};
@@ -78,23 +80,26 @@ const copy={
 };
 
 export function Portal({locale}:{locale:Locale}){
-  const t=copy[locale];const{user,roles,loading,signIn,signOut}=useAuth();
-  // Case workspaces only. Administration and identity checks are Control Center work: an account with nothing else
-  // lands there directly, and everyone else reaches it from the account menu.
-  const available=useMemo(()=>portalRoles(roles).filter(role=>!CONTROL_CENTER_ROLES.includes(role)),[roles]);
-  const controlCenterOnly=!!user&&!available.length&&portalRoles(roles).length>0;
+  const t=copy[locale];const{user,me,loading,signIn,signOut,refreshMe}=useAuth();
+  // Case workspaces come from /api/v1/me. Control Center work lives in the Control Center: an account with only that
+  // lands there directly; everyone else reaches it from the account menu. A signed-in account with no workforce
+  // workspace is a patient-side account: it opens My Care, where the account is bound to its patient record.
+  const views=useMemo(()=>portalViews(me),[me]);
+  const workforce=views.some(view=>view!=="patient");
+  const owner=!!me?.workspaces.includes("OWNER");
+  const ownerOnly=!!user&&!workforce&&owner;
+  const controlCenterOnly=!!user&&!workforce&&!owner&&opensControlCenter(me);
+  const available=useMemo<RoleKey[]>(()=>workforce?views:me&&!controlCenterOnly?["patient"]:[],[views,workforce,me,controlCenterOnly]);
+  const patientView=available.includes("patient");
   const controlCenter=useControlCenterEntry(locale);const router=useRouter();
   useEffect(()=>{if(controlCenterOnly)router.replace(ccHref(locale));},[controlCenterOnly,router,locale]);
-  // Provider Workspace (UX-4): someone who works with a provider organization and has no RehletShifaa staff workspace
-  // lands in My Practice. Identity-system accounts carry the default PATIENT role, so "only patient" does not mean "a
-  // patient": `?workspace=care` (the My Practice switch) and patient entry links keep My Care reachable.
-  const workforce=available.some(role=>role!=="patient");
-  const practice=useProviderPractice(!!user&&!controlCenterOnly);
-  const hasPractice=!!practice.view?.practices.length;
+  useEffect(()=>{if(ownerOnly)router.replace(`/${locale}/portal/owner`);},[ownerOnly,router,locale]);
+  // Virtual clinic: a consultant opens their own; an account that only manages a consultant's clinic lands there.
+  const clinicAccess=useVirtualClinics(!!user&&!controlCenterOnly);const hasClinic=clinicAccess.clinics.length>0;
   const[careEntry]=useState(()=>{if(typeof window==="undefined")return false;const q=new URLSearchParams(window.location.search);return q.get("workspace")==="care"||["activate","link","case","continue"].some(k=>q.has(k));});
-  const providerLanding=!!user&&!workforce&&hasPractice&&!careEntry;
-  const deferPatient=!workforce&&!careEntry&&(practice.loading||hasPractice);
-  useEffect(()=>{if(providerLanding)router.replace(practiceHref(locale));},[providerLanding,router,locale]);
+  const managedClinicLanding=!!user&&!workforce&&!careEntry&&clinicAccess.clinics.some(c=>c.relation==="PRACTICE_MANAGER");
+  const deferPatient=!workforce&&!careEntry&&(clinicAccess.loading||managedClinicLanding);
+  useEffect(()=>{if(managedClinicLanding)router.replace(virtualClinicHref(locale));},[managedClinicLanding,router,locale]);
   const[active,setActive]=useState<RoleKey|undefined>();const[cases,setCases]=useState<CaseView[]>([]);const[myTasks,setMyTasks]=useState<Task[]>([]);const[workspace,setWorkspace]=useState<Workspace|null>(null);const[documents,setDocuments]=useState<CaseDocument[]>([]);const[doctors,setDoctors]=useState<VerifiedDoctor[]>([]);const[categories,setCategories]=useState<CareCategory[]>([]);const[staff,setStaff]=useState<StaffMember[]>([]);const[share,setShare]=useState<{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null>(null);const[doctorProfile,setDoctorProfile]=useState<DoctorProfile|null>(null);const[coordinatorProfile,setCoordinatorProfile]=useState<StaffProfile|null>(null);const[catalog,setCatalog]=useState<CatalogService[]>([]);const[fxRates,setFxRates]=useState<FxRate[]>([]);const[busy,setBusy]=useState(false);const[notice,setNotice]=useState("");const[error,setError]=useState("");
   const [preferences,setPreferences]=useState<Preferences>({displayName:null,locale:null});
   const [queueState,setQueueState]=useState<QueueState>(initialQueue);
@@ -107,7 +112,6 @@ export function Portal({locale}:{locale:Locale}){
   const loadAssignmentHistory=useCallback((caseId:string)=>api<AssignmentHistoryEntry[]>(`/coordinator/cases/${caseId}/assignment-history`),[api]);
   useEffect(()=>{if(!user)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[user,api]);
   useEffect(()=>{
-    // A provider person on the way to My Practice (see providerLanding) never loads a patient queue.
     if(!currentRole||["admin","identity"].includes(currentRole)||deferPatient){setQueueLoading(false);return;}
     let cancelled=false;setQueueLoading(true);setCases([]);setMyTasks([]);setError("");
     void Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),["coordinator","doctor","operations","finance","patient"].includes(currentRole)?api<Task[]>("/work/mine"):Promise.resolve([])])
@@ -124,9 +128,9 @@ export function Portal({locale}:{locale:Locale}){
   // activates the account, and the answer says which case is current and whether an "is this you?" question waits.
   const [linkToken,setLinkToken]=useState<string|null>(()=>typeof window==="undefined"?null:new URLSearchParams(window.location.search).get("link"));
   const [landed,setLanded]=useState(false);
-  useEffect(()=>{if(!user||deferPatient||!roles.some(r=>["PATIENT","PATIENT_REPRESENTATIVE"].includes(r)))return;const params=new URLSearchParams(window.location.search);const link=params.get("link");if(link){params.delete("link");window.history.replaceState({},"",`${window.location.pathname}${params.toString()?`?${params}`:""}`);}void api<{linked:boolean;currentCaseId:string|null;accountStatus:string}>("/patient/account/session",{method:"POST"}).then(session=>{if(!params.get("case")&&session.currentCaseId&&!link){const url=new URL(window.location.href);url.searchParams.set("case",session.currentCaseId);window.history.replaceState({},"",url);}}).catch(()=>{}).finally(()=>setLanded(true));},[user,roles,api,deferPatient]);
+  useEffect(()=>{if(!user||deferPatient||!patientView)return;const params=new URLSearchParams(window.location.search);const link=params.get("link");if(link){params.delete("link");window.history.replaceState({},"",`${window.location.pathname}${params.toString()?`?${params}`:""}`);}void api<{linked:boolean;currentCaseId:string|null;accountStatus:string}>("/patient/account/session",{method:"POST"}).then(session=>{if(session.linked)refreshMe();if(!params.get("case")&&session.currentCaseId&&!link){const url=new URL(window.location.href);url.searchParams.set("case",session.currentCaseId);window.history.replaceState({},"",url);}}).catch(()=>{}).finally(()=>setLanded(true));},[user,patientView,api,deferPatient,refreshMe]);
   // Complete account activation when the patient returns from the activation link (?activate=token).
-  useEffect(()=>{if(!user||!roles.some(r=>["PATIENT","PATIENT_REPRESENTATIVE"].includes(r)))return;const token=new URLSearchParams(window.location.search).get("activate");if(!token)return;void api(`/patient/account/activate`,{method:"POST",body:JSON.stringify({activationToken:token})}).then(()=>{setNotice(t.activated);window.history.replaceState({},"",window.location.pathname);void refresh();}).catch(e=>setError(e instanceof Error?e.message:t.error));},[user,roles,api,refresh,t.activated,t.error]);
+  useEffect(()=>{if(!user||!patientView)return;const token=new URLSearchParams(window.location.search).get("activate");if(!token)return;void api(`/patient/account/activate`,{method:"POST",body:JSON.stringify({activationToken:token})}).then(()=>{setNotice(t.activated);window.history.replaceState({},"",window.location.pathname);void refresh();}).catch(e=>setError(e instanceof Error?e.message:t.error));},[user,patientView,api,refresh,t.activated,t.error]);
   useEffect(()=>{if(currentRole!=="doctor")return;void api<DoctorProfile>("/doctor/me").then(setDoctorProfile).catch(()=>setDoctorProfile(null));void api<CatalogService[]>("/doctor/catalog").then(setCatalog).catch(()=>setCatalog([]));void api<FxRate[]>("/doctor/fx-rates").then(setFxRates).catch(()=>setFxRates([]));},[currentRole,api]);
   useEffect(()=>{if(currentRole!=="coordinator")return;void api<StaffProfile>("/coordinator/me").then(setCoordinatorProfile).catch(()=>setCoordinatorProfile(null));},[currentRole,api]);
   useEffect(()=>{if(currentRole!=="coordinator")return;void api<VerifiedDoctor[]>("/coordinator/doctors").then(setDoctors).catch(()=>setDoctors([]));void api<CareCategory[]>("/coordinator/care-categories").then(setCategories).catch(()=>setCategories([]));void api<FxRate[]>("/coordinator/fx-rates").then(setFxRates).catch(()=>setFxRates([]));void Promise.all([api<StaffMember[]>("/coordinator/staff?role=COORDINATOR"),api<StaffMember[]>("/coordinator/staff?role=OPERATIONS"),api<StaffMember[]>("/coordinator/staff?role=FINANCE")]).then(rows=>setStaff(rows.flat())).catch(()=>setStaff([]));},[currentRole,api]);
@@ -162,9 +166,9 @@ export function Portal({locale}:{locale:Locale}){
   function changeQueue(next:QueueState){setQueueState(next);if(user&&currentRole)try{sessionStorage.setItem(`portal-queue:${user.profile.sub}:${currentRole}`,JSON.stringify(next));}catch{}}
   const restored=useRef(false);
   // For patients, wait for the session answer: it may have just pointed ?case= at their current case.
-  useEffect(()=>{if(queueLoading||restored.current||!cases.length)return;const patient=roles.some(r=>["PATIENT","PATIENT_REPRESENTATIVE"].includes(r));if(patient&&!landed)return;restored.current=true;const id=new URLSearchParams(window.location.search).get("case");
+  useEffect(()=>{if(queueLoading||restored.current||!cases.length)return;if(patientView&&!landed)return;restored.current=true;const id=new URLSearchParams(window.location.search).get("case");
     // A patient never lands on a list: the session named their current case; failing that, the most recent one.
-    const item=cases.find(c=>c.id===id)??(patient?cases[0]:undefined);if(item)void openCase(item);});
+    const item=cases.find(c=>c.id===id)??(patientView?cases[0]:undefined);if(item)void openCase(item);});
   // The patient's three destinations are one page with a view switch, kept in the URL so a reload or a shared link lands in the same place.
   const [careView,setCareView]=useState<CareView>(()=>{if(typeof window==="undefined")return "care";const v=new URLSearchParams(window.location.search).get("view");return v==="documents"||v==="messages"?v:"care";});
   const changeCareView=(view:CareView)=>{setCareView(view);const url=new URL(window.location.href);if(view==="care")url.searchParams.delete("view");else url.searchParams.set("view",view);window.history.replaceState({},"",url);requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());};
@@ -181,9 +185,8 @@ export function Portal({locale}:{locale:Locale}){
     finally{mutationPending.current=false;setBusy(false);}
   }
   if(loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
-  if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح مركز التحكم…":"Opening the Control Center…"}/>;
-  if(user&&!workforce&&!careEntry&&practice.loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
-  if(providerLanding)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح عيادتي…":"Opening My Practice…"}/>;
+  if(controlCenterOnly||ownerOnly)return <PortalFrame title={t.title} subtitle={ownerOnly?(locale==="ar"?"جارٍ فتح مساحة المالك…":"Opening the owner workspace…"):(locale==="ar"?"جارٍ فتح مركز التحكم…":"Opening the Control Center…")}/>;
+  if(user&&!workforce&&!careEntry&&clinicAccess.loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
   if(!user)return <PortalFrame title={t.title} subtitle={t.subtitle}><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]"><div className="card p-6 sm:p-8"><p className="eyebrow">{locale==="ar"?"مساحة خاصة ومحمية":"Private, protected space"}</p><h2 className="title mt-3">{locale==="ar"?"سجّل الدخول للوصول إلى حالتك":"Sign in to open your case"}</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-ink-600">{locale==="ar"?"للمرضى الذين أكملوا ملفهم وفعّلوا حسابهم، وللفريق الطبي والتنسيقي. بعد الدخول تصل مباشرة إلى حالتك الحالية وخطوتها التالية.":"For patients who completed their profile and set up their account, and for the care team. After signing in you land directly on your current case and its next step."}</p><div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn-primary" onClick={()=>void signIn()}>{t.signIn}</button><a className="btn-secondary" href={locale==="ar"?"/en/portal":"/ar/portal"} lang={locale==="ar"?"en":"ar"}>{locale==="ar"?"English":"العربية"}</a></div><p className="mt-5 border-t border-line pt-4 text-sm leading-6 text-ink-500">{locale==="ar"?"أرسلت حالتك ولم تفعّل حسابك بعد؟ ":"Sent a case but haven't set up your account yet? "}<a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/track-case`}>{locale==="ar"?"تابع حالتك عبر الرابط الآمن":"Check your case status with your secure link"}</a>{locale==="ar"?" — أما الحساب فتُنشئه عند إكمال ملفك بعد قبول العرض.":" — your account is created when you complete your profile after accepting a proposal."}</p></div><aside className="surface-muted p-6"><h2 className="font-bold text-brand-900">{locale==="ar"?"حماية الوصول":"Secure access"}</h2><ul className="mt-4 space-y-3 text-sm leading-6 text-ink-600"><li>✓ {locale==="ar"?"تسجيل دخول موحّد وآمن":"Secure single sign-on"}</li><li>✓ {locale==="ar"?"صلاحيات منفصلة لكل دور":"Role-specific access"}</li><li>✓ {locale==="ar"?"المستندات الطبية ليست عامة":"Medical files are never public"}</li></ul><p className="mt-5 border-t border-line pt-4 text-xs leading-5 text-ink-500">{locale==="ar"?"إذا لم تتمكن من الدخول، تواصل مع منسقك أو مسؤول النظام دون مشاركة كلمة المرور.":"If you cannot sign in, contact your coordinator or system administrator without sharing your password."}</p></aside></div></PortalFrame>;
   const profile=user.profile as {name?:string;preferred_username?:string;email?:string;sub?:string};
   const accountName=profile.name??profile.preferred_username??profile.email??profile.sub??"";
@@ -191,14 +194,14 @@ export function Portal({locale}:{locale:Locale}){
   const profileName=isDoctorRole?doctorProfile?.displayName:currentRole==="coordinator"?coordinatorProfile?.displayName:undefined;
   const baseName=preferences.displayName||profileName||accountName;
   const displayName=isDoctorRole&&profileName&&!/^d(r|octor)\b/i.test(baseName)?`Dr. ${baseName}`:baseName;
-  const descriptions:Record<RoleKey,string>=locale==="ar"?{coordinator:"راجع الحالات ونسّق الخطوة التالية للرعاية.",doctor:"راجع الحالات المسندة إليك وسجّل قراراتك السريرية.",operations:"تابع الترتيبات والإجراءات المطلوبة منك.",finance:"راجع المدفوعات والموافقات المطلوبة.",patient:"تابع رعايتك وتعرّف على الخطوة التالية.",admin:"الاستشاريون والاعتمادات والأسعار والموظفون والوصول — في مركز التحكم.",identity:"راجع طلبات التحقق من الهوية."}:{coordinator:"Review cases and coordinate the next step in care.",doctor:"Review assigned cases and record your clinical decisions.",operations:"Manage your assigned care and travel arrangements.",finance:"Review payments and commercial approvals that need your attention.",patient:"Follow your care and see what happens next.",admin:"Consultants, credentials, pricing, staff and access — all in the Control Center.",identity:"Review identity verification requests."};
+  const descriptions:Record<RoleKey,string>=locale==="ar"?{coordinator:"راجع الحالات ونسّق الخطوة التالية للرعاية.",doctor:"راجع الحالات المسندة إليك وسجّل قراراتك السريرية.",operations:"تابع الترتيبات والإجراءات المطلوبة منك.",finance:"راجع المدفوعات والموافقات المطلوبة.",patient:"تابع رعايتك وتعرّف على الخطوة التالية."}:{coordinator:"Review cases and coordinate the next step in care.",doctor:"Review assigned cases and record your clinical decisions.",operations:"Manage your assigned care and travel arrangements.",finance:"Review payments and commercial approvals that need your attention.",patient:"Follow your care and see what happens next."};
   const inWorkspace=!!workspace&&!!currentRole&&!["admin","identity"].includes(currentRole);
   const isPatientRole=currentRole==="patient";
   return <PortalFrame title={isPatientRole?(locale==="ar"?"رعايتي":"My Care"):currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>void openCaseById(caseId)}/>}
     {isPatientRole&&workspace&&<PatientNav locale={locale} view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
     <PortalAccount locale={locale} name={displayName} email={profile.email} role={currentRole?roleLabel(currentRole,locale):""} api={api} signOut={signOut} preferences={preferences} onSaved={value=>{setPreferences(value);setNotice(t.success);}} patient={isPatientRole} controlCenter={controlCenter}/>
-    {(available.length>1||hasPractice)&&<div className="mb-8 flex flex-wrap gap-2">{hasPractice&&<a className="btn-secondary" href={practiceHref(locale)}>{locale==="ar"?"عيادتي":"My Practice"}</a>}{available.length>1&&available.map(role=><button key={role} className={currentRole===role?"btn-primary":"btn-secondary"} onClick={()=>{setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}}>{roleLabel(role,locale)}</button>)}</div>}
+    {(owner||available.length>1||hasClinic)&&<div className="mb-8 flex flex-wrap gap-2">{owner&&<a className="btn-secondary" href={`/${locale}/portal/owner`}>{locale==="ar"?"مساحة المالك":"Owner workspace"}</a>}{hasClinic&&<a className="btn-secondary" href={virtualClinicHref(locale)}>{locale==="ar"?"العيادة الافتراضية":"Virtual Clinic"}</a>}{available.length>1&&available.map(role=><button key={role} className={currentRole===role?"btn-primary":"btn-secondary"} onClick={()=>{setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}}>{roleLabel(role,locale)}</button>)}</div>}
     <ReauthenticationReturnNotice locale={locale} className="mb-4 rounded-xl bg-brand-50 p-4 text-brand-800"/>
     {!available.length&&<NoPortalWorkspace locale={locale}/>}
     {linkToken&&currentRole==="patient"&&<AccountLinkRequest locale={locale} token={linkToken} api={api} onResolved={()=>{setLinkToken(null);restored.current=false;void refresh();}}/>}
@@ -206,14 +209,14 @@ export function Portal({locale}:{locale:Locale}){
     {busy&&workspace&&<p role="status" className="mb-3 text-sm text-ink-500">{t.loading}</p>}
     {documentError&&workspace&&<p role="alert" className="mb-4 rounded-xl bg-alert-50 p-4 text-sm text-alert-800">{locale==="ar"?"تعذّر تحميل المستندات.":"Documents could not be loaded."} <button className="link-cta" onClick={()=>void openCase(workspace.caseSummary)}>{locale==="ar"?"إعادة المحاولة":"Retry"}</button></p>}
     {workspace
-        ? <WorkspaceView locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={roles.includes("COORDINATOR_LEAD")} loadAssignmentHistory={loadAssignmentHistory} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={openCaseById}/>
-        : isPatientRole ? (queueLoading||(!landed&&roles.some(r=>["PATIENT","PATIENT_REPRESENTATIVE"].includes(r)))||(cases.length>0&&!error)
+        ? <WorkspaceView locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={openCaseById}/>
+        : isPatientRole ? (queueLoading||(!landed&&patientView)||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)
         : null}
-    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div hidden={!!workspace}><Queue queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={roles.includes("COORDINATOR_LEAD")} staff={staff} openCase={openCase} mutate={mutate}/></div>}
+    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div hidden={!!workspace}><Queue queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff} openCase={openCase} mutate={mutate}/></div>}
 
-    {currentRole==="finance"&&!workspace&&legacyAdministration(roles).financePolicy&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
+    {currentRole==="finance"&&!workspace&&holds(me,"COMMERCIAL_POLICY_READ")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
   </PortalFrame>;
 }
 
@@ -266,11 +269,11 @@ function Queue({locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],
   </>;
 }
 
-function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,careView="care",onCareView,otherCases=[],openCaseById}:{locale:Locale;t:typeof copy.en;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void}){
+function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,careView="care",onCareView,otherCases=[],openCaseById}:{locale:Locale;t:typeof copy.en;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void}){
  const c=value.caseSummary;const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
  const doctorPhase=["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
- const doctorAssignment=value.assignments.find(a=>a.assigneeRole==="DOCTOR"&&(a.status==="PENDING"||a.status==="ACTIVE"));
+ const doctorAssignment=value.assignments.find(a=>a.assigneeRole==="DOCTOR"&&!REFERRAL_ASSIGNMENTS.includes(a.assignmentType)&&(a.status==="PENDING"||a.status==="ACTIVE"));
  // Never fall back to an identity subject: the backend resolves the name, and an honest generic label
   // is better than a UUID when it cannot.
   const assignedDoctorName=doctorAssignment?(doctorAssignment.assigneeName??doctors.find(d=>d.subject===doctorAssignment.assigneeSubject)?.displayName??(locale==="ar"?"الاستشاري المعيَّن":"the assigned consultant")):"";
@@ -297,14 +300,16 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
  // The proposal is the coordinator's work while it is being prepared or released (or, at arrival, finalised);
  // once decided it becomes reference history.
  // An assignment step has its own inline form; every other focus step lives in the proposal panel.
- const formCode=current.workType==="TRAVEL"?"ASSIGN_OPERATIONS":current.code;
- const formAction=isCoordinator&&owned&&current.kind==="FOCUS"&&["ASSIGN_CONSULTANT","ASSIGN_OPERATIONS","ASSIGN_FINANCE"].includes(formCode);
+ const formCode=current.workType==="TRAVEL"?"ASSIGN_OPERATIONS":REFERRAL_CONFIRM_WORK.includes(current.workType??"")?"CONFIRM_REFERRAL":current.code;
+ const formAction=isCoordinator&&owned&&current.kind==="FOCUS"&&["ASSIGN_CONSULTANT","CONFIRM_REFERRAL","ASSIGN_OPERATIONS","ASSIGN_FINANCE"].includes(formCode);
  const proposalIsWork=isCoordinator&&owned&&(["PREPARE_PROPOSAL","RELEASE_PROPOSAL","WAIT_INTERNAL_APPROVAL","ASSIGN_FINANCE"].includes(current.code)||["PREPARE_PROPOSAL","PROPOSAL_REVISION"].includes(current.workType??"")||(!!approved&&!value.proposal)||c.status==="ARRIVAL_CONFIRMED");
  const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard locale={locale} t={t} proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm caseId={c.id} reviewId={approved.id} language={c.preferredLanguage} estimate={approved} fxRates={fxRates} locale={locale} t={t} busy={busy} onSend={sendProposal}/>}{isCoordinator&&share&&<ProposalShareLinks share={share} locale={locale} t={t}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} caseId={c.id} versionId={value.proposal.versionId} locale={locale} busy={busy} mutate={mutate} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions caseId={c.id} reviewId={approved?.id} proposal={value.proposal} gates={value.gates} fxRates={fxRates} locale={locale} busy={busy} mutate={mutate}/>}{value.deposit&&<DepositCard deposit={value.deposit} caseId={c.id} role={role} locale={locale} busy={busy} mutate={mutate}/>}{showActions&&<div className={dim?"pointer-events-none opacity-50":""}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} locale={locale} mutate={mutate}/></div>}</Panel>;
  const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={t.reviews}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="rounded-lg border border-line p-4"><strong>v{r.versionNumber} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 rounded-lg bg-brand-50 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-xs text-ink-600">{locale==="ar"?"عملة العرض":"Proposal currency"}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span>{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.72rem] text-ink-500">{locale==="ar"?"الأساس":"Base"} {money(e.estimatedCost,e.currency,locale)}</span>}</span></li>)}</ul></div>}</div>):<Empty/>}{isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&<FinalAssessment caseId={c.id} busy={busy} locale={locale} catalog={catalog} fxRates={fxRates} mutate={mutate}/>}</Panel>:null;
  // The consultant's clinical review is the page's primary work, not an appendix to the review history.
  const reviewDraft=isDoctor&&c.status==="CONSULTANT_REVIEW"?(value.clinicalReviews.find(r=>r.status==="DRAFT")??null):null;
- const clinicalReviewPanel=isDoctor&&c.status==="CONSULTANT_REVIEW"
+ // A second-opinion consultant reads the case and gives an opinion; the clinical decision stays with the primary consultant.
+ const secondOpinionOnly=isDoctor&&current.workType==="SECOND_OPINION";
+ const clinicalReviewPanel=isDoctor&&c.status==="CONSULTANT_REVIEW"&&!secondOpinionOnly
   ?<ClinicalReviewPanel locale={locale} caseId={c.id} busy={busy} catalog={catalog} fxRates={fxRates} documents={documents}
      draft={reviewDraft&&{id:reviewDraft.id,recommendedTreatment:reviewDraft.recommendedTreatment,risksAndLimitations:reviewDraft.risksAndLimitations,costEstimates:reviewDraft.costEstimates,proposalCurrency:reviewDraft.proposalCurrency}}
      viewDoc={viewDoc} downloadDoc={downloadDoc} mutate={mutate}/>
@@ -438,7 +443,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
        </section>}
        {banners}
        {/* The form behind the current action, and only that form. */}
-       {formAction&&<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} doctors={doctors} categories={categories} staff={staff} busy={busy} mutate={mutate}/>}
+       {formAction&&<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load}/>}
        {workflowBlock}
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>
@@ -451,6 +456,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
       {tab==="clinical"&&<>
        {doctorReviewComplete&&<div className="card flex items-center gap-3 border-s-4 border-brand-500 bg-brand-50 p-4"><span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-brand-600 font-bold text-white">✓</span><p className="font-bold text-brand-800">{c.status==="CLINICAL_RECOMMENDATION_READY"?t.doctorAccepted:c.status==="INFORMATION_REQUIRED"?t.doctorInfoSent:c.status==="CLINICALLY_NOT_SUITABLE"?t.doctorNotSuitable:t.doctorReturned}</p></div>}
        {clinicalReviewPanel}
+       {isDoctor&&<ConsultantReferrals key={c.id} locale={locale} caseId={c.id} careCategory={c.careCategory} categories={categories} canRefer={c.status==="CONSULTANT_REVIEW"&&!myPending&&!secondOpinionOnly} busy={busy} load={load} mutate={mutate}/>}
        {intakePanel}
        {/* While the consultant is composing, the review history would only repeat their own draft back at them. */}
        {!clinicalReviewPanel&&clinicalPanel}

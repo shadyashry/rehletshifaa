@@ -165,7 +165,7 @@ Canonical lifecycle (one authoritative server-side transition map; every UI cont
 
 Corrections encoded in the model:
 - Patient verification/login does **not** move `RECEIVED → INTAKE_REVIEW`; coordinator ownership drives intake.
-- A doctor never cancels the whole case. Consultant-review outcomes are distinct: more information required (`INFORMATION_REQUIRED`), not clinically suitable (`CLINICALLY_NOT_SUITABLE`), return to coordinator (`INTAKE_REVIEW`), reassignment/second opinion (ends the assignment, returns to `READY_FOR_CONSULTANT`).
+- A doctor never cancels the whole case. Consultant-review outcomes are distinct: more information required (`INFORMATION_REQUIRED`), not clinically suitable (`CLINICALLY_NOT_SUITABLE`), return to coordinator (`INTAKE_REVIEW`). Transfers and second opinions are consultant **referrals** (coordinator-confirmed, receiver-accepted; the case stays `CONSULTANT_REVIEW`) — see [consultant-virtual-clinic.md](consultant-virtual-clinic.md). The legacy `REASSIGN` decision (ends the assignment, returns to `READY_FOR_CONSULTANT`) is API-only for compatibility.
 - A declined doctor assignment ends and returns the case to `READY_FOR_CONSULTANT`.
 - Recovery paths: `REVISION_REQUESTED → PROPOSAL_PREPARATION`, `EXPIRED → PROPOSAL_PREPARATION`.
 - `CANCELLED` is reachable only from coordinator-controlled states — it represents service cancellation, distinct from patient decline (`DECLINED`) and clinical unsuitability (`CLINICALLY_NOT_SUITABLE`).
@@ -203,9 +203,18 @@ WhatsApp/email notifications carry only a code or a secure link and no clinical 
 
 Every submitted case has one active primary coordinator; a coordinator lead can view the queue and rebalance within their configured team. Coordination, Operations, and Finance each support multiple leads with distinct teams; a staff member has one direct lead in the same function, and leads can view cases assigned to direct or indirect reports. Normal coordinators can see limited routing data for unclaimed work and full details only after ownership. Doctors and ordinary Operations/Finance staff see only cases with a pending or active assignment to their identity; ended/declined assignments lose access. Lead visibility is supervisory and does not replace the accepted assignment required to perform protected case work. Representatives require an active scoped delegation; auditors are read-only. Only an available `VERIFIED` consultant with a current verified credential can receive a clinical assignment; an hourly expiry job marks expired credentials and removes an ineligible practitioner from availability. Accepted cases proceed through travel coordination, confirmed arrival, treatment, discharge, and follow-up; each change is authorized against an active assignment, guarded by version/state checks and blocking tasks, and recorded in status history and audit events.
 
+## Consultant assignment, referrals and the virtual clinic
+
+Consultants are independent (`Consultant → one Virtual Clinic → optional Practice Managers`); cases are assigned directly
+to a named consultant chosen by the coordinator from the backend's eligibility list (verified + current credentials,
+available, active account, matching care area or approved capability). A consultant can refer a case for a transfer or
+a second opinion; the coordinator confirms the handover and the receiving consultant accepts before any access exists.
+Practice managers help with the clinic's schedule, public-profile drafts and service/price drafts and never reach cases.
+Full rules: [consultant-virtual-clinic.md](consultant-virtual-clinic.md).
+
 ## Recovery, expiry, and activation
 
-- A doctor decline or reassignment ends that assignment and returns the case to `READY_FOR_CONSULTANT`.
+- A doctor decline or reassignment ends that assignment and returns the case to `READY_FOR_CONSULTANT`. A declined *referral* offer does not: it goes back to the coordinator and the original consultant stays primary.
 - A coordinator information request moves the case to `INFORMATION_REQUIRED`; a verified secure response completes patient blocking actions and returns it to `INTAKE_REVIEW`.
 - A revision or expired proposal can produce a new immutable proposal version, which repeats only the **required** Operations/Finance gates and the release step. Old links are revoked.
 - A scheduled expiry job atomically marks released/viewed proposal versions `EXPIRED`, revokes their links, and moves a case still awaiting decision to `EXPIRED`.

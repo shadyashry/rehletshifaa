@@ -1,9 +1,9 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.access.application.AuthorizationService;
-import com.rehletshifaa.access.domain.ChannelEntitlement;
-import com.rehletshifaa.access.domain.ResourceContext;
-import com.rehletshifaa.access.infrastructure.AccessAuditRepository;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.journey.api.JourneyDtos.CareCategoryView;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
@@ -52,14 +52,14 @@ public class JourneyCutoverStatusService {
     private final JourneyDefinitionRepository definitions;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final CareCategoryCatalog categories;
-    private final AuthorizationService authorization;
-    private final AccessAuditRepository audit;
+    private final Authority authorization;
+    private final GovernanceAuditLog audit;
     private final JdbcClient jdbc;
     private final JourneyLiveShadowRepository shadow;
 
     public JourneyCutoverStatusService(JourneyCutoverPolicy policy, JourneyDeploymentService readiness, JourneyCaseAdmissionRepository admissions,
             JourneyCaseBindingRepository bindings, JourneyDefinitionRepository definitions, ObjectProvider<JourneyRuntimePort> runtimes,
-            CareCategoryCatalog categories, AuthorizationService authorization, AccessAuditRepository audit, JdbcClient jdbc,
+            CareCategoryCatalog categories, Authority authorization, GovernanceAuditLog audit, JdbcClient jdbc,
             JourneyLiveShadowRepository shadow) {
         this.policy = policy; this.readiness = readiness; this.admissions = admissions; this.bindings = bindings; this.definitions = definitions;
         this.runtimes = runtimes; this.categories = categories; this.authorization = authorization; this.audit = audit; this.jdbc = jdbc; this.shadow = shadow;
@@ -115,7 +115,7 @@ public class JourneyCutoverStatusService {
     }
 
     private void authorize() {
-        authorization.require("journey.view", ResourceContext.platform(), ChannelEntitlement.ADMIN_WEB, ChannelEntitlement.API);
+        authorization.require(Permission.JOURNEY_READ);
     }
 
     private static Instant instant(Object value) {

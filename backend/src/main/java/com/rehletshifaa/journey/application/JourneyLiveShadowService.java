@@ -1,6 +1,6 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.access.infrastructure.AccessAuditRepository;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.journey.domain.JourneyModel.Node;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyLiveShadowRepository;
@@ -48,12 +48,12 @@ public class JourneyLiveShadowService {
     private final JdbcClient jdbc;
     private final JourneyCaseAdmissionRepository admissions;
     private final JourneyLiveShadowRepository results;
-    private final AccessAuditRepository audit;
+    private final GovernanceAuditLog audit;
     private final MeterRegistry metrics;
     private final Clock clock;
 
     public JourneyLiveShadowService(JdbcClient jdbc, JourneyCaseAdmissionRepository admissions,
-            JourneyLiveShadowRepository results, AccessAuditRepository audit, MeterRegistry metrics, Clock clock) {
+            JourneyLiveShadowRepository results, GovernanceAuditLog audit, MeterRegistry metrics, Clock clock) {
         this.jdbc = jdbc; this.admissions = admissions; this.results = results; this.audit = audit; this.metrics = metrics; this.clock = clock;
     }
 

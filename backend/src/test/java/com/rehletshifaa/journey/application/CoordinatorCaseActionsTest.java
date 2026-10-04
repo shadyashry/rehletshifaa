@@ -1,5 +1,7 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.authority.domain.Role;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
@@ -48,7 +50,7 @@ class CoordinatorCaseActionsTest {
     @Test void preparingTheProposalClosesTheCoordinatorsPrepareWorkAtSource() throws Exception {
         var ctx = recommended();
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='PREPARE_PROPOSAL' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.workspace(ctx.caseId).actions().currentAction().workType()).isEqualTo("PREPARE_PROPOSAL");
 
         createProposal(ctx); em.flush();
@@ -73,7 +75,7 @@ class CoordinatorCaseActionsTest {
         var ctx = acknowledged();
         // Data from before the fix: an item that was never closed when the proposal was created.
         jdbc.update("UPDATE case_tasks SET status='OPEN',completed_at=NULL WHERE case_id=? AND task_type='PREPARE_PROPOSAL'", ctx.caseId);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         CaseWorkspace ws = journey.workspace(ctx.caseId);
 
         assertThat(ws.caseSummary().status()).isEqualTo("ACCEPTED");
@@ -88,7 +90,7 @@ class CoordinatorCaseActionsTest {
 
     @Test void atTheDepositStageThePatientsProfileStepIsTheCurrentActionAndOperationsIsNotOffered() throws Exception {
         var ctx = acknowledged();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         CaseActionsView a = journey.workspace(ctx.caseId).actions();
 
         assertThat(a.journeyStage()).isEqualTo("ACCEPTED");
@@ -108,7 +110,7 @@ class CoordinatorCaseActionsTest {
         var ctx = acknowledged();
         // Activating with a corrected number voids that channel's possession proof: verification is pending again.
         activation.activate(ctx.token, grant(ctx), request("+254700000099")); em.flush();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         CaseActionsView blocked = journey.workspace(ctx.caseId).actions();
         assertThat(blocked.waitingOn()).isEqualTo("PATIENT");
         assertThat(blocked.currentAction().code()).isEqualTo("WAIT_PATIENT_READINESS");
@@ -133,7 +135,7 @@ class CoordinatorCaseActionsTest {
     @Test void operationsAssignmentIsRefusedWhileTheDepositIsUnsettledEvenWhenCalledDirectly() throws Exception {
         var ctx = acknowledged();
         activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.workspace(ctx.caseId).actions().availableActions()).doesNotContain("ASSIGN_OPERATIONS");
         assertThatThrownBy(() -> journey.assign(ctx.caseId, new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", null, "Too early")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("deposit");
@@ -144,7 +146,7 @@ class CoordinatorCaseActionsTest {
         var ctx = acknowledged();
         activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush();
         settleDeposit(ctx); em.flush();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         CaseActionsView a = journey.workspace(ctx.caseId).actions();
 
         assertThat(a.journeyStage()).isEqualTo("TRAVEL_COORDINATION");
@@ -164,7 +166,7 @@ class CoordinatorCaseActionsTest {
     @Test void aDepositSettledBeforeActivationHoldsTheCaseUntilThePatientIsReady() throws Exception {
         var ctx = acknowledged();
         settleDeposit(ctx); em.flush();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         CaseActionsView a = journey.workspace(ctx.caseId).actions();
         // The handoff happened (work, notification) but the journey did not advance: the profile gate holds it.
         assertThat(a.journeyStage()).isEqualTo("ACCEPTED");
@@ -182,7 +184,7 @@ class CoordinatorCaseActionsTest {
         assertThat(count("SELECT count(*) FROM case_status_history WHERE case_id=? AND to_status='TRAVEL_COORDINATION'", ctx.caseId)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='TRAVEL'", ctx.caseId)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_SETTLED'", "coordinator-subject")).isEqualTo(1);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.workspace(ctx.caseId).actions().availableActions()).contains("ASSIGN_OPERATIONS");
     }
 
@@ -191,7 +193,7 @@ class CoordinatorCaseActionsTest {
     @Test void operationsMayDraftATravelPlanButCannotAdvanceTheJourney() throws Exception {
         var ctx = acknowledged();
         seedOperationsAssignment(ctx);
-        authenticate("operations-subject", "OPERATIONS");
+        authenticate("operations-subject", Role.OPERATIONS);
         journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "Visa pending", "MS123", null, null, null, null, "Cairo Heart Centre", null, "PLANNING"));
         em.flush();
         // The draft is saved; the stage is untouched and no transition was written anywhere.
@@ -207,7 +209,7 @@ class CoordinatorCaseActionsTest {
 
     @Test void theCoordinatorTransitionEndpointCannotForceTreatmentCoordination() throws Exception {
         var ctx = acknowledged();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         long v = journey.workspace(ctx.caseId).caseSummary().version();
         assertThatThrownBy(() -> journey.transition(ctx.caseId, new TransitionRequest("TRAVEL_COORDINATION", "force", v)))
                 .isInstanceOf(ApiException.class).hasMessageContaining("dedicated");
@@ -256,7 +258,7 @@ class CoordinatorCaseActionsTest {
 
     @Test void requestInformationIsOfferedOnlyWhileNoPatientActionIsOpenAndNeverDuplicates() throws Exception {
         var ctx = acknowledged();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.workspace(ctx.caseId).actions().availableActions()).contains("REQUEST_INFORMATION").doesNotContain("RECORD_PATIENT_RESPONSE");
 
         var command = new InformationRequestCommand("Please send your latest ECG.", List.of(new RequestedItem("DOCUMENT", "ECG", "Latest ECG", true)), false, null, "en");
@@ -272,7 +274,7 @@ class CoordinatorCaseActionsTest {
 
     @Test void resendingTheProfileLinkRevokesThePriorOneAndIsRefusedOnceActivated() throws Exception {
         var ctx = acknowledged();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.resendOnboardingLink(ctx.caseId); em.flush();
         assertThat(count("SELECT count(*) FROM case_access_links WHERE case_id=? AND purpose='ONBOARDING' AND revoked_at IS NULL", ctx.caseId)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM case_access_links WHERE case_id=? AND purpose='ONBOARDING' AND revoked_at IS NOT NULL", ctx.caseId)).isEqualTo(1);
@@ -284,7 +286,7 @@ class CoordinatorCaseActionsTest {
 
         SecurityContextHolder.clearContext();
         activation.activate(onboardingTokenFor(ctx.caseId), grant(new Ctx(ctx.caseId, ctx.versionId, onboardingTokenFor(ctx.caseId), ctx.caseNumber)), request("+254700000020")); em.flush();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThatThrownBy(() -> journey.resendOnboardingLink(ctx.caseId)).isInstanceOf(ApiException.class).hasMessageContaining("already activated");
         // And the proposal link cannot be resent either — the acknowledged version is no longer decidable.
         assertThatThrownBy(() -> journey.resendProposalLink(ctx.caseId, ctx.versionId)).isInstanceOf(ApiException.class);
@@ -293,10 +295,10 @@ class CoordinatorCaseActionsTest {
 
     @Test void aCoordinatorWhoDoesNotOwnTheCaseGetsNoActions() throws Exception {
         var ctx = acknowledged();
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "other-coordinator", "COORDINATOR_LEAD", crypto.encrypt("Lead"), Instant.now(), Instant.now());
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "other-coordinator", "COORDINATOR_LEAD", crypto.encrypt("Lead"));
         jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
                 UUID.randomUUID(), ctx.caseId, "other-coordinator", "COORDINATOR", "SECONDARY", "ACTIVE", "Observer", "system", Instant.now(), Instant.now());
-        authenticate("other-coordinator", "COORDINATOR", "COORDINATOR_LEAD");
+        authenticate("other-coordinator", Role.COORDINATOR, Role.COORDINATOR);
         CaseActionsView a = journey.workspace(ctx.caseId).actions();
         assertThat(a.currentAction().code()).isEqualTo("VIEW_ONLY");
         assertThat(a.availableActions()).isEmpty();
@@ -310,13 +312,13 @@ class CoordinatorCaseActionsTest {
     private Recommended recommended() throws Exception {
         var created = cases.create(new CreateCaseRequest("Case", "Patient", "Kenya", "+254700000020", "Cardiac reports", "en", true, null, "link@local.test", "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "ready", v));
         UUID catalogId = seedDoctorWithCatalog(); seedStaff();
         var assignment = journey.assign(created.caseId(), new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "cardiac-pod", "Clinical review"));
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(created.caseId(), assignment.id(), new AssignmentDecisionRequest(true, null));
         journey.reviewDecision(created.caseId(), new ReviewDecisionRequest("ACCEPT", "Recommended intervention", "Standard risks",
                 List.of(new CostEstimateItem("Diagnostic cardiology consultation", new BigDecimal("3500.00"), "EGP", catalogId))));
@@ -326,7 +328,7 @@ class CoordinatorCaseActionsTest {
     }
 
     private ProposalView createProposal(Recommended ctx) {
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         return journey.createProposal(ctx.caseId(), new ProposalDraftRequest(ctx.reviewId(), "en", "Consultation", "EGP", "Consultation", "None", "Deposit", "Refund", "Consent",
                 Instant.now().plusSeconds(86400), List.of(new ProposalItemRequest("MEDICAL", "Diagnostic cardiology consultation", BigDecimal.ONE, new BigDecimal("3500.00"), false, 0)), null));
     }
@@ -367,7 +369,7 @@ class CoordinatorCaseActionsTest {
     private void settleDeposit(Ctx ctx) {
         UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, ctx.caseId);
         BigDecimal total = jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId);
-        authenticate("finance-subject", "FINANCE");
+        authenticate("finance-subject", Role.FINANCE);
         payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(total, "BANK", "ref-1", "settle-" + ctx.caseId));
         SecurityContextHolder.clearContext();
     }
@@ -380,9 +382,9 @@ class CoordinatorCaseActionsTest {
         return catalogId;
     }
     private void seedStaff() {
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "coordinator-subject", "COORDINATOR", crypto.encrypt("Layla Hassan"), Instant.now(), Instant.now());
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "operations-subject", "OPERATIONS", crypto.encrypt("Operations One"), Instant.now(), Instant.now());
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "finance-subject", "FINANCE", crypto.encrypt("Finance One"), Instant.now(), Instant.now());
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "coordinator-subject", "COORDINATOR", crypto.encrypt("Layla Hassan"));
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "operations-subject", "OPERATIONS", crypto.encrypt("Operations One"));
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-subject", "FINANCE", crypto.encrypt("Finance One"));
     }
 
     private String onboardingTokenFor(UUID caseId) throws Exception {
@@ -399,12 +401,7 @@ class CoordinatorCaseActionsTest {
         String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id JOIN proposal_share_tokens st ON st.id=ch.share_token_id WHERE st.token_hash=? AND o.channel=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), channel));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
     }
-    private void authenticate(String subject, String... roles) {
-        var jwt = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond())
-                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,
-                Arrays.stream(roles).map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList()));
-    }
+    private void authenticate(String subject, Role... roles) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, roles); }
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }
     private int count(String sql, Object... args) { Integer n = jdbc.queryForObject(sql, Integer.class, args); return n == null ? 0 : n; }

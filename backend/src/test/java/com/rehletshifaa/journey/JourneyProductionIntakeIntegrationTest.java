@@ -1,7 +1,6 @@
 package com.rehletshifaa.journey;
 
-import com.rehletshifaa.access.application.*;
-import com.rehletshifaa.access.infrastructure.AccessAuditRepository;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
@@ -47,10 +46,9 @@ class JourneyProductionIntakeIntegrationTest {
     @Autowired JourneyProjectionService projections;
     @Autowired JourneyProductionIntakeService productionIntake;
     @Autowired ObjectProvider<JourneyRuntimePort> runtimes;
-    @Autowired AccessAuditRepository audit;
-    @Autowired AccessBootstrapService bootstrap;
-    @Autowired RoleAssignmentService assignments;
+    @Autowired GovernanceAuditLog audit;
     @Autowired CaseService cases;
+    @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;
     @Autowired PlatformTransactionManager manager;
@@ -63,7 +61,6 @@ class JourneyProductionIntakeIntegrationTest {
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean JourneyLiveShadowRepository shadowResults;
     Version version;
     JourneyDefinitionIntegrationTest fixture;
-    static final UUID JOURNEY_WORK_PLATFORM = UUID.fromString("42000001-0000-0000-0000-000000000001");
 
     /** Staff review (COORDINATOR, real Assignment Engine routing) then a patient information request (PATIENT) — the same shape JourneyStageProjectionIntegrationTest already proved. */
     static Graph staffThenPatient() {
@@ -77,10 +74,9 @@ class JourneyProductionIntakeIntegrationTest {
 
     @BeforeAll void setup() {
         fixture = new JourneyDefinitionIntegrationTest();
-        fixture.service = definitions; fixture.bootstrap = bootstrap; fixture.assignments = assignments; fixture.jdbc = jdbc; fixture.clock = clock;
+        fixture.service = definitions; fixture.crypto = crypto; fixture.jdbc = jdbc; fixture.clock = clock;
         new TransactionTemplate(manager).executeWithoutResult(s -> fixture.setup());
         fixture.signIn("journey-owner");
-        fixture.grant("maker", JOURNEY_WORK_PLATFORM); // completeWorkItem requires journey.work.execute, exercised by the parity-path test below
         fixture.signIn("maker");
         var d = definitions.create();
         var v = d.versions().getFirst();
@@ -166,6 +162,11 @@ class JourneyProductionIntakeIntegrationTest {
 
     @Test void completingTheProjectedWorkReachesTheExistingPhase4bRuntimeAndOpensTheNextPatientAction() {
         UUID caseId = submitRealCase();
+        // A real case's projected work is completed by its case team, here the owning Coordinator.
+        com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, "case-coordinator", com.rehletshifaa.authority.domain.Role.COORDINATOR);
+        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,'COORDINATOR','PRIMARY','ACTIVE','Fixture ownership','TEST',?,0)",
+                UUID.randomUUID(), caseId, "case-coordinator", java.sql.Timestamp.from(clock.instant().minusSeconds(60)));
+        fixture.signIn("case-coordinator");
         projections.completeWorkItem(caseId, "review", Map.of());
         // PROVIDE_INFORMATION reuses the existing PatientActionService unchanged, including its own fixed
         // 'INFORMATION_REQUEST' task type — not the 'JOURNEY:<node>' convention only STAFF_TASK/NOTIFICATION

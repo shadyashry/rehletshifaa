@@ -1,9 +1,9 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.access.application.AuthorizationService;
-import com.rehletshifaa.access.domain.ChannelEntitlement;
-import com.rehletshifaa.access.domain.ResourceContext;
-import com.rehletshifaa.access.infrastructure.AccessAuditRepository;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.journey.domain.JourneyModel.Version;
 import com.rehletshifaa.journey.domain.JourneyModel.Status;
 import com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository;
@@ -27,23 +27,23 @@ public class JourneyDeploymentService {
     private final JourneyDeploymentRepository deployments;
     private final JourneyCompiler compiler;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
-    private final AuthorizationService authorization;
-    private final AccessAuditRepository audit;
+    private final Authority authorization;
+    private final GovernanceAuditLog audit;
 
     public JourneyDeploymentService(JourneyDefinitionRepository definitions, JourneyDeploymentRepository deployments,
-            JourneyCompiler compiler, ObjectProvider<JourneyRuntimePort> runtimes, AuthorizationService authorization,
-            AccessAuditRepository audit) {
+            JourneyCompiler compiler, ObjectProvider<JourneyRuntimePort> runtimes, Authority authorization,
+            GovernanceAuditLog audit) {
         this.definitions=definitions; this.deployments=deployments; this.compiler=compiler;
         this.runtimes=runtimes; this.authorization=authorization; this.audit=audit;
     }
     @Transactional(readOnly = true)
     public Readiness readiness(UUID definition, UUID version) {
-        authorize("journey.view"); definitions.version(definition, version);
+        authorize(Permission.JOURNEY_READ); definitions.version(definition, version);
         return view(version);
     }
     @Transactional
     public Readiness deployPublished(UUID definition, UUID version, JourneyDefinitionService.Change command) {
-        authorize("journey.publish"); authorize("journey.approve");
+        authorize(Permission.JOURNEY_APPROVE); authorize(Permission.JOURNEY_APPROVE);
         if (command == null || command.reason() == null || command.reason().isBlank() || command.reason().length()>500)
             throw new ApiException(400,"INVALID_JOURNEY_OPERATION","Provide a bounded deployment reason.");
         definitions.definition(definition, true);
@@ -59,7 +59,7 @@ public class JourneyDeploymentService {
         if (runtimes.getIfAvailable()!=null) deploy(version);
     }
     private void deploy(Version version) {
-        var actor = authorize("journey.publish");
+        var actor = authorize(Permission.JOURNEY_APPROVE);
         JourneyRuntimePort runtime = runtimes.getIfAvailable();
         if (runtime == null) throw new ApiException(503,"JOURNEY_RUNTIME_DISABLED","Journey runtime is not enabled.");
         var existing=deployments.find(version.id());
@@ -101,7 +101,7 @@ public class JourneyDeploymentService {
         return deployments.find(version).map(d -> new Readiness(version,"DEPLOYED",d.compilerVersion(),d.bpmnHash()))
                 .orElseGet(() -> new Readiness(version,"NOT_DEPLOYED",null,null));
     }
-    private com.rehletshifaa.access.application.AccessIdentity.Identity authorize(String permission) {
-        return authorization.require(permission, ResourceContext.platform(), ChannelEntitlement.ADMIN_WEB, ChannelEntitlement.API);
+    private com.rehletshifaa.authority.application.Principal authorize(Permission permission) {
+        return authorization.require(permission);
     }
 }

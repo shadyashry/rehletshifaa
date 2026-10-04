@@ -133,6 +133,9 @@ const WORK_LABELS: Record<string, { en: string; ar: string }> = {
   DEPOSIT_ARRANGEMENT: { en: "Payment instructions sent", ar: "تم إرسال تعليمات الدفع" },
   TRAVEL: { en: "Assign Operations", ar: "تعيين فريق العمليات" },
   REASSIGN_CONSULTANT: { en: "Reassign consultant", ar: "إعادة تعيين استشاري" },
+  CONFIRM_TRANSFER: { en: "Confirm the transfer", ar: "تأكيد النقل" },
+  CONFIRM_SECOND_OPINION: { en: "Choose a consultant", ar: "اختيار استشاري" },
+  SECOND_OPINION: { en: "Give your second opinion", ar: "تقديم رأيك الثاني" },
   REVIEW: { en: "Mark reviewed", ar: "تأكيد المراجعة" },
   INFORMATION_REQUEST: { en: "Mark handled", ar: "تأكيد المعالجة" },
 };

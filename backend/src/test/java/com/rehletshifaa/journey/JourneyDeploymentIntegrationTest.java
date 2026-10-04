@@ -1,6 +1,5 @@
 package com.rehletshifaa.journey;
 
-import com.rehletshifaa.access.application.*;
 import com.rehletshifaa.journey.application.*;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
 import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
@@ -30,8 +29,7 @@ class JourneyDeploymentIntegrationTest {
     @Autowired JourneyDefinitionService service;
     @Autowired JourneyDeploymentService deployments;
     @Autowired JourneyDeploymentRepository repository;
-    @Autowired AccessBootstrapService bootstrap;
-    @Autowired RoleAssignmentService assignments;
+    @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;
     @Autowired PlatformTransactionManager manager;
@@ -42,7 +40,7 @@ class JourneyDeploymentIntegrationTest {
 
     @Test @Order(1) void atomicPublicationAndImmutableDeploymentWithIndependentRunningVersions() throws Exception {
         var f=new JourneyDefinitionIntegrationTest();
-        f.service=service;f.bootstrap=bootstrap;f.assignments=assignments;f.jdbc=jdbc;f.clock=clock;
+        f.service=service;f.crypto=crypto;f.jdbc=jdbc;f.clock=clock;
         var tx=new TransactionTemplate(manager);
         try {
             tx.executeWithoutResult(s->f.setup());
@@ -76,14 +74,14 @@ class JourneyDeploymentIntegrationTest {
                     .andExpect(jsonPath("$.status").value("DEPLOYED"))
                     .andExpect(jsonPath("$.engine").doesNotExist());
             f.signIn("maker");
-            assertThatThrownBy(()->deployments.deployPublished(published.definitionId(),published.id(),f.change(published.revision()))).hasMessageContaining("not allowed");
+            assertThatThrownBy(()->deployments.deployPublished(published.definitionId(),published.id(),f.change(published.revision()))).hasMessageContaining("do not include this action");
         } finally { f.clear(); }
     }
 
     @Test @Order(2) void finalRegisteredPatientHandlerCanBecomeRuntimePublished() {
         // All eleven catalog actions now have concrete handlers; prove the former fail-closed fixture publishes.
         new TransactionTemplate(manager).executeWithoutResult(s->{
-            var f=new JourneyDefinitionIntegrationTest(); f.service=service;f.bootstrap=bootstrap;f.assignments=assignments;f.jdbc=jdbc;f.clock=clock;
+            var f=new JourneyDefinitionIntegrationTest(); f.service=service;f.crypto=crypto;f.jdbc=jdbc;f.clock=clock;
             try {
                 f.signIn("maker");
                 var definition=service.list().getFirst().id();
@@ -120,7 +118,7 @@ class JourneyDeploymentIntegrationTest {
             assertThatThrownBy(()->shadows.read(definition,versions.getFirst().id(),run.id())).hasMessageContaining("not found");
             assertThatThrownBy(()->shadows.step(definition,first.id(),run.id(),new JourneyShadowService.Step("wrong",0,"other",false,Map.of()))).hasMessageContaining("not currently available");
             f.signIn("checker");
-            assertThatThrownBy(()->shadows.step(definition,first.id(),run.id(),new JourneyShadowService.Step("permission",0,"review",false,Map.of()))).hasMessageContaining("not allowed");
+            assertThatThrownBy(()->shadows.step(definition,first.id(),run.id(),new JourneyShadowService.Step("permission",0,"review",false,Map.of()))).hasMessageContaining("do not include this action");
             service.retire(definition,first.id(),f.change(first.revision()));
             f.signIn("maker");
             assertThatThrownBy(()->shadows.start(definition,first.id(),new JourneyShadowService.Start("retired-start",Map.of()))).hasMessageContaining("published");
@@ -137,8 +135,8 @@ class JourneyDeploymentIntegrationTest {
             assertThat(f.counts()).isEqualTo(counts);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_shadow_commands WHERE run_id=?",Integer.class,run.id())).isEqualTo(1);
             f.signIn("unassigned");
-            assertThatThrownBy(()->shadows.step(definition,first.id(),run.id(),step)).hasMessageContaining("not allowed");
-            assertThatThrownBy(()->shadows.read(definition,first.id(),run.id())).hasMessageContaining("not allowed");
+            assertThatThrownBy(()->shadows.step(definition,first.id(),run.id(),step)).hasMessageContaining("do not include this action");
+            assertThatThrownBy(()->shadows.read(definition,first.id(),run.id())).hasMessageContaining("do not include this action");
         } finally {f.clear();}
     }
 

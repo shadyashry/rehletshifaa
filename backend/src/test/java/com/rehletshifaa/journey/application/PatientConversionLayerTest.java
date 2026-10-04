@@ -1,5 +1,7 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.authority.domain.Role;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
@@ -64,7 +66,7 @@ class PatientConversionLayerTest {
         var grant = journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "EMAIL"));
         journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "ACKNOWLEDGED", null, true)); em.flush();
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull();
-        authenticate("patient-subject-a", "PATIENT");
+        authenticate("patient-subject-a", Role.PATIENT);
         journey.activateAccount(activationToken(ctx.caseId));
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull(); // activation added no verification
     }
@@ -105,7 +107,7 @@ class PatientConversionLayerTest {
 
     @Test void otpVerificationProducesContactVerifiedNeverIdentityVerified() throws Exception {
         var ctx = onboardedCase();
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         CustomerReadiness r = journey.customerReadiness(ctx.caseId);
         assertThat(r.contactVerified()).isTrue();
         assertThat(r.identityVerified()).isFalse();
@@ -140,7 +142,7 @@ class PatientConversionLayerTest {
 
     @Test void activationResumesTheCorrectOnboarding() throws Exception {
         var ctx = onboardedCase();
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         OnboardingView view = onboarding.myOnboarding(ctx.caseId);
         assertThat(view.caseId()).isEqualTo(ctx.caseId);
         assertThat(view.readiness().accountActivated()).isTrue();
@@ -149,7 +151,7 @@ class PatientConversionLayerTest {
     @Test void patientCannotAccessAnotherPatientsOnboarding() throws Exception {
         var mine = onboardedCase();
         var other = onboardedCase("patient-subject-other", "+254700000044", "other@local.test");
-        authenticate(mine.patientSubject, "PATIENT");
+        authenticate(mine.patientSubject, Role.PATIENT);
         assertThatThrownBy(() -> onboarding.myOnboarding(other.caseId)).isInstanceOf(ApiException.class).hasMessageContaining("authorized");
     }
 
@@ -157,7 +159,7 @@ class PatientConversionLayerTest {
 
     @Test void representativeAuthorizationScopeAndExpiryAreEnforced() throws Exception {
         var ctx = onboardedCase();
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         long v = onboarding.myOnboarding(ctx.caseId).version();
         onboarding.setSubject(ctx.caseId, new OnboardingSubjectRequest("REPRESENTATIVE", "Parent", "COORDINATION", Instant.now().plusSeconds(86400), v));
         assertThat(journey.customerReadiness(ctx.caseId).representativeAuthorizationValid()).isTrue();
@@ -168,7 +170,7 @@ class PatientConversionLayerTest {
 
     @Test void payerOnlyDoesNotGrantRepresentativeAccess() throws Exception {
         var ctx = onboardedCase();
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         long v = onboarding.myOnboarding(ctx.caseId).version();
         onboarding.setSubject(ctx.caseId, new OnboardingSubjectRequest("PAYER", null, null, null, v));
         // A payer never receives a representative (medical-record access) row.
@@ -180,17 +182,17 @@ class PatientConversionLayerTest {
     @Test void coordinatorCannotMarkIdentityVerified() throws Exception {
         var ctx = onboardedCase();
         UUID identityId = startIdentityAs(ctx);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThatThrownBy(() -> identity.review(identityId, new IdentityReviewRequest("VERIFY", "looks fine", "HIGH"))).isInstanceOf(ApiException.class);
     }
 
     @Test void identityReviewRequiresRecentAuthenticationAndReason() throws Exception {
         var ctx = onboardedCase();
         UUID identityId = startIdentityAs(ctx);
-        authenticateStale("reviewer-subject", "PATIENT_IDENTITY_REVIEWER");
+        authenticateStale("reviewer-subject", Role.PATIENT_IDENTITY_REVIEWER);
         assertThatThrownBy(() -> identity.review(identityId, new IdentityReviewRequest("VERIFY", "ok", "HIGH")))
-                .isInstanceOf(ApiException.class).hasMessageContaining("authenticate again");
-        authenticate("reviewer-subject", "PATIENT_IDENTITY_REVIEWER");
+                .isInstanceOf(ApiException.class).hasMessageContaining("Sign in again");
+        authenticate("reviewer-subject", Role.PATIENT_IDENTITY_REVIEWER);
         assertThatThrownBy(() -> identity.review(identityId, new IdentityReviewRequest("VERIFY", "  ", "HIGH")))
                 .isInstanceOf(ApiException.class);
     }
@@ -198,10 +200,10 @@ class PatientConversionLayerTest {
     @Test void identityReviewIsAuditedAndFlowsToReadiness() throws Exception {
         var ctx = onboardedCase();
         UUID identityId = startIdentityAs(ctx);
-        authenticate("reviewer-subject", "PATIENT_IDENTITY_REVIEWER");
+        authenticate("reviewer-subject", Role.PATIENT_IDENTITY_REVIEWER);
         identity.review(identityId, new IdentityReviewRequest("VERIFY", "Passport checked against provider record", "HIGH"));
         assertThat(count("SELECT count(*) FROM audit_events WHERE event_type='IDENTITY_VERIFIED' AND entity_id=?", identityId.toString())).isEqualTo(1);
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         assertThat(journey.customerReadiness(ctx.caseId).identityVerified()).isTrue();
         // The legal name is encrypted at rest, never stored as plaintext.
         assertThat(jdbc.queryForObject("SELECT status FROM patient_identity_verifications WHERE id=?", String.class, identityId)).isEqualTo("VERIFIED");
@@ -210,7 +212,7 @@ class PatientConversionLayerTest {
 
     @Test void onboardingConsentDoesNotDuplicateProcedureSpecificConsent() throws Exception {
         var ctx = onboardedCase();
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         assertThatThrownBy(() -> onboarding.recordConsent(ctx.caseId, new OnboardingConsentRequest("PROCEDURE_SPECIFIC", "text", "v1", "en", null, null)))
                 .isInstanceOf(ApiException.class).hasMessageContaining("not part of onboarding");
     }
@@ -219,7 +221,7 @@ class PatientConversionLayerTest {
 
     @Test void onboardingCannotCompleteWithMissingSteps() throws Exception {
         var ctx = onboardedCase();
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         long v = onboarding.myOnboarding(ctx.caseId).version();
         assertThatThrownBy(() -> onboarding.submit(ctx.caseId, new OnboardingSubmitRequest(v))).isInstanceOf(ApiException.class);
     }
@@ -227,7 +229,7 @@ class PatientConversionLayerTest {
     @Test void fullyReadyPatientCanSubmitAndReachReadiness() throws Exception {
         var ctx = onboardedCase();
         makeReady(ctx);
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         long v = onboarding.myOnboarding(ctx.caseId).version();
         OnboardingView done = onboarding.submit(ctx.caseId, new OnboardingSubmitRequest(v));
         assertThat(done.state()).isEqualTo("COMPLETED");
@@ -239,16 +241,16 @@ class PatientConversionLayerTest {
     @Test void coordinatorCannotWaiveDeposit() throws Exception {
         var ctx = onboardedCase();
         UUID depositId = depositId(ctx.caseId);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         assertThatThrownBy(() -> payment.waiveDeposit(ctx.caseId, depositId, "please waive")).isInstanceOf(ApiException.class);
     }
 
     @Test void financeWaiverRequiresRecentAuthenticationAndReason() throws Exception {
         var ctx = onboardedCase();
         UUID depositId = depositId(ctx.caseId);
-        authenticateStale("finance-subject", "FINANCE");
-        assertThatThrownBy(() -> payment.waiveDeposit(ctx.caseId, depositId, "reason")).isInstanceOf(ApiException.class).hasMessageContaining("authenticate again");
-        authenticate("finance-subject", "FINANCE");
+        authenticateStale("finance-subject", Role.FINANCE);
+        assertThatThrownBy(() -> payment.waiveDeposit(ctx.caseId, depositId, "reason")).isInstanceOf(ApiException.class).hasMessageContaining("Sign in again");
+        authenticate("finance-subject", Role.FINANCE);
         assertThatThrownBy(() -> payment.waiveDeposit(ctx.caseId, depositId, "  ")).isInstanceOf(ApiException.class);
         payment.waiveDeposit(ctx.caseId, depositId, "Hardship approved by senior finance");
         assertThat(payment.depositSatisfied(ctx.caseId)).isTrue();
@@ -260,7 +262,7 @@ class PatientConversionLayerTest {
     @Test void nonCancellableCommitmentRejectedWhenNotReady() throws Exception {
         var ctx = onboardedCase();
         driveToTravelCoordination(ctx);
-        authenticate("operations-subject", "OPERATIONS");
+        authenticate("operations-subject", Role.OPERATIONS);
         assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "CONFIRMED")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("not ready");
     }
@@ -271,10 +273,10 @@ class PatientConversionLayerTest {
         acknowledge(ctx);
         jdbc.update("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId); // simulate legacy: no onboarding
         UUID depositId = depositId(ctx.caseId);
-        authenticate("finance-subject", "FINANCE");
+        authenticate("finance-subject", Role.FINANCE);
         payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(new BigDecimal("3000.00"), "BANK", "ref-1", "legacy-pay-1"));
         driveToTravelCoordination(ctx);
-        authenticate("operations-subject", "OPERATIONS");
+        authenticate("operations-subject", Role.OPERATIONS);
         // Deposit is paid and there is no onboarding record => legacy path allows confirmation.
         journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "CONFIRMED"));
         assertThat(status(ctx.caseId)).isEqualTo("TRAVEL_COORDINATION");
@@ -288,25 +290,25 @@ class PatientConversionLayerTest {
         var created = cases.create(new CreateCaseRequest("Link", "Patient", "Kenya", whatsapp, "Cardiac reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "ready", v));
         seedDoctor(); seedStaff();
         var doctorAssignment = journey.assign(created.caseId(), new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "cardiac-pod", "Clinical review"));
-        authenticate("doctor-subject", "DOCTOR");
+        authenticate("doctor-subject", Role.CONSULTANT);
         journey.acceptDoctorAssignment(created.caseId(), doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review = journey.saveClinicalReview(created.caseId(), new ClinicalReviewRequest("Reviewed", "SUITABLE", null, "Imaging", "Recommended intervention", "Alt", "Risks", "Seq", "7 days", "Follow-up"));
         journey.approveClinicalReview(created.caseId(), review.id());
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",
                 UUID.randomUUID(), review.id(), "Consultant treatment package", new BigDecimal("1000.00"), "EGP", 0, new BigDecimal("1000.00"), true);
-        authenticate("coordinator-subject", "COORDINATOR");
+        authenticate("coordinator-subject", Role.COORDINATOR);
         var proposal = journey.createProposal(created.caseId(), new ProposalDraftRequest(review.id(), "en", "Plan", "EGP", "Incl", "Excl", "Deposit", "Refund", "Not consent", Instant.now().plusSeconds(86400), List.of(new ProposalItemRequest("MEDICAL", "Treatment package", BigDecimal.ONE, new BigDecimal("1000.00"), false, 0)), null));
         var operationsAssignment = journey.assign(created.caseId(), new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", "cardiac-pod", "Ops"));
         var financeAssignment = journey.assign(created.caseId(), new AssignmentRequest("finance-subject", "FINANCE", "PRIMARY", "cardiac-pod", "Finance"));
-        authenticate("operations-subject", "OPERATIONS"); journey.decideAssignment(created.caseId(), operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
-        authenticate("finance-subject", "FINANCE"); journey.decideAssignment(created.caseId(), financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.security.ActorRole.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
-        authenticate("coordinator-subject", "COORDINATOR"); journey.releaseProposal(created.caseId(), proposal.versionId());
+        authenticate("operations-subject", Role.OPERATIONS); journey.decideAssignment(created.caseId(), operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.authority.domain.Role.OPERATIONS); journey.completeOperations(created.caseId(), proposal.versionId(), "Ops plan");
+        authenticate("finance-subject", Role.FINANCE); journey.decideAssignment(created.caseId(), financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.authority.domain.Role.FINANCE); journey.approveFinance(created.caseId(), proposal.versionId());
+        authenticate("coordinator-subject", Role.COORDINATOR); journey.releaseProposal(created.caseId(), proposal.versionId());
         em.flush();
         String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, "proposal-ready:" + proposal.versionId()));
         String raw = json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
@@ -325,14 +327,14 @@ class PatientConversionLayerTest {
     private Ctx onboardedCase(String patientSubject, String whatsapp, String email) throws Exception {
         var ctx = releasePreliminary(whatsapp, email);
         acknowledge(ctx);
-        authenticate(patientSubject, "PATIENT");
+        authenticate(patientSubject, Role.PATIENT);
         journey.activateAccount(activationToken(ctx.caseId));
         em.flush(); SecurityContextHolder.clearContext();
         return new Ctx(ctx.caseId, ctx.versionId, ctx.token, ctx.caseNumber, patientSubject);
     }
 
     private UUID startIdentityAs(Ctx ctx) {
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         IdentityVerificationView v = identity.start(ctx.caseId, new IdentityStartRequest("PATIENT", null, "DOCUMENT", "Jane Doe", "1990-01-01", "Kenya", "PASSPORT", "Kenya", "A1234567"));
         SecurityContextHolder.clearContext();
         return v.id();
@@ -341,13 +343,13 @@ class PatientConversionLayerTest {
     /** Satisfy every readiness gate except the final submission. */
     private void makeReady(Ctx ctx) throws Exception {
         UUID identityId = startIdentityAs(ctx);
-        authenticate("reviewer-subject", "PATIENT_IDENTITY_REVIEWER");
+        authenticate("reviewer-subject", Role.PATIENT_IDENTITY_REVIEWER);
         identity.review(identityId, new IdentityReviewRequest("VERIFY", "Verified against provider record", "HIGH"));
-        authenticate(ctx.patientSubject, "PATIENT");
+        authenticate(ctx.patientSubject, Role.PATIENT);
         for (String type : List.of("PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS"))
             onboarding.recordConsent(ctx.caseId, new OnboardingConsentRequest(type, "I agree to " + type, "v1", "en", null, null));
         UUID depositId = depositId(ctx.caseId);
-        authenticate("finance-subject", "FINANCE");
+        authenticate("finance-subject", Role.FINANCE);
         payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(new BigDecimal("3000.00"), "BANK", "ready-pay", "ready-pay-" + ctx.caseId));
         SecurityContextHolder.clearContext();
     }
@@ -360,12 +362,12 @@ class PatientConversionLayerTest {
     private void driveToTravelCoordination(Ctx ctx) {
         jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
                 UUID.randomUUID(), ctx.caseId, "operations-subject", "OPERATIONS", "PRIMARY", "ACTIVE", "Ops", "coordinator-subject", Instant.now(), Instant.now());
-        authenticate("operations-subject", "OPERATIONS");
+        authenticate("operations-subject", Role.OPERATIONS);
         journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "PLANNING"));
     }
 
     private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }
-    private void seedStaff() { if (count("SELECT count(*) FROM staff_members WHERE external_subject=?", "operations-subject") > 0) return; jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "operations-subject", "OPERATIONS", crypto.encrypt("Operations One"), Instant.now(), Instant.now()); jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,created_at,updated_at,version) VALUES(?,?,?,?,?,?,0)", UUID.randomUUID(), "finance-subject", "FINANCE", crypto.encrypt("Finance One"), Instant.now(), Instant.now()); }
+    private void seedStaff() { if (count("SELECT count(*) FROM workforce_people WHERE subject=?", "operations-subject") > 0) return; com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "operations-subject", "OPERATIONS", crypto.encrypt("Operations One")); com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-subject", "FINANCE", crypto.encrypt("Finance One")); }
 
     // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
     private String proposalCode(String token, String channel) throws Exception { String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id JOIN proposal_share_tokens st ON st.id=ch.share_token_id WHERE st.token_hash=? AND o.channel=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), channel)); return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code"); }
@@ -377,7 +379,7 @@ class PatientConversionLayerTest {
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }
     private int count(String sql, Object... args) { Integer n = jdbc.queryForObject(sql, Integer.class, args); return n == null ? 0 : n; }
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
-    private void authenticate(String subject, String role) { authenticate(subject, role, Instant.now()); }
-    private void authenticateStale(String subject, String role) { authenticate(subject, role, Instant.now().minusSeconds(3600)); }
-    private void authenticate(String subject, String role, Instant authTime) { Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", authTime.getEpochSecond()).issuedAt(authTime).expiresAt(Instant.now().plusSeconds(3600)).build(); SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_" + role)), subject)); }
+    private void authenticate(String subject, Role role) { authenticate(subject, role, Instant.now()); }
+    private void authenticateStale(String subject, Role role) { authenticate(subject, role, Instant.now().minusSeconds(3600)); }
+    private void authenticate(String subject, Role role, Instant authTime) { com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, subject, role); com.rehletshifaa.authority.TestPrincipals.signIn(subject, authTime); }
 }

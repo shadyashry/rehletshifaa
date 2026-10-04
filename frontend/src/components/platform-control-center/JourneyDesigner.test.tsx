@@ -3,11 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import "@testing-library/jest-dom/vitest";
 import { JourneyDesigner } from "./JourneyDesigner";
 import { apiFetchAs } from "@/lib/api";
+import type { Me } from "@/lib/access";
+import { meWith } from "./test-support";
 
-vi.mock("@/components/AuthProvider", () => {
-  const auth = { user: { access_token: "test", profile: { sub: "owner" } }, loading: false, signIn: vi.fn() };
-  return { useAuth: () => auth };
-});
+const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "owner" } }, me: null as Me | null, loading: false, signIn: vi.fn() }));
+vi.mock("@/components/AuthProvider", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
 
 beforeAll(() => {
@@ -41,18 +41,12 @@ const registry = [
 const registryMeta = { actorTypes: ["PATIENT", "COORDINATOR", "CONSULTANT", "SYSTEM"], stageTypes: ["START", "STAFF_TASK", "DECISION", "END"], conditionFacts: ["CLINICAL_ACCEPTED", "PROPOSAL_NEEDS_REWORK"], maxNodes: 200, maxEdges: 400, cyclePolicy: "ACYCLIC_ONLY", runtimeDeployment: "NOT_DEPLOYED" };
 
 function fullDecisions() {
-  return [
-    { permission: "journey.view", allowed: true }, { permission: "journey.create", allowed: true },
-    { permission: "journey.edit_draft", allowed: true }, { permission: "journey.validate", allowed: true },
-    { permission: "journey.simulate", allowed: true }, { permission: "journey.submit", allowed: true },
-    { permission: "journey.publish", allowed: true }, { permission: "journey.approve", allowed: true },
-    { permission: "journey.retire", allowed: true },
-  ];
+  return ["JOURNEY_READ", "JOURNEY_EDIT", "JOURNEY_APPROVE"];
 }
 
-function mockApi(overrides: Record<string, (init?: RequestInit) => Response> = {}, decisions = fullDecisions()) {
+function mockApi(overrides: Record<string, (init?: RequestInit) => Response> = {}, permissions = fullDecisions()) {
+  auth.me = meWith(permissions);
   vi.mocked(apiFetchAs).mockImplementation(async (_token, path, init) => {
-    if (path.endsWith("/admin/access/me")) return new Response(JSON.stringify(decisions), { status: 200 });
     const handler = overrides[path];
     if (handler) return handler(init);
     if (path === "/admin/journeys/def-1") return new Response(JSON.stringify(detail), { status: 200 });
@@ -222,7 +216,7 @@ describe("Journey Designer", () => {
   });
 
   it("fails closed when the caller lacks journey.view", async () => {
-    mockApi({}, [{ permission: "journey.view", allowed: false }]);
+    mockApi({}, []);
     render(<JourneyDesigner locale="en" definitionId="def-1" versionId="v-1" />);
     expect(await screen.findByText("You do not have access to this area.")).toBeVisible();
   });

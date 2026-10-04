@@ -111,6 +111,23 @@ class ArchitectureRulesTest {
                 .because("JdbcClient is the one persistence API in this codebase");
         rule.check(production);
     }
+
+    @Test
+    void workforceDoesNotDependOnCaseModules() {
+        noClasses().that().resideInAPackage("com.rehletshifaa.workforce..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.rehletshifaa.journey..", "com.rehletshifaa.coordination..", "com.rehletshifaa.clinic..")
+                .because("WF-15 makes workforce a platform module consumed through ports, not a child of the case modules")
+                .check(production);
+    }
+
+    @Test
+    void platformAccessDoesNotDependOnCaseModules() {
+        noClasses().that().resideInAPackage("com.rehletshifaa.access.platform..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.rehletshifaa.journey..", "com.rehletshifaa.coordination..", "com.rehletshifaa.clinic..")
+                .because("ACG-06 keeps platform access governance independent of the case workflow")
+                .check(production);
+    }
     /**
      * The property that decides whether a module can ever be extracted: no cycles between modules.
      * Two modules that import each other have to move together, whatever the deployment diagram says.

@@ -31,7 +31,9 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   const [deposits, setDeposits] = useState<DepositPolicy[]>([]);
   const [loadError, setLoadError] = useState<unknown>(null); const [saveError, setSaveError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false); const [notice, setNotice] = useState(""); const [pending, setPending] = useState<Pending | null>(null);
-  const allowed = access.legacy.financePolicy;
+  const allowed = access.can("COMMERCIAL_POLICY_READ");
+  // Reading is shared with Consultant Operations and the auditor; only Finance publishes a new version.
+  const canEdit = access.can("COMMERCIAL_POLICY_MANAGE");
   const load = useCallback(async () => {
     setLoadError(null);
     try { const [c, d] = await Promise.all([api<CommercialPolicy[]>("/finance/commercial-policies"), api<DepositPolicy[]>("/finance/deposit-policies")]); setMargins(c); setDeposits(d); }
@@ -55,7 +57,7 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
     intro={ar ? "إعداد تجاري داخلي: هامش رحلة شفاء ودفعة التنسيق المقدمة." : "Internal commercial configuration: RehletShifaa's margin and the coordination deposit."}>{body}</ControlCenterShell>;
   if (authLoading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
-  if (!allowed) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى سياسات الهامش والدفعة المقدمة" : "You don't have access to margin and deposit policies"} body={ar ? "يديرها قادة الفريق المالي." : "Finance leads manage these policies."} />);
+  if (!allowed) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى سياسات الهامش والدفعة المقدمة" : "You don't have access to margin and deposit policies"} body={ar ? "يديرها الفريق المالي." : "Finance manages these policies."} />);
   if (margins === null) return shell(<p role="status">{ar ? "جارٍ تحميل السياسات…" : "Loading policies…"}</p>);
   if (loadError) return shell(<ErrorNotice error={loadError} locale={locale} action="load" onRetry={() => void load()} />);
   const areaSelect = <Field label={ar ? "مجال الرعاية" : "Care area"}><select name="area"><option value="">{area()}</option>{AREAS.map((a) => <option key={a} value={a}>{area(a)}</option>)}</select></Field>;
@@ -67,19 +69,19 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
     <ErrorNotice error={saveError} locale={locale} />
     <Section id="margin" title={ar ? "سياسة الهامش" : "Margin policy"} description={ar ? "يُدمج في سعر الباقة عند إنشاء التقدير المبدئي. يستخدم العرض النهائي الهامش نفسه المثبّت في التقدير المبدئي للحالة." : "Built into the package price when a preliminary estimate is created. The final quote reuses the margin locked in the case's preliminary estimate."}>
       <ul className="cc-list">{margins.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.marginRate * 100).toFixed(2)}%</bdi></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
-      <form className="cc-filterbar" onSubmit={stage("margin")} aria-label={ar ? "إصدار جديد من سياسة الهامش" : "New margin policy version"}>
+      {canEdit && <form className="cc-filterbar" onSubmit={stage("margin")} aria-label={ar ? "إصدار جديد من سياسة الهامش" : "New margin policy version"}>
         {areaSelect}
         <Field label={ar ? "الهامش %" : "Margin %"}><input name="rate" type="number" min="0" max="50" step="0.1" required dir="ltr" /></Field>
         <button disabled={busy}>{ar ? "مراجعة الإصدار الجديد" : "Review new version"}</button>
-      </form>
+      </form>}
     </Section>
     <Section id="deposit" title={ar ? "سياسة دفعة التنسيق" : "Coordination deposit policy"} description={ar ? "المبلغ بالجنيه المصري الذي يُطلب عندما يُقرّ المريض بتقديره المبدئي، ويُحوَّل بسعر الصرف المجمَّد في ذلك التقدير." : "The EGP amount requested when a patient acknowledges their preliminary estimate, converted at that estimate's frozen exchange rate."}>
       <ul className="cc-list">{deposits.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span>{egp(p.coordinationDepositEgp)}</span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
-      <form className="cc-filterbar" onSubmit={stage("deposit")} aria-label={ar ? "إصدار جديد من سياسة دفعة التنسيق" : "New coordination deposit policy version"}>
+      {canEdit && <form className="cc-filterbar" onSubmit={stage("deposit")} aria-label={ar ? "إصدار جديد من سياسة دفعة التنسيق" : "New coordination deposit policy version"}>
         {areaSelect}
         <Field label={ar ? "دفعة التنسيق (ج.م)" : "Coordination deposit (EGP)"}><input name="amount" type="number" min="0" step="0.01" required dir="ltr" /></Field>
         <button disabled={busy}>{ar ? "مراجعة الإصدار الجديد" : "Review new version"}</button>
-      </form>
+      </form>}
     </Section>
     {pending && <FocusTrapDialog label={ar ? "تأكيد الإصدار الجديد" : "Confirm new version"} onClose={busy ? () => undefined : () => setPending(null)}>
       <h2>{pending.kind === "margin" ? (ar ? "حفظ إصدار جديد من الهامش؟" : "Save a new margin version?") : (ar ? "حفظ إصدار جديد من دفعة التنسيق؟" : "Save a new coordination deposit version?")}</h2>

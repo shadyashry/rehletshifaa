@@ -19,10 +19,10 @@ export function CoordinationAdvanced(ctx: CoordinationContext & { overview: Coor
   const t = coordCopy[locale];
   return <>
     <p className="cc-meta">{t.advancedIntro}</p>
-    {can("assignment.simulate") && <PreviewRouting {...ctx} />}
-    {can("assignment.audit.view") && <DecisionHistory {...ctx} />}
-    {can("assignment.queue.manage") && (overview?.liveQueue ?? 0) + (overview?.liveCases ?? 0) > 0 && <LiveRoutingQueue {...ctx} />}
-    {can("assignment.policy.view") && <TechnicalConfiguration {...ctx} />}
+    {can("ROUTING_READ") && <PreviewRouting {...ctx} />}
+    {can("ROUTING_READ") && <DecisionHistory {...ctx} />}
+    {can("ROUTING_READ") && ((overview?.queue ?? 0) > 0 || (overview?.routedCases ?? 0) > 0) && <LiveRoutingQueue {...ctx} />}
+    {can("ROUTING_READ") && <TechnicalConfiguration {...ctx} />}
   </>;
 }
 
@@ -39,7 +39,7 @@ function PreviewRouting(ctx: CoordinationContext) {
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  useEffect(() => { if (can("assignment.policy.view")) void api<ConsultantRouting[]>(`${base}/consultants`).then(setClinicians).catch(() => setClinicians([])); }, [api, base, can]);
+  useEffect(() => { if (can("ROUTING_READ")) void api<ConsultantRouting[]>(`${base}/consultants`).then(setClinicians).catch(() => setClinicians([])); }, [api, base, can]);
   const run = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setError(null); setResult(null);
     try {
@@ -97,7 +97,7 @@ function DecisionHistory(ctx: CoordinationContext) {
     return () => { live = false; };
   }, [api, base, attempt]);
   const name = (n: string | null, subject: string | null) => (subject ? <bdi>{n ?? t.unnamed}</bdi> : t.nobody);
-  const kind = (d: DecisionEntry) => d.mode === "SHADOW" ? t.entry.recommendation : d.path.startsWith("MANUAL_") ? (d.path === "MANUAL_QUEUE" ? t.entry.queued : t.entry.manual) : d.selectedOwner ? t.entry.automatic : t.entry.queued;
+  const kind = (d: DecisionEntry) => d.path.startsWith("MANUAL_") ? (d.path === "MANUAL_QUEUE" ? t.entry.queued : t.entry.manual) : d.selectedOwner ? t.entry.automatic : t.entry.queued;
   return <Section id="routing-decisions" title={t.historyTitle} description={t.historyIntro}>
     <ErrorNotice error={error} locale={locale} action="load" onRetry={() => void load()} />
     {rows === null ? (!error && <p role="status">{t.loading}</p>) : !rows.length ? <EmptyState title={t.historyEmpty} /> : (
@@ -105,12 +105,9 @@ function DecisionHistory(ctx: CoordinationContext) {
         {rows.map((d) => <li className="cc-step" key={d.id}>
           <div className="cc-step-head">
             <h3>{kind(d)} · <bdi dir="ltr">{d.caseNumber}</bdi></h3>
-            <StatusBadge tone={d.mode === "LIVE" ? "success" : "neutral"}>{d.mode === "LIVE" ? t.entry.applied : t.entry.evaluationOnly}</StatusBadge>
           </div>
           <p className="cc-meta"><time dateTime={d.evaluatedAt}>{when(d.evaluatedAt, locale)}</time>{d.actorName ? <> · {t.by} <bdi>{d.actorName}</bdi></> : null}</p>
-          {d.mode === "SHADOW"
-            ? <p>{t.recommendedPerson}: {name(d.selectedOwnerName, d.selectedOwner)}{d.team ? <> ({<bdi>{teamName(d.team)}</bdi>})</> : null} · {d.legacyMatches ? t.matched : t.differed}</p>
-            : <p>{t.from}: {name(d.previousOwnerName, d.previousOwner)} → {t.to}: {name(d.selectedOwnerName, d.selectedOwner)}{d.team ? <> ({<bdi>{teamName(d.team)}</bdi>})</> : null}</p>}
+          <p>{t.from}: {name(d.previousOwnerName, d.previousOwner)} → {t.to}: {name(d.selectedOwnerName, d.selectedOwner)}{d.team ? <> ({<bdi>{teamName(d.team)}</bdi>})</> : null}</p>
           <p className="cc-meta">{t.why}: {pathLabel(d.path, locale)}</p>
           {d.reason && <p className="cc-meta">{t.reasonLabel}: {d.reason}</p>}
         </li>)}
@@ -120,8 +117,9 @@ function DecisionHistory(ctx: CoordinationContext) {
 }
 
 /**
- * Cases adopted into live routing that routing could not place. Only these cannot be handled in the Staff Portal (its
- * take/transfer is refused for live-routed cases), so the one authoritative command is offered here, with its effects.
+
+ * Cases routing could not place (no eligible Coordinator), or that the manager parked. The manager assigns one here
+ * (ROUTING_ASSIGN); the decision is recorded with its reason.
  */
 function LiveRoutingQueue(ctx: CoordinationContext) {
   const { locale, api, base, can, teamName } = ctx;
@@ -145,7 +143,7 @@ function LiveRoutingQueue(ctx: CoordinationContext) {
         <h3><bdi dir="ltr">{q.caseNumber}</bdi></h3>
         <p className="cc-meta">{q.team ? <bdi>{teamName(q.team)}</bdi> : null}{q.reason ? <> · {pathLabel(q.reason, locale)}</> : null}</p>
         <p className="cc-meta">{t.waitingSince}: {when(q.queuedAt, locale)} · {t.deadline}: {when(q.dueAt, locale)}</p>
-        {can("assignment.manual_assign") && <div className="cc-step-actions"><button type="button" className="cc-secondary" onClick={() => { setNotice(""); setAssigning(q); }}>{t.assign}</button></div>}
+        {can("ROUTING_ASSIGN") && <div className="cc-step-actions"><button type="button" className="cc-secondary" onClick={() => { setNotice(""); setAssigning(q); }}>{t.assign}</button></div>}
       </li>)}</ul>
     )}
     {assigning && <AssignDialog ctx={ctx} item={assigning} onClose={() => setAssigning(null)} onDone={async () => { setAssigning(null); setNotice(t.assignDone); await load(); }} />}
@@ -194,7 +192,7 @@ function AssignDialog({ ctx, item, onClose, onDone }: { ctx: CoordinationContext
 
 /** The stored configuration and internal identifiers, collapsed — for support, never primary content. */
 function TechnicalConfiguration(ctx: CoordinationContext) {
-  const { locale, api, base, orgId, teams } = ctx;
+  const { locale, api, base, teams } = ctx;
   const t = coordCopy[locale];
   const [policies, setPolicies] = useState<Policy[] | null>(null);
   const open = async () => { if (policies) return; try { setPolicies(await api<Policy[]>(`${base}/policies`)); } catch { setPolicies([]); } };
@@ -202,7 +200,6 @@ function TechnicalConfiguration(ctx: CoordinationContext) {
     <details className="cc-technical" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) void open(); }}>
       <summary>{t.technicalTitle}</summary>
       <pre dir="ltr" style={{ whiteSpace: "pre-wrap", fontSize: 12.5, overflowWrap: "anywhere" }}>{JSON.stringify({
-        organizationId: orgId,
         teams: teams.map((x) => ({ id: x.id, name: x.name, revision: x.revision })),
         policies: (policies ?? []).map((p) => ({ id: p.id, version: p.version, effectiveFrom: formatDate(p.effectiveFrom, "en"), effectiveTo: formatDate(p.effectiveTo, "en"), configuration: p.configuration })),
       }, null, 2)}</pre>

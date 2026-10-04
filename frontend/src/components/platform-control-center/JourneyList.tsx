@@ -10,7 +10,7 @@ import type { Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { StatusBadge } from "./cc-ui";
 import { journeyCopy, journeyStatusLabel } from "./journey-copy";
-import type { Decision, JourneyDetail, JourneySummary } from "./journey-types";
+import type { JourneyDetail, JourneySummary } from "./journey-types";
 import "./journey-designer.css";
 
 const when = (iso: string | null, locale: Locale) => (iso ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso)) : "—");
@@ -21,15 +21,14 @@ const when = (iso: string | null, locale: Locale) => (iso ? new Intl.DateTimeFor
  */
 export function JourneyList({ locale }: { locale: Locale }) {
   const t = journeyCopy[locale];
-  const { user, loading: authLoading, signIn } = useAuth();
+  const { user, me, loading: authLoading, signIn } = useAuth();
   const [journeys, setJourneys] = useState<JourneySummary[]>([]);
-  const [can, setCan] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const allowed = (key: string) => can.some((d) => d.permission === key && d.allowed);
+  const allowed = (key: string) => !!me?.permissions.includes(key);
 
   const api = useCallback(async <T,>(path: string, method = "GET", body?: unknown): Promise<T> => {
     if (!user) throw new Error(t.denied);
@@ -45,13 +44,12 @@ export function JourneyList({ locale }: { locale: Locale }) {
 
   const refresh = useCallback(async () => {
     if (!user) { setLoading(false); return; }
+    if (!me) return; // wait for /api/v1/me before deciding what the caller may read
     setLoading(true); setError("");
     try {
-      const decisions = await apiFetchAs(user.access_token, "/admin/access/me").then((r) => (r.ok ? r.json() : []));
-      setCan(decisions);
-      if ((decisions as Decision[]).some((d) => d.permission === "journey.view" && d.allowed)) setJourneys(await api<JourneySummary[]>("/summaries"));
+      if (me?.permissions.includes("JOURNEY_READ")) setJourneys(await api<JourneySummary[]>("/summaries"));
     } catch (e) { setJourneys([]); setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
-  }, [api, user, t.error]);
+  }, [api, user, me, t.error]);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const submitCreate = async (e: React.FormEvent) => {

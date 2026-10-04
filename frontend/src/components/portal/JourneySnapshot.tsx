@@ -184,7 +184,6 @@ export function stageLabel(value: string, locale: Locale) {
 
 const ROLES: Record<string, { en: string; ar: string }> = {
   COORDINATOR: { en: "Coordinator", ar: "منسق" },
-  COORDINATOR_LEAD: { en: "Coordination lead", ar: "قائد التنسيق" },
   DOCTOR: { en: "Consultant", ar: "استشاري" },
   OPERATIONS: { en: "Operations", ar: "العمليات" },
   FINANCE: { en: "Finance", ar: "المالية" },

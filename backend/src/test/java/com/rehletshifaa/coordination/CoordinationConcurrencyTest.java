@@ -22,17 +22,17 @@ class CoordinationConcurrencyTest {
     @Test void duplicateDeliveryStaleWritersManualAutomaticAndCapacityRacesAreDatabaseSerialized()throws Exception{
         CoordinationIntegrationTest fixture=new CoordinationIntegrationTest();fixture.engine=engine;fixture.config=config;fixture.repo=repo;fixture.jdbc=jdbc;fixture.crypto=crypto;
         new TransactionTemplate(transactions).executeWithoutResult(s->fixture.seed());
-        fixture.command("SHADOW",0,null);fixture.command("ACTIVATE",1,null);
-        Command retry=new Command("same-race",2,"AUTO",null,null,null,"RACE");var replay=race(()->engine.execute(fixture.org,fixture.caseId,retry),()->engine.execute(fixture.org,fixture.caseId,retry));assertThat(replay).allMatch(x->x instanceof Decision);assertThat(((Decision)replay.get(0)).id()).isEqualTo(((Decision)replay.get(1)).id());
-        long revision=repo.facts(fixture.caseId).revision();var competing=race(()->engine.execute(fixture.org,fixture.caseId,new Command("one",revision,"AUTO",null,null,null,"RACE")),()->engine.execute(fixture.org,fixture.caseId,new Command("two",revision,"AUTO",null,null,null,"RACE")));oneWinner(competing);
-        long next=repo.facts(fixture.caseId).revision();var manual=race(()->engine.execute(fixture.org,fixture.caseId,new Command("automatic",next,"AUTO",null,null,null,"RACE")),()->engine.execute(fixture.org,fixture.caseId,new Command("manual",next,"REASSIGN","routing-b",null,"Manager decision","RACE")));oneWinner(manual);
+        fixture.command("AUTO",0,null);
+        Command retry=new Command("same-race",1,"AUTO",null,null,null,"RACE");var replay=race(()->engine.execute(fixture.caseId,retry),()->engine.execute(fixture.caseId,retry));assertThat(replay).allMatch(x->x instanceof Decision);assertThat(((Decision)replay.get(0)).id()).isEqualTo(((Decision)replay.get(1)).id());
+        long revision=repo.facts(fixture.caseId).revision();var competing=race(()->engine.execute(fixture.caseId,new Command("one",revision,"AUTO",null,null,null,"RACE")),()->engine.execute(fixture.caseId,new Command("two",revision,"AUTO",null,null,null,"RACE")));oneWinner(competing);
+        long next=repo.facts(fixture.caseId).revision();var manual=race(()->engine.execute(fixture.caseId,new Command("automatic",next,"AUTO",null,null,null,"RACE")),()->engine.execute(fixture.caseId,new Command("manual",next,"REASSIGN","routing-b",null,"Manager decision","RACE")));oneWinner(manual);
         assertThat(fixture.count("SELECT COUNT(*) FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND status='ACTIVE'",fixture.caseId)).isEqualTo(1);
         // Two different cases compete for the same final global capacity slot.
         fixture.capacity("routing-a",0,true);fixture.capacity("routing-b",0,true);
         UUID first=new TransactionTemplate(transactions).execute(s->fixture.medicalCase(fixture.consultant));UUID second=new TransactionTemplate(transactions).execute(s->fixture.medicalCase(fixture.consultant));
-        for(UUID id:List.of(first,second)){engine.execute(fixture.org,id,new Command("shadow",0,"SHADOW",null,null,null,"RACE"));engine.execute(fixture.org,id,new Command("adopt",1,"ACTIVATE",null,null,"Reviewed queue","RACE"));}
+        for(UUID id:List.of(first,second))engine.execute(id,new Command("queue",0,"AUTO",null,null,null,"RACE"));
         int current=(int)repo.workload("routing-a",UUID.randomUUID());fixture.capacity("routing-a",current+1,true);
-        var capacity=race(()->engine.execute(fixture.org,first,new Command("route",2,"AUTO",null,null,null,"RACE")),()->engine.execute(fixture.org,second,new Command("route",2,"AUTO",null,null,null,"RACE")));
+        var capacity=race(()->engine.execute(first,new Command("route",1,"AUTO",null,null,null,"RACE")),()->engine.execute(second,new Command("route",1,"AUTO",null,null,null,"RACE")));
         assertThat(capacity).allMatch(x->x instanceof Decision);assertThat(capacity.stream().map(x->(Decision)x).filter(d->d.selectedOwner()!=null)).hasSize(1);
         assertThat(repo.workload("routing-a",UUID.randomUUID())).isEqualTo(current+1);
     }

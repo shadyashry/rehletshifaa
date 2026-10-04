@@ -9,7 +9,7 @@ import { ReauthenticationReturnNotice } from "@/components/ReauthenticationNotic
 import { OIDC_AUTHORITY } from "@/lib/api";
 import { alternateLocale, type Locale } from "@/lib/i18n";
 import { swapLocale } from "@/lib/links";
-import { CONTROL_CENTER_ROLES, portalRoles } from "@/lib/portal-role-access";
+import { portalViews } from "@/lib/access";
 import { useControlCenterAccess } from "./control-center-access";
 import { ccHref, inSidebar, navGroupOf, navItem, pick, sidebarGroups, type NavItem, type NavKey } from "./control-center-nav";
 import "./control-center.css";
@@ -173,7 +173,7 @@ function LanguageLink({ locale }: { locale: Locale }) {
 /** Who is signed in, the way back to their workspace (when they have one), account security and sign-out. */
 function AccountMenu({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
-  const { user, roles, signOut } = useAuth();
+  const { user, me, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -188,7 +188,7 @@ function AccountMenu({ locale }: { locale: Locale }) {
   const profile = user.profile as { name?: string; preferred_username?: string; email?: string };
   const name = profile.name ?? profile.preferred_username ?? profile.email ?? "";
   const initials = name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "•";
-  const hasWorkspace = portalRoles(roles ?? []).some((r) => !CONTROL_CENTER_ROLES.includes(r));
+  const hasWorkspace = portalViews(me).length > 0;
   const label = ar ? "الحساب" : "Account";
   return (
     <div className="cc-account" ref={root}>

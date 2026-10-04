@@ -126,9 +126,8 @@ public class KeycloakPatientIdentityService implements PatientIdentityPort {
     }
 
     /**
-     * The realm's default role grants PATIENT to every new user, and reading the effective mappings only needs
-     * {@code view-users}. Assigning explicitly (which needs {@code view-realm}) is attempted only when the default
-     * did not apply, so a least-privilege service account still provisions correctly.
+     * PATIENT is assigned explicitly. The realm has no default business role because workforce and delegate
+     * invitations must never inherit patient authority.
      */
     private void ensurePatientRole(String subject) {
         if (hasRealmRole(subject, "PATIENT")) return;

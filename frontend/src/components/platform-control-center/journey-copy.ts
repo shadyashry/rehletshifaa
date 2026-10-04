@@ -139,7 +139,7 @@ export const journeyCopy = {
     independentReviewRequired: "Independent review required",
     published: "Version published.", submitted: "Sent for approval.", returned: "Returned to draft.", retiredDone: "Version retired.",
 
-    permission: { view: "journey.view", create: "journey.create", editDraft: "journey.edit_draft", validate: "journey.validate", simulate: "journey.simulate", submit: "journey.submit", publish: "journey.publish", approve: "journey.approve", retire: "journey.retire" },
+    permission: { view: "JOURNEY_READ", create: "JOURNEY_EDIT", editDraft: "JOURNEY_EDIT", validate: "JOURNEY_EDIT", simulate: "JOURNEY_EDIT", submit: "JOURNEY_EDIT", publish: "JOURNEY_APPROVE", approve: "JOURNEY_APPROVE", retire: "JOURNEY_APPROVE" },
   },
   ar: {
     navJourneys: "الرحلات",
@@ -273,7 +273,7 @@ export const journeyCopy = {
     independentReviewRequired: "مطلوب مراجعة مستقلة",
     published: "نُشر الإصدار.", submitted: "أُرسل للموافقة.", returned: "أُعيد إلى مسودة.", retiredDone: "أُنهي الإصدار.",
 
-    permission: { view: "journey.view", create: "journey.create", editDraft: "journey.edit_draft", validate: "journey.validate", simulate: "journey.simulate", submit: "journey.submit", publish: "journey.publish", approve: "journey.approve", retire: "journey.retire" },
+    permission: { view: "JOURNEY_READ", create: "JOURNEY_EDIT", editDraft: "JOURNEY_EDIT", validate: "JOURNEY_EDIT", simulate: "JOURNEY_EDIT", submit: "JOURNEY_EDIT", publish: "JOURNEY_APPROVE", approve: "JOURNEY_APPROVE", retire: "JOURNEY_APPROVE" },
   },
 };
 

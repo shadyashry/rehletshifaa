@@ -6,10 +6,9 @@ import { useControlCenterAccess } from "@/components/platform-control-center/con
 import { ccHref, openableSections, pick } from "@/components/platform-control-center/control-center-nav";
 
 /**
- * Landing for a signed-in account with no care-portal role and no provider practice (people who work with a provider
- * organization land in the Provider Workspace instead) — typically a RehletShifaa business role held without an
- * identity-system portal role. It never says "no access" to someone who has access: it lists the Control Center areas the caller's own
- * capabilities open, exactly as the Control Center navigation would, and shows no case or patient data.
+ * Landing for a signed-in account with no care-portal workspace — typically someone whose RehletShifaa role works only in
+ * the Control Center. It never says "no access" to someone who has access: it lists the Control Center areas their
+ * permissions open, exactly as the Control Center navigation would, and shows no case or patient data.
  */
 export function NoPortalWorkspace({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
@@ -35,7 +34,7 @@ export function NoPortalWorkspace({ locale }: { locale: Locale }) {
   return (
     <section className="card max-w-2xl p-6 sm:p-8" aria-labelledby="no-portal-workspace-title">
       <h2 id="no-portal-workspace-title" className="title">{ar ? "لم يُجهَّز شيء لحسابك بعد" : "Nothing is set up for your account yet"}</h2>
-      <p className="mt-2 text-sm leading-6 text-ink-600">{ar ? "لقد سجّلت الدخول، لكن لم تُجهَّز بعد أي مساحة عمل أو دور لهذا الحساب. إذا دعتك جهة طبية، فقد تكون عضويتك بانتظار التأكيد." : "You're signed in, but no workspace or role has been set up for this account yet. If an organization invited you, your membership may still be waiting for confirmation."}</p>
+      <p className="mt-2 text-sm leading-6 text-ink-600">{ar ? "لقد سجّلت الدخول، لكن لم تُجهَّز بعد أي مساحة عمل أو دور لهذا الحساب. إذا دُعيت للعمل مع رحلة شفاء، فقد يكون دورك بانتظار التفعيل." : "You're signed in, but no workspace or role has been set up for this account yet. If you were invited to work with RehletShifaa, your role may still be waiting to be set up."}</p>
       <p className="mt-3 text-sm leading-6 text-ink-600">{ar ? "تواصل مع الشخص الذي دعاك أو مع جهة الاتصال لدى رحلة شفاء. لا تشارك كلمة المرور مع أحد." : "Contact the person who invited you or your RehletShifaa contact. Never share your password."}</p>
     </section>
   );

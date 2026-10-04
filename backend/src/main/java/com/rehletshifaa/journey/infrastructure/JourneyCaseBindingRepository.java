@@ -11,7 +11,9 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 /** Application-owned case correlation; engine references never leave the application boundary. */
 @Repository
 public class JourneyCaseBindingRepository {
-    public record Binding(UUID caseId, UUID versionId, String createdBy, String requestHash, String engineReference) {}
+    public record Binding(UUID caseId, UUID versionId, String admissionMode, String createdBy, String requestHash, String engineReference) {
+        public boolean verificationBy(String subject) { return "VERIFICATION".equals(admissionMode) && createdBy.equals(subject); }
+    }
     private final JdbcClient jdbc;
     private final Clock clock;
 
@@ -52,7 +54,7 @@ public class JourneyCaseBindingRepository {
     }
 
     private Binding map(java.sql.ResultSet r, int row) throws java.sql.SQLException {
-        return new Binding(r.getObject("case_id",UUID.class),r.getObject("journey_version_id",UUID.class),
+        return new Binding(r.getObject("case_id",UUID.class),r.getObject("journey_version_id",UUID.class),r.getString("admission_mode"),
                 r.getString("created_by"),r.getString("request_hash"),r.getString("engine_instance_ref"));
     }
 }

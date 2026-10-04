@@ -16,7 +16,8 @@ type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown
 const BASE = "EGP";
 
 /** Only the outcomes the domain actually accepts, in the order a consultant would consider them. */
-const OUTCOMES = ["INFO", "REASSIGN", "RETURN_TO_COORDINATOR", "NOT_SUITABLE"] as const;
+// Transfers and second opinions go through the controlled referral flow (ConsultantReferrals), never through here.
+const OUTCOMES = ["INFO", "RETURN_TO_COORDINATOR", "NOT_SUITABLE"] as const;
 type Outcome = (typeof OUTCOMES)[number];
 
 const CURRENCY_LABELS: Record<string, string> = {
@@ -372,17 +373,16 @@ function copy(ar: boolean) {
     submit: "إرسال التوصية", saveDraft: "حفظ مسودة",
     otherOutcome: "نتيجة سريرية أخرى",
     outcomeLabel: {
-      INFO: "طلب معلومات إضافية", REASSIGN: "طلب رأي ثانٍ",
+      INFO: "طلب معلومات إضافية",
       RETURN_TO_COORDINATOR: "إعادة دون توصية", NOT_SUITABLE: "غير مناسبة سريريًا",
     } as Record<Outcome, string>,
     outcomeHint: {
       INFO: "يُرسل طلبًا آمنًا للمريض وينقل المسؤولية إليه.",
-      REASSIGN: "يعيد الحالة إلى المنسق ليعيّن استشاريًا إضافيًا.",
       RETURN_TO_COORDINATOR: "يعيد المسؤولية إلى المنسق دون تسجيل توصية.",
       NOT_SUITABLE: "يسجّل أن الحالة غير مناسبة سريريًا للعلاج.",
     } as Record<Outcome, string>,
     outcomeConfirm: {
-      INFO: "إرسال الطلب", REASSIGN: "طلب رأي ثانٍ",
+      INFO: "إرسال الطلب",
       RETURN_TO_COORDINATOR: "إعادة إلى المنسق", NOT_SUITABLE: "تأكيد عدم المناسبة السريرية",
     } as Record<Outcome, string>,
     outcomeReason: "السبب السريري",
@@ -422,17 +422,16 @@ function copy(ar: boolean) {
     submit: "Submit recommendation", saveDraft: "Save draft",
     otherOutcome: "Other clinical outcome",
     outcomeLabel: {
-      INFO: "Request additional information", REASSIGN: "Request second opinion",
+      INFO: "Request additional information",
       RETURN_TO_COORDINATOR: "Return without recommendation", NOT_SUITABLE: "Not clinically suitable",
     } as Record<Outcome, string>,
     outcomeHint: {
       INFO: "Sends a secure request to the patient and moves responsibility to them.",
-      REASSIGN: "Returns the case to the coordinator to assign an additional consultant.",
       RETURN_TO_COORDINATOR: "Hands responsibility back to the coordinator with no recommendation recorded.",
       NOT_SUITABLE: "Records that this case is not clinically suitable for treatment.",
     } as Record<Outcome, string>,
     outcomeConfirm: {
-      INFO: "Send request", REASSIGN: "Request second opinion",
+      INFO: "Send request",
       RETURN_TO_COORDINATOR: "Return to coordinator", NOT_SUITABLE: "Confirm not clinically suitable",
     } as Record<Outcome, string>,
     outcomeReason: "Clinical reason",

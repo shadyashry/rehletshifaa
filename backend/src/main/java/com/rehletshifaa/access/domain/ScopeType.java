@@ -1,3 +1,0 @@
-package com.rehletshifaa.access.domain;
-
-public enum ScopeType { SELF, ASSIGNED_CASES, MANAGED_CLINICIANS, ORGANIZATION, ASSIGNED_ORGANIZATIONS, SPECIFIC_RESOURCE, PLATFORM }

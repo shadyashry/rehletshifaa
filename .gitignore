@@ -26,3 +26,8 @@ output/
 /RehletShifaaQATestProtocol.pdf
 /rehletshifaa-tester-access-guide.pdf
 .cloudflared-runtime/
+
+# Local Codex/package/render scratch data
+.codex-tmp/
+.pnpm-store/
+/tmp/

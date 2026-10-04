@@ -1,10 +1,10 @@
 package com.rehletshifaa.journey.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rehletshifaa.access.application.AuthorizationService;
-import com.rehletshifaa.access.domain.ChannelEntitlement;
-import com.rehletshifaa.access.domain.ResourceContext;
-import com.rehletshifaa.access.infrastructure.AccessAuditRepository;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.journey.domain.JourneyModel.Status;
@@ -37,22 +37,22 @@ public class JourneyCaseVerificationService {
     private final JourneyCaseBindingRepository bindings;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final CaseService cases;
-    private final AuthorizationService authorization;
-    private final AccessAuditRepository audit;
+    private final Authority authorization;
+    private final GovernanceAuditLog audit;
     private final ObjectMapper mapper;
     private final Validator validator;
     private final boolean enabled;
 
     public JourneyCaseVerificationService(JourneyDefinitionRepository definitions, JourneyDeploymentRepository deployments,
             JourneyCaseBindingRepository bindings, ObjectProvider<JourneyRuntimePort> runtimes, CaseService cases,
-            AuthorizationService authorization, AccessAuditRepository audit, ObjectMapper mapper, Validator validator,
+            Authority authorization, GovernanceAuditLog audit, ObjectMapper mapper, Validator validator,
             @Value("${app.journey.runtime.case-verification-enabled:false}") boolean enabled) {
         this.definitions=definitions; this.deployments=deployments; this.bindings=bindings; this.runtimes=runtimes;
         this.cases=cases; this.authorization=authorization; this.audit=audit; this.mapper=mapper; this.validator=validator; this.enabled=enabled;
     }
 
     public View create(UUID definitionId, UUID versionId, Create command) {
-        String subject=authorize("journey.simulate");
+        String subject=authorize(Permission.JOURNEY_EDIT);
         runtime();
         if(command==null || command.commandKey()==null || !command.commandKey().matches("[A-Za-z0-9:_-]{1,80}")
                 || command.intake()==null || !validator.validate(command.intake()).isEmpty()
@@ -79,7 +79,7 @@ public class JourneyCaseVerificationService {
 
     /** Submits intake and starts the pinned deployment together, or rolls both back. */
     public View start(UUID caseId) {
-        String subject=authorize("journey.simulate");
+        String subject=authorize(Permission.JOURNEY_EDIT);
         var runtime=runtime();
         var binding=bindings.lock(caseId,subject);
         if(binding.engineReference()!=null) return view(binding);
@@ -93,7 +93,7 @@ public class JourneyCaseVerificationService {
     }
 
     public View read(UUID caseId) {
-        String subject=authorize("journey.view");
+        String subject=authorize(Permission.JOURNEY_READ);
         runtime();
         return view(bindings.lock(caseId,subject));
     }
@@ -103,8 +103,8 @@ public class JourneyCaseVerificationService {
         return new View(binding.caseId(),binding.versionId(),state);
     }
 
-    private String authorize(String permission) {
-        return authorization.require(permission,ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB,ChannelEntitlement.API).subject();
+    private String authorize(Permission permission) {
+        return authorization.require(permission).subject();
     }
     private JourneyRuntimePort runtime() {
         var runtime=runtimes.getIfAvailable();

@@ -14,58 +14,15 @@ const go = async (load: () => Promise<{ default: (a: never) => Promise<unknown> 
   return redirect.mock.calls.at(-1)?.[0];
 };
 
-describe("Old admin deep links keep working", () => {
-  it("sends Roles & Access tabs to Access & governance", async () => {
-    expect(await go(() => import("@/app/[locale]/portal/access/page"), { locale: "en" }, { tab: "audit" })).toBe("/en/portal/control-center/access/audit");
-    expect(await go(() => import("@/app/[locale]/portal/access/page"), { locale: "ar" })).toBe("/ar/portal/control-center/access/roles");
-  });
-
+describe("Section and legacy journey links land on the right page", () => {
   it("sends journey routes into the Control Center, preserving the designer tab", async () => {
     expect(await go(() => import("@/app/[locale]/portal/journeys/page"), { locale: "en" })).toBe("/en/portal/control-center/journeys");
     expect(await go(() => import("@/app/[locale]/portal/journeys/[definitionId]/versions/[versionId]/page"), { locale: "en", definitionId: "d1", versionId: "v1" }, { tab: "simulation" })).toBe("/en/portal/control-center/journeys/d1/versions/v1?tab=simulation");
   });
 
-  it("sends the former per-role organization pages to the People tab", async () => {
-    for (const r of ["consultants", "associate-doctors", "practice-managers", "assistants"]) {
-      expect(await go(() => import(`@/app/[locale]/portal/control-center/providers/[id]/${r}/page`), { locale: "en", id: "org-a" })).toBe("/en/portal/control-center/providers/org-a?tab=people");
-    }
-  });
-
-  it("sends clinician pricing and availability pages to the clinician page's Prices and Schedule", async () => {
-    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/[id]/clinicians/[practitionerId]/pricing/page"), { locale: "en", id: "org-a", practitionerId: "p1" })).toBe("/en/portal/control-center/providers/clinicians/org-a/p1?tab=prices");
-    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/[id]/clinicians/[practitionerId]/availability/page"), { locale: "en", id: "org-a", practitionerId: "p1" })).toBe("/en/portal/control-center/providers/clinicians/org-a/p1?tab=schedule");
-  });
-
-  it("keeps UX-2 consultant bookmarks working in the Clinicians page family (UX-3)", async () => {
-    const base = "/en/portal/control-center/providers/clinicians";
-    const list = () => import("@/app/[locale]/portal/control-center/providers/consultants/page");
-    expect(await go(list, { locale: "en" })).toBe(base);
-    expect(await go(list, { locale: "ar" }, { view: "direct" })).toBe("/ar/portal/control-center/providers/clinicians?engagement=direct");
-    const workspace = () => import("@/app/[locale]/portal/control-center/providers/consultants/[orgId]/[practitionerId]/page");
-    expect(await go(workspace, { locale: "en", orgId: "org-a", practitionerId: "p1" })).toBe(`${base}/org-a/p1`);
-    expect(await go(workspace, { locale: "en", orgId: "org-a", practitionerId: "p1" }, { tab: "readiness" })).toBe(`${base}/org-a/p1?tab=setup`);
-    expect(await go(workspace, { locale: "en", orgId: "org-a", practitionerId: "p1" }, { tab: "availability" })).toBe(`${base}/org-a/p1?tab=schedule`);
-    expect(await go(workspace, { locale: "en", orgId: "org-a", practitionerId: "p1" }, { tab: "pricing" })).toBe(`${base}/org-a/p1?tab=prices`);
-    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/consultants/[orgId]/[practitionerId]/setup/page"), { locale: "en", orgId: "org-a", practitionerId: "p1" }, { step: "working" })).toBe(`${base}/org-a/p1?tab=setup`);
-    expect(await go(() => import("@/app/[locale]/portal/control-center/providers/clinicians/[orgId]/[practitionerId]/setup/page"), { locale: "en", orgId: "org-a", practitionerId: "p1" })).toBe(`${base}/org-a/p1?tab=setup`);
-    const direct = () => import("@/app/[locale]/portal/control-center/providers/consultants/direct/[id]/page");
-    expect(await go(direct, { locale: "en", id: "p-9" })).toBe(`${base}/direct/p-9`);
-    expect(await go(direct, { locale: "en", id: "p-9" }, { tab: "pricing", created: "1" })).toBe(`${base}/direct/p-9?tab=prices&invited=1`);
-    const add = () => import("@/app/[locale]/portal/control-center/providers/onboarding/new/page");
-    expect(await go(add, { locale: "en" })).toBe(`${base}/new`);
-    expect(await go(add, { locale: "en" }, { org: "org-a" })).toBe(`${base}/new?org=org-a`);
-  });
 
   it("opens section landing pages on their first task", async () => {
-    expect(await go(() => import("@/app/[locale]/portal/control-center/access/page"), { locale: "en" })).toBe("/en/portal/control-center/access/users");
     expect(await go(() => import("@/app/[locale]/portal/control-center/commercial/page"), { locale: "en" })).toBe("/en/portal/control-center/commercial/prices");
-  });
-
-  it("sends the former Pricing page to Price Lists (keeping its selection) and its rates view to Exchange Rates", async () => {
-    const pricing = () => import("@/app/[locale]/portal/control-center/commercial/pricing/page");
-    expect(await go(pricing, { locale: "en" }, { view: "rates" })).toBe("/en/portal/control-center/commercial/exchange-rates");
-    expect(await go(pricing, { locale: "ar" }, { view: "provider", org: "org-a", clinician: "p1" })).toBe("/ar/portal/control-center/commercial/prices?view=provider&org=org-a&clinician=p1");
-    expect(await go(pricing, { locale: "en" })).toBe("/en/portal/control-center/commercial/prices");
   });
 });
 

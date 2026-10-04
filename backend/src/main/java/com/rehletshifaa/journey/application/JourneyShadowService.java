@@ -1,8 +1,9 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.access.application.AuthorizationService;
-import com.rehletshifaa.access.domain.*;
-import com.rehletshifaa.access.infrastructure.AccessAuditRepository;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
 import com.rehletshifaa.journey.infrastructure.*;
 import com.rehletshifaa.shared.api.ApiException;
@@ -23,14 +24,14 @@ public class JourneyShadowService {
     private final JourneyDeploymentRepository deployments;
     private final JourneyShadowRepository runs;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
-    private final AuthorizationService authorization;
-    private final AccessAuditRepository audit;
+    private final Authority authorization;
+    private final GovernanceAuditLog audit;
     public JourneyShadowService(JourneyDefinitionRepository definitions,JourneyDeploymentRepository deployments,
-            JourneyShadowRepository runs,ObjectProvider<JourneyRuntimePort> runtimes,AuthorizationService authorization,AccessAuditRepository audit) {
+            JourneyShadowRepository runs,ObjectProvider<JourneyRuntimePort> runtimes,Authority authorization,GovernanceAuditLog audit) {
         this.definitions=definitions;this.deployments=deployments;this.runs=runs;this.runtimes=runtimes;this.authorization=authorization;this.audit=audit;
     }
     public View start(UUID definition,UUID versionId,Start command) {
-        var actor=authorize("journey.simulate");
+        var actor=authorize(Permission.JOURNEY_EDIT);
         if(command==null)throw invalid();
         key(command.commandKey());
         // The singleton definition lock serializes start-key retries and publication/retirement.
@@ -51,13 +52,13 @@ public class JourneyShadowService {
         return view(runs.lock(id,versionId),version,instance,0);
     }
     public View read(UUID definition,UUID version,UUID id) {
-        authorize("journey.view");
+        authorize(Permission.JOURNEY_READ);
         var model=definitions.version(definition,version);
         var run=runs.lock(id,version);
         return view(run,model,runtime().inspect(run.engineReference()),run.revision());
     }
     public View step(UUID definition,UUID versionId,UUID id,Step command) {
-        var actor=authorize("journey.simulate");
+        var actor=authorize(Permission.JOURNEY_EDIT);
         if(command==null || command.nodeKey()==null || !command.nodeKey().matches("[A-Za-z][A-Za-z0-9_-]{0,59}"))throw invalid();
         key(command.commandKey());
         var version=definitions.version(definition,versionId);
@@ -93,7 +94,7 @@ public class JourneyShadowService {
         return result;
     }
     private JourneyRuntimePort runtime(){var runtime=runtimes.getIfAvailable();if(runtime==null)throw new ApiException(503,"JOURNEY_RUNTIME_DISABLED","Journey runtime is not enabled.");return runtime;}
-    private com.rehletshifaa.access.application.AccessIdentity.Identity authorize(String permission){return authorization.require(permission,ResourceContext.platform(),ChannelEntitlement.ADMIN_WEB,ChannelEntitlement.API);}
+    private com.rehletshifaa.authority.application.Principal authorize(Permission permission){return authorization.require(permission);}
     private static void key(String key){if(key==null || !key.matches("[A-Za-z0-9:_-]{1,80}"))throw invalid();}
     private static ApiException invalid(){return new ApiException(400,"INVALID_JOURNEY_SHADOW","Use a bounded command key, node key and registered boolean facts.");}
     private static ApiException conflict(String message){return new ApiException(409,"JOURNEY_SHADOW_CONFLICT",message);}

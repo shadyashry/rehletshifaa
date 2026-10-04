@@ -1,6 +1,7 @@
 package com.rehletshifaa.journey;
 
-import com.rehletshifaa.access.application.*;
+import com.rehletshifaa.authority.domain.Role;
+
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.coordination.application.AssignmentEngine;
 import com.rehletshifaa.coordination.application.CoordinationConfigurationService;
@@ -54,8 +55,6 @@ class JourneyHappyPathParityTest {
     @Autowired PatientActionService patientActions;
     @Autowired AssignmentEngine engine;
     @Autowired CoordinationConfigurationService config;
-    @Autowired AccessBootstrapService bootstrap;
-    @Autowired RoleAssignmentService assignments;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;
     @Autowired CryptoService crypto;
@@ -66,11 +65,6 @@ class JourneyHappyPathParityTest {
     Version version;
     JourneyDefinitionIntegrationTest fixture;
     final Instant past = Instant.now().minusSeconds(300), future = Instant.now().plusSeconds(86400);
-    static final UUID JOURNEY_WORK_PLATFORM = UUID.fromString("42000001-0000-0000-0000-000000000001");
-    static final UUID JOURNEY_WORK_ORGANIZATION = UUID.fromString("42000001-0000-0000-0000-000000000002");
-    static final UUID JOURNEY_WORK_CONSULTANT_ORGANIZATION = UUID.fromString("43000001-0000-0000-0000-000000000002");
-    static final UUID COORDINATION_MANAGER = UUID.fromString("36000001-0000-0000-0000-000000000008");
-    static final UUID COORDINATOR_RECEIVER = UUID.fromString("36000001-0000-0000-0000-000000000016");
 
     /** The real "Consultant must accept the assignment" gate as a genuine Journey WAIT — see technical-decisions.md §21. */
     static Node waitForConsultantAcceptance() {
@@ -121,10 +115,9 @@ class JourneyHappyPathParityTest {
 
     @BeforeAll void setup() {
         fixture = new JourneyDefinitionIntegrationTest();
-        fixture.service = definitions; fixture.bootstrap = bootstrap; fixture.assignments = assignments; fixture.jdbc = jdbc; fixture.clock = clock;
+        fixture.service = definitions; fixture.crypto = crypto; fixture.jdbc = jdbc; fixture.clock = clock;
         new TransactionTemplate(manager).executeWithoutResult(s -> fixture.setup());
         fixture.signIn("journey-owner");
-        fixture.grant("maker", JOURNEY_WORK_PLATFORM);
         fixture.signIn("maker");
         var d = definitions.create();
         var v = d.versions().getFirst();
@@ -144,25 +137,19 @@ class JourneyHappyPathParityTest {
         fixture.clear();
     }
     @BeforeEach void resetIdentity() { ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).reset(); }
-    @AfterEach void clear() { SecurityContextHolder.clearContext(); }
+    @BeforeEach void resetRouting() { com.rehletshifaa.coordination.CoordinationTestData.reset(jdbc); }
+    @AfterEach void clear() { SecurityContextHolder.clearContext(); com.rehletshifaa.coordination.CoordinationTestData.reset(jdbc); }
 
-    UUID organization() {
-        UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO provider_organizations(id,legal_name,display_name,organization_type,status,country_code,time_zone,default_currency,legacy_mapping_status,created_by,updated_by,created_at,updated_at,version) VALUES(?,'Test','Test','CLINIC','ONBOARDING','AE','Asia/Dubai','EGP','REVIEWED','TEST','TEST',?,?,0)", id, past, past);
-        return id;
-    }
-    UUID clinician(UUID organization) {
+    UUID clinician() {
         UUID id = UUID.randomUUID(); String subject = id.toString();
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,created_at,updated_at,version) VALUES(?,?,?,?,'UNDER_REVIEW','CONSULTANT','UNAVAILABLE',?,?,0)", id, subject, subject, subject, past, past);
-        jdbc.update("INSERT INTO clinician_onboardings(organization_id,practitioner_id,clinician_type,status,jurisdiction,created_by,updated_by,created_at,updated_at,version) VALUES(?,?,'CONSULTANT','OPERATIONAL_SETUP','AE','TEST','TEST',?,?,0)", organization, id, past, past);
         return id;
     }
-    UUID verifiedConsultant(UUID organization, String careCategory) {
+    UUID verifiedConsultant(String careCategory) {
         UUID id = UUID.randomUUID(); String subject = id.toString();
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,'VERIFIED','CONSULTANT','AVAILABLE',?,?,?,0)",
                 id, subject, subject, subject, careCategory, past, past);
         jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,created_at) VALUES(?,?,'MEDICAL_LICENSE','VERIFIED',?)", UUID.randomUUID(), id, past);
-        jdbc.update("INSERT INTO clinician_onboardings(organization_id,practitioner_id,clinician_type,status,jurisdiction,created_by,updated_by,created_at,updated_at,version) VALUES(?,?,'CONSULTANT','OPERATIONAL_SETUP','AE','TEST','TEST',?,?,0)", organization, id, past, past);
         return id;
     }
     /** An active, priced catalog service for a Consultant — the same "pre-approved" path that makes a clinical cost estimate finance-exempt. */
@@ -181,31 +168,29 @@ class JourneyHappyPathParityTest {
         jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,?,'PRIMARY','ACTIVE','Fixture assignment','TEST',?,0)",
                 UUID.randomUUID(), caseId, subject, role, past);
     }
-    void actor(String subject, UUID organization, UUID roleVersion) {
-        jdbc.update("INSERT INTO access_subjects(subject,active,revision) SELECT ?,TRUE,0 WHERE NOT EXISTS(SELECT 1 FROM access_subjects WHERE subject=?)", subject, subject);
-        jdbc.update("INSERT INTO access_memberships(subject,organization_id,status,effective_from,revision,created_by,reason) SELECT ?,?,'ACTIVE',?,0,'TEST','Test' WHERE NOT EXISTS(SELECT 1 FROM access_memberships WHERE subject=? AND organization_id=?)",
-                subject, organization, past, subject, organization);
-        jdbc.update("INSERT INTO role_assignments(id,subject,version_id,organization_id,scope_type,effective_from,status,source,assigned_by,reason,revision) VALUES(?,?,?,?,'ORGANIZATION',?,'ACTIVE','TEST','TEST','Test',0)", UUID.randomUUID(), subject, roleVersion, organization, past);
-        jdbc.update("INSERT INTO staff_members(id,external_subject,staff_role,display_name_encrypted,email_encrypted,created_at,updated_at,version) SELECT ?,?,'COORDINATOR',?,?,?,?,0 WHERE NOT EXISTS(SELECT 1 FROM staff_members WHERE external_subject=?)",
-                UUID.randomUUID(), subject, crypto.encrypt(subject), crypto.encrypt(subject + "@example.test"), past, past, subject);
+    void manager(String subject) { com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, subject, Role.CARE_COORDINATION_MANAGER); }
+    void coordinator(String subject) {
+        com.rehletshifaa.workforce.WorkforceTestData.staffWithEmail(jdbc, subject, "COORDINATOR", crypto.encrypt(subject), crypto.encrypt(subject + "@example.test"));
     }
-    void candidate(UUID org, String subject, UUID team, int max, boolean duty) {
-        actor(subject, org, COORDINATOR_RECEIVER);
-        config.saveMember(org, team, new Member(subject, past, null, true, false, -1), "Team member");
-        config.saveCapacity(org, new Capacity(subject, max, duty, Set.of("en"), Set.of(), -1), "Initial capacity");
+    UUID team() {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO workforce_teams(id,function_key,name,status,created_by,created_at,updated_at,revision) VALUES(?,'CARE_COORDINATION',?,'ACTIVE','TEST',?,?,0)", id, "Coordination " + id, past, past);
+        return id;
     }
-    PolicyConfig policy(UUID team) { return new PolicyConfig(80, 20, true, false, team, Map.of(), team, null, 24); }
-    static void signInWithLegacyRole(String subject, String role) {
-        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond()).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600)).build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_" + role)), subject));
+    void candidate(String subject, UUID team, int max, boolean duty) {
+        coordinator(subject);
+        jdbc.update("INSERT INTO workforce_team_memberships(id,team_id,subject,effective_from,status,created_by,reason,revision) VALUES(?,?,?,?,'ACTIVE','TEST','Member',0)", UUID.randomUUID(), team, subject, past);
+        config.saveCapacity(new Capacity(subject, max, duty, Set.of("en"), Set.of(), -1), "Initial capacity");
     }
+    PolicyConfig policy(UUID team) { return new PolicyConfig(80, 20, true, false, Map.of(), team, null, 24); }
+    void signInWithLegacyRole(String subject, Role role) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, role); }
     @Test void connectedHappyPathSegmentMatchesLegacyContractAtEveryImplementedCheckpoint() throws Exception {
-        UUID org = organization(), initialConsultant = clinician(org);
-        actor("routing-manager", org, COORDINATION_MANAGER);
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        UUID team = config.saveTeam(org, null, "Coordination", new TeamConfig(true, "Care coordination", Set.of(), Set.of(), "Asia/Dubai", null), 0, "Initial setup").id();
-        candidate(org, "routing-a", team, 10, true);
-        config.savePolicy(org, 0, past, future, policy(team), "Initial policy");
+        UUID initialConsultant = clinician();
+        manager("routing-manager");
+        fixture.signIn("routing-manager");
+        UUID team = team();
+        candidate("routing-a", team, 10, true);
+        config.savePolicy(0, past, future, policy(team), "Initial policy");
 
         fixture.signIn("maker");
         var bound = verification.create(version.definitionId(), version.id(),
@@ -214,14 +199,12 @@ class JourneyHappyPathParityTest {
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant); // provenance only
 
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 0, "SHADOW", null, null, "Reviewed", "TEST"));
-        Decision live = engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 1, "ACTIVATE", null, null, "Reviewed", "TEST"));
-        assertThat(live.selectedOwner()).isEqualTo("routing-a");
+        fixture.signIn("routing-manager");
 
-        // Checkpoint 1: RECEIVED, default STAFF waiting-on, no open work yet — routing decided, nothing projected.
+        // Checkpoint 1: RECEIVED, default STAFF waiting-on, no open work yet. Routing happens when coordinator work is
+        // projected, so no Coordinator owns the case before sync().
         fixture.signIn("maker");
-        assertThat(compare(new Expected("post-routing", "RECEIVED", "STAFF", List.of(), List.of(), true, true), snapshot(jdbc, bound.caseId())))
+        assertThat(compare(new Expected("post-routing", "RECEIVED", "STAFF", List.of(), List.of(), false, true), snapshot(jdbc, bound.caseId())))
                 .isEqualTo(Result.PASS);
 
         // Checkpoint 2: sync() opens the REQUEST_INFORMATION WorkItem, routed to the resolved Coordinator.
@@ -233,8 +216,8 @@ class JourneyHappyPathParityTest {
         // Checkpoint 3: completing REQUEST_INFORMATION opens PROVIDE_INFORMATION via PatientActionService.request,
         // which — per its own documented contract — parks a blocking request from RECEIVED into INFORMATION_REQUIRED
         // and moves WaitingOn to PATIENT.
-        actor("routing-a", org, JOURNEY_WORK_ORGANIZATION);
-        signInWithLegacyRole("routing-a", "COORDINATOR");
+        coordinator("routing-a");
+        signInWithLegacyRole("routing-a", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "request", null);
         assertThat(compare(new Expected("information-requested", "INFORMATION_REQUIRED", "PATIENT", List.of(), List.of("INFORMATION_REQUEST"), true, true), snapshot(jdbc, bound.caseId())))
                 .isEqualTo(Result.PASS);
@@ -251,8 +234,8 @@ class JourneyHappyPathParityTest {
         // Checkpoint 5: assigning the Consultant is the real JourneyService.assign(DOCTOR) — the case transitions
         // through READY_FOR_CONSULTANT into CONSULTANT_ASSIGNMENT_PENDING, WaitingOn moves to CONSULTANT, a PENDING
         // DOCTOR assignment appears, and the Consultant's own acceptance WorkItem opens.
-        UUID targetConsultant = verifiedConsultant(org, "cardiology");
-        signInWithLegacyRole("routing-a", "COORDINATOR");
+        UUID targetConsultant = verifiedConsultant("cardiology");
+        signInWithLegacyRole("routing-a", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "assign", Map.of("consultantSubject", targetConsultant.toString()), null);
         // The graph now models the legacy "consultant must accept" gate as a genuine Journey WAIT node
         // (see technical-decisions.md §21) between ASSIGN_CONSULTANT and RECORD_CLINICAL_DECISION: the
@@ -271,7 +254,7 @@ class JourneyHappyPathParityTest {
         // this design fix exists to prevent. JOURNEY:clinical must not appear yet.
         UUID assignmentId = jdbc.queryForObject("SELECT id FROM case_assignments WHERE case_id=? AND assignee_subject=? AND assignee_role='DOCTOR' AND status='PENDING'",
                 UUID.class, bound.caseId(), targetConsultant.toString());
-        signInWithLegacyRole(targetConsultant.toString(), "DOCTOR");
+        signInWithLegacyRole(targetConsultant.toString(), Role.CONSULTANT);
         journeyService.acceptDoctorAssignment(bound.caseId(), assignmentId, new AssignmentDecisionRequest(true, "Accepted"));
         assertThat(compare(new Expected("consultant-accepted-runtime-still-waiting", "CONSULTANT_REVIEW", "CONSULTANT",
                 List.of("CLINICAL_REVIEW", "REVIEW_PATIENT_RESPONSE"), List.of(), true, true), snapshot(jdbc, bound.caseId())))
@@ -299,8 +282,8 @@ class JourneyHappyPathParityTest {
         // pre-approved catalog services" release path. CONSULTANT_REVIEW → CLINICAL_RECOMMENDATION_READY,
         // WaitingOn returns to STAFF, and Journey immediately projects PREPARE_PROPOSAL for the Coordinator.
         UUID catalogServiceId = catalogService(targetConsultant, java.math.BigDecimal.valueOf(1000));
-        actor(targetConsultant.toString(), org, JOURNEY_WORK_CONSULTANT_ORGANIZATION);
-        signInWithLegacyRole(targetConsultant.toString(), "DOCTOR");
+        com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, targetConsultant.toString(), Role.CONSULTANT);
+        signInWithLegacyRole(targetConsultant.toString(), Role.CONSULTANT);
         var clinicalDecision = new ReviewDecisionRequest("ACCEPT", "Recommended coordinated care plan", null,
                 List.of(new CostEstimateItem("Consultation", java.math.BigDecimal.valueOf(1000), "EGP", catalogServiceId, null, null)), "EGP");
         projections.completeWorkItem(bound.caseId(), "clinical", Map.of(), clinicalDecision, Map.of("CLINICAL_ACCEPTED", true));
@@ -312,7 +295,7 @@ class JourneyHappyPathParityTest {
         // computed from the approved clinical review, CLINICAL_RECOMMENDATION_READY → PROPOSAL_PREPARATION,
         // and Journey immediately projects RELEASE_PROPOSAL for the Coordinator.
         UUID clinicalReviewId = jdbc.queryForObject("SELECT id FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'", UUID.class, bound.caseId());
-        signInWithLegacyRole("routing-a", "COORDINATOR");
+        signInWithLegacyRole("routing-a", Role.COORDINATOR);
         var proposalDraft = new ProposalDraftRequest(clinicalReviewId, "en", null, "EGP", null, null, null, null, null,
                 clock.instant().plusSeconds(30L * 24 * 3600), List.of(), null);
         projections.completeWorkItem(bound.caseId(), "prepare", Map.of(), proposalDraft, null);
@@ -327,7 +310,7 @@ class JourneyHappyPathParityTest {
                 "SELECT id FROM proposal_versions WHERE proposal_id=(SELECT id FROM proposals WHERE case_id=?) AND status='CLINICALLY_APPROVED'",
                 UUID.class, bound.caseId());
         long notificationsBefore = jdbc.queryForObject("SELECT count(*) FROM notification_outbox", Long.class);
-        signInWithLegacyRole("routing-a", "COORDINATOR");
+        signInWithLegacyRole("routing-a", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "release", Map.of("proposalVersionId", proposalVersionId.toString()), null);
         assertThat(compare(new Expected("proposal-released", "PATIENT_DECISION", "PATIENT",
                 List.of("REVIEW_PATIENT_RESPONSE"), List.of("JOURNEY:review_proposal"), true, true), snapshot(jdbc, bound.caseId())))
@@ -346,21 +329,21 @@ class JourneyHappyPathParityTest {
         SecurityContextHolder.clearContext();
         assertThatThrownBy(() -> projections.completeAuthenticatedPatientAction(bound.caseId(), reviewAction,
                 new ReviewProposalActionHandler.AuthenticatedDecision(proposalVersionId, new ProposalDecisionRequest("ACCEPTED", List.of(), null)),
-                Map.of("PROPOSAL_ACCEPTED", true))).hasMessageContaining("Authentication is required");
-        signInWithLegacyRole("wrong-patient", "PATIENT");
+                Map.of("PROPOSAL_ACCEPTED", true))).hasMessageContaining("Sign in to continue");
+        signInWithLegacyRole("wrong-patient", Role.PATIENT);
         assertThatThrownBy(() -> projections.completeAuthenticatedPatientAction(bound.caseId(), reviewAction,
                 new ReviewProposalActionHandler.AuthenticatedDecision(proposalVersionId, new ProposalDecisionRequest("ACCEPTED", List.of(), null)),
-                Map.of("PROPOSAL_ACCEPTED", true))).hasMessageContaining("Patient action was not found");
+                Map.of("PROPOSAL_ACCEPTED", true))).hasMessageContaining("do not include this action");
         assertThatThrownBy(() -> projections.completeAuthenticatedPatientAction(bound.caseId(), UUID.randomUUID(),
                 new ReviewProposalActionHandler.AuthenticatedDecision(proposalVersionId, new ProposalDecisionRequest("ACCEPTED", List.of(), null)),
-                Map.of("PROPOSAL_ACCEPTED", true))).hasMessageContaining("Patient action was not found");
+                Map.of("PROPOSAL_ACCEPTED", true))).hasMessageContaining("do not include this action");
         String patientEmail = "journey-" + bound.caseId() + "@example.test";
         String patientSubject = ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).seedActiveAccount(patientEmail);
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", patientSubject, bound.caseId());
-        signInWithLegacyRole(patientSubject, "PATIENT");
+        signInWithLegacyRole(patientSubject, Role.PATIENT);
         assertThatThrownBy(() -> projections.completeAuthenticatedPatientAction(UUID.randomUUID(), reviewAction,
                 new ReviewProposalActionHandler.AuthenticatedDecision(proposalVersionId, new ProposalDecisionRequest("ACCEPTED", List.of(), null)),
-                Map.of("PROPOSAL_ACCEPTED", true))).hasMessageContaining("Patient action was not found");
+                Map.of("PROPOSAL_ACCEPTED", true))).hasMessageContaining("not related to this record");
         assertThatThrownBy(() -> projections.completeAuthenticatedPatientAction(bound.caseId(), reviewAction,
                 new ReviewProposalActionHandler.AuthenticatedDecision(UUID.randomUUID(), new ProposalDecisionRequest("ACCEPTED", List.of(), null)),
                 Map.of("PROPOSAL_ACCEPTED", true)));
@@ -434,12 +417,12 @@ class JourneyHappyPathParityTest {
     }
 
     @Test void manualCommercialPathEngagesOperationsAndFinanceThenResendsTheLink() {
-        UUID org = organization(), initialConsultant = clinician(org);
-        actor("routing-manager", org, COORDINATION_MANAGER);
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        UUID team = config.saveTeam(org, null, "Coordination-3", new TeamConfig(true, "Care coordination", Set.of(), Set.of(), "Asia/Dubai", null), 0, "Initial setup").id();
-        candidate(org, "routing-b", team, 10, true);
-        config.savePolicy(org, 0, past, future, policy(team), "Initial policy");
+        UUID initialConsultant = clinician();
+        manager("routing-manager");
+        fixture.signIn("routing-manager");
+        UUID team = team();
+        candidate("routing-b", team, 10, true);
+        config.savePolicy(0, past, future, policy(team), "Initial policy");
 
         fixture.signIn("maker");
         var draft = definitions.cloneVersion(version.definitionId(), version.id(), fixture.change(version.revision()));
@@ -457,25 +440,23 @@ class JourneyHappyPathParityTest {
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant);
 
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 0, "SHADOW", null, null, "Reviewed", "TEST"));
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 1, "ACTIVATE", null, null, "Reviewed", "TEST"));
+        fixture.signIn("routing-manager");
 
         fixture.signIn("maker");
         projections.sync(bound.caseId());
-        actor("routing-b", org, JOURNEY_WORK_ORGANIZATION);
-        signInWithLegacyRole("routing-b", "COORDINATOR");
+        coordinator("routing-b");
+        signInWithLegacyRole("routing-b", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "request", null);
         var open = patientActions.openAction(bound.caseId());
         fixture.signIn("maker");
         projections.completePatientAction(bound.caseId(), "provide", List.of(new ItemResponse(open.items().getFirst().id(), "On file", null)), "Provided", null);
 
-        UUID targetConsultant = verifiedConsultant(org, "cardiology");
-        signInWithLegacyRole("routing-b", "COORDINATOR");
+        UUID targetConsultant = verifiedConsultant("cardiology");
+        signInWithLegacyRole("routing-b", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "assign", Map.of("consultantSubject", targetConsultant.toString()), null);
         UUID assignmentId = jdbc.queryForObject("SELECT id FROM case_assignments WHERE case_id=? AND assignee_subject=? AND assignee_role='DOCTOR' AND status='PENDING'",
                 UUID.class, bound.caseId(), targetConsultant.toString());
-        signInWithLegacyRole(targetConsultant.toString(), "DOCTOR");
+        signInWithLegacyRole(targetConsultant.toString(), Role.CONSULTANT);
         journeyService.acceptDoctorAssignment(bound.caseId(), assignmentId, new AssignmentDecisionRequest(true, "Accepted"));
         fixture.signIn("maker");
         projections.signal(bound.caseId(), "wait_consultant", Map.of("CONSULTANT_ACCEPTED", true));
@@ -483,20 +464,20 @@ class JourneyHappyPathParityTest {
         // A manual (non-catalog) cost estimate line makes the resulting proposal finance-required, and the
         // patient's travel package makes it operations-required — the one path where UPDATE_TRAVEL_PLAN and
         // APPROVE_COMMERCIAL_TERMS actually engage (see JourneyService.requiresFinanceApproval/travelRequested).
-        actor(targetConsultant.toString(), org, JOURNEY_WORK_CONSULTANT_ORGANIZATION);
-        signInWithLegacyRole(targetConsultant.toString(), "DOCTOR");
+        com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, targetConsultant.toString(), Role.CONSULTANT);
+        signInWithLegacyRole(targetConsultant.toString(), Role.CONSULTANT);
         var clinicalDecision = new ReviewDecisionRequest("ACCEPT", "Recommended coordinated care plan", null,
                 List.of(new CostEstimateItem("Custom procedure", java.math.BigDecimal.valueOf(2000), "EGP", null, null, null)), "EGP");
         projections.completeWorkItem(bound.caseId(), "clinical", Map.of(), clinicalDecision, null);
 
-        signInWithLegacyRole("routing-b", "COORDINATOR");
+        signInWithLegacyRole("routing-b", Role.COORDINATOR);
         journeyService.setTravelPackage(bound.caseId(), true);
         assertThat(compare(new Expected("travel-requested", "CLINICAL_RECOMMENDATION_READY", "STAFF",
                 List.of("JOURNEY:prepare", "PREPARE_PROPOSAL", "REVIEW_PATIENT_RESPONSE"), List.of(), true, true), snapshot(jdbc, bound.caseId())))
                 .isEqualTo(Result.PASS);
 
         UUID clinicalReviewId = jdbc.queryForObject("SELECT id FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'", UUID.class, bound.caseId());
-        signInWithLegacyRole("routing-b", "COORDINATOR");
+        signInWithLegacyRole("routing-b", Role.COORDINATOR);
         var proposalDraft = new ProposalDraftRequest(clinicalReviewId, "en", null, "EGP", null, null, null, null, null,
                 clock.instant().plusSeconds(30L * 24 * 3600), List.of(), null);
         projections.completeWorkItem(bound.caseId(), "prepare", Map.of(), proposalDraft, null);
@@ -508,8 +489,8 @@ class JourneyHappyPathParityTest {
         // UPDATE_TRAVEL_PLAN (Operations) must complete before APPROVE_COMMERCIAL_TERMS (Finance) — the real
         // JourneyService.approveFinance enforces this ordering itself (OPERATIONS_REQUIRED_FIRST).
         bindAssignment(bound.caseId(), "ops-a", "OPERATIONS");
-        actor("ops-a", org, JOURNEY_WORK_ORGANIZATION);
-        signInWithLegacyRole("ops-a", "OPERATIONS");
+        coordinator("ops-a");
+        signInWithLegacyRole("ops-a", Role.OPERATIONS);
         projections.completeWorkItem(bound.caseId(), "travel", Map.of("proposalVersionId", proposalVersionId.toString(), "operationalPlan", "Direct flight, airport transfer, 5 nights"), null);
         assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?", String.class, proposalVersionId)).isEqualTo("OPERATIONS_COMPLETED");
         assertThat(compare(new Expected("operations-completed", "PROPOSAL_PREPARATION", "STAFF",
@@ -517,8 +498,8 @@ class JourneyHappyPathParityTest {
                 .isEqualTo(Result.PASS);
 
         bindAssignment(bound.caseId(), "finance-a", "FINANCE");
-        actor("finance-a", org, JOURNEY_WORK_ORGANIZATION);
-        signInWithLegacyRole("finance-a", "FINANCE");
+        coordinator("finance-a");
+        signInWithLegacyRole("finance-a", Role.FINANCE);
         projections.completeWorkItem(bound.caseId(), "commercial", Map.of("proposalVersionId", proposalVersionId.toString()), null);
         assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?", String.class, proposalVersionId)).isEqualTo("FINANCE_APPROVED");
         assertThat(compare(new Expected("finance-approved", "PROPOSAL_INTERNAL_APPROVAL", "STAFF",
@@ -526,7 +507,7 @@ class JourneyHappyPathParityTest {
                 .isEqualTo(Result.PASS);
 
         long notificationsBefore = jdbc.queryForObject("SELECT count(*) FROM notification_outbox", Long.class);
-        signInWithLegacyRole("routing-b", "COORDINATOR");
+        signInWithLegacyRole("routing-b", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "release", Map.of("proposalVersionId", proposalVersionId.toString()), null);
         assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?", String.class, proposalVersionId)).isEqualTo("RELEASED");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM notification_outbox", Long.class)).isEqualTo(notificationsBefore + 1);
@@ -537,7 +518,7 @@ class JourneyHappyPathParityTest {
         // RESEND_PROPOSAL_LINK (Coordinator): cancels any pending resend, mints a fresh secure link — a
         // second notification, no proposal-state change, no Journey advancement past the resend stage
         // itself (there is nowhere for it to advance to: the patient's own decision is still BLOCKED).
-        signInWithLegacyRole("routing-b", "COORDINATOR");
+        signInWithLegacyRole("routing-b", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "resend", Map.of("proposalVersionId", proposalVersionId.toString()), null);
         assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?", String.class, proposalVersionId)).isEqualTo("RELEASED");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM notification_outbox", Long.class)).isEqualTo(notificationsBefore + 2);
@@ -556,12 +537,12 @@ class JourneyHappyPathParityTest {
      * `PatientActionService`/{@code case_assignments} upsert-by-status), not something Journey re-implements.
      */
     @Test void duplicateCompletionReplayMatchesLegacyIdempotencyAtEveryImplementedCheckpoint() {
-        UUID org = organization(), initialConsultant = clinician(org);
-        actor("routing-manager", org, COORDINATION_MANAGER);
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        UUID team = config.saveTeam(org, null, "Coordination-2", new TeamConfig(true, "Care coordination", Set.of(), Set.of(), "Asia/Dubai", null), 0, "Initial setup").id();
-        candidate(org, "routing-c", team, 10, true);
-        config.savePolicy(org, 0, past, future, policy(team), "Initial policy");
+        UUID initialConsultant = clinician();
+        manager("routing-manager");
+        fixture.signIn("routing-manager");
+        UUID team = team();
+        candidate("routing-c", team, 10, true);
+        config.savePolicy(0, past, future, policy(team), "Initial policy");
 
         fixture.signIn("maker");
         var bound = verification.create(version.definitionId(), version.id(),
@@ -570,14 +551,12 @@ class JourneyHappyPathParityTest {
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant);
 
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 0, "SHADOW", null, null, "Reviewed", "TEST"));
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 1, "ACTIVATE", null, null, "Reviewed", "TEST"));
+        fixture.signIn("routing-manager");
 
         fixture.signIn("maker");
         projections.sync(bound.caseId());
-        actor("routing-c", org, JOURNEY_WORK_ORGANIZATION);
-        signInWithLegacyRole("routing-c", "COORDINATOR");
+        coordinator("routing-c");
+        signInWithLegacyRole("routing-c", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "request", null);
         CaseSnapshot afterFirst = snapshot(jdbc, bound.caseId());
 
@@ -602,12 +581,12 @@ class JourneyHappyPathParityTest {
      * covered separately by {@link #proposalRevisionAndExpiryRecoveryLoopsReachPrepareAndConverge()}.
      */
     @Test void patientDeclineProposalRecoveryPathMatchesLegacyContractAndFailsClosedOnReplay() throws Exception {
-        UUID org = organization(), initialConsultant = clinician(org);
-        actor("routing-manager", org, COORDINATION_MANAGER);
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        UUID team = config.saveTeam(org, null, "Coordination-decline", new TeamConfig(true, "Care coordination", Set.of(), Set.of(), "Asia/Dubai", null), 0, "Initial setup").id();
-        candidate(org, "routing-d", team, 10, true);
-        config.savePolicy(org, 0, past, future, policy(team), "Initial policy");
+        UUID initialConsultant = clinician();
+        manager("routing-manager");
+        fixture.signIn("routing-manager");
+        UUID team = team();
+        candidate("routing-d", team, 10, true);
+        config.savePolicy(0, past, future, policy(team), "Initial policy");
 
         fixture.signIn("maker");
         var bound = verification.create(version.definitionId(), version.id(),
@@ -616,38 +595,36 @@ class JourneyHappyPathParityTest {
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant);
 
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 0, "SHADOW", null, null, "Reviewed", "TEST"));
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 1, "ACTIVATE", null, null, "Reviewed", "TEST"));
+        fixture.signIn("routing-manager");
 
         fixture.signIn("maker");
         projections.sync(bound.caseId());
-        actor("routing-d", org, JOURNEY_WORK_ORGANIZATION);
-        signInWithLegacyRole("routing-d", "COORDINATOR");
+        coordinator("routing-d");
+        signInWithLegacyRole("routing-d", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "request", null);
         var open = patientActions.openAction(bound.caseId());
         fixture.signIn("maker");
         projections.completePatientAction(bound.caseId(), "provide", List.of(new ItemResponse(open.items().getFirst().id(), "On file", null)), "Provided", null);
 
-        UUID targetConsultant = verifiedConsultant(org, "cardiology");
-        signInWithLegacyRole("routing-d", "COORDINATOR");
+        UUID targetConsultant = verifiedConsultant("cardiology");
+        signInWithLegacyRole("routing-d", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "assign", Map.of("consultantSubject", targetConsultant.toString()), null);
         UUID assignmentId = jdbc.queryForObject("SELECT id FROM case_assignments WHERE case_id=? AND assignee_subject=? AND assignee_role='DOCTOR' AND status='PENDING'",
                 UUID.class, bound.caseId(), targetConsultant.toString());
-        signInWithLegacyRole(targetConsultant.toString(), "DOCTOR");
+        signInWithLegacyRole(targetConsultant.toString(), Role.CONSULTANT);
         journeyService.acceptDoctorAssignment(bound.caseId(), assignmentId, new AssignmentDecisionRequest(true, "Accepted"));
         fixture.signIn("maker");
         projections.signal(bound.caseId(), "wait_consultant", Map.of("CONSULTANT_ACCEPTED", true));
 
         UUID catalogServiceId = catalogService(targetConsultant, java.math.BigDecimal.valueOf(1000));
-        actor(targetConsultant.toString(), org, JOURNEY_WORK_CONSULTANT_ORGANIZATION);
-        signInWithLegacyRole(targetConsultant.toString(), "DOCTOR");
+        com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, targetConsultant.toString(), Role.CONSULTANT);
+        signInWithLegacyRole(targetConsultant.toString(), Role.CONSULTANT);
         var clinicalDecision = new ReviewDecisionRequest("ACCEPT", "Recommended coordinated care plan", null,
                 List.of(new CostEstimateItem("Consultation", java.math.BigDecimal.valueOf(1000), "EGP", catalogServiceId, null, null)), "EGP");
         projections.completeWorkItem(bound.caseId(), "clinical", Map.of(), clinicalDecision, Map.of("CLINICAL_ACCEPTED", true));
 
         UUID clinicalReviewId = jdbc.queryForObject("SELECT id FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'", UUID.class, bound.caseId());
-        signInWithLegacyRole("routing-d", "COORDINATOR");
+        signInWithLegacyRole("routing-d", Role.COORDINATOR);
         var proposalDraft = new ProposalDraftRequest(clinicalReviewId, "en", null, "EGP", null, null, null, null, null,
                 clock.instant().plusSeconds(30L * 24 * 3600), List.of(), null);
         projections.completeWorkItem(bound.caseId(), "prepare", Map.of(), proposalDraft, null);
@@ -655,7 +632,7 @@ class JourneyHappyPathParityTest {
         UUID proposalVersionId = jdbc.queryForObject(
                 "SELECT id FROM proposal_versions WHERE proposal_id=(SELECT id FROM proposals WHERE case_id=?) AND status='CLINICALLY_APPROVED'",
                 UUID.class, bound.caseId());
-        signInWithLegacyRole("routing-d", "COORDINATOR");
+        signInWithLegacyRole("routing-d", Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "release", Map.of("proposalVersionId", proposalVersionId.toString()), null);
         assertThat(compare(new Expected("proposal-released", "PATIENT_DECISION", "PATIENT",
                 List.of("REVIEW_PATIENT_RESPONSE"), List.of("JOURNEY:review_proposal"), true, true), snapshot(jdbc, bound.caseId())))
@@ -667,7 +644,7 @@ class JourneyHappyPathParityTest {
         String patientEmail = "journey-decline-" + bound.caseId() + "@example.test";
         String patientSubject = ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).seedActiveAccount(patientEmail);
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", patientSubject, bound.caseId());
-        signInWithLegacyRole(patientSubject, "PATIENT");
+        signInWithLegacyRole(patientSubject, Role.PATIENT);
         long depositsBefore = jdbc.queryForObject("SELECT count(*) FROM deposits WHERE case_id=?", Long.class, bound.caseId());
         projections.completeAuthenticatedPatientAction(bound.caseId(), reviewAction,
                 new ReviewProposalActionHandler.AuthenticatedDecision(proposalVersionId, new ProposalDecisionRequest("DECLINED", List.of(), "No longer needed")),
@@ -695,19 +672,20 @@ class JourneyHappyPathParityTest {
 
     // ---- Bounded recovery-cycle parity (technical-decisions.md §22) ----
 
-    private record ReadyForClinicalReview(UUID caseId, UUID org, UUID consultant, String coordinator) {}
+    private record ReadyForClinicalReview(UUID caseId, UUID consultant, String coordinator) {}
 
     /** Fast-forwards a fresh case through intake, information, consultant assignment and acceptance,
      * leaving the Consultant's RECORD_CLINICAL_DECISION WorkItem open — the common setup every clinical
      * recovery scenario below needs before it diverges. */
     private ReadyForClinicalReview caseReadyForClinicalReview(String suffix) {
-        UUID org = organization(), initialConsultant = clinician(org);
-        actor("routing-manager", org, COORDINATION_MANAGER);
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        UUID team = config.saveTeam(org, null, "Coordination-" + suffix, new TeamConfig(true, "Care coordination", Set.of(), Set.of(), "Asia/Dubai", null), 0, "Initial setup").id();
+        com.rehletshifaa.coordination.CoordinationTestData.reset(jdbc); // one routing configuration per prepared case
+        UUID initialConsultant = clinician();
+        manager("routing-manager");
+        fixture.signIn("routing-manager");
+        UUID team = team();
         String coordinator = "routing-" + suffix;
-        candidate(org, coordinator, team, 10, true);
-        config.savePolicy(org, 0, past, future, policy(team), "Initial policy");
+        candidate(coordinator, team, 10, true);
+        config.savePolicy(0, past, future, policy(team), "Initial policy");
 
         fixture.signIn("maker");
         var bound = verification.create(version.definitionId(), version.id(),
@@ -716,30 +694,28 @@ class JourneyHappyPathParityTest {
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant);
 
-        signInWithLegacyRole("routing-manager", "COORDINATOR_LEAD");
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 0, "SHADOW", null, null, "Reviewed", "TEST"));
-        engine.execute(org, bound.caseId(), new Command(UUID.randomUUID().toString(), 1, "ACTIVATE", null, null, "Reviewed", "TEST"));
+        fixture.signIn("routing-manager");
 
         fixture.signIn("maker");
         projections.sync(bound.caseId());
-        actor(coordinator, org, JOURNEY_WORK_ORGANIZATION);
-        signInWithLegacyRole(coordinator, "COORDINATOR");
+        coordinator(coordinator);
+        signInWithLegacyRole(coordinator, Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "request", null);
         var open = patientActions.openAction(bound.caseId());
         fixture.signIn("maker");
         projections.completePatientAction(bound.caseId(), "provide", List.of(new ItemResponse(open.items().getFirst().id(), "On file", null)), "Provided", null);
 
-        UUID targetConsultant = verifiedConsultant(org, "cardiology");
-        signInWithLegacyRole(coordinator, "COORDINATOR");
+        UUID targetConsultant = verifiedConsultant("cardiology");
+        signInWithLegacyRole(coordinator, Role.COORDINATOR);
         projections.completeWorkItem(bound.caseId(), "assign", Map.of("consultantSubject", targetConsultant.toString()), null);
         UUID assignmentId = jdbc.queryForObject("SELECT id FROM case_assignments WHERE case_id=? AND assignee_subject=? AND assignee_role='DOCTOR' AND status='PENDING'",
                 UUID.class, bound.caseId(), targetConsultant.toString());
-        signInWithLegacyRole(targetConsultant.toString(), "DOCTOR");
+        signInWithLegacyRole(targetConsultant.toString(), Role.CONSULTANT);
         journeyService.acceptDoctorAssignment(bound.caseId(), assignmentId, new AssignmentDecisionRequest(true, "Accepted"));
         fixture.signIn("maker");
         projections.signal(bound.caseId(), "wait_consultant", Map.of("CONSULTANT_ACCEPTED", true));
-        actor(targetConsultant.toString(), org, JOURNEY_WORK_CONSULTANT_ORGANIZATION);
-        return new ReadyForClinicalReview(bound.caseId(), org, targetConsultant, coordinator);
+        com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, targetConsultant.toString(), Role.CONSULTANT);
+        return new ReadyForClinicalReview(bound.caseId(), targetConsultant, coordinator);
     }
 
     /**
@@ -761,7 +737,7 @@ class JourneyHappyPathParityTest {
         // completion so the WAIT genuinely re-blocks for whoever accepts next, rather than reusing the
         // still-true process variable left over from the first pass (see JourneyProjectionService/FlowableJourneyRuntimeAdapter — Flowable
         // process variables persist across a loop unless explicitly reset).
-        signInWithLegacyRole(ready.consultant().toString(), "DOCTOR");
+        signInWithLegacyRole(ready.consultant().toString(), Role.CONSULTANT);
         var returned = new ReviewDecisionRequest("RETURN_TO_COORDINATOR", null, "Needs a different specialty", null, null);
         projections.completeWorkItem(caseId, "clinical", Map.of(), returned, Map.of("CLINICAL_ACCEPTED", false, "CONSULTANT_ACCEPTED", false));
         assertThat(jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId)).isEqualTo("INTAKE_REVIEW");
@@ -782,12 +758,12 @@ class JourneyHappyPathParityTest {
 
         // Pass 2: the coordinator re-assigns a second Consultant, who accepts and this time records ACCEPT —
         // proving the loop converges rather than trapping the case.
-        UUID secondConsultant = verifiedConsultant(ready.org(), "cardiology");
-        signInWithLegacyRole(ready.coordinator(), "COORDINATOR");
+        UUID secondConsultant = verifiedConsultant("cardiology");
+        signInWithLegacyRole(ready.coordinator(), Role.COORDINATOR);
         projections.completeWorkItem(caseId, "assign", Map.of("consultantSubject", secondConsultant.toString()), null);
         UUID secondAssignmentId = jdbc.queryForObject("SELECT id FROM case_assignments WHERE case_id=? AND assignee_subject=? AND assignee_role='DOCTOR' AND status='PENDING'",
                 UUID.class, caseId, secondConsultant.toString());
-        signInWithLegacyRole(secondConsultant.toString(), "DOCTOR");
+        signInWithLegacyRole(secondConsultant.toString(), Role.CONSULTANT);
         journeyService.acceptDoctorAssignment(caseId, secondAssignmentId, new AssignmentDecisionRequest(true, "Accepted"));
         fixture.signIn("maker");
         // If the CONSULTANT_ACCEPTED reset above had NOT taken effect, this signal would be a redundant
@@ -798,8 +774,8 @@ class JourneyHappyPathParityTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='JOURNEY:clinical' AND status='OPEN'", Integer.class, caseId)).isEqualTo(1);
 
         UUID catalogServiceId = catalogService(secondConsultant, java.math.BigDecimal.valueOf(1000));
-        actor(secondConsultant.toString(), ready.org(), JOURNEY_WORK_CONSULTANT_ORGANIZATION);
-        signInWithLegacyRole(secondConsultant.toString(), "DOCTOR");
+        com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, secondConsultant.toString(), Role.CONSULTANT);
+        signInWithLegacyRole(secondConsultant.toString(), Role.CONSULTANT);
         var accepted = new ReviewDecisionRequest("ACCEPT", "Recommended coordinated care plan", null,
                 List.of(new CostEstimateItem("Consultation", java.math.BigDecimal.valueOf(1000), "EGP", catalogServiceId, null, null)), "EGP");
         projections.completeWorkItem(caseId, "clinical", Map.of(), accepted, Map.of("CLINICAL_ACCEPTED", true));
@@ -834,18 +810,18 @@ class JourneyHappyPathParityTest {
         var ready = caseReadyForClinicalReview(suffix);
         UUID caseId = ready.caseId();
         UUID catalogServiceId = catalogService(ready.consultant(), java.math.BigDecimal.valueOf(1000));
-        signInWithLegacyRole(ready.consultant().toString(), "DOCTOR");
+        signInWithLegacyRole(ready.consultant().toString(), Role.CONSULTANT);
         var clinicalDecision = new ReviewDecisionRequest("ACCEPT", "Recommended coordinated care plan", null,
                 List.of(new CostEstimateItem("Consultation", java.math.BigDecimal.valueOf(1000), "EGP", catalogServiceId, null, null)), "EGP");
         projections.completeWorkItem(caseId, "clinical", Map.of(), clinicalDecision, Map.of("CLINICAL_ACCEPTED", true));
 
         UUID firstPrepareTask = jdbc.queryForObject("SELECT case_task_id FROM journey_stage_projections WHERE case_id=? AND node_key='prepare'", UUID.class, caseId);
         UUID clinicalReviewId = jdbc.queryForObject("SELECT id FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'", UUID.class, caseId);
-        signInWithLegacyRole(ready.coordinator(), "COORDINATOR");
+        signInWithLegacyRole(ready.coordinator(), Role.COORDINATOR);
         projections.completeWorkItem(caseId, "prepare", Map.of(), freshDraft(clinicalReviewId, clock.instant().plusSeconds(30L * 24 * 3600)), null);
         UUID firstVersionId = jdbc.queryForObject(
                 "SELECT id FROM proposal_versions WHERE proposal_id=(SELECT id FROM proposals WHERE case_id=?) AND status='CLINICALLY_APPROVED'", UUID.class, caseId);
-        signInWithLegacyRole(ready.coordinator(), "COORDINATOR");
+        signInWithLegacyRole(ready.coordinator(), Role.COORDINATOR);
         projections.completeWorkItem(caseId, "release", Map.of("proposalVersionId", firstVersionId.toString()), null);
         UUID reviewAction = jdbc.queryForObject("SELECT id FROM case_tasks WHERE case_id=? AND task_type='JOURNEY:review_proposal'", UUID.class, caseId);
 
@@ -854,7 +830,7 @@ class JourneyHappyPathParityTest {
         String patientEmail = "journey-" + suffix + "-" + caseId + "@example.test";
         String patientSubject = ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).seedActiveAccount(patientEmail);
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", patientSubject, caseId);
-        signInWithLegacyRole(patientSubject, "PATIENT");
+        signInWithLegacyRole(patientSubject, Role.PATIENT);
         projections.completeAuthenticatedPatientAction(caseId, reviewAction,
                 new ReviewProposalActionHandler.AuthenticatedDecision(firstVersionId, new ProposalDecisionRequest("REVISION_REQUESTED", List.of(), "Please adjust the plan")),
                 Map.of("PROPOSAL_ACCEPTED", false, "PROPOSAL_NEEDS_REWORK", true));
@@ -870,12 +846,12 @@ class JourneyHappyPathParityTest {
 
         // Converges: preparing and releasing a corrected proposal on the second pass is the same unmodified
         // createProposal/releaseProposal path, which already accepts REVISION_REQUESTED as a valid re-entry state.
-        signInWithLegacyRole(ready.coordinator(), "COORDINATOR");
+        signInWithLegacyRole(ready.coordinator(), Role.COORDINATOR);
         projections.completeWorkItem(caseId, "prepare", Map.of(), freshDraft(clinicalReviewId, clock.instant().plusSeconds(30L * 24 * 3600)), null);
         UUID secondVersionId = jdbc.queryForObject(
                 "SELECT id FROM proposal_versions WHERE proposal_id=(SELECT id FROM proposals WHERE case_id=?) AND status='CLINICALLY_APPROVED'", UUID.class, caseId);
         assertThat(secondVersionId).isNotEqualTo(firstVersionId);
-        signInWithLegacyRole(ready.coordinator(), "COORDINATOR");
+        signInWithLegacyRole(ready.coordinator(), Role.COORDINATOR);
         projections.completeWorkItem(caseId, "release", Map.of("proposalVersionId", secondVersionId.toString()), null);
         assertThat(compare(new Expected("revision-corrected-proposal-released", "PATIENT_DECISION", "PATIENT",
                 List.of("REVIEW_PATIENT_RESPONSE"), List.of("JOURNEY:review_proposal"), true, true), snapshot(jdbc, caseId)))
@@ -886,20 +862,20 @@ class JourneyHappyPathParityTest {
         var ready = caseReadyForClinicalReview(suffix);
         UUID caseId = ready.caseId();
         UUID catalogServiceId = catalogService(ready.consultant(), java.math.BigDecimal.valueOf(1000));
-        signInWithLegacyRole(ready.consultant().toString(), "DOCTOR");
+        signInWithLegacyRole(ready.consultant().toString(), Role.CONSULTANT);
         var clinicalDecision = new ReviewDecisionRequest("ACCEPT", "Recommended coordinated care plan", null,
                 List.of(new CostEstimateItem("Consultation", java.math.BigDecimal.valueOf(1000), "EGP", catalogServiceId, null, null)), "EGP");
         projections.completeWorkItem(caseId, "clinical", Map.of(), clinicalDecision, Map.of("CLINICAL_ACCEPTED", true));
 
         UUID clinicalReviewId = jdbc.queryForObject("SELECT id FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'", UUID.class, caseId);
-        signInWithLegacyRole(ready.coordinator(), "COORDINATOR");
+        signInWithLegacyRole(ready.coordinator(), Role.COORDINATOR);
         // Released already past its own deadline — nothing invented: an ordinary released proposal simply
         // has a validUntil in the past by the time the patient acts on it (no new expiry policy/timer/state).
         java.time.Instant alreadyPast = clock.instant().minusSeconds(3600);
         projections.completeWorkItem(caseId, "prepare", Map.of(), freshDraft(clinicalReviewId, alreadyPast), null);
         UUID versionId = jdbc.queryForObject(
                 "SELECT id FROM proposal_versions WHERE proposal_id=(SELECT id FROM proposals WHERE case_id=?) AND status='CLINICALLY_APPROVED'", UUID.class, caseId);
-        signInWithLegacyRole(ready.coordinator(), "COORDINATOR");
+        signInWithLegacyRole(ready.coordinator(), Role.COORDINATOR);
         projections.completeWorkItem(caseId, "release", Map.of("proposalVersionId", versionId.toString()), null);
         UUID reviewAction = jdbc.queryForObject("SELECT id FROM case_tasks WHERE case_id=? AND task_type='JOURNEY:review_proposal'", UUID.class, caseId);
 
@@ -910,7 +886,7 @@ class JourneyHappyPathParityTest {
         String patientEmail = "journey-" + suffix + "-" + caseId + "@example.test";
         String patientSubject = ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).seedActiveAccount(patientEmail);
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", patientSubject, caseId);
-        signInWithLegacyRole(patientSubject, "PATIENT");
+        signInWithLegacyRole(patientSubject, Role.PATIENT);
         long depositsBefore = jdbc.queryForObject("SELECT count(*) FROM deposits WHERE case_id=?", Long.class, caseId);
         projections.completeAuthenticatedPatientAction(caseId, reviewAction,
                 new ReviewProposalActionHandler.AuthenticatedDecision(versionId, new ProposalDecisionRequest("ACCEPTED", List.of(), null)),
@@ -922,11 +898,11 @@ class JourneyHappyPathParityTest {
         // Converges: a fresh PREPARE_PROPOSAL is projected and createProposal already accepts EXPIRED as a
         // valid re-entry state — the same unmodified guard REVISION_REQUESTED uses.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_stage_projections WHERE case_id=? AND node_key='prepare' AND status='OPEN'", Integer.class, caseId)).isEqualTo(1);
-        signInWithLegacyRole(ready.coordinator(), "COORDINATOR");
+        signInWithLegacyRole(ready.coordinator(), Role.COORDINATOR);
         projections.completeWorkItem(caseId, "prepare", Map.of(), freshDraft(clinicalReviewId, clock.instant().plusSeconds(30L * 24 * 3600)), null);
         UUID secondVersionId = jdbc.queryForObject(
                 "SELECT id FROM proposal_versions WHERE proposal_id=(SELECT id FROM proposals WHERE case_id=?) AND status='CLINICALLY_APPROVED'", UUID.class, caseId);
-        signInWithLegacyRole(ready.coordinator(), "COORDINATOR");
+        signInWithLegacyRole(ready.coordinator(), Role.COORDINATOR);
         projections.completeWorkItem(caseId, "release", Map.of("proposalVersionId", secondVersionId.toString()), null);
         assertThat(compare(new Expected("expiry-recovered-proposal-released", "PATIENT_DECISION", "PATIENT",
                 List.of("REVIEW_PATIENT_RESPONSE"), List.of("JOURNEY:review_proposal"), true, true), snapshot(jdbc, caseId)))
