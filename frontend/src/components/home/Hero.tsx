@@ -29,7 +29,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
     : [[Stethoscope, "Consultant-led review"], [UserRoundCheck, "One coordinator throughout"], [Languages, "Arabic & English"], [HandHeart, "No commitment to start"]] as const;
 
   return (
-    <section className="bg-surface-pearl">
+    <section className="home-hero bg-surface-pearl">
       <div className="container-site grid gap-8 py-8 sm:gap-9 sm:py-10 lg:grid-cols-[minmax(0,53fr)_minmax(0,47fr)] lg:items-center lg:gap-16 lg:py-16">
         <div className="max-w-[34rem]">
           <p className="flex items-center gap-2 text-[0.9375rem] font-semibold leading-6 text-brand-700">
@@ -68,7 +68,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
               className="object-cover object-[50%_58%]"
             />
           </div>
-          <figcaption className="relative z-[1] -mt-5 mx-4 rounded-[12px] border border-border-subtle bg-surface-elevated px-4 py-3.5 shadow-[0_10px_30px_-24px_rgba(28,51,58,0.35)] sm:mx-8 sm:px-5 sm:py-4 lg:mx-6">
+          <figcaption className="home-hero-card relative z-[1] -mt-5 mx-4 rounded-[12px] border border-border-subtle bg-surface-elevated px-4 py-3.5 shadow-[0_10px_30px_-24px_rgba(28,51,58,0.35)] sm:mx-8 sm:px-5 sm:py-4 lg:mx-6">
             <p className="text-[0.875rem] font-semibold text-brand-900">{d.home.heroCardTitle}</p>
             <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
               {d.home.prepareItems.map((item) => (
@@ -84,8 +84,8 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
       </div>
 
       {/* The reassurance rail: one line of four, separated by hairlines, on the clinical mist. */}
-      <div className="border-y border-border-clinical bg-surface-clinical">
-        <ul className="container-site grid grid-cols-2 gap-y-3.5 py-[1.125rem] lg:grid-cols-4 lg:divide-x lg:divide-border-clinical lg:py-0 rtl:lg:divide-x-reverse">
+      <div className="home-hero-rail border-y border-border-clinical bg-surface-clinical">
+        <ul className="container-site grid grid-cols-2 gap-y-3.5 py-[1.125rem] lg:grid-cols-4 lg:divide-x lg:divide-border-clinical lg:py-0">
           {trust.map(([Icon, label]) => (
             <li key={label} className="flex items-center gap-2.5 text-[0.875rem] font-semibold leading-5 text-ink-700 lg:justify-center lg:py-[1.125rem]">
               <span aria-hidden className="grid h-8 w-8 flex-none place-items-center rounded-full bg-surface-elevated text-brand-600 ring-1 ring-border-clinical">

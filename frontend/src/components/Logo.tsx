@@ -40,7 +40,7 @@ export function GuidedArc({
       ? "brightness(0) invert(1)"
       : variant === "mono"
         ? "brightness(0) saturate(0)"
-        : undefined;
+        : "var(--logo-icon-filter, none)"; // a brand theme may re-tint the colour mark
 
   return (
     <Image
@@ -73,14 +73,14 @@ export function Logo({
   size = 34,
   className = "",
 }: LogoProps) {
-  const inkColor = variant === "reversed" ? "#ffffff" : "#29454d";
+  const inkColor = variant === "reversed" ? "#ffffff" : "var(--logo-ink, #29454d)";
   // Fresh Aqua accent only reads on the light "color" variant; reversed/mono
   // stay a single flat color so the mark still holds up on a saturated or
   // single-ink surface.
-  const accentColor = variant === "color" ? "#65bdb5" : inkColor;
+  const accentColor = variant === "color" ? "var(--logo-accent, #65bdb5)" : inkColor;
   const wordmarkSize = `${size * 0.62}px`;
   const arabicSize = `${size * 0.42}px`;
-  const arabicAccentColor = variant === "color" ? "#65bdb5" : variant === "reversed" ? "#a9ddd6" : inkColor;
+  const arabicAccentColor = variant === "color" ? "var(--logo-accent, #65bdb5)" : variant === "reversed" ? "#a9ddd6" : inkColor;
 
   const [latinLead, latinAccent] = splitWordmark(label, accent);
   const [arabicLead, arabicAccentText] = arabicLabel ? splitWordmark(arabicLabel, arabicAccent) : ["", ""];

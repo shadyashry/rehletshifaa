@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { CtaPanel } from "@/components/CtaPanel";
 import { CarePathways } from "@/components/home/CarePathways";
 import { Hero } from "@/components/home/Hero";
+import { HomeThemeSwitch } from "@/components/home/HomeThemeSwitch";
 import { JourneyFilm } from "@/components/home/JourneyFilm";
 import { PromiseSection } from "@/components/home/PromiseSection";
 import { TravelServices } from "@/components/home/TravelServices";
@@ -34,13 +35,16 @@ export default async function Home({ params }: Props) {
       <PromiseSection d={d} locale={locale} />
       <TravelServices d={d} />
       <TrustSection d={d} />
-      <CtaPanel
-        locale={locale}
-        title={d.home.finalTitle}
-        body={d.home.finalBody}
-        button={d.common.send}
-        note={d.home.finalNote}
-      />
+      <div className="home-final-cta">
+        <CtaPanel
+          locale={locale}
+          title={d.home.finalTitle}
+          body={d.home.finalBody}
+          button={d.common.send}
+          note={d.home.finalNote}
+        />
+      </div>
+      <HomeThemeSwitch locale={locale} />
     </>
   );
 }
