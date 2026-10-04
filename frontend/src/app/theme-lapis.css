@@ -1,0 +1,203 @@
+/* ---------------------------------------------------------------------------
+   Brand preview — "Lapis Night" (سماء اللازورد), RehletShifaa only
+   ---------------------------------------------------------------------------
+   Ancient Egyptian tomb and temple ceilings painted the night sky as deep lapis
+   strewn with gold five-pointed stars (the sba star) — the sky that guided every
+   journey. Rehlet Shifaa is a journey of healing: patients travel guided by stars,
+   and their coordinator is the constellation.
+
+   Three sacred stones carry the meaning:
+     lapis lazuli   — depth and trust  → structure, headings, links
+     carnelian      — life, vitality   → the single action colour
+     faience        — rebirth          → the journey path, checks, markers
+   on a papyrus canvas. Care areas map to the stones by meaning: heart and women's
+   health carnelian; brain and movement lapis; digestion and surgery faience.
+
+   Switched on from the home page only (`HomeThemeSwitch`, data-brand-theme="lapis").
+   Every text pairing checked to WCAG AA (≥ 4.5:1).
+--------------------------------------------------------------------------- */
+
+:root[data-brand-theme="lapis"] {
+  --color-brand-50: #eef1fa;
+  --color-brand-100: #dde3f4;
+  --color-brand-200: #bcc8ea;
+  --color-brand-300: #8fa2d8;
+  --color-brand-400: #1f9e94; /* markers, rules and dots: the faience journey thread */
+  --color-brand-500: #2b4ea8;
+  --color-brand-600: #1f3c88; /* lapis: links and structure — white 10.2:1 */
+  --color-brand-700: #182f6e;
+  --color-brand-800: #142659;
+  --color-brand-900: #14245c; /* headings — 13.0:1 on papyrus */
+  --color-brand-950: #0c1640;
+
+  /* Accent = faience signal family (checks, icon strokes) */
+  --color-accent-50: #e8f4f2;
+  --color-accent-100: #cde9e5;
+  --color-accent-200: #9fd6cf;
+  --color-accent-500: #1f9e94;
+  --color-accent-600: #12847c;
+  --color-accent-700: #0b6e6a;
+  --color-accent-800: #08524f;
+
+  --color-ink-900: #16203d;
+  --color-ink-800: #16203d;
+  --color-ink-700: #252f4f;
+  --color-ink-600: #33405f;
+  --color-ink-500: #414d6b;
+  --color-ink-400: #55607c;
+  --color-ink-300: #9aa3bb;
+
+  --color-line: #e4ddcb;
+  --color-line-strong: #d2c8b0;
+  --color-mist: #fbf6ea;
+  --color-mist-deep: #e3e8f5;
+  --color-wash-aqua: #e8f4f2;
+  --color-wash-sky: #e3e8f5;
+  --color-wash-peach: #f8e6dc;
+  --color-wash-lavender: #ebe8f3;
+
+  --color-surface-default: #fffcf5;
+  --color-surface-pearl: #f7f1e3; /* papyrus */
+  --color-surface-clinical: #eef1f8; /* lapis mist */
+  --color-surface-sage: #e8f4f2; /* faience mist */
+  --color-surface-ivory: #fbf6ea;
+  --color-surface-warm: #f3ead6;
+  --color-surface-hospitality: #efe3c8;
+  --color-surface-elevated: #fffcf5;
+  --color-accent-clinical: #1f9e94;
+  --color-accent-warm: #b8892e;
+  --color-accent-sand: #d1aa55;
+  --color-border-subtle: #e6dfcd;
+  --color-border-card: #e1d9c4;
+  --color-border-clinical: #d3dbee;
+
+  --color-system-heart-well: #f8e6dc;
+  --color-system-heart-ring: #eccbbb;
+  --color-system-heart-line: #b23a20;
+  --color-system-women-well: #f8e6dc;
+  --color-system-women-ring: #eccbbb;
+  --color-system-women-line: #b23a20;
+  --color-system-neuro-well: #e3e8f5;
+  --color-system-neuro-ring: #c9d2ec;
+  --color-system-neuro-line: #1f3c88;
+  --color-system-movement-well: #e3e8f5;
+  --color-system-movement-ring: #c9d2ec;
+  --color-system-movement-line: #1f3c88;
+  --color-system-digestive-well: #e8f4f2;
+  --color-system-digestive-ring: #c6e3df;
+  --color-system-digestive-line: #12847c;
+  --color-system-surgery-well: #e8f4f2;
+  --color-system-surgery-ring: #c6e3df;
+  --color-system-surgery-line: #12847c;
+
+  --color-text-heading: #14245c;
+  --color-text-body: #33405f;
+  --color-text-muted: #55607c;
+  --color-coral: #b23a20;
+  --color-sand-700: #8a5a14;
+
+  /* Logo: lapis wordmark, carnelian "Shifaa" (life), and the mark shifted from teal to lapis. */
+  --logo-ink: #14245c;
+  --logo-accent: #b23a20;
+  --logo-icon-filter: hue-rotate(48deg) saturate(1.25) brightness(0.68);
+
+  --shadow-card: 0 1px 2px rgba(20, 36, 92, 0.05), 0 16px 44px -34px rgba(20, 36, 92, 0.42);
+  --brand-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  /* The sba star sky: gold five-pointed stars and star-dust, as on the tomb ceilings. */
+  --lapis-stars: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23f2c14e'%3E%3Cpolygon fill-opacity='0.42' points='10,5 11.18,8.38 14.76,8.45 11.9,10.62 12.94,14.05 10,12 7.06,14.05 8.1,10.62 5.24,8.45 8.82,8.38'/%3E%3Cpolygon fill-opacity='0.3' transform='translate(40 40)' points='10,5 11.18,8.38 14.76,8.45 11.9,10.62 12.94,14.05 10,12 7.06,14.05 8.1,10.62 5.24,8.45 8.82,8.38'/%3E%3Ccircle cx='62' cy='18' r='0.9' fill-opacity='0.5'/%3E%3Ccircle cx='28' cy='64' r='0.7' fill-opacity='0.45'/%3E%3Ccircle cx='70' cy='70' r='0.6' fill-opacity='0.35'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+@layer components {
+  :root[data-brand-theme="lapis"]:not([dir="rtl"]) :is(.display, .headline, .statement, h1, h2) {
+    font-family: var(--brand-serif);
+    font-weight: 600;
+    letter-spacing: -0.012em;
+  }
+
+  /* Carnelian is the one action colour: life, moving forward (white text 6.0:1). */
+  :root[data-brand-theme="lapis"] .btn-primary {
+    background: #b23a20;
+    border-color: #b23a20;
+    color: #ffffff;
+  }
+  :root[data-brand-theme="lapis"] .btn-primary:hover {
+    background: #9a3218;
+    border-color: #9a3218;
+    box-shadow: 0 12px 26px -18px rgba(154, 50, 24, 0.8);
+  }
+  :root[data-brand-theme="lapis"] .eyebrow {
+    color: #9a3218;
+  }
+
+  /* ---- Signature moment: the hero is the night sky of the tomb ceilings ---- */
+  :root[data-brand-theme="lapis"] .home-hero {
+    --color-surface-pearl: #0f1b45;
+    --color-brand-900: #f7f1e3;
+    --color-brand-700: #f2c14e;
+    --color-brand-400: #3fc1b5;
+    --color-ink-700: #e8ecf8;
+    --color-ink-600: #d5dbef;
+    --color-ink-500: #aeb8d8;
+    --color-border-subtle: rgba(242, 193, 78, 0.28);
+    background-color: #0f1b45;
+    background-image:
+      linear-gradient(180deg, rgba(15, 27, 69, 0) 0%, rgba(15, 27, 69, 0) 70%, rgba(31, 158, 148, 0.18) 100%),
+      linear-gradient(90deg, #0f1b45 0%, rgba(15, 27, 69, 0.9) 40%, rgba(15, 27, 69, 0.55) 100%),
+      var(--lapis-stars);
+    background-size: auto, auto, 80px 80px;
+  }
+  :root[data-brand-theme="lapis"] .home-hero .btn-primary {
+    background: #c4452a;
+    border-color: #c4452a;
+    color: #ffffff;
+  }
+  :root[data-brand-theme="lapis"] .home-hero .btn-primary:hover {
+    background: #d4553a;
+    border-color: #d4553a;
+    box-shadow: 0 14px 34px -16px rgba(242, 193, 78, 0.55);
+  }
+  :root[data-brand-theme="lapis"] .home-hero .btn-secondary {
+    background: transparent;
+    color: #f7f1e3;
+    border-color: rgba(247, 241, 227, 0.45);
+  }
+  :root[data-brand-theme="lapis"] .home-hero .btn-secondary:hover {
+    background: rgba(247, 241, 227, 0.08);
+    border-color: #f2c14e;
+    color: #f7f1e3;
+  }
+  :root[data-brand-theme="lapis"] .home-hero .link-cta {
+    color: #f2c14e;
+  }
+  :root[data-brand-theme="lapis"] .home-hero .home-hero-card {
+    --color-brand-900: #14245c;
+    --color-ink-600: #33405f;
+    --color-ink-500: #414d6b;
+    --color-border-subtle: #e6dfcd;
+    border-top: 3px solid #f2c14e;
+  }
+  /* The rail is the horizon: deeper lapis, gold-starred chips. */
+  :root[data-brand-theme="lapis"] .home-hero .home-hero-rail {
+    --color-surface-clinical: #0b1638;
+    --color-border-clinical: rgba(63, 193, 181, 0.3);
+    --color-surface-elevated: #1a2a62;
+    --color-brand-600: #f2c14e;
+  }
+
+  /* The closing call to action is the same sky: one more star to follow. */
+  :root[data-brand-theme="lapis"] .home-final-cta .on-dark {
+    background-color: #0f1b45;
+    background-image: var(--lapis-stars);
+    background-size: 80px 80px;
+    border-top: 3px solid #f2c14e;
+  }
+  :root[data-brand-theme="lapis"] .home-final-cta .btn-inverse {
+    background: #c4452a;
+    border-color: #c4452a;
+    color: #ffffff;
+  }
+  :root[data-brand-theme="lapis"] .home-final-cta .btn-inverse:hover {
+    background: #d4553a;
+    border-color: #d4553a;
+  }
+}

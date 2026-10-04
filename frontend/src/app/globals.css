@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./theme-malachite.css";
+@import "./theme-lapis.css";
 
 /* ---------------------------------------------------------------------------
    Design tokens — "Light Healing" system
