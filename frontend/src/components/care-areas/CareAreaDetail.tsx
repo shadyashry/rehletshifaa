@@ -47,6 +47,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
   const system = systems.find((item) => item.key === area.system)!;
   const style = SYSTEM_STYLES[area.system];
   const faculty = universityFacultySlugs();
+  const singleConsultant = area.consultants.length === 1;
   const focusCount = scope.reduce((sum, section) => sum + section.items.length, 0);
   const led = (n: number) => (n === 1 ? d.careAreasPage.atlas.consultantsOne : n === 2 ? d.careAreasPage.atlas.consultantsTwo : fill(d.careAreasPage.atlas.consultantsMany, { n }));
   const siblings = system.areas.filter((item) => item.slug !== slug);
@@ -97,7 +98,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
           </div>
 
           {/* The area snapshot: icon, sub-areas, and the Consultants who lead it. */}
-          <figure aria-hidden className="relative mx-auto w-full max-w-[26rem] overflow-hidden rounded-[22px] border border-border-card bg-surface-default shadow-[0_30px_60px_-42px_rgba(36,64,74,0.6)]">
+          <figure aria-hidden className={`relative mx-auto w-full max-w-[26rem] overflow-hidden rounded-[22px] border border-border-card bg-surface-default shadow-[0_30px_60px_-42px_rgba(36,64,74,0.6)] ${singleConsultant ? "hidden lg:block" : ""}`}>
             <div className={`relative px-6 pb-6 pt-6 ${style.soft}`}>
               <CareAreaIcon name={area.icon} strokeWidth={0.7} className={`pointer-events-none absolute end-3 top-3 h-28 w-28 opacity-[0.16] ${style.line}`} />
               <span className={`relative grid h-14 w-14 place-items-center rounded-2xl bg-surface-default text-brand-800 shadow-[0_10px_24px_-14px_rgba(36,64,74,0.6)] ring-1 ${style.ring}`}>
@@ -186,20 +187,21 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
 
       {/* 3 — the Consultants */}
       <section id="area-consultants" aria-labelledby="area-consultants-title" className="scroll-mt-20 border-t border-border-subtle bg-surface-default py-14 md:py-20">
-        <div className="container-site grid gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12">
-          <div className="lg:sticky lg:top-28 lg:self-start">
+        <div className={`container-site grid gap-8 ${singleConsultant ? "" : "lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12"}`}>
+          <div className={singleConsultant ? "" : "lg:sticky lg:top-28 lg:self-start"}>
             <div>
               <p className="eyebrow">{t.consultantsEyebrow}</p>
               <h2 id="area-consultants-title" className="mt-3 text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal sm:text-[2.125rem]">
                 {fill(t.consultantsTitle, { area: area.title })}
               </h2>
             </div>
-            <p className="mt-4 max-w-[44ch] text-[1rem] leading-7 text-ink-600">{t.consultantsIntro}</p>
+            <p className={`mt-4 text-[1rem] leading-7 text-ink-600 ${singleConsultant ? "max-w-[70ch]" : "max-w-[44ch]"}`}>{t.consultantsIntro}</p>
           </div>
-          <ul className="grid gap-5 md:grid-cols-2">
+          <ul className={`grid gap-5 ${singleConsultant ? "" : "md:grid-cols-2"}`}>
             {area.consultants.map((profile) => (
               <li key={profile.slug}>
                 <ConsultantCard
+                  featured={singleConsultant}
                   profile={profile}
                   system={area.system}
                   icon={area.icon}

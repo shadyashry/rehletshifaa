@@ -151,17 +151,22 @@ test("the homepage offers Sign in as a quiet entry, distinct from Check case sta
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/en");
   const header = page.locator("header");
-  const signIn = header.getByRole("link", { name: /^Sign in$/ });
+  // Existing patients reach both of their routes through one quiet "My case" control, never a primary button.
+  const myCase = header.getByRole("button", { name: /My case/ });
+  await expect(myCase).toHaveAttribute("aria-expanded", "false");
+  expect(await myCase.evaluate((el) => el.className.includes("btn-primary"))).toBe(false);
+  await myCase.click();
+  const signIn = header.getByRole("link", { name: /^Sign in/ });
   await expect(signIn).toBeVisible();
   await expect(signIn).toHaveAttribute("href", /\/en\/portal\?signin=1$/);
-  // Three distinct destinations for three distinct situations; the status check lives in the utility bar.
-  const utility = page.getByRole("navigation", { name: "Patient services" });
-  await expect(utility.getByRole("link", { name: /^Check case status$/ })).toHaveAttribute("href", /\/en\/track-case$/);
-  await expect(utility.getByRole("link", { name: /Talk to a Patient Coordinator/ })).toHaveAttribute("href", /wa\.me|whatsapp/);
-  await expect(utility.getByRole("link", { name: /Switch language/ })).toBeVisible();
+  // Three distinct destinations for three distinct situations.
+  await expect(header.getByRole("link", { name: /^Check case status/ })).toHaveAttribute("href", /\/en\/track-case$/);
+  await page.keyboard.press("Escape");
+  await expect(myCase).toHaveAttribute("aria-expanded", "false");
+  await expect(myCase).toBeFocused();
   await expect(header.getByRole("link", { name: /^Start my case$/ })).toHaveAttribute("href", /\/en\/send-my-case$/);
-  // Sign in is not a second dominant CTA.
-  expect(await signIn.evaluate((el) => el.className.includes("btn-primary"))).toBe(false);
+  await expect(header.getByRole("link", { name: "Talk to a Patient Coordinator" })).toHaveAttribute("href", /wa\.me|whatsapp/);
+  await expect(header.getByRole("link", { name: /Switch language/ })).toBeVisible();
   expect(await header.locator("a.btn-primary:visible").count()).toBe(1);
 });
 

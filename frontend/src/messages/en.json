@@ -19,7 +19,6 @@
       "notSureTitle": "Not sure which area fits?",
       "notSureBody": "Send what you have. Your coordinator routes your case to the right Consultant."
     },
-    "utilityTagline": "Specialist care in Egypt — one coordinator, every step of the way",
     "account": {
       "trigger": "My case",
       "heading": "Already started a case?",
@@ -49,7 +48,7 @@
     "brandArabicAccent": "شفاء"
   },
   "home": {
-    "eyebrow": "Care in Egypt, coordinated for international patients",
+    "eyebrow": "Specialist care in Egypt — one coordinator, every step of the way",
     "title": "Understand your treatment options before you travel",
     "intro": "Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.",
     "primaryAction": "Start my case",

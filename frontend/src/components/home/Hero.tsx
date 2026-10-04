@@ -29,7 +29,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
     : [[Stethoscope, "Consultant-led review"], [Clock3, "Clear steps before travel"], [Languages, "Arabic & English support"], [ShieldCheck, "Private document handling"]] as const;
 
   return (
-    <section className="bg-surface-default">
+    <section className="bg-surface-pearl">
       <div className="container-site grid gap-8 py-8 sm:gap-9 sm:py-10 lg:grid-cols-[minmax(0,53fr)_minmax(0,47fr)] lg:items-center lg:gap-16 lg:py-16">
         <div className="max-w-[34rem]">
           <p className="eyebrow">{d.home.eyebrow}</p>
