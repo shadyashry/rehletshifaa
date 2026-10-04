@@ -628,6 +628,24 @@ WF-09 removal of `COORDINATOR_LEAD` bypasses; and a Control Center UI.
   - `e2e/portal-ux.spec.ts` was already failing. Its fixture answers `GET /me` with a profile object that has no
     `workspaces`, so `portalViews` throws.
   - ESLint on the changed files: clean. The remaining `Portal.tsx` findings are on lines this change did not touch.
+- QA deep pass (2026-10-04, `qa-deep-test-report-2026-10-04.md`):
+  - 29 committed access/workforce/journey tests had been red since A8 because their sign-in fixtures had no `acr`.
+    They were fixed test-only.
+  - Added `qa/PlatformUsersDeepQaTest` (9) and `qa/JourneyGovernanceDeepQaTest` (5) as the regression net.
+  - Same-day fix pass (report §7): every defect from the pass is fixed, plus QA-14, found while fixing.
+    - QA-01: re-invite of a closed address on the same identity.
+    - QA-02: the owner decides administrator changes, gets the Control Center workspace, and sees decide-only UI.
+    - QA-03: owner/administrator separation is enforced.
+    - QA-04: the validator reports `SLA_NOT_SUPPORTED`.
+    - QA-05: metadata states the cycle policy.
+    - QA-06: `ACTION_PREREQUISITE` must-happen-before warnings.
+    - QA-07: Return-to-draft is shown to approvers only.
+    - QA-08: the journey map is a drag-and-drop editor.
+    - QA-14: `request()` now runs in a transaction.
+  - The temporary `qa-defect` class and `pom.xml` exclusion were removed. `PatientIdentityAndAccountTest` had the same
+    missing-`acr` fixture and is fixed.
+  - Still open, needing decisions or features (QA-09..13): other functions' managers, an in-product admission switch,
+    SOD-05/STF-05, the coordination manager's case visibility, UAT seeds, and an owner-transfer UI.
 - Flyway V1–V63 on H2: PASS.
 - Earlier focused workforce, architecture, JWT and identity-operation tests: PASS (29 tests for the S1-01/S1-02 gate).
 - The full backend run reached 556 tests but was not green: the new identity test initially collided with another

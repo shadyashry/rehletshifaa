@@ -10,13 +10,13 @@ import type { Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { journeyCopy, journeyStatusLabel, stageTypeLabel } from "./journey-copy";
 import type { JourneyCapability, JourneyCutoverStatus, JourneyDetail, JourneyGraph, JourneyRegistryMetadata, JourneySimulation, JourneyValidation, JourneyVersion } from "./journey-types";
-import { JourneyGraphCanvas } from "./JourneyGraphCanvas";
+import { JourneyGraphCanvas, STAGE_DRAG_TYPE } from "./JourneyGraphCanvas";
 import { JourneyNodeInspector } from "./JourneyNodeInspector";
 import { JourneyValidationPanel } from "./JourneyValidationPanel";
 import { JourneySimulationPanel } from "./JourneySimulationPanel";
 import { JourneyVersionDiffPanel } from "./JourneyVersionDiffPanel";
 import { JourneyPublishPanel } from "./JourneyPublishPanel";
-import { computeJourneyDiff, computeLayout } from "./journey-graph-utils";
+import { addNode, blankNode, computeJourneyDiff, computeLayout, nextKey } from "./journey-graph-utils";
 import "./journey-designer.css";
 
 type Tab = "designer" | "validation" | "simulation" | "diff" | "publish";
@@ -156,8 +156,6 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
   }, [detail, version]);
   const materialChanges = useMemo(() => (version && previousPublished ? computeJourneyDiff(previousPublished.graph, version.graph) : null), [version, previousPublished]);
 
-  const issues = validation ? [...validation.errors, ...validation.warnings] : [];
-
   const orderedNodeKeys = useMemo(() => (graph ? Object.entries(computeLayout(graph).positions).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x).map(([k]) => k) : []), [graph]);
 
   // One primary action in the header. Check, Test and publishing live in their own tabs (no duplicate controls).
@@ -214,7 +212,22 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
               <div className="jd-layout">
                 <div className="jd-palette">
                   <h3>{t.palette}</h3>
-                  <p className="cc-meta">{t.selectNode}</p>
+                  {editable && allowed(t.permission.editDraft) ? (
+                    <>
+                      <p className="cc-meta">{t.paletteHint}</p>
+                      <ul className="jd-palette-items" aria-label={t.palette}>
+                        {(registryMeta?.stageTypes ?? []).filter((type) => type !== "START").map((type) => (
+                          <li key={type}>
+                            <button type="button" className="cc-secondary jd-palette-item" draggable
+                              onDragStart={(e) => { e.dataTransfer.setData(STAGE_DRAG_TYPE, type); e.dataTransfer.effectAllowed = "copy"; }}
+                              onClick={() => { const key = nextKey(type, graph.nodes.map((n) => n.key)); setGraph(addNode(graph, blankNode(key, type, stageTypeLabel(type, locale)))); setSelectedNodeKey(key); setSelectedEdgeKey(null); }}>
+                              {stageTypeLabel(type, locale)}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : <p className="cc-meta">{t.selectNode}</p>}
                 </div>
                 {listMode ? (
                   <div className="jd-canvas-wrap" style={{ height: "auto", padding: 12, overflow: "auto" }}>
@@ -235,10 +248,12 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
                   <div className="jd-canvas-wrap">
                     <JourneyGraphCanvas
                       locale={locale} graph={graph} selectedNodeKey={selectedNodeKey} selectedEdgeKey={selectedEdgeKey}
-                      issues={issues} simVisited={simulation ? new Set(simulation.steps.map((s) => s.nodeKey)) : undefined}
+                      issues={validation?.errors ?? []} warnings={validation?.warnings ?? []} simVisited={simulation ? new Set(simulation.steps.map((s) => s.nodeKey)) : undefined}
                       simCurrent={simulation ? simulation.steps[simulation.steps.length - 1]?.nodeKey ?? null : null}
                       onSelectNode={(k) => { setSelectedNodeKey(k); if (k) setSelectedEdgeKey(null); }}
                       onSelectEdge={(k) => { setSelectedEdgeKey(k); if (k) setSelectedNodeKey(null); }}
+                      editable={editable && allowed(t.permission.editDraft)} onChangeGraph={(g) => { setGraph(g); setNotice(""); }}
+                      defaultFact={registryMeta?.conditionFacts[0]} onRefused={(r) => setNotice(t.connectRefused[r])}
                     />
                   </div>
                 )}

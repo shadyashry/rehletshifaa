@@ -54,7 +54,7 @@ export function JourneyPublishPanel({
 
       <div className="cc-toolbar">
         {s === "SIMULATED" && allowed(t.permission.submit) && <button type="button" disabled={busy || !reason.trim()} onClick={onSubmit}>{t.submit}</button>}
-        {s === "PENDING_APPROVAL" && allowed(t.permission.editDraft) && <button type="button" className="cc-secondary" disabled={busy || !reason.trim()} onClick={onReturnToDraft}>{t.returnToDraft}</button>}
+        {s === "PENDING_APPROVAL" && allowed(t.permission.approve) && <button type="button" className="cc-secondary" disabled={busy || !reason.trim()} onClick={onReturnToDraft}>{t.returnToDraft}</button>}
         {s === "PENDING_APPROVAL" && <button type="button" disabled={busy || !canPublishNow} onClick={() => open("publish")}>{t.publish}</button>}
         {s === "PUBLISHED" && allowed(t.permission.retire) && <button type="button" className="cc-secondary cc-danger-button" disabled={busy} onClick={() => open("retire")}>{t.retireVersion}…</button>}
       </div>

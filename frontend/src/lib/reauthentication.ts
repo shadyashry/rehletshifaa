@@ -5,6 +5,8 @@
  * trip reloads the page and a half-filled form cannot be restored — tells them on return to repeat the change.
  */
 export const REAUTHENTICATION_REQUIRED = "REAUTHENTICATION_REQUIRED";
+/** Governance actions (owner decisions, owner transfer) ask specifically for a passkey sign-in; the remedy is the same. */
+export const isReauthenticationCode = (code: unknown) => code === REAUTHENTICATION_REQUIRED || code === "PHISHING_RESISTANT_AUTHENTICATION_REQUIRED";
 const KEY = "rs:reauthentication-requested";
 /** A marker older than this is stale (the person abandoned the sign-in); never show the return notice for it. */
 const MARKER_TTL_MS = 30 * 60_000;

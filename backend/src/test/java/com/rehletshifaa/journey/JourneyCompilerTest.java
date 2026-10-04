@@ -51,7 +51,8 @@ class JourneyCompilerTest {
     @Test void slaCannotBeSilentlyDiscarded() {
         var graph=JourneyGraphTest.linear();
         var nodes=graph.nodes().stream().map(n->n.key().equals("review")?new Node(n.key(),n.label(),n.type(),n.actorType(),n.action(),null,null,new Sla(60L,30L,90L),null,true):n).toList();
-        assertThatThrownBy(()->compiler.compile(UUID.randomUUID(),new Graph(nodes,graph.edges()))).hasMessageContaining("SLA projection");
+        // QA-04: an SLA is refused at validation, so it can never pass review and then fail at publication.
+        assertThatThrownBy(()->compiler.compile(UUID.randomUUID(),new Graph(nodes,graph.edges()))).hasMessageContaining("SLA_NOT_SUPPORTED");
     }
     @Test void waitTimerAndConditionsCompile() {
         var graph=JourneyGraphTest.linear();

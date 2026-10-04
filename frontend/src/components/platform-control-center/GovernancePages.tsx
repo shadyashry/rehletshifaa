@@ -17,29 +17,31 @@ const toIso = (date: string) => (date ? new Date(`${date}T00:00:00`).toISOString
 
 // ---------------- Administrators ----------------
 
-type Overview = { administrators: AdministratorAssignment[]; requests: ChangeRequest[] };
+type Overview = { administrators: AdministratorAssignment[]; requests: ChangeRequest[]; names?: Record<string, string> };
 
-/** Access › Administrators (ACCESS_GOVERN): System Administrator appointments and removals, each approved by a second administrator. */
+/** Access › Administrators (ACCESS_GOVERN, or the Platform Account Owner): administrators raise appointments and removals; a second administrator or the owner decides them (GOV-02). */
 export function AdministratorsPage({ locale }: { locale: Locale }) {
   const [requesting, setRequesting] = useState(false);
   return <WorkforcePage locale={locale} active="administrators" title={t(locale, "Administrators", "مسؤولو النظام")}
-    intro={t(locale, "Every System Administrator change needs a second administrator's approval. The last administrator can never be removed.", "كل تغيير في مسؤولي النظام يحتاج إلى موافقة مسؤول ثانٍ. لا يمكن إزالة آخر مسؤول.")}
-    allowed={(a) => a.can("ACCESS_GOVERN")}
-    actions={() => <button type="button" onClick={() => setRequesting(true)}>{t(locale, "Request appointment", "طلب تعيين")}</button>}>
+    intro={t(locale, "Every System Administrator change needs the approval of a second administrator or the Platform Account Owner. The last administrator can never be removed.", "كل تغيير في مسؤولي النظام يحتاج إلى موافقة مسؤول ثانٍ أو مالك حساب المنصة. لا يمكن إزالة آخر مسؤول.")}
+    allowed={(a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner}
+    actions={(a) => a.can("ACCESS_GOVERN") && <button type="button" onClick={() => setRequesting(true)}>{t(locale, "Request appointment", "طلب تعيين")}</button>}>
     {({ access, api }) => <Administrators locale={locale} access={access} api={api} requesting={requesting} setRequesting={setRequesting} />}
   </WorkforcePage>;
 }
 
 function Administrators({ locale, access, api, requesting, setRequesting }: { locale: Locale; access: ControlCenterAccess; api: AdminApi; requesting: boolean; setRequesting: (v: boolean) => void }) {
   const overview = useRead<Overview>(api, `${ADMIN}/administrator-changes`);
-  const staff = useRead<StaffDirectory>(api, `${ADMIN}/staff`);
+  const governs = access.can("ACCESS_GOVERN");
+  // The owner has no directory read; the overview carries the names it shows.
+  const staff = useRead<StaffDirectory>(api, access.can("WORKFORCE_READ") ? `${ADMIN}/staff` : null);
   const [dialog, setDialog] = useState<{ kind: "remove"; admin: AdministratorAssignment } | { kind: "approve" | "reject"; request: ChangeRequest } | null>(null);
   const [notice, setNotice] = useState("");
   const [appoint, setAppoint] = useState({ subject: "", from: new Date().toISOString().slice(0, 10), to: "" });
   const [removeOn, setRemoveOn] = useState(new Date().toISOString().slice(0, 10));
   const me = access.me?.subject;
   const done = (message: string) => { setDialog(null); setRequesting(false); setNotice(message); overview.reload(); };
-  const name = (subject: string) => staff.data?.people.find((p) => p.subject === subject)?.name ?? t(locale, "Name not recorded", "اسم غير مسجّل");
+  const name = (subject: string) => overview.data?.names?.[subject] ?? staff.data?.people.find((p) => p.subject === subject)?.name ?? t(locale, "Name not recorded", "اسم غير مسجّل");
   if (overview.error && !overview.data) return <ErrorNotice error={overview.error} locale={locale} action="load" onRetry={overview.reload} />;
   if (!overview.data) return <p role="status">{t(locale, "Loading…", "جارٍ التحميل…")}</p>;
   const pending = overview.data.requests.filter((r) => r.status === "PENDING");
@@ -50,7 +52,7 @@ function Administrators({ locale, access, api, requesting, setRequesting }: { lo
       <ul className="cc-list">{overview.data.administrators.map((a) => <li key={a.id}>
         <span><strong><bdi>{name(a.subject)}</bdi></strong></span>
         <span className="cc-meta">{t(locale, "From", "من")} {when(a.effectiveFrom, locale)}{a.effectiveTo ? ` · ${t(locale, "until", "حتى")} ${when(a.effectiveTo, locale)}` : ""}</span>
-        <span className="cc-row-actions"><button type="button" className="cc-secondary cc-small cc-danger-button" onClick={() => setDialog({ kind: "remove", admin: a })}>{t(locale, "Request removal", "طلب إزالة")}</button></span>
+        {governs && <span className="cc-row-actions"><button type="button" className="cc-secondary cc-small cc-danger-button" onClick={() => setDialog({ kind: "remove", admin: a })}>{t(locale, "Request removal", "طلب إزالة")}</button></span>}
       </li>)}</ul>
     </Section>
     <Section id="pending" title={t(locale, "Waiting for a second approval", "بانتظار موافقة ثانية")}>

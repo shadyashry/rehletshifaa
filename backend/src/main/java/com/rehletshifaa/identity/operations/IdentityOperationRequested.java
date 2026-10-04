@@ -30,6 +30,16 @@ public record IdentityOperationRequested(UUID id, String idempotencyKey, String 
                 null, null, Map.of("locale", "ar".equals(locale) ? "ar" : "en"));
     }
 
+    /**
+     * Re-invitation of a closed workforce person: one ordered operation re-enables the existing identity, clears a
+     * former employee's MFA credentials when asked, then sends the invitation email.
+     */
+    public static IdentityOperationRequested reinvite(UUID id, String key, String subject, String requestedBy,
+            String reason, String locale, boolean resetMfa) {
+        return new IdentityOperationRequested(id, key, subject, Type.RESEND_INVITE, requestedBy, reason, id.toString(),
+                null, null, Map.of("locale", "ar".equals(locale) ? "ar" : "en", "reopen", "true", "resetMfa", String.valueOf(resetMfa)));
+    }
+
     public static IdentityOperationRequested create(UUID id, String key, Type type, String requestedBy,
             String reason, String targetType, UUID targetId, Map<String,String> payload) {
         if (type != Type.CREATE_STAFF && type != Type.CREATE_PRACTITIONER) throw new IllegalArgumentException("Not a create operation");

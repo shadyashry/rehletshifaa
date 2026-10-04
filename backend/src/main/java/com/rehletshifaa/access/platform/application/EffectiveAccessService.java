@@ -60,10 +60,15 @@ public class EffectiveAccessService {
         List<PlatformRoleView> platformRoles = access.subjectFacts(principal.subject(), now).administratorAssignments().stream()
                 .map(a -> new PlatformRoleView(PlatformAccessRepository.SYSTEM_ADMINISTRATOR, a.effectiveFrom(), a.effectiveTo(),
                         !a.effectiveFrom().isAfter(now))).toList();
+        boolean owner = owners.findCurrentOwner().filter(principal.subject()::equals).isPresent();
+        // GOV-02: the owner decides administrator changes in the Control Center even without any workforce role.
+        Set<Workspace> workspaces = java.util.EnumSet.noneOf(Workspace.class);
+        workspaces.addAll(held.workspaces());
+        if (owner) workspaces.add(Workspace.CONTROL_CENTER);
         List<String> pending = new ArrayList<>();
         if (person != null && "INVITED".equals(person.lifecycleStatus())) pending.add("ACTIVATE_ACCOUNT");
         return new MeView(principal.subject(), now, held.roles(), held.platformPermissions(),
-                held.platformPermissions().stream().filter(Permission::stepUp).collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new)), held.workspaces(), held.managedFunctions(),
-                owners.findCurrentOwner().filter(principal.subject()::equals).isPresent(), platformRoles, person, List.copyOf(pending));
+                held.platformPermissions().stream().filter(Permission::stepUp).collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new)), workspaces, held.managedFunctions(),
+                owner, platformRoles, person, List.copyOf(pending));
     }
 }

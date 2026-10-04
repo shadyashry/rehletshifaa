@@ -182,14 +182,19 @@ export function JourneyNodeInspector({
               </select>
             )}
           </div>
-          <details>
+          {!registryMeta?.slaSupported && n.sla && (
+            <p className="cc-meta" role="note">{t.slaNotSupported}{" "}
+              {!disabled && <button type="button" className="cc-secondary cc-small" onClick={() => onChangeGraph(updateNode(graph, n.key, { sla: null }))}>{t.removeSla}</button>}
+            </p>
+          )}
+          {registryMeta?.slaSupported && <details>
             <summary style={{ cursor: "pointer" }}>{t.sla}</summary>
             <div className="jd-inline">
               <label>{t.dueMinutes}<input disabled={disabled} type="number" min={1} max={525600} value={n.sla?.dueMinutes ?? ""} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { sla: { dueMinutes: e.target.value ? Number(e.target.value) : null, reminderMinutes: n.sla?.reminderMinutes ?? null, escalationMinutes: n.sla?.escalationMinutes ?? null } }))} /></label>
               <label>{t.reminderMinutes}<input disabled={disabled} type="number" min={1} max={525600} value={n.sla?.reminderMinutes ?? ""} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { sla: { dueMinutes: n.sla?.dueMinutes ?? null, reminderMinutes: e.target.value ? Number(e.target.value) : null, escalationMinutes: n.sla?.escalationMinutes ?? null } }))} /></label>
               <label>{t.escalationMinutes}<input disabled={disabled} type="number" min={1} max={525600} value={n.sla?.escalationMinutes ?? ""} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { sla: { dueMinutes: n.sla?.dueMinutes ?? null, reminderMinutes: n.sla?.reminderMinutes ?? null, escalationMinutes: e.target.value ? Number(e.target.value) : null } }))} /></label>
             </div>
-          </details>
+          </details>}
         </>
       )}
 

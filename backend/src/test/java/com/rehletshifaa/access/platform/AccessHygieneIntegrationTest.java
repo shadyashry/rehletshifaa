@@ -164,7 +164,7 @@ class AccessHygieneIntegrationTest {
     }
 
     private void authenticate(String subject) {
-        var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", clock.instant()).build();
+        var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", clock.instant()).claim("acr", "3").build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(token, List.of()));
     }
 }

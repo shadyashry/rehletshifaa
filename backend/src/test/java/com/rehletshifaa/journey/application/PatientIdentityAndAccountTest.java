@@ -496,7 +496,7 @@ class PatientIdentityAndAccountTest {
     private void authenticate(String subject, Role... roles) { authenticateWithEmail(subject, null, roles); }
     private void authenticateWithEmail(String subject, String email, Role... roles) {
         for (Role role : roles) com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, subject, role);
-        var builder = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond())
+        var builder = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", Instant.now().getEpochSecond()).claim("acr", "2")
                 .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(3600));
         if (email != null) builder.claim("email", email).claim("email_verified", true);
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(builder.build(), List.of(), subject));

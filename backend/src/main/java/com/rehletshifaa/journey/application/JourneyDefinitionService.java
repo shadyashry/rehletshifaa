@@ -33,7 +33,7 @@ public class JourneyDefinitionService {
             versions.size(),repository.lastActivity(d.id()));}).toList();}
     public Detail detail(UUID definition){authorize(Permission.JOURNEY_READ);return new Detail(repository.definition(definition,false),repository.versions(definition));}
     public Version version(UUID definition,UUID version){authorize(Permission.JOURNEY_READ);return repository.version(definition,version);}
-    public RegistryMetadata registryMetadata(){authorize(Permission.JOURNEY_READ);return new RegistryMetadata(List.of(ActorType.values()),List.of(StageType.values()),List.of(Fact.values()),200,400,"ACYCLIC_ONLY","NOT_DEPLOYED");}
+    public RegistryMetadata registryMetadata(){authorize(Permission.JOURNEY_READ);return new RegistryMetadata(List.of(ActorType.values()),List.of(StageType.values()),List.of(Fact.values()),200,400,"GOVERNED_RECOVERY_LOOPS","NOT_DEPLOYED",JourneyGraphValidator.SLA_SUPPORTED);}
     public List<JourneyStageRegistry.Capability> registry(){authorize(Permission.JOURNEY_READ);return registry.all();}
     @Transactional public Detail create(){var actor=authorize(Permission.JOURNEY_EDIT);UUID id=repository.create();audit.record(actor.subject(),id.toString(),"JOURNEY_CREATED","SUCCESS","Canonical platform journey");Version initial=repository.draft(id,new Graph(List.of(),List.of()),actor.subject());audit.record(actor.subject(),initial.id().toString(),"JOURNEY_VERSION_CREATED","SUCCESS","Initial draft");return new Detail(repository.definition(id,false),repository.versions(id));}
     @Transactional public Version cloneVersion(UUID definition,UUID source,Change change){
@@ -91,7 +91,8 @@ public class JourneyDefinitionService {
     private static String why(Change change){return change.reason().trim();}
     private void editable(Version v){if(!Set.of(Status.DRAFT,Status.VALIDATED,Status.SIMULATED).contains(v.status()))invalid("Use a new draft for a published version, or return pending approval to draft.");}
     private static void invalid(String message){throw new ApiException(400,"INVALID_JOURNEY_OPERATION",message);}
-    public record RegistryMetadata(List<ActorType> actorTypes,List<StageType> stageTypes,List<Fact> conditionFacts,int maxNodes,int maxEdges,String cyclePolicy,String runtimeDeployment) {}
+    /** {@code cyclePolicy}: GOVERNED_RECOVERY_LOOPS — a loop only from a Decision, through a human step, with an exit (technical-decisions §22). */
+    public record RegistryMetadata(List<ActorType> actorTypes,List<StageType> stageTypes,List<Fact> conditionFacts,int maxNodes,int maxEdges,String cyclePolicy,String runtimeDeployment,boolean slaSupported) {}
     /** {@code reason} is the technical detail the system recorded; {@code changeReason} is what the person said (J-1), null when none was recorded. */
     public record HistoryEntry(String actor,String entity,String action,String outcome,String reason,String changeReason,java.time.Instant occurredAt) {}
     public record Change(long revision,String reason) {}

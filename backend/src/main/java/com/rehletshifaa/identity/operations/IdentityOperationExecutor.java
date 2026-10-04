@@ -30,7 +30,16 @@ public class IdentityOperationExecutor {
                 identities.logout(operation.subject());
                 succeed(operation);
             }
-            case RESEND_INVITE -> { identities.resend(operation.subject(), payload(operation).locale()); succeed(operation); }
+            case RESEND_INVITE -> {
+                Payload payload = payload(operation);
+                if ("true".equals(payload.reopen())) {
+                    // Re-invitation of a closed person: re-enable first, so the email is never sent to a disabled account.
+                    identities.setEnabled(operation.subject(), true);
+                    if ("true".equals(payload.resetMfa())) identities.resetMfa(operation.subject());
+                }
+                identities.resend(operation.subject(), payload.locale());
+                succeed(operation);
+            }
             case RESET_PASSWORD -> { identities.sendPasswordReset(operation.subject(), payload(operation).locale()); succeed(operation); }
             case RESET_MFA -> {
                 identities.resetMfa(operation.subject());
@@ -69,5 +78,5 @@ public class IdentityOperationExecutor {
         catch (Exception failure) { throw new IllegalStateException("Identity operation payload is invalid", failure); }
     }
 
-    public record Payload(String name, String email, String locale, String compatibilityRole) {}
+    public record Payload(String name, String email, String locale, String compatibilityRole, String reopen, String resetMfa) {}
 }

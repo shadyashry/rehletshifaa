@@ -171,3 +171,28 @@ export function computeJourneyDiff(base: JourneyGraph, next: JourneyGraph): Jour
   }
   return entries;
 }
+
+/** Why a drawn connection was not applied (the graph is returned unchanged). */
+export type ConnectRefusal = "SELF" | "FROM_END" | "INTO_START" | "DUPLICATE" | "DECISION_FULL";
+
+/**
+ * A connection drawn on the map (drag from a step's handle to another step). It follows the same rules the
+ * validator enforces, so drawing never produces a shape the form editor could not: a Decision gets its Yes path
+ * first and the complementary No path second; any other step has one next step, so drawing again re-points it.
+ */
+export function connectByDrag(graph: JourneyGraph, from: string, to: string, defaultFact: string): { graph: JourneyGraph; refused?: ConnectRefusal } {
+  const source = graph.nodes.find((n) => n.key === from);
+  const target = graph.nodes.find((n) => n.key === to);
+  if (!source || !target || from === to) return { graph, refused: "SELF" };
+  if (source.type === "END") return { graph, refused: "FROM_END" };
+  if (target.type === "START") return { graph, refused: "INTO_START" };
+  const out = outgoing(graph, from);
+  if (out.some((e) => e.to === to)) return { graph, refused: "DUPLICATE" };
+  if (source.type === "DECISION") {
+    if (out.length >= 2) return { graph, refused: "DECISION_FULL" };
+    const first = out[0]?.condition;
+    return { graph: connect(graph, from, to, first ? { fact: first.fact, equalsValue: !first.equalsValue } : { fact: defaultFact, equalsValue: true }) };
+  }
+  if (out.length > 0) return { graph: updateEdge(graph, out[0].key, { to, condition: null }) };
+  return { graph: connect(graph, from, to, null) };
+}

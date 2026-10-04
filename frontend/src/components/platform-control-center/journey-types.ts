@@ -81,6 +81,8 @@ export type JourneyRegistryMetadata = {
   maxEdges: number;
   cyclePolicy: string;
   runtimeDeployment: string;
+  /** Whether the runtime enforces stage service levels; false today, so the designer hides them (QA-04). */
+  slaSupported?: boolean;
 };
 
 export type JourneyChange = { revision: number; reason: string };

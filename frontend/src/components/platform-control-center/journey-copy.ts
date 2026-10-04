@@ -56,7 +56,9 @@ export const journeyCopy = {
       DRAFT: "Draft", VALIDATED: "Draft · checked", SIMULATED: "Draft · tested", PENDING_APPROVAL: "Waiting for approval", PUBLISHED: "Published", RETIRED: "Retired",
     } as Record<string, string>,
 
-    designer: "Design", palette: "Steps", inspector: "Step details", canvas: "Journey map",
+    designer: "Design", palette: "Steps", paletteHint: "Drag a step onto the map, or click it to add. Drag from a step's lower handle to another step to connect them; select a step or link and press Delete to remove it.",
+    connectRefused: { SELF: "A step cannot lead to itself.", FROM_END: "An End step cannot lead anywhere.", INTO_START: "Nothing can lead back into Start.", DUPLICATE: "These steps are already connected.", DECISION_FULL: "A decision has exactly a Yes and a No path; re-point one in Step details." },
+    inspector: "Step details", canvas: "Journey map",
     stageList: "Steps in order", switchToGraph: "Switch to map view", switchToList: "Switch to list view",
     addStage: "Add step", saveDraft: "Save draft", saved: "Saved", unsaved: "Unsaved changes",
     validate: "Check", simulate: "Test", submit: "Send for approval", publish: "Publish", retire: "Retire",
@@ -91,7 +93,7 @@ export const journeyCopy = {
     blocking: "Blocking (the case cannot continue until this is done)", optionalStage: "Optional",
     entryCondition: "Starts when", exitCondition: "Completes when", noCondition: "None",
     conditionFact: "Condition", conditionEquals: "Must be", conditionTrue: "Yes", conditionFalse: "No",
-    sla: "Service level", dueMinutes: "Due (minutes)", reminderMinutes: "Reminder (minutes)", escalationMinutes: "Escalation (minutes)",
+    sla: "Service level", slaNotSupported: "Service levels are not enforced yet, so this journey cannot be checked while this step has one.", removeSla: "Remove service level", dueMinutes: "Due (minutes)", reminderMinutes: "Reminder (minutes)", escalationMinutes: "Escalation (minutes)",
     timerMinutes: "Timer duration (minutes)", advancedKey: "Advanced: immutable technical key",
 
     edges: "Next steps", addTransition: "Connect to next step", editTransition: "Change the next step",
@@ -190,7 +192,9 @@ export const journeyCopy = {
       DRAFT: "مسودة", VALIDATED: "مسودة · مفحوصة", SIMULATED: "مسودة · مختبرة", PENDING_APPROVAL: "بانتظار الموافقة", PUBLISHED: "منشور", RETIRED: "منتهٍ",
     } as Record<string, string>,
 
-    designer: "التصميم", palette: "الخطوات", inspector: "تفاصيل الخطوة", canvas: "خريطة الرحلة",
+    designer: "التصميم", palette: "الخطوات", paletteHint: "اسحب خطوة إلى الخريطة أو انقر عليها لإضافتها. اسحب من المقبض السفلي لخطوة إلى خطوة أخرى لربطهما، واختر خطوة أو رابطًا واضغط Delete لحذفه.",
+    connectRefused: { SELF: "لا يمكن أن تؤدي الخطوة إلى نفسها.", FROM_END: "لا يمكن أن تؤدي خطوة النهاية إلى أي خطوة.", INTO_START: "لا يمكن العودة إلى خطوة البداية.", DUPLICATE: "هاتان الخطوتان مرتبطتان بالفعل.", DECISION_FULL: "للقرار مسارا «نعم» و«لا» فقط؛ غيّر وجهة أحدهما من تفاصيل الخطوة." },
+    inspector: "تفاصيل الخطوة", canvas: "خريطة الرحلة",
     stageList: "الخطوات بالترتيب", switchToGraph: "التبديل إلى عرض الخريطة", switchToList: "التبديل إلى عرض القائمة",
     addStage: "إضافة خطوة", saveDraft: "حفظ المسودة", saved: "تم الحفظ", unsaved: "تغييرات غير محفوظة",
     validate: "فحص", simulate: "اختبار", submit: "إرسال للموافقة", publish: "نشر", retire: "إنهاء",
@@ -225,7 +229,7 @@ export const journeyCopy = {
     blocking: "مانعة (لا يمكن للحالة المتابعة حتى تكتمل)", optionalStage: "اختيارية",
     entryCondition: "تبدأ عندما", exitCondition: "تكتمل عندما", noCondition: "لا يوجد",
     conditionFact: "الشرط", conditionEquals: "يجب أن يكون", conditionTrue: "نعم", conditionFalse: "لا",
-    sla: "مستوى الخدمة", dueMinutes: "الاستحقاق (دقائق)", reminderMinutes: "التذكير (دقائق)", escalationMinutes: "التصعيد (دقائق)",
+    sla: "مستوى الخدمة", slaNotSupported: "مستويات الخدمة غير مطبّقة بعد، لذا لا يمكن فحص هذه الرحلة ما دامت هذه الخطوة تحمل مستوى خدمة.", removeSla: "إزالة مستوى الخدمة", dueMinutes: "الاستحقاق (دقائق)", reminderMinutes: "التذكير (دقائق)", escalationMinutes: "التصعيد (دقائق)",
     timerMinutes: "مدة المؤقّت (دقائق)", advancedKey: "متقدم: المفتاح التقني الثابت",
 
     edges: "الخطوات التالية", addTransition: "الاتصال بالخطوة التالية", editTransition: "تغيير الخطوة التالية",
@@ -285,10 +289,11 @@ const ISSUE_AR: Record<string, (step: string) => string> = {
   NO_COMPLETION: (s) => `${s} ليس لها مسار إلى النهاية.`, DECISION_OUTCOMES: (s) => `${s} تحتاج إلى مساري «نعم» و«لا» للشرط نفسه.`,
   END_OUTGOING: (s) => `${s} خطوة نهاية ولا يمكن أن تكون لها خطوة تالية.`, START_INCOMING: () => "لا يمكن الوصول إلى البداية من خطوة أخرى.", START_COUNT: () => "اختر بداية واحدة بالضبط.",
   NODE_LABEL: () => "أعطِ كل خطوة اسمًا لا يتجاوز 120 حرفًا.", WAIT_CONDITION: (s) => `${s} تحتاج إلى شرط اكتمال يصف الحدث المنتظر.`,
-  INVALID_SLA: (s) => `${s} تحتاج إلى وقت استحقاق موجب، وتذكير قبله، وتصعيد عنده أو بعده.`, INVALID_TIMER: (s) => `${s} تحتاج إلى مدة مؤقّت موجبة على خطوة مؤقّت فقط.`,
+  INVALID_SLA: (s) => `${s} تحتاج إلى وقت استحقاق موجب، وتذكير قبله، وتصعيد عنده أو بعده.`, SLA_NOT_SUPPORTED: (s) => `${s} تحمل مستوى خدمة، لكن المواعيد النهائية غير مطبّقة بعد؛ أزله.`, INVALID_TIMER: (s) => `${s} تحتاج إلى مدة مؤقّت موجبة على خطوة مؤقّت فقط.`,
   TERMINAL_METADATA: (s) => `${s} لا يمكن أن تحمل شروطًا أو مستوى خدمة أو مؤقّتًا.`, CYCLE_SELF_LOOP: (s) => `${s} لا يمكن أن تعود إلى نفسها.`,
   CYCLE_UNGATED: () => "يجب أن تتفرع حلقة التعافي من خطوة قرار على شرط عمل مدعوم.", CYCLE_NO_HUMAN_ACTION: () => "يجب أن تتضمن حلقة التعافي إجراءً واحدًا على الأقل لموظف أو مريض.",
   INVALID_CONDITION: () => "اختر شرط عمل مدعومًا وقيمة «نعم» أو «لا».", DANGLING_EDGE: () => "رابط يشير إلى خطوة غير موجودة.",
+  ACTION_PREREQUISITE: (s) => `${s} تحتاج إلى خطوة سابقة لم تُنفَّذ قبلها في كل مسار من البداية؛ ستتوقف الحالة هنا ما لم تُنجز تلك الخطوة خارج هذه الرحلة.`,
   RUNTIME_NOT_DEPLOYED: () => "الفحص والاختبار لا يغيّران الحالات: تستمر الحالات الموجودة على الرحلة الحالية.",
 };
 const ISSUE_EN: Record<string, string> = { RUNTIME_NOT_DEPLOYED: "Checking and testing never change cases: existing cases continue on the journey they are on." };

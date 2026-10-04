@@ -6,6 +6,8 @@ import static com.rehletshifaa.journey.domain.JourneyModel.*;
 
 @Component
 public class JourneyGraphValidator {
+    /** Stage service levels (due / reminder / escalation) are modelled but not projected by the runtime. */
+    public static final boolean SLA_SUPPORTED = false;
     private final JourneyStageRegistry registry;
     public JourneyGraphValidator(JourneyStageRegistry registry){this.registry=registry;}
     public Validation validate(Graph graph) {
@@ -41,6 +43,8 @@ public class JourneyGraphValidator {
                 if(!minutes(s.dueMinutes()) || (s.reminderMinutes()!=null && (!minutes(s.reminderMinutes()) || s.dueMinutes()==null || s.reminderMinutes()>=s.dueMinutes()))
                         || (s.escalationMinutes()!=null && (!minutes(s.escalationMinutes()) || s.dueMinutes()==null || s.escalationMinutes()<s.dueMinutes())))
                     error(errors,"INVALID_SLA",n.key(),label(n)+" needs a positive due time, a reminder before due and an escalation at or after due.");
+                // QA-04: the runtime cannot project deadlines yet, so the designer must not accept one it can never compile.
+                if(!SLA_SUPPORTED) error(errors,"SLA_NOT_SUPPORTED",n.key(),label(n)+" has a service level, but deadlines are not enforced by the runtime yet; remove it.");
             }
         }
         Map<String,List<Edge>> outgoing=new HashMap<>();Set<String> edgeKeys=new HashSet<>();
@@ -66,6 +70,7 @@ public class JourneyGraphValidator {
         boolean changed;do {changed=false;for(Edge e:graph.edges()) if(completable.contains(e.to())) changed|=completable.add(e.from());}while(changed);
         for(Node n:nodes.values()) if(!completable.contains(n.key())) error(errors,"NO_COMPLETION",n.key(),label(n)+" has no path to completion.");
         if(starts.size()==1) validateCycles(starts.getFirst().key(),outgoing,nodes,errors);
+        if(starts.size()==1) validatePrerequisites(starts.getFirst().key(),nodes,graph.edges(),reachable,warnings);
         warnings.add(new Issue("RUNTIME_NOT_DEPLOYED",null,"This configuration is a dry-run domain model; existing cases continue using the current journey."));
         return new Validation(List.copyOf(errors),List.copyOf(warnings));
     }
@@ -112,6 +117,45 @@ public class JourneyGraphValidator {
         for(int i=0;i<=toIndex;i++){StageType t=nodes.get(path.get(i)).type();if(t==StageType.STAFF_TASK||t==StageType.PATIENT_ACTION){human=true;break;}}
         if(!human) error(errors,"CYCLE_NO_HUMAN_ACTION",e.from(),"A recovery loop must include at least one staff or patient action; an automatic loop between system/decision stages alone is not permitted.");
     }
+    /**
+     * QA-06: an action whose domain service needs an earlier action (a prepared proposal before release, a request
+     * before the patient answers) is flagged unless that action is on every path from Start (a warning: see
+     * {@link JourneyStageRegistry.Capability}). Must-happen-before is a forward
+     * "available actions" analysis: the set guaranteed on entry to a stage is the intersection, over its incoming
+     * transitions, of what its predecessor guarantees plus the predecessor's own action. Loops converge because the
+     * sets only shrink.
+     */
+    private void validatePrerequisites(String start,Map<String,Node> nodes,List<Edge> edges,Set<String> reachableKeys,List<Issue> warnings){
+        Set<String> reachable=new HashSet<>(reachableKeys);reachable.retainAll(nodes.keySet()); // a dangling edge is reported elsewhere
+        Map<String,List<String>> incoming=new HashMap<>();
+        for(Edge e:edges) if(nodes.containsKey(e.from()) && nodes.containsKey(e.to()) && reachable.contains(e.from())) incoming.computeIfAbsent(e.to(),k->new ArrayList<>()).add(e.from());
+        Set<String> universe=new HashSet<>();nodes.values().forEach(n->{if(n.action()!=null)universe.add(n.action());});
+        Map<String,Set<String>> before=new HashMap<>();
+        for(String k:reachable) before.put(k,k.equals(start)?new HashSet<>():new HashSet<>(universe));
+        boolean changed;
+        do{changed=false;
+            for(String k:reachable){
+                if(k.equals(start))continue;
+                Set<String> in=null;
+                for(String p:incoming.getOrDefault(k,List.of())){
+                    Set<String> out=new HashSet<>(before.get(p));
+                    if(nodes.get(p).action()!=null)out.add(nodes.get(p).action());
+                    if(in==null)in=out;else in.retainAll(out);
+                }
+                if(in==null)in=new HashSet<>();
+                if(!in.equals(before.get(k))){before.put(k,in);changed=true;}
+            }
+        }while(changed);
+        for(String k:reachable){
+            Node n=nodes.get(k);
+            if(n.action()==null)continue;
+            var cap=registry.find(n.action());
+            if(cap.isEmpty())continue;
+            for(String needed:cap.get().dependsOn()) if(!before.get(k).contains(needed))
+                warnings.add(new Issue("ACTION_PREREQUISITE",k,label(n)+" needs "+actionLabel(needed)+" to have happened first; it is not earlier on every path from Start, so a case will stop here unless that work is done outside this journey."));
+        }
+    }
+    private String actionLabel(String key){return registry.find(key).map(c->"\""+c.label()+"\"").orElse(key);}
     private boolean complementary(List<Edge> edges){
         if(edges.size()!=2 || edges.get(0).condition()==null || edges.get(1).condition()==null)return false;
         var a=edges.get(0).condition();var b=edges.get(1).condition();

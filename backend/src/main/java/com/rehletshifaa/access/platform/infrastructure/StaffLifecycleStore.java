@@ -28,9 +28,41 @@ public class StaffLifecycleStore {
                                   String requestedBy, Instant requestedAt, String decidedBy, String decisionReason,
                                   String executionReference, long revision) {}
 
+    /** A live person (anyone not CANCELLED, EXPIRED or OFFBOARDED) or an open invitation holds the address. */
     public boolean emailInUse(String emailHash) {
-        return count("SELECT COUNT(*) FROM workforce_people WHERE email_hash=?", emailHash) > 0
+        return count("SELECT COUNT(*) FROM workforce_people WHERE email_hash=? AND lifecycle_status NOT IN ('CANCELLED','EXPIRED','OFFBOARDED')", emailHash) > 0
                 || count("SELECT COUNT(*) FROM workforce_invitations WHERE email_hash=? AND status IN ('QUEUED','SENT')", emailHash) > 0;
+    }
+
+    /** The closed workforce person holding this address, if any (re-invitation reuses them). */
+    public Optional<Person> closedPersonByEmail(String emailHash) {
+        return jdbc.sql("SELECT subject FROM workforce_people WHERE email_hash=? AND lifecycle_status IN ('CANCELLED','EXPIRED','OFFBOARDED')")
+                .param(emailHash).query(String.class).optional().map(this::personForUpdate);
+    }
+
+    /** An identity operation for the subject is still queued or running (for example the disable after expiry). */
+    public boolean identityOperationPending(String subject) {
+        return count("SELECT COUNT(*) FROM identity_operations WHERE target_subject=? AND status IN ('PENDING','RUNNING','RETRYING')", subject) > 0;
+    }
+
+    /**
+     * Re-invitation of a closed person: the new invitation is bound to their existing identity at once (SENT), the
+     * person returns to INVITED with inactive access and no MFA evidence, and the invited roles are recorded with
+     * source INVITATION — effective only after activation, exactly like a first invitation (STF-02).
+     */
+    public void reopenForInvitation(Person person, UUID invitationId, String name, String locale, String reason, Instant now) {
+        jdbc.sql("UPDATE workforce_invitations SET subject=?,status='SENT',revision=revision+1 WHERE id=? AND status='QUEUED'")
+                .params(person.subject(), invitationId).update();
+        if (jdbc.sql("UPDATE workforce_people SET display_name_encrypted=?,locale=?,lifecycle_status='INVITED',lifecycle_reason=?,lifecycle_changed_at=?,"
+                        + "activated_at=NULL,mfa_enrolled=FALSE,phishing_resistant_mfa_enrolled=FALSE,updated_at=?,revision=revision+1 "
+                        + "WHERE subject=? AND revision=?")
+                .params(name, locale, reason, timestamp(now), timestamp(now), person.subject(), person.revision()).update() != 1) stale();
+        jdbc.sql("UPDATE access_subjects SET active=FALSE,revision=revision+1 WHERE subject=?").param(person.subject()).update();
+        for (String role : jdbc.sql("SELECT role_key FROM workforce_invitation_roles WHERE invitation_id=? ORDER BY role_key")
+                .param(invitationId).query(String.class).list())
+            jdbc.sql("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,status,source,assigned_by,reason,created_at,revision) "
+                            + "SELECT ?,?,?,?,'ACTIVE','INVITATION',i.invited_by,i.reason,?,0 FROM workforce_invitations i WHERE i.id=?")
+                    .params(UUID.randomUUID(), person.subject(), role, timestamp(now), timestamp(now), invitationId).update();
     }
 
     /** STF-05: an address already known in another population needs System Administrator review, never auto-linking. */

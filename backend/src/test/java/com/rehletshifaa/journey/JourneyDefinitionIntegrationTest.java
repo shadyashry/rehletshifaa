@@ -28,7 +28,7 @@ class JourneyDefinitionIntegrationTest {
  @BeforeEach void setup(){grant("maker",Role.JOURNEY_MANAGER);grant("checker",Role.JOURNEY_APPROVER);signIn("maker");}
  void grant(String s,Role r){TestPrincipals.grant(jdbc,crypto,s,r);}
  void revoke(String s){jdbc.update("UPDATE workforce_role_assignments SET status='REVOKED' WHERE subject=?",s);}
- void signIn(String s){SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(Jwt.withTokenValue("test").header("alg","none").subject(s).claim("auth_time",clock.instant()).build(),List.of()));}
+ void signIn(String s){SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(Jwt.withTokenValue("test").header("alg","none").subject(s).claim("auth_time",clock.instant()).claim("acr","3").build(),List.of()));}
  @AfterEach void clear(){SecurityContextHolder.clearContext();}
  Change change(long r){return new Change(r,"Reviewed synthetic journey");}
  JourneyModel.Version prepare(){var d=service.create();var v=d.versions().getFirst();UUID id=d.definition().id();v=service.edit(id,v.id(),new Edit(0,"Configure",JourneyGraphTest.linear()));v=service.validate(id,v.id(),change(v.revision())).version();v=service.simulate(id,v.id(),new Simulate(v.revision(),"Dry run",Map.of())).version();return service.submit(id,v.id(),change(v.revision()));}

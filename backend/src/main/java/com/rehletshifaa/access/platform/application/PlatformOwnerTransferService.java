@@ -44,6 +44,7 @@ public class PlatformOwnerTransferService {
         if (!store.currentOwner().equals(actor.subject()))
             throw new ApiException(403, "CURRENT_OWNER_REQUIRED", "Only the current Platform Account Owner can initiate a transfer");
         verifyEligibleIdentity(incoming);
+        separateFromAdministration(incoming);
         Instant now = clock.instant();
         return store.create(actor.subject(), incoming, command.reason().trim(), now, now.plus(REQUEST_LIFETIME));
     }
@@ -57,6 +58,7 @@ public class PlatformOwnerTransferService {
         if (!actor.subject().equals(transfer.incomingOwner()))
             throw new ApiException(403, "INCOMING_OWNER_REQUIRED", "Only the named incoming owner can accept this transfer");
         verifyEligibleIdentity(actor.subject());
+        separateFromAdministration(actor.subject());
         return store.accept(transfer, actor.subject(), command.reason().trim(), clock.instant());
     }
 
@@ -72,6 +74,7 @@ public class PlatformOwnerTransferService {
         if (actor.subject().equals(transfer.currentOwner()) || actor.subject().equals(transfer.incomingOwner()))
             throw new ApiException(409, "INDEPENDENT_OWNER_VERIFIER_REQUIRED", "A System Administrator distinct from both owners must verify the transfer");
         verifyEligibleIdentity(transfer.incomingOwner());
+        separateFromAdministration(transfer.incomingOwner());
         return store.complete(transfer, actor.subject(), command.reason().trim(), now);
     }
 
@@ -80,6 +83,13 @@ public class PlatformOwnerTransferService {
             throw new ApiException(409, "STALE_OWNER_TRANSFER", "The owner transfer changed; reload and try again");
         if (!transfer.expiresAt().isAfter(clock.instant()))
             throw new ApiException(409, "OWNER_TRANSFER_EXPIRED", "The owner transfer expired; the current owner must initiate a new transfer");
+    }
+
+    /** Bootstrap separates the owner from the System Administrators; a transfer keeps that separation (QA-03). */
+    private void separateFromAdministration(String subject) {
+        if (!access.subjectFacts(subject, clock.instant()).administratorAssignments().isEmpty())
+            throw new ApiException(409, "OWNER_ADMINISTRATOR_SEPARATION_REQUIRED",
+                    "The Platform Account Owner cannot also be a System Administrator; end that administrator assignment first");
     }
 
     private void verifyEligibleIdentity(String subject) {

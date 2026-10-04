@@ -124,12 +124,33 @@ public class StaffLifecycleService {
         if (store.emailKnownElsewhere(hash))
             throw new ApiException(409, "IDENTITY_REVIEW_REQUIRED", "This address belongs to another platform population; a System Administrator must review it");
         UUID id = UUID.randomUUID();
+        var closed = store.closedPersonByEmail(hash);
+        if (closed.isPresent()) return reinvite(closed.get(), id, name, email, hash, locale, actor, reason, requested, now);
         store.insertInvitation(id, crypto.encrypt(name), crypto.encrypt(email), hash, locale, actor, reason, now, now.plus(invitationLifetime), requested);
         events.publishEvent(IdentityOperationRequested.create(id, "workforce-invite:" + id, IdentityOperationRequested.Type.CREATE_STAFF,
                 actor, "Create workforce identity and send invitation", "WorkforceInvitation", id,
                 Map.of("name", name, "email", email, "locale", locale)));
         audit.record(actor, id.toString(), "STAFF_INVITED", "SUCCESS", "roles=" + requested, reason);
         return new InvitationView(id, name, email, "QUEUED", null, now.plus(invitationLifetime), requested, 0);
+    }
+
+    /**
+     * Lifecycle "re-invite creates a new invitation": a CANCELLED, EXPIRED or OFFBOARDED person keeps their identity
+     * and history, receives a new single-use invitation and returns to INVITED. A former employee (OFFBOARDED) must
+     * enrol MFA again. Refused while the identity's previous disable is still being applied, so it cannot land after
+     * the re-enable.
+     */
+    private InvitationView reinvite(Person person, UUID id, String name, String email, String hash, String locale, String actor,
+            String reason, List<String> requested, Instant now) {
+        if (store.identityOperationPending(person.subject()))
+            throw new ApiException(409, "IDENTITY_OPERATION_PENDING", "The previous account change is still being applied; try again shortly");
+        boolean formerEmployee = "OFFBOARDED".equals(person.lifecycle());
+        store.insertInvitation(id, crypto.encrypt(name), crypto.encrypt(email), hash, locale, actor, reason, now, now.plus(invitationLifetime), requested);
+        store.reopenForInvitation(person, id, crypto.encrypt(name), locale, reason, now);
+        UUID op = UUID.randomUUID();
+        events.publishEvent(IdentityOperationRequested.reinvite(op, "workforce-reinvite:" + id, person.subject(), actor, reason, locale, formerEmployee));
+        audit.record(actor, id.toString(), "STAFF_REINVITED", "SUCCESS", "subject=" + person.subject() + "; previous=" + person.lifecycle() + "; roles=" + requested, reason);
+        return new InvitationView(id, name, email, "SENT", person.subject(), now.plus(invitationLifetime), requested, 1);
     }
 
     /** STF-02: the invited person activates only with an enrolled MFA credential confirmed by the identity provider. */

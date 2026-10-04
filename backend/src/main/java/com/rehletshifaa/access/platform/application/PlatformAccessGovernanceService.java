@@ -6,7 +6,10 @@ import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.access.platform.infrastructure.PlatformAccessRepository;
 import com.rehletshifaa.access.platform.infrastructure.PlatformAccessRepository.ChangeRequest;
+import com.rehletshifaa.access.platform.infrastructure.PlatformOwnerTransferStore;
 import com.rehletshifaa.access.platform.infrastructure.WorkforceRoleAssignmentStore;
+import com.rehletshifaa.authority.application.Principal;
+import com.rehletshifaa.workforce.application.WorkforceDirectory;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,25 +28,42 @@ public class PlatformAccessGovernanceService {
     private final WorkforceRoleAssignmentStore roles;
     private final GovernanceAuditLog audit;
     private final Clock clock;
+    private final PlatformOwnerTransferStore owners;
+    private final GovernanceAuthentication governanceAuthentication;
+    private final WorkforceDirectory directory;
 
-    public PlatformAccessGovernanceService(PlatformAccessRepository repository, Authority authority, WorkforceRoleAssignmentStore roles,             GovernanceAuditLog audit, Clock clock) {
+    public PlatformAccessGovernanceService(PlatformAccessRepository repository, Authority authority, WorkforceRoleAssignmentStore roles,
+            GovernanceAuditLog audit, Clock clock, PlatformOwnerTransferStore owners, GovernanceAuthentication governanceAuthentication,
+            WorkforceDirectory directory) {
         this.repository = repository;
         this.authority = authority;
         this.roles = roles;
-
         this.audit = audit;
         this.clock = clock;
+        this.owners = owners;
+        this.governanceAuthentication = governanceAuthentication;
+        this.directory = directory;
+    }
+
+    /** {@code names}: display names of every subject shown, so the owner (who has no directory read) sees people, not ids. */
+    public record Overview(java.util.List<PlatformAccessRepository.Assignment> administrators, java.util.List<ChangeRequest> requests,
+                           java.util.Map<String, String> names) {}
+
+    /** Who administers the platform now (and is scheduled to), and the two-person change requests. Administrators and the owner (GOV-02). */
+    @Transactional(readOnly = true)
+    public Overview overview() {
+        if (!isCurrentOwner(Principal.current())) authority.require(Permission.ACCESS_GOVERN);
+        var administrators = repository.administratorAssignments(clock.instant());
+        var requests = repository.recentRequests(50);
+        java.util.Map<String, String> names = new java.util.TreeMap<>();
+        java.util.stream.Stream.concat(administrators.stream().map(PlatformAccessRepository.Assignment::subject),
+                        requests.stream().flatMap(r -> java.util.stream.Stream.of(r.subject(), r.requestedBy())))
+                .filter(java.util.Objects::nonNull).distinct()
+                .forEach(s -> directory.contact(s).ifPresent(c -> names.put(s, c.displayName())));
+        return new Overview(administrators, requests, names);
     }
 
     @Transactional
-    public record Overview(java.util.List<PlatformAccessRepository.Assignment> administrators, java.util.List<ChangeRequest> requests) {}
-
-    /** Who administers the platform now (and is scheduled to), and the two-person change requests. */
-    public Overview overview() {
-        authority.require(Permission.ACCESS_GOVERN);
-        return new Overview(repository.administratorAssignments(clock.instant()), repository.recentRequests(50));
-    }
-
     public ChangeRequest request(AdministratorChange command) {
         Instant now = clock.instant();
         repository.lockGovernance();
@@ -61,6 +81,7 @@ public class PlatformAccessGovernanceService {
 
         PlatformAccessRepository.Assignment assignment = null;
         if (command.type() == ChangeType.APPOINT) {
+            ownerSeparation(command.subject());
             if (repository.overlappingAdministratorAssignment(command.subject(), command.effectiveFrom(), command.effectiveTo()))
                 throw new ApiException(409, "OVERLAPPING_ADMIN_ASSIGNMENT", "An overlapping administrator assignment already exists");
             roleConflict(command.subject(), command.effectiveFrom(), command.effectiveTo());
@@ -80,13 +101,14 @@ public class PlatformAccessGovernanceService {
     public ChangeRequest approve(UUID requestId, Decision command) {
         Instant now = clock.instant();
         repository.lockGovernance();
-        var actor = requireAdministrator(now);
+        var actor = requireDecider(now);
         text(command.reason(), 1000, "Give a reason for this decision");
         ChangeRequest request = repository.requestForUpdate(requestId);
         pending(request, command.revision(), now);
         checker(request, actor.subject());
 
         if (request.type().equals(ChangeType.APPOINT.name())) {
+            ownerSeparation(request.subject());
             if (repository.overlappingAdministratorAssignment(request.subject(), request.effectiveFrom(), request.effectiveTo()))
                 throw new ApiException(409, "OVERLAPPING_ADMIN_ASSIGNMENT", "An overlapping administrator assignment already exists");
             roleConflict(request.subject(), request.effectiveFrom(), request.effectiveTo());
@@ -106,7 +128,7 @@ public class PlatformAccessGovernanceService {
     public ChangeRequest reject(UUID requestId, Decision command) {
         Instant now = clock.instant();
         repository.lockGovernance();
-        var actor = requireAdministrator(now);
+        var actor = requireDecider(now);
         text(command.reason(), 1000, "Give a reason for this decision");
         ChangeRequest request = repository.requestForUpdate(requestId);
         pending(request, command.revision(), now);
@@ -123,6 +145,25 @@ public class PlatformAccessGovernanceService {
     public void assertAdministratorInvariant() {
         // Compatibility mode: legacy authority continues to operate until the first target assignment is provisioned.
         if (repository.governanceInitialized()) assertInvariant(clock.instant());
+    }
+
+    /**
+     * GOV-02/SOD-03: a different System Administrator or the Platform Account Owner decides. The owner decides with
+     * recent phishing-resistant authentication and needs no administrator role; raising a request stays with administrators.
+     */
+    private Principal requireDecider(Instant now) {
+        if (isCurrentOwner(Principal.current())) return governanceAuthentication.requireRecentPhishingResistant();
+        return requireAdministrator(now);
+    }
+
+    /** QA-03: the Platform Account Owner is never also a System Administrator (bootstrap rule, kept for every later change). */
+    private void ownerSeparation(String subject) {
+        if (owners.findCurrentOwner().filter(subject::equals).isPresent())
+            throw new ApiException(409, "OWNER_ADMINISTRATOR_SEPARATION_REQUIRED", "The Platform Account Owner cannot also be a System Administrator");
+    }
+
+    private boolean isCurrentOwner(Principal principal) {
+        return owners.findCurrentOwner().filter(principal.subject()::equals).isPresent();
     }
 
     private com.rehletshifaa.authority.application.Principal requireAdministrator(Instant now) {
