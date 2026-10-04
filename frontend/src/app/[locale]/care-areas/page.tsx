@@ -7,6 +7,7 @@ import { SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import { CareNetwork } from "@/components/care-areas/CareNetwork";
 import { CaseRouter } from "@/components/care-areas/CaseRouter";
 import { HeroStats } from "@/components/HeroStats";
+import { HomeThemeSwitch } from "@/components/home/HomeThemeSwitch";
 import { PageHero } from "@/components/PageHero";
 import { TrackedLink } from "@/components/TrackedLink";
 import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
@@ -149,6 +150,7 @@ export default async function CareAreas({ params }: Props) {
       </section>
 
       <CaseRouter locale={locale} copy={page.router} button={d.common.send} />
+      <HomeThemeSwitch locale={locale} />
     </>
   );
 }

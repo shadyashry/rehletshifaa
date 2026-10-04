@@ -4,8 +4,8 @@ import { useEffect, useSyncExternalStore } from "react";
 import type { Locale } from "@/lib/i18n";
 
 /**
- * Brand preview switch (home page only). While the home page is mounted it can put the candidate themes
- * ("Malachite & Gold", `app/theme-malachite.css`; "Lapis Night", `app/theme-lapis.css`) on <html>; leaving the home page always restores the original theme, so no other
+ * Brand preview switch (home and Care Areas pages). While one of those pages is mounted it can put the candidate themes
+ * ("Malachite & Gold", `app/theme-malachite.css`; "Lapis Night", `app/theme-lapis.css`) on <html>; leaving them always restores the original theme, so no other
  * page is affected. The choice is a per-viewer convenience kept in localStorage (memory if storage is unavailable).
  * Remove this component and the stylesheet once the final brand is chosen.
  */
