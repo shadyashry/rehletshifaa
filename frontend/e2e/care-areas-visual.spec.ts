@@ -63,3 +63,28 @@ test("all care areas have working doctor profiles", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Dr Mostafa Baraka" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Dr Mohammed Ali Ibrahim Hussien" })).toBeVisible();
 });
+
+const DETAIL_PAGES = ["cardiology", "rheumatology-rehabilitation", "orthopedics", "vascular-endovascular-surgery", "gastroenterology-hepatology", "interventional-neuroradiology", "womens-health", "general-surgery", "plastic-reconstructive-surgery"];
+
+test("every care-area detail page fits a phone in both languages", async ({ page }) => {
+  test.setTimeout(180000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const locale of ["en", "ar"]) {
+    for (const slug of DETAIL_PAGES) {
+      await page.goto(`/${locale}/${slug}`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15000 });
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, `${locale}/${slug}`).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
+test("small teams are named in the hero; larger teams are counted", async ({ page }) => {
+  await page.goto("/en/cardiology");
+  const hero = page.locator("main > section").first();
+  await expect(hero.getByRole("link", { name: /Dr Ahmed AlAshry/ })).toHaveAttribute("href", /\/en\/consultants\/ahmed-alashry$/);
+  await expect(hero.getByText("Verified Consultants")).toHaveCount(0);
+  await expect(page.getByText("Send us your case if…")).toBeVisible();
+  await page.goto("/en/orthopedics");
+  await expect(page.locator("main > section").first().getByText("Verified Consultants")).toBeVisible();
+});

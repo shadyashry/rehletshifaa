@@ -41,7 +41,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
       </div>
 
       <div className={`flex min-w-0 flex-1 flex-col px-6 pb-6 pt-5 sm:px-7 ${featured ? "md:p-8" : ""}`}>
-        <p className="inline-flex items-center gap-1.5 text-[0.75rem] font-semibold leading-5 text-brand-700">
+        <p className="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold leading-5 text-brand-700">
           <CareAreaIcon name={icon} size={14} strokeWidth={1.8} />
           {profile.careAreaLabel}
         </p>
@@ -55,7 +55,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
 
         {profile.distinction && (!featured || profile.distinction !== profile.role) ? (
           <div className="mt-4 border-s-2 border-brand-400 ps-3.5">
-            <p className="inline-flex items-center gap-1.5 text-[0.75rem] font-semibold uppercase tracking-[0.08em] text-ink-500 rtl:normal-case rtl:tracking-normal">
+            <p className="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold uppercase tracking-[0.06em] text-ink-500 rtl:normal-case rtl:tracking-normal">
               <Award size={13} aria-hidden="true" />
               {labels.distinction}
             </p>
@@ -64,7 +64,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
         ) : null}
 
         <div className="mt-5">
-          <p className="text-[0.75rem] font-semibold uppercase tracking-[0.08em] text-ink-500 rtl:normal-case rtl:tracking-normal">{labels.focus}</p>
+          <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.06em] text-ink-500 rtl:normal-case rtl:tracking-normal">{labels.focus}</p>
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {(featured ? profile.focusAreas : profile.focusAreas.slice(0, 3)).map((focus) => (
               <li key={focus} className="inline-flex items-start gap-1.5 rounded-lg border border-border-subtle bg-surface-pearl px-2.5 py-1 text-[0.8125rem] leading-5 text-ink-700">

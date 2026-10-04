@@ -219,16 +219,16 @@
   },
   "cardiology": {
     "eyebrow": "Consultant-led cardiac pathways",
-    "title": "Advanced Cardiac Care, Guided by Your Case",
+    "title": "Advanced cardiac care, guided by your case",
     "intro": "You don't need to choose a cardiac specialty yourself. Send your medical information and RehletShifaa will help direct your case to the appropriate Consultant.",
     "exploreAction": "Explore cardiac care areas",
-    "coronaryTitle": "Coronary Arteries & Interventional Cardiology",
+    "coronaryTitle": "Coronary arteries & interventional cardiology",
     "coronaryItems": [
-      "Coronary Angiography",
-      "Cardiac Catheterization",
-      "PCI / Coronary Angioplasty",
-      "Coronary Stents",
-      "Multiple Stent Procedures",
+      "Coronary angiography",
+      "Cardiac catheterization",
+      "PCI / coronary angioplasty",
+      "Coronary stents",
+      "Multiple stent procedures",
       "Complex PCI",
       "Evaluation for alternative treatment when PCI is not appropriate"
     ],
@@ -240,17 +240,17 @@
       "Coronary disease was described as complex",
       "Another opinion is required before intervention"
     ],
-    "structuralTitle": "Structural Heart & Valve Interventions",
+    "structuralTitle": "Structural heart & valve interventions",
     "structuralItems": [
       "TAVI / TAVR",
-      "Percutaneous Mitral Commissurotomy",
+      "Percutaneous mitral commissurotomy",
       "Mitral TEER",
       "Tricuspid TEER",
-      "Transcatheter Tricuspid Valve Replacement",
-      "Bicaval Valve Implantation"
+      "Transcatheter tricuspid valve replacement",
+      "Bicaval valve implantation"
     ],
     "suitability": "Suitability for any procedure is determined only after Consultant review.",
-    "rhythmTitle": "Heart Rhythm & Cardiac Devices",
+    "rhythmTitle": "Heart rhythm & cardiac devices",
     "rhythmItems": [
       "Pacemaker",
       "ICD",
@@ -263,9 +263,9 @@
       "CRT was suggested",
       "A second opinion is needed before device implantation"
     ],
-    "examples": "Patients may contact RehletShifaa if",
-    "finalTitle": "Not Sure Where Your Condition Fits?",
-    "finalBody": "That's completely fine. You do not need to select a specialty. Send your reports and we'll help direct your case to the appropriate Consultant."
+    "examples": "Send us your case if…",
+    "finalTitle": "Not sure where your condition fits?",
+    "finalBody": "You don't need to pick a specialty. Send what you have, and your coordinator will route your case to the right Consultant."
   },
   "consultants": {
     "eyebrow": "Appropriate expertise for each case",
@@ -605,13 +605,13 @@
   },
   "rheumatology": {
     "eyebrow": "Consultant-led rehabilitation & dysphagia care",
-    "title": "Dysphagia Rehabilitation & Physical Medicine",
+    "title": "Dysphagia rehabilitation & physical medicine",
     "intro": "A rare, focused service for adults and children with swallowing (dysphagia) difficulties — alongside broader rehabilitation, physical medicine and rheumatology. Send your reports and RehletShifaa will help direct your case to the appropriate Consultant.",
     "highlight": "A rare, specialised service — Adult & Pediatric Dysphagia (swallowing) Rehabilitation.",
     "videoTitle": "Meet your rehabilitation & dysphagia Consultant — coming soon",
     "sections": [
       {
-        "title": "Adult & Pediatric Dysphagia Rehabilitation",
+        "title": "Adult & pediatric dysphagia rehabilitation",
         "items": [
           "Post-stroke & neurological swallowing rehabilitation",
           "Head & neck cancer swallowing rehabilitation",
@@ -622,7 +622,7 @@
         ]
       },
       {
-        "title": "Rehabilitation & Physical Medicine",
+        "title": "Rehabilitation & physical medicine",
         "items": [
           "Post-surgical rehabilitation",
           "Post-stroke & neurological rehabilitation",
@@ -631,7 +631,7 @@
         ]
       },
       {
-        "title": "Rheumatology & Joint Care",
+        "title": "Rheumatology & joint care",
         "items": [
           "Rheumatoid arthritis & inflammatory joint disease",
           "Ankylosing spondylitis & spondyloarthritis",
@@ -641,17 +641,17 @@
       }
     ],
     "note": "Your treatment and therapy plan is decided by the Consultant after review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
-    "finalTitle": "Not Sure Where Your Condition Fits?",
-    "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate Consultant."
+    "finalTitle": "Not sure where your condition fits?",
+    "finalBody": "Send what you have, and your coordinator will route your case to the right Consultant."
   },
   "orthopedics": {
     "eyebrow": "Consultant-led orthopedic care",
-    "title": "Orthopedics & Joint Surgery",
+    "title": "Orthopedics & joint surgery",
     "intro": "From joint replacement to sports injuries and spine evaluation — send your reports and RehletShifaa will help direct your case to the appropriate Consultant.",
     "videoTitle": "Meet your orthopedics Consultant — coming soon",
     "sections": [
       {
-        "title": "Joint Replacement",
+        "title": "Joint replacement",
         "items": [
           "Hip replacement",
           "Knee replacement",
@@ -660,7 +660,7 @@
         ]
       },
       {
-        "title": "Sports Injuries & Arthroscopy",
+        "title": "Sports injuries & arthroscopy",
         "items": [
           "Knee arthroscopy (ACL, meniscus)",
           "Shoulder arthroscopy",
@@ -669,7 +669,7 @@
         ]
       },
       {
-        "title": "Spine, Trauma & Deformity",
+        "title": "Spine, trauma & deformity",
         "items": [
           "Spine evaluation & selected interventions",
           "Fracture & trauma follow-up",
@@ -679,8 +679,8 @@
       }
     ],
     "note": "Suitability for any procedure is determined only after Consultant review. RehletShifaa coordinates the case; it does not diagnose or prescribe.",
-    "finalTitle": "Not Sure Where Your Condition Fits?",
-    "finalBody": "That's completely fine. Send your reports and we'll help direct your case to the appropriate Consultant."
+    "finalTitle": "Not sure where your condition fits?",
+    "finalBody": "Send what you have, and your coordinator will route your case to the right Consultant."
   },
   "consultantsPage": {
     "stats": {
@@ -758,21 +758,26 @@
     "stats": {
       "consultants": "Verified Consultants",
       "faculty": "University faculty",
-      "focus": "Clinical focus areas"
+      "focus": "Clinical focus areas",
+      "consultantsOne": "Verified Consultant",
+      "facultyOne": "University faculty member"
     },
     "snapshotLed": "Led by",
     "scopeEyebrow": "What we review",
     "scopeTitle": "What this care area covers",
     "scopeIntro": "Not every condition is listed. Send your reports anyway — your coordinator confirms the right Consultant.",
     "focusTitle": "Clinical focus of our Consultants",
-    "signsFallback": "You might contact us if",
+    "signsFallback": "Send us your case if…",
     "consultantsEyebrow": "The Consultants",
     "consultantsTitle": "Who leads {area}",
     "consultantsIntro": "Verified senior specialists. Your coordinator matches your case to the most appropriate one.",
     "relatedEyebrow": "Keep exploring",
     "relatedTitle": "Other care areas",
     "sameSystem": "Also in {system}",
-    "allAreas": "View all care areas"
+    "allAreas": "View all care areas",
+    "signsTitle": "When to send us your case",
+    "showMore": "Show {n} more",
+    "ledBy": "Led by"
   },
   "consultantProfile": {
     "verified": "Verified profile",

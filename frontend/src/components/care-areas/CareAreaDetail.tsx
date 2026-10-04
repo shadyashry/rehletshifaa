@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, Check, ChevronRight, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowRight, Check, ChevronDown, ChevronRight, Send, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -48,6 +48,10 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
   const style = SYSTEM_STYLES[area.system];
   const faculty = universityFacultySlugs();
   const singleConsultant = area.consultants.length === 1;
+  const namedLeads = area.consultants.length > 0 && area.consultants.length <= 2;
+  const facultyCount = area.consultants.filter((p) => faculty.has(p.slug)).length;
+  const signGroups = scope.filter((section) => section.signs?.length);
+  const PREVIEW = 4;
   const focusCount = scope.reduce((sum, section) => sum + section.items.length, 0);
   const led = (n: number) => (n === 1 ? d.careAreasPage.atlas.consultantsOne : n === 2 ? d.careAreasPage.atlas.consultantsTwo : fill(d.careAreasPage.atlas.consultantsMany, { n }));
   const siblings = system.areas.filter((item) => item.slug !== slug);
@@ -77,13 +81,35 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
               </p>
             ) : null}
             <div className="mt-6">
-              <HeroStats
-                stats={[
-                  { value: area.consultants.length, label: t.stats.consultants },
-                  { value: area.consultants.filter((p) => faculty.has(p.slug)).length, label: t.stats.faculty },
-                  { value: focusCount, label: t.stats.focus },
-                ]}
-              />
+              {namedLeads ? (
+                // One or two Consultants: name them — a person builds more trust than a count of one.
+                <div className="max-w-[36rem] rounded-[16px] bg-surface-default/80 p-4 ring-1 ring-border-subtle">
+                  <p className="text-[0.8125rem] font-semibold text-ink-500">{t.ledBy}</p>
+                  <ul className="mt-2.5 grid gap-2.5">
+                    {area.consultants.map((profile) => (
+                      <li key={profile.slug}>
+                        <Link href={localeHref(locale, `consultants/${profile.slug}`)} className="group flex items-center gap-3 rounded-xl">
+                          <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-full text-[0.8125rem] font-semibold tracking-[0.03em] text-brand-800 ring-1 ${style.well} ${style.ring}`}>
+                            {profile.initials}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[1rem] font-semibold leading-6 text-brand-900 group-hover:text-brand-700">{profile.name}</span>
+                            <span className="line-clamp-1 text-[0.875rem] leading-5 text-ink-500">{profile.distinction ?? profile.role}</span>
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <HeroStats
+                  stats={[
+                    { value: area.consultants.length, label: area.consultants.length === 1 ? t.stats.consultantsOne : t.stats.consultants },
+                    { value: facultyCount, label: facultyCount === 1 ? t.stats.facultyOne : t.stats.faculty },
+                    { value: focusCount, label: t.stats.focus },
+                  ]}
+                />
+              )}
             </div>
             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
               <TrackedLink event="send_case_cta_clicked" className="btn-primary w-full sm:w-auto" href={localeHref(locale, "send-my-case")}>
@@ -126,8 +152,11 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
                     </span>
                   ))}
                 </span>
-                <span className="text-[0.875rem] text-ink-600">
-                  {t.snapshotLed} <span className="font-semibold text-brand-900">{led(area.consultants.length)}</span>
+                <span className="min-w-0 text-[0.875rem] leading-5 text-ink-600">
+                  {t.snapshotLed}{" "}
+                  <span className="font-semibold text-brand-900">
+                    {namedLeads ? area.consultants.map((profile) => profile.name).join(locale === "ar" ? " و" : " & ") : led(area.consultants.length)}
+                  </span>
                 </span>
               </div>
             ) : null}
@@ -151,37 +180,71 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
               <article key={section.title} className="flex flex-col rounded-[18px] border border-border-card bg-surface-default p-6 shadow-[0_1px_2px_rgba(36,64,74,0.04)] sm:p-7">
                 <div className="flex items-center gap-3.5">
                   <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-full text-[0.8125rem] font-semibold tabular-nums text-brand-800 ring-1 ${style.well} ${style.ring}`}>
-                    {String(index + 1).padStart(2, "0")}
+                    {scope.length === 1 ? <CareAreaIcon name={area.icon} size={18} strokeWidth={1.8} /> : String(index + 1).padStart(2, "0")}
                   </span>
                   <h3 className="text-[1.125rem] font-semibold leading-snug text-brand-900 [text-wrap:balance]">{section.title}</h3>
                 </div>
+                {/* Phones show the first items and a "show more" toggle; from sm every item is listed. */}
                 <ul className={`mt-5 grid gap-x-5 gap-y-2.5 ${scope.length === 1 ? "sm:grid-cols-2" : ""}`}>
-                  {section.items.map((item) => (
-                    <li key={item} className="flex gap-2.5 text-[0.9375rem] leading-6 text-ink-700">
+                  {section.items.map((item, i) => (
+                    <li key={item} className={`flex gap-2.5 text-[0.9375rem] leading-6 text-ink-700 ${i >= PREVIEW ? "max-sm:hidden" : ""}`}>
                       <Check size={16} strokeWidth={2.2} aria-hidden="true" className="mt-1 flex-none text-brand-600" />
                       {item}
                     </li>
                   ))}
                 </ul>
-                {section.signs?.length ? (
-                  <div className="mt-6 rounded-[14px] bg-surface-clinical p-4 ring-1 ring-border-clinical">
-                    <p className="text-[0.8125rem] font-semibold text-brand-800">{signsLabel ?? t.signsFallback}</p>
-                    <ul className="mt-2 grid gap-1.5">
-                      {section.signs.map((sign) => (
-                        <li key={sign} className="flex gap-2 text-[0.875rem] leading-6 text-ink-600">
-                          <span aria-hidden className={`mt-2.5 h-1.5 w-1.5 flex-none rounded-full ${style.dot}`} />
-                          {sign}
+                {section.items.length > PREVIEW ? (
+                  <details className="group/more mt-2.5 sm:hidden">
+                    <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-[0.9375rem] font-semibold text-brand-700 [&::-webkit-details-marker]:hidden">
+                      {fill(t.showMore, { n: section.items.length - PREVIEW })}
+                      <ChevronDown size={16} aria-hidden="true" className="transition-transform group-open/more:rotate-180" />
+                    </summary>
+                    <ul className="mt-1 grid gap-y-2.5">
+                      {section.items.slice(PREVIEW).map((item) => (
+                        <li key={item} className="flex gap-2.5 text-[0.9375rem] leading-6 text-ink-700">
+                          <Check size={16} strokeWidth={2.2} aria-hidden="true" className="mt-1 flex-none text-brand-600" />
+                          {item}
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </details>
                 ) : null}
               </article>
             ))}
           </div>
-          <p className="mt-6 flex max-w-[80ch] items-start gap-3 rounded-[14px] border-s-4 border-brand-500 bg-surface-default px-5 py-4 text-[0.9375rem] font-medium leading-7 text-brand-900 ring-1 ring-border-subtle">
-            {note}
-          </p>
+
+          {/* When to send a case: every section's signs in one panel, with the suitability note as its footer. */}
+          <div className="mt-6 overflow-hidden rounded-[18px] border border-border-clinical bg-surface-clinical">
+            {signGroups.length ? (
+              <div className="p-6 sm:p-7">
+                <p className="flex items-center gap-2.5 text-[1.125rem] font-semibold text-brand-900">
+                  <span aria-hidden className="grid h-9 w-9 place-items-center rounded-xl bg-surface-default text-brand-700 ring-1 ring-border-clinical">
+                    <Send size={16} strokeWidth={1.9} className="rtl:-scale-x-100" />
+                  </span>
+                  {signsLabel ?? t.signsTitle}
+                </p>
+                <div className={`mt-5 grid gap-6 ${signGroups.length > 1 ? "md:grid-cols-2" : ""} ${signGroups.length > 2 ? "xl:grid-cols-3" : ""}`}>
+                  {signGroups.map((section) => (
+                    <div key={section.title}>
+                      {signGroups.length > 1 ? <p className="text-[0.8125rem] font-semibold text-brand-700">{section.title}</p> : null}
+                      <ul className="mt-2 grid gap-1.5">
+                        {section.signs!.map((sign) => (
+                          <li key={sign} className="flex gap-2.5 text-[0.9375rem] leading-6 text-ink-700">
+                            <span aria-hidden className={`mt-2.5 h-1.5 w-1.5 flex-none rounded-full ${style.dot}`} />
+                            {sign}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <p className={`flex items-start gap-3 bg-surface-default px-6 py-4 text-[0.9375rem] font-medium leading-7 text-brand-900 sm:px-7 ${signGroups.length ? "border-t border-border-clinical" : ""}`}>
+              <ShieldCheck size={18} aria-hidden="true" className="mt-1 flex-none text-brand-600" />
+              {note}
+            </p>
+          </div>
         </div>
       </section>
 
