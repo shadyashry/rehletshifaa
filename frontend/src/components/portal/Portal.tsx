@@ -87,7 +87,9 @@ export function Portal({locale}:{locale:Locale}){
   const views=useMemo(()=>portalViews(me),[me]);
   const workforce=views.some(view=>view!=="patient");
   const controlCenterOnly=!!user&&!workforce&&opensControlCenter(me);
-  const available=useMemo<RoleKey[]>(()=>workforce?views:me&&!controlCenterOnly?["patient"]:[],[views,workforce,me,controlCenterOnly]);
+  // An invited workforce person whose activation was refused (STF-02) is not a patient-side account: they finish setup first.
+  const awaitingActivation=!!me?.pendingActions.includes("ACTIVATE_ACCOUNT");
+  const available=useMemo<RoleKey[]>(()=>workforce?views:me&&!controlCenterOnly&&!awaitingActivation?["patient"]:[],[views,workforce,me,controlCenterOnly,awaitingActivation]);
   const patientView=available.includes("patient");
   const controlCenter=useControlCenterEntry(locale);const router=useRouter();
   useEffect(()=>{if(controlCenterOnly)router.replace(ccHref(locale));},[controlCenterOnly,router,locale]);

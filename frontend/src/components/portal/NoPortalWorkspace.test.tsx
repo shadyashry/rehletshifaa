@@ -6,10 +6,10 @@ import { apiFetchAs } from "@/lib/api";
 import type { Me } from "@/lib/access";
 import { meWith } from "@/components/platform-control-center/test-support";
 
-const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "verifier" } }, me: null as Me | null, roles: [] as string[], loading: false, meFailed: false, refreshMe: vi.fn(), signIn: vi.fn() }));
+const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "verifier" } }, me: null as Me | null, roles: [] as string[], loading: false, meFailed: false, activationIssue: null as { code: string; message: string } | null, refreshMe: vi.fn(), signIn: vi.fn() }));
 vi.mock("@/components/AuthProvider", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); auth.me = null; auth.meFailed = false; });
+afterEach(() => { cleanup(); vi.clearAllMocks(); auth.me = null; auth.meFailed = false; auth.activationIssue = null; });
 
 describe("Signed-in account without a care-portal workspace", () => {
   it("points a Control-Center-only person to the areas their role opens — never 'no access'", () => {
@@ -33,6 +33,19 @@ describe("Signed-in account without a care-portal workspace", () => {
     auth.me = null; auth.meFailed = true;
     render(<NoPortalWorkspace locale="en" />);
     expect(screen.getByRole("alert")).toHaveTextContent("We couldn't check what you can use.");
+  });
+
+  it("asks an invited person whose activation was refused to set up two-step verification, and lets them retry", () => {
+    auth.me = meWith([], { pendingActions: ["ACTIVATE_ACCOUNT"] });
+    auth.activationIssue = { code: "MFA_ENROLMENT_REQUIRED", message: "Set up two-step verification before activating your account" };
+    render(<NoPortalWorkspace locale="en" />);
+    expect(screen.getByRole("heading", { name: "Finish setting up your account" })).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Set up two-step verification to activate your account.");
+    screen.getByRole("button", { name: "Sign in to set it up" }).click();
+    expect(auth.signIn).toHaveBeenCalledWith(true);
+    screen.getByRole("button", { name: "Try again" }).click();
+    expect(auth.refreshMe).toHaveBeenCalled();
+    expect(apiFetchAs).not.toHaveBeenCalled();
   });
 
   it("renders in Arabic", () => {

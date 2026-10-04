@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
+import { useAuth } from "@/components/AuthProvider";
 import { useControlCenterAccess } from "@/components/platform-control-center/control-center-access";
 import { ccHref, openableSections, pick } from "@/components/platform-control-center/control-center-nav";
 
@@ -13,6 +14,24 @@ import { ccHref, openableSections, pick } from "@/components/platform-control-ce
 export function NoPortalWorkspace({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
   const access = useControlCenterAccess();
+  const { me, activationIssue, refreshMe, signIn } = useAuth();
+  // STF-02: an invited person whose activation was refused (usually: two-step verification not set up yet). Nothing is
+  // granted until it succeeds; signing in again lets the identity provider run its pending setup, and "Try again" re-asks.
+  if (me?.pendingActions.includes("ACTIVATE_ACCOUNT")) {
+    const mfa = activationIssue?.code === "MFA_ENROLMENT_REQUIRED";
+    return (
+      <section className="card max-w-2xl p-6 sm:p-8" aria-labelledby="no-portal-workspace-title">
+        <h2 id="no-portal-workspace-title" className="title">{ar ? "أكمل إعداد حسابك" : "Finish setting up your account"}</h2>
+        <p role="status" className="mt-2 text-sm leading-6 text-ink-600">{mfa
+          ? (ar ? "فعّل التحقق بخطوتين لتفعيل حسابك. لن تُمنح أي صلاحية قبل ذلك." : "Set up two-step verification to activate your account. Nothing is granted until you do.")
+          : (ar ? "لم نتمكن من تفعيل حسابك بعد. " : "We couldn't activate your account yet. ") + (activationIssue?.message ?? "")}</p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          {mfa && <button type="button" className="btn-primary" onClick={() => void signIn(true)}>{ar ? "تسجيل الدخول لإعداد التحقق" : "Sign in to set it up"}</button>}
+          <button type="button" className={mfa ? "btn-secondary" : "btn-primary"} onClick={refreshMe}>{ar ? "إعادة المحاولة" : "Try again"}</button>
+        </div>
+      </section>
+    );
+  }
   if (access.loading) return <p role="status" className="text-sm text-ink-500">{ar ? "جارٍ التحقق مما يمكنك الوصول إليه…" : "Checking what you can use…"}</p>;
   // A failed capability read is not an access answer: never tell someone "nothing is set up" because a read failed.
   if (access.failed) return <p role="alert" className="text-sm text-alert-800">{ar ? "تعذّر التحقق مما يمكنك الوصول إليه. " : "We couldn't check what you can use. "}<button type="button" className="font-semibold underline" onClick={access.retry}>{ar ? "إعادة المحاولة" : "Try again"}</button></p>;

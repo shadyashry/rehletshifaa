@@ -68,6 +68,22 @@ Cutover slices (executed in order; each keeps the backend suite green):
     inactive access and the invited roles (source `INVITATION`).
   - `POST /api/v1/me/activation` activates only when the identity provider confirms an enabled identity with an MFA
     credential (STF-02).
+  - Activation trigger (2026-10-04). Before this, nothing called `/me/activation`: no backend hook on `GET /api/v1/me`,
+    no login event listener, no portal or Control Center caller. `/me` only reported `pendingActions: ["ACTIVATE_ACCOUNT"]`,
+    so an invitee who completed the Keycloak required actions stayed INVITED and their roles never took effect.
+    - `AuthProvider` is the single `/me` reader for both the portal and the Control Center. When `/me` reports
+      `ACTIVATE_ACCOUNT`, it calls `POST /me/activation` once per signed-in subject. On success it re-reads `/me`
+      before publishing it, so the roles the invitation granted take effect with no INVITED flash.
+    - A refusal (`MFA_ENROLMENT_REQUIRED`, `INVITATION_NOT_VALID`, a 503 from the identity provider, a network error) is
+      kept as `activationIssue`. It never sets `meFailed` and it does not retry in a loop: `refreshMe` asks again.
+    - `Portal` no longer treats an account that is awaiting activation as a patient-side account. It never reaches
+      My Care or `/patient/account/session`. `NoPortalWorkspace` shows "Finish setting up your account": for MFA it
+      offers a fresh sign-in, so Keycloak runs the pending `CONFIGURE_TOTP`, plus "Try again".
+    - Tests: `AuthProvider.test.tsx` (3): activates and re-reads; keeps the MFA refusal without granting; never calls
+      activation when it is not pending. `NoPortalWorkspace.test.tsx` adds the refusal screen. `e2e/staff-activation.spec.ts`
+      (2, synthetic): an invited coordinator lands in the Coordinator workspace after one activation call, and an
+      invitee without MFA sees the setup screen, makes no patient-session call, and retries on demand. There was no
+      Playwright staff-invite flow to extend. A live Keycloak + Mailpit invitee walkthrough has not been run yet.
   - Resend (extends expiry) and cancel. A scheduled expiry sets EXPIRED and queues identity disablement.
   - Disable and restore take the governance lock and check the last-admin invariant; restore never reopens
     offboarding (STF-09).
@@ -603,6 +619,15 @@ WF-09 removal of `COORDINATOR_LEAD` bypasses; and a Control Center UI.
   isolated runs.
 - Full backend suite after S1-11: 594 tests. The only other error is the known OTP-helper flake
   (`PatientActivationJourneyTest`); the identity-operation failure in that run is the fixture fixed above.
+- STF-02 activation trigger (2026-10-04, frontend only):
+  - `pnpm typecheck` PASS.
+  - Vitest `AuthProvider`, `NoPortalWorkspace` and `PortalEntry`: PASS (13 tests).
+  - Full Vitest run: 262/273 pass. All 11 failures are in `ProposalSign.test.tsx`, which does not use `AuthProvider`
+    or the portal.
+  - Playwright `e2e/staff-activation.spec.ts` against a local dev server: PASS (2).
+  - `e2e/portal-ux.spec.ts` was already failing. Its fixture answers `GET /me` with a profile object that has no
+    `workspaces`, so `portalViews` throws.
+  - ESLint on the changed files: clean. The remaining `Portal.tsx` findings are on lines this change did not touch.
 - Flyway V1–V63 on H2: PASS.
 - Earlier focused workforce, architecture, JWT and identity-operation tests: PASS (29 tests for the S1-01/S1-02 gate).
 - The full backend run reached 556 tests but was not green: the new identity test initially collided with another
