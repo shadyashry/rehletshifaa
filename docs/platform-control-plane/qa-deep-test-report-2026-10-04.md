@@ -101,4 +101,28 @@ Still open (business decisions or features, not defects):
 - **QA-11:** SOD-05 (verifier ≠ the Consultant's Consultant Operations owner) and the STF-04/05 identity review queue.
 - **QA-12:** the Care Coordination Manager's case visibility.
 - **QA-13:** seeding Journey, Audit, Support and Identity-review UAT identities.
-- **New gap:** there is no owner-transfer UI. Its API exists, but the transfer can't be started from the Control Center.
+- ~~No owner-transfer UI~~: **built** (see section 8).
+
+## 8. Platform ownership UI (follow-up, same day)
+
+**Access › Platform Ownership** (`/portal/control-center/ownership`) shows the current owner, any transfer in progress, and earlier transfers. Each transfer shows its three steps: started, accepted, verified.
+
+**Who sees the page:** the current owner, System Administrators, and the named incoming owner of a live transfer. The incoming owner gets the Control Center workspace and an `ACCEPT_PLATFORM_OWNERSHIP` pending action in `/me`, so they can reach it with no role. Control Center Home counts transfers waiting for the viewer.
+
+**What each party can do:**
+- **Current owner:** start a transfer by the incoming owner's **work email**, resolved server-side to an existing RehletShifaa account; withdraw it at any pending step.
+- **Incoming owner:** accept or decline.
+- **Independent System Administrator:** verify, or refuse verification.
+
+**Rules:** every step needs a recent passkey sign-in, and a passkey refusal opens the sign-in prompt. Only one transfer can be in progress. Owner/administrator separation (QA-03) applies at every step.
+
+**New backend endpoints:**
+- `GET /api/v1/admin/platform-access/owner-transfers`: read model with per-viewer `canAccept`, `canDecline`, `canWithdraw` and `canVerify` flags; expired transfers are shown as EXPIRED.
+- `POST …/owner-transfers/{id}/reject`: withdraw, decline or refuse, depending on who calls it. It uses the schema's existing REJECTED status and adds the audit events `PLATFORM_OWNER_TRANSFER_WITHDRAWN`, `_DECLINED` and `_VERIFICATION_REFUSED`.
+- `POST …/owner-transfers` (initiate) now also accepts `incomingOwnerEmail`.
+
+**Tests:**
+- Backend: `PlatformUsersDeepQaTest.ownershipIsHandedOverThroughTheControlCenterByThreeIndependentParties` covers read permissions, the email lookup, `/me`, decline, withdraw, refuse verification, a full handover and audit.
+- Frontend: `GovernancePages.test.tsx` (4 new tests).
+
+**Limit:** the incoming owner must already have a RehletShifaa workforce account. Owner recovery (OD-02) is still unavailable.

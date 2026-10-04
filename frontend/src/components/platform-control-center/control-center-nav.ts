@@ -17,7 +17,7 @@ export type NavKey =
   | "pricing" | "exchangeRates" | "marginDeposit"
   | "coordination"
   | "journeys"
-  | "people" | "teams" | "staffing" | "administrators" | "support" | "recertification" | "serviceAccounts" | "audit";
+  | "people" | "teams" | "staffing" | "administrators" | "ownership" | "support" | "recertification" | "serviceAccounts" | "audit";
 
 export type NavItem = {
   key: NavKey; path: string; label: [string, string]; summary: [string, string];
@@ -61,6 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { key: "access", label: ["Access & Governance", "الصلاحيات والحوكمة"], icon: ShieldCheck, items: [
     { key: "administrators", path: "/administrators", label: ["Administrators", "مسؤولو النظام"], summary: ["System administrator changes (two-person approval) and platform ownership.", "تغييرات مسؤولي النظام (بموافقة شخصين) وملكية المنصة."], visible: (a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner },
+    { key: "ownership", path: "/ownership", label: ["Platform Ownership", "ملكية المنصة"], summary: ["Who owns the platform, and handing ownership over with the incoming owner's acceptance and an independent check.", "من يملك المنصة، وتسليم الملكية بقبول المالك الجديد وتحقق مستقل."], visible: (a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner || !!a.me?.pendingActions.includes("ACCEPT_PLATFORM_OWNERSHIP") },
     { key: "support", path: "/account-support", label: ["Account Support", "دعم الحسابات"], summary: ["Verify a caller, resend an invitation, send a password reset or request an MFA reset.", "تحقق من المتصل، وأعد إرسال الدعوة، وأرسل إعادة تعيين كلمة المرور أو اطلب إعادة تعيين التحقق."], visible: (a) => a.can("SUPPORT_ACCOUNT") },
     { key: "recertification", path: "/recertification", label: ["Access Reviews", "مراجعات الصلاحيات"], summary: ["Periodic confirmation that every role is still needed; MFA reset approvals.", "تأكيد دوري لحاجة كل دور؛ والموافقة على إعادة تعيين التحقق."], visible: (a) => a.can("WORKFORCE_READ") },
     { key: "serviceAccounts", path: "/service-accounts", label: ["Service Accounts", "حسابات الخدمة"], summary: ["Machine clients, their owners and credential rotation.", "العملاء الآليون ومالكوهم وتدوير بيانات الاعتماد."], visible: (a) => a.can("WORKFORCE_READ") },

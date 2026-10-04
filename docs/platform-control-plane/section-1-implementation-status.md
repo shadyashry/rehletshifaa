@@ -645,7 +645,9 @@ WF-09 removal of `COORDINATOR_LEAD` bypasses; and a Control Center UI.
   - The temporary `qa-defect` class and `pom.xml` exclusion were removed. `PatientIdentityAndAccountTest` had the same
     missing-`acr` fixture and is fixed.
   - Still open, needing decisions or features (QA-09..13): other functions' managers, an in-product admission switch,
-    SOD-05/STF-05, the coordination manager's case visibility, UAT seeds, and an owner-transfer UI.
+    SOD-05/STF-05, the coordination manager's case visibility and UAT seeds.
+  - Platform Ownership page built (report §8): read model, initiation by work email, withdraw/decline/refuse, and the
+    incoming owner's access through `/me`.
 - Flyway V1–V63 on H2: PASS.
 - Earlier focused workforce, architecture, JWT and identity-operation tests: PASS (29 tests for the S1-01/S1-02 gate).
 - The full backend run reached 556 tests but was not green: the new identity test initially collided with another

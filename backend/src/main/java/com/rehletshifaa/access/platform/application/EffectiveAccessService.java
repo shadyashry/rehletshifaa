@@ -64,8 +64,11 @@ public class EffectiveAccessService {
         // GOV-02: the owner decides administrator changes in the Control Center even without any workforce role.
         Set<Workspace> workspaces = java.util.EnumSet.noneOf(Workspace.class);
         workspaces.addAll(held.workspaces());
-        if (owner) workspaces.add(Workspace.CONTROL_CENTER);
+        // The named incoming owner of a live transfer reaches the ownership page to accept or decline it.
+        boolean incomingOwner = owners.pendingFor(principal.subject(), now).filter(t -> "PENDING_ACCEPTANCE".equals(t.status())).isPresent();
+        if (owner || incomingOwner) workspaces.add(Workspace.CONTROL_CENTER);
         List<String> pending = new ArrayList<>();
+        if (incomingOwner) pending.add("ACCEPT_PLATFORM_OWNERSHIP");
         if (person != null && "INVITED".equals(person.lifecycleStatus())) pending.add("ACTIVATE_ACCOUNT");
         return new MeView(principal.subject(), now, held.roles(), held.platformPermissions(),
                 held.platformPermissions().stream().filter(Permission::stepUp).collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new)), workspaces, held.managedFunctions(),

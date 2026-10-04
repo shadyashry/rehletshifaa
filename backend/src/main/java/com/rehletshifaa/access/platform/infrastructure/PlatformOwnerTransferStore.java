@@ -119,6 +119,29 @@ public class PlatformOwnerTransferStore {
                 rs.getTimestamp("expires_at").toInstant(), rs.getLong("revision"));
     }
 
+    /** Newest first, bounded: the ownership page's history. */
+    public java.util.List<Transfer> recent(int limit) {
+        return jdbc.sql("SELECT * FROM platform_owner_transfer_requests ORDER BY initiated_at DESC,id LIMIT " + Math.max(1, Math.min(limit, 50)))
+                .query(this::map).list();
+    }
+
+    /** The live (unexpired, undecided) transfer naming this subject as the incoming owner, if any. */
+    public Optional<Transfer> pendingFor(String incomingOwner, Instant now) {
+        return jdbc.sql("SELECT * FROM platform_owner_transfer_requests WHERE incoming_owner_subject=? "
+                        + "AND status IN ('PENDING_ACCEPTANCE','PENDING_VERIFICATION') AND expires_at>? ORDER BY initiated_at DESC LIMIT 1")
+                .params(incomingOwner, timestamp(now)).query(this::map).optional();
+    }
+
+    /** Withdrawn by the current owner, declined by the incoming owner, or refused by the verifier: the transfer ends. */
+    public Transfer reject(Transfer transfer, String actor, String action, String reason) {
+        int changed = jdbc.sql("UPDATE platform_owner_transfer_requests SET status='REJECTED',revision=revision+1 "
+                        + "WHERE id=? AND revision=? AND status IN ('PENDING_ACCEPTANCE','PENDING_VERIFICATION')")
+                .params(transfer.id(), transfer.revision()).update();
+        if (changed != 1) stale();
+        audit.record(actor, transfer.id().toString(), action, "SUCCESS", reason);
+        return forUpdate(transfer.id());
+    }
+
     private static void stale() {
         throw new ApiException(409, "STALE_OWNER_TRANSFER", "The owner transfer changed; reload and try again");
     }

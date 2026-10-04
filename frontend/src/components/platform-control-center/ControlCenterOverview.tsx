@@ -34,8 +34,11 @@ const SOURCES: Source[] = [
     find: async ({ api, locale }) => ({ count: (await api<{ invitations: { status: string }[] }>("/admin/platform-access/staff")).invitations.filter((i) => i.status === "QUEUED" || i.status === "SENT").length, href: ccHref(locale, "/people") }) },
   { key: "staffing", group: "workforce", label: ["Staffing requests waiting for a decision", "طلبات توظيف بانتظار قرار"], applies: (a) => a.can("WORKFORCE_ADMINISTER"),
     find: async ({ api, locale }) => ({ count: (await api<{ status: string }[]>("/admin/platform-access/staffing-requests")).filter((r) => r.status === "SUBMITTED").length, href: ccHref(locale, "/staffing-requests") }) },
-  { key: "administrators", group: "access", label: ["Administrator changes waiting for a second approver", "تغييرات مسؤولي النظام بانتظار موافقة ثانية"], applies: (a) => a.can("ACCESS_GOVERN"),
+  { key: "administrators", group: "access", label: ["Administrator changes waiting for a second approver", "تغييرات مسؤولي النظام بانتظار موافقة ثانية"], applies: (a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner,
     find: async ({ api, locale }) => ({ count: (await api<{ requests: { status: string }[] }>("/admin/platform-access/administrator-changes")).requests.filter((r) => r.status === "PENDING").length, href: ccHref(locale, "/administrators") }) },
+  { key: "ownership", group: "access", label: ["Platform ownership transfers waiting for you", "تسليمات ملكية المنصة بانتظارك"],
+    applies: (a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner || !!a.me?.pendingActions.includes("ACCEPT_PLATFORM_OWNERSHIP"),
+    find: async ({ api, locale }) => ({ count: (await api<{ transfers: { canAccept: boolean; canVerify: boolean }[] }>("/admin/platform-access/owner-transfers")).transfers.filter((x) => x.canAccept || x.canVerify).length, href: ccHref(locale, "/ownership") }) },
   { key: "mfa", group: "access", label: ["MFA reset requests waiting for approval", "طلبات إعادة تعيين التحقق بانتظار الموافقة"], applies: (a) => a.can("WORKFORCE_ADMINISTER"),
     find: async ({ api, locale }) => ({ count: (await api<{ status: string }[]>("/admin/platform-access/mfa-reset-requests")).filter((r) => r.status === "PENDING").length, href: ccHref(locale, "/recertification") }) },
 ];

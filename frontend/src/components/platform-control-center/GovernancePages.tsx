@@ -8,7 +8,7 @@ import type { ControlCenterAccess } from "./control-center-access";
 import { ActionDialog, WorkforcePage, json, useRead } from "./workforce-ui";
 import {
   lifecycleBadge, platformRoleLabel, when,
-  type AdministratorAssignment, type AuditEntry, type Campaign, type CampaignItem, type ChangeRequest, type MfaReset, type ServiceAccount, type StaffDirectory, type SupportView,
+  type AdministratorAssignment, type AuditEntry, type Campaign, type CampaignItem, type ChangeRequest, type MfaReset, type OwnerParty, type OwnerTransfer, type OwnerTransferStatus, type Ownership, type ServiceAccount, type StaffDirectory, type SupportView,
 } from "./workforce-model";
 
 const ADMIN = "/admin/platform-access";
@@ -81,6 +81,103 @@ function Administrators({ locale, access, api, requesting, setRequesting }: { lo
     </ActionDialog>}
     {(dialog?.kind === "approve" || dialog?.kind === "reject") && <ActionDialog locale={locale} title={dialog.kind === "approve" ? t(locale, "Approve this change?", "الموافقة على هذا التغيير؟") : t(locale, "Reject this change?", "رفض هذا التغيير؟")} confirm={dialog.kind === "approve" ? t(locale, "Approve", "موافقة") : t(locale, "Reject", "رفض")} danger={dialog.kind === "reject"} onClose={() => setDialog(null)}
       onSubmit={async (reason) => { await api(`${ADMIN}/administrator-changes/${dialog.request.id}/${dialog.kind}`, json("POST", { revision: dialog.request.revision, reason })); done(t(locale, "Decision recorded.", "سُجّل القرار.")); }} />}
+  </>;
+}
+
+// ---------------- Platform ownership ----------------
+
+const OWNER_TRANSFERS = `${ADMIN}/owner-transfers`;
+const TRANSFER_STATUS: Record<OwnerTransferStatus, { tone: "warning" | "success" | "neutral"; label: [string, string] }> = {
+  PENDING_ACCEPTANCE: { tone: "warning", label: ["Waiting for the incoming owner", "بانتظار المالك الجديد"] },
+  PENDING_VERIFICATION: { tone: "warning", label: ["Waiting for independent verification", "بانتظار التحقق المستقل"] },
+  COMPLETED: { tone: "success", label: ["Completed", "اكتمل"] },
+  REJECTED: { tone: "neutral", label: ["Stopped", "أُوقف"] },
+  EXPIRED: { tone: "neutral", label: ["Expired", "انتهت صلاحيته"] },
+};
+const pickPair = (pair: [string, string], locale: Locale) => (locale === "ar" ? pair[1] : pair[0]);
+
+type TransferAction = "accept" | "decline" | "withdraw" | "verify" | "refuse";
+const TRANSFER_ACTIONS: Record<TransferAction, { label: [string, string]; title: [string, string]; path: string; danger?: boolean; done: [string, string] }> = {
+  accept: { label: ["Accept ownership", "قبول الملكية"], title: ["Accept platform ownership?", "قبول ملكية المنصة؟"], path: "accept", done: ["Accepted. An independent System Administrator now verifies the transfer.", "تم القبول. يتحقق الآن مسؤول نظام مستقل من التسليم."] },
+  decline: { label: ["Decline", "رفض"], title: ["Decline platform ownership?", "رفض ملكية المنصة؟"], path: "reject", danger: true, done: ["Declined. The current owner keeps ownership.", "تم الرفض. يحتفظ المالك الحالي بالملكية."] },
+  withdraw: { label: ["Withdraw transfer", "سحب التسليم"], title: ["Withdraw this transfer?", "سحب هذا التسليم؟"], path: "reject", danger: true, done: ["Withdrawn. You remain the owner.", "تم السحب. تبقى أنت المالك."] },
+  verify: { label: ["Verify and complete", "التحقق وإتمام التسليم"], title: ["Verify and complete the transfer?", "التحقق من التسليم وإتمامه؟"], path: "verify", done: ["Verified. Ownership has moved to the incoming owner.", "تم التحقق. انتقلت الملكية إلى المالك الجديد."] },
+  refuse: { label: ["Refuse verification", "رفض التحقق"], title: ["Refuse to verify this transfer?", "رفض التحقق من هذا التسليم؟"], path: "reject", danger: true, done: ["Refused. The current owner keeps ownership.", "تم الرفض. يحتفظ المالك الحالي بالملكية."] },
+};
+const availableActions = (x: OwnerTransfer): TransferAction[] => [
+  ...(x.canAccept ? ["accept" as const] : []), ...(x.canDecline ? ["decline" as const] : []), ...(x.canWithdraw ? ["withdraw" as const] : []),
+  ...(x.canVerify ? ["verify" as const, "refuse" as const] : []),
+];
+
+/**
+ * Access › Platform Ownership (GOV-04): the current owner starts a transfer to a named person; that person accepts with a
+ * passkey; a System Administrator who is neither of them verifies, and ownership moves. Readable by the owner, System
+ * Administrators and the named incoming owner. Every step needs a recent passkey sign-in (enforced by the backend).
+ */
+export function OwnershipPage({ locale }: { locale: Locale }) {
+  const [starting, setStarting] = useState(false);
+  return <WorkforcePage locale={locale} active="ownership" title={t(locale, "Platform Ownership", "ملكية المنصة")}
+    intro={t(locale, "Ownership is a governance relationship, not an administrator role. A transfer needs three different people: the current owner starts it, the incoming owner accepts, and an independent System Administrator verifies.", "الملكية علاقة حوكمة وليست دور مسؤول. يحتاج التسليم إلى ثلاثة أشخاص مختلفين: يبدؤه المالك الحالي، ويقبله المالك الجديد، ويتحقق منه مسؤول نظام مستقل.")}
+    allowed={(a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner || !!a.me?.pendingActions.includes("ACCEPT_PLATFORM_OWNERSHIP")}
+    actions={(a) => a.me?.platformAccountOwner && <button type="button" onClick={() => setStarting(true)}>{t(locale, "Transfer ownership", "تسليم الملكية")}</button>}>
+    {({ access, api }) => <OwnershipBody locale={locale} access={access} api={api} starting={starting} setStarting={setStarting} />}
+  </WorkforcePage>;
+}
+
+function OwnershipBody({ locale, access, api, starting, setStarting }: { locale: Locale; access: ControlCenterAccess; api: AdminApi; starting: boolean; setStarting: (v: boolean) => void }) {
+  const ownership = useRead<Ownership>(api, OWNER_TRANSFERS);
+  const [notice, setNotice] = useState("");
+  const [email, setEmail] = useState("");
+  const [dialog, setDialog] = useState<{ action: TransferAction; transfer: OwnerTransfer } | null>(null);
+  const done = (message: string) => { setDialog(null); setStarting(false); setEmail(""); setNotice(message); ownership.reload(); access.retry(); };
+  const who = (p: OwnerParty | null) => (p ? p.name ?? t(locale, "Name not recorded", "اسم غير مسجّل") : "—");
+  if (ownership.error && !ownership.data) return <ErrorNotice error={ownership.error} locale={locale} action="load" onRetry={ownership.reload} />;
+  if (!ownership.data) return <p role="status">{t(locale, "Loading…", "جارٍ التحميل…")}</p>;
+  const data = ownership.data;
+  const live = data.transfers.filter((x) => x.status.startsWith("PENDING_"));
+  const past = data.transfers.filter((x) => !x.status.startsWith("PENDING_"));
+  const step = (label: string, isDone: boolean) => <li><span>{label}</span><StatusBadge tone={isDone ? "success" : "neutral"}>{isDone ? t(locale, "Done", "تم") : t(locale, "Waiting", "قيد الانتظار")}</StatusBadge></li>;
+  return <>
+    <SuccessNotice>{notice || null}</SuccessNotice>
+    <Section id="owner" title={t(locale, "Current owner", "المالك الحالي")}>
+      <p><strong><bdi>{who(data.currentOwner)}</bdi></strong>{data.viewerIsOwner && <> <StatusBadge tone="info">{t(locale, "You", "أنت")}</StatusBadge></>}</p>
+      {data.viewerIsOwner && !data.canInitiate && <p className="cc-meta">{t(locale, "A transfer is already in progress; finish or withdraw it before starting another.", "يوجد تسليم قيد التنفيذ؛ أكمله أو اسحبه قبل بدء تسليم آخر.")}</p>}
+    </Section>
+    <Section id="in-progress" title={t(locale, "Transfer in progress", "تسليم قيد التنفيذ")}>
+      {!live.length ? <EmptyState title={t(locale, "No transfer is in progress.", "لا يوجد تسليم قيد التنفيذ.")} /> : <ul className="cc-cards">{live.map((x) => <li className="cc-card" key={x.id}>
+        <h3><bdi>{who(x.currentOwner)}</bdi> → <bdi>{who(x.incomingOwner)}</bdi> <StatusBadge tone={TRANSFER_STATUS[x.status].tone}>{pickPair(TRANSFER_STATUS[x.status].label, locale)}</StatusBadge></h3>
+        <p className="cc-meta">{t(locale, "Started", "بدأ")} {when(x.initiatedAt, locale)} · {t(locale, "Expires", "ينتهي")} {when(x.expiresAt, locale)}</p>
+        <p className="cc-meta"><bdi>{x.reason}</bdi></p>
+        <ol className="cc-journey-steps" aria-label={t(locale, "Transfer steps", "خطوات التسليم")}>
+          {step(t(locale, "1. Started by the current owner", "1. بدأه المالك الحالي"), true)}
+          {step(t(locale, "2. Accepted by the incoming owner", "2. قبله المالك الجديد"), x.status === "PENDING_VERIFICATION")}
+          {step(t(locale, "3. Verified by an independent System Administrator", "3. تحقق منه مسؤول نظام مستقل"), false)}
+        </ol>
+        {availableActions(x).length > 0
+          ? <div className="cc-step-actions">{availableActions(x).map((a) =>
+            <button key={a} type="button" className={"cc-small" + (TRANSFER_ACTIONS[a].danger ? " cc-secondary cc-danger-button" : "")} onClick={() => setDialog({ action: a, transfer: x })}>{pickPair(TRANSFER_ACTIONS[a].label, locale)}</button>)}</div>
+          : x.status === "PENDING_VERIFICATION" && data.viewerIsAdministrator
+            ? <p className="cc-meta">{t(locale, "A System Administrator who is neither the current nor the incoming owner must verify.", "يجب أن يتحقق مسؤول نظام ليس المالك الحالي ولا الجديد.")}</p> : null}
+      </li>)}</ul>}
+    </Section>
+    {past.length > 0 && <Section id="history" title={t(locale, "Earlier transfers", "التسليمات السابقة")}>
+      <ul className="cc-list">{past.map((x) => <li key={x.id}>
+        <span><bdi>{who(x.currentOwner)}</bdi> → <bdi>{who(x.incomingOwner)}</bdi></span>
+        <span className="cc-meta">{when(x.initiatedAt, locale)}</span>
+        <span><StatusBadge tone={TRANSFER_STATUS[x.status].tone}>{pickPair(TRANSFER_STATUS[x.status].label, locale)}</StatusBadge></span>
+      </li>)}</ul>
+    </Section>}
+    {starting && <ActionDialog locale={locale} title={t(locale, "Transfer platform ownership", "تسليم ملكية المنصة")} confirm={t(locale, "Start transfer", "بدء التسليم")} danger onClose={() => setStarting(false)}
+      onSubmit={async (reason) => { await api(OWNER_TRANSFERS, json("POST", { incomingOwnerEmail: email.trim(), reason })); done(t(locale, "Transfer started. The incoming owner must accept within 72 hours.", "بدأ التسليم. يجب أن يقبله المالك الجديد خلال 72 ساعة.")); }}>
+      <p className="cc-meta">{t(locale, "The incoming owner needs a RehletShifaa account with a passkey and must not be a System Administrator. You stay the owner until an independent administrator verifies.", "يحتاج المالك الجديد إلى حساب في رحلة شفاء بمفتاح مرور، ويجب ألا يكون مسؤول نظام. تبقى المالك حتى يتحقق مسؤول مستقل.")}</p>
+      <Field label={t(locale, "Incoming owner's work email", "البريد المهني للمالك الجديد")} required>
+        <input type="email" required dir="ltr" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </Field>
+    </ActionDialog>}
+    {dialog && <ActionDialog locale={locale} title={pickPair(TRANSFER_ACTIONS[dialog.action].title, locale)} confirm={pickPair(TRANSFER_ACTIONS[dialog.action].label, locale)} danger={TRANSFER_ACTIONS[dialog.action].danger} onClose={() => setDialog(null)}
+      onSubmit={async (reason) => { await api(`${OWNER_TRANSFERS}/${dialog.transfer.id}/${TRANSFER_ACTIONS[dialog.action].path}`, json("POST", { revision: dialog.transfer.revision, reason })); done(pickPair(TRANSFER_ACTIONS[dialog.action].done, locale)); }}>
+      <p><bdi>{who(dialog.transfer.currentOwner)}</bdi> → <bdi>{who(dialog.transfer.incomingOwner)}</bdi></p>
+    </ActionDialog>}
   </>;
 }
 

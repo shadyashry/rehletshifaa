@@ -292,6 +292,82 @@ class PlatformUsersDeepQaTest {
         assertCode("OWNER_ADMINISTRATOR_SEPARATION_REQUIRED", () -> transfers.accept(transfer.id(), new PlatformOwnerTransferService.Decision(transfer.revision(), "Accept")));
     }
 
+    /** Owner transfer UI backend: read model, initiation by work email, decline/withdraw/refuse, and the full three-party handover. */
+    @Test
+    void ownershipIsHandedOverThroughTheControlCenterByThreeIndependentParties() {
+        var data = new WorkforceTestData(jdbc, crypto, clock.instant()).person("qa-ceo").person("qa-heir").person("qa-bystander", "FINANCE");
+        jdbc.update("UPDATE workforce_people SET email_hash=? WHERE subject='qa-heir'", sha256("heir@qa.test"));
+        when(identities.identityState(org.mockito.ArgumentMatchers.anyString())).thenReturn(new IdentityState(true, true, true, true, true));
+        jdbc.update("DELETE FROM platform_role_assignments WHERE subject IN (?,?)", ADMIN_A, ADMIN_B);
+        bootstrap.initialize("qa-ceo", List.of(ADMIN_A, ADMIN_B));
+
+        // Who may read.
+        signIn("qa-bystander", "3");
+        assertCode("PERMISSION_NOT_HELD", () -> transfers.overview());
+        signIn("qa-heir", "3");
+        assertCode("PERMISSION_NOT_HELD", () -> transfers.overview());
+        assertThat(me.me().pendingActions()).doesNotContain("ACCEPT_PLATFORM_OWNERSHIP");
+
+        // The owner starts a transfer by work email; an unknown address is refused.
+        signIn("qa-ceo", "3");
+        var start = transfers.overview();
+        assertThat(start.viewerIsOwner()).isTrue();
+        assertThat(start.canInitiate()).isTrue();
+        assertThat(start.currentOwner().name()).isEqualTo("qa-ceo");
+        assertCode("OWNER_CANDIDATE_NOT_FOUND", () -> transfers.initiate(new PlatformOwnerTransferService.Initiate(null, "nobody@qa.test", "Succession")));
+        var first = transfers.initiate(new PlatformOwnerTransferService.Initiate(null, " Heir@QA.test ", "Succession"));
+        assertThat(first.incomingOwner()).isEqualTo("qa-heir");
+        assertThat(transfers.overview().canInitiate()).as("one transfer at a time").isFalse();
+
+        // The incoming owner sees it in /me and on the page, and may decline.
+        signIn("qa-heir", "3");
+        assertThat(me.me().pendingActions()).contains("ACCEPT_PLATFORM_OWNERSHIP");
+        assertThat(me.me().workspaces()).contains(Workspace.CONTROL_CENTER);
+        var mine = transfers.overview();
+        assertThat(mine.transfers()).singleElement().satisfies(t -> {
+            assertThat(t.canAccept()).isTrue();
+            assertThat(t.canDecline()).isTrue();
+            assertThat(t.canWithdraw()).isFalse();
+            assertThat(t.incomingOwner().name()).isEqualTo("qa-heir");
+        });
+        transfers.reject(first.id(), new PlatformOwnerTransferService.Decision(first.revision(), "Not ready yet"));
+        assertThat(me.me().pendingActions()).doesNotContain("ACCEPT_PLATFORM_OWNERSHIP");
+
+        // The owner may withdraw a transfer at any pending stage; a bystander administrator may not withdraw one awaiting acceptance.
+        signIn("qa-ceo", "3");
+        var second = transfers.initiate(new PlatformOwnerTransferService.Initiate("qa-heir", "Second attempt"));
+        signIn(ADMIN_A, "3");
+        assertCode("OWNER_TRANSFER_PARTY_REQUIRED", () -> transfers.reject(second.id(), new PlatformOwnerTransferService.Decision(second.revision(), "Not mine")));
+        signIn("qa-ceo", "3");
+        assertThat(transfers.reject(second.id(), new PlatformOwnerTransferService.Decision(second.revision(), "Changed my mind")).status()).isEqualTo("REJECTED");
+
+        // An independent administrator may refuse verification.
+        var third = transfers.initiate(new PlatformOwnerTransferService.Initiate("qa-heir", "Third attempt"));
+        signIn("qa-heir", "3");
+        var accepted = transfers.accept(third.id(), new PlatformOwnerTransferService.Decision(third.revision(), "I accept"));
+        assertCode("OWNER_TRANSFER_PARTY_REQUIRED", () -> transfers.reject(accepted.id(), new PlatformOwnerTransferService.Decision(accepted.revision(), "Too late to decline")));
+        signIn(ADMIN_A, "3");
+        assertThat(transfers.overview().transfers()).filteredOn(t -> t.id().equals(third.id())).singleElement()
+                .satisfies(t -> assertThat(t.canVerify()).isTrue());
+        assertThat(transfers.reject(third.id(), new PlatformOwnerTransferService.Decision(accepted.revision(), "Identity not confirmed")).status()).isEqualTo("REJECTED");
+
+        // The full handover: initiate, accept, independent verification.
+        signIn("qa-ceo", "3");
+        var fourth = transfers.initiate(new PlatformOwnerTransferService.Initiate(null, "heir@qa.test", "Planned succession"));
+        signIn("qa-heir", "3");
+        var acceptedFourth = transfers.accept(fourth.id(), new PlatformOwnerTransferService.Decision(fourth.revision(), "I accept"));
+        signIn(ADMIN_B, "3");
+        assertThat(transfers.verify(fourth.id(), new PlatformOwnerTransferService.Decision(acceptedFourth.revision(), "Verified in person")).status()).isEqualTo("COMPLETED");
+        signIn("qa-heir", "3");
+        var after = transfers.overview();
+        assertThat(after.viewerIsOwner()).isTrue();
+        assertThat(after.currentOwner().subject()).isEqualTo("qa-heir");
+        assertThat(after.transfers()).extracting(PlatformOwnerTransferService.TransferView::status)
+                .containsExactlyInAnyOrder("COMPLETED", "REJECTED", "REJECTED", "REJECTED");
+        assertThat(audits("PLATFORM_OWNER_TRANSFER_DECLINED") + audits("PLATFORM_OWNER_TRANSFER_WITHDRAWN") + audits("PLATFORM_OWNER_TRANSFER_VERIFICATION_REFUSED")).isEqualTo(3);
+        assertThat(data).isNotNull();
+    }
+
     // ---------------------------------------------------------------- 2. separation of duties / escalation
 
     @Test

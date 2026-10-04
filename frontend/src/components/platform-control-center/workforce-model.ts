@@ -64,3 +64,13 @@ export const lifecycleBadge = (value: string, locale: Locale): { label: string; 
 
 export const when = (iso: string | null | undefined, locale: Locale) =>
   iso ? new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "—";
+
+/** Platform ownership (GOV-04): the current owner and the three-party transfers, with what this viewer may do. */
+export type OwnerParty = { subject: string; name: string | null };
+export type OwnerTransferStatus = "PENDING_ACCEPTANCE" | "PENDING_VERIFICATION" | "COMPLETED" | "REJECTED" | "EXPIRED";
+export type OwnerTransfer = {
+  id: string; currentOwner: OwnerParty; incomingOwner: OwnerParty; status: OwnerTransferStatus; reason: string;
+  initiatedAt: string; expiresAt: string; revision: number;
+  canAccept: boolean; canVerify: boolean; canWithdraw: boolean; canDecline: boolean;
+};
+export type Ownership = { currentOwner: OwnerParty | null; viewerIsOwner: boolean; viewerIsAdministrator: boolean; canInitiate: boolean; transfers: OwnerTransfer[] };
