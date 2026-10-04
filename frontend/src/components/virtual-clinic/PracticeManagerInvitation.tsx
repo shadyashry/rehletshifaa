@@ -26,13 +26,13 @@ export function PracticeManagerInvitation({ locale }: { locale: Locale }) {
     setState("working"); setMessage("");
     const response = await apiFetchAs(user.access_token, "/clinics/invitations/accept", { method: "POST", body: JSON.stringify({ token }) });
     if (response.ok) { setState("done"); return; }
-    if (response.status === 401) { await signIn(true); return; }
+    if (response.status === 401) { await signIn(true, undefined, "2"); return; }
     const body = await response.json().catch(() => ({})) as { message?: string };
     setMessage(body.message ?? (ar ? "تعذر قبول الدعوة." : "The invitation could not be accepted.")); setState("error");
   };
 
   if (loading) return <main className="container-site section"><p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p></main>;
-  if (!user) return <main className="container-site section"><div className="card max-w-2xl p-6"><h1 className="title">{ar ? "دعوة مدير العيادة" : "Practice Manager invitation"}</h1><p className="mt-3 text-ink-600">{ar ? "سجّل الدخول بالبريد المدعو والمصادقة متعددة العوامل لمراجعة التفويض وقبوله." : "Sign in with the invited email and multi-factor authentication to review and accept this delegation."}</p><button className="btn-primary mt-5" onClick={() => void signIn(true)}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button></div></main>;
+  if (!user) return <main className="container-site section"><div className="card max-w-2xl p-6"><h1 className="title">{ar ? "دعوة مدير العيادة" : "Practice Manager invitation"}</h1><p className="mt-3 text-ink-600">{ar ? "سجّل الدخول بالبريد المدعو والمصادقة متعددة العوامل لمراجعة التفويض وقبوله." : "Sign in with the invited email and multi-factor authentication to review and accept this delegation."}</p><button className="btn-primary mt-5" onClick={() => void signIn(true, undefined, "2")}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button></div></main>;
   if (state === "done") return <main className="container-site section"><div className="card max-w-2xl p-6"><h1 className="title">{ar ? "تم قبول التفويض" : "Delegation accepted"}</h1><p className="mt-3 text-ink-600">{ar ? "يمكنك الآن فتح العيادة الافتراضية ضمن الصلاحيات التي وافقت عليها." : "You can now open the Virtual Clinic within the permissions you accepted."}</p><a className="btn-primary mt-5 inline-flex" href={`/${locale}/portal/virtual-clinic`}>{ar ? "فتح العيادة الافتراضية" : "Open Virtual Clinic"}</a></div></main>;
   const invite = invites[0];
   return <main className="container-site section"><div className="card max-w-2xl p-6">

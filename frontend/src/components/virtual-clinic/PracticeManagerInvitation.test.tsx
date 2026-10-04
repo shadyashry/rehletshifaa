@@ -38,6 +38,13 @@ describe("Practice Manager invitation", () => {
     render(<PracticeManagerInvitation locale="en" />);
     await screen.findByText(/Dr A invited you/);
     fireEvent.click(screen.getByRole("button", { name: "Accept delegation" }));
-    await waitFor(() => expect(signIn).toHaveBeenCalledWith(true));
+    await waitFor(() => expect(signIn).toHaveBeenCalledWith(true, undefined, "2"));
+  });
+
+  it("requests ordinary MFA rather than owner or administrator phishing-resistant authentication before activation", () => {
+    auth = { user: null, loading: false };
+    render(<PracticeManagerInvitation locale="en" />);
+    fireEvent.click(screen.getByRole("button", { name: "Sign in securely" }));
+    expect(signIn).toHaveBeenCalledWith(true, undefined, "2");
   });
 });

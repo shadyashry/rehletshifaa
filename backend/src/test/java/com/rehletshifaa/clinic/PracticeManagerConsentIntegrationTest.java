@@ -73,6 +73,17 @@ class PracticeManagerConsentIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM practice_manager_delegation_history WHERE delegation_id=? AND event_type='ACCEPTED'", accepted.id())).isOne();
     }
 
+    @Test void directInvitationCreatesTheClinicForAConsultantAddedAfterTheClinicMigration() {
+        UUID practitioner = consultant("consultant-late", "Dr Late");
+        signInConsultant("consultant-late");
+
+        ManagerView invitation = managers.invite(practitioner,
+                new ManagerInviteRequest("Mona Manager", "late-manager@example.test", List.of("SCHEDULE"), "en"));
+
+        assertThat(invitation.status()).isEqualTo("INVITED");
+        assertThat(count("SELECT COUNT(*) FROM virtual_clinics WHERE practitioner_id=?", practitioner)).isOne();
+    }
+
     @Test void exactExistingIdentityIsAdoptedAndAmbiguityFailsClosedWithoutCreatingAnAccount() {
         ManagerView invited = invite(clinicA, "consultant-a", "existing@example.test", List.of("PROFILE"));
         resolvePendingIdentity();

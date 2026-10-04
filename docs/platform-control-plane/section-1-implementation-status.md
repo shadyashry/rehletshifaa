@@ -937,10 +937,18 @@ delivery. Final PostgreSQL invariants were one current owner, two effective admi
 commissioning/recovery/transfer records. The run exposed and corrected one PostgreSQL-only nullable-parameter defect
 in indefinite administrator/workforce role overlap checks; the policy and architecture did not change.
 
-**Next exact action:** retain real Keycloak/mail/tunnel evidence for the Practice Manager consent flow. Separately,
-complete the wider OPS-03 backup/data/document restore drill and the remaining OSA-8 assurance activities (external
-notification channel evidence, no-waiver quarterly exercise, threat-model/penetration review). Do not substitute a
-production ownership change for an isolated drill.
+**PRACTICE MANAGER LIVE CONSENT REHEARSAL COMPLETE (2026-10-04):** retained evidence is
+`evidence/2026-10-04-practice-manager-consent-live.md`. The named-tunnel stack completed real Keycloak account setup,
+TOTP/ACR 2 acceptance, Mailpit delivery, clinic-only scope, unrelated-case denial, permission widening held pending
+renewed consent, renewed acceptance, revocation and immediate stale-token denial. PostgreSQL retained both accepted
+invitations at ACR 2 and immutable `ACCEPTED → PERMISSIONS_ACCEPTED → REVOKED` history. The run corrected two
+targeted gaps without changing the architecture: direct API invitations now idempotently establish a missing clinic
+row for a newly added Consultant, and the pre-acceptance Practice Manager journey explicitly requests ordinary MFA
+ACR 2 instead of the fail-closed owner/administrator ACR 3 default.
+
+**Next exact action:** complete the wider OPS-03 backup/data/document restore drill. Separately, complete the
+remaining OSA-8 assurance activities (external notification channel evidence, no-waiver quarterly exercise,
+threat-model/penetration review). Do not substitute a production ownership change for an isolated drill.
 
 Business/operator/tester guide: `platform-users-roles-hierarchy-onboarding-and-test-guide.md` describes the user
 model, hierarchy, who grants whom, current Control Center screens, onboarding/lifecycle flows, authentication rules,
@@ -957,9 +965,10 @@ Open gates (do not claim complete):
 - **IDO-06 COMPLETE (2026-09-27):** live manual and `POST_RESTORE` comparisons, a scheduler-originated daily-job and
   alert review, the activated-block/passing-release rehearsal, and the OPS-04 durable replay/inactive-lifecycle
   disable proof are retained. The wider OPS-03 backup/data/document restore drill is separate launch evidence.
-- **Practice Manager consent flow IMPLEMENTATION COMPLETE (2026-09-28):** the consent state machine, MFA-bound
-  exact-identity acceptance, durable identity operation, re-consent/revocation/suspension rules, isolation tests and
-  frontend journey are implemented and pass offline. Real Keycloak/mail/tunnel release evidence is not yet retained.
+- **Practice Manager consent flow COMPLETE (2026-10-04):** the consent state machine, MFA-bound exact-identity
+  acceptance, durable identity operation, re-consent/revocation/suspension rules, isolation tests and frontend
+  journey are implemented. Real Keycloak/mail/named-tunnel evidence now proves ACR 2 acceptance, isolation,
+  permission re-consent and immediate stale-token denial after revocation.
 - **OD-02 COMPLETE, INCLUDING ISOLATED REHEARSAL (2026-10-04):** multi-party recovery, evidence,
   cooling-off/waiver, immediate relationship transition, notifications, negative tests and runbook are delivered.
   The first isolated production-equivalent recovery rehearsal passed with real Keycloak LoA 3 and retained evidence.

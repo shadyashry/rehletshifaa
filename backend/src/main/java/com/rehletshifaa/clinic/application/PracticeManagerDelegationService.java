@@ -238,7 +238,14 @@ public class PracticeManagerDelegationService {
         return result;
     }
 
-    private Principal owner(UUID practitionerId) { return authority.require(Permission.CLINIC_APPROVE, Resource.ofClinic(practitionerId)); }
+    private Principal owner(UUID practitionerId) {
+        Principal owner = authority.require(Permission.CLINIC_APPROVE, Resource.ofClinic(practitionerId));
+        Instant now = clock.instant();
+        jdbc.sql("INSERT INTO virtual_clinics(practitioner_id,created_at,updated_at,version) SELECT id,?,?,0 FROM practitioner_profiles "
+                        + "WHERE id=? AND practitioner_type='CONSULTANT' AND NOT EXISTS(SELECT 1 FROM virtual_clinics WHERE practitioner_id=?)")
+                .params(timestamp(now), timestamp(now), practitionerId, practitionerId).update();
+        return owner;
+    }
     private UUID createInvitation(UUID practitionerId, UUID delegationId, String kind, String name, String email, String emailHash,
             String locale, Set<String> permissions, String invitedBy, String resolvedSubject) {
         UUID id = UUID.randomUUID(); Instant now = clock.instant(); String token = token();
