@@ -158,7 +158,7 @@
 
 @layer components {
   /* ---- 2. Night tokens: the heroes and the footer re-point the same semantic tokens ---- */
-  :root[data-brand-theme="lapis"] :is(.home-hero, .page-hero, .site-footer, .promise-panel) {
+  :root[data-brand-theme="lapis"] :is(.home-hero, .page-hero, .site-footer) {
     --color-surface-pearl: var(--lapis-night);
     --color-mist: var(--lapis-night);
     --color-surface-clinical: #1b3a7a; /* the soft azure-lapis glow behind interior heroes */
@@ -312,22 +312,27 @@
     }
   }
 
-  /* ---- The credential plaque: dark as an object, not as a band ----
-     The Senior Consultants section stays on the calm day canvas; only the Consultants panel becomes a contained lapis
-     plaque — champagne credential numerals, the lead Consultant's gold monogram, a fine gold edge — the same
-     contained-night language as the closing call to action. One jewel-like focal point where trust is earned. */
+  /* ---- The credential certificate: the Consultants panel, in daylight ----
+     The middle of the page stays light and calm (dark is reserved for the hero and the closing call to action).
+     The panel reads as a certificate: a progressive ivory-to-azure ground, the logo's signature line on top,
+     credential numerals in deep lapis under small gold hallmark bars (gold as a shape, never as text on light). */
   :root[data-brand-theme="lapis"] .promise-section .promise-panel {
-    --color-surface-default: var(--lapis-night); /* monogram rings read as night */
-    border-color: rgba(241, 213, 150, 0.3);
+    border-color: #d6e2f1;
     box-shadow:
-      inset 0 1px 0 rgba(241, 213, 150, 0.55),
-      0 30px 60px -34px rgba(14, 26, 61, 0.55);
+      0 1px 2px rgba(14, 26, 61, 0.05),
+      0 26px 52px -34px rgba(14, 26, 61, 0.42);
   }
   :root[data-brand-theme="lapis"] .promise-section .promise-panel p:first-child {
     text-wrap: balance; /* "The Consultants behind your care" never leaves "care" alone on a line */
   }
-  :root[data-brand-theme="lapis"] .promise-section dd {
-    --color-brand-900: var(--lapis-gold-light); /* credential numerals: the champagne hallmark (12.4:1) */
+  :root[data-brand-theme="lapis"] .promise-section .promise-panel dd::before {
+    content: "";
+    display: block;
+    width: 1.25rem;
+    height: 2px;
+    margin-bottom: 0.65rem;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #e2b962, #f1d596);
   }
 
   /* ---- The closing call to action: the same night, the hairline on top, one coral action ---- */
@@ -450,55 +455,52 @@
   box-shadow: 0 22px 44px -26px rgba(5, 10, 28, 0.75);
 }
 
-/* The plaque moves from night to dawn — the Lapis story in one object: deep lapis night where the Consultants sit,
-   warming progressively into a luminous azure dawn where the action is. Unlayered, over the panel's bg utility.
-   Text stays AA across the whole sweep (champagne ≥ 5.9:1, ivory ≥ 7.5:1, labels ≥ 4.5:1 at the brightest end). */
+/* The certificate's ground moves progressively from warm ivory into a soft azure mist — toward the dawn, in daylight —
+   with the logo's signature line along the top edge. Unlayered, over the panel's translucent bg utility.
+   Text stays AA across the sweep (lapis ≥ 12.7:1, body ≥ 7.3:1, azure link ≥ 5.5:1). */
 :root[data-brand-theme="lapis"] .promise-section .promise-panel {
-  background-color: var(--lapis-night);
+  background-color: #fffdf9;
   background-image:
-    radial-gradient(38% 150% at 100% 50%, rgba(95, 176, 255, 0.28) 0%, rgba(95, 176, 255, 0) 70%),
-    radial-gradient(30% 120% at 0% 100%, rgba(224, 122, 98, 0.1) 0%, rgba(224, 122, 98, 0) 70%),
-    linear-gradient(100deg, #0e1a3d 0%, #112250 30%, #173a78 66%, #1d4c93 100%);
+    var(--lapis-line),
+    linear-gradient(100deg, #fffdf9 0%, #fbfaf7 34%, #f1f6fc 70%, #e6f0fb 100%);
+  background-size: 100% 2px, auto;
+  background-repeat: no-repeat;
+  background-position: top, center;
 }
 :root[data-brand-theme="lapis"][dir="rtl"] .promise-section .promise-panel {
   background-image:
-    radial-gradient(38% 150% at 0% 50%, rgba(95, 176, 255, 0.28) 0%, rgba(95, 176, 255, 0) 70%),
-    radial-gradient(30% 120% at 100% 100%, rgba(224, 122, 98, 0.1) 0%, rgba(224, 122, 98, 0) 70%),
-    linear-gradient(260deg, #0e1a3d 0%, #112250 30%, #173a78 66%, #1d4c93 100%);
+    var(--lapis-line),
+    linear-gradient(260deg, #fffdf9 0%, #fbfaf7 34%, #f1f6fc 70%, #e6f0fb 100%);
 }
-/* Monograms in a graded sequence: the lead Consultant in gold, the others from pale sky to deeper azure — a quiet
-   progression rather than five identical discs (night initials, 7.0–12.7:1); "+N" is an outlined chip. */
-:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:first-child {
-  background-color: var(--lapis-gold);
-  color: var(--lapis-night);
-}
-:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(2) { background-color: #c4e2ff; color: var(--lapis-night); }
-:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(3) { background-color: #a6d1fb; color: var(--lapis-night); }
-:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(4) { background-color: #8abff4; color: var(--lapis-night); }
-:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(5) { background-color: #6fabea; color: var(--lapis-night); }
+/* Monograms in a graded sequence: the lead Consultant in gold, the others from pale to deeper azure (night
+   initials, 7.0–13.5:1); "+N" is an outlined chip. */
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:first-child { background-color: var(--lapis-gold); color: var(--lapis-night); }
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(2) { background-color: #d6e7fb; color: var(--lapis-night); }
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(3) { background-color: #b8d4f5; color: var(--lapis-night); }
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(4) { background-color: #97bfee; color: var(--lapis-night); }
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(5) { background-color: #79a9e4; color: var(--lapis-night); }
 :root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(6) {
-  background-color: transparent;
-  color: #e8ecf8;
-  box-shadow: inset 0 0 0 1px rgba(157, 208, 255, 0.45);
+  background-color: #fffdf9;
+  color: #33405f;
+  box-shadow: inset 0 0 0 1px #b8d4f5;
 }
-/* The action at the bright end, in champagne (5.9:1 at the brightest stop). Between 1024 and 1280px the panel's
-   middle column is tight, so the action stays a compact link; from 1280px it becomes a refined outlined pill. */
+/* "Meet the Consultants": azure; between 1024 and 1280px a compact link (the middle column is tight there),
+   otherwise a refined outlined pill. */
 :root[data-brand-theme="lapis"] .promise-section .promise-panel .link-cta {
-  color: var(--lapis-gold-light);
+  color: var(--color-brand-600);
   transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-}
-:root[data-brand-theme="lapis"] .promise-section .promise-panel .link-cta:hover {
-  color: #fff6dc;
 }
 @media (max-width: 63.99rem), (min-width: 80rem) {
   :root[data-brand-theme="lapis"] .promise-section .promise-panel .link-cta {
     padding: 0.5rem 1.1rem;
-    border: 1px solid rgba(241, 213, 150, 0.55);
+    border: 1px solid rgba(26, 95, 180, 0.35);
     border-radius: 999px;
+    background-color: rgba(255, 253, 249, 0.7);
   }
   :root[data-brand-theme="lapis"] .promise-section .promise-panel .link-cta:hover {
-    border-color: var(--lapis-gold-light);
-    background-color: rgba(241, 213, 150, 0.1);
+    border-color: var(--color-brand-600);
+    background-color: #edf4fc;
+    color: var(--color-brand-700);
   }
 }
 
