@@ -29,6 +29,7 @@ beforeEach(() => {
   vi.mocked(apiFetchAs).mockImplementation(async (_token, path, init) => {
     if (path === "/admin/journeys/def-1") return new Response(JSON.stringify(detail(versions)), { status: 200 });
     if (path === "/admin/journey-cutover") return new Response(JSON.stringify({ productionIntakeEnabled: false, runtimeEnabled: false }), { status: 200 });
+    if (path === "/admin/journey-cutover/policies") return new Response(JSON.stringify([]), { status: 200 });
     if (path === "/admin/journeys/def-1/history?offset=0") return new Response(JSON.stringify(history), { status: 200 });
     if (path === "/admin/journeys/def-1/versions/v-1/runtime") return new Response(JSON.stringify({ journeyVersionId: "v-1", status: "DEPLOYED", compilerVersion: "flowable-1", artifactHash: "art-9" }), { status: 200 });
     if (path.endsWith("/clone") && init?.method === "POST") return new Response(JSON.stringify({ ...draft, id: "v-3" }), { status: 200 });
@@ -45,7 +46,7 @@ describe("Journey detail", () => {
     const change = screen.getByRole("heading", { name: "Change in progress" }).closest("section")!;
     expect(change).toHaveTextContent("Waiting for approval");
     expect(within(change).getByRole("link", { name: "Review for approval" })).toHaveAttribute("href", "/en/portal/control-center/journeys/def-1/versions/v-2?tab=publish");
-    expect(screen.getByRole("heading", { name: "New patient cases" }).closest("section")).toHaveTextContent(/Production intake is off.*does not turn it on/);
+    expect(screen.getByRole("heading", { name: "New patient cases" }).closest("section")).toHaveTextContent(/Journey admission is off.*independently approved admission policy/);
   });
 
   it("keeps engine detail out of the primary page and loads it only when Advanced opens", async () => {

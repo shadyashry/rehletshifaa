@@ -1,21 +1,21 @@
 package com.rehletshifaa.journey;
 
-import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
 import com.rehletshifaa.journey.application.*;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyLiveShadowRepository;
 import org.flowable.engine.ProcessEngine;
 import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Clock;
@@ -33,33 +33,29 @@ import static com.rehletshifaa.journey.JourneyGraphTest.*;
  * {@code CaseService.submit()} — with no {@code journey.simulate} grant anywhere in this class.
  */
 @SpringBootTest(properties={"spring.task.scheduling.enabled=false","app.journey.runtime.enabled=true",
-        "app.journey.runtime.schema-update=true","app.journey.runtime.production-intake-enabled=true",
-        // Phase 7B: master on alone admits nothing; this whole-population policy keeps the 7A contract under test.
-        "app.journey.cutover.policies[0].id=all-new-cases","app.journey.cutover.policies[0].enabled=true","app.journey.cutover.policies[0].scope=ALL_NEW_CASES",
+        "app.journey.runtime.production-intake-enabled=true",
+        "app.journey.runtime.schema-update=true",
         "spring.datasource.url=jdbc:h2:mem:journey-production-intake;MODE=LEGACY;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class JourneyProductionIntakeIntegrationTest {
     @Autowired JourneyDefinitionService definitions;
-    @Autowired JourneyDefinitionRepository definitionRepo;
     @Autowired JourneyDeploymentRepository deploymentRepo;
     @Autowired JourneyCaseBindingRepository bindings;
     @Autowired JourneyProjectionService projections;
     @Autowired JourneyProductionIntakeService productionIntake;
-    @Autowired ObjectProvider<JourneyRuntimePort> runtimes;
-    @Autowired GovernanceAuditLog audit;
     @Autowired CaseService cases;
     @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;
     @Autowired PlatformTransactionManager manager;
     @Autowired ProcessEngine engine;
-    @Autowired JourneyAdmissionDecisionService decisions;
+    @Autowired JourneyAdmissionPolicyService policies;
     @Autowired com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository admissions;
-    @Autowired org.springframework.jdbc.core.simple.JdbcClient jdbcClient;
     @Autowired io.micrometer.core.instrument.MeterRegistry meters;
     @Autowired JourneyLiveShadowService liveShadow;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean JourneyLiveShadowRepository shadowResults;
     Version version;
+    JourneyAdmissionPolicyService.Policy policy;
     JourneyDefinitionIntegrationTest fixture;
 
     /** Staff review (COORDINATOR, real Assignment Engine routing) then a patient information request (PATIENT) — the same shape JourneyStageProjectionIntegrationTest already proved. */
@@ -73,10 +69,11 @@ class JourneyProductionIntakeIntegrationTest {
     }
 
     @BeforeAll void setup() {
-        fixture = new JourneyDefinitionIntegrationTest();
+        fixture = new JourneyDefinitionIntegrationTest() {
+            @Override void signIn(String subject) { staffSignIn(subject, clock); }
+        };
         fixture.service = definitions; fixture.crypto = crypto; fixture.jdbc = jdbc; fixture.clock = clock;
         new TransactionTemplate(manager).executeWithoutResult(s -> fixture.setup());
-        fixture.signIn("journey-owner");
         fixture.signIn("maker");
         var d = definitions.create();
         var v = d.versions().getFirst();
@@ -88,12 +85,23 @@ class JourneyProductionIntakeIntegrationTest {
         version = definitions.publish(pending.definitionId(), pending.id(), fixture.change(pending.revision()));
         fixture.clear();
     }
-    @BeforeEach void signIn() { fixture.signIn("maker"); }
+    @BeforeEach void signIn() {
+        fixture.signIn("maker");
+        var pending = policies.prepare(new JourneyAdmissionPolicyService.Prepare(version.id(), "ALL_NEW_CASES", List.of(), "Production intake fixture"));
+        fixture.signIn("checker");
+        policy = policies.approve(pending.id(), new JourneyAdmissionPolicyService.Decide(pending.revision(), "Independent activation"));
+        fixture.signIn("maker");
+    }
     @AfterEach void clear() { fixture.clear(); }
 
     CreateCaseRequest intake() { return new CreateCaseRequest("Real", "Patient", "AE", "+971500000002", "Genuine new-case intake", "en", true, null); }
     UUID submitRealCase() { var created = cases.create(intake()); cases.submit(created.caseId()); return created.caseId(); }
     long count(String table) { return jdbc.queryForObject("SELECT count(*) FROM " + table, Long.class); }
+
+    static void staffSignIn(String subject, Clock clock) {
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(Jwt.withTokenValue("test")
+                .header("alg", "none").subject(subject).claim("auth_time", clock.instant()).claim("acr", "2").build(), List.of()));
+    }
 
     @Test void eligibleNewCaseIsBoundToTheRealPublishedVersionAndRuntimeStartsExactlyOnce() {
         UUID caseId = submitRealCase();
@@ -178,7 +186,7 @@ class JourneyProductionIntakeIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_stage_projections WHERE case_id=? AND node_key='review' AND status='COMPLETED'", Integer.class, caseId)).isEqualTo(1);
     }
 
-    @Test void versionPinningSurvivesNewerPublicationAndANewCaseBindsToTheLatestEligibleVersion() {
+    @Test void versionPinningSurvivesNewerPublicationUntilANewPolicyIsIndependentlyApproved() {
         UUID firstCaseId = submitRealCase();
         assertThat(bindings.findByCase(firstCaseId).orElseThrow().versionId()).isEqualTo(version.id());
 
@@ -190,7 +198,12 @@ class JourneyProductionIntakeIntegrationTest {
         fixture.signIn("maker");
 
         UUID newCaseId = submitRealCase();
-        assertThat(bindings.findByCase(newCaseId).orElseThrow().versionId()).isEqualTo(v2.id());
+        assertThat(bindings.findByCase(newCaseId).orElseThrow().versionId()).isEqualTo(version.id());
+        var nextPolicy = policies.prepare(new JourneyAdmissionPolicyService.Prepare(v2.id(), "ALL_NEW_CASES", List.of(), "Move future admissions to version two"));
+        fixture.signIn("checker");
+        policies.approve(nextPolicy.id(), new JourneyAdmissionPolicyService.Decide(nextPolicy.revision(), "Independent version two activation"));
+        UUID afterApproval = submitRealCase();
+        assertThat(bindings.findByCase(afterApproval).orElseThrow().versionId()).isEqualTo(v2.id());
         // The already-bound case never moves.
         assertThat(bindings.findByCase(firstCaseId).orElseThrow().versionId()).isEqualTo(version.id());
     }
@@ -208,15 +221,14 @@ class JourneyProductionIntakeIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE entity_id=? AND action='JOURNEY_CASE_BOUND'", Long.class, caseId.toString())).isEqualTo(boundEventsBefore);
     }
 
-    @Test void disablingTheIntakeFlagNeverTouchesAnAlreadyBoundCase() {
+    @Test void pausingAdmissionsNeverTouchesAnAlreadyBoundCase() {
         UUID caseId = submitRealCase();
         var before = bindings.findByCase(caseId).orElseThrow();
-        var offInstance = new JourneyProductionIntakeService(decisions, JourneyCutoverPolicy.of(false, List.of()), deploymentRepo, bindings,
-                admissions, runtimes, projections, audit, jdbcClient, manager, meters);
+        fixture.signIn("checker");
+        policies.pause(policy.id(), new JourneyAdmissionPolicyService.Decide(policy.revision(), "Stop future admissions"));
+        productionIntake.onCaseSubmitted(new IntakeEvents.CaseSubmitted(caseId));
 
-        offInstance.onCaseSubmitted(new IntakeEvents.CaseSubmitted(caseId));
-
-        assertThat(bindings.findByCase(caseId).orElseThrow()).isEqualTo(before); // flag-off is a no-op, never an unbind
+        assertThat(bindings.findByCase(caseId).orElseThrow()).isEqualTo(before);
     }
 
     @Test void runtimeStartFailureRollsBackTheSubmissionNotJustTheJourneyBinding() {

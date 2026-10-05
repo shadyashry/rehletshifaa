@@ -31,7 +31,8 @@ import java.util.UUID;
  */
 @Service
 public class JourneyCutoverStatusService {
-    public record PolicyView(String id, boolean enabled, String scope, List<String> careCategories) {}
+    public record PolicyView(String id, boolean enabled, String scope, List<String> careCategories, UUID journeyVersionId,
+                             Integer versionNumber, String state, String readiness, String preparedBy, String approvedBy, String pausedBy) {}
     public record ReadinessView(String category, UUID journeyVersionId, Integer versionNumber) {}
     public record Anomalies(long journeyAdmissionsWithoutStartedBinding, long productionBindingsWithoutJourneyAdmission) {}
     public record Status(boolean productionIntakeEnabled, boolean runtimeEnabled, boolean configurationValid, List<String> configurationProblems,
@@ -45,7 +46,7 @@ public class JourneyCutoverStatusService {
     public record CaseView(UUID caseId, String authority, AdmissionView admission, BindingView binding,
                            JourneyCaseAdmissionRepository.Failure latestFailure) {}
 
-    private final JourneyCutoverPolicy policy;
+    private final JourneyAdmissionPolicyService policies;
     private final JourneyDeploymentService readiness;
     private final JourneyCaseAdmissionRepository admissions;
     private final JourneyCaseBindingRepository bindings;
@@ -57,26 +58,29 @@ public class JourneyCutoverStatusService {
     private final JdbcClient jdbc;
     private final JourneyLiveShadowRepository shadow;
 
-    public JourneyCutoverStatusService(JourneyCutoverPolicy policy, JourneyDeploymentService readiness, JourneyCaseAdmissionRepository admissions,
+    public JourneyCutoverStatusService(JourneyAdmissionPolicyService policies, JourneyDeploymentService readiness, JourneyCaseAdmissionRepository admissions,
             JourneyCaseBindingRepository bindings, JourneyDefinitionRepository definitions, ObjectProvider<JourneyRuntimePort> runtimes,
             CareCategoryCatalog categories, Authority authorization, GovernanceAuditLog audit, JdbcClient jdbc,
             JourneyLiveShadowRepository shadow) {
-        this.policy = policy; this.readiness = readiness; this.admissions = admissions; this.bindings = bindings; this.definitions = definitions;
+        this.policies = policies; this.readiness = readiness; this.admissions = admissions; this.bindings = bindings; this.definitions = definitions;
         this.runtimes = runtimes; this.categories = categories; this.authorization = authorization; this.audit = audit; this.jdbc = jdbc; this.shadow = shadow;
     }
 
     @Transactional(readOnly = true)
     public Status status() {
         authorize();
-        var ready = readiness.admissionReadiness();
+        var configured = policies.history();
+        var current = configured.stream().filter(p -> "ACTIVE".equals(p.state()) || "PAUSED".equals(p.state())).findFirst().orElse(null);
         var known = categories.all().stream().map(CareCategoryView::slug).toList();
-        var unknown = policy.rules().stream().flatMap(r -> r.careCategories().stream()).filter(c -> !known.contains(c)).distinct().sorted().toList();
+        var unknown = configured.stream().flatMap(r -> r.careCategories().stream()).filter(c -> !known.contains(c)).distinct().sorted().toList();
         var counts = admissions.countsByDecisionAndReason();
         long journey = counts.entrySet().stream().filter(e -> e.getKey().startsWith("JOURNEY:")).mapToLong(Map.Entry::getValue).sum();
         long legacy = counts.entrySet().stream().filter(e -> e.getKey().startsWith("LEGACY:")).mapToLong(Map.Entry::getValue).sum();
-        return new Status(policy.masterEnabled(), runtimes.getIfAvailable() != null, policy.valid(), policy.problems(), unknown, policy.revision(),
-                policy.rules().stream().map(r -> new PolicyView(r.id(), r.enabled(), r.scope() == null ? null : r.scope().name(), r.careCategories())).toList(),
-                new ReadinessView(ready.category(), ready.version().map(v -> v.id()).orElse(null), ready.version().map(v -> v.number()).orElse(null)),
+        return new Status(current != null && "ACTIVE".equals(current.state()), runtimes.getIfAvailable() != null, true, List.of(), unknown,
+                current == null ? "none" : current.revisionToken(),
+                configured.stream().map(r -> new PolicyView(r.id().toString(), "ACTIVE".equals(r.state()), r.eligibilityScope(), r.careCategories(),
+                        r.journeyVersionId(), r.versionNumber(), r.state(), r.readiness(), r.preparedBy(), r.approvedBy(), r.pausedBy())).toList(),
+                new ReadinessView(current == null ? "NO_ACTIVE_POLICY" : current.readiness(), current == null ? null : current.journeyVersionId(), current == null ? null : current.versionNumber()),
                 counts, journey, legacy, admissions.failureCount(), admissions.distinctRevisions(),
                 new Anomalies(admissions.journeyAdmissionsWithoutStartedBinding(), admissions.productionBindingsWithoutJourneyAdmission()), shadow.aggregate());
     }
@@ -104,16 +108,6 @@ public class JourneyCutoverStatusService {
      * recorded once whenever the effective revision differs from the last one recorded. The default (master off,
      * no policies) configuration records nothing.
      */
-    @EventListener(ApplicationReadyEvent.class)
-    public void recordRevision() {
-        if (!policy.masterEnabled() && policy.rules().isEmpty()) return;
-        String last = jdbc.sql("SELECT reason FROM audit_events WHERE action='JOURNEY_CUTOVER_POLICY_CHANGED' ORDER BY occurred_at DESC,id DESC LIMIT 1")
-                .query(String.class).optional().orElse("");
-        String reason = "revision=" + policy.revision() + "; master=" + policy.masterEnabled() + "; valid=" + policy.valid()
-                + "; enabled=" + policy.rules().stream().filter(JourneyCutoverPolicy.Rule::enabled).map(JourneyCutoverPolicy.Rule::id).toList();
-        if (!last.startsWith("revision=" + policy.revision() + ";")) audit.record("SYSTEM", "journey-cutover", "JOURNEY_CUTOVER_POLICY_CHANGED", "SUCCESS", reason);
-    }
-
     private void authorize() {
         authorization.require(Permission.JOURNEY_READ);
     }

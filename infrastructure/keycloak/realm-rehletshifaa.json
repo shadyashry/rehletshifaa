@@ -360,6 +360,136 @@
       ]
     },
     {
+      "id": "00000000-0000-0000-0000-000000000301",
+      "username": "journey-manager",
+      "email": "journey-manager@local.test",
+      "firstName": "Journey",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000302",
+      "username": "journey-approver",
+      "email": "journey-approver@local.test",
+      "firstName": "Journey",
+      "lastName": "Approver",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000303",
+      "username": "compliance-auditor",
+      "email": "compliance-auditor@local.test",
+      "firstName": "Compliance",
+      "lastName": "Auditor",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000304",
+      "username": "support-officer",
+      "email": "support-officer@local.test",
+      "firstName": "Support",
+      "lastName": "Officer",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000305",
+      "username": "patient-identity-reviewer",
+      "email": "patient-identity-reviewer@local.test",
+      "firstName": "Patient Identity",
+      "lastName": "Reviewer",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000306",
+      "username": "operations-manager",
+      "email": "operations-manager@local.test",
+      "firstName": "Operations",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000307",
+      "username": "finance-manager",
+      "email": "finance-manager@local.test",
+      "firstName": "Finance",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000308",
+      "username": "credentialing-manager",
+      "email": "credentialing-manager@local.test",
+      "firstName": "Credentialing",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000309",
+      "username": "support-manager",
+      "email": "support-manager@local.test",
+      "firstName": "Support",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000310",
+      "username": "care-manager",
+      "email": "care-manager@local.test",
+      "firstName": "Care Coordination",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000311",
+      "username": "consultant-operations-manager",
+      "email": "consultant-operations-manager@local.test",
+      "firstName": "Consultant Operations",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000312",
+      "username": "coordinator-scope",
+      "email": "coordinator-scope@local.test",
+      "firstName": "Scope Test",
+      "lastName": "Coordinator",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000313",
+      "username": "care-manager-scope",
+      "email": "care-manager-scope@local.test",
+      "firstName": "Scope Test Care",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
       "username": "service-account-staff-identity-admin",
       "enabled": true,
       "serviceAccountClientId": "staff-identity-admin",

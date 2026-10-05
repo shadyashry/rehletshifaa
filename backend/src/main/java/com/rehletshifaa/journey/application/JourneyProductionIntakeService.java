@@ -2,7 +2,6 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
-import com.rehletshifaa.journey.application.JourneyAdmissionDecisionService.CaseContext;
 import com.rehletshifaa.journey.application.JourneyAdmissionDecisionService.Decision;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository.Admission;
@@ -26,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.Instant;
 
 /**
  * Phase 7A — the real production Journey intake hook; Phase 7B — governed by the cutover policy. Reacts to the
@@ -40,9 +41,10 @@ import java.util.UUID;
  * {@link JourneyProjectionService#syncAsSystem} for initial WorkItem/PatientAction projection (Assignment Engine
  * integration inherited through {@link JourneyActionDispatcher}).
  *
- * <p>Order of an admission attempt: master switch off → no-op, nothing recorded (legacy, byte-for-byte). Already
- * admitted or bound → no-op (idempotent redelivery). Otherwise one {@link JourneyAdmissionDecisionService} decision
- * is taken and persisted as immutable evidence. A LEGACY decision never fails the submission. A JOURNEY decision
+ * <p>Order of an admission attempt: already admitted or bound → no-op (idempotent redelivery). Otherwise the
+ * database policy is read under the shared governance lock and one decision is persisted as immutable evidence.
+ * A missing or paused policy records a LEGACY decision, preventing a replay after later activation from adopting an
+ * already-submitted case. A LEGACY decision never fails the submission. A JOURNEY decision
  * binds, starts and projects; any failure there propagates and rolls back the whole submission (the case returns
  * to DRAFT with no admission, binding or instance) — it is never silently re-routed to legacy. The failure itself
  * is recorded in a separate transaction so operators can see it after the rollback.
@@ -51,8 +53,8 @@ import java.util.UUID;
 public class JourneyProductionIntakeService {
     private static final Logger log = LoggerFactory.getLogger(JourneyProductionIntakeService.class);
 
-    private final JourneyAdmissionDecisionService decisions;
-    private final JourneyCutoverPolicy policy;
+    private final JourneyAdmissionPolicyService policies;
+    private final com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository definitions;
     private final JourneyDeploymentRepository deployments;
     private final JourneyCaseBindingRepository bindings;
     private final JourneyCaseAdmissionRepository admissions;
@@ -62,16 +64,19 @@ public class JourneyProductionIntakeService {
     private final JdbcClient jdbc;
     private final TransactionTemplate separate;
     private final MeterRegistry meters;
+    private final Clock clock;
 
-    public JourneyProductionIntakeService(JourneyAdmissionDecisionService decisions, JourneyCutoverPolicy policy,
+    public JourneyProductionIntakeService(JourneyAdmissionPolicyService policies,
+            com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository definitions,
             JourneyDeploymentRepository deployments, JourneyCaseBindingRepository bindings, JourneyCaseAdmissionRepository admissions,
             ObjectProvider<JourneyRuntimePort> runtimes, JourneyProjectionService projections, GovernanceAuditLog audit,
-            JdbcClient jdbc, PlatformTransactionManager transactions, MeterRegistry meters) {
-        this.decisions = decisions; this.policy = policy; this.deployments = deployments; this.bindings = bindings;
+            JdbcClient jdbc, PlatformTransactionManager transactions, MeterRegistry meters, Clock clock) {
+        this.policies=policies; this.definitions=definitions; this.deployments = deployments; this.bindings = bindings;
         this.admissions = admissions; this.runtimes = runtimes; this.projections = projections; this.audit = audit; this.jdbc = jdbc;
         this.separate = new TransactionTemplate(transactions);
         this.separate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.meters = meters;
+        this.clock = clock;
     }
 
     @EventListener
@@ -82,7 +87,7 @@ public class JourneyProductionIntakeService {
 
     /** New-case-only: a case already admitted or bound (any mode) is never re-evaluated — authority never switches. */
     void admitIfEligible(UUID caseId) {
-        if (!policy.masterEnabled()) return; // master switch off: legacy intake exactly as before Phase 7A
+        var policy = policies.currentForAdmission(); // also holds the governance lock, linearizing this decision with pause/activation
         if (admissions.find(caseId).isPresent() || bindings.findByCase(caseId).isPresent()) return; // duplicate delivery
 
         var runtime = runtimes.getIfAvailable();
@@ -90,7 +95,19 @@ public class JourneyProductionIntakeService {
                 .query((r, n) -> java.util.Optional.ofNullable(r.getString("care_category"))).optional();
         boolean present = row.isPresent();
         String careCategory = row.flatMap(c -> c).orElse(null);
-        Decision decision = decisions.evaluate(policy, runtime != null, new CaseContext(caseId, present, careCategory));
+        Instant evaluatedAt=clock.instant();
+        Decision decision;
+        if (!present) decision=new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,"CONTEXT_INCOMPLETE",policy==null?null:policy.id().toString(),policy==null?"db:none":policy.revisionToken(),null,careCategory,evaluatedAt);
+        else if (policy==null || !"ACTIVE".equals(policy.state())) decision=new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,"ADMISSION_NOT_ACTIVE",policy==null?null:policy.id().toString(),policy==null?"db:none":policy.revisionToken(),null,careCategory,evaluatedAt);
+        else if (!policy.matches(careCategory)) decision=new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,"POLICY_NO_MATCH",policy.id().toString(),policy.revisionToken(),null,careCategory,evaluatedAt);
+        else if (runtime==null) decision=new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,"RUNTIME_DISABLED",policy.id().toString(),policy.revisionToken(),null,careCategory,evaluatedAt);
+        else {
+            var version=definitions.version(policy.journeyVersionId());
+            String ready=policies.exactReadiness(version.id());
+            decision="DEPLOYED".equals(ready)
+                    ? new Decision(JourneyAdmissionDecisionService.Authority.JOURNEY,"POLICY_MATCHED",policy.id().toString(),policy.revisionToken(),version,careCategory,evaluatedAt)
+                    : new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,ready,policy.id().toString(),policy.revisionToken(),null,careCategory,evaluatedAt);
+        }
         if (!present) { count(decision); return; } // nothing to attach evidence to (FK): counted, not stored
 
         if (!decision.journey()) {
@@ -115,7 +132,7 @@ public class JourneyProductionIntakeService {
         } catch (RuntimeException e) {
             String category = e instanceof DuplicateKeyException ? "BINDING_CONFLICT" : "RUNTIME_START_FAILED";
             log.warn("Journey admission of case {} failed ({}); submission rolled back", caseId, category, e);
-            failed(caseId, category, version.id());
+            failed(caseId, category, version.id(), decision.policyRevision());
             throw e;
         }
         count(decision);
@@ -128,12 +145,12 @@ public class JourneyProductionIntakeService {
     }
 
     /** Survives the submission rollback: a separate transaction, safe category only (never the exception text). */
-    private void failed(UUID caseId, String category, UUID versionId) {
+    private void failed(UUID caseId, String category, UUID versionId, String revision) {
         meters.counter("journey.runtime.start", "outcome", "failure").increment();
         if ("BINDING_CONFLICT".equals(category)) meters.counter("journey.binding.conflict").increment();
         try {
             separate.executeWithoutResult(s -> audit.record("SYSTEM", caseId.toString(), "JOURNEY_RUNTIME_START_FAILED", "FAILURE",
-                    "category=" + category + "; version=" + versionId + "; revision=" + policy.revision()));
+                    "category=" + category + "; version=" + versionId + "; revision=" + revision));
         } catch (RuntimeException auditFailure) {
             log.warn("Could not record Journey admission failure for case {}", caseId, auditFailure); // never mask the original error
         }

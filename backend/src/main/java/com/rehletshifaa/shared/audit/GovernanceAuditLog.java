@@ -20,6 +20,11 @@ public class GovernanceAuditLog {
     public void denied(String actor, String entity, String permission, String reason) {
         record(actor,entity,"ACCESS_DENIED","DENY",permission+":"+reason);
     }
+    /** Read evidence must survive a surrounding read-only transaction. */
+    @Transactional(propagation=Propagation.REQUIRES_NEW)
+    public void supervisoryRead(String actor, String caseId, String permission) {
+        record(actor,caseId,"SUPERVISORY_READ","SUCCESS",permission);
+    }
     public void record(String actor, String entity, String action, String outcome, String reason) { record(actor,entity,action,outcome,reason,null); }
     /**
      * {@code reason} is the system's technical detail; {@code governanceReason} is what the person said when they made the

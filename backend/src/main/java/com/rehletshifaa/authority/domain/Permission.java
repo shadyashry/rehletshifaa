@@ -6,7 +6,7 @@ package com.rehletshifaa.authority.domain;
  */
 public enum Permission {
     // cases and work
-    WORK_QUEUE_VIEW(false), COORDINATION_QUEUE(false), ROUTING_READ(false), ROUTING_CONFIGURE(true), ROUTING_ASSIGN(false), ASSIGNMENT_RESPOND(false), CASE_INTAKE(false), CASE_READ(false), CASE_COORDINATE(false), CASE_REASSIGN_COORDINATOR(false),
+    WORK_QUEUE_VIEW(false), COORDINATION_QUEUE(false), COORDINATION_CASE_SUMMARY(false), ROUTING_READ(false), ROUTING_CONFIGURE(true), ROUTING_ASSIGN(false), ASSIGNMENT_RESPOND(false), CASE_INTAKE(false), CASE_READ(false), CASE_COORDINATE(false), CASE_REASSIGN_COORDINATOR(false),
     CASE_MESSAGE(false), TASK_CREATE(false), TASK_WORK(false), TASK_SUPERVISE(false), REFERRAL_DECIDE(false),
     // clinical and fulfilment
     CLINICAL_REVIEW(false), SECOND_OPINION_SUBMIT(false), CLINICAL_APPROVE(true), OPERATIONS_FULFIL(false), FINANCE_SETTLE(true),
@@ -18,7 +18,7 @@ public enum Permission {
     CONSULTANT_ONBOARD(true), CREDENTIAL_READ(false), CREDENTIAL_DECIDE(true), PATIENT_IDENTITY_REVIEW(true), PATIENT_IDENTITY_READ(false),
     CLINIC_MANAGE(false), CLINIC_APPROVE(true), CAPABILITY_DECIDE(true),
     // journeys
-    JOURNEY_READ(false), JOURNEY_EDIT(false), JOURNEY_APPROVE(true),
+    JOURNEY_READ(false), JOURNEY_EDIT(false), JOURNEY_APPROVE(true), JOURNEY_ADMISSION_PAUSE(false),
     // platform administration
     WORKFORCE_READ(false), WORKFORCE_ADMINISTER(true), ACCESS_GOVERN(true), TEAM_MANAGE(false), STAFFING_REQUEST(false),
     AUDIT_READ(false), IDENTITY_OPERATIONS_READ(false), IDENTITY_OPERATIONS_MANAGE(true), SUPPORT_ACCOUNT(false),

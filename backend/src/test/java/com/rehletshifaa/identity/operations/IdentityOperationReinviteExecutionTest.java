@@ -5,6 +5,7 @@ import com.rehletshifaa.identity.IdentityProvisioningPort;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +18,8 @@ class IdentityOperationReinviteExecutionTest {
     private final IdentityProvisioningPort identities = mock(IdentityProvisioningPort.class);
     private final IdentityOperationStore store = mock(IdentityOperationStore.class);
     private final CryptoService crypto = mock(CryptoService.class);
-    private final IdentityOperationExecutor executor = new IdentityOperationExecutor(identities, store, mock(IdentityOperationCompletionService.class), crypto, new ObjectMapper());
+    private final IdentityOperationExecutor executor = new IdentityOperationExecutor(identities, store, mock(IdentityOperationCompletionService.class), crypto, new ObjectMapper(),
+            mock(ApplicationEventPublisher.class));
 
     private IdentityOperationStore.Operation resend(String json) {
         when(crypto.decrypt("cipher")).thenReturn(json);

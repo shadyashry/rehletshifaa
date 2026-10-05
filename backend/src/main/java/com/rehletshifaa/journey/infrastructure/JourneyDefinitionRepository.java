@@ -20,10 +20,11 @@ public class JourneyDefinitionRepository {
         return jdbc.sql("SELECT * FROM journey_definitions WHERE id=?"+(lock?" FOR UPDATE":"")).param(id).query((r,n)->new Definition(r.getObject("id",UUID.class),r.getString("journey_key"),r.getString("display_name"),r.getTimestamp("created_at").toInstant())).optional().orElseThrow(JourneyDefinitionRepository::notFound);
     }
     public UUID create(){
-        jdbc.sql("SELECT id FROM journey_governance_lock WHERE id=1 FOR UPDATE").query(Integer.class).single();
+        governanceLock();
         if(!definitions().isEmpty())throw new ApiException(409,"JOURNEY_EXISTS","The canonical International Care Journey already exists.");
         UUID id=UUID.randomUUID();jdbc.sql("INSERT INTO journey_definitions VALUES(?,'INTERNATIONAL_CARE','International Care Journey',?)").params(id,timestamp(clock.instant())).update();return id;
     }
+    public void governanceLock(){jdbc.sql("SELECT id FROM journey_governance_lock WHERE id=1 FOR UPDATE").query(Integer.class).single();}
     public List<Version> versions(UUID definition){return jdbc.sql("SELECT id FROM journey_versions WHERE definition_id=? ORDER BY version_number DESC").param(definition).query(UUID.class).list().stream().map(id->version(definition,id)).toList();}
     /** Resolves the owning definition first; for callers (Journey runtime projections) that only hold a version id. */
     public Version version(UUID id){

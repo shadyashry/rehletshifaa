@@ -182,7 +182,7 @@ function Teams({ locale, access, api, dialog, setDialog }: { locale: Locale; acc
               <ul className="cc-checklist">{team.members.map((m) => <li key={m.membershipId}>
                 <span style={{ flex: 1 }}><bdi>{m.displayName ?? t(locale, "Name not recorded", "اسم غير مسجّل")}</bdi>{m.lead ? ` · ${t(locale, "Team lead", "قائد الفريق")}` : ""}
                   <span className="cc-row-sub">{t(locale, "Reports to", "يتبع")}: <bdi>{name(m.managerSubject)}</bdi></span></span>
-                {canManage && <span className="cc-row-actions">
+                {canManage && m.subject !== access.me?.subject && <span className="cc-row-actions">
                   {m.lead ? <button type="button" className="cc-secondary cc-small" onClick={() => setDialog({ kind: "unlead", team, member: m })}>{t(locale, "End lead", "إنهاء القيادة")}</button>
                     : <button type="button" className="cc-secondary cc-small" onClick={() => setDialog({ kind: "lead", team, member: m })}>{t(locale, "Make lead", "تعيين قائدًا")}</button>}
                   <button type="button" className="cc-secondary cc-small" onClick={() => setDialog({ kind: "manager", team, member: m })}>{t(locale, "Set manager", "تحديد المدير")}</button>

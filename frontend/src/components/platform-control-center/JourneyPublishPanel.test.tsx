@@ -42,7 +42,7 @@ describe("Approval & publishing", () => {
     expect(onLoadIntake).toHaveBeenCalled();
     const dialog = screen.getByRole("dialog", { name: "Publish this journey version?" });
     expect(within(dialog).getByText(/Version 3 becomes a published version of International Care Journey/)).toBeVisible();
-    expect(within(dialog).getByText(/Production intake is off.*Publishing a version does not turn it on/)).toBeVisible();
+    expect(within(dialog).getByText(/Journey admission is off.*independently approved admission policy/)).toBeVisible();
     expect(within(dialog).getByText(/Cases already on an earlier version stay on it/)).toBeVisible();
     expect(within(dialog).getByText(/Saved in the journey history with this action/)).toBeVisible();
     const confirm = within(dialog).getByRole("button", { name: "Yes, publish version" });
@@ -57,7 +57,7 @@ describe("Approval & publishing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retire version…" }));
     const dialog = screen.getByRole("dialog", { name: "Retire this published version?" });
     expect(within(dialog).getByText("Version 3 is no longer used for new patient cases.")).toBeVisible();
-    expect(within(dialog).getByText(/Version 1, the newest remaining published version/)).toBeVisible();
+    expect(within(dialog).getByText(/Version 1 remains published.*admission policy selects it/)).toBeVisible();
     expect(within(dialog).getByText("Cases already on this version stay on it and are not moved.")).toBeVisible();
     expect(onDecide).not.toHaveBeenCalled();
     fireEvent.change(within(dialog).getByLabelText(/Why are you retiring/), { target: { value: "Superseded" } });

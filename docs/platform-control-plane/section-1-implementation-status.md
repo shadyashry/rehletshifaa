@@ -711,6 +711,66 @@ No migration was added or edited. The dev DB does not need recreating.
 - **QA-13:** UAT seeds are missing for the Journey, Auditor, Support and Identity-review roles.
 - The incoming owner must already be a workforce person. OD-02 recovery is still unavailable.
 
+## Codex handoff intake (2026-10-05)
+
+- Read `AGENTS.md`, the Claude QA/fix handoff and the next-action instructions. No implementation slice started:
+  the resumption request's task field is still `<describe the next task here>`.
+- Verified branch `codex/platform-control-plane`; working tree was clean at intake. Latest commits, newest first:
+  `f874e5f`, `0879859`, `04e2175`, `652f47e`. Local tracking status reports one commit ahead of
+  `origin/codex/platform-control-plane`; remote state was not refreshed.
+- Delivered: handoff intake and this continuity note only. No application or migration changes. Tests were not
+  rerun; the preceding handoff's verification remains historical evidence, not a new verification claim.
+- Open gaps remain as listed above. Platform Ownership UI is already delivered and must not be rebuilt.
+- **Next exact action:** obtain the concrete task omitted from the resumption request, then inspect only its
+  affected files. Observe the request's explicit decision gates for QA-09..13, OD-02 and Practice Manager consent.
+
+## Approved completion scope (2026-10-05)
+
+The owner has now resolved QA-09..13 and explicitly authorized implementation. These decisions supersede the
+earlier "do not start without one" gate for those five items only:
+
+- Record an effective-dated, audited Consultant Operations owner for each Consultant. Credential and capability
+  decisions must reject the Consultant and the owner captured for that already-open review; reassignment retains
+  both ownership and conflict history. Backend decisions and ownership changes are transactional and serialized.
+- Replace the workforce `IDENTITY_REVIEW_REQUIRED` dead end with exact server-side identity adoption plus a durable
+  System Administrator review queue. Adoption requires the identity holder to authenticate and accept; authority
+  remains inactive until acceptance, activation and MFA requirements pass. Patient identity review stays separate.
+- Retain the two existing manager roles and add narrowly scoped Operations, Finance, Credentialing and Support
+  Managers. Journey Manager remains the Care Journey function manager. Managers maintain only their function's
+  teams, memberships, leads and reporting lines and submit staffing requests; they do not grant roles, self-appoint
+  as leads, change their own reporting lines, or inherit execution/clinical/administrator powers.
+- Care Coordination Managers receive backend-filtered operational summaries for managed teams. Clinical detail is
+  available only to a Coordinator with a direct-report or team-lead relationship to the active assignee, never by
+  recursive reporting. Supervisory reads are audited and confer no execution authority.
+- Live Journey admission becomes database governed: a Journey Manager prepares, a different Journey Approver
+  approves/activates a policy revision after recent authentication and a reason. Either role may immediately pause
+  new admissions. Existing cases keep their pinned versions and continue; intake/fallback remains available.
+- Development fixtures add distinct Journey Manager/Approver, auditor, support, patient-identity reviewer and new
+  function-manager identities, with a second team for scope-denial testing. Seeding stays development-only, keeps
+  real activation/MFA requirements, and places no credentials in source or logs.
+- Patient activation remains independent of document verification. The existing narrow Patient Identity Reviewer
+  role/queue remains an operational travel-readiness control and is not granted to all Operations staff.
+- Still excluded: OD-02 recovery, Practice Manager identity/consent work, unrelated refactors/ProposalSign repair,
+  publishing/pushing/merging, and enabling live admission merely as a demonstration. QA-06 stays warning-only.
+
+Implementation slices (primary agent owns contracts, migrations, integration, verification and this checkpoint):
+
+1. **P1 — Consultant ownership + SOD-05:** schema/history, owner commands/read model, decision-time conflict binding,
+   concurrency tests and management UI.
+2. **P2 — Workforce identity adoption:** durable review/adoption state machine, holder acceptance and activation
+   integration, administrator UI, conflict/concurrency tests.
+3. **P3 — Function management:** role/policy catalogue, function mapping, hierarchy invariants, staffing requests,
+   UI and denial tests.
+4. **P4 — Coordination visibility:** minimum operational summary, direct supervisory detail, field filtering,
+   audit and execution-denial tests.
+5. **P5 — Journey admission:** versioned policy/readiness/approval/pause controls, transactional admission and pinned
+   execution, UI and concurrency/idempotency tests.
+6. **P6 — Development fixtures and final gate:** development identities/teams/fixtures, secure setup documentation,
+   focused verification per slice, frontend typecheck/tests and the full offline backend suite.
+
+**Next exact action:** inspect the existing consultant, workforce identity, authority/hierarchy, coordination and
+journey-admission boundaries; settle the shared schema/API contracts; then implement P1 before dependent slices.
+
 ## Next Section 1 slice
 
 **Resume here (2026-09-26, direction changed):** the owner rejected mapping onto legacy structures. Build the
@@ -972,3 +1032,92 @@ Open gates (do not claim complete):
 - **OD-02:** recovery remains unavailable.
 - Known pre-existing flaky history remains documented under Verification: OTP selection ties and the notification
   outbox hand-back test. Neither was observed in this takeover's focused runs; the full backend suite was not rerun.
+
+## Approved completion scope delivered (2026-10-05)
+
+The owner-approved P1–P6 work above is implemented in the current working tree. It preserves the Platform Ownership
+workflow, patient activation without document verification, the narrow Patient Identity Reviewer queue, QA-06
+warning-only behavior and all explicitly excluded work.
+
+### Delivered behavior and contracts
+
+- **P1 — Consultant Operations ownership and SOD-05:** V68 adds immutable effective-dated ownership history, a
+  serialized current-owner pointer and conflict snapshots for already-open credential/capability reviews. The
+  Consultant Operations Manager API and Consultant page support audited assignment/reassignment. Only an active
+  Consultant Operations Manager is eligible. A Consultant and every owner captured for that review are denied at
+  decision time; reassignment cannot erase the conflict. Ownership changes, review opening and decisions lock the
+  Consultant row so concurrent changes cannot bypass the rule. Active ownership also blocks incompatible role
+  removal/offboarding.
+- **P2 — workforce identity adoption:** V70 adds the durable System Administrator review, decision, acceptance and
+  history records. Staff invitation resolves identities from Keycloak server-side; neither email alone nor a
+  browser identifier establishes ownership. Exact enabled/verified matches enter holder acceptance, and ambiguous,
+  conflicting or create-race matches enter the administrator queue. Reviews support pending, awaiting acceptance,
+  resolved and rejected outcomes with reasons/revisions/audit history. The authenticated resolved subject must
+  accept; authority stays ineffective until acceptance, workforce activation and MFA. Prohibited population/role
+  combinations remain non-waivable. A synchronous identity-domain event routes CREATE_STAFF races into review
+  without creating an access↔identity module cycle. This surface is separate from patient identity review.
+- **P3 — function management:** V69 and the fixed `RolePolicy` retain Care Coordination Manager and Consultant
+  Operations Manager and add Operations, Finance, Credentialing and Support Managers. Journey Manager owns Care
+  Journey team management. Each manager receives only their function's hierarchy/staffing authority; manager roles
+  confer no role-grant, financial execution, credential-decision, patient-identity, clinical or administrator
+  power. Existing hierarchy services continue to enforce eligible membership, no self-lead/self-reporting change,
+  one direct manager per function, cycle prevention, effective dates and orphan safeguards. Leads remain
+  relationships, not roles.
+- **P4 — Care Coordination visibility:** `GET /api/v1/admin/coordination/managed-cases` returns only case reference,
+  stage, active coordinator, workload, overdue count and blocker flags for teams the caller manages. Filtering is
+  server-side. Detailed `CASE_READ` still requires the Coordinator role plus a direct-report or team-lead
+  relationship to the active assignee; reporting is not recursive. Successful supervised reads are audited and do
+  not authorize another person's task execution. The Control Center renders the operational summary without
+  clinical documents, narratives or private messages.
+- **P5 — governed live Journey admission:** V71 replaces the business cutover switch with a database policy carrying
+  the exact published Journey version, eligibility, readiness, revision, state, actors, reasons and history. A
+  Journey Manager prepares; a different Journey Approver with recent authentication approves/activates. Either
+  role can immediately pause new admissions with a reason. Approval is bound to the policy revision and refuses an
+  unpublished/unready version, absent runtime or disabled production-intake infrastructure. Pausing affects only
+  new submissions; existing bindings continue on pinned versions. Every submitted case records one immutable
+  Journey/legacy admission decision, including a paused/no-policy legacy result, preventing later replay from
+  changing authority. Intake fallback remains available, policy changes require no restart and live admission or
+  authorization state is not cached. The Control Center exposes prepare/approve/reject/pause and the complete
+  policy history; no policy was enabled as demonstration.
+- **P6 — development fixtures:** local-only seeding and the realm export now include distinct Journey Manager,
+  Journey Approver, Compliance Auditor, Support Officer, Patient Identity Reviewer, all manager roles, a second
+  Coordinator and a distinct second Care Coordination Manager/team for scope-denial testing. The new identities
+  have no source-controlled credentials or fabricated authentication evidence; they remain invited until the real
+  password-update, TOTP, activation and MFA checks succeed. `docs/local-development.md` documents their purposes
+  and secure setup.
+
+Additive H2-safe migrations are `V68__consultant_operations_ownership.sql`,
+`V69__function_manager_roles.sql`, `V70__workforce_identity_adoption.sql` and
+`V71__governed_journey_admission.sql`; no committed migration was edited.
+
+### Fresh verification
+
+- Required safe removal of only `backend/target/test-classes`, followed by offline `test-compile`: **PASS**.
+- Focused governed Journey admission/intake integration: **24 PASS**.
+- Focused ownership, workforce-adoption, coordination, staff lifecycle and role-policy integration before the final
+  gate: **35 PASS**; the later architecture/adoption/Journey regression rerun also passed after replacing the
+  cross-module callback with the domain event.
+- Full offline backend suite (with the local Mockito agent required by this Windows environment): **557 tests, 0
+  failures, 1 skipped**. All 71 Flyway migrations applied to fresh H2 test schemas.
+- Frontend typecheck: **PASS**.
+- Affected Control Center/portal component tests: **68 PASS across 9 files** (identity review, Journey admission and
+  version governance, consultant ownership surfaces, coordination workspace, navigation/routes and holder pending
+  actions).
+- Keycloak realm JSON parse and `git diff --check`: **PASS** (line-ending notices only).
+
+The requested Astra/high security design review informed the transactional/identity boundaries. A final independent
+Astra/high read-only review was also started: it found that the same seeded manager led both test teams, which was
+fixed by adding a distinct second Care Coordination Manager. That reviewer then exhausted its runtime usage limit,
+so a complete second-pass review could not be obtained. The primary review plus ArchUnit and the full backend gate
+found and fixed the identity→access dependency cycle.
+
+### Open evidence and next exact action
+
+- No approved implementation gap remains in P1–P6. OD-02 and Practice Manager consent remain excluded.
+- The canonical tunnel stack was not rebuilt and live identity/browser tests were not run in this slice. Nothing
+  was published, pushed, merged or enabled, and no development volume was deleted. Existing historical live
+  evidence remains historical rather than a fresh claim.
+- **Next exact action:** preserve the unrelated AGENTS/checkpoint and frontend brand/theme work, review the targeted
+  P1–P6 diff, then commit only if the owner requests it. If fresh deployment evidence is requested, use the
+  canonical tunnel overlay and exercise the distinct holder/admin/manager identities without enabling Journey
+  admission merely for demonstration.

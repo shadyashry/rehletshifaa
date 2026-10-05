@@ -27,8 +27,11 @@ class JourneyProductionIntakeDisabledTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_case_bindings WHERE case_id=?", Integer.class, created.caseId()))
                 .as("no Journey binding is ever created when the intake flag is off (the default)").isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_case_admissions WHERE case_id=?", Integer.class, created.caseId()))
-                .as("master off records no admission evidence either: legacy is unevaluated, not decided").isZero();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE entity_id=? AND action LIKE '%ADMISSION%'", Integer.class, created.caseId().toString())).isZero();
+                .as("the immutable legacy decision prevents a replay after later activation").isOne();
+        assertThat(jdbc.queryForMap("SELECT decision,reason,policy_revision FROM journey_case_admissions WHERE case_id=?", created.caseId()))
+                .containsEntry("DECISION", "LEGACY").containsEntry("REASON", "ADMISSION_NOT_ACTIVE")
+                .containsEntry("POLICY_REVISION", "db:none");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE entity_id=? AND action='LEGACY_ADMISSION_SELECTED'", Integer.class, created.caseId().toString())).isOne();
     }
 
     @Test void anonymousSubmissionRequiresTheExactUnconsumedCreatorGrant() {

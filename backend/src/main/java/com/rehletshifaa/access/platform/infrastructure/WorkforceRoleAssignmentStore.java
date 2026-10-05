@@ -110,6 +110,12 @@ public class WorkforceRoleAssignmentStore {
                 .params(subject, function).query(Long.class).single() > 0;
     }
 
+    /** SOD-05: an Operations owner must be reassigned before their qualifying role is removed. */
+    public boolean ownsConsultant(String subject) {
+        return jdbc.sql("SELECT COUNT(*) FROM consultant_current_operations_owners WHERE owner_subject=?")
+                .param(subject).query(Long.class).single() > 0;
+    }
+
     public RoleAssignment insert(String subject, String role, Instant from, Instant to, String actor, String reason, Instant now) {
         return insert(subject, role, from, to, "GRANT", actor, reason, now);
     }

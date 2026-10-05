@@ -8,6 +8,7 @@ import { apiFetchAs } from "@/lib/api";
 import type { Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { FocusTrapDialog } from "./FocusTrapDialog";
+import { JourneyAdmissionPolicyPanel } from "./JourneyAdmissionPolicyPanel";
 import { Section, StatusBadge } from "./cc-ui";
 import type { Tone } from "./admin-labels";
 import { historyActionLabel, journeyCopy, journeyStatusLabel } from "./journey-copy";
@@ -121,6 +122,8 @@ export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Loca
               <p className="cc-meta" role="status">{intake === "error" || intake === null ? t.intakeUnknown : intake.productionIntakeEnabled ? t.intakeOn : t.intakeOff}</p>
             </section>
           </div>
+
+          <JourneyAdmissionPolicyPanel locale={locale} definitionId={definitionId} versions={versions} permissions={me?.permissions ?? []} currentUser={user.profile.sub} api={api} onChanged={refresh} />
 
           <Section title={t.versions} id="journey-versions">
             <ul className="cc-journey-steps" aria-label={t.versions}>

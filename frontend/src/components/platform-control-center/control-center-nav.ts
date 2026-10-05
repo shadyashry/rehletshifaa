@@ -17,7 +17,7 @@ export type NavKey =
   | "pricing" | "exchangeRates" | "marginDeposit"
   | "coordination"
   | "journeys"
-  | "people" | "teams" | "staffing" | "administrators" | "ownership" | "support" | "recertification" | "serviceAccounts" | "audit";
+  | "people" | "workforceIdentity" | "teams" | "staffing" | "administrators" | "ownership" | "support" | "recertification" | "serviceAccounts" | "audit";
 
 export type NavItem = {
   key: NavKey; path: string; label: [string, string]; summary: [string, string];
@@ -48,7 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { key: "marginDeposit", path: "/commercial/margin-deposit", label: ["Margin & Deposit", "الهامش والدفعة المقدمة"], summary: ["The margin and coordination deposit applied to new cases.", "الهامش ودفعة التنسيق المقدمة المطبّقان على الحالات الجديدة."], visible: (a) => a.can("COMMERCIAL_POLICY_READ") },
   ] },
   { key: "operations", label: ["Operations", "العمليات"], icon: Workflow, items: [
-    { key: "coordination", path: "/coordination", label: ["Coordination Setup", "إعداد التنسيق"], summary: ["Coordinator capacity, team routing, consultant preferences and routing rules.", "سعة المنسقين وتوجيه الفرق وتفضيلات الاستشاريين وقواعد التوجيه."], visible: (a) => a.can("ROUTING_READ") },
+    { key: "coordination", path: "/coordination", label: ["Coordination Setup", "إعداد التنسيق"], summary: ["Managed case summaries, coordinator capacity, team routing and routing rules.", "ملخصات الحالات المُدارة وسعة المنسقين وتوجيه الفرق وقواعد التوجيه."], visible: (a) => a.canAny(["ROUTING_READ", "COORDINATION_CASE_SUMMARY"]) },
   ] },
   // Journey design and publishing happen inside each journey (journey › version › design).
   { key: "journeys", label: ["Care Journeys", "رحلات الرعاية"], icon: Route, items: [
@@ -56,6 +56,7 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { key: "workforce", label: ["Workforce", "فريق العمل"], icon: Users, items: [
     { key: "people", path: "/people", label: ["People", "الأشخاص"], summary: ["RehletShifaa staff: invitations, roles, lifecycle and offboarding.", "موظفو رحلة شفاء: الدعوات والأدوار ودورة العمل وإنهاء الخدمة."], visible: (a) => a.can("WORKFORCE_READ") },
+    { key: "workforceIdentity", path: "/workforce-identity-reviews", label: ["Workforce Identity Reviews", "مراجعات هوية الموظفين"], summary: ["Resolve workforce invitation identity conflicts and track holder acceptance.", "معالجة تعارضات هوية دعوات الموظفين ومتابعة قبول صاحب الهوية."], visible: (a) => a.can("WORKFORCE_ADMINISTER") },
     { key: "teams", path: "/teams", label: ["Teams", "الفرق"], summary: ["Teams, team leads and reporting lines for each function.", "الفرق وقادتها وخطوط الإشراف لكل وظيفة."], visible: (a) => a.canAny(["WORKFORCE_READ", "TEAM_MANAGE"]) },
     { key: "staffing", path: "/staffing-requests", label: ["Staffing Requests", "طلبات التوظيف"], summary: ["Requests for new staff, decided by a system administrator.", "طلبات موظفين جدد يقررها مسؤول النظام."], visible: (a) => a.canAny(["STAFFING_REQUEST", "WORKFORCE_ADMINISTER"]) },
   ] },

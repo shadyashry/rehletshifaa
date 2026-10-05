@@ -5,6 +5,7 @@ import type { Locale } from "@/lib/i18n";
 import { useAuth } from "@/components/AuthProvider";
 import { useControlCenterAccess } from "@/components/platform-control-center/control-center-access";
 import { ccHref, openableSections, pick } from "@/components/platform-control-center/control-center-nav";
+import { WorkforceAdoptionPanel } from "./WorkforceAdoptionPanel";
 
 /**
  * Landing for a signed-in account with no care-portal workspace — typically someone whose RehletShifaa role works only in
@@ -14,7 +15,9 @@ import { ccHref, openableSections, pick } from "@/components/platform-control-ce
 export function NoPortalWorkspace({ locale }: { locale: Locale }) {
   const ar = locale === "ar";
   const access = useControlCenterAccess();
-  const { me, activationIssue, refreshMe, signIn } = useAuth();
+  const { user, me, activationIssue, refreshMe, signIn } = useAuth();
+  if (user && me?.pendingActions.includes("ACCEPT_WORKFORCE_ADOPTION"))
+    return <WorkforceAdoptionPanel locale={locale} token={user.access_token} onAccepted={refreshMe} />;
   // STF-02: an invited person whose activation was refused (usually: two-step verification not set up yet). Nothing is
   // granted until it succeeds; signing in again lets the identity provider run its pending setup, and "Try again" re-asks.
   if (me?.pendingActions.includes("ACTIVATE_ACCOUNT")) {

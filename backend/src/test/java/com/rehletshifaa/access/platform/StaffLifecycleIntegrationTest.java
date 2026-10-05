@@ -55,6 +55,8 @@ class StaffLifecycleIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        when(identities.resolveEmail(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(new com.rehletshifaa.identity.IdentityProvisioningPort.EmailResolution(true,List.of()));
         new WorkforceTestData(jdbc, crypto, clock.instant())
                 .person(admin, "OPERATIONS").administrator(admin)
                 .person(checker, "OPERATIONS").administrator(checker)
@@ -93,7 +95,7 @@ class StaffLifecycleIntegrationTest {
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,email_hash,created_at,updated_at,version) "
                         + "VALUES(?,?,?,?,'VERIFIED','CONSULTANT','AVAILABLE',?,?,?,0)", UUID.randomUUID(), "staff-doctor", "Doc", "Doc",
                 sha256("doc@example.test"), clock.instant(), clock.instant());
-        assertCode("IDENTITY_REVIEW_REQUIRED", () -> staff.invite(new Invite("Doc", "doc@example.test", "en", List.of("FINANCE"), "r")));
+        assertThat(staff.invite(new Invite("Doc", "doc@example.test", "en", List.of("FINANCE"), "r")).status()).isEqualTo("PENDING_REVIEW");
         authenticate(manager);
         assertCode("PERMISSION_NOT_HELD", () -> staff.invite(new Invite("B", "b@example.test", "en", List.of("FINANCE"), "r")));
     }

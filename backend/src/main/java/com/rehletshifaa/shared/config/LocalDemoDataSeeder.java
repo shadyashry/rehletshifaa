@@ -38,6 +38,7 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
     }
     public static final String ADMIN_SUBJECT="00000000-0000-0000-0000-000000000106";
     private static final UUID COORDINATION_TEAM=UUID.fromString("00000000-0000-0000-0000-00000000c001");
+    private static final UUID COORDINATION_SCOPE_TEAM=UUID.fromString("00000000-0000-0000-0000-00000000c002");
 
     /**
      * Section 1 workforce model for the realm QA identities: one workforce person each, their database business
@@ -50,6 +51,19 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         seedPerson(OPERATIONS_SUBJECT,"Mariam Soliman","operations@local.test",now,"OPERATIONS");
         seedPerson(FINANCE_SUBJECT,"Youssef Adel","finance@local.test",now,"FINANCE");
         seedPerson(ADMIN_SUBJECT,"Credential Administrator","credential-admin@local.test",now,"CREDENTIAL_VERIFIER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000301","Journey Manager","journey-manager@local.test",now,"JOURNEY_MANAGER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000302","Journey Approver","journey-approver@local.test",now,"JOURNEY_APPROVER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000303","Compliance Auditor","compliance-auditor@local.test",now,"COMPLIANCE_AUDITOR");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000304","Support Officer","support-officer@local.test",now,"SUPPORT_AGENT");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000305","Patient Identity Reviewer","patient-identity-reviewer@local.test",now,"PATIENT_IDENTITY_REVIEWER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000306","Operations Manager","operations-manager@local.test",now,"OPERATIONS_MANAGER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000307","Finance Manager","finance-manager@local.test",now,"FINANCE_MANAGER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000308","Credentialing Manager","credentialing-manager@local.test",now,"CREDENTIALING_MANAGER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000309","Support Manager","support-manager@local.test",now,"SUPPORT_MANAGER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000310","Care Coordination Manager","care-manager@local.test",now,"CARE_COORDINATION_MANAGER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000311","Consultant Operations Manager","consultant-operations-manager@local.test",now,"CONSULTANT_OPERATIONS_MANAGER");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000312","Scope Test Coordinator","coordinator-scope@local.test",now,"COORDINATOR");
+        seedInvitedPerson("00000000-0000-0000-0000-000000000313","Scope Test Care Manager","care-manager-scope@local.test",now,"CARE_COORDINATION_MANAGER");
         // IAM-17: the one technical client the backend uses, recorded with an owner and scopes; it holds no business role.
         jdbc.sql("INSERT INTO service_accounts(client_id,owner_subject,purpose,scopes,secret_rotated_at,status,registered_by,registered_at,revision) "
                 +"VALUES('staff-identity-admin',?,'Keycloak user administration for workforce and consultant identity operations','realm-management: manage-users view-users query-users view-realm',?,'ACTIVE','local-demo-seeder',?,0) ON CONFLICT (client_id) DO NOTHING")
@@ -68,6 +82,11 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         jdbc.sql("INSERT INTO workforce_lead_designations(id,team_id,subject,effective_from,status,created_by,reason,revision) SELECT ?,?,?,?,'ACTIVE','local-demo-seeder','Local demo lead',0 "
                 +"WHERE NOT EXISTS(SELECT 1 FROM workforce_lead_designations WHERE team_id=? AND subject=?)")
             .params(UUID.randomUUID(),COORDINATION_TEAM,COORDINATOR_SUBJECT,timestamp(now),COORDINATION_TEAM,COORDINATOR_SUBJECT).update();
+        seedTeamRelation(COORDINATION_TEAM,"00000000-0000-0000-0000-000000000310",now,true);
+        jdbc.sql("INSERT INTO workforce_teams(id,function_key,name,status,created_by,created_at,updated_at,revision) VALUES(?,'CARE_COORDINATION','Coordination scope-denial team','ACTIVE','local-demo-seeder',?,?,0) ON CONFLICT (id) DO NOTHING")
+            .params(COORDINATION_SCOPE_TEAM,timestamp(now),timestamp(now)).update();
+        seedTeamRelation(COORDINATION_SCOPE_TEAM,"00000000-0000-0000-0000-000000000312",now,false);
+        seedTeamRelation(COORDINATION_SCOPE_TEAM,"00000000-0000-0000-0000-000000000313",now,true);
         if(jdbc.sql("SELECT COUNT(*) FROM workforce_current_managers WHERE function_key='CARE_COORDINATION' AND staff_subject=?").param(SECOND_COORDINATOR_SUBJECT).query(Long.class).single()==0){
             UUID line=UUID.randomUUID();
             jdbc.sql("INSERT INTO workforce_reporting_lines(id,function_key,staff_subject,manager_subject,effective_from,status,created_by,reason,revision) VALUES(?,'CARE_COORDINATION',?,?,?,'ACTIVE','local-demo-seeder','Local demo reporting line',0)")
@@ -75,6 +94,12 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
             jdbc.sql("INSERT INTO workforce_current_managers(function_key,staff_subject,manager_subject,reporting_line_id) VALUES('CARE_COORDINATION',?,?,?)")
                 .params(SECOND_COORDINATOR_SUBJECT,COORDINATOR_SUBJECT,line).update();
         }
+    }
+    private void seedTeamRelation(UUID team,String subject,Instant now,boolean lead){
+        jdbc.sql("INSERT INTO workforce_team_memberships(id,team_id,subject,effective_from,status,created_by,reason,revision) SELECT ?,?,?,?,'ACTIVE','local-demo-seeder','Local demo team',0 WHERE NOT EXISTS(SELECT 1 FROM workforce_team_memberships WHERE team_id=? AND subject=? AND status='ACTIVE')")
+            .params(UUID.randomUUID(),team,subject,timestamp(now),team,subject).update();
+        if(lead) jdbc.sql("INSERT INTO workforce_lead_designations(id,team_id,subject,effective_from,status,created_by,reason,revision) SELECT ?,?,?,?,'ACTIVE','local-demo-seeder','Local demo lead',0 WHERE NOT EXISTS(SELECT 1 FROM workforce_lead_designations WHERE team_id=? AND subject=? AND status='ACTIVE')")
+            .params(UUID.randomUUID(),team,subject,timestamp(now),team,subject).update();
     }
     private void seedPerson(String subject,String name,String email,Instant now,String role){
         jdbc.sql("INSERT INTO access_subjects(subject,active,revision) VALUES(?,TRUE,0) ON CONFLICT (subject) DO NOTHING").param(subject).update();
@@ -84,6 +109,23 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         jdbc.sql("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,status,source,assigned_by,reason,created_at,revision) "
                 +"SELECT ?,?,?,?,'ACTIVE','GRANT','local-demo-seeder','Local demo role',?,0 "
                 +"WHERE NOT EXISTS(SELECT 1 FROM workforce_role_assignments WHERE subject=? AND role_key=? AND status='ACTIVE')")
+            .params(UUID.randomUUID(),subject,role,timestamp(now),timestamp(now),subject,role).update();
+    }
+    /** Seeded UAT users have no source-controlled password and no fabricated MFA evidence. */
+    private void seedInvitedPerson(String subject,String name,String email,Instant now,String role){
+        jdbc.sql("INSERT INTO access_subjects(subject,active,revision) VALUES(?,TRUE,0) ON CONFLICT (subject) DO NOTHING").param(subject).update();
+        jdbc.sql("INSERT INTO workforce_people(subject,display_name_encrypted,email_encrypted,email_hash,lifecycle_status,created_at,updated_at,revision) VALUES(?,?,?,?,'INVITED',?,?,0) ON CONFLICT (subject) DO NOTHING")
+            .params(subject,crypto.encrypt(name),crypto.encrypt(email),emailHash(email),timestamp(now),timestamp(now)).update();
+        UUID invitation=jdbc.sql("SELECT id FROM workforce_invitations WHERE subject=? AND status IN ('SENT','ACCEPTED') ORDER BY created_at DESC LIMIT 1")
+            .param(subject).query(UUID.class).optional().orElseGet(()->{
+                UUID id=UUID.randomUUID();
+                jdbc.sql("INSERT INTO workforce_invitations(id,display_name_encrypted,email_encrypted,email_hash,locale,status,subject,invited_by,reason,created_at,expires_at,revision) VALUES(?,?,?,?,?,'SENT',?,'local-demo-seeder','Development UAT identity',?,?,0)")
+                    .params(id,crypto.encrypt(name),crypto.encrypt(email),emailHash(email),"en",subject,timestamp(now),timestamp(now.plusSeconds(315360000))).update();
+                return id;
+            });
+        jdbc.sql("INSERT INTO workforce_invitation_roles(invitation_id,role_key) SELECT ?,? WHERE NOT EXISTS(SELECT 1 FROM workforce_invitation_roles WHERE invitation_id=? AND role_key=?)")
+            .params(invitation,role,invitation,role).update();
+        jdbc.sql("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,status,source,assigned_by,reason,created_at,revision) SELECT ?,?,?,?,'ACTIVE','INVITATION','local-demo-seeder','Development UAT role',?,0 WHERE NOT EXISTS(SELECT 1 FROM workforce_role_assignments WHERE subject=? AND role_key=? AND status='ACTIVE')")
             .params(UUID.randomUUID(),subject,role,timestamp(now),timestamp(now),subject,role).update();
     }
     private void seedPractitionerEmail(String subject,String email,Instant now){

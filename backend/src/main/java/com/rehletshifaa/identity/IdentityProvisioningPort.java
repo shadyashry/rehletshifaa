@@ -18,12 +18,19 @@ public interface IdentityProvisioningPort {
     void logout(String subject);
     String status(String subject, String storedStatus);
     default IdentityState identityState(String subject) { return IdentityState.unavailable(); }
+    /** Exact server-side resolution; an unavailable directory is never evidence that an address is free. */
+    default EmailResolution resolveEmail(String email) { return EmailResolution.unavailable(); }
     /** SUP-02: the standard self-service password reset email. */
     default void sendPasswordReset(String subject, String locale) { throw new UnsupportedOperationException("Password reset is not supported"); }
     /** SUP-03: removes the second factors so the person must enrol again; callers end sessions separately. */
     default void resetMfa(String subject) { throw new UnsupportedOperationException("MFA reset is not supported"); }
 
     record IdentityAccount(String subject, String email, String status, Instant invitedAt) {}
+    record EmailIdentity(String subject, String email, boolean verified, boolean enabled) {}
+    record EmailResolution(boolean available, java.util.List<EmailIdentity> identities) {
+        public EmailResolution { identities = java.util.List.copyOf(identities); }
+        public static EmailResolution unavailable() { return new EmailResolution(false, java.util.List.of()); }
+    }
     record IdentityState(boolean available, boolean exists, boolean enabled, boolean mfaEnrolled,
                          boolean phishingResistantMfaEnrolled) {
         public static IdentityState unavailable() { return new IdentityState(false, false, false, false, false); }

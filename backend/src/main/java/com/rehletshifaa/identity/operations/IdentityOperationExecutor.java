@@ -2,7 +2,9 @@ package com.rehletshifaa.identity.operations;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.identity.IdentityProvisioningPort;
+import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -12,14 +14,17 @@ public class IdentityOperationExecutor {
     private final IdentityOperationCompletionService completion;
     private final CryptoService crypto;
     private final ObjectMapper json;
+    private final ApplicationEventPublisher events;
 
     public IdentityOperationExecutor(IdentityProvisioningPort identities, IdentityOperationStore store,
-            IdentityOperationCompletionService completion, CryptoService crypto, ObjectMapper json) {
+            IdentityOperationCompletionService completion, CryptoService crypto, ObjectMapper json,
+            ApplicationEventPublisher events) {
         this.identities = identities;
         this.store = store;
         this.completion = completion;
         this.crypto = crypto;
         this.json = json;
+        this.events = events;
     }
 
     public void execute(IdentityOperationStore.Operation operation) {
@@ -65,8 +70,16 @@ public class IdentityOperationExecutor {
                 identities.setCompatibilityRole(account.subject(), payload.compatibilityRole());
             identities.resend(account.subject(), payload.locale());
         } else {
-            account = identities.inviteTracked(payload.name(), payload.email(), payload.locale(), operation.idempotencyKey(),
-                    payload.compatibilityRole());
+            try {
+                account = identities.inviteTracked(payload.name(), payload.email(), payload.locale(), operation.idempotencyKey(),
+                        payload.compatibilityRole());
+            } catch (ApiException collision) {
+                if (collision.status()!=409 || operation.type()!=IdentityOperationRequested.Type.CREATE_STAFF
+                        || !"WorkforceInvitation".equals(operation.targetType())) throw collision;
+                events.publishEvent(new WorkforceIdentityConflictDetected(operation.targetId()));
+                succeed(operation);
+                return;
+            }
         }
         completion.created(operation, account.subject());
     }

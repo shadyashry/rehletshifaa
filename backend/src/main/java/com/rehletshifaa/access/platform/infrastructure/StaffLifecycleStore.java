@@ -31,7 +31,11 @@ public class StaffLifecycleStore {
     /** A live person (anyone not CANCELLED, EXPIRED or OFFBOARDED) or an open invitation holds the address. */
     public boolean emailInUse(String emailHash) {
         return count("SELECT COUNT(*) FROM workforce_people WHERE email_hash=? AND lifecycle_status NOT IN ('CANCELLED','EXPIRED','OFFBOARDED')", emailHash) > 0
-                || count("SELECT COUNT(*) FROM workforce_invitations WHERE email_hash=? AND status IN ('QUEUED','SENT')", emailHash) > 0;
+                || count("SELECT COUNT(*) FROM workforce_invitations WHERE email_hash=? AND status IN ('QUEUED','SENT','PENDING_REVIEW','AWAITING_ACCEPTANCE')", emailHash) > 0;
+    }
+
+    public boolean sharedIdentity(String subject) {
+        return count("SELECT COUNT(*) FROM workforce_invitations WHERE subject=? AND identity_adopted=TRUE", subject)>0;
     }
 
     /** The closed workforce person holding this address, if any (re-invitation reuses them). */
@@ -91,11 +95,11 @@ public class StaffLifecycleStore {
     }
 
     public List<Invitation> openInvitations() {
-        return jdbc.sql("SELECT * FROM workforce_invitations WHERE status IN ('QUEUED','SENT') ORDER BY created_at").query((rs, n) -> invitation(rs)).list();
+        return jdbc.sql("SELECT * FROM workforce_invitations WHERE status IN ('QUEUED','SENT','PENDING_REVIEW','AWAITING_ACCEPTANCE') ORDER BY created_at").query((rs, n) -> invitation(rs)).list();
     }
 
     public List<UUID> expiredInvitations(Instant now) {
-        return jdbc.sql("SELECT id FROM workforce_invitations WHERE status IN ('QUEUED','SENT') AND expires_at<=? ORDER BY expires_at LIMIT 200")
+        return jdbc.sql("SELECT id FROM workforce_invitations WHERE status IN ('QUEUED','SENT','PENDING_REVIEW','AWAITING_ACCEPTANCE') AND expires_at<=? ORDER BY expires_at LIMIT 200")
                 .param(timestamp(now)).query(UUID.class).list();
     }
 
@@ -181,6 +185,8 @@ public class StaffLifecycleStore {
                         + "AND EXISTS(SELECT 1 FROM workforce_team_memberships m WHERE m.team_id=t.id AND m.status='ACTIVE' AND m.subject<>l.subject)", subject);
         add(blockers, "DIRECT_REPORTS", "Direct reports must be re-parented first",
                 "SELECT COUNT(*) FROM workforce_current_managers WHERE manager_subject=?", subject);
+        add(blockers, "CONSULTANT_OPERATIONS_OWNER", "Owned Consultants must be reassigned first",
+                "SELECT COUNT(*) FROM consultant_current_operations_owners WHERE owner_subject=?", subject);
         return blockers;
     }
 

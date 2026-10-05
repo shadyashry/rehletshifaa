@@ -88,6 +88,8 @@ class PlatformUsersDeepQaTest {
 
     @BeforeEach
     void setUp() {
+        when(identities.resolveEmail(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(new com.rehletshifaa.identity.IdentityProvisioningPort.EmailResolution(true,List.of()));
         new WorkforceTestData(jdbc, crypto, clock.instant())
                 .person(ADMIN_A).administrator(ADMIN_A)
                 .person(ADMIN_B).administrator(ADMIN_B);

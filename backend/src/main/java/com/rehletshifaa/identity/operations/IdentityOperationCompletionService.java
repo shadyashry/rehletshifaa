@@ -24,6 +24,8 @@ public class IdentityOperationCompletionService {
 
     @Transactional
     public void created(IdentityOperationStore.Operation operation, String subject) {
+        // Serialize identity attachment with invitation cancellation, acceptance and role/governance changes.
+        jdbc.sql("SELECT id FROM platform_governance_lock WHERE id=1 FOR UPDATE").query(Integer.class).single();
         if ("WorkforceInvitation".equals(operation.targetType())) completeInvitation(operation, subject);
         else if ("Practitioner".equals(operation.targetType())) completePractitioner(operation, subject);
         else throw new ApiException(409, "IDENTITY_OPERATION_TARGET_INVALID", "Identity operation target is invalid");

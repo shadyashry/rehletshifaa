@@ -26,6 +26,7 @@ export type AuditEntry = { actor: string; entity: string; action: string; outcom
 export const ASSIGNABLE_ROLES = [
   "CONSULTANT_OPERATIONS_MANAGER", "CREDENTIAL_VERIFIER", "CARE_COORDINATION_MANAGER", "COORDINATOR", "OPERATIONS", "FINANCE",
   "JOURNEY_MANAGER", "JOURNEY_APPROVER", "COMPLIANCE_AUDITOR", "SUPPORT_AGENT", "PATIENT_IDENTITY_REVIEWER",
+  "OPERATIONS_MANAGER", "FINANCE_MANAGER", "CREDENTIALING_MANAGER", "SUPPORT_MANAGER",
 ] as const;
 
 const roleNames: Record<string, [string, string]> = {
@@ -35,7 +36,11 @@ const roleNames: Record<string, [string, string]> = {
   CARE_COORDINATION_MANAGER: ["Care Coordination Manager", "مدير تنسيق الرعاية"],
   COORDINATOR: ["Care Coordinator", "منسق رعاية"],
   OPERATIONS: ["Operations Specialist", "أخصائي عمليات"],
+  OPERATIONS_MANAGER: ["Operations Manager", "مدير العمليات"],
   FINANCE: ["Finance Officer", "مسؤول مالي"],
+  FINANCE_MANAGER: ["Finance Manager", "المدير المالي"],
+  CREDENTIALING_MANAGER: ["Credentialing Manager", "مدير الاعتماد"],
+  SUPPORT_MANAGER: ["Support Manager", "مدير الدعم"],
   JOURNEY_MANAGER: ["Care Journey Manager", "مدير رحلات الرعاية"],
   JOURNEY_APPROVER: ["Care Journey Approver", "معتمد رحلات الرعاية"],
   COMPLIANCE_AUDITOR: ["Compliance and Audit Reviewer", "مراجع الامتثال والتدقيق"],

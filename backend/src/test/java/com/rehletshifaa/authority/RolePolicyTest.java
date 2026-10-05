@@ -26,7 +26,8 @@ class RolePolicyTest {
 
     @Test
     void administratorsAuditorsAndSupportHaveNoCaseClinicalOrCredentialPower() {
-        for (Role role : EnumSet.of(Role.SYSTEM_ADMINISTRATOR, Role.COMPLIANCE_AUDITOR, Role.SUPPORT_AGENT))
+        for (Role role : EnumSet.of(Role.SYSTEM_ADMINISTRATOR, Role.COMPLIANCE_AUDITOR, Role.SUPPORT_AGENT,
+                Role.OPERATIONS_MANAGER, Role.FINANCE_MANAGER, Role.CREDENTIALING_MANAGER, Role.SUPPORT_MANAGER))
             assertThat(RolePolicy.grants()).filteredOn(g -> g.role() == role).extracting(RolePolicy.Grant::permission)
                     .as(role.name()).doesNotContainAnyElementsOf(CASE_AND_CLINICAL);
     }
@@ -46,6 +47,6 @@ class RolePolicyTest {
 
     @Test
     void workforceRolesAreExactlyTheCatalogue() {
-        assertThat(Arrays.stream(Role.values()).filter(r -> r.kind() == Role.Kind.WORKFORCE)).hasSize(12);
+        assertThat(Arrays.stream(Role.values()).filter(r -> r.kind() == Role.Kind.WORKFORCE)).hasSize(16);
     }
 }

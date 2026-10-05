@@ -230,6 +230,32 @@ class CoordinationIntegrationTest {
         assertThatThrownBy(() -> capacity("routing-a", 3, true)).hasMessageContaining("do not include this action");
     }
 
+    @Test void managedCaseSummaryIsTeamScopedAndContainsOnlyOperationalCounts() {
+        jdbc.update("INSERT INTO workforce_team_memberships(id,team_id,subject,effective_from,status,created_by,reason,revision) VALUES(?,?,?,?,'ACTIVE','TEST','Manager member',0)",
+                UUID.randomUUID(), team, "routing-manager", past);
+        jdbc.update("INSERT INTO workforce_lead_designations(id,team_id,subject,effective_from,status,created_by,reason,revision) VALUES(?,?,?,?,'ACTIVE','TEST','Managed team',0)",
+                UUID.randomUUID(), team, "routing-manager", past);
+        assignOwner(caseId, "routing-a");
+        task("COORDINATOR", "routing-a");
+        jdbc.update("UPDATE case_tasks SET due_at=?,blocking=TRUE WHERE case_id=? AND owner_subject='routing-a'", past, caseId);
+
+        UUID otherTeam = team("Out of scope");
+        candidate("routing-outside", otherTeam, 10, true);
+        UUID otherCase = medicalCase(consultant);
+        assignOwner(otherCase, "routing-outside");
+
+        var summaries = reads.managedCaseSummaries();
+        assertThat(summaries).singleElement().satisfies(summary -> {
+            assertThat(summary.caseId()).isEqualTo(caseId);
+            assertThat(summary.coordinatorSubject()).isEqualTo("routing-a");
+            assertThat(summary.openWork()).isEqualTo(1);
+            assertThat(summary.overdueWork()).isEqualTo(1);
+            assertThat(summary.blockingWork()).isEqualTo(1);
+        });
+        assertThat(summaries).extracting(CoordinationReadService.ManagedCaseSummary::caseId).doesNotContain(otherCase);
+        assertThat(count("SELECT COUNT(*) FROM audit_events WHERE entity_id=? AND action='SUPERVISORY_SUMMARY_READ'", caseId.toString())).isOne();
+    }
+
     Decision command(String action, long revision, String target) {
         return engine.execute(caseId, new Command(UUID.randomUUID().toString(), revision, action, target, action.equals("QUEUE") ? team : null, "Reviewed assignment", "TEST"));
     }

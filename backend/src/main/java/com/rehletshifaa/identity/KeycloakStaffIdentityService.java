@@ -119,6 +119,18 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
         } catch(RuntimeException e) { return IdentityState.unavailable(); }
     }
 
+    @Override public EmailResolution resolveEmail(String email) {
+        if (clientSecret.isBlank()) return EmailResolution.unavailable();
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        try {
+            return new EmailResolution(true, findByEmail(normalized).stream()
+                    .filter(user -> normalized.equalsIgnoreCase(String.valueOf(user.get("email"))))
+                    .map(user -> new EmailIdentity(String.valueOf(user.get("id")), normalized,
+                            Boolean.TRUE.equals(user.get("emailVerified")), Boolean.TRUE.equals(user.get("enabled"))))
+                    .toList());
+        } catch (RuntimeException failure) { return EmailResolution.unavailable(); }
+    }
+
 
     private void replaceStaffRole(String subject,String role){
         Map<String,Object> staffRole=role(role);Map<String,Object> patientRole=role("PATIENT");

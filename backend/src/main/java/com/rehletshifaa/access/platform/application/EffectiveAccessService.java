@@ -12,6 +12,7 @@ import com.rehletshifaa.workforce.application.WorkforceFacts;
 import com.rehletshifaa.workforce.application.WorkforceFacts.PersonFacts;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -31,15 +32,17 @@ public class EffectiveAccessService {
     private final PlatformOwnerTransferStore owners;
     private final AccessHygieneStore hygiene;
     private final Clock clock;
+    private final JdbcClient jdbc;
 
     public EffectiveAccessService(Authority authority, WorkforceFacts workforce, PlatformAccessRepository access,
-            PlatformOwnerTransferStore owners, AccessHygieneStore hygiene, Clock clock) {
+            PlatformOwnerTransferStore owners, AccessHygieneStore hygiene, Clock clock, JdbcClient jdbc) {
         this.authority = authority;
         this.workforce = workforce;
         this.access = access;
         this.owners = owners;
         this.hygiene = hygiene;
         this.clock = clock;
+        this.jdbc = jdbc;
     }
 
     public record PlatformRoleView(String role, Instant effectiveFrom, Instant effectiveTo, boolean effectiveNow) {}
@@ -69,6 +72,10 @@ public class EffectiveAccessService {
         if (owner || incomingOwner) workspaces.add(Workspace.CONTROL_CENTER);
         List<String> pending = new ArrayList<>();
         if (incomingOwner) pending.add("ACCEPT_PLATFORM_OWNERSHIP");
+        boolean pendingAdoption = jdbc.sql("SELECT COUNT(*) FROM workforce_identity_reviews r JOIN workforce_invitations i ON i.id=r.invitation_id "
+                        + "WHERE r.resolved_subject=? AND r.status='AWAITING_ACCEPTANCE' AND i.status='AWAITING_ACCEPTANCE' AND i.expires_at>?")
+                .params(principal.subject(), com.rehletshifaa.shared.persistence.SqlValues.timestamp(now)).query(Long.class).single() > 0;
+        if (pendingAdoption) pending.add("ACCEPT_WORKFORCE_ADOPTION");
         if (person != null && "INVITED".equals(person.lifecycleStatus())) pending.add("ACTIVATE_ACCOUNT");
         return new MeView(principal.subject(), now, held.roles(), held.platformPermissions(),
                 held.platformPermissions().stream().filter(Permission::stepUp).collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new)), workspaces, held.managedFunctions(),

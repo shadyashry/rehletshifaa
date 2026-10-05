@@ -100,6 +100,8 @@ public class WorkforceRoleAssignmentService {
         Instant requested = micros(command.effectiveAt());
         Instant removalAt = requested == null || requested.isBefore(now) ? now : requested;
         if (!store.retainsFunction(assignment.subject(), assignment.function(), assignment.id(), removalAt)) {
+            if ("CONSULTANT_OPERATIONS".equals(assignment.function()) && store.ownsConsultant(assignment.subject()))
+                throw new ApiException(409, "CONSULTANT_OWNERSHIP_REASSIGNMENT_REQUIRED", "Reassign every owned Consultant before removing this role");
             if (store.onlyLeadOfStaffedTeam(assignment.subject(), assignment.function(), removalAt))
                 throw new ApiException(409, "ONLY_TEAM_LEAD", "Designate another lead for this person's team before removing the role");
             if (store.hasDirectReports(assignment.subject(), assignment.function()))

@@ -60,11 +60,13 @@ public class StaffLifecycleService {
     private final CryptoService crypto;
     private final Clock clock;
     private final Duration invitationLifetime;
+    private final WorkforceIdentityReviewService identityReviews;
 
     public StaffLifecycleService(StaffLifecycleStore store, WorkforceRoleAssignmentStore roles, WorkforceRoleAssignmentService assignments,
             PlatformAccessRepository access,
             PlatformAccessGovernanceService governance, Authority authority,             IdentityProvisioningPort identityProvider, ApplicationEventPublisher events, GovernanceAuditLog audit,
-            CryptoService crypto, Clock clock, @Value("${app.staff.invitation-lifetime-days:7}") long invitationDays) {
+            CryptoService crypto, Clock clock, @Value("${app.staff.invitation-lifetime-days:7}") long invitationDays,
+            WorkforceIdentityReviewService identityReviews) {
         this.store = store;
         this.roles = roles;
         this.assignments = assignments;
@@ -78,6 +80,7 @@ public class StaffLifecycleService {
         this.crypto = crypto;
         this.clock = clock;
         this.invitationLifetime = Duration.ofDays(invitationDays);
+        this.identityReviews = identityReviews;
     }
 
     public record Invite(String name, String email, String locale, List<String> roles, String reason) {}
@@ -105,6 +108,7 @@ public class StaffLifecycleService {
     public InvitationView invite(Invite command) {
         Instant now = clock.instant();
         String actor = requireAdministrator(now);
+        access.lockGovernance();
         String name = text(command.name(), 160, "Enter the person's name");
         String email = text(command.email(), 254, "Enter a work email address").toLowerCase(Locale.ROOT);
         if (!email.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) throw new ApiException(400, "INVALID_EMAIL", "Enter a valid email address");
@@ -121,12 +125,16 @@ public class StaffLifecycleService {
         }
         String hash = hash(email);
         if (store.emailInUse(hash)) throw new ApiException(409, "STAFF_EMAIL_EXISTS", "A workforce person or open invitation already uses this email address");
-        if (store.emailKnownElsewhere(hash))
-            throw new ApiException(409, "IDENTITY_REVIEW_REQUIRED", "This address belongs to another platform population; a System Administrator must review it");
         UUID id = UUID.randomUUID();
         var closed = store.closedPersonByEmail(hash);
         if (closed.isPresent()) return reinvite(closed.get(), id, name, email, hash, locale, actor, reason, requested, now);
         store.insertInvitation(id, crypto.encrypt(name), crypto.encrypt(email), hash, locale, actor, reason, now, now.plus(invitationLifetime), requested);
+        var resolution = identityProvider.resolveEmail(email);
+        if (store.emailKnownElsewhere(hash) || resolution == null || !resolution.available() || !resolution.identities().isEmpty()) {
+            identityReviews.open(id, resolution, actor, "Existing or uncertain identity requires verified holder acceptance: " + reason);
+            Invitation reviewInvitation = store.invitationForUpdate(id);
+            return new InvitationView(id,name,email,reviewInvitation.status(),null,reviewInvitation.expiresAt(),requested,reviewInvitation.revision());
+        }
         events.publishEvent(IdentityOperationRequested.create(id, "workforce-invite:" + id, IdentityOperationRequested.Type.CREATE_STAFF,
                 actor, "Create workforce identity and send invitation", "WorkforceInvitation", id,
                 Map.of("name", name, "email", email, "locale", locale)));
@@ -156,6 +164,7 @@ public class StaffLifecycleService {
     /** STF-02: the invited person activates only with an enrolled MFA credential confirmed by the identity provider. */
     @Transactional
     public StaffView activate() {
+        access.lockGovernance();
         Instant now = clock.instant();
         String subject = com.rehletshifaa.authority.application.Principal.current().subject();
         Person person = store.personForUpdate(subject);
@@ -197,10 +206,12 @@ public class StaffLifecycleService {
     public void cancelInvitation(UUID invitationId, Change command) {
         Instant now = clock.instant();
         String actor = requireAdministrator(now);
+        access.lockGovernance();
         String reason = text(command.reason(), 500, "Give a reason");
         Invitation invitation = store.invitationForUpdate(invitationId);
-        if (invitation.revision() != command.revision() || !Set.of("QUEUED", "SENT").contains(invitation.status())) stale();
+        if (invitation.revision() != command.revision() || !Set.of("QUEUED", "SENT", "PENDING_REVIEW", "AWAITING_ACCEPTANCE").contains(invitation.status())) stale();
         store.setInvitationStatus(invitation, "CANCELLED", now);
+        identityReviews.close(invitationId, actor, reason);
         closeInvitedPerson(invitation, "CANCELLED", actor, reason, now);
         audit.record(actor, invitationId.toString(), "STAFF_INVITATION_CANCELLED", "SUCCESS", "subject=" + invitation.subject(), reason);
     }
@@ -210,11 +221,13 @@ public class StaffLifecycleService {
             initialDelayString = "${app.staff.invitation-expiry-initial-delay-milliseconds:120000}")
     @Transactional
     public int expireInvitations() {
+        access.lockGovernance();
         Instant now = clock.instant();
         int expired = 0;
         for (UUID id : store.expiredInvitations(now)) {
             Invitation invitation = store.invitationForUpdate(id);
             store.setInvitationStatus(invitation, "EXPIRED", now);
+            identityReviews.close(id, "system", "Invitation lapsed");
             closeInvitedPerson(invitation, "EXPIRED", "system", "Invitation lapsed", now);
             audit.record("system", id.toString(), "STAFF_INVITATION_EXPIRED", "SUCCESS", "subject=" + invitation.subject());
             expired++;
@@ -364,7 +377,7 @@ public class StaffLifecycleService {
         if (!"INVITED".equals(person.lifecycle())) return;
         store.endAllRelationships(person.subject(), actor, reason, now);
         store.transition(person, lifecycle, false, reason, now);
-        queueState(person.subject(), false, actor, reason);
+        if (!store.sharedIdentity(person.subject())) queueState(person.subject(), false, actor, reason);
     }
 
     private Person current(String subject, long revision) {

@@ -14,8 +14,9 @@ import { CoordinationTeamsPeople } from "./CoordinationTeamsPeople";
 import { ClinicianPreferences } from "./ClinicianPreferences";
 import { RoutingRules } from "./RoutingRules";
 import { CoordinationAdvanced } from "./CoordinationAdvanced";
+import { ManagedCoordinationCases } from "./ManagedCoordinationCases";
 
-export type CoordinationSection = "teams" | "preferences" | "rules" | "advanced";
+export type CoordinationSection = "cases" | "teams" | "preferences" | "rules" | "advanced";
 
 /** What every section receives: scoped reads, the caller's capabilities, and names for people and teams. */
 export type CoordinationContext = {
@@ -45,6 +46,7 @@ export function CareCoordinationWorkspace({ locale, initialSection }: { locale: 
   const [section, setSection] = useState<CoordinationSection>(initialSection ?? "teams");
   const can = access.can;
   const canRead = can("ROUTING_READ");
+  const canSummarize = can("COORDINATION_CASE_SUMMARY");
 
   const loadTeams = useCallback(async () => {
     if (!canRead) return;
@@ -65,11 +67,12 @@ export function CareCoordinationWorkspace({ locale, initialSection }: { locale: 
   }, [user, access.loading, api, base, canRead, attempt]);
 
   const sections = useMemo(() => ([
+    { key: "cases" as const, label: locale === "ar" ? "الحالات المُدارة" : "Managed cases", visible: canSummarize },
     { key: "teams" as const, label: t.sections.teams, visible: canRead },
     { key: "preferences" as const, label: t.sections.preferences, visible: canRead },
     { key: "rules" as const, label: t.sections.rules, visible: canRead },
     { key: "advanced" as const, label: t.sections.advanced, visible: canRead },
-  ]).filter((s) => s.visible), [t, canRead]);
+  ]).filter((s) => s.visible), [t, canRead, canSummarize, locale]);
   const active = sections.some((s) => s.key === section) ? section : sections[0]?.key;
   const choose = (next: CoordinationSection) => { setSection(next); router.replace(`/${locale}/portal/control-center/coordination?tab=${next}`, { scroll: false }); };
 
@@ -83,13 +86,14 @@ export function CareCoordinationWorkspace({ locale, initialSection }: { locale: 
   if (authLoading || access.loading || (user && canRead && !loaded && !error)) return shell(<p role="status">{t.loading}</p>);
   if (!user) return shell(<button type="button" onClick={() => void signIn()}>{t.signin}</button>);
   if (error && !loaded) return shell(<ErrorNotice error={error} locale={locale} action="load" onRetry={() => void load()} />);
-  if (!canRead || !active) return shell(<p className="cc-empty">{t.denied}</p>);
+  if ((!canRead && !canSummarize) || !active) return shell(<p className="cc-empty">{t.denied}</p>);
 
   return shell(<>
     <ErrorNotice error={error} locale={locale} action="load" onRetry={() => void load()} />
     {overview && <ModeBanner locale={locale} overview={overview} />}
     <SectionTabs label={t.sectionsLabel} tabs={sections} active={active} onChange={choose} />
     <TabPanel id={active}>
+      {active === "cases" && <ManagedCoordinationCases locale={locale} api={api} />}
       {active === "teams" && <CoordinationTeamsPeople {...context} />}
       {active === "preferences" && <ClinicianPreferences {...context} />}
       {active === "rules" && <RoutingRules {...context} />}

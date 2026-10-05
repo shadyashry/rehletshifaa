@@ -69,7 +69,7 @@ public class JourneyDefinitionService {
         repository.transition(v,Status.DRAFT,null,null);audit.record(actor.subject(),id.toString(),"JOURNEY_RETURNED","SUCCESS","revision="+v.revision(),why(change));return repository.version(definition,id);
     }
     @Transactional public Version publish(UUID definition,UUID id,Change change){
-        var actor=authorize(Permission.JOURNEY_APPROVE);authorize(Permission.JOURNEY_APPROVE);Version v=locked(definition,id,change);
+        var actor=authorize(Permission.JOURNEY_APPROVE);authorize(Permission.JOURNEY_APPROVE);repository.governanceLock();Version v=locked(definition,id,change);
         if(v.status()!=Status.PENDING_APPROVAL || !validator.validate(v.graph()).valid() || !"COMPLETED".equals(v.simulationSummary())) {
             audit.denied(actor.subject(),id.toString(),Permission.JOURNEY_APPROVE.name(),"VALIDATION_AND_SIMULATION_REQUIRED");invalid("Submit a validated, successfully simulated version before publication.");
         }
@@ -80,7 +80,7 @@ public class JourneyDefinitionService {
         audit.record(actor.subject(),id.toString(),"JOURNEY_PUBLISHED","SUCCESS","graph="+v.graphHash()+"; runtime="+published.runtimeDeployment(),why(change));return published;
     }
     @Transactional public Version retire(UUID definition,UUID id,Change change){
-        var actor=authorize(Permission.JOURNEY_APPROVE);Version v=locked(definition,id,change);if(v.status()!=Status.PUBLISHED)invalid("Only a published journey version can be retired.");repository.transition(v,Status.RETIRED,v.validationSummary(),v.simulationSummary());audit.record(actor.subject(),id.toString(),"JOURNEY_RETIRED","SUCCESS","graph="+v.graphHash(),why(change));return repository.version(definition,id);
+        var actor=authorize(Permission.JOURNEY_APPROVE);repository.governanceLock();Version v=locked(definition,id,change);if(v.status()!=Status.PUBLISHED)invalid("Only a published journey version can be retired.");repository.transition(v,Status.RETIRED,v.validationSummary(),v.simulationSummary());audit.record(actor.subject(),id.toString(),"JOURNEY_RETIRED","SUCCESS","graph="+v.graphHash(),why(change));return repository.version(definition,id);
     }
     private com.rehletshifaa.authority.application.Principal authorize(Permission permission){return authorization.require(permission);}
     private Version locked(UUID definition,UUID id,Change change){

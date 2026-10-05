@@ -8,6 +8,7 @@ import com.rehletshifaa.authority.domain.Scope;
 import com.rehletshifaa.authority.domain.Workspace;
 import com.rehletshifaa.authority.infrastructure.EffectiveRoleStore;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.workforce.application.WorkforceDirectory;
 import org.springframework.stereotype.Service;
 
@@ -33,14 +34,16 @@ public class Authority {
     private final WorkforceDirectory workforce;
     private final Clock clock;
     private final AuthenticationStrength authenticationStrength;
+    private final GovernanceAuditLog audit;
 
     public Authority(EffectiveRoleStore roles, CaseRelationships cases, WorkforceDirectory workforce, Clock clock,
-            AuthenticationStrength authenticationStrength) {
+            AuthenticationStrength authenticationStrength, GovernanceAuditLog audit) {
         this.roles = roles;
         this.cases = cases;
         this.workforce = workforce;
         this.clock = clock;
         this.authenticationStrength = authenticationStrength;
+        this.audit = audit;
     }
 
     /** {@code granted=false} carries the refusal code and the reason; {@code role}/{@code scope} name the grant used. */
@@ -55,6 +58,7 @@ public class Authority {
         Decision decision = decide(principal, permission, resource);
         if (!decision.granted())
             throw new ApiException("REAUTHENTICATION_REQUIRED".equals(decision.code()) ? 401 : 403, decision.code(), decision.reason());
+        auditSupervisoryRead(principal, permission, resource, decision);
         return principal;
     }
 
@@ -66,6 +70,7 @@ public class Authority {
         Decision decision = decide(principal, permission, resource);
         if (!decision.granted())
             throw new ApiException("REAUTHENTICATION_REQUIRED".equals(decision.code()) ? 401 : 403, decision.code(), decision.reason());
+        auditSupervisoryRead(principal, permission, resource, decision);
         return new Actor(principal.subject(), principal.authenticatedAt(), decision.role(), roles.roles(principal.subject(), clock.instant()));
     }
 
@@ -154,5 +159,10 @@ public class Authority {
 
     private static boolean isCase(Resource resource) {
         return resource.kind() == Resource.Kind.CASE && resource.id() != null;
+    }
+
+    private void auditSupervisoryRead(Principal principal, Permission permission, Resource resource, Decision decision) {
+        if (permission == Permission.CASE_READ && decision.scope() == Scope.SUPERVISED && isCase(resource))
+            audit.supervisoryRead(principal.subject(), resource.id().toString(), permission.name());
     }
 }

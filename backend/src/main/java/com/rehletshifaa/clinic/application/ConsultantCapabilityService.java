@@ -30,10 +30,11 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 public class ConsultantCapabilityService {
     private final JdbcClient jdbc;
     private final Authority authority;
+    private final ConsultantOperationsOwnershipService ownership;
     private final Clock clock;
 
-    public ConsultantCapabilityService(JdbcClient jdbc, Authority authority, Clock clock) {
-        this.jdbc = jdbc; this.authority = authority; this.clock = clock;
+    public ConsultantCapabilityService(JdbcClient jdbc, Authority authority, ConsultantOperationsOwnershipService ownership, Clock clock) {
+        this.jdbc = jdbc; this.authority = authority; this.ownership = ownership; this.clock = clock;
     }
 
     public List<CapabilityAdminView> list(UUID practitionerId) {
@@ -85,6 +86,7 @@ public class ConsultantCapabilityService {
             throw new ApiException(404, "PRACTITIONER_NOT_FOUND", "Consultant profile was not found");
         if (subject.isPresent() && actor.subject().equals(subject.get()))
             throw new ApiException(403, "SELF_VERIFICATION_PROHIBITED", "Another authorized reviewer must approve your clinical capabilities");
+        ownership.requireCapabilityReviewer(practitionerId, actor.subject());
         return actor;
     }
 

@@ -47,7 +47,7 @@ class JourneyServiceIntegrationTest {
         authenticate("self-reviewer", Role.SYSTEM_ADMINISTRATOR, Role.CREDENTIAL_VERIFIER);
         for(boolean approved:List.of(true,false))
             assertThatThrownBy(()->journey.verifyPractitioner(practitioner,approved,"Review decision"))
-                    .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("Another authorized reviewer");
+                    .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("cannot decide this review");
         assertThat(jdbc.queryForObject("SELECT status FROM practitioner_credentials WHERE id=?",String.class,credential)).isEqualTo("UNDER_REVIEW");
         authenticate("independent-reviewer",Role.CREDENTIAL_VERIFIER);
         assertThat(journey.verifyPractitioner(practitioner,true,"Independent review").status()).isEqualTo("VERIFIED");

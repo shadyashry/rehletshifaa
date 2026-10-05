@@ -48,8 +48,8 @@ export const journeyCopy = {
     } as Record<string, string>,
 
     intakeTitle: "New patient cases",
-    intakeOff: "Production intake is off: new patient cases don't use Care Journeys yet. Publishing a version does not turn it on — that is a separate deployment setting.",
-    intakeOn: "Production intake is on for the configured care areas: new cases there start on the newest published version.",
+    intakeOff: "Journey admission is off: new patient cases don't start a Care Journey. An independently approved admission policy and runtime readiness are required to turn it on.",
+    intakeOn: "Journey admission is on: eligible new cases start on the exact published version selected by the active admission policy.",
     intakeUnknown: "Couldn't check whether production intake is on.",
 
     status: {
@@ -64,7 +64,7 @@ export const journeyCopy = {
     validate: "Check", simulate: "Test", submit: "Send for approval", publish: "Publish", retire: "Retire",
     retireVersion: "Retire version", retireConfirmTitle: "Retire this published version?", retireConfirm: "Yes, retire version",
     retireNoNewCases: (n: number) => `Version ${n} is no longer used for new patient cases.`,
-    retireReplacement: (n: number) => `Version ${n}, the newest remaining published version, would be used for new cases while production intake is on.`,
+    retireReplacement: (n: number) => `Version ${n} remains published. New cases use it only if an independently approved admission policy selects it.`,
     retireNoReplacement: "No published version would remain, so new cases could not start on this journey while production intake is on.",
     retireKeepsCases: "Cases already on this version stay on it and are not moved.",
     retireFinal: "A retired version can't be published again — to reuse it, edit a copy.",
@@ -131,7 +131,7 @@ export const journeyCopy = {
     makerChecker: "The person who publishes must not have edited this version. The platform enforces this.",
     makerCheckerYou: "You created this version, so another authorized person must publish it.",
     publishBecomes: (n: number, name: string) => `Version ${n} becomes a published version of ${name}. It can't be edited after publishing; changes need a new draft.`,
-    publishNewCases: "While production intake is on, new patient cases start on the newest published version — this one.",
+    publishNewCases: "Publishing does not select this version for new cases. An independently approved admission policy selects the exact published version and eligible cases.",
     publishKeepsCases: "Cases already on an earlier version stay on it and are not moved. Earlier published versions stay published until retired.",
     publishRuntime: "Where the journey runtime is enabled, it is prepared for this version automatically (details under Advanced).",
     publishMaterialChanges: (n: number) => `${n} change${n === 1 ? "" : "s"} since the last published version.`,
@@ -184,8 +184,8 @@ export const journeyCopy = {
     } as Record<string, string>,
 
     intakeTitle: "حالات المرضى الجديدة",
-    intakeOff: "الاستقبال الفعلي متوقف: لا تستخدم حالات المرضى الجديدة رحلات الرعاية بعد. نشر إصدار لا يشغّله — فهو إعداد نشر منفصل.",
-    intakeOn: "الاستقبال الفعلي يعمل لمجالات الرعاية المُعدّة: تبدأ الحالات الجديدة فيها على أحدث إصدار منشور.",
+    intakeOff: "قبول الرحلات متوقف: لا تبدأ حالات المرضى الجديدة رحلة رعاية. يتطلب التفعيل سياسة قبول معتمدة بشكل مستقل وجاهزية التشغيل.",
+    intakeOn: "قبول الرحلات يعمل: تبدأ الحالات الجديدة المؤهلة على الإصدار المنشور المحدد في سياسة القبول الفعّالة.",
     intakeUnknown: "تعذّر التحقق مما إذا كان الاستقبال الفعلي يعمل.",
 
     status: {
@@ -200,7 +200,7 @@ export const journeyCopy = {
     validate: "فحص", simulate: "اختبار", submit: "إرسال للموافقة", publish: "نشر", retire: "إنهاء",
     retireVersion: "إنهاء الإصدار", retireConfirmTitle: "إنهاء هذا الإصدار المنشور؟", retireConfirm: "نعم، أنهِ الإصدار",
     retireNoNewCases: (n: number) => `لن يُستخدم الإصدار ${n} للحالات الجديدة بعد الآن.`,
-    retireReplacement: (n: number) => `سيُستخدم الإصدار ${n}، أحدث إصدار منشور متبقٍ، للحالات الجديدة ما دام الاستقبال الفعلي يعمل.`,
+    retireReplacement: (n: number) => `يبقى الإصدار ${n} منشورًا. تستخدمه الحالات الجديدة فقط إذا اختارته سياسة قبول معتمدة بشكل مستقل.`,
     retireNoReplacement: "لن يبقى أي إصدار منشور، لذا لا يمكن أن تبدأ حالات جديدة على هذه الرحلة ما دام الاستقبال الفعلي يعمل.",
     retireKeepsCases: "تبقى الحالات الموجودة على هذا الإصدار ولا تُنقل.",
     retireFinal: "لا يمكن نشر إصدار منتهٍ مرة أخرى — لإعادة استخدامه، عدّل نسخة منه.",
@@ -267,7 +267,7 @@ export const journeyCopy = {
     makerChecker: "يجب ألّا يكون الناشر قد عدّل هذا الإصدار. تفرض المنصة ذلك.",
     makerCheckerYou: "أنت أنشأت هذا الإصدار، لذا يجب أن ينشره شخص مخوَّل آخر.",
     publishBecomes: (n: number, name: string) => `يصبح الإصدار ${n} إصدارًا منشورًا من ${name}. لا يمكن تعديله بعد النشر؛ تحتاج التغييرات إلى مسودة جديدة.`,
-    publishNewCases: "ما دام الاستقبال الفعلي يعمل، تبدأ حالات المرضى الجديدة على أحدث إصدار منشور — هذا الإصدار.",
+    publishNewCases: "لا يختار النشر هذا الإصدار للحالات الجديدة. تحدد سياسة قبول معتمدة بشكل مستقل الإصدار المنشور والحالات المؤهلة.",
     publishKeepsCases: "تبقى الحالات الموجودة على إصدار سابق عليه ولا تُنقل. تبقى الإصدارات المنشورة السابقة منشورة حتى تُنهى.",
     publishRuntime: "حيث يكون تشغيل الرحلات مفعّلًا، يُجهَّز لهذا الإصدار تلقائيًا (التفاصيل في «متقدم»).",
     publishMaterialChanges: (n: number) => `${n} تغيير منذ آخر إصدار منشور.`,

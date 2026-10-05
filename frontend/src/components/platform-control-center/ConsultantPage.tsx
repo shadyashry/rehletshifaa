@@ -11,6 +11,7 @@ import { EmptyState, ErrorNotice, Facts, Section, SectionTabs, StatusBadge, Succ
 import { accountStatusLabel, approvalStatusLabel, careAreaLabel, formatDate, type Tone } from "./admin-labels";
 import { ConsultantApproval, ConsultantPriceList } from "./catalog-admin";
 import { caseEligibility, consultantHref, credentialStatus, setupStatus, type Consultant } from "./consultant-model";
+import { ConsultantOwnershipPanel } from "./ConsultantOwnershipPanel";
 
 type SectionState = "complete" | "attention" | "waiting";
 const stateBadge = (state: SectionState, locale: Locale): { label: string; tone: Tone } => ({
@@ -103,6 +104,7 @@ export function ConsultantPage({ locale, practitionerId, initialTab, invited }: 
               ); })}
             </ol>
           </Section>
+          {access.can("CONSULTANT_ONBOARD") && <ConsultantOwnershipPanel locale={locale} api={api} practitionerId={item.id} />}
           <TechnicalDetails locale={locale} items={[[ar ? "معرّف الطبيب" : "Practitioner ID", item.id], [ar ? "حالة الاعتماد" : "Credentialing code", item.credentialingStatus ?? "—"], [ar ? "حالة التوافر" : "Availability code", item.availabilityStatus ?? "—"]]} />
         </>}
         {shown === "approval" && <ConsultantApproval locale={locale} api={api} practitionerId={item.id} status={approval.label} editable={access.can("CREDENTIAL_DECIDE")} onChanged={() => void load()} />}

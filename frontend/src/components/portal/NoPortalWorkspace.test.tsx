@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NoPortalWorkspace } from "./NoPortalWorkspace";
 import { apiFetchAs } from "@/lib/api";
@@ -46,6 +46,18 @@ describe("Signed-in account without a care-portal workspace", () => {
     screen.getByRole("button", { name: "Try again" }).click();
     expect(auth.refreshMe).toHaveBeenCalled();
     expect(apiFetchAs).not.toHaveBeenCalled();
+  });
+
+  it("lets the authenticated identity holder accept a reviewed workforce adoption", async () => {
+    auth.me = meWith([], { pendingActions: ["ACCEPT_WORKFORCE_ADOPTION"] });
+    vi.mocked(apiFetchAs)
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: "review-1", name: "Sam", email: "sam@example.test", status: "AWAITING_ACCEPTANCE", revision: 2 }]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "RESOLVED" }), { status: 200 }));
+    render(<NoPortalWorkspace locale="en" />);
+    expect(await screen.findByRole("heading", { name: "Accept your workforce invitation" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Accept and link my identity" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenLastCalledWith("test", "/me/workforce-adoptions/review-1/accept", expect.objectContaining({ method: "POST" })));
+    await waitFor(() => expect(auth.refreshMe).toHaveBeenCalled());
   });
 
   it("renders in Arabic", () => {

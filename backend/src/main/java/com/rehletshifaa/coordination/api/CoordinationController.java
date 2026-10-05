@@ -20,6 +20,7 @@ public class CoordinationController {
     }
 
     @GetMapping("/overview") public CoordinationOverview overview() { return reads.overview(); }
+    @GetMapping("/managed-cases") public List<CoordinationReadService.ManagedCaseSummary> managedCases() { return reads.managedCaseSummaries(); }
     @GetMapping("/people") public List<CoordinationPerson> people() { return reads.people(); }
     @GetMapping("/consultants") public List<ConsultantRouting> consultants() { return reads.consultants(); }
     @GetMapping("/decisions") public List<DecisionEntry> decisions(@RequestParam(required = false) Integer limit) { return reads.decisions(limit); }
