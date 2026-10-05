@@ -61,7 +61,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
   return (
     <>
       {/* 1 — hero */}
-      <section className="border-b border-border-subtle bg-surface-pearl bg-[radial-gradient(70%_120%_at_88%_-10%,var(--color-surface-clinical),var(--color-surface-pearl)_72%)]">
+      <section className="page-hero border-b border-border-subtle bg-surface-pearl bg-[radial-gradient(70%_120%_at_88%_-10%,var(--color-surface-clinical),var(--color-surface-pearl)_72%)]">
         <div className="container-site grid gap-9 pb-12 pt-8 md:pt-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pb-14">
           <div>
             <nav aria-label={t.careAreas} className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-ink-500">
@@ -75,7 +75,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
             <h1 className="display mt-4 max-w-[20ch] rtl:max-w-[28ch] [text-wrap:balance]">{area.title}</h1>
             <p className="lead mt-4 max-w-[58ch]">{area.body}</p>
             {highlight ? (
-              <p className="mt-4 inline-flex max-w-full items-start gap-2 rounded-xl bg-surface-default px-3.5 py-2.5 text-[0.9375rem] font-semibold leading-6 text-brand-800 ring-1 ring-border-clinical">
+              <p className="hero-island mt-4 inline-flex max-w-full items-start gap-2 rounded-xl bg-surface-default px-3.5 py-2.5 text-[0.9375rem] font-semibold leading-6 text-brand-800 ring-1 ring-border-clinical">
                 <Sparkles size={17} aria-hidden="true" className="mt-0.5 flex-none text-brand-600" />
                 {highlight}
               </p>
@@ -83,7 +83,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
             <div className="mt-6">
               {namedLeads ? (
                 // One or two Consultants: name them — a person builds more trust than a count of one.
-                <div className="max-w-[36rem] rounded-[16px] bg-surface-default/80 p-4 ring-1 ring-border-subtle">
+                <div className="hero-island max-w-[36rem] rounded-[16px] bg-surface-default/80 p-4 ring-1 ring-border-subtle">
                   <p className="text-[0.8125rem] font-semibold text-ink-500">{t.ledBy}</p>
                   <ul className="mt-2.5 grid gap-2.5">
                     {area.consultants.map((profile) => (
@@ -124,7 +124,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
           </div>
 
           {/* The area snapshot: icon, sub-areas, and the Consultants who lead it. */}
-          <figure aria-hidden className={`relative mx-auto w-full max-w-[26rem] overflow-hidden rounded-[22px] border border-border-card bg-surface-default shadow-[0_30px_60px_-42px_rgba(36,64,74,0.6)] ${singleConsultant ? "hidden lg:block" : ""}`}>
+          <figure aria-hidden className={`hero-island relative mx-auto w-full max-w-[26rem] overflow-hidden rounded-[22px] border border-border-card bg-surface-default shadow-[0_30px_60px_-42px_rgba(36,64,74,0.6)] ${singleConsultant ? "hidden lg:block" : ""}`}>
             <div className={`relative px-6 pb-6 pt-6 ${style.soft}`}>
               <CareAreaIcon name={area.icon} strokeWidth={0.7} className={`pointer-events-none absolute end-3 top-3 h-28 w-28 opacity-[0.16] ${style.line}`} />
               <span className={`relative grid h-14 w-14 place-items-center rounded-2xl bg-surface-default text-brand-800 shadow-[0_10px_24px_-14px_rgba(36,64,74,0.6)] ring-1 ${style.ring}`}>

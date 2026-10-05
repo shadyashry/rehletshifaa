@@ -5,7 +5,7 @@
  */
 export function HeroStats({ stats }: { stats: readonly { value: number; label: string }[] }) {
   return (
-    <dl className="grid max-w-[34rem] grid-cols-3 divide-x divide-border-subtle border-y border-border-subtle rtl:divide-x-reverse">
+    <dl className="hero-stats grid max-w-[34rem] grid-cols-3 divide-x divide-border-subtle border-y border-border-subtle">
       {stats.map((stat) => (
         <div key={stat.label} className="flex flex-col gap-2 px-3 py-4 first:ps-0 sm:px-5">
           <dt className="order-last text-[0.75rem] leading-4 text-ink-500 sm:text-[0.8125rem] sm:leading-5">{stat.label}</dt>

@@ -48,7 +48,7 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
   ];
 
   return (
-    <footer className="border-t border-border-subtle bg-surface-warm text-ink-600">
+    <footer className="site-footer border-t border-border-subtle bg-surface-warm text-ink-600">
       <div className="container-site py-8 sm:grid sm:grid-cols-2 sm:gap-10 sm:py-12 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] lg:gap-10 lg:py-14">
         <div className="max-w-sm sm:col-span-2 lg:col-span-1">
           <Logo label={d.common.brand} accent={d.common.brandAccent} arabicLabel={d.common.brandArabic} arabicAccent={d.common.brandArabicAccent} size={44} />

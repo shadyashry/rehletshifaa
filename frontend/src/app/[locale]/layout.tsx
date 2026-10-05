@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AnalyticsScripts } from "@/components/AnalyticsScripts";
 import { AuthProvider } from "@/components/AuthProvider";
+import { BRAND_THEME_BOOT, BrandThemeSwitch } from "@/components/brand/BrandThemeSwitch";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { HideInControlCenter, SiteMain } from "@/components/nav/HideInControlCenter";
@@ -30,7 +31,12 @@ export default async function LocaleLayout({
       dir={locale === "ar" ? "rtl" : "ltr"}
       className={fontVariables}
       data-scroll-behavior="smooth"
+      // The brand-preview boot script may set data-brand-theme before hydration.
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: BRAND_THEME_BOOT }} />
+      </head>
       <body>
         <HideInControlCenter>
           <a href="#main" className="skip-link">
@@ -41,6 +47,7 @@ export default async function LocaleLayout({
         <AuthProvider><SiteMain>{children}</SiteMain></AuthProvider>
         <HideInControlCenter>
           <Footer locale={locale} d={d} />
+          <BrandThemeSwitch locale={locale} />
         </HideInControlCenter>
         <AnalyticsScripts />
       </body>

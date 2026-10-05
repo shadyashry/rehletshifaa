@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { CtaPanel } from "@/components/CtaPanel";
 import { CarePathways } from "@/components/home/CarePathways";
 import { Hero } from "@/components/home/Hero";
-import { HomeThemeSwitch } from "@/components/home/HomeThemeSwitch";
 import { JourneyFilm } from "@/components/home/JourneyFilm";
 import { PromiseSection } from "@/components/home/PromiseSection";
 import { TravelServices } from "@/components/home/TravelServices";
@@ -44,7 +43,6 @@ export default async function Home({ params }: Props) {
           note={d.home.finalNote}
         />
       </div>
-      <HomeThemeSwitch locale={locale} />
     </>
   );
 }

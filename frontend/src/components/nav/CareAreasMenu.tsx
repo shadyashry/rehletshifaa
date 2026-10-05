@@ -50,7 +50,7 @@ export function CareAreasMenu({ systems, labels, overviewHref, sendHref, activeH
 
       <div id={panelId} hidden={!open} className="absolute inset-x-0 top-full pt-2.5 motion-safe:animate-[care-menu-in_0.18s_ease-out]">
         <div className="container-site">
-          <div className="grid gap-8 rounded-[22px] border border-border-subtle bg-surface-default/95 p-7 shadow-[0_34px_70px_-34px_rgba(28,51,58,0.5)] backdrop-blur-xl lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-10">
+          <div className="nav-panel grid gap-8 rounded-[22px] border border-border-subtle bg-surface-default/95 p-7 shadow-[0_34px_70px_-34px_rgba(28,51,58,0.5)] backdrop-blur-xl lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-10">
             <div className="grid grid-cols-3 gap-x-6 gap-y-7">
               {systems.map((system) => {
                 const style = SYSTEM_STYLES[system.key];

@@ -1,203 +1,729 @@
 /* ---------------------------------------------------------------------------
    Brand preview — "Lapis Night" (سماء اللازورد), RehletShifaa only
    ---------------------------------------------------------------------------
-   Ancient Egyptian tomb and temple ceilings painted the night sky as deep lapis
-   strewn with gold five-pointed stars (the sba star) — the sky that guided every
-   journey. Rehlet Shifaa is a journey of healing: patients travel guided by stars,
-   and their coordinator is the constellation.
+   From night to dawn. Every page opens under a calm lapis night; the content
+   below sits on a warm-ivory day canvas. The whole palette comes from the logo,
+   so mark, wordmark and page speak one language:
 
-   Three sacred stones carry the meaning:
-     lapis lazuli   — depth and trust  → structure, headings, links
-     carnelian      — life, vitality   → the single action colour
-     faience        — rebirth          → the journey path, checks, markers
-   on a papyrus canvas. Care areas map to the stones by meaning: heart and women's
-   health carnelian; brain and movement lapis; digestion and surgery faience.
+     lapis   — authority  (the heart, "Rehlet")  → the night, headings, structure
+     azure   — care       (the hand, "Shifaa")   → links, the journey thread,
+                                                   rings, starlight, focus
+     coral   — the person (the head, the i-dot)  → the human thread: step numerals,
+                                                   the guiding star's halo
+     gold    — what is precious                  → only on the night, like jewellery:
+                                                   the night action, the window ring,
+                                                   the guiding star, the hero label,
+                                                   the credential numerals, the footer thread
 
-   Switched on from the home page only (`HomeThemeSwitch`, data-brand-theme="lapis").
-   Every text pairing checked to WCAG AA (≥ 4.5:1).
+   Day actions are deep lapis; night actions are champagne gold (gold on lapis is
+   the oldest premium pairing). Gold never appears as text on the light canvas —
+   that is where it turns to mustard — and stays a few percent of any view. The
+   signature hairline on light islands is a fine azure-to-coral line, the logo's
+   own palette. Headings are set in Alexandria, the wordmark's family, in both
+   Latin and Arabic.
+
+   Structure:
+     1. Day tokens on :root — also re-applied inside "light islands" (the hero
+        note card, the interior hero visual) so they stay legible on the night.
+     2. Night tokens on the dark regions (heroes, footer), re-pointing the same
+        semantic tokens so components need no theme conditionals.
+     3. Component refinements, then the signature moments.
+   Switched on site-wide by `BrandThemeSwitch` (data-brand-theme="lapis").
+   Every text pairing is WCAG 2.2 AA (≥ 4.5:1); ratios noted where it matters.
 --------------------------------------------------------------------------- */
 
-:root[data-brand-theme="lapis"] {
-  --color-brand-50: #eef1fa;
-  --color-brand-100: #dde3f4;
-  --color-brand-200: #bcc8ea;
-  --color-brand-300: #8fa2d8;
-  --color-brand-400: #1f9e94; /* markers, rules and dots: the faience journey thread */
-  --color-brand-500: #2b4ea8;
-  --color-brand-600: #1f3c88; /* lapis: links and structure — white 10.2:1 */
-  --color-brand-700: #182f6e;
-  --color-brand-800: #142659;
-  --color-brand-900: #14245c; /* headings — 13.0:1 on papyrus */
+/* 1. Day tokens. Unlayered, so a light island inside a night region wins over the inherited night values. */
+:root[data-brand-theme="lapis"],
+:root[data-brand-theme="lapis"] :is(.home-hero-card, .page-hero-aside, .hero-island) {
+  --color-brand-50: #edf4fc; /* azure mist: hover washes */
+  --color-brand-100: #d9e8f8; /* focus halo */
+  --color-brand-200: #b4d0f0;
+  --color-brand-300: #86b3e6;
+  --color-brand-400: #1c7fd1; /* logo azure: markers, rules, the journey thread */
+  --color-brand-500: #1966b8; /* eyebrows — 5.3:1 on ivory */
+  --color-brand-600: #1a5fb4; /* links, icons, active states — 5.8:1 on ivory, white 6.3:1 */
+  --color-brand-700: #164f97;
+  --color-brand-800: #133f7a;
+  --color-brand-900: #14245c; /* lapis headings — 13.4:1 on ivory */
   --color-brand-950: #0c1640;
 
-  /* Accent = faience signal family (checks, icon strokes) */
-  --color-accent-50: #e8f4f2;
-  --color-accent-100: #cde9e5;
-  --color-accent-200: #9fd6cf;
-  --color-accent-500: #1f9e94;
-  --color-accent-600: #12847c;
-  --color-accent-700: #0b6e6a;
-  --color-accent-800: #08524f;
+  /* Accent = the azure care family (checks, icon strokes) */
+  --color-accent-50: #edf4fc;
+  --color-accent-100: #d9e8f8;
+  --color-accent-200: #a9cdf2;
+  --color-accent-500: #1c7fd1;
+  --color-accent-600: #1a6cc0;
+  --color-accent-700: #1a5fb4; /* checks — 5.8:1 on ivory */
+  --color-accent-800: #133f7a;
 
   --color-ink-900: #16203d;
   --color-ink-800: #16203d;
   --color-ink-700: #252f4f;
-  --color-ink-600: #33405f;
+  --color-ink-600: #33405f; /* body — 9.6:1 on ivory */
   --color-ink-500: #414d6b;
-  --color-ink-400: #55607c;
+  --color-ink-400: #55607c; /* muted — 5.8:1 on ivory */
   --color-ink-300: #9aa3bb;
 
-  --color-line: #e4ddcb;
-  --color-line-strong: #d2c8b0;
-  --color-mist: #fbf6ea;
-  --color-mist-deep: #e3e8f5;
-  --color-wash-aqua: #e8f4f2;
-  --color-wash-sky: #e3e8f5;
-  --color-wash-peach: #f8e6dc;
-  --color-wash-lavender: #ebe8f3;
+  /* Day canvas: warm ivory — calm, never sterile white; it also warms the coral. */
+  --color-line: #e5dfd2;
+  --color-line-strong: #d3cbb9;
+  --color-mist: #f6f2ea;
+  --color-mist-deep: #e3edf9;
+  --color-wash-aqua: #edf4fc;
+  --color-wash-sky: #e6f0fb;
+  --color-wash-peach: #fbece7;
+  --color-wash-lavender: #ecebf3;
 
-  --color-surface-default: #fffcf5;
-  --color-surface-pearl: #f7f1e3; /* papyrus */
-  --color-surface-clinical: #eef1f8; /* lapis mist */
-  --color-surface-sage: #e8f4f2; /* faience mist */
-  --color-surface-ivory: #fbf6ea;
-  --color-surface-warm: #f3ead6;
-  --color-surface-hospitality: #efe3c8;
-  --color-surface-elevated: #fffcf5;
-  --color-accent-clinical: #1f9e94;
-  --color-accent-warm: #b8892e;
-  --color-accent-sand: #d1aa55;
-  --color-border-subtle: #e6dfcd;
-  --color-border-card: #e1d9c4;
-  --color-border-clinical: #d3dbee;
+  --color-sand-50: #faf7f0;
+  --color-sand-100: #f2ecdf;
+  --color-sand-200: #e5dccb;
+  --color-sand-300: #d2c4a6;
+  --color-sand-700: #a94b34; /* warm text is coral-deep now — 5.5:1 on white */
 
-  --color-system-heart-well: #f8e6dc;
-  --color-system-heart-ring: #eccbbb;
-  --color-system-heart-line: #b23a20;
-  --color-system-women-well: #f8e6dc;
-  --color-system-women-ring: #eccbbb;
-  --color-system-women-line: #b23a20;
-  --color-system-neuro-well: #e3e8f5;
-  --color-system-neuro-ring: #c9d2ec;
-  --color-system-neuro-line: #1f3c88;
-  --color-system-movement-well: #e3e8f5;
-  --color-system-movement-ring: #c9d2ec;
-  --color-system-movement-line: #1f3c88;
-  --color-system-digestive-well: #e8f4f2;
-  --color-system-digestive-ring: #c6e3df;
-  --color-system-digestive-line: #12847c;
-  --color-system-surgery-well: #e8f4f2;
-  --color-system-surgery-ring: #c6e3df;
-  --color-system-surgery-line: #12847c;
+  --color-surface-default: #fffdf9;
+  --color-surface-pearl: #f8f5ee; /* the day canvas */
+  --color-surface-clinical: #edf4fc; /* azure mist */
+  --color-surface-sage: #eef5fb;
+  --color-surface-ivory: #f6f2ea;
+  --color-surface-warm: #f2ecdf;
+  --color-surface-hospitality: #f7e9e2; /* a coral-warm hospitality wash */
+  --color-surface-elevated: #fffdf9;
+  --color-accent-clinical: #1c7fd1;
+  --color-accent-warm: #d9725b; /* coral hairline on ivory — 3:1 graphic contrast */
+  --color-accent-sand: #e07a62;
+  --color-border-subtle: #e6e0d3;
+  --color-border-card: #e1dacb;
+  --color-border-clinical: #cfe0f3;
+
+  /* Care areas in the logo's three colours: heart and women's health coral (the person); brain and movement
+     lapis; digestion and surgery azure. Muted wells, never a rainbow. */
+  --color-system-heart-well: #fbece7;
+  --color-system-heart-ring: #f2cfc4;
+  --color-system-heart-line: #c4573f;
+  --color-system-women-well: #fbece7;
+  --color-system-women-ring: #f2cfc4;
+  --color-system-women-line: #c4573f;
+  --color-system-neuro-well: #e9edf7;
+  --color-system-neuro-ring: #cfd7ee;
+  --color-system-neuro-line: #2b4ea8;
+  --color-system-movement-well: #e9edf7;
+  --color-system-movement-ring: #cfd7ee;
+  --color-system-movement-line: #2b4ea8;
+  --color-system-digestive-well: #e6f0fb;
+  --color-system-digestive-ring: #c6dcf3;
+  --color-system-digestive-line: #1a6cc0;
+  --color-system-surgery-well: #e6f0fb;
+  --color-system-surgery-ring: #c6dcf3;
+  --color-system-surgery-line: #1a6cc0;
 
   --color-text-heading: #14245c;
   --color-text-body: #33405f;
   --color-text-muted: #55607c;
-  --color-coral: #b23a20;
-  --color-sand-700: #8a5a14;
+  --color-coral: #e07a62;
 
-  /* Logo: lapis wordmark, carnelian "Shifaa" (life), and the mark shifted from teal to lapis. */
+  /* Calm, clearly visible error red — deeper and cooler than the brand coral, so errors never look like branding. */
+  --color-alert-50: #fbf0ee;
+  --color-alert-200: #edd0ca;
+  --color-alert-600: #b3352f;
+  --color-alert-700: #8c2b28;
+  --color-alert-800: #74201e;
+
+  /* Logo: lapis heart + "Rehlet", azure hand + "Shifaa", coral head + i-dot. */
   --logo-ink: #14245c;
-  --logo-accent: #b23a20;
-  --logo-icon-filter: hue-rotate(48deg) saturate(1.25) brightness(0.68);
+  --logo-accent: #1c7fd1;
+  --logo-dot: #e07a62;
+  --logo-part-body: #1f3c88;
+  --logo-part-hand: #1c7fd1;
+  --logo-part-head: #e07a62;
 
-  --shadow-card: 0 1px 2px rgba(20, 36, 92, 0.05), 0 16px 44px -34px rgba(20, 36, 92, 0.42);
-  --brand-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-  /* The sba star sky: gold five-pointed stars and star-dust, as on the tomb ceilings. */
-  --lapis-stars: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23f2c14e'%3E%3Cpolygon fill-opacity='0.42' points='10,5 11.18,8.38 14.76,8.45 11.9,10.62 12.94,14.05 10,12 7.06,14.05 8.1,10.62 5.24,8.45 8.82,8.38'/%3E%3Cpolygon fill-opacity='0.3' transform='translate(40 40)' points='10,5 11.18,8.38 14.76,8.45 11.9,10.62 12.94,14.05 10,12 7.06,14.05 8.1,10.62 5.24,8.45 8.82,8.38'/%3E%3Ccircle cx='62' cy='18' r='0.9' fill-opacity='0.5'/%3E%3Ccircle cx='28' cy='64' r='0.7' fill-opacity='0.45'/%3E%3Ccircle cx='70' cy='70' r='0.6' fill-opacity='0.35'/%3E%3C/g%3E%3C/svg%3E");
+  --radius-card: 0.95rem;
+  --shadow-card: 0 1px 2px rgba(14, 26, 61, 0.05), 0 14px 36px -26px rgba(14, 26, 61, 0.34);
+
+  /* Primitives shared by the night regions and the signature moments. */
+  --lapis-night: #0e1a3d; /* white 16.6:1 */
+  --lapis-night-deep: #0a1431;
+  --lapis-night-raised: #17275c;
+  --lapis-azure: #1c7fd1;
+  --lapis-azure-light: #9dd0ff; /* azure type on night — 10.5:1 */
+  --lapis-gold-light: #f1d596; /* champagne: gold type on night — 12.4:1 */
+  --lapis-gold: #e2b962; /* night text on it 9.2:1 */
+  --lapis-gold-ring: rgba(232, 198, 116, 0.6);
+  /* The signature hairline: the logo's care-to-person line, azure into coral. */
+  --lapis-line: linear-gradient(90deg, #1c7fd1 0%, #5f8fd6 45%, #e07a62 100%);
+  /* Starlight: sparse, pale azure, barely there — the night stays calm. */
+  --lapis-stars: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='%23dbe9ff'%3E%3Cpath fill-opacity='0.4' d='M24 18 L25.1 22.9 L30 24 L25.1 25.1 L24 30 L22.9 25.1 L18 24 L22.9 22.9 Z'/%3E%3Cpath fill-opacity='0.24' d='M98 86 L98.8 89.2 L102 90 L98.8 90.8 L98 94 L97.2 90.8 L94 90 L97.2 89.2 Z'/%3E%3Ccircle cx='108' cy='26' r='0.9' fill-opacity='0.5'/%3E%3Ccircle cx='46' cy='104' r='0.8' fill-opacity='0.45'/%3E%3Ccircle cx='128' cy='122' r='0.6' fill-opacity='0.35'/%3E%3Ccircle cx='70' cy='58' r='0.5' fill-opacity='0.35'/%3E%3C/g%3E%3C/svg%3E");
+  --lapis-brand-heading-latin: var(--font-brand-latin), var(--font-latin), "Segoe UI", sans-serif;
+  --lapis-brand-heading-arabic: var(--font-brand-arabic), var(--font-brand-latin), var(--font-arabic), Tahoma, sans-serif;
 }
 
 @layer components {
-  :root[data-brand-theme="lapis"]:not([dir="rtl"]) :is(.display, .headline, .statement, h1, h2) {
-    font-family: var(--brand-serif);
-    font-weight: 600;
-    letter-spacing: -0.012em;
+  /* ---- 2. Night tokens: the heroes and the footer re-point the same semantic tokens ---- */
+  :root[data-brand-theme="lapis"] :is(.home-hero, .page-hero, .site-footer, .promise-panel) {
+    --color-surface-pearl: var(--lapis-night);
+    --color-mist: var(--lapis-night);
+    --color-surface-clinical: #1b3a7a; /* the soft azure-lapis glow behind interior heroes */
+    --color-surface-elevated: var(--lapis-night-raised);
+    --color-brand-900: #f6f2e8; /* headings — 15.0:1 */
+    --color-brand-800: #e8ecf8;
+    --color-brand-700: var(--lapis-azure-light);
+    --color-brand-600: var(--lapis-azure-light); /* links, icons and the focus ring on night — 10.5:1 */
+    --color-brand-500: #86b3e6;
+    --color-brand-400: #5fb0ff; /* the azure thread on night */
+    --color-brand-100: #1f5fb0; /* the blurred glow in the mist-tone hero */
+    --color-brand-50: rgba(232, 236, 248, 0.06);
+    --color-accent-700: var(--lapis-azure-light);
+    --color-ink-900: #f6f2e8;
+    --color-ink-800: #f6f2e8;
+    --color-ink-700: #e8ecf8;
+    --color-ink-600: #d5dbef; /* body on night — 12.0:1 */
+    --color-ink-500: #b4bedc; /* supporting — 9.1:1 */
+    --color-ink-400: #9faacb; /* muted — 7.2:1 */
+    --color-line: rgba(232, 236, 248, 0.12);
+    --color-line-strong: rgba(232, 236, 248, 0.32);
+    --color-border-subtle: rgba(157, 208, 255, 0.22);
+    --color-border-clinical: rgba(157, 208, 255, 0.2);
+    --color-sand-200: rgba(232, 236, 248, 0.14);
   }
 
-  /* Carnelian is the one action colour: life, moving forward (white text 6.0:1). */
+  /* ---- 3. Typography: one voice with the wordmark — Alexandria for display type, Latin and Arabic ---- */
+  :root[data-brand-theme="lapis"] :is(.display, .headline, .statement, .page-hero h1) {
+    font-family: var(--lapis-brand-heading-latin);
+    font-weight: 600;
+    letter-spacing: -0.024em;
+  }
+  :root[data-brand-theme="lapis"][dir="rtl"] :is(.display, .headline, .statement, .page-hero h1) {
+    font-family: var(--lapis-brand-heading-arabic);
+    letter-spacing: 0;
+  }
+
+  :root[data-brand-theme="lapis"] .eyebrow {
+    color: var(--color-brand-500);
+  }
+
+  /* ---- Actions, split by surface: luxury where people first look, trust where they work ----
+     By day (header, forms, sections): deep lapis — authoritative and calm (white 10.2:1).
+     By night (heroes, the closing call to action): champagne gold — gold leaf on lapis, the oldest premium pairing
+     (night text 9.2–11.9:1). Coral stays the person's accent (logo head, i-dot, step numerals, the star's halo). */
   :root[data-brand-theme="lapis"] .btn-primary {
-    background: #b23a20;
-    border-color: #b23a20;
+    background: #1f3c88;
+    border-color: #1f3c88;
     color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 8px 18px -14px rgba(14, 26, 61, 0.8);
   }
   :root[data-brand-theme="lapis"] .btn-primary:hover {
-    background: #9a3218;
-    border-color: #9a3218;
-    box-shadow: 0 12px 26px -18px rgba(154, 50, 24, 0.8);
+    background: #182f6e;
+    border-color: #182f6e;
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 28px -16px rgba(14, 26, 61, 0.75);
   }
-  :root[data-brand-theme="lapis"] .eyebrow {
-    color: #9a3218;
+  :root[data-brand-theme="lapis"] :is(.home-hero, .page-hero, .on-dark) :is(.btn-primary, .btn-inverse) {
+    background: linear-gradient(180deg, #f1d596 0%, #e2b962 100%);
+    border-color: #e8c674;
+    color: var(--lapis-night);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 10px 26px -16px rgba(226, 185, 98, 0.65);
+  }
+  :root[data-brand-theme="lapis"] :is(.home-hero, .page-hero, .on-dark) :is(.btn-primary, .btn-inverse):hover {
+    background: linear-gradient(180deg, #f6dfaa 0%, #e8c674 100%);
+    border-color: #f1d596;
+    color: var(--lapis-night);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 14px 32px -16px rgba(226, 185, 98, 0.75);
   }
 
-  /* ---- Signature moment: the hero is the night sky of the tomb ceilings ---- */
-  :root[data-brand-theme="lapis"] .home-hero {
-    --color-surface-pearl: #0f1b45;
-    --color-brand-900: #f7f1e3;
-    --color-brand-700: #f2c14e;
-    --color-brand-400: #3fc1b5;
-    --color-ink-700: #e8ecf8;
-    --color-ink-600: #d5dbef;
-    --color-ink-500: #aeb8d8;
-    --color-border-subtle: rgba(242, 193, 78, 0.28);
-    background-color: #0f1b45;
-    background-image:
-      linear-gradient(180deg, rgba(15, 27, 69, 0) 0%, rgba(15, 27, 69, 0) 70%, rgba(31, 158, 148, 0.18) 100%),
-      linear-gradient(90deg, #0f1b45 0%, rgba(15, 27, 69, 0.9) 40%, rgba(15, 27, 69, 0.55) 100%),
-      var(--lapis-stars);
-    background-size: auto, auto, 80px 80px;
+  :root[data-brand-theme="lapis"] .btn-secondary {
+    color: var(--color-brand-900);
+    border-color: var(--color-line-strong);
   }
-  :root[data-brand-theme="lapis"] .home-hero .btn-primary {
-    background: #c4452a;
-    border-color: #c4452a;
-    color: #ffffff;
+  :root[data-brand-theme="lapis"] .btn-secondary:hover {
+    color: var(--color-brand-700);
+    border-color: var(--color-brand-400);
+    background: var(--color-brand-50);
   }
-  :root[data-brand-theme="lapis"] .home-hero .btn-primary:hover {
-    background: #d4553a;
-    border-color: #d4553a;
-    box-shadow: 0 14px 34px -16px rgba(242, 193, 78, 0.55);
-  }
-  :root[data-brand-theme="lapis"] .home-hero .btn-secondary {
+  :root[data-brand-theme="lapis"] :is(.home-hero, .page-hero) .btn-secondary {
     background: transparent;
-    color: #f7f1e3;
-    border-color: rgba(247, 241, 227, 0.45);
+    color: #f6f2e8;
+    border-color: rgba(246, 242, 232, 0.38);
   }
-  :root[data-brand-theme="lapis"] .home-hero .btn-secondary:hover {
-    background: rgba(247, 241, 227, 0.08);
-    border-color: #f2c14e;
-    color: #f7f1e3;
-  }
-  :root[data-brand-theme="lapis"] .home-hero .link-cta {
-    color: #f2c14e;
-  }
-  :root[data-brand-theme="lapis"] .home-hero .home-hero-card {
-    --color-brand-900: #14245c;
-    --color-ink-600: #33405f;
-    --color-ink-500: #414d6b;
-    --color-border-subtle: #e6dfcd;
-    border-top: 3px solid #f2c14e;
-  }
-  /* The rail is the horizon: deeper lapis, gold-starred chips. */
-  :root[data-brand-theme="lapis"] .home-hero .home-hero-rail {
-    --color-surface-clinical: #0b1638;
-    --color-border-clinical: rgba(63, 193, 181, 0.3);
-    --color-surface-elevated: #1a2a62;
-    --color-brand-600: #f2c14e;
-  }
-
-  /* The closing call to action is the same sky: one more star to follow. */
-  :root[data-brand-theme="lapis"] .home-final-cta .on-dark {
-    background-color: #0f1b45;
-    background-image: var(--lapis-stars);
-    background-size: 80px 80px;
-    border-top: 3px solid #f2c14e;
-  }
-  :root[data-brand-theme="lapis"] .home-final-cta .btn-inverse {
-    background: #c4452a;
-    border-color: #c4452a;
+  :root[data-brand-theme="lapis"] :is(.home-hero, .page-hero) .btn-secondary:hover {
+    background: rgba(157, 208, 255, 0.08);
+    border-color: var(--lapis-azure-light);
     color: #ffffff;
   }
-  :root[data-brand-theme="lapis"] .home-final-cta .btn-inverse:hover {
-    background: #d4553a;
-    border-color: #d4553a;
+  :root[data-brand-theme="lapis"] .field:focus {
+    box-shadow: 0 0 0 4px rgba(28, 127, 209, 0.16);
+  }
+
+  /* ---- Home hero: the night, with an azure dawn glow behind the photograph ---- */
+  :root[data-brand-theme="lapis"] .home-hero {
+    background-color: var(--lapis-night);
+    background-image:
+      radial-gradient(46% 68% at 76% 44%, rgba(28, 127, 209, 0.34) 0%, rgba(28, 127, 209, 0) 70%),
+      radial-gradient(30% 40% at 92% 6%, rgba(233, 141, 120, 0.12) 0%, rgba(233, 141, 120, 0) 70%),
+      linear-gradient(90deg, var(--lapis-night) 0%, rgba(14, 26, 61, 0.94) 38%, rgba(14, 26, 61, 0.4) 100%),
+      var(--lapis-stars);
+    background-size: auto, auto, auto, 140px 140px;
+  }
+  /* Light islands carry the signature hairline along their top edge. */
+  :root[data-brand-theme="lapis"] :is(.home-hero .home-hero-card, .page-hero-aside) {
+    background-image: var(--lapis-line);
+    background-size: 100% 2px;
+    background-repeat: no-repeat;
+    background-position: top;
+    box-shadow: 0 22px 44px -26px rgba(5, 10, 28, 0.75);
+  }
+  /* The reassurance rail is the horizon: a deeper band, azure-lit chips. */
+  :root[data-brand-theme="lapis"] .home-hero .home-hero-rail {
+    --color-surface-clinical: var(--lapis-night-deep);
+    --color-border-clinical: rgba(157, 208, 255, 0.14);
+  }
+
+  /* ---- Interior heroes: the same night, compact; their visual sits on an ivory instrument card ---- */
+  :root[data-brand-theme="lapis"] .page-hero {
+    position: relative;
+    isolation: isolate;
+  }
+  :root[data-brand-theme="lapis"] .page-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--lapis-stars);
+    background-size: 140px 140px;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.25) 40%, #000 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.25) 40%, #000 100%);
+  }
+  :root[data-brand-theme="lapis"][dir="rtl"] .page-hero::before {
+    -webkit-mask-image: linear-gradient(270deg, transparent 0%, rgba(0, 0, 0, 0.25) 40%, #000 100%);
+    mask-image: linear-gradient(270deg, transparent 0%, rgba(0, 0, 0, 0.25) 40%, #000 100%);
+  }
+  :root[data-brand-theme="lapis"] .page-hero-aside {
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 1rem;
+    background-color: var(--color-surface-default);
+    color: var(--color-ink-700);
+    padding: 1.25rem;
+  }
+
+  /* From the desktop navigation width the header floats: tuck the night band under it, so no ivory strip shows above. */
+  @media (min-width: 68.75rem) {
+    :root[data-brand-theme="lapis"] #main > :is(.home-hero, .page-hero):first-child {
+      margin-top: -4.75rem;
+      padding-top: 4.75rem;
+    }
+  }
+
+  /* ---- The credential plaque: dark as an object, not as a band ----
+     The Senior Consultants section stays on the calm day canvas; only the Consultants panel becomes a contained lapis
+     plaque — champagne credential numerals, the lead Consultant's gold monogram, a fine gold edge — the same
+     contained-night language as the closing call to action. One jewel-like focal point where trust is earned. */
+  :root[data-brand-theme="lapis"] .promise-section .promise-panel {
+    --color-surface-default: var(--lapis-night); /* monogram rings read as night */
+    border-color: rgba(241, 213, 150, 0.3);
+    box-shadow:
+      inset 0 1px 0 rgba(241, 213, 150, 0.55),
+      0 30px 60px -34px rgba(14, 26, 61, 0.55);
+  }
+  :root[data-brand-theme="lapis"] .promise-section .promise-panel p:first-child {
+    text-wrap: balance; /* "The Consultants behind your care" never leaves "care" alone on a line */
+  }
+  :root[data-brand-theme="lapis"] .promise-section dd {
+    --color-brand-900: var(--lapis-gold-light); /* credential numerals: the champagne hallmark (12.4:1) */
+  }
+
+  /* ---- The closing call to action: the same night, the hairline on top, one coral action ---- */
+  :root[data-brand-theme="lapis"] .on-dark {
+    --color-brand-700: var(--lapis-night); /* CtaPanel paints with the bg-brand-700 utility */
+    background-image:
+      var(--lapis-line),
+      radial-gradient(60% 130% at 100% 0%, rgba(28, 127, 209, 0.36) 0%, rgba(28, 127, 209, 0) 70%),
+      radial-gradient(40% 90% at 0% 100%, rgba(233, 141, 120, 0.14) 0%, rgba(233, 141, 120, 0) 70%),
+      var(--lapis-stars);
+    background-size: 100% 2px, auto, auto, 140px 140px;
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+    background-position: top, center, center, center;
+  }
+  :root[data-brand-theme="lapis"] .on-dark :focus-visible,
+  :root[data-brand-theme="lapis"] .on-dark:focus-visible {
+    outline-color: var(--lapis-azure-light);
+  }
+
+  /* ---- Footer: the deepest night ---- */
+  :root[data-brand-theme="lapis"] .site-footer {
+    --color-surface-warm: var(--lapis-night-deep); /* the footer's bg-surface-warm utility */
+  }
+
+  /* ---- The thread through the page ---- */
+  /* A small azure four-point star before every section eyebrow. */
+  :root[data-brand-theme="lapis"] .eyebrow::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em;
+    height: 0.62em;
+    margin-inline-end: 0.55em;
+    vertical-align: 0.02em;
+    background: var(--lapis-star-dot) no-repeat center / contain;
+  }
+  :root[data-brand-theme="lapis"] :is(.home-hero, .page-hero) .eyebrow {
+    color: var(--lapis-gold-light);
+  }
+  /* The home hero's label (a styled paragraph above the headline): engraved champagne, a gold point before it. */
+  :root[data-brand-theme="lapis"] .home-hero p:has(+ h1) {
+    --color-brand-700: var(--lapis-gold-light);
+    --color-brand-400: var(--lapis-gold);
+  }
+  /* Credentials read like a hallmark: the interior heroes' key numbers in champagne (12.4:1). */
+  :root[data-brand-theme="lapis"] .page-hero .hero-stats dd {
+    --color-brand-900: var(--lapis-gold-light);
+  }
+  :root[data-brand-theme="lapis"] :is(.home-hero, .page-hero) .eyebrow::before {
+    background-image: var(--lapis-star-dot-night);
+  }
+  /* Light islands inside a night hero are day surfaces again: never gold type on ivory. */
+  :root[data-brand-theme="lapis"] :is(.home-hero-card, .page-hero-aside, .hero-island) .eyebrow {
+    color: var(--color-brand-500);
+  }
+  :root[data-brand-theme="lapis"] :is(.home-hero-card, .page-hero-aside, .hero-island) .eyebrow::before {
+    background-image: var(--lapis-star-dot);
+  }
+
+  /* Journey steps carry the whole logo: a lapis-night disc, an azure ring, coral numerals (the person's steps). */
+  :root[data-brand-theme="lapis"] .journey-marker {
+    background: var(--lapis-night);
+    color: #e07a62; /* 5.8:1 on the night disc */
+    box-shadow:
+      inset 0 0 0 1.5px rgba(95, 176, 255, 0.85),
+      0 0 0 4px var(--color-surface-pearl),
+      0 8px 18px -10px rgba(14, 26, 61, 0.7);
+  }
+  /* Hospitality steps stay on the day canvas: ivory disc, coral ring, deep-coral numerals (5.5:1). */
+  :root[data-brand-theme="lapis"] .journey-marker-warm {
+    background: var(--color-surface-default);
+    color: var(--color-sand-700);
+    box-shadow:
+      inset 0 0 0 1.5px var(--color-accent-warm),
+      0 0 0 4px var(--color-surface-pearl);
+  }
+  :root[data-brand-theme="lapis"] .journey-path {
+    stroke: var(--color-brand-300);
+    stroke-dasharray: 3 5;
+  }
+
+  /* Cards: an azure hairline on hover — a quiet sign of focus, never a float. */
+  :root[data-brand-theme="lapis"] .card {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  :root[data-brand-theme="lapis"] .card:hover {
+    border-color: var(--color-brand-300);
+  }
+
+  :root[data-brand-theme="lapis"] ::selection {
+    background: #d9e8f8;
+    color: #14245c;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Signature: the window onto the night sky
+   The hero photograph becomes an arched temple window, set in a fine gold
+   ring like a jewel. Behind it a constellation of care traces the patient's path — case,
+   coordinator, Consultant, recommendation — up to one softly breathing guiding
+   star — gold, with a faint coral halo: the destination is the person, well. Decorative only
+   (pseudo-elements, no text); hidden below lg, where the photo stacks under the
+   copy and stars would sit behind words.
+--------------------------------------------------------------------------- */
+:root[data-brand-theme="lapis"] {
+  --lapis-constellation: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='656' height='480' viewBox='0 0 656 480'%3E%3Cg fill='none' stroke='%239dd0ff' stroke-width='0.9' stroke-linecap='round'%3E%3Cpath stroke-opacity='0.42' d='M22 410 L12 292 L36 182 L108 92 L248 30 L420 20 L600 32'/%3E%3Cpath stroke-opacity='0.18' stroke-dasharray='2 6' d='M36 182 L4 120 M248 30 L330 6 M600 32 L648 140'/%3E%3C/g%3E%3Cg fill='%23e6f1ff'%3E%3Ccircle cx='22' cy='410' r='2.2' fill-opacity='0.7'/%3E%3Ccircle cx='12' cy='292' r='2.6' fill-opacity='0.85'/%3E%3Ccircle cx='36' cy='182' r='3'/%3E%3Ccircle cx='108' cy='92' r='2.6' fill-opacity='0.9'/%3E%3Ccircle cx='248' cy='30' r='3'/%3E%3Ccircle cx='420' cy='20' r='2.4' fill-opacity='0.85'/%3E%3Ccircle cx='4' cy='120' r='1.4' fill-opacity='0.5'/%3E%3Ccircle cx='330' cy='6' r='1.3' fill-opacity='0.5'/%3E%3Ccircle cx='648' cy='140' r='1.5' fill-opacity='0.55'/%3E%3Ccircle cx='640' cy='300' r='1' fill-opacity='0.4'/%3E%3C/g%3E%3C/svg%3E");
+  --lapis-guide-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath fill='%23f6dfaa' d='M32 6 L35.2 28.8 L58 32 L35.2 35.2 L32 58 L28.8 35.2 L6 32 L28.8 28.8 Z'/%3E%3Cpath fill='%23e2b962' fill-opacity='0.9' d='M32 18 L33.6 30.4 L46 32 L33.6 33.6 L32 46 L30.4 33.6 L18 32 L30.4 30.4 Z' transform='rotate(45 32 32)'/%3E%3Ccircle cx='32' cy='32' r='3.2' fill='%23ffffff'/%3E%3C/svg%3E");
+  --lapis-star-dot: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%231c7fd1' d='M10 0 L11.8 8.2 L20 10 L11.8 11.8 L10 20 L8.2 11.8 L0 10 L8.2 8.2 Z'/%3E%3C/svg%3E");
+  --lapis-star-dot-night: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23e2b962' d='M10 0 L11.8 8.2 L20 10 L11.8 11.8 L10 20 L8.2 11.8 L0 10 L8.2 8.2 Z'/%3E%3C/svg%3E");
+}
+
+/* The arched window: an elliptical dome over the photograph, safe for the faces in frame. Unlayered on purpose —
+   the photo carries a rounded-[16px] utility, which a components-layer rule cannot outrank. */
+:root[data-brand-theme="lapis"] .home-hero figure > div:first-child {
+  border-radius: 50% 50% 1.125rem 1.125rem / 30% 30% 1.125rem 1.125rem;
+}
+
+/* Light cards inside a night hero are opaque ivory (a translucent card would turn grey over the night) and float. */
+:root[data-brand-theme="lapis"] .page-hero .hero-island:is(div, figure, aside, p) {
+  background-color: var(--color-surface-default);
+  box-shadow: 0 22px 44px -26px rgba(5, 10, 28, 0.75);
+}
+
+/* The plaque moves from night to dawn — the Lapis story in one object: deep lapis night where the Consultants sit,
+   warming progressively into a luminous azure dawn where the action is. Unlayered, over the panel's bg utility.
+   Text stays AA across the whole sweep (champagne ≥ 5.9:1, ivory ≥ 7.5:1, labels ≥ 4.5:1 at the brightest end). */
+:root[data-brand-theme="lapis"] .promise-section .promise-panel {
+  background-color: var(--lapis-night);
+  background-image:
+    radial-gradient(38% 150% at 100% 50%, rgba(95, 176, 255, 0.28) 0%, rgba(95, 176, 255, 0) 70%),
+    radial-gradient(30% 120% at 0% 100%, rgba(224, 122, 98, 0.1) 0%, rgba(224, 122, 98, 0) 70%),
+    linear-gradient(100deg, #0e1a3d 0%, #112250 30%, #173a78 66%, #1d4c93 100%);
+}
+:root[data-brand-theme="lapis"][dir="rtl"] .promise-section .promise-panel {
+  background-image:
+    radial-gradient(38% 150% at 0% 50%, rgba(95, 176, 255, 0.28) 0%, rgba(95, 176, 255, 0) 70%),
+    radial-gradient(30% 120% at 100% 100%, rgba(224, 122, 98, 0.1) 0%, rgba(224, 122, 98, 0) 70%),
+    linear-gradient(260deg, #0e1a3d 0%, #112250 30%, #173a78 66%, #1d4c93 100%);
+}
+/* Monograms in a graded sequence: the lead Consultant in gold, the others from pale sky to deeper azure — a quiet
+   progression rather than five identical discs (night initials, 7.0–12.7:1); "+N" is an outlined chip. */
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:first-child {
+  background-color: var(--lapis-gold);
+  color: var(--lapis-night);
+}
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(2) { background-color: #c4e2ff; color: var(--lapis-night); }
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(3) { background-color: #a6d1fb; color: var(--lapis-night); }
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(4) { background-color: #8abff4; color: var(--lapis-night); }
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(5) { background-color: #6fabea; color: var(--lapis-night); }
+:root[data-brand-theme="lapis"] .promise-section .promise-panel span > span:nth-child(6) {
+  background-color: transparent;
+  color: #e8ecf8;
+  box-shadow: inset 0 0 0 1px rgba(157, 208, 255, 0.45);
+}
+/* The action at the bright end, in champagne (5.9:1 at the brightest stop). Between 1024 and 1280px the panel's
+   middle column is tight, so the action stays a compact link; from 1280px it becomes a refined outlined pill. */
+:root[data-brand-theme="lapis"] .promise-section .promise-panel .link-cta {
+  color: var(--lapis-gold-light);
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+:root[data-brand-theme="lapis"] .promise-section .promise-panel .link-cta:hover {
+  color: #fff6dc;
+}
+@media (max-width: 63.99rem), (min-width: 80rem) {
+  :root[data-brand-theme="lapis"] .promise-section .promise-panel .link-cta {
+    padding: 0.5rem 1.1rem;
+    border: 1px solid rgba(241, 213, 150, 0.55);
+    border-radius: 999px;
+  }
+  :root[data-brand-theme="lapis"] .promise-section .promise-panel .link-cta:hover {
+    border-color: var(--lapis-gold-light);
+    background-color: rgba(241, 213, 150, 0.1);
+  }
+}
+
+/* The Care Areas menu opens over the dark hero; a nested backdrop blur cannot work inside the blurred header pill,
+   so the panel is fully opaque — no headline ghosting through the menu. */
+:root[data-brand-theme="lapis"] .nav-panel {
+  background-color: var(--color-surface-default);
+  box-shadow: 0 34px 70px -30px rgba(5, 10, 28, 0.6);
+}
+
+/* The logo mark in three colours (heart, hand, head) instead of a filtered bitmap. */
+:root[data-brand-theme="lapis"] .logo-mark-parts {
+  display: block;
+}
+:root[data-brand-theme="lapis"] .logo-mark .logo-mark-img {
+  visibility: hidden;
+}
+
+/* Footer: the row with the logo is a light band — the logo exactly as in the header — and the lapis night begins
+   below it with the links. Unlayered so it outranks the footer's padding / column utilities. */
+:root[data-brand-theme="lapis"] .site-footer {
+  overflow-x: clip; /* contains the full-bleed band and its horizon line */
+}
+:root[data-brand-theme="lapis"] .site-footer > .container-site {
+  padding-top: 0;
+}
+:root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child {
+  --color-ink-600: #33405f; /* day body ink for the description */
+  position: relative;
+  grid-column: 1 / -1;
+  max-width: none;
+  /* Phones and tablets: the signature stacks, start-aligned — logo, a short rule, the tagline. */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  margin-bottom: 2.25rem;
+  padding-block: 1.75rem 2rem;
+  /* full-bleed day canvas behind the row, edge to edge */
+  border-image: linear-gradient(#f8f5ee 0 0) fill 0 / / 0 100vmax;
+}
+/* A single gold thread where the day band meets the night. */
+:root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child::after {
+  content: "";
+  position: absolute;
+  left: -100vmax;
+  right: -100vmax;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(226, 185, 98, 0) 0%, #e2b962 22%, #f1d596 50%, #e2b962 78%, rgba(226, 185, 98, 0) 100%);
+}
+/* The logo leads a size up (vector mark + live text, so it stays crisp), growing from its start edge. */
+:root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child > :first-child {
+  transform: scale(1.15);
+  transform-origin: 0 50%;
+  margin-block: 0.2rem 0.35rem;
+}
+:root[data-brand-theme="lapis"][dir="rtl"] .site-footer > .container-site > :first-child > :first-child {
+  transform-origin: 100% 50%;
+}
+/* The tagline speaks in the wordmark's voice — Alexandria, a little larger than body copy. */
+:root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child > p {
+  position: relative;
+  margin-top: 0;
+  max-width: 46ch;
+  font-family: var(--lapis-brand-heading-latin);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: -0.005em;
+  color: #414d6b; /* 8.0:1 on the band */
+}
+:root[data-brand-theme="lapis"][dir="rtl"] .site-footer > .container-site > :first-child > p {
+  font-family: var(--lapis-brand-heading-arabic);
+  letter-spacing: 0;
+  line-height: 1.8;
+}
+/* The rule in the logo's own colours, azure (care) into coral (the person): short and horizontal when stacked. */
+:root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child > p::before {
+  content: "";
+  display: block;
+  width: 3rem;
+  height: 2px;
+  margin: 1rem 0 0.85rem;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #1c7fd1, #e07a62);
+}
+:root[data-brand-theme="lapis"][dir="rtl"] .site-footer > .container-site > :first-child > p::before {
+  background: linear-gradient(270deg, #1c7fd1, #e07a62);
+}
+/* From laptop width the signature sits on the very grid of the link columns below: the logo shares the first
+   column's edge with "Explore", the tagline starts exactly on the second column's edge with "Legal", and the rule
+   stands vertical in the middle of the gutter between them. */
+@media (min-width: 64rem) {
+  :root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 2.5rem; /* = the link columns' gutter */
+    align-items: center;
+    padding-block: 1.9rem 2.1rem;
+  }
+  :root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child > :first-child {
+    justify-self: start; /* the logo keeps its own width rather than stretching across its column */
+    margin-block: 0;
+  }
+  :root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child > p {
+    grid-column: 2 / span 2;
+  }
+  :root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child > p::before,
+  :root[data-brand-theme="lapis"][dir="rtl"] .site-footer > .container-site > :first-child > p::before {
+    position: absolute;
+    inset-block: 0.2em;
+    inset-inline-start: calc(-1.25rem - 1px); /* the centre of the 2.5rem gutter */
+    width: 2px;
+    height: auto;
+    margin: 0;
+    background: linear-gradient(180deg, #1c7fd1, #e07a62);
+  }
+}
+/* ---- Footer navigation on the night ----
+   The base grid reserved a wide first column for the logo; with the logo now in the band above, that slot pushed
+   "Legal" away and left a dead fourth column. Lapis uses one even three-column grid on the band's left edge. */
+@media (min-width: 640px) {
+  :root[data-brand-theme="lapis"] .site-footer > .container-site {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 2.5rem;
+  }
+}
+/* Column labels: small champagne caps — gold on the night, used like jewellery (12.4:1). */
+:root[data-brand-theme="lapis"] .site-footer details > summary {
+  --color-brand-900: var(--lapis-gold-light); /* the same labels on phones (disclosure rows) */
+}
+:root[data-brand-theme="lapis"] .site-footer > .container-site > div > h2 {
+  --color-brand-900: var(--lapis-gold-light);
+  letter-spacing: 0.16em;
+}
+:root[data-brand-theme="lapis"][dir="rtl"] .site-footer > .container-site > div > h2 {
+  letter-spacing: 0;
+}
+/* Links: a calm rhythm, softer ivory, an azure hover with a fine underline. */
+:root[data-brand-theme="lapis"] .site-footer .footer-link {
+  color: #c9d1e8; /* 11.4:1 on the night */
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+  transition: color 0.18s ease;
+}
+:root[data-brand-theme="lapis"] .site-footer .footer-link:hover {
+  color: var(--lapis-azure-light);
+  text-decoration: underline;
+}
+/* The one action in the footer — talk to a coordinator — reads as a refined outlined pill, not plain text. */
+:root[data-brand-theme="lapis"] .site-footer .footer-link:has(svg) {
+  min-height: 2.75rem;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid rgba(157, 208, 255, 0.38);
+  border-radius: 999px;
+  color: #f6f2e8;
+  transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+:root[data-brand-theme="lapis"] .site-footer .footer-link:has(svg):hover {
+  border-color: var(--lapis-azure-light);
+  background-color: rgba(157, 208, 255, 0.08);
+  color: #ffffff;
+  text-decoration: none;
+}
+:root[data-brand-theme="lapis"] .site-footer .footer-link:has(svg) svg {
+  color: var(--lapis-azure-light);
+}
+
+@media (max-width: 640px) {
+  :root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child > p {
+    font-size: 1rem;
+  }
+}
+
+@keyframes lapis-guide {
+  0%, 100% { opacity: 0.72; transform: scale(0.94) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(8deg); }
+}
+
+@layer components {
+  /* The arched window (its radius is set unlayered above, to outrank the rounded utility). */
+  :root[data-brand-theme="lapis"] .home-hero figure > div:first-child {
+    box-shadow:
+      0 0 0 7px var(--lapis-night),
+      0 0 0 8px var(--lapis-gold-ring),
+      0 40px 90px -40px rgba(28, 127, 209, 0.75);
+  }
+
+  @media (min-width: 64rem) {
+    /* The constellation frames the photograph itself (48px each side, 56px above), so it scales with the column
+       and never reaches the copy. Its frame keeps the photo's proportions (7:5 plus margins ≈ 1.365:1). */
+    :root[data-brand-theme="lapis"] .home-hero {
+      isolation: isolate; /* keeps the z-index:-1 sky above the hero's own background */
+    }
+    :root[data-brand-theme="lapis"] .home-hero figure {
+      position: relative;
+    }
+    :root[data-brand-theme="lapis"] .home-hero figure::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      top: -56px;
+      inset-inline: -48px;
+      aspect-ratio: 1.365;
+      pointer-events: none;
+      background: var(--lapis-constellation) no-repeat center / 100% 100%;
+    }
+    /* The guiding star, breathing slowly where the path arrives (frame point 600,32): gold, with a faint coral halo. */
+    :root[data-brand-theme="lapis"] .home-hero figure::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      top: calc(-24px - 32px);
+      inset-inline-start: calc(98.6% - 32px);
+      width: 64px;
+      height: 64px;
+      pointer-events: none;
+      background:
+        var(--lapis-guide-star) no-repeat center / 64px 64px,
+        radial-gradient(circle, rgba(241, 213, 150, 0.4) 0%, rgba(233, 141, 120, 0.16) 42%, rgba(233, 141, 120, 0) 66%);
+      animation: lapis-guide 7s ease-in-out infinite;
+    }
+    :root[data-brand-theme="lapis"][dir="rtl"] .home-hero figure::before {
+      transform: scaleX(-1);
+    }
   }
 }

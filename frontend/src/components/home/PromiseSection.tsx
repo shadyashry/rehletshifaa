@@ -39,7 +39,7 @@ export function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale })
       ];
 
   return (
-    <section className="canvas-clinical py-[clamp(2.5rem,1.9rem+1.8vw,3.75rem)]">
+    <section className="promise-section canvas-clinical py-[clamp(2.5rem,1.9rem+1.8vw,3.75rem)]">
       <div className="container-site grid gap-8 sm:gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-16">
         <div className="lg:sticky lg:top-24 lg:pt-1">
           <p className="eyebrow">{p.eyebrow}</p>
@@ -64,7 +64,7 @@ export function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale })
           })}
         </ol>
 
-        <div className="rounded-[18px] border border-border-clinical bg-surface-default/85 p-5 shadow-[0_24px_48px_-40px_rgba(36,64,74,0.5)] backdrop-blur-sm sm:p-6 lg:col-span-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8 lg:px-8 lg:py-7">
+        <div className="promise-panel rounded-[18px] border border-border-clinical bg-surface-default/85 p-5 shadow-[0_24px_48px_-40px_rgba(36,64,74,0.5)] backdrop-blur-sm sm:p-6 lg:col-span-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8 lg:px-8 lg:py-7">
           <div className="flex items-center gap-4">
             <span aria-hidden className="flex flex-none -space-x-2 rtl:space-x-reverse">
               {profiles.slice(0, SHOWN_MONOGRAMS).map((profile, index) => (
@@ -86,7 +86,7 @@ export function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale })
             <p className="mt-0.5 text-[0.875rem] leading-5 text-ink-600">{panel.body}</p>
           </div>
           <div className="mt-5 flex flex-col gap-4 border-t border-border-subtle pt-5 sm:flex-row sm:items-center sm:justify-between lg:mt-0 lg:border-t-0 lg:pt-0">
-            <dl className="grid grid-cols-3 divide-x divide-border-subtle rtl:divide-x-reverse">
+            <dl className="grid grid-cols-3 divide-x divide-border-subtle">
               {facts.map((fact) => (
                 <div key={fact.label} className="flex flex-col gap-1.5 px-3 first:ps-0 sm:px-5 lg:px-4">
                   <dt className="order-last max-w-[8.5rem] text-[0.8125rem] leading-5 text-ink-500">{fact.label}</dt>

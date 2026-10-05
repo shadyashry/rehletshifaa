@@ -82,7 +82,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
 
   return (
     <>
-      <section className="border-b border-border-subtle bg-surface-pearl bg-[radial-gradient(70%_120%_at_88%_-10%,var(--color-surface-clinical),var(--color-surface-pearl)_72%)]">
+      <section className="page-hero border-b border-border-subtle bg-surface-pearl bg-[radial-gradient(70%_120%_at_88%_-10%,var(--color-surface-clinical),var(--color-surface-pearl)_72%)]">
         <div className="container-site pb-12 pt-8 md:pt-10 lg:pb-14">
           <nav aria-label={ui.back} className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-ink-500">
             <Link href={localeHref(locale, "consultants")} className="rounded px-0.5 hover:text-brand-700">{ui.back}</Link>
@@ -98,12 +98,12 @@ export default async function ConsultantProfilePage({ params }: Props) {
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <span className={`relative inline-block w-fit flex-none rounded-full p-1.5 ${style.well}`}>
                   <ConsultantPortrait profile={profile} size="lg" />
-                  <span className="absolute -bottom-0.5 -end-0.5 grid h-9 w-9 place-items-center rounded-full bg-brand-700 text-white ring-4 ring-surface-pearl" title={profile.careAreaLabel}>
+                  <span className="hero-island absolute -bottom-0.5 -end-0.5 grid h-9 w-9 place-items-center rounded-full bg-brand-700 text-white ring-4 ring-surface-pearl" title={profile.careAreaLabel}>
                     <CareAreaIcon name={meta.icon} size={17} strokeWidth={2} />
                   </span>
                 </span>
                 <div className="min-w-0">
-                  <Link href={localeHref(locale, profile.careAreaHref)} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.8125rem] font-semibold text-brand-800 ring-1 transition-colors hover:text-brand-600 ${style.soft} ${style.ring}`}>
+                  <Link href={localeHref(locale, profile.careAreaHref)} className={`hero-island inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.8125rem] font-semibold text-brand-800 ring-1 transition-colors hover:text-brand-600 ${style.soft} ${style.ring}`}>
                     <CareAreaIcon name={meta.icon} size={14} strokeWidth={1.9} />
                     {profile.careAreaLabel}
                   </Link>
@@ -113,12 +113,12 @@ export default async function ConsultantProfilePage({ params }: Props) {
               </div>
 
               <p className="mt-6 flex flex-wrap gap-1.5">
-                <span title={t.reviewNote} className="inline-flex items-center gap-1.5 rounded-full bg-surface-default px-3 py-1 text-[0.8125rem] font-semibold text-brand-800 ring-1 ring-border-clinical">
+                <span title={t.reviewNote} className="hero-island inline-flex items-center gap-1.5 rounded-full bg-surface-default px-3 py-1 text-[0.8125rem] font-semibold text-brand-800 ring-1 ring-border-clinical">
                   <FileText size={14} aria-hidden="true" className="text-brand-600" />
                   {t.verified}
                 </span>
                 {profile.achievementBadges.map((badge) => (
-                  <span key={badge} className="inline-flex items-center gap-1.5 rounded-full bg-surface-default px-3 py-1 text-[0.8125rem] font-semibold text-brand-800 ring-1 ring-border-card">
+                  <span key={badge} className="hero-island inline-flex items-center gap-1.5 rounded-full bg-surface-default px-3 py-1 text-[0.8125rem] font-semibold text-brand-800 ring-1 ring-border-card">
                     <Award size={14} aria-hidden="true" className="text-brand-600" />
                     <bdi>{badge}</bdi>
                   </span>
@@ -140,7 +140,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
               </div>
             </div>
 
-            <aside className="overflow-hidden rounded-[20px] border border-border-card bg-surface-default shadow-[0_30px_60px_-44px_rgba(36,64,74,0.6)]">
+            <aside className="hero-island overflow-hidden rounded-[20px] border border-border-card bg-surface-default shadow-[0_30px_60px_-44px_rgba(36,64,74,0.6)]">
               {/* The specialty banner: the body system's own motif, tint and icon — each Consultant's page reads as their specialty. */}
               <div className={`relative isolate flex h-28 items-end overflow-hidden px-5 pb-4 sm:px-6 ${style.soft}`}>
                 <SpecialtyMotif system={meta.system} className="absolute -end-10 -top-12 -z-10 h-56 w-[26rem] opacity-60 rtl:-scale-x-100" />

@@ -5,11 +5,11 @@ type LogoVariant = "color" | "reversed" | "mono";
 type LogoProps = {
   /** Latin wordmark, supplied by the dictionary so it stays translatable. */
   label: string;
-  /** Trailing portion of `label` rendered in Fresh Aqua, matching the brand handoff (e.g. "Shifaa" in "RehletShifaa"). */
+  /** Trailing portion of `label` rendered in the brand accent (e.g. "Shifaa" in "RehletShifaa"). */
   accent?: string;
   /** Arabic wordmark. When present it is shown beneath the Latin wordmark. */
   arabicLabel?: string;
-  /** Trailing portion of `arabicLabel` rendered in Fresh Aqua (e.g. "شفاء" in "رحلة شفاء"). */
+  /** Trailing portion of `arabicLabel` rendered in the brand accent (e.g. "شفاء" in "رحلة شفاء"). */
   arabicAccent?: string;
   variant?: LogoVariant;
   /** Icon edge length in px. The wordmark scales from the same base. */
@@ -24,6 +24,10 @@ type LogoProps = {
  * asset, and the "reversed" (white, for dark surfaces) and "mono" (single
  * ink) variants are produced from it with CSS filters rather than shipping
  * separate exports.
+ *
+ * A brand theme may instead colour the three parts of the mark separately (heart, hand, head): the colour variant
+ * also renders `.logo-mark-parts`, three vector masks traced from the same mark (`/brand/mark-*.svg`; full-colour master: `mark-lapis.svg`), hidden
+ * unless a theme switches them on and sets `--logo-part-body/-hand/-head`.
  */
 export function GuidedArc({
   variant = "color",
@@ -42,20 +46,32 @@ export function GuidedArc({
         ? "brightness(0) saturate(0)"
         : "var(--logo-icon-filter, none)"; // a brand theme may re-tint the colour mark
 
-  return (
+  const image = (
     <Image
       src="/brand/icon.png"
       alt={title ?? ""}
       width={size}
       height={size}
-      className="shrink-0"
+      className="logo-mark-img shrink-0"
       style={{ width: size, height: size, filter }}
       priority
     />
   );
+  if (variant !== "color") return image;
+
+  return (
+    <span className="logo-mark" style={{ width: size, height: size }}>
+      {image}
+      <span aria-hidden className="logo-mark-parts">
+        <span className="logo-mark-body" />
+        <span className="logo-mark-hand" />
+        <span className="logo-mark-head" />
+      </span>
+    </span>
+  );
 }
 
-/** Splits a wordmark into its ink-colored lead and its Fresh-Aqua accent. */
+/** Splits a wordmark into its ink-colored lead and its accent. */
 function splitWordmark(label: string, accent?: string): [string, string] {
   if (accent && label.endsWith(accent)) {
     return [label.slice(0, label.length - accent.length), accent];
@@ -63,7 +79,27 @@ function splitWordmark(label: string, accent?: string): [string, string] {
   return [label, ""];
 }
 
-/** Icon + Latin wordmark lockup, with the Arabic wordmark stacked beneath it. */
+/**
+ * The signature detail: the tittle of the first "i" becomes a small round dot in the theme's dot colour, rhyming with
+ * the head of the figure in the mark. Drawn as a dotless ı plus a CSS dot (`.logo-i` in globals.css); the wordmark is
+ * hidden from assistive technology and the plain label is exposed instead.
+ */
+function withSignatureDot(text: string) {
+  const at = text.indexOf("i");
+  if (at < 0) return text;
+  return (
+    <>
+      {text.slice(0, at)}
+      <span className="logo-i">ı</span>
+      {text.slice(at + 1)}
+    </>
+  );
+}
+
+/**
+ * Icon + wordmark lockup. The wordmark is set in Alexandria, one Egyptian-designed family for both scripts, so the
+ * Latin and Arabic names carry equal weight: the lead in medium, the accent ("Shifaa" / "شفاء") in bold and colour.
+ */
 export function Logo({
   label,
   accent,
@@ -74,13 +110,11 @@ export function Logo({
   className = "",
 }: LogoProps) {
   const inkColor = variant === "reversed" ? "#ffffff" : "var(--logo-ink, #29454d)";
-  // Fresh Aqua accent only reads on the light "color" variant; reversed/mono
-  // stay a single flat color so the mark still holds up on a saturated or
-  // single-ink surface.
-  const accentColor = variant === "color" ? "var(--logo-accent, #65bdb5)" : inkColor;
+  // The accent reads on the light "color" variant; reversed uses a light tint and mono stays one flat ink.
+  const accentColor = variant === "color" ? "var(--logo-accent, #247c86)" : variant === "reversed" ? "#a9ddd6" : inkColor;
+  const dotColor = variant === "color" ? "var(--logo-dot, #e98d78)" : variant === "reversed" ? "#f3b3a3" : inkColor;
   const wordmarkSize = `${size * 0.62}px`;
-  const arabicSize = `${size * 0.42}px`;
-  const arabicAccentColor = variant === "color" ? "var(--logo-accent, #65bdb5)" : variant === "reversed" ? "#a9ddd6" : inkColor;
+  const arabicSize = `${size * 0.44}px`;
 
   const [latinLead, latinAccent] = splitWordmark(label, accent);
   const [arabicLead, arabicAccentText] = arabicLabel ? splitWordmark(arabicLabel, arabicAccent) : ["", ""];
@@ -89,19 +123,15 @@ export function Logo({
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
       <GuidedArc variant={variant} size={size} />
       <span className="inline-flex flex-col leading-none">
-        <span className="font-brand" style={{ fontSize: wordmarkSize, color: inkColor }}>
+        <span className="sr-only">{arabicLabel ? `${label} — ${arabicLabel}` : label}</span>
+        <span aria-hidden className="logo-wordmark" style={{ fontSize: wordmarkSize, color: inkColor, ["--logo-i-dot" as string]: dotColor }}>
           {latinLead}
-          {latinAccent ? <span style={{ color: accentColor }}>{latinAccent}</span> : null}
+          {latinAccent ? <span className="logo-wordmark-accent" style={{ color: accentColor }}>{withSignatureDot(latinAccent)}</span> : null}
         </span>
         {arabicLabel ? (
-          <span
-            lang="ar"
-            dir="rtl"
-            className="mt-1 font-semibold leading-none"
-            style={{ fontSize: arabicSize, color: inkColor, fontFamily: "var(--font-arabic), sans-serif" }}
-          >
+          <span aria-hidden lang="ar" dir="rtl" className="logo-wordmark-ar mt-1" style={{ fontSize: arabicSize, color: inkColor }}>
             {arabicLead}
-            {arabicAccentText ? <span style={{ color: arabicAccentColor }}>{arabicAccentText}</span> : null}
+            {arabicAccentText ? <span className="logo-wordmark-accent" style={{ color: accentColor }}>{arabicAccentText}</span> : null}
           </span>
         ) : null}
       </span>

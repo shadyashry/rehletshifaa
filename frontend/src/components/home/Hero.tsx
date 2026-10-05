@@ -32,8 +32,9 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
     <section className="home-hero bg-surface-pearl">
       <div className="container-site grid gap-8 py-8 sm:gap-9 sm:py-10 lg:grid-cols-[minmax(0,53fr)_minmax(0,47fr)] lg:items-center lg:gap-16 lg:py-16">
         <div className="max-w-[34rem]">
-          <p className="flex items-center gap-2 text-[0.9375rem] font-semibold leading-6 text-brand-700">
-            <span aria-hidden className="h-1.5 w-1.5 flex-none rounded-full bg-brand-400" />
+          <p className="flex items-start gap-2 text-[0.9375rem] font-semibold leading-6 text-brand-700">
+            {/* Aligned to the first line, so a label that wraps on a phone keeps its dot at the start of the text. */}
+            <span aria-hidden className="mt-[0.5625rem] h-1.5 w-1.5 flex-none rounded-full bg-brand-400" />
             {d.home.eyebrow}
           </p>
           <h1 className="display mt-2.5 [text-wrap:balance] sm:mt-3">{d.home.title}</h1>
