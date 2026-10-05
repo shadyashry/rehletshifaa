@@ -539,8 +539,19 @@
   gap: 0;
   margin-bottom: 2.25rem;
   padding-block: 1.75rem 2rem;
-  /* full-bleed day canvas behind the row, edge to edge */
-  border-image: linear-gradient(#f8f5ee 0 0) fill 0 / / 0 100vmax;
+  /* One footer in two tones: the band is a pale lapis — the daylight of the footer's night — rather than the page's
+     ivory, so it reads as the top of the footer, not as more page. Full-bleed, edge to edge. */
+  border-image: linear-gradient(#e9eef7 0 0) fill 0 / / 0 100vmax;
+}
+/* Where the page ends and the footer begins: one fine full-width edge. */
+:root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child::before {
+  content: "";
+  position: absolute;
+  left: -100vmax;
+  right: -100vmax;
+  top: 0;
+  height: 1px;
+  background: #d3dcec;
 }
 /* A single gold thread where the day band meets the night. */
 :root[data-brand-theme="lapis"] .site-footer > .container-site > :first-child::after {
