@@ -16,7 +16,7 @@ export type ConsultantProfile = {
   summary: string;
   /** The listing card's evidence line (≈20–30 words); the full summary lives on the profile page. */
   cardSummary: string;
-  /** The expertise map: one central clinical anchor and its verified related areas (from focusAreas / summary), in map order: top, start, end, bottom. Qualitative only. */
+  /** One clinical anchor and its verified related areas (from focusAreas / summary); short labels are shown as tags above the profile's focus list. Qualitative only. */
   expertise: { anchor: string; areas: readonly string[] };
   /** A verified professional distinction (appointment or role) from appointments/qualifications — shown only when it adds value. */
   distinction?: string;
