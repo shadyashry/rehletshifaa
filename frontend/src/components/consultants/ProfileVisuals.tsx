@@ -8,14 +8,14 @@ import type { CareAreaIconName, CareSystem } from "@/lib/care-area-catalog";
  * system's tint and a faint motif. Sized by its own column (container query), so it fits the profile's CV column;
  * narrow columns stack the hub over the list. Qualitative only: scope, never rank or volume.
  */
-export function FocusMap({ anchor, areas, icon, system, bare = false }: { anchor: string; areas: readonly string[]; icon: CareAreaIconName; system: CareSystem; bare?: boolean }) {
+export function FocusMap({ anchor, areas, icon, system }: { anchor: string; areas: readonly string[]; icon: CareAreaIconName; system: CareSystem }) {
   const style = SYSTEM_STYLES[system];
   const half = Math.ceil(areas.length / 2);
   const item = "relative flex gap-3 rounded-[14px] bg-surface-default/95 px-4 py-3.5 text-[0.9375rem] font-medium leading-6 text-brand-900 shadow-[0_14px_30px_-24px_rgba(36,64,74,0.55)] ring-1 ring-border-card @2xl:after:absolute @2xl:after:top-1/2 @2xl:after:h-px @2xl:after:w-6 @2xl:after:bg-brand-300";
   const dot = <span aria-hidden className={`mt-2 h-2 w-2 flex-none rounded-full ${style.dot}`} />;
 
   return (
-    <div className={`@container relative isolate overflow-hidden px-4 py-7 sm:px-6 ${style.soft} ${bare ? "" : `rounded-[20px] ring-1 ${style.ring}`}`}>
+    <div className={`@container relative isolate overflow-hidden rounded-[20px] px-4 py-7 ring-1 sm:px-6 ${style.soft} ${style.ring}`}>
       <SpecialtyMotif system={system} className="absolute inset-0 -z-10 h-full w-full opacity-20 rtl:-scale-x-100" />
       <div className="grid gap-3 @2xl:grid-cols-[minmax(0,1fr)_10.5rem_minmax(0,1fr)] @2xl:items-center @2xl:gap-6">
         <div className="mb-2 flex flex-col items-center text-center @2xl:col-start-2 @2xl:row-start-1 @2xl:mb-0">
@@ -41,8 +41,7 @@ export function FocusMap({ anchor, areas, icon, system, bare = false }: { anchor
 
 /**
  * Up to three figures from the record, set large in a white card between hairlines: the value on top, its label
- * beneath, centred, so a wrapping label never pushes its number out of line. Used by Consultant profiles and
- * care-area pages alike.
+ * beneath, centred, so a wrapping label never pushes its number out of line.
  */
 export function FiguresCard({ stats, className = "" }: { stats: readonly { value: string | number; label: string }[]; className?: string }) {
   return (
