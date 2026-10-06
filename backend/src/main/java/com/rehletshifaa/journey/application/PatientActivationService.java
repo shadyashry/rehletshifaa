@@ -1,10 +1,18 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.casemanagement.domain.ConsentRecord;
+import com.rehletshifaa.casemanagement.infrastructure.CaseSubmissionContactRepository;
+import com.rehletshifaa.casemanagement.infrastructure.ConsentRecordRepository;
+import com.rehletshifaa.directory.domain.PatientProfile;
+import com.rehletshifaa.directory.infrastructure.PatientProfileRepository;
 import com.rehletshifaa.journey.api.ActivationDtos.*;
+import com.rehletshifaa.journey.infrastructure.PatientOnboardingRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.api.FieldValidationException;
+import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.util.Countries;
 import com.rehletshifaa.shared.util.PatientNames;
+
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +24,7 @@ import java.time.*;
 import java.util.*;
 import java.util.regex.Pattern;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * "Complete your profile" — the continuation of Send My Case, never a second registration.
@@ -33,6 +41,11 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class PatientActivationService {
+    private final PatientOnboardingRepository onboardings;
+    private final ConsentRecordRepository consentRecords;
+    private final CaseSubmissionContactRepository contacts;
+    private final PatientProfileRepository patients;
+    private final AuditTrail auditTrail;
     private static final Pattern E164 = Pattern.compile("^\\+[1-9]\\d{6,14}$");
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[A-Za-z]{2,}$");
     private static final Set<String> SEXES = Set.of("MALE", "FEMALE", "OTHER", "UNDISCLOSED");
@@ -52,7 +65,7 @@ public class PatientActivationService {
     public PatientActivationService(JdbcClient jdbc, PublicCaseAccessService access, PaymentService payment,
                                     CustomerReadinessService readiness, CaseHandoffService handoff,
                                     PatientAccountService account,
-                                    CaseActionService caseActions, Clock clock) {
+                                    CaseActionService caseActions, Clock clock, AuditTrail auditTrail, PatientProfileRepository patients, CaseSubmissionContactRepository contacts, ConsentRecordRepository consentRecords, PatientOnboardingRepository onboardings) { this.onboardings = onboardings; this.consentRecords = consentRecords; this.contacts = contacts; this.patients = patients; this.auditTrail = auditTrail;
         this.jdbc = jdbc; this.access = access; this.payment = payment; this.readiness = readiness;
         this.handoff = handoff; this.account = account; this.caseActions = caseActions; this.clock = clock;
     }
@@ -128,17 +141,14 @@ public class PatientActivationService {
         // A number that is another active account's VERIFIED personal mobile is never silently re-verified for
         // a different patient: it stays an unverified contact here until resolved through a controlled path.
         boolean phoneClaimedElsewhere = clean.phone() != null && verifiedElsewhere(patientId, clean.phone());
-        jdbc.sql("UPDATE patient_profiles SET given_name=?,family_name=?,preferred_name=?,email=?,whatsapp_number=?,mobile_owner=?,country=?,nationality=?,date_of_birth=?,sex=?,preferred_language=?,"
-                        + "email_verified_at=CASE WHEN ? THEN NULL ELSE email_verified_at END,"
-                        + "phone_verified_at=CASE WHEN ? THEN NULL ELSE phone_verified_at END,"
-                        + "profile_status='ACTIVE',profile_completed_at=COALESCE(profile_completed_at,?),activated_at=COALESCE(activated_at,?),updated_at=?,version=version+1 WHERE id=? AND profile_status<>'ACTIVE'")
-                .params(clean.givenName(), clean.familyName(), clean.preferredName(), clean.email(), clean.phone(), clean.phone() == null ? null : "PATIENT", clean.countryName(), clean.nationality(),
-                        clean.dateOfBirth(), clean.sex(), clean.language(), emailChanged, phoneChanged || phoneClaimedElsewhere,
-                        timestamp(now), timestamp(now), timestamp(now), patientId)
-                .update();
+        PatientProfile profile = patients.lockById(patientId).orElseThrow();
+        if (profile.complete(new PatientProfile.Completion(clean.givenName(), clean.familyName(), clean.preferredName(), clean.email(), clean.phone(),
+                        clean.countryName(), clean.nationality(), clean.dateOfBirth(), clean.sex(), clean.language()),
+                emailChanged, phoneChanged || phoneClaimedElsewhere, now))
+            patients.saveAndFlush(profile);
         // The intake number belonged to the person who submitted the case: keep it there, never on the patient.
         if ("REPRESENTATIVE".equals(clean.mobileOwner()) && sub != null && "PATIENT".equals(sub.role()))
-            jdbc.sql("UPDATE case_submission_contacts SET contact_role='REPRESENTATIVE',contact_name=NULL WHERE case_id=? AND whatsapp_number IS NOT NULL AND whatsapp_number<>COALESCE(?, '')").params(caseId, clean.phone()).update();
+            contacts.markOtherNumberAsRepresentative(caseId, clean.phone());
 
         recordConsents(patientId, caseId, clean.consents(), clean.language(), now);
         completeOnboarding(onboarding, now);
@@ -239,12 +249,7 @@ public class PatientActivationService {
     private void recordConsents(UUID patientId, UUID caseId, List<String> consents, String language, Instant now) {
         for (String type : consents) {
             // Idempotent: a replay (or a consent already on file) inserts nothing.
-            jdbc.sql("INSERT INTO consent_records(id,patient_id,case_id,consent_type,policy_version,language,exact_text,purpose,scope,channel,captured_by,effective_from,created_at) "
-                            + "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM consent_records WHERE patient_id=? AND consent_type=? AND revoked_at IS NULL AND (case_id IS NULL OR case_id=?))")
-                    .params(UUID.randomUUID(), patientId, caseId, type, consentPolicyVersion(type), language, consentText(type, language),
-                            "Care coordination onboarding", "Care coordination onboarding", "ONBOARDING_LINK", "SECURE_LINK",
-                            timestamp(now), timestamp(now), patientId, type, caseId)
-                    .update();
+            if (!consentRecords.isGiven(patientId, type, caseId)) consentRecords.saveAndFlush(new ConsentRecord(UUID.randomUUID(), patientId, caseId, new ConsentRecord.Terms(type, consentPolicyVersion(type), language, consentText(type, language), "Care coordination onboarding", "Care coordination onboarding"), "ONBOARDING_LINK", "SECURE_LINK", now));
         }
     }
 
@@ -262,8 +267,7 @@ public class PatientActivationService {
     /** Complete only the current onboarding created by estimate acknowledgement. */
     private void completeOnboarding(OnboardingState onboarding, Instant now) {
         if ("COMPLETED".equals(onboarding.state())) return;
-        jdbc.sql("UPDATE patient_onboardings SET state='COMPLETED',submitted_at=COALESCE(submitted_at,?),completed_at=COALESCE(completed_at,?),updated_at=?,version=version+1 WHERE id=?")
-                .params(timestamp(now), timestamp(now), timestamp(now), onboarding.id()).update();
+        onboardings.completeOnActivation(onboarding.id(), micros(now));
     }
 
     // ---- views ----
@@ -382,9 +386,7 @@ public class PatientActivationService {
         return c != null && c > 0;
     }
     private void audit(UUID caseId, String type, UUID entityId, String reason) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, "SECURE_LINK", "PATIENT", caseId, "PatientProfile", entityId.toString(),
-                        "ACTIVATE", "SUCCESS", reason, timestamp(clock.instant())).update();
+        auditTrail.event(type).actor("SECURE_LINK", "PATIENT").caseId(caseId).entity("PatientProfile", entityId).action("ACTIVATE").reason(reason).record();
     }
 
     // ---- normalization ----

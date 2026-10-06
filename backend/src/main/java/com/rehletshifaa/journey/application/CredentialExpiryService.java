@@ -1,6 +1,11 @@
 package com.rehletshifaa.journey.application;
 
-import org.springframework.jdbc.core.simple.JdbcClient;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
+
+import com.rehletshifaa.directory.infrastructure.PractitionerCredentialRepository;
+import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
+import com.rehletshifaa.notification.application.NotificationOutbox;
+import com.rehletshifaa.shared.audit.AuditTrail;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,7 +17,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
 /**
  * Consultant credential lifecycle in time: a verified credential expires at its expiry instant, a Consultant with no
@@ -20,14 +24,16 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class CredentialExpiryService {
-    private final JdbcClient jdbc;
+    private final PractitionerCredentialRepository credentials;
+    private final PractitionerProfileRepository practitioners;
+    private final NotificationOutbox notificationOutbox;
+    private final AuditTrail auditTrail;
     private final Clock clock;
     private final com.rehletshifaa.shared.crypto.CryptoService crypto;
     private final List<Integer> reminderDays;
 
-    public CredentialExpiryService(JdbcClient jdbc, Clock clock, com.rehletshifaa.shared.crypto.CryptoService crypto,
-            @Value("${app.credentials.reminder-days:30,7,1}") List<Integer> reminderDays) {
-        this.jdbc = jdbc;
+    public CredentialExpiryService(Clock clock, com.rehletshifaa.shared.crypto.CryptoService crypto,
+            @Value("${app.credentials.reminder-days:30,7,1}") List<Integer> reminderDays, AuditTrail auditTrail, NotificationOutbox notificationOutbox, PractitionerProfileRepository practitioners, PractitionerCredentialRepository credentials) { this.credentials = credentials; this.practitioners = practitioners; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
         this.clock = clock;
         this.crypto = crypto;
         this.reminderDays = reminderDays.stream().filter(days->days>0).distinct().sorted(java.util.Comparator.reverseOrder()).toList();
@@ -37,17 +43,13 @@ public class CredentialExpiryService {
     @Transactional
     public void expireCredentials() {
         Instant now = clock.instant();
-        jdbc.sql("UPDATE practitioner_credentials SET status='EXPIRED' WHERE status='VERIFIED' AND expires_at IS NOT NULL AND expires_at<=?")
-            .param(timestamp(now)).update();
+        credentials.expireLapsed(micros(now));
 
-        List<UUID> profiles = jdbc.sql("SELECT p.id FROM practitioner_profiles p WHERE p.credentialing_status='VERIFIED' AND NOT EXISTS (SELECT 1 FROM practitioner_credentials pc WHERE pc.practitioner_id=p.id AND pc.status='VERIFIED' AND (pc.expires_at IS NULL OR pc.expires_at>?))")
-            .param(timestamp(now)).query(UUID.class).list();
+        List<UUID> profiles = practitioners.findVerifiedWithoutCurrentCredential(micros(now));
         for (UUID practitionerId : profiles) {
-            int changed = jdbc.sql("UPDATE practitioner_profiles SET credentialing_status='EXPIRED',availability_status='UNAVAILABLE',updated_at=?,version=version+1 WHERE id=? AND credentialing_status='VERIFIED'")
-                .params(timestamp(now), practitionerId).update();
+            int changed = practitioners.expireCredentialing(practitionerId, micros(now));
             if (changed == 1) {
-                jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,entity_type,entity_id,action,outcome,occurred_at) VALUES(?,?,?,?,?,?,?,?,?)")
-                    .params(UUID.randomUUID(),"PRACTITIONER_CREDENTIALS_EXPIRED","SYSTEM","SYSTEM","Practitioner",practitionerId.toString(),"EXPIRE","SUCCESS",timestamp(now)).update();
+                auditTrail.event("PRACTITIONER_CREDENTIALS_EXPIRED").actor("SYSTEM", "SYSTEM").entity("Practitioner", practitionerId).action("EXPIRE").at(now).record();
             }
         }
         for (int days : reminderDays) enqueueReminders(now, days);
@@ -55,12 +57,11 @@ public class CredentialExpiryService {
 
     private void enqueueReminders(Instant now, int days) {
         Instant boundary = now.plus(Duration.ofDays(days));
-        var due = jdbc.sql("SELECT c.id,c.expires_at,p.email_encrypted FROM practitioner_credentials c JOIN practitioner_profiles p ON p.id=c.practitioner_id WHERE c.status='VERIFIED' AND c.expires_at>? AND c.expires_at<=? AND p.email_encrypted IS NOT NULL")
-                .params(timestamp(now), timestamp(boundary)).query((r, n) -> new Reminder(r.getObject(1, UUID.class), r.getTimestamp(2).toInstant(), r.getString(3))).list();
+        var due = credentials.findExpiringWithEmail(micros(now), micros(boundary)).stream()
+                .map(c -> new Reminder(c.getCredentialId(), c.getExpiresAt(), c.getEmailEncrypted())).toList();
         for (var value : due) {
             String key = "credential-expiry-reminder:" + value.credentialId() + ":" + value.expiresAt() + ":" + days;
-            jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) SELECT ?,'CONSULTANT_CREDENTIAL','EMAIL',?,'consultant-credential-expiry',?,'PENDING',0,5,?,?,? WHERE NOT EXISTS(SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
-                    .params(UUID.randomUUID(), crypto.decrypt(value.encryptedEmail()), "enc:" + crypto.encrypt("{\"days\":\"" + days + "\"}"), timestamp(now), key, timestamp(now), key).update();
+            notificationOutbox.enqueueOnce("CONSULTANT_CREDENTIAL", "EMAIL", crypto.decrypt(value.encryptedEmail()), "consultant-credential-expiry", "enc:" + crypto.encrypt("{\"days\":\"" + days + "\"}"), key, now);
         }
     }
 

@@ -1,7 +1,14 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.casemanagement.application.CaseStatusLog;
 import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
+import com.rehletshifaa.casemanagement.domain.CaseStatus;
+import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
+import com.rehletshifaa.notification.application.NotificationOutbox;
+import com.rehletshifaa.shared.audit.AuditTrail;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -12,7 +19,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * Hands an accepted, deposit-paid case back to its coordinator so the existing treatment journey continues,
@@ -26,6 +33,11 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class CaseHandoffService {
+    private final CaseStatusLog statusLog;
+    private final CaseAssignmentRepository assignments;
+    private final MedicalCaseRepository cases;
+    private final NotificationOutbox notificationOutbox;
+    private final AuditTrail auditTrail;
     /** Staff work for arranging the offline coordination deposit with the patient. */
     private static final String DEPOSIT_WORK = "DEPOSIT_ARRANGEMENT";
 
@@ -37,7 +49,7 @@ public class CaseHandoffService {
     private final String coordinatorEmail;
 
     public CaseHandoffService(JdbcClient jdbc, IntakeLifecycleService intake, StaffWorkService work, CaseTransitionPolicy policy, Clock clock,
-                              @Value("${app.mail.coordinator}") String coordinatorEmail) {
+                              @Value("${app.mail.coordinator}") String coordinatorEmail, AuditTrail auditTrail, NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseStatusLog statusLog) { this.statusLog = statusLog; this.assignments = assignments; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
         this.jdbc = jdbc; this.intake = intake; this.work = work; this.policy = policy; this.clock = clock; this.coordinatorEmail = coordinatorEmail;
     }
 
@@ -136,12 +148,10 @@ public class CaseHandoffService {
      */
     private boolean advanceToCoordination(UUID caseId, String status, Instant now) {
         if (!"ACCEPTED".equals(status) || !policy.mayEnter(caseId, "ACCEPTED", "TRAVEL_COORDINATION")) return false;
-        int changed = jdbc.sql("UPDATE medical_cases SET status='TRAVEL_COORDINATION',updated_at=?,version=version+1 WHERE id=? AND status='ACCEPTED'")
-                .params(timestamp(now), caseId).update();
+        int changed = cases.moveStatus(caseId, CaseStatus.ACCEPTED, CaseStatus.TRAVEL_COORDINATION, micros(now));
         if (changed != 1) return false;
-        jdbc.sql("INSERT INTO case_status_history(id,case_id,from_status,to_status,actor_subject,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), caseId, "ACCEPTED", "TRAVEL_COORDINATION", "SYSTEM", "SYSTEM",
-                        "Coordination deposit settled and patient ready", timestamp(now)).update();
+        statusLog.record(caseId, "ACCEPTED", "TRAVEL_COORDINATION", "SYSTEM", "SYSTEM",
+                        "Coordination deposit settled and patient ready", now);
         audit(caseId, "CASE_STATUS_CHANGED", "ACCEPTED -> TRAVEL_COORDINATION: deposit settled and patient ready");
         return true;
     }
@@ -166,8 +176,7 @@ public class CaseHandoffService {
                 .param(caseId).query((rs, n) -> new Prior(rs.getObject("id", UUID.class), rs.getString("assignee_subject"))).optional().orElse(null);
         if (prior == null) return null; // no coordinator has ever owned it — the ownership queue still applies
 
-        int revived = jdbc.sql("UPDATE case_assignments SET status='ACTIVE',ended_at=NULL,accepted_at=COALESCE(accepted_at,?),version=version+1 WHERE id=? AND status<>'ACTIVE'")
-                .params(timestamp(now), prior.id()).update();
+        int revived = assignments.reinstate(prior.id(), micros(now));
         if (revived == 1) audit(caseId, "CASE_COORDINATOR_RESTORED", "Original coordinator reactivated after deposit");
         return prior.subject();
     }
@@ -179,12 +188,8 @@ public class CaseHandoffService {
      */
     private void notifyTeamMailbox(UUID caseId, String template, String key, Instant now) {
         String caseNumber = jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse("");
-        jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) "
-                        + "SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
-                .params(UUID.randomUUID(), "TEAM_WORK", "EMAIL", coordinatorEmail, template,
-                        intake.encryptedJson("{\"case\":\"" + caseNumber.replace("\"", "") + "\"}"),
-                        "PENDING", 0, 5, timestamp(now), key, timestamp(now), key)
-                .update();
+        notificationOutbox.enqueueOnce("TEAM_WORK", "EMAIL", coordinatorEmail, template,
+                intake.encryptedJson("{\"case\":\"" + caseNumber.replace("\"", "") + "\"}"), key, now);
     }
 
     private void notifyPatient(UUID caseId, Instant now) {
@@ -198,17 +203,11 @@ public class CaseHandoffService {
         if (destination == null || destination.isBlank()) return;
         String key = "deposit-settled-patient:" + caseId;
         String lang = "ar".equals(c.language()) ? "ar" : "en";
-        jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) "
-                        + "SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
-                .params(UUID.randomUUID(), "DEPOSIT_SETTLED", whatsapp ? "WHATSAPP" : "EMAIL", destination,
-                        "deposit-settled-patient", intake.encryptedJson("{\"lang\":\"" + lang + "\"}"),
-                        "PENDING", 0, 5, timestamp(now), key, timestamp(now), key)
-                .update();
+        notificationOutbox.enqueueOnce("DEPOSIT_SETTLED", whatsapp ? "WHATSAPP" : "EMAIL", destination,
+                "deposit-settled-patient", intake.encryptedJson("{\"lang\":\"" + lang + "\"}"), key, now);
     }
 
     private void audit(UUID caseId, String type, String reason) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, "SYSTEM", "SYSTEM", caseId, "MedicalCase", caseId.toString(),
-                        "HANDOFF", "SUCCESS", reason, timestamp(clock.instant())).update();
+        auditTrail.event(type).actor("SYSTEM", "SYSTEM").caseId(caseId).entity("MedicalCase", caseId).action("HANDOFF").reason(reason).record();
     }
 }

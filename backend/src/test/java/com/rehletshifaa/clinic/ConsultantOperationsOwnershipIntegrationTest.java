@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
         "spring.datasource.url=jdbc:h2:mem:consultant-operations-ownership;MODE=LEGACY;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"})
 class ConsultantOperationsOwnershipIntegrationTest {
     @Autowired ConsultantOperationsOwnershipService ownership;
+    @Autowired com.rehletshifaa.journey.application.ConsultantOnboardingService onboarding;
     @Autowired ConsultantCapabilityService capabilities;
     @Autowired JourneyService journeys;
     @Autowired JdbcTemplate jdbc;
@@ -75,12 +76,12 @@ class ConsultantOperationsOwnershipIntegrationTest {
                 .containsExactly("operations-owner-b", "operations-owner-a");
 
         signIn("operations-owner-a", Role.CONSULTANT_OPERATIONS_MANAGER, Role.CREDENTIAL_VERIFIER);
-        assertCode("INDEPENDENT_REVIEW_REQUIRED", () -> journeys.verifyPractitioner(consultant, true, "Reviewed"));
+        assertCode("INDEPENDENT_REVIEW_REQUIRED", () -> onboarding.verifyPractitioner(consultant, true, "Reviewed"));
         signIn("operations-owner-b", Role.CONSULTANT_OPERATIONS_MANAGER, Role.CREDENTIAL_VERIFIER);
-        assertCode("INDEPENDENT_REVIEW_REQUIRED", () -> journeys.verifyPractitioner(consultant, true, "Reviewed"));
+        assertCode("INDEPENDENT_REVIEW_REQUIRED", () -> onboarding.verifyPractitioner(consultant, true, "Reviewed"));
 
         signIn("independent-reviewer", Role.CREDENTIAL_VERIFIER);
-        assertThat(journeys.verifyPractitioner(consultant, true, "Independent review").status()).isEqualTo("VERIFIED");
+        assertThat(onboarding.verifyPractitioner(consultant, true, "Independent review").status()).isEqualTo("VERIFIED");
     }
 
     @Test

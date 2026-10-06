@@ -68,7 +68,11 @@ public class V72__retire_legacy_runtime_contracts extends BaseJavaMigration {
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
                     String clause = result.getString("check_clause");
-                    if (clause != null && clause.toLowerCase(java.util.Locale.ROOT).contains("decision"))
+                    if (clause == null) continue;
+                    String normalized = clause.toLowerCase(java.util.Locale.ROOT).replaceAll("[()\\s]", "");
+                    // PostgreSQL (up to 17) also lists the column's NOT NULL constraint here as "decision IS NOT NULL";
+                    // that one stays, only the two business checks on the value are replaced.
+                    if (normalized.contains("decision") && !normalized.equals("decisionisnotnull"))
                         names.add(result.getString("constraint_name"));
                 }
             }

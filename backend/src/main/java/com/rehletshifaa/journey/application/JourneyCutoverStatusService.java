@@ -1,18 +1,15 @@
 package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
-import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.journey.api.JourneyDtos.CareCategoryView;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionStore;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingStore;
+import com.rehletshifaa.journey.infrastructure.JourneyDefinitionStore;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
+
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,25 +39,23 @@ public class JourneyCutoverStatusService {
     public record BindingView(UUID journeyDefinitionId, UUID journeyVersionId, Integer versionNumber, String admissionMode,
                               Instant boundAt, boolean runtimeStarted, Instant startedAt, String deploymentReadiness) {}
     public record CaseView(UUID caseId, String authority, AdmissionView admission, BindingView binding,
-                           JourneyCaseAdmissionRepository.Failure latestFailure) {}
+                           JourneyCaseAdmissionStore.Failure latestFailure) {}
 
     private final JourneyAdmissionPolicyService policies;
     private final JourneyDeploymentService readiness;
-    private final JourneyCaseAdmissionRepository admissions;
-    private final JourneyCaseBindingRepository bindings;
-    private final JourneyDefinitionRepository definitions;
+    private final JourneyCaseAdmissionStore admissions;
+    private final JourneyCaseBindingStore bindings;
+    private final JourneyDefinitionStore definitions;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final CareCategoryCatalog categories;
     private final Authority authorization;
     private final GovernanceAuditLog audit;
-    private final JdbcClient jdbc;
 
-    public JourneyCutoverStatusService(JourneyAdmissionPolicyService policies, JourneyDeploymentService readiness, JourneyCaseAdmissionRepository admissions,
-            JourneyCaseBindingRepository bindings, JourneyDefinitionRepository definitions, ObjectProvider<JourneyRuntimePort> runtimes,
-            CareCategoryCatalog categories, Authority authorization, GovernanceAuditLog audit, JdbcClient jdbc) {
+    public JourneyCutoverStatusService(JourneyAdmissionPolicyService policies, JourneyDeploymentService readiness, JourneyCaseAdmissionStore admissions,
+            JourneyCaseBindingStore bindings, JourneyDefinitionStore definitions, ObjectProvider<JourneyRuntimePort> runtimes,
+            CareCategoryCatalog categories, Authority authorization, GovernanceAuditLog audit) {
         this.policies = policies; this.readiness = readiness; this.admissions = admissions; this.bindings = bindings; this.definitions = definitions;
-        this.runtimes = runtimes; this.categories = categories; this.authorization = authorization; this.audit = audit; this.jdbc = jdbc;
-    }
+        this.runtimes = runtimes; this.categories = categories; this.authorization = authorization; this.audit = audit;     }
 
     @Transactional(readOnly = true)
     public Status status() {
@@ -84,16 +79,15 @@ public class JourneyCutoverStatusService {
     @Transactional(readOnly = true)
     public CaseView caseAdmission(UUID caseId) {
         authorize();
-        boolean exists = jdbc.sql("SELECT count(*) FROM medical_cases WHERE id=?").param(caseId).query(Long.class).single() == 1;
+        boolean exists = admissions.caseExists(caseId);
         if (!exists) throw new ApiException(404, "CASE_NOT_FOUND", "Case was not found");
         var admission = admissions.find(caseId).map(a -> new AdmissionView(a.decision(), a.reason(), a.policyId(), a.policyRevision(),
                 a.journeyVersionId(), a.careCategory(), a.evaluatedAt())).orElse(null);
         var binding = bindings.findByCase(caseId).map(b -> {
-            var row = jdbc.sql("SELECT admission_mode,created_at,started_at FROM journey_case_bindings WHERE case_id=?").param(caseId).query().singleRow();
-            UUID definitionId = jdbc.sql("SELECT definition_id FROM journey_versions WHERE id=?").param(b.versionId()).query(UUID.class).single();
-            var version = definitions.version(definitionId, b.versionId());
-            return new BindingView(definitionId, b.versionId(), version.number(), (String) row.get("admission_mode"), instant(row.get("created_at")),
-                    b.engineReference() != null, instant(row.get("started_at")), readiness.pinnedReadiness(version));
+            var timeline = bindings.timeline(caseId).orElseThrow();
+            var version = definitions.version(b.versionId());
+            return new BindingView(version.definitionId(), b.versionId(), version.number(), b.admissionMode(), timeline.createdAt(),
+                    b.engineReference() != null, timeline.startedAt(), readiness.pinnedReadiness(version));
         }).orElse(null);
         // Authority is the binding, never a re-evaluation of current policy: a bound case stays Journey-owned.
         return new CaseView(caseId, binding == null ? "COORDINATION" : "JOURNEY", admission, binding, admissions.latestFailure(caseId).orElse(null));
@@ -101,13 +95,5 @@ public class JourneyCutoverStatusService {
 
     private void authorize() {
         authorization.require(Permission.JOURNEY_READ);
-    }
-
-    private static Instant instant(Object value) {
-        if (value == null) return null;
-        if (value instanceof java.sql.Timestamp t) return t.toInstant();
-        if (value instanceof java.time.OffsetDateTime o) return o.toInstant();
-        if (value instanceof Instant i) return i;
-        throw new IllegalStateException("Unexpected timestamp type " + value.getClass());
     }
 }

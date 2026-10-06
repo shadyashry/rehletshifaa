@@ -35,7 +35,7 @@ class ReferenceDataCachingTest {
     static class MapCaches {
         // The production RedisCacheManager needs a server; the contract under test is the annotations.
         @Bean @Primary CacheManager testCacheManager() {
-            return new BrokenReads(CacheNames.FX_RATES, CacheNames.CARE_CATEGORIES, CacheNames.COMMERCIAL_POLICY);
+            return new BrokenReads(CacheNames.ALL.toArray(String[]::new));
         }
     }
 
@@ -108,7 +108,7 @@ class ReferenceDataCachingTest {
 
     @Test
     void everyDeclaredCacheExists() {
-        assertThat(caches.getCacheNames()).contains(CacheNames.FX_RATES, CacheNames.CARE_CATEGORIES, CacheNames.COMMERCIAL_POLICY);
+        assertThat(caches.getCacheNames()).containsAll(CacheNames.ALL);
     }
 
     private void seedRate(String currencyCode, BigDecimal rate, LocalDate date) {

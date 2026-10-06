@@ -5,9 +5,9 @@ import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
 import com.rehletshifaa.journey.application.*;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionStore;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingStore;
+import com.rehletshifaa.journey.infrastructure.JourneyDeploymentStore;
 import com.rehletshifaa.shared.api.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.flowable.engine.ProcessEngine;
@@ -44,9 +44,9 @@ import static com.rehletshifaa.journey.application.JourneyDefinitionService.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class JourneyCutoverIntegrationTest {
     @Autowired JourneyDefinitionService definitions;
-    @Autowired JourneyDeploymentRepository deploymentRepo;
-    @Autowired JourneyCaseBindingRepository bindings;
-    @Autowired JourneyCaseAdmissionRepository admissions;
+    @Autowired JourneyDeploymentStore deploymentRepo;
+    @Autowired JourneyCaseBindingStore bindings;
+    @Autowired JourneyCaseAdmissionStore admissions;
     @Autowired JourneyProjectionService projections;
     @Autowired JourneyProductionIntakeService productionIntake;
     @Autowired JourneyAdmissionPolicyService policies;
@@ -105,7 +105,7 @@ class JourneyCutoverIntegrationTest {
     JourneyAdmissionPolicyService.Decide decide(JourneyAdmissionPolicyService.Policy policy, String reason) {
         return new JourneyAdmissionPolicyService.Decide(policy.revision(), reason);
     }
-    JourneyCaseAdmissionRepository.Admission admission(UUID caseId) { return admissions.find(caseId).orElseThrow(); }
+    JourneyCaseAdmissionStore.Admission admission(UUID caseId) { return admissions.find(caseId).orElseThrow(); }
     long instances(UUID caseId) { return engine.getRuntimeService().createProcessInstanceQuery().processInstanceBusinessKey("case:" + caseId).count(); }
     long audits(UUID caseId, String action) { return jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE entity_id=? AND action=?", Long.class, caseId.toString(), action); }
     long tasks(UUID caseId) { return jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=?", Long.class, caseId); }

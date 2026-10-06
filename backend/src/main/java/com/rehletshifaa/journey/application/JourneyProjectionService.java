@@ -8,11 +8,11 @@ import com.rehletshifaa.journey.api.WorkDtos.ItemResponse;
 import com.rehletshifaa.journey.domain.JourneyModel.Node;
 import com.rehletshifaa.journey.domain.JourneyModel.StageType;
 import com.rehletshifaa.journey.domain.JourneyModel.Version;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository.Binding;
-import com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyStageProjectionRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyStageProjectionRepository.Projection;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingStore;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingStore.Binding;
+import com.rehletshifaa.journey.infrastructure.JourneyDefinitionStore;
+import com.rehletshifaa.journey.infrastructure.JourneyStageProjectionStore;
+import com.rehletshifaa.journey.infrastructure.JourneyStageProjectionStore.Projection;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,9 +49,9 @@ import java.util.UUID;
 @Service
 @Transactional
 public class JourneyProjectionService {
-    private final JourneyCaseBindingRepository bindings;
-    private final JourneyDefinitionRepository definitions;
-    private final JourneyStageProjectionRepository projections;
+    private final JourneyCaseBindingStore bindings;
+    private final JourneyDefinitionStore definitions;
+    private final JourneyStageProjectionStore projections;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final JourneyActionDispatcher dispatcher;
     private final Authority authorization;
@@ -59,8 +59,8 @@ public class JourneyProjectionService {
     private final GovernanceAuditLog audit;
     private final boolean enabled;
 
-    public JourneyProjectionService(JourneyCaseBindingRepository bindings, JourneyDefinitionRepository definitions,
-            JourneyStageProjectionRepository projections, ObjectProvider<JourneyRuntimePort> runtimes,
+    public JourneyProjectionService(JourneyCaseBindingStore bindings, JourneyDefinitionStore definitions,
+            JourneyStageProjectionStore projections, ObjectProvider<JourneyRuntimePort> runtimes,
             JourneyActionDispatcher dispatcher, Authority authorization,
             PatientJourneyAuthorizationService patientAuthorization, GovernanceAuditLog audit,
             @Value("${app.journey.runtime.case-verification-enabled:false}") boolean verificationEnabled,
@@ -254,7 +254,7 @@ public class JourneyProjectionService {
      * A verification case is driven by the Journey Manager who created it (JOURNEY_EDIT); a real case's projected work
      * is completed by its case team, and the registered handler's own service enforces the specific action permission.
      */
-    private String authorizeWork(JourneyCaseBindingRepository.Binding binding) {
+    private String authorizeWork(JourneyCaseBindingStore.Binding binding) {
         var principal = com.rehletshifaa.authority.application.Principal.current();
         if (binding.verificationBy(principal.subject())) return authorization.require(Permission.JOURNEY_EDIT).subject();
         return authorization.require(Permission.CASE_READ, Resource.ofCase(binding.caseId())).subject();

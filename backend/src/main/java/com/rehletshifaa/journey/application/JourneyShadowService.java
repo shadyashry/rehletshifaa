@@ -20,14 +20,14 @@ public class JourneyShadowService {
     public record Step(String commandKey,long revision,String nodeKey,boolean signal,Map<String,Boolean> facts) {}
     public record Activity(String nodeKey,String state,String actorType,String action) {}
     public record View(UUID id,UUID journeyVersionId,long revision,boolean completed,List<Activity> activities) {}
-    private final JourneyDefinitionRepository definitions;
-    private final JourneyDeploymentRepository deployments;
-    private final JourneyShadowRepository runs;
+    private final JourneyDefinitionStore definitions;
+    private final JourneyDeploymentStore deployments;
+    private final JourneyShadowStore runs;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final Authority authorization;
     private final GovernanceAuditLog audit;
-    public JourneyShadowService(JourneyDefinitionRepository definitions,JourneyDeploymentRepository deployments,
-            JourneyShadowRepository runs,ObjectProvider<JourneyRuntimePort> runtimes,Authority authorization,GovernanceAuditLog audit) {
+    public JourneyShadowService(JourneyDefinitionStore definitions,JourneyDeploymentStore deployments,
+            JourneyShadowStore runs,ObjectProvider<JourneyRuntimePort> runtimes,Authority authorization,GovernanceAuditLog audit) {
         this.definitions=definitions;this.deployments=deployments;this.runs=runs;this.runtimes=runtimes;this.authorization=authorization;this.audit=audit;
     }
     public View start(UUID definition,UUID versionId,Start command) {
@@ -77,7 +77,7 @@ public class JourneyShadowService {
         audit.record(actor.subject(),id.toString(),"JOURNEY_SHADOW_ADVANCED","SUCCESS","node="+command.nodeKey()+"; revision="+view.revision());
         return view;
     }
-    private View view(JourneyShadowRepository.Run run,Version version,JourneyRuntimePort.Instance state,long revision) {
+    private View view(JourneyShadowStore.Run run,Version version,JourneyRuntimePort.Instance state,long revision) {
         var nodes=new HashMap<String,Node>();version.graph().nodes().forEach(n->nodes.put(n.key(),n));
         var activities=state.activities().stream().map(a->{
             String key=a.nodeKey().replaceFirst("^(n_|entry_|exit_)","");

@@ -10,9 +10,10 @@ import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.authority.domain.Workspace;
 import com.rehletshifaa.workforce.application.WorkforceFacts;
 import com.rehletshifaa.workforce.application.WorkforceFacts.PersonFacts;
+import com.rehletshifaa.workforce.infrastructure.WorkforceIdentityReviewRepository;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -26,24 +27,23 @@ import java.util.Set;
  */
 @Service
 public class EffectiveAccessService {
+    private final WorkforceIdentityReviewRepository identityReviews;
     private final Authority authority;
     private final WorkforceFacts workforce;
     private final PlatformAccessRepository access;
     private final PlatformOwnerTransferStore owners;
     private final AccessHygieneStore hygiene;
     private final Clock clock;
-    private final JdbcClient jdbc;
 
     public EffectiveAccessService(Authority authority, WorkforceFacts workforce, PlatformAccessRepository access,
-            PlatformOwnerTransferStore owners, AccessHygieneStore hygiene, Clock clock, JdbcClient jdbc) {
+            PlatformOwnerTransferStore owners, AccessHygieneStore hygiene, Clock clock, WorkforceIdentityReviewRepository identityReviews) { this.identityReviews = identityReviews;
         this.authority = authority;
         this.workforce = workforce;
         this.access = access;
         this.owners = owners;
         this.hygiene = hygiene;
         this.clock = clock;
-        this.jdbc = jdbc;
-    }
+            }
 
     public record PlatformRoleView(String role, Instant effectiveFrom, Instant effectiveTo, boolean effectiveNow) {}
     public record MeView(String subject, Instant evaluatedAt, Set<Role> roles, Set<Permission> permissions, Set<Permission> reauthenticate, Set<Workspace> workspaces,
@@ -72,9 +72,7 @@ public class EffectiveAccessService {
         if (owner || incomingOwner) workspaces.add(Workspace.CONTROL_CENTER);
         List<String> pending = new ArrayList<>();
         if (incomingOwner) pending.add("ACCEPT_PLATFORM_OWNERSHIP");
-        boolean pendingAdoption = jdbc.sql("SELECT COUNT(*) FROM workforce_identity_reviews r JOIN workforce_invitations i ON i.id=r.invitation_id "
-                        + "WHERE r.resolved_subject=? AND r.status='AWAITING_ACCEPTANCE' AND i.status='AWAITING_ACCEPTANCE' AND i.expires_at>?")
-                .params(principal.subject(), com.rehletshifaa.shared.persistence.SqlValues.timestamp(now)).query(Long.class).single() > 0;
+        boolean pendingAdoption = identityReviews.awaitsAdoptionBy(principal.subject(), com.rehletshifaa.shared.persistence.SqlValues.micros(now));
         if (pendingAdoption) pending.add("ACCEPT_WORKFORCE_ADOPTION");
         if (person != null && "INVITED".equals(person.lifecycleStatus())) pending.add("ACTIVATE_ACCOUNT");
         return new MeView(principal.subject(), now, held.roles(), held.platformPermissions(),

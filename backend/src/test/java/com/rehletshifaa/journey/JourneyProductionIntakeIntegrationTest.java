@@ -5,8 +5,8 @@ import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
 import com.rehletshifaa.journey.application.*;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingStore;
+import com.rehletshifaa.journey.infrastructure.JourneyDeploymentStore;
 import org.flowable.engine.ProcessEngine;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,8 +38,8 @@ import static com.rehletshifaa.journey.JourneyGraphTest.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class JourneyProductionIntakeIntegrationTest {
     @Autowired JourneyDefinitionService definitions;
-    @Autowired JourneyDeploymentRepository deploymentRepo;
-    @Autowired JourneyCaseBindingRepository bindings;
+    @Autowired JourneyDeploymentStore deploymentRepo;
+    @Autowired JourneyCaseBindingStore bindings;
     @Autowired JourneyProjectionService projections;
     @Autowired JourneyProductionIntakeService productionIntake;
     @Autowired CaseService cases;
@@ -49,7 +49,7 @@ class JourneyProductionIntakeIntegrationTest {
     @Autowired PlatformTransactionManager manager;
     @Autowired ProcessEngine engine;
     @Autowired JourneyAdmissionPolicyService policies;
-    @Autowired com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository admissions;
+    @Autowired com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionStore admissions;
     @Autowired io.micrometer.core.instrument.MeterRegistry meters;
     Version version;
     JourneyAdmissionPolicyService.Policy policy;

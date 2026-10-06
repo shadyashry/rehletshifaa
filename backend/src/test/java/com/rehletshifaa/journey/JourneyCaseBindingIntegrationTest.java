@@ -4,7 +4,7 @@ import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.journey.application.*;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
-import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyDeploymentStore;
 import org.flowable.engine.ProcessEngine;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,8 +24,9 @@ import static com.rehletshifaa.journey.application.JourneyDefinitionService.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class JourneyCaseBindingIntegrationTest {
     @Autowired JourneyCaseVerificationService verification;
+    @Autowired jakarta.persistence.EntityManager em;
     @Autowired JourneyDefinitionService definitions;
-    @Autowired JourneyDeploymentRepository deployments;
+    @Autowired JourneyDeploymentStore deployments;
     @Autowired CaseService cases;
     @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @Autowired JdbcTemplate jdbc;
@@ -128,7 +129,8 @@ class JourneyCaseBindingIntegrationTest {
         new TransactionTemplate(manager).executeWithoutResult(tx->{
             var draft=definitions.cloneVersion(version.definitionId(),version.id(),fixture.change(version.revision()));
             assertThatThrownBy(()->verification.create(draft.definitionId(),draft.id(),command())).hasMessageContaining("published");
-            jdbc.update("UPDATE journey_versions SET status='PUBLISHED' WHERE id=?",draft.id());
+            // Raw SQL behind JPA's back: flush pending changes first, then drop the stale managed version.
+            em.flush(); jdbc.update("UPDATE journey_versions SET status='PUBLISHED' WHERE id=?",draft.id()); em.clear();
             assertThatThrownBy(()->verification.create(draft.definitionId(),draft.id(),command())).hasMessageContaining("not deployed");
             tx.setRollbackOnly();
         });

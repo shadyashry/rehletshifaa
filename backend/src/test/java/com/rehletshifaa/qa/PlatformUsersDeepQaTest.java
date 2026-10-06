@@ -67,6 +67,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(properties = "spring.task.scheduling.enabled=false")
 @Transactional
 class PlatformUsersDeepQaTest {
+    @jakarta.persistence.PersistenceContext jakarta.persistence.EntityManager entityManager;
     @Autowired StaffLifecycleService staff;
     @Autowired WorkforceRoleAssignmentService roles;
     @Autowired PlatformAccessGovernanceService governance;
@@ -173,7 +174,7 @@ class PlatformUsersDeepQaTest {
         assertThat(held("qa-fadi").roles()).containsExactly(Role.ACCOUNT_HOLDER);
 
         // An expired invitation cannot be activated even with MFA.
-        jdbc.update("UPDATE workforce_invitations SET created_at=?,expires_at=? WHERE id=?", clock.instant().minusSeconds(7200), clock.instant().minusSeconds(1), invite.id());
+        raw("UPDATE workforce_invitations SET created_at=?,expires_at=? WHERE id=?", clock.instant().minusSeconds(7200), clock.instant().minusSeconds(1), invite.id());
         when(identities.identityState("qa-fadi")).thenReturn(new IdentityState(true, true, true, true, false));
         assertCode("INVITATION_NOT_VALID", () -> staff.activate());
 
@@ -191,10 +192,10 @@ class PlatformUsersDeepQaTest {
         // Expired: the re-invite waits until the queued disable has been applied, then reuses the same person.
         var first = staff.invite(new Invite("Late Starter", "late.starter@qa.test", "en", List.of("FINANCE"), "Hire"));
         complete(first.id(), "qa-late");
-        jdbc.update("UPDATE workforce_invitations SET created_at=?,expires_at=? WHERE id=?", clock.instant().minusSeconds(7200), clock.instant().minusSeconds(1), first.id());
+        raw("UPDATE workforce_invitations SET created_at=?,expires_at=? WHERE id=?", clock.instant().minusSeconds(7200), clock.instant().minusSeconds(1), first.id());
         staff.expireInvitations();
         assertCode("IDENTITY_OPERATION_PENDING", () -> staff.invite(new Invite("Late Starter", "late.starter@qa.test", "en", List.of("OPERATIONS"), "Too soon")));
-        jdbc.update("UPDATE identity_operations SET status='SUCCEEDED' WHERE target_subject='qa-late'");
+        raw("UPDATE identity_operations SET status='SUCCEEDED' WHERE target_subject='qa-late'");
         var again = staff.invite(new Invite("Late Starter", "Late.Starter@qa.test", "ar", List.of("OPERATIONS"), "Re-invite after expiry"));
         assertThat(again.subject()).isEqualTo("qa-late");
         assertThat(again.status()).isEqualTo("SENT");
@@ -212,7 +213,7 @@ class PlatformUsersDeepQaTest {
         var withdrawn = staff.invite(new Invite("Second Chance", "second.chance@qa.test", "en", List.of("FINANCE"), "Hire"));
         complete(withdrawn.id(), "qa-second");
         staff.cancelInvitation(withdrawn.id(), new Change(1, "Withdrawn"));
-        jdbc.update("UPDATE identity_operations SET status='SUCCEEDED' WHERE target_subject='qa-second'");
+        raw("UPDATE identity_operations SET status='SUCCEEDED' WHERE target_subject='qa-second'");
         var reinstated = staff.invite(new Invite("Second Chance", "second.chance@qa.test", "en", List.of("FINANCE"), "Reinstated"));
         assertThat(reinstated.subject()).isEqualTo("qa-second");
         // The new invitation can itself be cancelled again (revision returned by the re-invite is current).
@@ -221,11 +222,11 @@ class PlatformUsersDeepQaTest {
 
         // Offboarded former employee: re-hired with MFA reset; old MFA evidence no longer counts.
         new WorkforceTestData(jdbc, crypto, clock.instant()).person("qa-alumnus", "COORDINATOR");
-        jdbc.update("UPDATE workforce_people SET email_hash=?,email_encrypted=?,mfa_enrolled=TRUE WHERE subject='qa-alumnus'",
+        raw("UPDATE workforce_people SET email_hash=?,email_encrypted=?,mfa_enrolled=TRUE WHERE subject='qa-alumnus'",
                 sha256("alumnus@qa.test"), crypto.encrypt("alumnus@qa.test"));
         var leaving = staff.startOffboarding("qa-alumnus", new Change(0, "Left"));
         staff.completeOffboarding("qa-alumnus", new Change(revision("qa-alumnus"), "Gone"));
-        jdbc.update("UPDATE identity_operations SET status='SUCCEEDED' WHERE target_subject='qa-alumnus'");
+        raw("UPDATE identity_operations SET status='SUCCEEDED' WHERE target_subject='qa-alumnus'");
         var rehire = staff.invite(new Invite("Alumnus", "alumnus@qa.test", "en", List.of("COORDINATOR"), "Re-hired"));
         assertThat(rehire.subject()).isEqualTo("qa-alumnus");
         assertThat(reinviteQueued("qa-alumnus", "true")).as("former employee re-enrols MFA").isTrue();
@@ -239,7 +240,7 @@ class PlatformUsersDeepQaTest {
     void thePlatformAccountOwnerDecidesAdministratorChangesFromTheControlCenter() {
         new WorkforceTestData(jdbc, crypto, clock.instant()).person("qa-owner").person("qa-third", "FINANCE");
         when(identities.identityState(org.mockito.ArgumentMatchers.anyString())).thenReturn(new IdentityState(true, true, true, true, true));
-        jdbc.update("DELETE FROM platform_role_assignments WHERE subject IN (?,?)", ADMIN_A, ADMIN_B); // bootstrap appoints them itself
+        raw("DELETE FROM platform_role_assignments WHERE subject IN (?,?)", ADMIN_A, ADMIN_B); // bootstrap appoints them itself
         bootstrap.initialize("qa-owner", List.of(ADMIN_A, ADMIN_B));
         signIn(ADMIN_A, "3");
 
@@ -257,14 +258,14 @@ class PlatformUsersDeepQaTest {
         assertThat(overview.names()).containsEntry("qa-third", "qa-third").containsKey(ADMIN_A);
         assertCode("PERMISSION_NOT_HELD", () -> governance.request(new AdministratorChange(ChangeType.APPOINT, "qa-owner", clock.instant(), null, "Owners do not raise requests")));
         assertThat(governance.approve(request.id(), new PlatformAccessGovernanceService.Decision(request.revision(), "Owner approves")).status()).isEqualTo("APPROVED");
-        jdbc.update("UPDATE workforce_people SET mfa_enrolled=TRUE WHERE subject='qa-third'");
+        raw("UPDATE workforce_people SET mfa_enrolled=TRUE WHERE subject='qa-third'");
         assertThat(held("qa-third").roles()).contains(Role.SYSTEM_ADMINISTRATOR);
 
         // With three administrators the owner can also approve a removal; a non-owner, non-admin cannot decide.
         signIn(ADMIN_A, "3");
         var removal = governance.request(new AdministratorChange(ChangeType.REMOVE, ADMIN_B, clock.instant(), null, "Rotation"));
         signIn("qa-third", "2");
-        jdbc.update("DELETE FROM platform_role_assignments WHERE subject='qa-third'");
+        raw("DELETE FROM platform_role_assignments WHERE subject='qa-third'");
         assertCode("PERMISSION_NOT_HELD", () -> governance.reject(removal.id(), new PlatformAccessGovernanceService.Decision(removal.revision(), "Not mine")));
         signIn("qa-owner", "3");
         assertThat(governance.reject(removal.id(), new PlatformAccessGovernanceService.Decision(removal.revision(), "Keep two administrators")).status()).isEqualTo("REJECTED");
@@ -275,7 +276,7 @@ class PlatformUsersDeepQaTest {
     void theOwnerIsNeverAlsoASystemAdministrator() {
         new WorkforceTestData(jdbc, crypto, clock.instant()).person("qa-owner2").person("qa-successor");
         when(identities.identityState(org.mockito.ArgumentMatchers.anyString())).thenReturn(new IdentityState(true, true, true, true, true));
-        jdbc.update("DELETE FROM platform_role_assignments WHERE subject IN (?,?)", ADMIN_A, ADMIN_B);
+        raw("DELETE FROM platform_role_assignments WHERE subject IN (?,?)", ADMIN_A, ADMIN_B);
         bootstrap.initialize("qa-owner2", List.of(ADMIN_A, ADMIN_B));
 
         signIn(ADMIN_A, "3");
@@ -298,9 +299,9 @@ class PlatformUsersDeepQaTest {
     @Test
     void ownershipIsHandedOverThroughTheControlCenterByThreeIndependentParties() {
         var data = new WorkforceTestData(jdbc, crypto, clock.instant()).person("qa-ceo").person("qa-heir").person("qa-bystander", "FINANCE");
-        jdbc.update("UPDATE workforce_people SET email_hash=? WHERE subject='qa-heir'", sha256("heir@qa.test"));
+        raw("UPDATE workforce_people SET email_hash=? WHERE subject='qa-heir'", sha256("heir@qa.test"));
         when(identities.identityState(org.mockito.ArgumentMatchers.anyString())).thenReturn(new IdentityState(true, true, true, true, true));
-        jdbc.update("DELETE FROM platform_role_assignments WHERE subject IN (?,?)", ADMIN_A, ADMIN_B);
+        raw("DELETE FROM platform_role_assignments WHERE subject IN (?,?)", ADMIN_A, ADMIN_B);
         bootstrap.initialize("qa-ceo", List.of(ADMIN_A, ADMIN_B));
 
         // Who may read.
@@ -392,7 +393,7 @@ class PlatformUsersDeepQaTest {
         signIn(ADMIN_B, "3");
         governance.approve(appoint.id(), new PlatformAccessGovernanceService.Decision(appoint.revision(), "Independent check"));
         assertThat(held("qa-candidate").roles()).doesNotContain(Role.SYSTEM_ADMINISTRATOR);
-        jdbc.update("UPDATE workforce_people SET mfa_enrolled=TRUE WHERE subject='qa-candidate'");
+        raw("UPDATE workforce_people SET mfa_enrolled=TRUE WHERE subject='qa-candidate'");
         assertThat(held("qa-candidate").roles()).contains(Role.SYSTEM_ADMINISTRATOR, Role.FINANCE);
 
         // Function manager: only its own function; never access administration.
@@ -484,16 +485,16 @@ class PlatformUsersDeepQaTest {
             assertThat(held(subject).workspaces()).as(lifecycle).isEmpty();
         }
         data.person("qa-inactive-subject", "FINANCE");
-        jdbc.update("UPDATE access_subjects SET active=FALSE WHERE subject='qa-inactive-subject'");
+        raw("UPDATE access_subjects SET active=FALSE WHERE subject='qa-inactive-subject'");
         assertThat(held("qa-inactive-subject").roles()).containsExactly(Role.ACCOUNT_HOLDER);
 
         data.person("qa-future");
-        jdbc.update("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,status,source,assigned_by,reason,created_at,revision) "
+        raw("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,status,source,assigned_by,reason,created_at,revision) "
                 + "VALUES(?,?,'FINANCE',?,'ACTIVE','GRANT','QA','future',?,0)", UUID.randomUUID(), "qa-future", clock.instant().plusSeconds(3600), clock.instant());
         assertThat(held("qa-future").roles()).doesNotContain(Role.FINANCE);
 
         data.person("qa-expired-role");
-        jdbc.update("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,effective_to,status,source,assigned_by,reason,created_at,revision) "
+        raw("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,effective_to,status,source,assigned_by,reason,created_at,revision) "
                 + "VALUES(?,?,'FINANCE',?,?,'ACTIVE','GRANT','QA','ended',?,0)", UUID.randomUUID(), "qa-expired-role",
                 clock.instant().minusSeconds(7200), clock.instant().minusSeconds(60), clock.instant());
         assertThat(held("qa-expired-role").roles()).doesNotContain(Role.FINANCE);
@@ -504,7 +505,7 @@ class PlatformUsersDeepQaTest {
 
         // An administrator assignment without recorded MFA is not effective.
         data.person("qa-admin-no-mfa");
-        jdbc.update("INSERT INTO platform_role_assignments(id,subject,role_key,effective_from,status,assigned_by,reason,created_at,revision) "
+        raw("INSERT INTO platform_role_assignments(id,subject,role_key,effective_from,status,assigned_by,reason,created_at,revision) "
                 + "VALUES(?,?,'SYSTEM_ADMINISTRATOR',?,'ACTIVE','QA','r',?,0)", UUID.randomUUID(), "qa-admin-no-mfa", clock.instant().minusSeconds(60), clock.instant());
         assertThat(held("qa-admin-no-mfa").roles()).doesNotContain(Role.SYSTEM_ADMINISTRATOR);
     }
@@ -530,7 +531,7 @@ class PlatformUsersDeepQaTest {
         assertCode("INVALID_LIFECYCLE_TRANSITION", () -> staff.restore("qa-worker", new Change(offboarded, "Undo")));
 
         // Admin A's own assignment ends tomorrow; disabling B would leave no indefinite administrator.
-        jdbc.update("UPDATE platform_role_assignments SET effective_to=? WHERE subject=?", clock.instant().plusSeconds(86_400), ADMIN_A);
+        raw("UPDATE platform_role_assignments SET effective_to=? WHERE subject=?", clock.instant().plusSeconds(86_400), ADMIN_A);
         assertCode("LAST_EFFECTIVE_SYSTEM_ADMINISTRATOR", () -> staff.disable(ADMIN_B, new Change(0, "Would orphan the platform")));
         // The refused write rolls back with its request; inside this shared test transaction it is only marked rollback-only.
         assertCode("SELF_LIFECYCLE_CHANGE", () -> staff.startOffboarding(ADMIN_A, new Change(0, "Self")));
@@ -602,7 +603,7 @@ class PlatformUsersDeepQaTest {
     }
 
     private void complete(UUID invitationId, String subject) {
-        jdbc.update("UPDATE identity_operations SET status='RUNNING',attempts=1 WHERE id=?", invitationId);
+        raw("UPDATE identity_operations SET status='RUNNING',attempts=1 WHERE id=?", invitationId);
         completion.created(new IdentityOperationStore.Operation(invitationId, "workforce-invite:" + invitationId, null,
                 IdentityOperationRequested.Type.CREATE_STAFF, 1, 8, clock.instant().plusSeconds(60), "WorkforceInvitation", invitationId, "payload"), subject);
     }
@@ -638,6 +639,17 @@ class PlatformUsersDeepQaTest {
         ApiException error = catchThrowableOfType(ApiException.class, call);
         assertThat(error).as("expected " + code).isNotNull();
         assertThat(error.code()).isEqualTo(code);
+    }
+
+    /**
+     * Raw-SQL fixture change inside the test transaction. The persistence context is flushed first and cleared
+     * after, so services read the changed rows instead of entities loaded earlier in the transaction.
+     */
+    private int raw(String sql, Object... args) {
+        entityManager.flush();
+        int changed = jdbc.update(sql, args);
+        entityManager.clear();
+        return changed;
     }
 
     private void signIn(String subject, String acr) {

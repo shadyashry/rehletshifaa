@@ -5,7 +5,7 @@ import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.journey.api.WorkDtos.ItemResponse;
 import com.rehletshifaa.journey.application.*;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
-import com.rehletshifaa.journey.infrastructure.JourneyStageProjectionRepository.Projection;
+import com.rehletshifaa.journey.infrastructure.JourneyStageProjectionStore.Projection;
 import org.flowable.engine.ProcessEngine;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;

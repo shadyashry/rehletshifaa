@@ -6,8 +6,8 @@ import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.journey.domain.JourneyModel.Version;
 import com.rehletshifaa.journey.domain.JourneyModel.Status;
-import com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyDefinitionStore;
+import com.rehletshifaa.journey.infrastructure.JourneyDeploymentStore;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -23,14 +23,14 @@ public class JourneyDeploymentService {
     public record AdmissionReadiness(String category, Optional<Version> version) {
         public boolean ready() { return version.isPresent(); }
     }
-    private final JourneyDefinitionRepository definitions;
-    private final JourneyDeploymentRepository deployments;
+    private final JourneyDefinitionStore definitions;
+    private final JourneyDeploymentStore deployments;
     private final JourneyCompiler compiler;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final Authority authorization;
     private final GovernanceAuditLog audit;
 
-    public JourneyDeploymentService(JourneyDefinitionRepository definitions, JourneyDeploymentRepository deployments,
+    public JourneyDeploymentService(JourneyDefinitionStore definitions, JourneyDeploymentStore deployments,
             JourneyCompiler compiler, ObjectProvider<JourneyRuntimePort> runtimes, Authority authorization,
             GovernanceAuditLog audit) {
         this.definitions=definitions; this.deployments=deployments; this.compiler=compiler;

@@ -1,9 +1,9 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.clinic.infrastructure.CareCategoryRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.CareCategoryView;
 import com.rehletshifaa.shared.cache.CacheNames;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,13 +17,13 @@ import java.util.List;
  */
 @Service
 public class CareCategoryCatalog {
-    private final JdbcClient jdbc;
+    private final CareCategoryRepository categories;
 
-    public CareCategoryCatalog(JdbcClient jdbc) { this.jdbc = jdbc; }
+    public CareCategoryCatalog(CareCategoryRepository categories) { this.categories = categories; }
 
     @Cacheable(cacheNames = CacheNames.CARE_CATEGORIES, key = "'all'")
     public List<CareCategoryView> all() {
-        return jdbc.sql("SELECT slug,name_en,name_ar FROM care_categories ORDER BY sort_order,name_en")
-                .query((rs, n) -> new CareCategoryView(rs.getString("slug"), rs.getString("name_en"), rs.getString("name_ar"))).list();
+        return categories.findAllByOrderBySortOrderAscNameEnAsc().stream()
+                .map(c -> new CareCategoryView(c.getSlug(), c.getNameEn(), c.getNameAr())).toList();
     }
 }

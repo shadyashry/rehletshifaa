@@ -1,8 +1,11 @@
 package com.rehletshifaa.shared.cache;
 
+import java.util.Set;
+
 /**
  * Every cache the application is allowed to use, named in one place so a cache can never be created
- * by a typo and so {@link CacheProperties} can give each one a deliberate TTL.
+ * by a typo and so {@link CacheProperties} can give each one a deliberate TTL. The Redis cache manager
+ * refuses any other name, and each name must have exactly one {@link CacheSpec} declaring its value type.
  *
  * <p>Only reference data lives here. Live workflow state — case status, work items, notifications,
  * deposits, proposal decisions, authorization outcomes and secure tokens — is deliberately absent:
@@ -11,10 +14,14 @@ package com.rehletshifaa.shared.cache;
 public final class CacheNames {
     private CacheNames() {}
 
-    /** Exchange rates per quote currency and rate date. Evicted when Finance pins a manual rate. */
+    /** One exchange rate per quote currency and rate date. Evicted when Finance pins a manual rate. */
     public static final String FX_RATES = "fx-rates";
+    /** The full rate table for one rate date. Evicted together with {@link #FX_RATES}. */
+    public static final String FX_RATE_TABLES = "fx-rate-tables";
     /** The care-area reference list shown in coordinator tooling. */
     public static final String CARE_CATEGORIES = "care-categories";
     /** The active coordinated-care margin policy per care area. Evicted when Finance configures a new version. */
     public static final String COMMERCIAL_POLICY = "commercial-policy";
+
+    public static final Set<String> ALL = Set.of(FX_RATES, FX_RATE_TABLES, CARE_CATEGORIES, COMMERCIAL_POLICY);
 }

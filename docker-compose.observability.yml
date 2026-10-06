@@ -1,0 +1,102 @@
+# Opt-in centralized log search: Filebeat -> Elasticsearch -> Kibana. Never required by the application.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.observability.yml up -d --build
+#
+# Ships only the backend and api-gateway container logs (both ECS JSON) into one data stream,
+# logs-rehletshifaa-${LOG_NAMESPACE}, with ${LOG_RETENTION} retention. Kibana: http://localhost:5601
+# (user "elastic"). Both ports are bound to loopback; nothing here is routed through the tunnel.
+# Requires in .env: ELASTIC_PASSWORD, KIBANA_SYSTEM_PASSWORD, LOG_WRITER_PASSWORD (see infrastructure/observability/README.md).
+# Versions are the latest GA Elastic release verified on 2026-10-06; keep all three on the same version.
+
+x-elastic-env: &elastic-env
+  ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?Set ELASTIC_PASSWORD}
+  KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:?Set KIBANA_SYSTEM_PASSWORD}
+  LOG_WRITER_PASSWORD: ${LOG_WRITER_PASSWORD:?Set LOG_WRITER_PASSWORD}
+  LOG_RETENTION: ${LOG_RETENTION:-7d}
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.4
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      # Loopback-only development cluster on the private compose network; production needs TLS.
+      xpack.security.http.ssl.enabled: "false"
+      xpack.license.self_generated.type: basic
+      # Docker Desktop disks are routinely >90% full; do not let the watermark make logs read-only locally.
+      cluster.routing.allocation.disk.threshold_enabled: "false"
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?Set ELASTIC_PASSWORD}
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports: ["127.0.0.1:9200:9200"]
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:$$ELASTIC_PASSWORD http://localhost:9200/_cluster/health | grep -q '\"status\":\"\\(green\\|yellow\\)\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # One-shot: kibana_system password, least-privilege log writer, data stream template + retention.
+  elastic-setup:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.4
+    user: "0"
+    environment: *elastic-env
+    volumes:
+      - ./infrastructure/observability:/setup:ro
+    command: ["bash", "/setup/setup.sh", "elasticsearch"]
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.5.4
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:?Set KIBANA_SYSTEM_PASSWORD}
+    ports: ["127.0.0.1:5601:5601"]
+    mem_limit: 1536m
+    depends_on:
+      elastic-setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:5601/api/status | grep -q -E '200|401'"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+
+  # One-shot: data view and saved searches for troubleshooting.
+  kibana-setup:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.4
+    user: "0"
+    environment: *elastic-env
+    volumes:
+      - ./infrastructure/observability:/setup:ro
+    command: ["bash", "/setup/setup.sh", "kibana"]
+    depends_on:
+      kibana:
+        condition: service_healthy
+    restart: "no"
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:9.5.4
+    # Reading other containers' log files and the Docker API needs root inside this container only.
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    environment:
+      LOG_WRITER_PASSWORD: ${LOG_WRITER_PASSWORD:?Set LOG_WRITER_PASSWORD}
+      LOG_NAMESPACE: ${LOG_NAMESPACE:-dev}
+    volumes:
+      - ./infrastructure/observability/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - filebeat-data:/usr/share/filebeat/data
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      elastic-setup:
+        condition: service_completed_successfully
+
+volumes:
+  elasticsearch-data:
+  filebeat-data:

@@ -1,14 +1,18 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
-import com.rehletshifaa.journey.api.WorkDtos.*;
-import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
-import com.rehletshifaa.authority.domain.Role;
+import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
+import com.rehletshifaa.casemanagement.domain.CaseTask;
+import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
+import com.rehletshifaa.journey.api.WorkDtos.*;
+import com.rehletshifaa.journey.infrastructure.StaffNotificationRepository;
+import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -23,7 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * The operational layer between a case and the people who must act on it.
@@ -42,6 +46,11 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class StaffWorkService {
+    private final StaffNotificationRepository notifications;
+    private final CaseTaskRepository tasks;
+    private final MedicalCaseRepository cases;
+    private final NotificationOutbox notificationOutbox;
+    private final AuditTrail auditTrail;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StaffWorkService.class);
     private static final Set<String> OPEN = Set.of("OPEN", "IN_PROGRESS");
     /** Responsibility values a case can carry; kept in sync with the database check constraint. */
@@ -55,7 +64,7 @@ public class StaffWorkService {
     private final String teamMailbox;
 
     public StaffWorkService(JdbcClient jdbc, Authority authority, IntakeLifecycleService intake, CryptoService crypto,
-                            Clock clock, @Value("${app.mail.coordinator}") String teamMailbox) {
+                            Clock clock, @Value("${app.mail.coordinator}") String teamMailbox, AuditTrail auditTrail, NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseTaskRepository tasks, StaffNotificationRepository notifications) { this.notifications = notifications; this.tasks = tasks; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
         this.jdbc = jdbc; this.authority = authority; this.intake = intake; this.crypto = crypto;
         this.clock = clock; this.teamMailbox = teamMailbox;
     }
@@ -77,18 +86,12 @@ public class StaffWorkService {
         if (existing != null) {
             // Keep the owner accurate when work comes back to a different (or newly resolved) coordinator.
             if (item.ownerSubject() != null)
-                jdbc.sql("UPDATE case_tasks SET owner_subject=COALESCE(owner_subject,?),updated_at=?,version=version+1 WHERE id=?")
-                        .params(item.ownerSubject(), timestamp(now), existing).update();
+                tasks.adoptOwner(existing, item.ownerSubject(), micros(now));
             notify(item, existing, now);
             return existing;
         }
         UUID id = UUID.randomUUID();
-        jdbc.sql("INSERT INTO case_tasks(id,case_id,task_type,title,description,owner_subject,owner_role,visibility_scope,priority,status,blocking,due_at,created_by,created_at,updated_at,version) "
-                        + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
-                .params(id, item.caseId(), item.type(), encrypt(item.title()), encryptNullable(item.context()),
-                        item.ownerSubject(), item.ownerRole(), "INTERNAL", derivePriority(item.blocking(), item.dueAt(), now), "OPEN", item.blocking(),
-                        timestamp(item.dueAt()), item.createdBy(), timestamp(now), timestamp(now))
-                .update();
+        tasks.saveAndFlush(new CaseTask(id, item.caseId(), item.type(), encrypt(item.title()), encryptNullable(item.context()), item.ownerSubject(), item.ownerRole(), "INTERNAL", derivePriority(item.blocking(), item.dueAt(), now), item.blocking(), item.dueAt(), item.createdBy(), now));
         audit(item.caseId(), "CASE_WORK_ITEM_OPENED", id, item.type());
         notify(item, id, now);
         return id;
@@ -101,9 +104,7 @@ public class StaffWorkService {
     @Transactional
     public int closeWorkItems(UUID caseId, String type, String reason) {
         Instant now = clock.instant();
-        return jdbc.sql("UPDATE case_tasks SET status='COMPLETED',completed_at=?,completion_evidence=?,updated_at=?,version=version+1 "
-                        + "WHERE case_id=? AND task_type=? AND visibility_scope='INTERNAL' AND status IN ('OPEN','IN_PROGRESS')")
-                .params(timestamp(now), encrypt(reason), timestamp(now), caseId, type).update();
+        return tasks.completeOpenOfType(caseId, type, encrypt(reason), micros(now));
     }
 
     /** Work due within this window is escalated: it needs attention today, not in the normal queue order. */
@@ -189,11 +190,9 @@ public class StaffWorkService {
         var actor = com.rehletshifaa.authority.application.Principal.current();
         Instant now = clock.instant();
         if (id != null) {
-            jdbc.sql("UPDATE staff_notifications SET read_at=? WHERE id=? AND recipient_subject=? AND read_at IS NULL")
-                    .params(timestamp(now), id, actor.subject()).update();
+            notifications.markRead(id, actor.subject(), micros(now));
         } else {
-            jdbc.sql("UPDATE staff_notifications SET read_at=? WHERE recipient_subject=? AND read_at IS NULL")
-                    .params(timestamp(now), actor.subject()).update();
+            notifications.markAllRead(actor.subject(), micros(now));
         }
         Integer unread = jdbc.sql("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND read_at IS NULL")
                 .param(actor.subject()).query(Integer.class).single();
@@ -210,11 +209,7 @@ public class StaffWorkService {
 
     private boolean insertNotification(String recipient, UUID caseId, UUID taskId, String eventType,
                                        String title, String context, String key, Instant now) {
-        return jdbc.sql("INSERT INTO staff_notifications(id,recipient_subject,case_id,task_id,event_type,title,context,idempotency_key,created_at) "
-                        + "SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM staff_notifications WHERE idempotency_key=?)")
-                .params(UUID.randomUUID(), recipient, caseId, taskId, eventType, encrypt(title), encryptNullable(context),
-                        key, timestamp(now), key)
-                .update() == 1;
+        return notifications.notifyOnce(UUID.randomUUID(), recipient, caseId, taskId, eventType, encrypt(title), encryptNullable(context), key, micros(now)) == 1;
     }
 
     /**
@@ -232,19 +227,15 @@ public class StaffWorkService {
         boolean coordinator = recipient.role() != null && recipient.role().startsWith("COORDINATOR");
         if ((address == null || address.isBlank()) && coordinator) address = teamMailbox;
         if (address == null || address.isBlank()) {
-            log.warn("No work email on file for {} {}; in-app notification only for '{}'", recipient.role(), subject, title);
+            // The title is encrypted at rest (it can name the patient), so it is not logged.
+            log.warn("No work email on file for {} {}; in-app notification only", recipient.role(), subject);
             return;
         }
         String caseNumber = caseId == null ? null : jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?")
                 .param(caseId).query(String.class).optional().orElse(null);
         String template = "DOCTOR".equals(recipient.role()) ? "consultant-work-assigned"
                 : coordinator ? "coordinator-work-assigned" : "staff-work-assigned";
-        jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) "
-                        + "SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM notification_outbox WHERE idempotency_key=?)")
-                .params(UUID.randomUUID(), "STAFF_WORK", "EMAIL", address, template,
-                        intake.encryptedJson("{\"title\":\"" + json(title) + "\",\"case\":\"" + json(caseNumber) + "\",\"role\":\"" + json(recipient.role()) + "\"}"),
-                        "PENDING", 0, 5, timestamp(now), "work-email:" + key, timestamp(now), "work-email:" + key)
-                .update();
+        notificationOutbox.enqueueOnce("STAFF_WORK", "EMAIL", address, template, intake.encryptedJson("{\"title\":\"" + json(title) + "\",\"case\":\"" + json(caseNumber) + "\",\"role\":\"" + json(recipient.role()) + "\"}"), "work-email:" + key, now);
     }
 
     private record Recipient(String address, String role) {}
@@ -359,8 +350,7 @@ public class StaffWorkService {
     public void setWaitingOn(UUID caseId, String actor, String reason) {
         if (!WAITING.contains(actor)) throw new ApiException(400, "INVALID_WAITING_ACTOR", "Unsupported responsibility value");
         // Keep waiting_since as the moment responsibility actually moved, not the last time it was re-stated.
-        jdbc.sql("UPDATE medical_cases SET waiting_on=?,waiting_reason=?,waiting_since=CASE WHEN waiting_on=? THEN COALESCE(waiting_since,?) ELSE ? END WHERE id=?")
-                .params(actor, reason, actor, timestamp(clock.instant()), timestamp(clock.instant()), caseId).update();
+        cases.waitOn(caseId, actor, reason, micros(clock.instant()));
     }
 
     // ---------------- helpers ----------------
@@ -380,8 +370,6 @@ public class StaffWorkService {
     private static String json(String value) { return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\""); }
 
     private void audit(UUID caseId, String type, UUID entityId, String reason) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, "SYSTEM", "SYSTEM", caseId, "CaseTask", entityId.toString(),
-                        "CREATE", "SUCCESS", reason, timestamp(clock.instant())).update();
+        auditTrail.event(type).actor("SYSTEM", "SYSTEM").caseId(caseId).entity("CaseTask", entityId).action("CREATE").reason(reason).record();
     }
 }

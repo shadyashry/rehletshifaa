@@ -1,23 +1,27 @@
 package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.PatientProposalState;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalAccessHandoff;
+import com.rehletshifaa.journey.domain.ProposalAccessChallenge;
+import com.rehletshifaa.journey.domain.ProposalShareToken;
+import com.rehletshifaa.journey.infrastructure.ProposalAccessChallengeRepository;
+import com.rehletshifaa.journey.infrastructure.ProposalShareTokenRepository;
+import com.rehletshifaa.journey.infrastructure.ProposalVersionRepository;
 import com.rehletshifaa.shared.api.ApiException;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.rehletshifaa.shared.audit.AuditTrail;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * The single rule for "which proposal, if any, may the patient see right now" — and the one way a
@@ -31,6 +35,11 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class ProposalAccessService {
+    private final MedicalCaseRepository cases;
+    private final ProposalVersionRepository proposalVersions;
+    private final ProposalAccessChallengeRepository accessChallenges;
+    private final ProposalShareTokenRepository shareTokens;
+    private final AuditTrail auditTrail;
     /** Stages where a proposal is genuinely in the making, so "being prepared" is honest before a version exists. */
     private static final Set<String> PREPARING_STAGES = Set.of("CLINICAL_RECOMMENDATION_READY", "PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL", "REVISION_REQUESTED");
     private static final Set<String> PRE_RELEASE = Set.of("CLINICALLY_APPROVED", "OPERATIONS_COMPLETED", "FINANCE_APPROVED");
@@ -38,23 +47,22 @@ public class ProposalAccessService {
     private static final Duration HANDOFF_TOKEN_TTL = Duration.ofHours(24);
     private static final Duration HANDOFF_GRANT_TTL = Duration.ofMinutes(30);
 
-    private final JdbcClient jdbc;
     private final IntakeLifecycleService intake;
     private final Clock clock;
 
-    public ProposalAccessService(JdbcClient jdbc, IntakeLifecycleService intake, Clock clock) {
-        this.jdbc = jdbc; this.intake = intake; this.clock = clock;
+    public ProposalAccessService(IntakeLifecycleService intake, Clock clock, AuditTrail auditTrail, ProposalShareTokenRepository shareTokens, ProposalAccessChallengeRepository accessChallenges, ProposalVersionRepository proposalVersions, MedicalCaseRepository cases) { this.cases = cases; this.proposalVersions = proposalVersions; this.accessChallenges = accessChallenges; this.shareTokens = shareTokens; this.auditTrail = auditTrail;
+        this.intake = intake; this.clock = clock;
     }
 
     @Transactional(readOnly = true)
     public PatientProposalState state(UUID caseId) {
         Instant now = clock.instant();
-        Version v = jdbc.sql("SELECT pv.id,pv.version_number,pv.status,pv.document_type,pv.currency,pv.valid_until,pv.released_at,"
-                        + "(SELECT MAX(d.created_at) FROM proposal_decisions d WHERE d.proposal_version_id=pv.id) decided_at "
-                        + "FROM proposal_versions pv JOIN proposals p ON p.id=pv.proposal_id WHERE p.case_id=? ORDER BY pv.version_number DESC LIMIT 1")
-                .param(caseId).query(this::map).optional().orElse(null);
+        Version v = proposalVersions.latestForCase(caseId, org.springframework.data.domain.PageRequest.of(0, 1)).stream().findFirst()
+                .map(x -> new Version(x.getId(), x.getVersionNumber(), x.getStatus(), x.getDocumentType(), x.getCurrency(), x.getValidUntil(),
+                        x.getReleasedAt(), x.getDecidedAt()))
+                .orElse(null);
         if (v == null) {
-            String stage = jdbc.sql("SELECT status FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse("");
+            String stage = cases.findById(caseId).map(c -> c.getStatus().name()).orElse("");
             return PREPARING_STAGES.contains(stage) ? hidden("PREPARING") : hidden("NONE");
         }
         if (PRE_RELEASE.contains(v.status())) return hidden("PREPARING");
@@ -89,35 +97,19 @@ public class ProposalAccessService {
         Instant now = clock.instant();
         String token = randomToken();
         UUID shareId = UUID.randomUUID();
-        jdbc.sql("INSERT INTO proposal_share_tokens(id,proposal_version_id,case_id,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?)")
-                .params(shareId, state.versionId(), caseId, intake.hash(token), timestamp(now.plus(HANDOFF_TOKEN_TTL)), timestamp(now)).update();
+        shareTokens.saveAndFlush(new ProposalShareToken(shareId, state.versionId(), caseId, intake.hash(token), now.plus(HANDOFF_TOKEN_TTL), now));
         String grant = randomToken();
         Instant grantExpiry = now.plus(HANDOFF_GRANT_TTL);
         // A consumed challenge is the only shape a grant has; the code itself was verified on the case link.
-        jdbc.sql("INSERT INTO proposal_access_challenges(id,share_token_id,proposal_version_id,case_id,code_hash,delivery_channel,destination_hint,expires_at,attempts,max_attempts,consumed_at,grant_hash,grant_expires_at,created_at) "
-                        + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), shareId, state.versionId(), caseId, intake.hash(randomToken()), channel == null ? "CASE_LINK" : channel,
-                        destinationHint == null ? "***" : destinationHint, timestamp(now), 1, 1, timestamp(now), intake.hash(grant), timestamp(grantExpiry), timestamp(now)).update();
-        jdbc.sql("UPDATE proposal_versions SET status='VIEWED',viewed_at=? WHERE id=? AND status='RELEASED'").params(timestamp(now), state.versionId()).update();
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), "PROPOSAL_ACCESS_VERIFIED", "SECURE_LINK", "PATIENT", caseId, "ProposalVersion", state.versionId().toString(),
-                        "VERIFY", "SUCCESS", "Opened from verified case-status link", timestamp(now)).update();
+        accessChallenges.saveAndFlush(ProposalAccessChallenge.provenElsewhere(new ProposalAccessChallenge.Target(shareId, state.versionId(), caseId), intake.hash(randomToken()), channel == null ? "CASE_LINK" : channel, destinationHint == null ? "***" : destinationHint, intake.hash(grant), grantExpiry, now));
+        proposalVersions.markViewed(state.versionId(), micros(now));
+        auditTrail.event("PROPOSAL_ACCESS_VERIFIED").actor("SECURE_LINK", "PATIENT").caseId(caseId).entity("ProposalVersion", state.versionId()).action("VERIFY").reason("Opened from verified case-status link").at(now).record();
         return new ProposalAccessHandoff(token, grant, grantExpiry, state.versionId());
     }
 
     private static PatientProposalState hidden(String state) { return new PatientProposalState(state, null, null, null, null, null, null, null, null); }
 
     private record Version(UUID id, int number, String status, String documentType, String currency, Instant validUntil, Instant releasedAt, Instant decidedAt) {}
-
-    private Version map(ResultSet rs, int n) throws SQLException {
-        return new Version(rs.getObject("id", UUID.class), rs.getInt("version_number"), rs.getString("status"), rs.getString("document_type"),
-                rs.getString("currency"), instant(rs, "valid_until"), instant(rs, "released_at"), instant(rs, "decided_at"));
-    }
-
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
 
     private static String randomToken() { return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", ""); }
 }

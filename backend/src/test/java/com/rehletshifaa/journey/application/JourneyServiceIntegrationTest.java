@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class JourneyServiceIntegrationTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto; @Autowired EntityManager entityManager; @Autowired PaymentService payment; @Autowired MockMvc mvc;
+    @Autowired com.rehletshifaa.journey.application.ConsultantOnboardingService onboarding;
     @AfterEach void clearSecurity(){SecurityContextHolder.clearContext();}
 
     @Test void credentialDecisionRequiresIndependentReviewerEvenForLegacyAdministrators() {
@@ -42,15 +43,15 @@ class JourneyServiceIntegrationTest {
                 credential,practitioner,"LICENSE","UNDER_REVIEW",Instant.now().plusSeconds(86400),Instant.now());
         // SOD-08: System Administrator authority never reaches credential decisions.
         authenticate("self-reviewer",Role.SYSTEM_ADMINISTRATOR);
-        assertThatThrownBy(()->journey.verifyPractitioner(practitioner,true,"Review decision"))
+        assertThatThrownBy(()->onboarding.verifyPractitioner(practitioner,true,"Review decision"))
                 .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("do not include this action");
         authenticate("self-reviewer", Role.SYSTEM_ADMINISTRATOR, Role.CREDENTIAL_VERIFIER);
         for(boolean approved:List.of(true,false))
-            assertThatThrownBy(()->journey.verifyPractitioner(practitioner,approved,"Review decision"))
+            assertThatThrownBy(()->onboarding.verifyPractitioner(practitioner,approved,"Review decision"))
                     .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("cannot decide this review");
         assertThat(jdbc.queryForObject("SELECT status FROM practitioner_credentials WHERE id=?",String.class,credential)).isEqualTo("UNDER_REVIEW");
         authenticate("independent-reviewer",Role.CREDENTIAL_VERIFIER);
-        assertThat(journey.verifyPractitioner(practitioner,true,"Independent review").status()).isEqualTo("VERIFIED");
+        assertThat(onboarding.verifyPractitioner(practitioner,true,"Independent review").status()).isEqualTo("VERIFIED");
         assertThat(jdbc.queryForObject("SELECT verified_by FROM practitioner_credentials WHERE id=?",String.class,credential)).isEqualTo("independent-reviewer");
     }
 

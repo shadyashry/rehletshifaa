@@ -1,13 +1,16 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
-import com.rehletshifaa.authority.domain.Role;
+import com.rehletshifaa.journey.api.JourneyDtos.*;
+import com.rehletshifaa.journey.domain.PatientIdentityVerification;
+import com.rehletshifaa.journey.infrastructure.PatientIdentityVerificationRepository;
+import com.rehletshifaa.journey.infrastructure.PatientOnboardingRepository;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
+
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,7 @@ import java.sql.SQLException;
 import java.time.*;
 import java.util.*;
 
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
 /**
@@ -28,10 +32,13 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class IdentityVerificationService {
+    private final PatientOnboardingRepository onboardings;
+    private final PatientIdentityVerificationRepository verifications;
+    private final AuditTrail auditTrail;
     private final JdbcClient jdbc; private final Authority authority; private final Clock clock; private final CryptoService crypto; private final IdentityVerificationPort port;
     private static final Duration VERIFICATION_VALIDITY = Duration.ofDays(730);
 
-    public IdentityVerificationService(JdbcClient jdbc, Authority authority, Clock clock, CryptoService crypto, IdentityVerificationPort port) {
+    public IdentityVerificationService(JdbcClient jdbc, Authority authority, Clock clock, CryptoService crypto, IdentityVerificationPort port, AuditTrail auditTrail, PatientIdentityVerificationRepository verifications, PatientOnboardingRepository onboardings) { this.onboardings = onboardings; this.verifications = verifications; this.auditTrail = auditTrail;
         this.jdbc = jdbc; this.authority = authority; this.clock = clock; this.crypto = crypto; this.port = port;
     }
 
@@ -47,12 +54,9 @@ public class IdentityVerificationService {
         }
         var outcome = port.submit(new IdentityVerificationPort.Submission(request.subjectType(), request.method(), request.nationality(), request.documentType(), request.issuingCountry()));
         Instant now = clock.instant(); UUID id = UUID.randomUUID();
-        jdbc.sql("INSERT INTO patient_identity_verifications(id,patient_id,onboarding_id,subject_type,representative_id,representative_relationship,assurance_level,method,provider,provider_reference,status,legal_name_encrypted,date_of_birth_encrypted,nationality,document_type,issuing_country,document_reference_masked,requested_at,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
-                .params(id, patientId, onboardingId, request.subjectType(), representativeId, request.representativeRelationship(), outcome.assuranceLevel(), request.method(), outcome.provider(), outcome.providerReference(), outcome.status(),
-                        crypto.encrypt(request.legalName()), request.dateOfBirth() == null ? null : crypto.encrypt(request.dateOfBirth()), request.nationality(), request.documentType(), request.issuingCountry(), mask(request.documentReference()),
-                        timestamp(now), timestamp(now), timestamp(now)).update();
+        verifications.saveAndFlush(new PatientIdentityVerification(id, new PatientIdentityVerification.Subject(patientId, onboardingId, request.subjectType(), representativeId, request.representativeRelationship()), new PatientIdentityVerification.Evidence(request.method(), outcome.provider(), outcome.providerReference(), outcome.assuranceLevel(), outcome.status(), crypto.encrypt(request.legalName()), request.dateOfBirth() == null ? null : crypto.encrypt(request.dateOfBirth()), request.nationality(), request.documentType(), request.issuingCountry(), mask(request.documentReference())), now));
         if (onboardingId != null && ("MANUAL_REVIEW".equals(outcome.status()) || "PENDING".equals(outcome.status())))
-            jdbc.sql("UPDATE patient_onboardings SET state='IDENTITY_REVIEW',updated_at=?,version=version+1 WHERE id=? AND state NOT IN ('COMPLETED','CANCELLED')").params(timestamp(now), onboardingId).update();
+            onboardings.awaitIdentityReview(onboardingId, micros(now));
         audit(actor.subject(), actor.label(), caseId, "IDENTITY_VERIFICATION_STARTED", id, "provider=" + outcome.provider() + ";status=" + outcome.status());
         return view(id);
     }
@@ -68,11 +72,10 @@ public class IdentityVerificationService {
         if (!Set.of("PENDING", "MANUAL_REVIEW").contains(r.status())) throw new ApiException(409, "IDENTITY_NOT_REVIEWABLE", "This identity verification is no longer awaiting review");
         boolean verify = "VERIFY".equals(request.decision());
         Instant now = clock.instant();
-        int changed = jdbc.sql("UPDATE patient_identity_verifications SET status=?,assurance_level=COALESCE(?,assurance_level),reviewed_by=?,verified_at=?,expires_at=?,rejection_reason=?,updated_at=?,version=version+1 WHERE id=? AND status IN ('PENDING','MANUAL_REVIEW')")
-                .params(verify ? "VERIFIED" : "REJECTED", request.assuranceLevel(), actor.subject(), verify ? timestamp(now) : null, verify ? timestamp(now.plus(VERIFICATION_VALIDITY)) : null, verify ? null : request.reason(), timestamp(now), identityId).update();
+        int changed = verifications.decide(identityId, verify ? "VERIFIED" : "REJECTED", request.assuranceLevel(), actor.subject(), verify ? micros(now) : null, verify ? micros(now.plus(VERIFICATION_VALIDITY)) : null, verify ? null : request.reason(), micros(now));
         if (changed != 1) throw new ApiException(409, "IDENTITY_NOT_REVIEWABLE", "This identity verification is no longer awaiting review");
         if (verify && r.onboardingId() != null)
-            jdbc.sql("UPDATE patient_onboardings SET identity_verified_at=?,updated_at=?,version=version+1 WHERE id=?").params(timestamp(now), timestamp(now), r.onboardingId()).update();
+            onboardings.markIdentityVerified(r.onboardingId(), micros(now));
         UUID caseId = jdbc.sql("SELECT case_id FROM patient_onboardings WHERE id=?").param(r.onboardingId()).query(UUID.class).optional().orElse(null);
         audit(actor.subject(), actor.label(), caseId, verify ? "IDENTITY_VERIFIED" : "IDENTITY_REJECTED", identityId, request.reason());
         return view(identityId);
@@ -109,8 +112,7 @@ public class IdentityVerificationService {
     }
     private String mask(String value) { if (value == null || value.isBlank()) return null; String clean = value.replaceAll("\\s", ""); return clean.length() < 4 ? "***" : "***" + clean.substring(clean.length() - 4); }
     private void audit(String subject, String role, UUID caseId, String type, UUID entityId, String reason) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, subject, role, caseId, "IdentityVerification", entityId.toString(), "IDENTITY", "SUCCESS", reason, timestamp(clock.instant())).update();
+        auditTrail.event(type).actor(subject, role).caseId(caseId).entity("IdentityVerification", entityId).action("IDENTITY").reason(reason).record();
     }
     private static Instant instN(ResultSet rs, String col) throws SQLException { OffsetDateTime v = rs.getObject(col, OffsetDateTime.class); return v == null ? null : v.toInstant(); }
 }

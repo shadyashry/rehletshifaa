@@ -1,8 +1,10 @@
 package com.rehletshifaa.casemanagement.application;
 
+import com.rehletshifaa.casemanagement.domain.CaseIntakeGrant;
+import com.rehletshifaa.casemanagement.infrastructure.CaseIntakeGrantRepository;
 import com.rehletshifaa.shared.api.ApiException;
+
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -11,41 +13,37 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /** Binds anonymous draft uploads and submission to the bot-verified browser that created the case. */
 @Service
 public class CaseIntakeGrantService {
-    private final JdbcClient jdbc;
+    private final CaseIntakeGrantRepository grants;
     private final IntakeLifecycleService intake;
     private final Clock clock;
     private final Duration ttl;
     private final SecureRandom random = new SecureRandom();
 
-    public CaseIntakeGrantService(JdbcClient jdbc, IntakeLifecycleService intake, Clock clock,
-            @Value("${app.claim.intake-grant-expiry-seconds:7200}") long expirySeconds) {
-        this.jdbc=jdbc; this.intake=intake; this.clock=clock; this.ttl=Duration.ofSeconds(expirySeconds);
+    public CaseIntakeGrantService(IntakeLifecycleService intake, Clock clock,
+            @Value("${app.claim.intake-grant-expiry-seconds:7200}") long expirySeconds, CaseIntakeGrantRepository grants) { this.grants = grants;
+        this.intake=intake; this.clock=clock; this.ttl=Duration.ofSeconds(expirySeconds);
     }
 
     public String issue(UUID caseId) {
         byte[] bytes=new byte[32]; random.nextBytes(bytes);
         String token=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         var now=clock.instant();
-        jdbc.sql("INSERT INTO case_intake_grants(case_id,grant_hash,expires_at,created_at) VALUES(?,?,?,?)")
-                .params(caseId,intake.hash(token),timestamp(now.plus(ttl)),timestamp(now)).update();
+        grants.saveAndFlush(new CaseIntakeGrant(caseId,intake.hash(token),now.plus(ttl),now));
         return token;
     }
 
     public void require(UUID caseId,String token) {
         if(token==null || token.isBlank()) throw denied();
-        Integer found=jdbc.sql("SELECT count(*) FROM case_intake_grants WHERE case_id=? AND grant_hash=? AND expires_at>? AND consumed_at IS NULL")
-                .params(caseId,intake.hash(token),timestamp(clock.instant())).query(Integer.class).single();
-        if(found==null || found!=1) throw denied();
+        if(!grants.isUsable(caseId,intake.hash(token),micros(clock.instant()))) throw denied();
     }
 
     public void consume(UUID caseId,String token) {
-        int changed=jdbc.sql("UPDATE case_intake_grants SET consumed_at=? WHERE case_id=? AND grant_hash=? AND expires_at>? AND consumed_at IS NULL")
-                .params(timestamp(clock.instant()),caseId,intake.hash(token),timestamp(clock.instant())).update();
+        int changed=grants.consume(caseId,intake.hash(token),micros(clock.instant()));
         if(changed!=1) throw denied();
     }
 

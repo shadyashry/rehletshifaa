@@ -1,7 +1,19 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
 import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
+import com.rehletshifaa.casemanagement.infrastructure.CaseAccessLinkRepository;
+import com.rehletshifaa.casemanagement.infrastructure.CaseSubmissionContactRepository;
+import com.rehletshifaa.casemanagement.infrastructure.ConsentRecordRepository;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
+import com.rehletshifaa.directory.domain.PatientProfile;
+import com.rehletshifaa.directory.domain.PatientRepresentative;
+import com.rehletshifaa.directory.infrastructure.PatientProfileRepository;
+import com.rehletshifaa.directory.infrastructure.PatientRepresentativeRepository;
 import com.rehletshifaa.identity.PatientIdentityPort;
 import com.rehletshifaa.identity.PatientIdentityPort.IdentityUser;
 import com.rehletshifaa.journey.api.ActivationDtos.AccountSetup;
@@ -10,13 +22,15 @@ import com.rehletshifaa.journey.api.JourneyDtos.AccountLinkRequestView;
 import com.rehletshifaa.journey.api.JourneyDtos.AccountLinkResolution;
 import com.rehletshifaa.journey.api.JourneyDtos.AccountSessionView;
 import com.rehletshifaa.journey.api.JourneyDtos.PatientProfileView;
-import com.rehletshifaa.authority.application.Actor;
-import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.application.Resource;
-import com.rehletshifaa.authority.domain.Permission;
-import com.rehletshifaa.authority.domain.Role;
+import com.rehletshifaa.journey.domain.PatientAccountLinkRequest;
+import com.rehletshifaa.journey.infrastructure.PatientAccountLinkRequestRepository;
+import com.rehletshifaa.journey.infrastructure.PatientIdentityVerificationRepository;
+import com.rehletshifaa.journey.infrastructure.PatientOnboardingRepository;
+import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.util.PatientNames;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -32,6 +46,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.*;
 
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
 /**
@@ -50,6 +65,17 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class PatientAccountService {
+    private final PatientIdentityVerificationRepository identityVerifications;
+    private final ConsentRecordRepository consentRecords;
+    private final CaseAccessLinkRepository accessLinks;
+    private final MedicalCaseRepository cases;
+    private final PatientAccountLinkRequestRepository linkRequests;
+    private final PatientOnboardingRepository onboardings;
+    private final CaseSubmissionContactRepository contacts;
+    private final PatientRepresentativeRepository representatives;
+    private final PatientProfileRepository patients;
+    private final NotificationOutbox notificationOutbox;
+    private final AuditTrail auditTrail;
     private static final Logger log = LoggerFactory.getLogger(PatientAccountService.class);
     /** How long an "is this you?" continuation link stays valid. */
     private static final Duration LINK_TTL = Duration.ofDays(7);
@@ -64,7 +90,7 @@ public class PatientAccountService {
     private final Authority authority;
     private final Clock clock;
 
-    public PatientAccountService(JdbcClient jdbc, PatientIdentityPort identity, IntakeLifecycleService intake, com.rehletshifaa.casemanagement.application.CaseService caseService, Authority authority, Clock clock) {
+    public PatientAccountService(JdbcClient jdbc, PatientIdentityPort identity, IntakeLifecycleService intake, com.rehletshifaa.casemanagement.application.CaseService caseService, Authority authority, Clock clock, AuditTrail auditTrail, NotificationOutbox notificationOutbox, PatientProfileRepository patients, PatientRepresentativeRepository representatives, CaseSubmissionContactRepository contacts, PatientOnboardingRepository onboardings, PatientAccountLinkRequestRepository linkRequests, MedicalCaseRepository cases, CaseAccessLinkRepository accessLinks, ConsentRecordRepository consentRecords, PatientIdentityVerificationRepository identityVerifications) { this.identityVerifications = identityVerifications; this.consentRecords = consentRecords; this.accessLinks = accessLinks; this.cases = cases; this.linkRequests = linkRequests; this.onboardings = onboardings; this.contacts = contacts; this.representatives = representatives; this.patients = patients; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
         this.jdbc = jdbc; this.identity = identity; this.intake = intake; this.caseService = caseService; this.authority = authority; this.clock = clock;
     }
 
@@ -114,9 +140,8 @@ public class PatientAccountService {
 
         boolean verified = a.emailVerifiedAt() != null && normalized.equals(normalizeEmail(a.email()));
         String subject = identity.provisionPatient(normalized, a.givenName(), a.familyName(), lang, verified);
-        int bound = jdbc.sql("UPDATE patient_profiles SET external_subject=?,account_status='SETUP_PENDING',account_setup_requested_at=?,updated_at=?,version=version+1 WHERE id=? AND external_subject IS NULL")
-                .params(subject, timestamp(now), timestamp(now), patientId).update();
-        if (bound != 1) { // lost a race with a parallel request for the same patient: keep the first account
+        boolean bound = changeProfile(patientId, p -> p.bindPendingSetup(subject, now));
+        if (!bound) { // lost a race with a parallel request for the same patient: keep the first account
             Account again = load(patientId);
             return view(again, "ACTIVE".equals(again.accountStatus()) ? AccountStatus.ACTIVE : AccountStatus.SETUP_PENDING, false);
         }
@@ -130,7 +155,8 @@ public class PatientAccountService {
     private boolean trySendSetup(String subject, String lang, UUID caseId, UUID patientId, Instant now) {
         try { sendSetup(subject, lang, caseId, patientId, now); return true; }
         catch (RuntimeException e) {
-            log.warn("Account setup email could not be sent for patient {}: {}", patientId, e.getMessage());
+            // Exception messages can carry the recipient address; the type is enough to triage.
+            log.warn("Account setup email could not be sent for patient {}: {}", patientId, e.getClass().getSimpleName());
             audit(caseId, "PATIENT_ACCOUNT_SETUP_SEND_FAILED", patientId, "Identity-provider setup email failed; patient can resend");
             return false;
         }
@@ -188,7 +214,7 @@ public class PatientAccountService {
                 markActive(a.patientId(), now, claim != null && claim.verified() && claim.email().equals(normalizeEmail(a.email())));
                 audit(null, "PATIENT_ACCOUNT_ACTIVATED", a.patientId(), "First authenticated sign-in after identity-provider setup");
             } else if (claim != null && claim.verified() && claim.email().equals(normalizeEmail(a.email())) && a.emailVerifiedAt() == null) {
-                jdbc.sql("UPDATE patient_profiles SET email_verified_at=?,updated_at=? WHERE id=? AND email_verified_at IS NULL").params(timestamp(now), timestamp(now), a.patientId()).update();
+                changeProfile(a.patientId(), p -> p.markEmailVerified(now));
             }
         }
         Account a = findBySubject(actor.subject()).orElse(null);
@@ -237,7 +263,7 @@ public class PatientAccountService {
             if (identity.findByEmail(normalized).isEmpty()) return;
             issueLinkRequest(s.patientId(), event.caseId(), normalized, "INTAKE", s.lang(), clock.instant());
         } catch (RuntimeException e) {
-            log.warn("Existing-account check skipped for case {}: {}", event.caseId(), e.getMessage());
+            log.warn("Existing-account check skipped for case {}: {}", event.caseId(), e.getClass().getSimpleName());
         }
     }
 
@@ -270,8 +296,7 @@ public class PatientAccountService {
             case "DECLINED" -> decline(r, now);
             default -> throw new ApiException(400, "INVALID_RESOLUTION", "Choose whether this case is for you or for someone else");
         }
-        jdbc.sql("UPDATE patient_account_link_requests SET consumed_at=?,resolved_subject=?,resolution=?,relationship=?,updated_at=? WHERE id=? AND consumed_at IS NULL")
-                .params(timestamp(now), actor.subject(), resolution, "REPRESENTATIVE".equals(resolution) ? trimToNull(decision.relationship()) : null, timestamp(now), r.id()).update();
+        linkRequests.resolve(r.id(), actor.subject(), resolution, "REPRESENTATIVE".equals(resolution) ? trimToNull(decision.relationship()) : null, micros(now));
         return linkRequest(token);
     }
 
@@ -287,10 +312,8 @@ public class PatientAccountService {
             audit(r.caseId(), "PATIENT_IDENTITY_MERGED", r.patientId(), "Account owner confirmed the case is theirs; pending patient folded into canonical patient " + owner.get().patientId());
             return;
         }
-        int bound = jdbc.sql("UPDATE patient_profiles SET external_subject=?,account_status='ACTIVE',account_activated_at=COALESCE(account_activated_at,?),email=COALESCE(email,?),email_verified_at=CASE WHEN LOWER(COALESCE(email,?))=? THEN COALESCE(email_verified_at,?) ELSE email_verified_at END,updated_at=?,version=version+1 WHERE id=? AND (external_subject IS NULL OR external_subject=?)")
-                .params(subject, timestamp(now), r.email(), r.email(), r.email(), timestamp(now), timestamp(now), r.patientId(), subject).update();
-        if (bound != 1) throw new ApiException(409, "ALREADY_LINKED", "This profile is already linked to another account");
-        jdbc.sql("UPDATE patient_profiles SET profile_status='ACTIVE',activated_at=COALESCE(activated_at,?) WHERE id=? AND profile_completed_at IS NOT NULL AND profile_status<>'ACTIVE'").params(timestamp(now), r.patientId()).update();
+        if (!changeProfile(r.patientId(), p -> p.bindConfirmedOwner(subject, r.email(), now))) throw new ApiException(409, "ALREADY_LINKED", "This profile is already linked to another account");
+        changeProfile(r.patientId(), p -> p.activateCompletedProfile(now));
         audit(r.caseId(), "PATIENT_ACCOUNT_LINKED", r.patientId(), "Account owner confirmed the case is theirs");
     }
 
@@ -301,36 +324,42 @@ public class PatientAccountService {
      */
     private void linkAsRepresentative(LinkRequest r, String subject, String relationship, Instant now) {
         String rel = trimToNull(relationship) == null ? "OTHER" : relationship.trim().toUpperCase(Locale.ROOT);
-        jdbc.sql("INSERT INTO patient_representatives(id,patient_id,representative_subject,relationship,permissions,effective_from,created_at) SELECT ?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM patient_representatives WHERE patient_id=? AND representative_subject=? AND revoked_at IS NULL)")
-                .params(UUID.randomUUID(), r.patientId(), subject, rel, "VIEW,MESSAGE,COORDINATE", timestamp(now), timestamp(now), r.patientId(), subject).update();
+        if (!representatives.existsByPatientIdAndRepresentativeSubjectAndRevokedAtIsNull(r.patientId(), subject))
+            representatives.saveAndFlush(new PatientRepresentative(r.patientId(), subject, rel, "VIEW,MESSAGE,COORDINATE", now, null, now));
         // The representative's email is not the patient's account email.
-        jdbc.sql("UPDATE patient_profiles SET email=NULL,email_verified_at=NULL,updated_at=? WHERE id=? AND LOWER(email)=?").params(timestamp(now), r.patientId(), r.email()).update();
+        changeProfile(r.patientId(), p -> p.withdrawEmail(r.email(), false, now));
         // If the intake said "myself", it was in fact a representative: correct the submission record and the
         // number's ownership. A verified OTP on that number proved the representative's possession, not the patient's.
-        jdbc.sql("UPDATE case_submission_contacts SET contact_role='REPRESENTATIVE',relationship_to_patient=COALESCE(relationship_to_patient,?) WHERE case_id=?").params(rel, r.caseId()).update();
-        jdbc.sql("UPDATE patient_profiles SET whatsapp_number=NULL,mobile_owner=NULL,phone_verified_at=NULL,updated_at=? WHERE id=? AND whatsapp_number IS NOT NULL AND whatsapp_number IN (SELECT whatsapp_number FROM case_submission_contacts WHERE case_id=?)")
-                .params(timestamp(now), r.patientId(), r.caseId()).update();
-        jdbc.sql("UPDATE patient_onboardings SET subject_type='REPRESENTATIVE',updated_at=? WHERE case_id=? AND (subject_type IS NULL OR subject_type='PATIENT')").params(timestamp(now), r.caseId()).update();
+        contacts.markRepresentative(r.caseId(), rel);
+        // case_submission_contacts is converted with the journey module; until then its numbers are read with JDBC.
+        List<String> submitterNumbers = jdbc.sql("SELECT whatsapp_number FROM case_submission_contacts WHERE case_id=? AND whatsapp_number IS NOT NULL")
+                .param(r.caseId()).query(String.class).list();
+        changeProfile(r.patientId(), p -> p.withdrawPhone(submitterNumbers, now));
+        onboardings.markRepresentative(r.caseId(), micros(now));
         audit(r.caseId(), "PATIENT_REPRESENTATIVE_LINKED", r.patientId(), "Account owner confirmed they act for the patient (" + rel + ")");
     }
 
     private void decline(LinkRequest r, Instant now) {
         // Not theirs and not for someone they act for: withdraw the address from the pending patient.
-        jdbc.sql("UPDATE patient_profiles SET email=NULL,email_verified_at=NULL,updated_at=? WHERE id=? AND LOWER(email)=? AND external_subject IS NULL").params(timestamp(now), r.patientId(), r.email()).update();
+        changeProfile(r.patientId(), p -> p.withdrawEmail(r.email(), true, now));
         audit(r.caseId(), "PATIENT_ACCOUNT_LINK_DECLINED", r.patientId(), "Account owner said the case is not theirs; contact email withdrawn, coordinator to follow up");
     }
 
     /** Fold the pending patient {@code from} into the canonical {@code into}. Every patient-scoped row moves. */
     private void mergePatient(UUID from, UUID into, Instant now) {
-        for (String table : List.of("medical_cases", "case_submission_contacts", "case_access_links", "consent_records", "patient_onboardings", "patient_identity_verifications", "case_claim_challenges"))
-            jdbc.sql("UPDATE " + table + " SET patient_id=? WHERE patient_id=?").params(into, from).update();
-        jdbc.sql("DELETE FROM patient_representatives WHERE patient_id=? AND representative_subject IN (SELECT representative_subject FROM patient_representatives WHERE patient_id=?)").params(from, into).update();
-        jdbc.sql("UPDATE patient_representatives SET patient_id=? WHERE patient_id=?").params(into, from).update();
-        jdbc.sql("UPDATE patient_account_link_requests SET patient_id=? WHERE patient_id=? AND email NOT IN (SELECT email FROM patient_account_link_requests WHERE patient_id=?)").params(into, from, into).update();
-        jdbc.sql("UPDATE patient_profiles SET merged_into_patient_id=?,profile_status='MERGED',account_status='NOT_PROVISIONED',email=NULL,whatsapp_number=NULL,updated_at=?,version=version+1 WHERE id=?").params(into, timestamp(now), from).update();
+        cases.moveToPatient(from, into);
+        contacts.moveToPatient(from, into);
+        accessLinks.moveToPatient(from, into);
+        consentRecords.moveToPatient(from, into);
+        onboardings.moveToPatient(from, into);
+        identityVerifications.moveToPatient(from, into);
+        representatives.deleteDuplicatesOf(from, into);
+        representatives.moveAll(from, into);
+        linkRequests.moveToSurvivor(from, into);
+        changeProfile(from, p -> { p.mergeInto(into, now); return true; });
         // The canonical patient keeps its own name; a WhatsApp number the pending patient supplied is only
         // adopted when the canonical patient has none (it was never a matching key).
-        jdbc.sql("UPDATE patient_profiles SET updated_at=? WHERE id=?").params(timestamp(now), into).update();
+        changeProfile(into, p -> { p.touch(now); return true; });
     }
 
     // ======================================================================
@@ -341,30 +370,34 @@ public class PatientAccountService {
         // After the Keycloak actions complete the browser is returned straight to the patient's case; the portal
         // finishes sign-in from the fresh Keycloak session without showing the public homepage.
         identity.sendAccountSetup(subject, lang, "/" + lang + "/portal?case=" + caseId + "&continue=1");
-        jdbc.sql("UPDATE patient_profiles SET account_setup_requested_at=?,updated_at=? WHERE id=?").params(timestamp(now), timestamp(now), patientId).update();
+        changeProfile(patientId, p -> { p.recordSetupRequested(now); return true; });
         audit(caseId, "PATIENT_ACCOUNT_SETUP_SENT", patientId, "Identity-provider account setup link sent");
     }
 
     /** One live request per (patient, email): a repeat rotates the token and re-sends, never accumulates. */
     private void issueLinkRequest(UUID patientId, UUID caseId, String email, String origin, String lang, Instant now) {
         String token = randomToken();
-        int rotated = jdbc.sql("UPDATE patient_account_link_requests SET token_hash=?,expires_at=?,consumed_at=NULL,resolution=NULL,resolved_subject=NULL,case_id=?,origin=?,updated_at=? WHERE patient_id=? AND email=? AND consumed_at IS NULL")
-                .params(intake.hash(token), timestamp(now.plus(LINK_TTL)), caseId, origin, timestamp(now), patientId, email).update();
+        int rotated = linkRequests.rotate(patientId, email, intake.hash(token), micros(now.plus(LINK_TTL)), caseId, origin, micros(now));
         if (rotated == 0) {
             Integer resolved = count("SELECT count(*) FROM patient_account_link_requests WHERE patient_id=? AND email=?", patientId, email);
             if (resolved > 0) return; // already resolved by the account owner: never re-open it
-            jdbc.sql("INSERT INTO patient_account_link_requests(id,patient_id,case_id,email,origin,token_hash,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
-                    .params(UUID.randomUUID(), patientId, caseId, email, origin, intake.hash(token), timestamp(now.plus(LINK_TTL)), timestamp(now), timestamp(now)).update();
+            linkRequests.saveAndFlush(new PatientAccountLinkRequest(patientId, caseId, email, origin, intake.hash(token), now.plus(LINK_TTL), now));
         }
         String payload = intake.encryptedJson("{\"token\":\"" + token + "\",\"lang\":\"" + ("ar".equals(lang) ? "ar" : "en") + "\"}");
-        jdbc.sql("INSERT INTO notification_outbox(id,notification_type,channel,destination,template_key,template_data,status,attempts,max_attempts,next_attempt_at,idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), "ACCOUNT_LINK", "EMAIL", email, ACCOUNT_LINK_TEMPLATE, payload, "PENDING", 0, 5, timestamp(now), "account-link:" + patientId + ":" + intake.hash(token), timestamp(now)).update();
+        notificationOutbox.enqueue("ACCOUNT_LINK", "EMAIL", email, ACCOUNT_LINK_TEMPLATE, payload, "account-link:" + patientId + ":" + intake.hash(token), now);
         audit(caseId, "PATIENT_ACCOUNT_LINK_REQUESTED", patientId, "Contact email already has an account; neutral continuation link sent (" + origin + ")");
     }
 
     private void markActive(UUID patientId, Instant now, boolean emailProven) {
-        jdbc.sql("UPDATE patient_profiles SET account_status='ACTIVE',account_activated_at=COALESCE(account_activated_at,?),email_verified_at=CASE WHEN ? THEN COALESCE(email_verified_at,?) ELSE email_verified_at END,profile_status=CASE WHEN profile_completed_at IS NOT NULL THEN 'ACTIVE' ELSE profile_status END,activated_at=CASE WHEN profile_completed_at IS NOT NULL THEN COALESCE(activated_at,?) ELSE activated_at END,updated_at=?,version=version+1 WHERE id=? AND account_status<>'ACTIVE'")
-                .params(timestamp(now), emailProven, timestamp(now), timestamp(now), timestamp(now), patientId).update();
+        changeProfile(patientId, p -> p.activateAccount(emailProven, now));
+    }
+
+    /** Applies one guarded change to the locked, current patient row; saves only when the guard held. */
+    private boolean changeProfile(UUID patientId, java.util.function.Predicate<PatientProfile> change) {
+        PatientProfile profile = patients.lockById(patientId).orElseThrow(() -> new ApiException(404, "PATIENT_NOT_FOUND", "Patient was not found"));
+        if (!change.test(profile)) return false;
+        patients.saveAndFlush(profile);
+        return true;
     }
 
     private LinkRequest requireLink(String token, Actor actor) {
@@ -413,11 +446,10 @@ public class PatientAccountService {
                 instantNullable(rs, "expires_at"), instantNullable(rs, "consumed_at"), rs.getString("resolution"), rs.getString("resolved_subject"));
     }
     private AccountSetup view(Account a, AccountStatus status, boolean sent) { return new AccountSetup(status, mask(a.email()), status == AccountStatus.SETUP_PENDING, sent); }
-    private Optional<IdentityUser> safeFind(java.util.function.Supplier<Optional<IdentityUser>> call) { try { return call.get(); } catch (RuntimeException e) { log.warn("Identity lookup failed: {}", e.getMessage()); return Optional.empty(); } }
+    private Optional<IdentityUser> safeFind(java.util.function.Supplier<Optional<IdentityUser>> call) { try { return call.get(); } catch (RuntimeException e) { log.warn("Identity lookup failed: {}", e.getClass().getSimpleName()); return Optional.empty(); } }
     private int count(String sql, Object... args) { Integer n = jdbc.sql(sql).params(args).query(Integer.class).single(); return n == null ? 0 : n; }
     private void audit(UUID caseId, String type, UUID patientId, String reason) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, "SYSTEM", "PATIENT", caseId, "PatientProfile", patientId.toString(), "ACCOUNT", "SUCCESS", reason, timestamp(clock.instant())).update();
+        auditTrail.event(type).actor("SYSTEM", "PATIENT").caseId(caseId).entity("PatientProfile", patientId).action("ACCOUNT").reason(reason).record();
     }
     static String normalizeEmail(String v) { return v == null || v.isBlank() ? null : v.trim().toLowerCase(Locale.ROOT); }
     private static String trimToNull(String v) { return v == null || v.isBlank() ? null : v.trim(); }

@@ -1,8 +1,10 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.BlockerView;
+import com.rehletshifaa.journey.infrastructure.ProposalVersionRepository;
 import com.rehletshifaa.shared.api.ApiException;
-import org.springframework.jdbc.core.simple.JdbcClient;
+
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -27,6 +29,8 @@ import java.util.*;
  */
 @Component
 public class CaseTransitionPolicy {
+    private final CaseTaskRepository tasks;
+    private final ProposalVersionRepository proposalVersions;
     private static final Map<String, Set<String>> TRANSITIONS = Map.ofEntries(
         Map.entry("RECEIVED", Set.of("INTAKE_REVIEW", "CANCELLED")),
         Map.entry("INTAKE_REVIEW", Set.of("INFORMATION_REQUIRED", "READY_FOR_CONSULTANT", "CANCELLED")),
@@ -50,12 +54,11 @@ public class CaseTransitionPolicy {
     private static final Set<String> ADVANCING = Set.of("CLINICAL_RECOMMENDATION_READY", "PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL",
             "PATIENT_DECISION", "ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED");
 
-    private final JdbcClient jdbc;
     private final PaymentService payment;
     private final CaseActionService caseActions;
 
-    public CaseTransitionPolicy(JdbcClient jdbc, PaymentService payment, CaseActionService caseActions) {
-        this.jdbc = jdbc; this.payment = payment; this.caseActions = caseActions;
+    public CaseTransitionPolicy(PaymentService payment, CaseActionService caseActions, ProposalVersionRepository proposalVersions, CaseTaskRepository tasks) { this.tasks = tasks; this.proposalVersions = proposalVersions;
+        this.payment = payment; this.caseActions = caseActions;
     }
 
     /** Refuses a move the lifecycle or a stage's entry invariant does not allow. Conflicts are 409s the client can act on. */
@@ -84,9 +87,7 @@ public class CaseTransitionPolicy {
     public List<String> entryBlockers(UUID caseId, String target) {
         if (!"TRAVEL_COORDINATION".equals(target)) return List.of();
         List<String> out = new ArrayList<>();
-        Integer accepted = jdbc.sql("SELECT count(*) FROM proposal_versions pv JOIN proposals p ON p.id=pv.proposal_id WHERE p.case_id=? AND pv.status='ACCEPTED'")
-                .param(caseId).query(Integer.class).single();
-        if (accepted == null || accepted == 0) out.add("no accepted proposal is on record");
+        if (!proposalVersions.hasAcceptedForCase(caseId)) out.add("no accepted proposal is on record");
         if (!payment.depositSatisfied(caseId)) out.add("the coordination deposit is not settled");
         for (BlockerView step : caseActions.readinessBlockers(caseId))
             if (CaseActionService.patientGate(step)) out.add(step.labelEn().toLowerCase(Locale.ROOT) + " is still pending with the patient");
@@ -94,8 +95,6 @@ public class CaseTransitionPolicy {
     }
 
     private boolean blockingWorkOpen(UUID caseId) {
-        Integer blocking = jdbc.sql("SELECT count(*) FROM case_tasks WHERE case_id=? AND blocking=TRUE AND status IN ('OPEN','IN_PROGRESS')")
-                .param(caseId).query(Integer.class).single();
-        return blocking != null && blocking > 0;
+        return tasks.existsByCaseIdAndBlockingTrueAndStatusIn(caseId, List.of("OPEN", "IN_PROGRESS"));
     }
 }

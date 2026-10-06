@@ -1,37 +1,33 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
-import com.rehletshifaa.authority.domain.Role;
+import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
 import com.rehletshifaa.shared.api.ApiException;
-import org.springframework.jdbc.core.simple.JdbcClient;
+
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.UUID;
 
 /** Narrow subject/grant-to-PatientAction authorization boundary for Journey patient completion. */
 @Service
 public class PatientJourneyAuthorizationService {
+    private final CaseTaskRepository tasks;
     public record Authorization(UUID caseId, String subject) {}
 
-    private final JdbcClient jdbc;
     private final Authority authority;
     private final PublicCaseAccessService publicCases;
     private final JourneyService journeys;
 
-    public PatientJourneyAuthorizationService(JdbcClient jdbc, Authority authority,
-            PublicCaseAccessService publicCases, JourneyService journeys) {
-        this.jdbc = jdbc; this.authority = authority; this.publicCases = publicCases; this.journeys = journeys;
+    public PatientJourneyAuthorizationService(Authority authority,
+            PublicCaseAccessService publicCases, JourneyService journeys, CaseTaskRepository tasks) { this.tasks = tasks;
+        this.authority = authority; this.publicCases = publicCases; this.journeys = journeys;
     }
 
     public Authorization authenticated(UUID caseId, UUID taskId) {
         var actor = authority.authorize(Permission.PATIENT_DECIDE, Resource.ofCase(caseId));
-        Integer owned = jdbc.sql("SELECT count(*) FROM case_tasks t JOIN medical_cases c ON c.id=t.case_id JOIN patient_profiles p ON p.id=c.patient_id WHERE t.id=? AND t.case_id=? AND t.visibility_scope='PATIENT_ACTION' AND p.external_subject=? AND p.merged_into_patient_id IS NULL")
-                .params(taskId, caseId, actor.subject()).query(Integer.class).single();
-        if (owned == null || owned == 0) throw hidden();
+        if (!tasks.isPatientActionOf(taskId, caseId, actor.subject())) throw hidden();
         return new Authorization(caseId, actor.subject());
     }
 
@@ -54,9 +50,7 @@ public class PatientJourneyAuthorizationService {
     }
 
     private void requireTask(UUID caseId, UUID patientId, UUID taskId) {
-        Integer owned = jdbc.sql("SELECT count(*) FROM case_tasks t JOIN medical_cases c ON c.id=t.case_id WHERE t.id=? AND t.case_id=? AND t.visibility_scope='PATIENT_ACTION' AND c.patient_id=?")
-                .params(taskId, caseId, patientId).query(Integer.class).single();
-        if (owned == null || owned == 0) throw hidden();
+        if (!tasks.isPatientActionOfPatient(taskId, caseId, patientId)) throw hidden();
     }
 
     private static ApiException hidden() {

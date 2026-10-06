@@ -1,0 +1,42 @@
+# Ships the backend and api-gateway container logs of this compose project only. Other containers
+# (Keycloak, Postgres, MinIO, Mailpit, and other projects on the same Docker host) are not shipped:
+# their output is not ECS and can carry credentials or patient e-mail content.
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      templates:
+        # Compose names containers <project>-<service>-<n>; matching the name pins both project and service.
+        - condition:
+            regexp:
+              container.name: "^rehletshifaa-(backend|api-gateway)-[0-9]+$"
+          config:
+            - type: filestream
+              id: rehletshifaa-${data.docker.container.id}
+              paths: ["/var/lib/docker/containers/${data.docker.container.id}/*.log"]
+              prospector.scanner.symlinks: true
+              parsers:
+                - container: { stream: all }
+                # Both services already write ECS JSON; lift it to the event root unchanged.
+                - ndjson:
+                    target: ""
+                    overwrite_keys: true
+                    expand_keys: true
+                    add_error_key: true
+
+processors:
+  # service.name comes from each ECS line itself; container labels are noise and can hold secrets.
+  - drop_fields:
+      fields: ["docker", "container.labels", "agent.ephemeral_id", "agent.id", "input", "log.file.device_id", "log.file.inode", "log.file.fingerprint"]
+      ignore_missing: true
+
+setup.template.enabled: false
+setup.ilm.enabled: false
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  username: rehletshifaa_log_writer
+  password: "${LOG_WRITER_PASSWORD}"
+  # Data stream logs-<dataset>-<namespace>; its template and retention come from setup.sh.
+  index: "logs-rehletshifaa-${LOG_NAMESPACE}"
+
+logging.level: warning

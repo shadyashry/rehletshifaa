@@ -1,15 +1,20 @@
 package com.rehletshifaa.authority.infrastructure;
 
+import com.rehletshifaa.directory.infrastructure.PatientRepresentativeRepository;
+import com.rehletshifaa.directory.infrastructure.PatientProfileRepository;
+import com.rehletshifaa.directory.infrastructure.PracticeManagerRepository;
+import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
 import com.rehletshifaa.authority.domain.Role;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.rehletshifaa.workforce.infrastructure.WorkforceRoleAssignmentRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * Effective roles, read on every request from their own records (IAM-08). No identity-provider claim is an input.
@@ -18,54 +23,47 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Repository
 public class EffectiveRoleStore {
-    private final JdbcClient jdbc;
+    private final PatientRepresentativeRepository representatives;
+    private final PatientProfileRepository patients;
+    private final PracticeManagerRepository practiceManagers;
+    private final PractitionerProfileRepository practitioners;
+    private final WorkforceRoleAssignmentRepository workforceAssignments;
+    private final PlatformRoleAssignmentRepository platformAssignments;
 
-    public EffectiveRoleStore(JdbcClient jdbc) { this.jdbc = jdbc; }
+    public EffectiveRoleStore(WorkforceRoleAssignmentRepository workforceAssignments,
+                              PlatformRoleAssignmentRepository platformAssignments, PractitionerProfileRepository practitioners, PracticeManagerRepository practiceManagers, PatientProfileRepository patients, PatientRepresentativeRepository representatives) { this.representatives = representatives; this.patients = patients; this.practiceManagers = practiceManagers; this.practitioners = practitioners;
+        this.workforceAssignments = workforceAssignments; this.platformAssignments = platformAssignments;
+    }
 
     public Set<Role> roles(String subject, Instant now) {
         Set<Role> roles = EnumSet.of(Role.ACCOUNT_HOLDER);
-        for (String key : jdbc.sql("SELECT a.role_key FROM workforce_role_assignments a "
-                        + "JOIN workforce_people p ON p.subject=a.subject JOIN access_subjects s ON s.subject=a.subject "
-                        + "WHERE a.subject=? AND a.status='ACTIVE' AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>?) "
-                        + "AND p.lifecycle_status='ACTIVE' AND s.active=TRUE AND NOT EXISTS(SELECT 1 FROM workforce_role_conflicts c JOIN ("
-                        + "SELECT role_key,effective_from,effective_to FROM workforce_role_assignments WHERE subject=? AND status='ACTIVE' "
-                        + "UNION ALL SELECT role_key,effective_from,effective_to FROM platform_role_assignments WHERE subject=? AND status='ACTIVE'"
-                        + ") held ON held.role_key=c.conflicting_role_key "
-                        + "WHERE c.role_key=a.role_key AND held.effective_from<=? AND (held.effective_to IS NULL OR held.effective_to>?))")
-                .params(subject, timestamp(now), timestamp(now), subject, subject, timestamp(now), timestamp(now))
-                .query(String.class).list())
-            roles.add(Role.valueOf(key));
-        if (count("SELECT COUNT(*) FROM platform_role_assignments a JOIN workforce_people p ON p.subject=a.subject "
-                        + "JOIN access_subjects s ON s.subject=a.subject WHERE a.subject=? AND a.role_key='SYSTEM_ADMINISTRATOR' "
-                        + "AND a.status='ACTIVE' AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>?) "
-                        + "AND p.lifecycle_status='ACTIVE' AND p.mfa_enrolled=TRUE AND s.active=TRUE",
-                subject, timestamp(now), timestamp(now)) > 0)
+        Instant at = micros(now);
+        // SOD-04 fails closed: a role whose conflict rule is triggered by any other effective role the subject holds
+        // (workforce or platform scope) grants nothing until the conflict is resolved.
+        Set<String> conflicted = new HashSet<>(workforceAssignments.findRolesConflictedByHeldRoles(subject, at));
+        conflicted.addAll(platformAssignments.findWorkforceRolesConflictedByPlatformRoles(subject, at));
+        for (String key : workforceAssignments.findAuthorityRoleKeys(subject, at))
+            if (!conflicted.contains(key)) roles.add(Role.valueOf(key));
+        if (platformAssignments.isEffectiveHolder(subject, "SYSTEM_ADMINISTRATOR", at))
             roles.add(Role.SYSTEM_ADMINISTRATOR);
-        if (count("SELECT COUNT(*) FROM practitioner_profiles WHERE external_subject=? AND account_status<>'DISABLED' AND disabled_at IS NULL", subject) > 0)
+        if (practitioners.isEnabledConsultant(subject))
             roles.add(Role.CONSULTANT);
-        if (count("SELECT COUNT(*) FROM practice_managers WHERE manager_subject=? AND status='ACTIVE'", subject) > 0)
+        if (practiceManagers.existsByManagerSubjectAndStatus(subject, "ACTIVE"))
             roles.add(Role.PRACTICE_MANAGER);
-        if (count("SELECT COUNT(*) FROM patient_profiles WHERE external_subject=?", subject) > 0)
+        if (patients.existsByExternalSubject(subject))
             roles.add(Role.PATIENT);
-        if (count("SELECT COUNT(*) FROM patient_representatives WHERE representative_subject=? AND revoked_at IS NULL "
-                + "AND effective_from<=? AND (expires_at IS NULL OR expires_at>?)", subject, timestamp(now), timestamp(now)) > 0)
+        if (representatives.representsAnyoneAt(subject, at))
             roles.add(Role.PATIENT_REPRESENTATIVE);
         return roles;
     }
 
     /** OWN_CLINIC: the clinic belongs to the subject's own enabled consultant profile. */
     public boolean ownsClinic(UUID practitionerId, String subject) {
-        return count("SELECT COUNT(*) FROM practitioner_profiles WHERE id=? AND external_subject=? AND account_status<>'DISABLED' "
-                + "AND disabled_at IS NULL", practitionerId, subject) > 0;
+        return practitioners.ownsEnabledProfile(practitionerId, subject);
     }
 
     /** DELEGATED_CLINIC: the subject holds an accepted delegation for the clinic. */
     public boolean delegated(UUID practitionerId, String subject) {
-        return count("SELECT COUNT(*) FROM practice_managers WHERE practitioner_id=? AND manager_subject=? AND status='ACTIVE'",
-                practitionerId, subject) > 0;
-    }
-
-    private long count(String sql, Object... params) {
-        return jdbc.sql(sql).params(params).query(Long.class).single();
+        return practiceManagers.existsByPractitionerIdAndManagerSubjectAndStatus(practitionerId, subject, "ACTIVE");
     }
 }

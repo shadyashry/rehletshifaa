@@ -10,7 +10,7 @@ import com.rehletshifaa.coordination.infrastructure.CoordinationRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.journey.application.*;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
-import com.rehletshifaa.journey.infrastructure.JourneyStageProjectionRepository.Projection;
+import com.rehletshifaa.journey.infrastructure.JourneyStageProjectionStore.Projection;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;

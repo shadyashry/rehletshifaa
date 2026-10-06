@@ -5,7 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.rehletshifaa.notification.infrastructure.QueuedNotificationRepository;
+import com.rehletshifaa.notification.infrastructure.WhatsAppDeliveryEventRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,25 +21,28 @@ import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 @Service
 @ConditionalOnProperty(name="app.whatsapp.mode", havingValue="meta")
 public class MetaWhatsAppWebhookService {
-    private final JdbcClient jdbc;
+    private final WhatsAppDeliveryEventRepository deliveryEvents;
+    private final QueuedNotificationRepository messages;
     private final ObjectMapper json;
     private final Clock clock;
     private final byte[] appSecret;
     private final byte[] verifyToken;
 
     public MetaWhatsAppWebhookService(
-        JdbcClient jdbc,
+        WhatsAppDeliveryEventRepository deliveryEvents,
+        QueuedNotificationRepository messages,
         ObjectMapper json,
         Clock clock,
         @Value("${app.whatsapp.meta.app-secret}") String appSecret,
         @Value("${app.whatsapp.meta.verify-token}") String verifyToken
     ) {
-        this.jdbc = jdbc;
+        this.deliveryEvents = deliveryEvents;
+        this.messages = messages;
         this.json = json;
         this.clock = clock;
         this.appSecret = required(appSecret, "WHATSAPP_META_APP_SECRET").getBytes(StandardCharsets.UTF_8);
@@ -84,11 +88,9 @@ public class MetaWhatsAppWebhookService {
             Instant eventAt = parseTimestamp(statusNode.path("timestamp").asText());
             String errorCode = firstErrorCode(statusNode.path("errors"));
             String payloadHash = sha256(payload);
-            int inserted = jdbc.sql("INSERT INTO whatsapp_delivery_events(id,provider,provider_message_id,delivery_status,provider_event_at,error_code,payload_hash,received_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(provider,provider_message_id,delivery_status,provider_event_at) DO NOTHING")
-                .params(UUID.randomUUID(), "META", messageId, deliveryStatus, timestamp(eventAt), errorCode, payloadHash, timestamp(clock.instant())).update();
+            int inserted = deliveryEvents.recordOnce(UUID.randomUUID(), "META", messageId, deliveryStatus, micros(eventAt), errorCode, payloadHash, micros(clock.instant()));
             if (inserted == 1) {
-                jdbc.sql("UPDATE notification_outbox SET provider_delivery_status=?,provider_status_at=?,provider_error_code=? WHERE provider_reference=? AND (provider_status_at IS NULL OR provider_status_at<=?)")
-                    .params(deliveryStatus, timestamp(eventAt), errorCode, messageId, timestamp(eventAt)).update();
+                messages.recordProviderStatus(messageId, deliveryStatus, micros(eventAt), errorCode);
             }
         }
     }

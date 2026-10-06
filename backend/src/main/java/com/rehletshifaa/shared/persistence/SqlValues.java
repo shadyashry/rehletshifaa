@@ -16,4 +16,9 @@ public final class SqlValues {
     public static OffsetDateTime timestamp(Instant value) {
         return value == null ? null : value.truncatedTo(ChronoUnit.MICROS).atOffset(ZoneOffset.UTC);
     }
+
+    /** The same rule for an {@link Instant} assigned to an entity attribute or passed as a query parameter. */
+    public static Instant micros(Instant value) {
+        return value == null ? null : value.truncatedTo(ChronoUnit.MICROS);
+    }
 }

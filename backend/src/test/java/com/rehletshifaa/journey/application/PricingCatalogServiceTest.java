@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional
 class PricingCatalogServiceTest {
     @Autowired PricingCatalogService pricing;
+    @Autowired com.rehletshifaa.journey.application.ConsultantOnboardingService onboarding;
     @Autowired JourneyService journey;
     @Autowired JdbcTemplate jdbc;
     @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
@@ -98,7 +99,7 @@ class PricingCatalogServiceTest {
 
     @Test void newConsultantAutomaticallyGetsOwnDerivedPriceList() {
         authenticate("admin-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
-        var created = journey.createPractitioner(new PractitionerRequest("Dr New", "Dr New", "doc-new-subject", null, "Cardiology", null, null, null, null, null, null, null, null, "AVAILABLE", null, "CONSULTANT", "cardiology"));
+        var created = onboarding.createPractitioner(new PractitionerRequest("Dr New", "Dr New", "doc-new-subject", null, "Cardiology", null, null, null, null, null, null, null, null, "AVAILABLE", null, "CONSULTANT", "cardiology"));
         // Each consultant starts with their own list, isolated from any other consultant's.
         assertThat(pricing.practitionerCatalog(created.id())).hasSize(11).allSatisfy(s -> assertThat(s.priceEgp()).isNotNull());
     }

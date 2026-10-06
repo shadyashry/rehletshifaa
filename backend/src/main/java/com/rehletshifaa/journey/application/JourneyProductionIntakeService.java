@@ -4,10 +4,10 @@ import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
 import com.rehletshifaa.journey.domain.JourneyAdmission.Decision;
 import com.rehletshifaa.journey.domain.JourneyAdmission.Authority;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository.Admission;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionStore;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionStore.Admission;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingStore;
+import com.rehletshifaa.journey.infrastructure.JourneyDeploymentStore;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -54,10 +54,10 @@ public class JourneyProductionIntakeService {
     private static final Logger log = LoggerFactory.getLogger(JourneyProductionIntakeService.class);
 
     private final JourneyAdmissionPolicyService policies;
-    private final com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository definitions;
-    private final JourneyDeploymentRepository deployments;
-    private final JourneyCaseBindingRepository bindings;
-    private final JourneyCaseAdmissionRepository admissions;
+    private final com.rehletshifaa.journey.infrastructure.JourneyDefinitionStore definitions;
+    private final JourneyDeploymentStore deployments;
+    private final JourneyCaseBindingStore bindings;
+    private final JourneyCaseAdmissionStore admissions;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final JourneyProjectionService projections;
     private final GovernanceAuditLog audit;
@@ -67,8 +67,8 @@ public class JourneyProductionIntakeService {
     private final Clock clock;
 
     public JourneyProductionIntakeService(JourneyAdmissionPolicyService policies,
-            com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository definitions,
-            JourneyDeploymentRepository deployments, JourneyCaseBindingRepository bindings, JourneyCaseAdmissionRepository admissions,
+            com.rehletshifaa.journey.infrastructure.JourneyDefinitionStore definitions,
+            JourneyDeploymentStore deployments, JourneyCaseBindingStore bindings, JourneyCaseAdmissionStore admissions,
             ObjectProvider<JourneyRuntimePort> runtimes, JourneyProjectionService projections, GovernanceAuditLog audit,
             CoordinatorRoutingPort routing, PlatformTransactionManager transactions, MeterRegistry meters, Clock clock) {
         this.policies=policies; this.definitions=definitions; this.deployments = deployments; this.bindings = bindings;

@@ -3,7 +3,8 @@ package com.rehletshifaa.notification.application;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.shared.api.ApiException;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.rehletshifaa.notification.infrastructure.QueuedNotificationRepository;
+import com.rehletshifaa.notification.infrastructure.WhatsAppDeliveryEventRepository;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -17,7 +18,8 @@ import static org.mockito.Mockito.mock;
 
 class MetaWhatsAppWebhookServiceTest {
     private final MetaWhatsAppWebhookService service = new MetaWhatsAppWebhookService(
-        mock(JdbcClient.class), new ObjectMapper(), Clock.systemUTC(), "test-app-secret", "test-verify-token");
+        mock(WhatsAppDeliveryEventRepository.class), mock(QueuedNotificationRepository.class), new ObjectMapper(), Clock.systemUTC(),
+        "test-app-secret", "test-verify-token");
 
     @Test void acceptsOnlyMatchingSubscriptionChallenge() {
         assertThat(service.acceptsVerification("subscribe", "test-verify-token")).isTrue();

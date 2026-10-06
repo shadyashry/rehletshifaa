@@ -1,13 +1,23 @@
 package com.rehletshifaa.casemanagement.domain;
 
+import com.rehletshifaa.shared.persistence.AssignedIdEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.DynamicUpdate;
+
 import java.time.Instant;
 import java.util.UUID;
 
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
+
+/**
+ * A medical case. {@code version} is the case revision clients send back as {@code expectedVersion}; it is managed
+ * explicitly (status, care-area and claim changes bump it, bookkeeping such as the waiting-on marker does not).
+ * Updates write only changed columns, so a case loaded here never overwrites a guarded JPQL update on another column.
+ */
 @Entity
+@DynamicUpdate
 @Table(name = "medical_cases")
-public class MedicalCase {
-    @Id private UUID id;
+public class MedicalCase extends AssignedIdEntity {
     @Column(name="case_number", nullable=false, unique=true, length=20) private String caseNumber;
     @Column(name="full_name", nullable=false, length=120) private String fullName;
     @Column(nullable=false, length=80) private String country;
@@ -21,26 +31,34 @@ public class MedicalCase {
     @Column(name="submitted_at") private Instant submittedAt;
     @Column(name="created_at", nullable=false) private Instant createdAt;
     @Column(name="updated_at", nullable=false) private Instant updatedAt;
-    @Version @Column(nullable=false) private long version;
+    @Column(nullable=false) private long version;
+    @Column(name="patient_id") private UUID patientId;
+    @Column(name="claimed_at") private Instant claimedAt;
+    @Column(name="waiting_on", nullable=false, length=20) private String waitingOn;
+    @Column(name="waiting_reason", length=240) private String waitingReason;
+    @Column(name="waiting_since") private Instant waitingSince;
 
     protected MedicalCase() {}
-
     public MedicalCase(UUID id, String caseNumber, String fullName, String country, String whatsappNumber, String conditionDescription, String preferredLanguage, Instant now) {
         this(id, caseNumber, fullName, country, whatsappNumber, conditionDescription, preferredLanguage, null, now);
     }
-
     public MedicalCase(UUID id, String caseNumber, String fullName, String country, String whatsappNumber, String conditionDescription, String preferredLanguage, String careCategory, Instant now) {
-        this.id = id; this.caseNumber = caseNumber; this.fullName = fullName.trim(); this.country = country.trim(); this.whatsappNumber = whatsappNumber.trim();
+        super(id);
+        this.caseNumber = caseNumber; this.fullName = fullName.trim(); this.country = country.trim(); this.whatsappNumber = whatsappNumber.trim();
         this.conditionDescription = conditionDescription == null || conditionDescription.isBlank() ? null : conditionDescription.trim();
         this.careCategory = careCategory;
-        this.preferredLanguage = preferredLanguage; this.status = CaseStatus.DRAFT; this.consentTimestamp = now; this.createdAt = now; this.updatedAt = now;
+        this.preferredLanguage = preferredLanguage; this.status = CaseStatus.DRAFT; this.waitingOn = "STAFF";
+        this.consentTimestamp = micros(now); this.createdAt = micros(now); this.updatedAt = micros(now);
     }
-
-    public void submit(Instant now) { if (status != CaseStatus.DRAFT) throw new IllegalStateException("Case is not in draft state"); status = CaseStatus.RECEIVED; submittedAt = now; updatedAt = now; }
-    public UUID getId() { return id; } public String getCaseNumber() { return caseNumber; } public String getFullName() { return fullName; }
+    public void submit(Instant now) { if (status != CaseStatus.DRAFT) throw new IllegalStateException("Case is not in draft state"); status = CaseStatus.RECEIVED; submittedAt = micros(now); updatedAt = micros(now); version++; }
+    /** Links the case to its canonical patient (intake bookkeeping: not a case revision). */
+    public void belongsTo(UUID patientId) { this.patientId = patientId; }
+    public UUID getPatientId() { return patientId; }
+    public String getCaseNumber() { return caseNumber; } public String getFullName() { return fullName; }
     public String getCountry() { return country; } public String getWhatsappNumber() { return whatsappNumber; } public String getConditionDescription() { return conditionDescription; }
     public String getCareCategory() { return careCategory; }
     public String getPreferredLanguage() { return preferredLanguage; } public CaseStatus getStatus() { return status; } public Instant getSubmittedAt() { return submittedAt; }
+    public long getVersion() { return version; }
     public boolean isTravelPackageRequested() { return travelPackageRequested; }
     public void setTravelPackageRequested(boolean value) { this.travelPackageRequested = value; }
 }

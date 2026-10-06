@@ -1,16 +1,24 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.clinic.application.ConsultantEligibilityService;
-import com.rehletshifaa.journey.api.JourneyDtos.IdResponse;
-import com.rehletshifaa.journey.api.ReferralDtos.*;
-import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.authority.domain.Role;
+import com.rehletshifaa.casemanagement.domain.CaseAssignment;
+import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
+import com.rehletshifaa.clinic.application.ConsultantEligibilityService;
+import com.rehletshifaa.clinic.infrastructure.CareCategoryRepository;
+import com.rehletshifaa.journey.api.JourneyDtos.IdResponse;
+import com.rehletshifaa.journey.api.ReferralDtos.*;
+import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
+import com.rehletshifaa.journey.domain.ConsultantReferral;
+import com.rehletshifaa.journey.infrastructure.ConsultantReferralRepository;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
+
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,11 +29,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Objects;
-
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * Consultant-initiated referrals: a <b>transfer</b> to another consultant, or a <b>second opinion</b>.
@@ -46,6 +52,9 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class ConsultantReferralService {
+    private final ConsultantReferralRepository referralRecords;
+    private final CaseAssignmentRepository assignments;
+    private final MedicalCaseRepository cases;
     private static final String CLINICAL_WORK = "CLINICAL_REVIEW";
 
     private final JdbcClient jdbc;
@@ -53,11 +62,15 @@ public class ConsultantReferralService {
     private final ConsultantEligibilityService eligibility;
     private final StaffWorkService work;
     private final CryptoService crypto;
+    private final CareCategoryRepository careCategories;
+    private final AuditTrail audit;
     private final Clock clock;
 
     public ConsultantReferralService(JdbcClient jdbc, Authority authority, ConsultantEligibilityService eligibility,
-                                     StaffWorkService work, CryptoService crypto, Clock clock) {
-        this.jdbc = jdbc; this.authority = authority; this.eligibility = eligibility; this.work = work; this.crypto = crypto; this.clock = clock;
+                                     StaffWorkService work, CryptoService crypto, CareCategoryRepository careCategories,
+                                     AuditTrail audit, Clock clock, MedicalCaseRepository cases, CaseAssignmentRepository assignments, ConsultantReferralRepository referralRecords) { this.referralRecords = referralRecords; this.assignments = assignments; this.cases = cases;
+        this.jdbc = jdbc; this.authority = authority; this.eligibility = eligibility; this.work = work; this.crypto = crypto;
+        this.careCategories = careCategories; this.audit = audit; this.clock = clock;
     }
 
     // ================= consultant =================
@@ -76,7 +89,7 @@ public class ConsultantReferralService {
                 .params(caseId, request.type()).query(Long.class).single();
         if (open > 0) throw new ApiException(409, "REFERRAL_ALREADY_OPEN", "A referral of this kind is already in progress for this case");
         String suggestedArea = blankToNull(request.suggestedCareArea());
-        if (suggestedArea != null && jdbc.sql("SELECT COUNT(*) FROM care_categories WHERE slug=?").param(suggestedArea).query(Long.class).single() == 0)
+        if (suggestedArea != null && !careCategories.existsBySlug(suggestedArea))
             throw new ApiException(400, "INVALID_CARE_CATEGORY", "Select a managed care area");
         if (request.suggestedPractitionerId() != null) {
             String area = suggestedArea != null ? suggestedArea : caseCareArea(caseId);
@@ -85,11 +98,7 @@ public class ConsultantReferralService {
         }
         UUID id = UUID.randomUUID();
         Instant now = clock.instant();
-        jdbc.sql("INSERT INTO consultant_referrals(id,case_id,referral_type,status,from_subject,from_practitioner_id,source_assignment_id,clinical_reason_encrypted,"
-                        + "suggested_care_category,suggested_capability,suggested_practitioner_id,created_at,updated_at,version) VALUES(?,?,?,'AWAITING_COORDINATOR',?,?,?,?,?,?,?,?,?,0)")
-                .params(id, caseId, request.type(), actor.subject(), from, source, crypto.encrypt(request.clinicalReason().trim()), suggestedArea,
-                        blankToNull(request.suggestedCapability()), request.suggestedPractitionerId(), timestamp(now), timestamp(now))
-                .update();
+        referralRecords.saveAndFlush(new ConsultantReferral(id, caseId, request.type(), actor.subject(), from, source, crypto.encrypt(request.clinicalReason().trim()), suggestedArea, blankToNull(request.suggestedCapability()), request.suggestedPractitionerId(), now));
         boolean transfer = "TRANSFER".equals(request.type());
         String consultant = consultantName(from);
         work.openWorkItem(new NewWorkItem(caseId, confirmWork(request.type()),
@@ -126,10 +135,9 @@ public class ConsultantReferralService {
         if (!"SECOND_OPINION".equals(r.type()) || !"IN_PROGRESS".equals(r.status()) || !actor.subject().equals(assignee(r.targetAssignment())))
             throw new ApiException(409, "SECOND_OPINION_NOT_OPEN", "This second opinion is not open for your account");
         Instant now = clock.instant();
-        int changed = jdbc.sql("UPDATE consultant_referrals SET status='COMPLETED',opinion_encrypted=?,opinion_submitted_at=?,updated_at=?,version=version+1 WHERE id=? AND status='IN_PROGRESS'")
-                .params(crypto.encrypt(request.opinion().trim()), timestamp(now), timestamp(now), referralId).update();
+        int changed = referralRecords.submitOpinion(referralId, crypto.encrypt(request.opinion().trim()), micros(now));
         if (changed != 1) throw conflict();
-        jdbc.sql("UPDATE case_assignments SET status='ENDED',ended_at=?,version=version+1 WHERE id=? AND status='ACTIVE'").params(timestamp(now), r.targetAssignment()).update();
+        assignments.endIf(r.targetAssignment(), "ACTIVE", micros(now));
         work.closeWorkItems(caseId, "SECOND_OPINION", "Second opinion submitted");
         String who = consultantName(r.targetPractitioner());
         work.notifyStaff(r.fromSubject(), caseId, null, "SECOND_OPINION_SUBMITTED", "Second opinion received",
@@ -169,13 +177,8 @@ public class ConsultantReferralService {
         Instant now = clock.instant();
         UUID assignment = UUID.randomUUID();
         boolean transfer = "TRANSFER".equals(r.type());
-        jdbc.sql("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,'DOCTOR',?,'PENDING',?,?,?,0)")
-                .params(assignment, caseId, subject, r.type(), transfer ? "Consultant transfer (referral)" : "Second opinion (referral)", actor.subject(), timestamp(now))
-                .update();
-        int changed = jdbc.sql("UPDATE consultant_referrals SET status='AWAITING_CONSULTANT',target_care_category=?,target_practitioner_id=?,target_assignment_id=?,coordinator_subject=?,"
-                        + "coordinator_note=?,coordinator_decided_at=?,updated_at=?,version=version+1 WHERE id=? AND version=?")
-                .params(area, request.practitionerId(), assignment, actor.subject(), blankToNull(request.note()), timestamp(now), timestamp(now), referralId, request.expectedVersion())
-                .update();
+        assignments.saveAndFlush(CaseAssignment.pending(assignment, caseId, subject, "DOCTOR", r.type(), null, transfer ? "Consultant transfer (referral)" : "Second opinion (referral)", actor.subject(), now));
+        int changed = referralRecords.route(referralId, request.expectedVersion(), area, request.practitionerId(), assignment, actor.subject(), blankToNull(request.note()), micros(now));
         if (changed != 1) throw conflict();
         work.closeWorkItems(caseId, confirmWork(r.type()), "Referral confirmed");
         String caseNumber = caseNumber(caseId);
@@ -195,8 +198,7 @@ public class ConsultantReferralService {
         Ref r = ref(caseId, referralId);
         if (!"AWAITING_COORDINATOR".equals(r.status())) throw new ApiException(409, "REFERRAL_NOT_AWAITING_COORDINATOR", "This referral is not waiting for a coordinator decision");
         Instant now = clock.instant();
-        int changed = jdbc.sql("UPDATE consultant_referrals SET status='DECLINED_BY_COORDINATOR',coordinator_subject=?,coordinator_note=?,coordinator_decided_at=?,updated_at=?,version=version+1 WHERE id=? AND version=?")
-                .params(actor.subject(), request.note().trim(), timestamp(now), timestamp(now), referralId, request.expectedVersion()).update();
+        int changed = referralRecords.declineByCoordinator(referralId, request.expectedVersion(), actor.subject(), request.note().trim(), micros(now));
         if (changed != 1) throw conflict();
         work.closeWorkItems(caseId, confirmWork(r.type()), "Referral declined");
         work.notifyStaff(r.fromSubject(), caseId, null, "REFERRAL_DECLINED", "Your referral was not confirmed",
@@ -229,10 +231,9 @@ public class ConsultantReferralService {
         boolean transfer = "TRANSFER".equals(r.type());
         String receiver = consultantName(r.targetPractitioner());
         if (!accept) {
-            jdbc.sql("UPDATE case_assignments SET status='DECLINED',ended_at=?,version=version+1 WHERE id=? AND status='PENDING'").params(timestamp(now), assignmentId).update();
+            assignments.decline(assignmentId, micros(now));
             // Back to the coordinator to choose someone else; the declined offer stays in the assignment history.
-            jdbc.sql("UPDATE consultant_referrals SET status='AWAITING_COORDINATOR',target_practitioner_id=NULL,target_assignment_id=NULL,receiver_reason=?,receiver_decided_at=?,updated_at=?,version=version+1 WHERE id=?")
-                    .params(blankToNull(reason), timestamp(now), timestamp(now), referralId).update();
+            referralRecords.returnToCoordinator(referralId, blankToNull(reason), micros(now));
             work.closeWorkItems(caseId, offerWork(r.type()), "Referral declined");
             work.openWorkItem(new NewWorkItem(caseId, confirmWork(r.type()), "Referral declined — choose another consultant",
                     receiver + " declined the " + label(r.type()) + (blankToNull(reason) == null ? "." : ": " + reason.trim()) + " Choose another eligible consultant, or decline the referral.",
@@ -245,13 +246,13 @@ public class ConsultantReferralService {
             if (!"CONSULTANT_REVIEW".equals(caseStatus(caseId)) || !"ACTIVE".equals(assignmentStatus(r.sourceAssignment())))
                 throw new ApiException(409, "REFERRAL_NO_LONGER_APPLICABLE", "The case has moved on since this transfer was offered");
             // One primary consultant at all times: the original assignment ends as the new one becomes primary.
-            jdbc.sql("UPDATE case_assignments SET status='ENDED',ended_at=?,version=version+1 WHERE id=? AND status='ACTIVE'").params(timestamp(now), r.sourceAssignment()).update();
-            jdbc.sql("UPDATE case_assignments SET status='ACTIVE',assignment_type='PRIMARY',accepted_at=?,version=version+1 WHERE id=? AND status='PENDING'").params(timestamp(now), assignmentId).update();
+            assignments.endIf(r.sourceAssignment(), "ACTIVE", micros(now));
+            assignments.acceptAsPrimary(assignmentId, micros(now));
             if (r.targetArea() != null && !r.targetArea().equals(caseCareArea(caseId))) {
-                jdbc.sql("UPDATE medical_cases SET care_category=?,updated_at=?,version=version+1 WHERE id=?").params(r.targetArea(), timestamp(now), caseId).update();
+                cases.changeCareCategory(caseId, r.targetArea(), micros(now));
                 audit(actor, caseId, "CASE_CARE_CATEGORY_CHANGED", "MedicalCase", caseId, "UPDATE", "Consultant transfer to " + r.targetArea());
             }
-            jdbc.sql("UPDATE consultant_referrals SET status='COMPLETED',receiver_decided_at=?,updated_at=?,version=version+1 WHERE id=?").params(timestamp(now), timestamp(now), referralId).update();
+            referralRecords.acceptByReceiver(referralId, "COMPLETED", micros(now));
             work.closeWorkItems(caseId, offerWork(r.type()), "Transfer accepted");
             work.closeWorkItems(caseId, CLINICAL_WORK, "Case transferred to another consultant");
             work.openWorkItem(new NewWorkItem(caseId, CLINICAL_WORK, "Review case and provide clinical recommendation",
@@ -264,8 +265,8 @@ public class ConsultantReferralService {
                     receiver + " is now the case's consultant.", "transfer-completed:" + referralId + ":coordinator", false);
             audit(actor, caseId, "ASSIGNMENT_ENDED", "CaseAssignment", r.sourceAssignment(), "END", "Transferred to another consultant");
         } else {
-            jdbc.sql("UPDATE case_assignments SET status='ACTIVE',accepted_at=?,version=version+1 WHERE id=? AND status='PENDING'").params(timestamp(now), assignmentId).update();
-            jdbc.sql("UPDATE consultant_referrals SET status='IN_PROGRESS',receiver_decided_at=?,updated_at=?,version=version+1 WHERE id=?").params(timestamp(now), timestamp(now), referralId).update();
+            assignments.accept(assignmentId, micros(now));
+            referralRecords.acceptByReceiver(referralId, "IN_PROGRESS", micros(now));
             work.closeWorkItems(caseId, offerWork(r.type()), "Second opinion accepted");
             work.openWorkItem(new NewWorkItem(caseId, "SECOND_OPINION", "Provide your second opinion",
                     "Review the case and submit your opinion. Your access ends when you submit it.", actor.subject(), "DOCTOR",
@@ -289,8 +290,8 @@ public class ConsultantReferralService {
                 .param(caseId).query(this::ref).list();
         for (Ref r : open) {
             if (r.targetAssignment() != null)
-                jdbc.sql("UPDATE case_assignments SET status='ENDED',ended_at=?,version=version+1 WHERE id=? AND status='PENDING'").params(timestamp(now), r.targetAssignment()).update();
-            jdbc.sql("UPDATE consultant_referrals SET status='WITHDRAWN',updated_at=?,version=version+1 WHERE id=?").params(timestamp(now), r.id()).update();
+                assignments.endIf(r.targetAssignment(), "PENDING", micros(now));
+            referralRecords.withdraw(r.id(), micros(now));
             audit(actor, caseId, "REFERRAL_WITHDRAWN", "ConsultantReferral", r.id(), "WITHDRAW", "Clinical decision recorded");
         }
         if (!open.isEmpty()) {
@@ -366,9 +367,7 @@ public class ConsultantReferralService {
     private static String label(String type) { return "TRANSFER".equals(type) ? "transfer" : "second-opinion request"; }
 
     private void audit(Actor actor, UUID caseId, String type, String entity, UUID entityId, String action, String reason) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, actor.subject(), actor.label(), caseId, entity, Objects.toString(entityId), action, "SUCCESS", reason, timestamp(clock.instant()))
-                .update();
+        audit.event(type).actor(actor.subject(), actor.label()).caseId(caseId).entity(entity, entityId).action(action).reason(reason).record();
     }
 
     private static ApiException conflict() {

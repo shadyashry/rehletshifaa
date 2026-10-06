@@ -2,7 +2,7 @@ package com.rehletshifaa.journey;
 
 import com.rehletshifaa.journey.application.*;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
-import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyDeploymentStore;
 import org.flowable.engine.ProcessEngine;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class JourneyDeploymentIntegrationTest {
     @Autowired JourneyDefinitionService service;
     @Autowired JourneyDeploymentService deployments;
-    @Autowired JourneyDeploymentRepository repository;
+    @Autowired JourneyDeploymentStore repository;
     @Autowired com.rehletshifaa.shared.crypto.CryptoService crypto;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;

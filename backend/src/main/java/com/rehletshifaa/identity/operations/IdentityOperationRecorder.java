@@ -2,27 +2,24 @@ package com.rehletshifaa.identity.operations;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
-
 /** Synchronous listener: failure to persist the operation fails the surrounding business transaction. */
 @Component
 public class IdentityOperationRecorder {
-    private final JdbcClient jdbc;
+    private final IdentityOperationRepository operations;
     private final Clock clock;
     private final int maxAttempts;
     private final CryptoService crypto;
     private final ObjectMapper json;
 
-    public IdentityOperationRecorder(JdbcClient jdbc, Clock clock, CryptoService crypto, ObjectMapper json,
+    public IdentityOperationRecorder(IdentityOperationRepository operations, Clock clock, CryptoService crypto, ObjectMapper json,
             @Value("${app.identity-operations.max-attempts:8}") int maxAttempts) {
-        this.jdbc = jdbc;
+        this.operations = operations;
         this.clock = clock;
         this.crypto = crypto;
         this.json = json;
@@ -32,13 +29,9 @@ public class IdentityOperationRecorder {
     @EventListener
     public void record(IdentityOperationRequested event) {
         var now = clock.instant();
-        jdbc.sql("INSERT INTO identity_operations(id,idempotency_key,target_subject,operation_type,status,attempts,max_attempts," +
-                        "next_attempt_at,correlation_id,requested_by,reason,created_at,updated_at,revision,target_type,target_id,payload_encrypted) " +
-                        "VALUES(?,?,?,?,'PENDING',0,?,?,?,?,?,?,?,0,?,?,?)")
-                .params(event.id(), event.idempotencyKey(), event.targetSubject(), event.type().name(), maxAttempts,
-                        timestamp(now), event.correlationId(), event.requestedBy(), bounded(event.reason()),
-                        timestamp(now), timestamp(now), event.targetType(), event.targetId(), encrypted(event.payload()))
-                .update();
+        operations.saveAndFlush(new IdentityOperation(event.id(), event.idempotencyKey(), event.targetSubject(), event.type().name(),
+                maxAttempts, event.correlationId(), event.requestedBy(), bounded(event.reason()), event.targetType(), event.targetId(),
+                encrypted(event.payload()), clock.instant()));
     }
 
     private String encrypted(java.util.Map<String,String> payload) {

@@ -38,6 +38,9 @@ class PatientConversionLayerTest {
     @Autowired OnboardingService onboarding; @Autowired IdentityVerificationService identity; @Autowired PaymentService payment;
     @Autowired PatientAccountService accounts; @Autowired CustomerReadinessService readiness;
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+
+    /** Raw SQL behind JPA's back: flush pending entity changes first, then drop managed instances the SQL made stale. */
+    private int raw(String sql, Object... args) { em.flush(); int changed = jdbc.update(sql, args); em.clear(); return changed; }
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---------- Contact verification vs account activation vs identity ----------
@@ -164,7 +167,7 @@ class PatientConversionLayerTest {
         onboarding.setSubject(ctx.caseId, new OnboardingSubjectRequest("REPRESENTATIVE", "Parent", "COORDINATION", Instant.now().plusSeconds(86400), v));
         assertThat(journey.customerReadiness(ctx.caseId).representativeAuthorizationValid()).isTrue();
         // Expire the delegation: readiness must now flag missing representative authorization.
-        jdbc.update("UPDATE patient_representatives SET expires_at=? WHERE representative_subject=?", Instant.now().minusSeconds(60), ctx.patientSubject);
+        raw("UPDATE patient_representatives SET expires_at=? WHERE representative_subject=?", Instant.now().minusSeconds(60), ctx.patientSubject);
         assertThat(journey.customerReadiness(ctx.caseId).representativeAuthorizationValid()).isFalse();
     }
 
@@ -270,7 +273,7 @@ class PatientConversionLayerTest {
     @Test void paidDepositDoesNotBypassMissingOnboardingForCommitment() throws Exception {
         var ctx = releasePreliminary();
         acknowledge(ctx);
-        jdbc.update("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
+        raw("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
         UUID depositId = depositId(ctx.caseId);
         authenticate("finance-subject", Role.FINANCE);
         payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(new BigDecimal("3000.00"), "BANK", "ref-1", "missing-onboarding-pay-1"));
@@ -284,15 +287,15 @@ class PatientConversionLayerTest {
 
     @Test void completedProfileWithPendingAccountDoesNotSatisfyAccountReadiness() throws Exception {
         var ctx = onboardedCase();
-        jdbc.update("UPDATE patient_profiles SET account_status='SETUP_PENDING' WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", ctx.caseId);
+        raw("UPDATE patient_profiles SET account_status='SETUP_PENDING' WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", ctx.caseId);
         assertThat(readiness.compute(ctx.caseId).accountActivated()).isFalse();
         assertThat(readiness.compute(ctx.caseId).blockingItems()).extracting(BlockingItem::code).contains("ACCOUNT_NOT_ACTIVATED");
     }
 
     @Test void missingOnboardingReadDoesNotInventProgressEvidence() throws Exception {
         var ctx = onboardedCase();
-        jdbc.update("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
-        jdbc.update("UPDATE medical_cases SET status='TRAVEL_COORDINATION' WHERE id=?", ctx.caseId);
+        raw("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
+        raw("UPDATE medical_cases SET status='TRAVEL_COORDINATION' WHERE id=?", ctx.caseId);
         authenticate(ctx.patientSubject, Role.PATIENT);
         assertThatThrownBy(() -> onboarding.myOnboarding(ctx.caseId))
                 .isInstanceOf(ApiException.class).hasMessageContaining("no onboarding");
@@ -306,7 +309,7 @@ class PatientConversionLayerTest {
     private Ctx releasePreliminary(String whatsapp, String email) throws Exception {
         var created = cases.create(new CreateCaseRequest("Link", "Patient", "Kenya", whatsapp, "Cardiac reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
-        jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
+        raw("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
         authenticate("coordinator-subject", Role.COORDINATOR);
         com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
         if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject"))
@@ -319,7 +322,7 @@ class PatientConversionLayerTest {
         journey.acceptDoctorAssignment(created.caseId(), doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review = journey.saveClinicalReview(created.caseId(), new ClinicalReviewRequest("Reviewed", "SUITABLE", null, "Imaging", "Recommended intervention", "Alt", "Risks", "Seq", "7 days", "Follow-up"));
         journey.approveClinicalReview(created.caseId(), review.id());
-        jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",
+        raw("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",
                 UUID.randomUUID(), review.id(), "Consultant treatment package", new BigDecimal("1000.00"), "EGP", 0, new BigDecimal("1000.00"), true);
         authenticate("coordinator-subject", Role.COORDINATOR);
         var proposal = journey.createProposal(created.caseId(), new ProposalDraftRequest(review.id(), "en", "Plan", "EGP", "Incl", "Excl", "Deposit", "Refund", "Not consent", Instant.now().plusSeconds(86400), List.of(new ProposalItemRequest("MEDICAL", "Treatment package", BigDecimal.ONE, new BigDecimal("1000.00"), false, 0)), null));
@@ -379,13 +382,13 @@ class PatientConversionLayerTest {
      * helper exercises the travel-confirmation gate, not assignment policy.
      */
     private void driveToTravelCoordination(Ctx ctx) {
-        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+        raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
                 UUID.randomUUID(), ctx.caseId, "operations-subject", "OPERATIONS", "PRIMARY", "ACTIVE", "Ops", "coordinator-subject", Instant.now(), Instant.now());
         authenticate("operations-subject", Role.OPERATIONS);
         journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "PLANNING"));
     }
 
-    private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }
+    private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); raw("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); raw("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }
     private void seedStaff() { if (count("SELECT count(*) FROM workforce_people WHERE subject=?", "operations-subject") > 0) return; com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "operations-subject", "OPERATIONS", crypto.encrypt("Operations One")); com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-subject", "FINANCE", crypto.encrypt("Finance One")); }
 
     // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
@@ -393,7 +396,7 @@ class PatientConversionLayerTest {
     private String activeChannel(UUID caseId) { return jdbc.queryForObject("SELECT delivery_channel FROM proposal_access_challenges WHERE case_id=? AND revoked_at IS NULL AND consumed_at IS NULL", String.class, caseId); }
     /** The binding credential is internal now - no customer message carries it, so the test asks for it directly. */
     private void startAuthenticatedAccount(Ctx ctx, String subject) {
-        jdbc.update("UPDATE patient_profiles SET external_subject=?,account_status='SETUP_PENDING',profile_status='ACTIVE',profile_completed_at=CURRENT_TIMESTAMP WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", subject, ctx.caseId);
+        raw("UPDATE patient_profiles SET external_subject=?,account_status='SETUP_PENDING',profile_status='ACTIVE',profile_completed_at=CURRENT_TIMESTAMP WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", subject, ctx.caseId);
         accounts.session();
     }
     private Instant verifiedAt(UUID caseId, String column) { return jdbc.queryForObject("SELECT " + column + " FROM patient_profiles WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", Instant.class, caseId); }

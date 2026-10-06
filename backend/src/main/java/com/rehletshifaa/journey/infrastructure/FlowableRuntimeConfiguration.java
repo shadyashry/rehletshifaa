@@ -5,25 +5,16 @@ import org.flowable.engine.ProcessEngine;
 import org.flowable.spring.SpringProcessEngineConfiguration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
-/** Explicit opt-in; engine internals own their tables, application Flyway owns business metadata. */
+/**
+ * Explicit opt-in; engine internals own their tables, application Flyway owns business metadata. Flowable's own
+ * auto-configurations are excluded on {@code RehletShifaaApplication}; an {@code @EnableAutoConfiguration} here would
+ * also register this package as a second auto-configuration package and scan its JPA repositories twice.
+ */
 @Configuration(proxyBeanMethods = false)
-@EnableAutoConfiguration(excludeName = {
-        "org.flowable.spring.boot.ProcessEngineAutoConfiguration",
-        "org.flowable.spring.boot.ProcessEngineServicesAutoConfiguration",
-        "org.flowable.spring.boot.idm.IdmEngineAutoConfiguration",
-        "org.flowable.spring.boot.idm.IdmEngineServicesAutoConfiguration",
-        "org.flowable.spring.boot.eventregistry.EventRegistryAutoConfiguration",
-        "org.flowable.spring.boot.eventregistry.EventRegistryServicesAutoConfiguration",
-        "org.flowable.spring.boot.FlowableJpaAutoConfiguration",
-        "org.flowable.spring.boot.EndpointAutoConfiguration",
-        "org.flowable.spring.boot.actuate.info.FlowableInfoAutoConfiguration",
-        "org.flowable.spring.boot.FlowableSecurityAutoConfiguration"
-})
 public class FlowableRuntimeConfiguration {
     @Bean(destroyMethod = "close")
     @ConditionalOnProperty(name = "app.journey.runtime.enabled", havingValue = "true")

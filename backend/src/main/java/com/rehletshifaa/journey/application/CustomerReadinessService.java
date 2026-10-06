@@ -1,17 +1,23 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.casemanagement.domain.MedicalCase;
+import com.rehletshifaa.casemanagement.infrastructure.ConsentRecordRepository;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
+import com.rehletshifaa.directory.domain.PatientProfile;
+import com.rehletshifaa.directory.infrastructure.PatientProfileRepository;
+import com.rehletshifaa.directory.infrastructure.PatientRepresentativeRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
+import com.rehletshifaa.journey.infrastructure.PatientIdentityVerificationRepository;
+import com.rehletshifaa.journey.infrastructure.PatientOnboardingRepository;
 import com.rehletshifaa.shared.api.ApiException;
-import org.springframework.jdbc.core.simple.JdbcClient;
+
 import org.springframework.stereotype.Service;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * The single, backend-computed source of customer readiness. The frontend renders {@link CustomerReadiness}
@@ -21,7 +27,13 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class CustomerReadinessService {
-    private final JdbcClient jdbc; private final Clock clock; private final PaymentService payment;
+    private final PatientRepresentativeRepository representatives;
+    private final ConsentRecordRepository consents;
+    private final PatientIdentityVerificationRepository verifications;
+    private final PatientOnboardingRepository onboardings;
+    private final PatientProfileRepository patients;
+    private final MedicalCaseRepository cases;
+    private final Clock clock; private final PaymentService payment;
     // Onboarding-stage consents that live in the existing consent_records table (never a new table).
     static final List<String> BASE_CONSENTS = List.of("PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS");
     static final String REP_CONSENT = "REPRESENTATIVE_AUTHORIZATION";
@@ -29,7 +41,7 @@ public class CustomerReadinessService {
     // and the deposit plus any operational identity step deliberately come after the profile is active.
     private static final Set<String> SUBMIT_DEFERRED = Set.of("ONBOARDING_INCOMPLETE", "DEPOSIT_UNPAID", "ACCOUNT_NOT_ACTIVATED", "IDENTITY_NOT_VERIFIED");
 
-    public CustomerReadinessService(JdbcClient jdbc, Clock clock, PaymentService payment) { this.jdbc = jdbc; this.clock = clock; this.payment = payment; }
+    public CustomerReadinessService(Clock clock, PaymentService payment, MedicalCaseRepository cases, PatientProfileRepository patients, PatientOnboardingRepository onboardings, PatientIdentityVerificationRepository verifications, ConsentRecordRepository consents, PatientRepresentativeRepository representatives) { this.representatives = representatives; this.consents = consents; this.verifications = verifications; this.onboardings = onboardings; this.patients = patients; this.cases = cases; this.clock = clock; this.payment = payment; }
 
     public List<String> requiredConsentTypes(String subjectType) {
         List<String> required = new ArrayList<>(BASE_CONSENTS);
@@ -40,12 +52,13 @@ public class CustomerReadinessService {
     /** Compute readiness for the case's patient. Throws 404 if the case/patient is unknown. */
     public CustomerReadiness compute(UUID caseId) {
         record P(UUID patientId, String subject, Instant phone, Instant email, String profileStatus, String accountStatus, boolean travelPackage) {}
-        P p = jdbc.sql("SELECT p.id,p.external_subject,p.phone_verified_at,p.email_verified_at,p.profile_status,p.account_status,c.travel_package_requested FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?")
-                .param(caseId).query((rs, n) -> new P(rs.getObject("id", UUID.class), rs.getString("external_subject"), instN(rs, "phone_verified_at"), instN(rs, "email_verified_at"), rs.getString("profile_status"), rs.getString("account_status"), rs.getBoolean("travel_package_requested")))
-                .optional().orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
+        MedicalCase medicalCase = cases.findById(caseId).orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
+        PatientProfile patient = Optional.ofNullable(medicalCase.getPatientId()).flatMap(patients::findById)
+                .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
+        P p = new P(patient.getId(), patient.getExternalSubject(), patient.getPhoneVerifiedAt(), patient.getEmailVerifiedAt(), patient.getProfileStatus(),
+                patient.getAccountStatus(), medicalCase.isTravelPackageRequested());
         record OB(String state, String subjectType) {}
-        OB ob = jdbc.sql("SELECT state,subject_type FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1")
-                .param(caseId).query((rs, n) -> new OB(rs.getString("state"), rs.getString("subject_type"))).optional().orElse(null);
+        OB ob = onboardings.findFirstByCaseIdOrderByCreatedAtDesc(caseId).map(o -> new OB(o.getState(), o.getSubjectType())).orElse(null);
         String subjectType = ob == null ? null : ob.subjectType();
 
         boolean accountActivated = "ACTIVE".equals(p.profileStatus()) && "ACTIVE".equals(p.accountStatus()) && p.subject() != null;
@@ -102,22 +115,15 @@ public class CustomerReadinessService {
     }
 
     private boolean identityVerified(UUID patientId) {
-        Integer c = jdbc.sql("SELECT count(*) FROM patient_identity_verifications WHERE patient_id=? AND status='VERIFIED' AND (expires_at IS NULL OR expires_at>?)")
-                .params(patientId, timestamp(clock.instant())).query(Integer.class).single();
-        return c != null && c > 0;
+        return verifications.hasCurrentVerified(patientId, micros(clock.instant()));
     }
     private boolean consentPresent(UUID patientId, UUID caseId, String type) {
-        Integer c = jdbc.sql("SELECT count(*) FROM consent_records WHERE patient_id=? AND consent_type=? AND revoked_at IS NULL AND (case_id IS NULL OR case_id=?)")
-                .params(patientId, type, caseId).query(Integer.class).single();
-        return c != null && c > 0;
+        return consents.isGiven(patientId, type, caseId);
     }
     private boolean repAuthValid(UUID patientId, String subjectType) {
         // The patient acting for themselves, or a payer (who never receives clinical access), needs no
         // delegation. A guardian/representative needs an active, non-expired authorization row.
         if (subjectType == null || "PATIENT".equals(subjectType) || "PAYER".equals(subjectType)) return true;
-        Integer c = jdbc.sql("SELECT count(*) FROM patient_representatives WHERE patient_id=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)")
-                .params(patientId, timestamp(clock.instant())).query(Integer.class).single();
-        return c != null && c > 0;
+        return representatives.hasActiveFor(patientId, micros(clock.instant()));
     }
-    private static Instant instN(ResultSet rs, String col) throws SQLException { OffsetDateTime v = rs.getObject(col, OffsetDateTime.class); return v == null ? null : v.toInstant(); }
 }

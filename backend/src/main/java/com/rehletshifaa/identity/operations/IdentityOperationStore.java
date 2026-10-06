@@ -1,46 +1,36 @@
 package com.rehletshifaa.identity.operations;
 
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 @Service
 public class IdentityOperationStore {
     static final long LEASE_SECONDS = 120;
     private static final long MAX_BACKOFF_SECONDS = 3600;
-    private final JdbcClient jdbc;
+    private final IdentityOperationRepository operations;
     private final Clock clock;
 
-    public IdentityOperationStore(JdbcClient jdbc, Clock clock) {
-        this.jdbc = jdbc;
+    public IdentityOperationStore(IdentityOperationRepository operations, Clock clock) {
+        this.operations = operations;
         this.clock = clock;
     }
 
+    /** Leases up to {@code batchSize} due operations; rows another worker holds are skipped, not waited for. */
     @Transactional
     public List<Operation> claim(int batchSize) {
-        Instant now = clock.instant();
-        jdbc.sql("UPDATE identity_operations SET status='DEAD',last_error_code=COALESCE(last_error_code,'UNKNOWN_OUTCOME')," +
-                        "updated_at=?,revision=revision+1 WHERE status='RUNNING' AND lease_expires_at<=? AND attempts>=max_attempts")
-                .params(timestamp(now), timestamp(now)).update();
-        List<Operation> due = jdbc.sql("SELECT id,idempotency_key,target_subject,operation_type,attempts,max_attempts,target_type,target_id,payload_encrypted FROM identity_operations " +
-                        "WHERE abandoned_at IS NULL AND attempts<max_attempts AND next_attempt_at<=? " +
-                        "AND (status IN ('PENDING','RETRYING') OR (status='RUNNING' AND lease_expires_at<=?)) " +
-                        "ORDER BY created_at LIMIT " + batchSize + " FOR UPDATE SKIP LOCKED")
-                .params(timestamp(now), timestamp(now)).query(this::map).list();
+        Instant now = micros(clock.instant());
+        operations.expireExhaustedLeases(now);
+        List<Operation> due = operations.lockDue(now, Limit.of(batchSize)).stream().map(IdentityOperationStore::operation).toList();
         Instant lease = now.plusSeconds(LEASE_SECONDS);
-        for (Operation operation : due)
-            jdbc.sql("UPDATE identity_operations SET status='RUNNING',attempts=attempts+1,lease_expires_at=?," +
-                            "next_attempt_at=?,updated_at=?,revision=revision+1 WHERE id=?")
-                    .params(timestamp(lease), timestamp(lease), timestamp(now), operation.id()).update();
+        for (Operation operation : due) operations.claim(operation.id(), lease, now);
         return due.stream().map(operation -> operation.claimed(lease)).toList();
     }
 
@@ -49,36 +39,26 @@ public class IdentityOperationStore {
 
     @Transactional
     public boolean succeeded(Operation operation, String resultSubject) {
-        Instant now = clock.instant();
-        return jdbc.sql("UPDATE identity_operations SET status='SUCCEEDED',completed_at=?,lease_expires_at=NULL,result_subject=COALESCE(?,result_subject)," +
-                        "last_error_code=NULL,updated_at=?,revision=revision+1 WHERE id=? AND status='RUNNING' AND attempts=?")
-                .params(timestamp(now), resultSubject, timestamp(now), operation.id(), operation.attempt()).update() == 1;
+        return operations.succeed(operation.id(), operation.attempt(), resultSubject, micros(clock.instant())) == 1;
     }
 
     @Transactional
     public boolean failed(Operation operation, String code) {
-        Instant now = clock.instant();
+        Instant now = micros(clock.instant());
         boolean dead = operation.attempt() >= operation.maxAttempts();
         long delay = Math.min(MAX_BACKOFF_SECONDS, 30L * (1L << Math.min(operation.attempt(), 6)));
-        return jdbc.sql("UPDATE identity_operations SET status=?,next_attempt_at=?,lease_expires_at=NULL,last_error_code=?," +
-                        "updated_at=?,revision=revision+1 WHERE id=? AND status='RUNNING' AND attempts=?")
-                .params(dead ? "DEAD" : "RETRYING", timestamp(now.plusSeconds(delay)), bounded(code), timestamp(now),
-                        operation.id(), operation.attempt()).update() == 1;
+        return operations.fail(operation.id(), operation.attempt(), dead ? "DEAD" : "RETRYING", now.plusSeconds(delay), bounded(code), now) == 1;
     }
 
     @Transactional
     public boolean release(Operation operation) {
-        Instant now = clock.instant();
-        return jdbc.sql("UPDATE identity_operations SET status='RETRYING',attempts=attempts-1,next_attempt_at=?," +
-                        "lease_expires_at=NULL,updated_at=?,revision=revision+1 WHERE id=? AND status='RUNNING' AND attempts=?")
-                .params(timestamp(now), timestamp(now), operation.id(), operation.attempt()).update() == 1;
+        return operations.release(operation.id(), operation.attempt(), micros(clock.instant())) == 1;
     }
 
-    private Operation map(ResultSet rs, int row) throws SQLException {
-        return new Operation(rs.getObject("id", UUID.class), rs.getString("idempotency_key"), rs.getString("target_subject"),
-                IdentityOperationRequested.Type.valueOf(rs.getString("operation_type")), rs.getInt("attempts") + 1,
-                rs.getInt("max_attempts"), null, rs.getString("target_type"), rs.getObject("target_id", UUID.class),
-                rs.getString("payload_encrypted"));
+    /** The attempt number of a claimed row is the stored count plus the one being started. */
+    private static Operation operation(IdentityOperation o) {
+        return new Operation(o.getId(), o.getIdempotencyKey(), o.getTargetSubject(), IdentityOperationRequested.Type.valueOf(o.getOperationType()),
+                o.getAttempts() + 1, o.getMaxAttempts(), null, o.getTargetType(), o.getTargetId(), o.getPayloadEncrypted());
     }
 
     private static String bounded(String value) {

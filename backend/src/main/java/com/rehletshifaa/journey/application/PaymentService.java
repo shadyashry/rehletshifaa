@@ -1,12 +1,19 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
-import com.rehletshifaa.authority.domain.Role;
+import com.rehletshifaa.journey.api.JourneyDtos.*;
+import com.rehletshifaa.journey.domain.CoordinationDepositPolicy;
+import com.rehletshifaa.journey.domain.Deposit;
+import com.rehletshifaa.journey.domain.DepositComponent;
+import com.rehletshifaa.journey.infrastructure.CoordinationDepositPolicyRepository;
+import com.rehletshifaa.journey.infrastructure.DepositComponentRepository;
+import com.rehletshifaa.journey.infrastructure.DepositRepository;
+import com.rehletshifaa.journey.infrastructure.PaymentEventRepository;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.audit.AuditTrail;
+
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -15,12 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * Deposit + payment sub-workflow. Deposit state lives in its own tables, never in
@@ -30,6 +36,11 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class PaymentService {
+    private final PaymentEventRepository paymentEvents;
+    private final CoordinationDepositPolicyRepository depositPolicies;
+    private final DepositComponentRepository depositComponents;
+    private final DepositRepository deposits;
+    private final AuditTrail auditTrail;
     /** Version of the patient-facing deposit terms (frontend lib/commercial-terms.ts), recorded with each new component. */
     public static final String DEPOSIT_TERMS_VERSION = "deposit-terms-2026-09-25";
     static final String DEPOSIT_TERMS_REFERENCE = "Deducted from the final treatment plan and quote price. Refund and cancellation terms: as shown to the patient ("
@@ -39,7 +50,7 @@ public class PaymentService {
     private final Clock clock;
     private final ApplicationEventPublisher events;
 
-    public PaymentService(JdbcClient jdbc, Authority authority, Clock clock, ApplicationEventPublisher events) {
+    public PaymentService(JdbcClient jdbc, Authority authority, Clock clock, ApplicationEventPublisher events, AuditTrail auditTrail, DepositRepository deposits, DepositComponentRepository depositComponents, CoordinationDepositPolicyRepository depositPolicies, PaymentEventRepository paymentEvents) { this.paymentEvents = paymentEvents; this.depositPolicies = depositPolicies; this.depositComponents = depositComponents; this.deposits = deposits; this.auditTrail = auditTrail;
         this.jdbc = jdbc; this.authority = authority; this.clock = clock; this.events = events;
     }
 
@@ -76,8 +87,7 @@ public class PaymentService {
         BigDecimal totalEgp = policy.coordinationEgp();
         BigDecimal totalDisplay = totalEgp.multiply(rate).setScale(2, RoundingMode.HALF_UP);
         UUID depositId = UUID.randomUUID(); java.time.Instant now = clock.instant();
-        jdbc.sql("INSERT INTO deposits(id,case_id,proposal_version_id,currency,fx_rate,fx_rate_date,fx_source,policy_id,policy_version,total_egp,total_display,status,created_by,created_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
-                .params(depositId, caseId, versionId, fx.currency() == null ? "EGP" : fx.currency(), rate, fx.date(), fx.source(), policy.id(), policy.version(), totalEgp, totalDisplay, "REQUESTED", "SYSTEM", timestamp(now)).update();
+        deposits.saveAndFlush(new Deposit(depositId, caseId, versionId, new Deposit.Quote(fx.currency() == null ? "EGP" : fx.currency(), rate, fx.date(), fx.source(), totalEgp, totalDisplay), policy.id(), policy.version(), "SYSTEM", now));
         // Raising the deposit is not the end of the story: with an offline process a person has to arrange
         // it, so the case gains real staff work rather than sitting silently waiting for money to appear.
         events.publishEvent(new CaseEvents.DepositRequired(caseId));
@@ -85,8 +95,7 @@ public class PaymentService {
         // truthful value in the current model and its enforceability awaits a legal decision. The terms text only
         // points to the terms the patient is shown; it no longer claims a refund window tied to coordination starting,
         // which payment of this deposit itself triggers. Existing rows keep the text they were created with.
-        jdbc.sql("INSERT INTO deposit_components(id,deposit_id,beneficiary,purpose,amount_egp,refundability,cancellation_terms,credited_to_final,sort_order) VALUES(?,?,?,?,?,?,?,?,0)")
-                .params(UUID.randomUUID(), depositId, "PLATFORM", "Case coordination initiation", totalEgp, "NON_REFUNDABLE", DEPOSIT_TERMS_REFERENCE, true).update();
+        depositComponents.saveAndFlush(new DepositComponent(depositId, "PLATFORM", "Case coordination initiation", totalEgp, "NON_REFUNDABLE", DEPOSIT_TERMS_REFERENCE, true));
         appendEvent(caseId, depositId, "DEPOSIT_REQUESTED", totalEgp, totalDisplay, fx.currency(), null, "OFFLINE", null, "REQUESTED", "SYSTEM", null, "deposit-req:" + depositId);
     }
 
@@ -170,11 +179,9 @@ public class PaymentService {
         Integer prev = (careCategory == null
                 ? jdbc.sql("SELECT COALESCE(MAX(version),0) FROM deposit_policies WHERE care_category IS NULL")
                 : jdbc.sql("SELECT COALESCE(MAX(version),0) FROM deposit_policies WHERE care_category=?").param(careCategory)).query(Integer.class).single();
-        if (careCategory == null) jdbc.sql("UPDATE deposit_policies SET active=FALSE WHERE care_category IS NULL AND active").update();
-        else jdbc.sql("UPDATE deposit_policies SET active=FALSE WHERE care_category=? AND active").param(careCategory).update();
+        if (careCategory == null) depositPolicies.retireDefault(); else depositPolicies.retireFor(careCategory);
         UUID id = UUID.randomUUID();
-        jdbc.sql("INSERT INTO deposit_policies(id,name,care_category,coordination_deposit_egp,active,version,created_by,valid_from,created_at) VALUES(?,?,?,?,TRUE,?,?,?,?)")
-                .params(id, request.name() == null || request.name().isBlank() ? "Coordination-initiation deposit" : request.name().trim(), careCategory, request.coordinationDepositEgp(), prev + 1, actor.subject(), LocalDate.now(clock), timestamp(clock.instant())).update();
+        depositPolicies.saveAndFlush(new CoordinationDepositPolicy(id, request.name() == null || request.name().isBlank() ? "Coordination-initiation deposit" : request.name().trim(), careCategory, request.coordinationDepositEgp(), prev + 1, actor.subject(), LocalDate.now(clock), clock.instant()));
         audit(actor, null, "DEPOSIT_POLICY_CONFIGURED", id, "amount=" + request.coordinationDepositEgp());
         return jdbc.sql("SELECT id,name,care_category,coordination_deposit_egp,active,version,created_by,valid_from FROM deposit_policies WHERE id=?").param(id)
                 .query((rs, n) -> new DepositPolicyView(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("care_category"), rs.getBigDecimal("coordination_deposit_egp"), rs.getBoolean("active"), rs.getInt("version"), rs.getString("created_by"), rs.getObject("valid_from", LocalDate.class))).single();
@@ -235,8 +242,7 @@ public class PaymentService {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
         if (reason == null || reason.isBlank()) throw new ApiException(400, "WAIVER_REASON_REQUIRED", "A reason is required to waive a deposit");
         requireDeposit(caseId, depositId);
-        int changed = jdbc.sql("UPDATE deposits SET waived_at=?,waived_by=?,waiver_reason=?,version=version+1 WHERE id=? AND waived_at IS NULL AND status<>'CANCELLED'")
-                .params(timestamp(clock.instant()), actor.subject(), reason.trim(), depositId).update();
+        int changed = deposits.waive(depositId, actor.subject(), reason.trim(), micros(clock.instant()));
         if (changed != 1) throw new ApiException(409, "DEPOSIT_NOT_WAIVABLE", "This deposit cannot be waived");
         audit(actor, caseId, "DEPOSIT_WAIVED", depositId, reason.trim());
         events.publishEvent(new CaseEvents.DepositSettled(caseId)); // an authorized waiver settles the deposit just as a receipt does
@@ -250,9 +256,7 @@ public class PaymentService {
     }
     private void appendEvent(UUID caseId, UUID depositId, String type, BigDecimal amountEgp, BigDecimal amountDisplay, String currency, String method, String provider, String providerRef, String status, String actor, String reason, String idempotencyKey) {
         // Idempotent by idempotency_key: a duplicate submission inserts nothing.
-        jdbc.sql("INSERT INTO payment_events(id,case_id,deposit_id,event_type,amount_egp,amount_display,currency,method,provider,provider_reference,status,actor_subject,reason,idempotency_key,occurred_at) " +
-                        "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM payment_events WHERE idempotency_key=?)")
-                .params(UUID.randomUUID(), caseId, depositId, type, amountEgp, amountDisplay, currency, method, provider, providerRef, status, actor, reason, idempotencyKey, timestamp(clock.instant()), idempotencyKey).update();
+        paymentEvents.append(UUID.randomUUID(), caseId, depositId, type, amountEgp, amountDisplay, currency, method, provider, providerRef, status, actor, reason, idempotencyKey, micros(clock.instant()));
     }
     /** Recompute from the append-only ledger and, on the first authoritative settlement, continue the journey. */
     private void recomputeStatus(UUID caseId, UUID depositId) {
@@ -262,7 +266,7 @@ public class PaymentService {
         BigDecimal refunded = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='REFUND_RECORDED'").param(depositId).query(BigDecimal.class).single());
         BigDecimal net = paid.subtract(refunded);
         String status = net.signum() <= 0 ? (paid.signum() > 0 ? "REFUNDED" : "REQUESTED") : net.compareTo(total) >= 0 ? "PAID" : "PARTIALLY_PAID";
-        jdbc.sql("UPDATE deposits SET status=?,version=version+1 WHERE id=?").params(status, depositId).update();
+        deposits.settleAs(depositId, status);
         // Authoritative settlement is the ONLY trigger for continuing the journey; a browser never reaches here.
         if ("PAID".equals(status) && !"PAID".equals(previous)) events.publishEvent(new CaseEvents.DepositSettled(caseId));
     }
@@ -273,7 +277,6 @@ public class PaymentService {
     private String currencyOf(UUID depositId) { return jdbc.sql("SELECT currency FROM deposits WHERE id=?").param(depositId).query(String.class).optional().orElse("EGP"); }
     private static BigDecimal firstNonNull(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
     private void audit(Actor actor, UUID caseId, String type, UUID entityId, String reason) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, actor.subject(), actor.label(), caseId, "Deposit", entityId.toString(), "PAYMENT", "SUCCESS", reason, timestamp(clock.instant())).update();
+        auditTrail.event(type).actor(actor.subject(), actor.label()).caseId(caseId).entity("Deposit", entityId).action("PAYMENT").reason(reason).record();
     }
 }

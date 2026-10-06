@@ -52,6 +52,18 @@ spring:
   task.scheduling.shutdown:
     await-termination: true
     await-termination-period: ${SCHEDULER_SHUTDOWN_AWAIT:30s}
+logging:
+  # One JSON object per line in Elastic Common Schema (Spring Boot native, no extra library), so a shipper
+  # forwards stdout to Elasticsearch unchanged and stack traces stay inside error.stack_trace instead of
+  # breaking the line. LOG_FORMAT= (empty) switches to human-readable console output.
+  structured:
+    format.console: ${LOG_FORMAT:ecs}
+    ecs.service:
+      name: ${spring.application.name}
+      environment: ${APP_ENVIRONMENT:local}
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.rehletshifaa: ${LOG_LEVEL_APP:INFO}
 server:
   port: ${PORT:8080}
   shutdown: graceful
@@ -95,6 +107,7 @@ app:
     default-ttl: ${CACHE_DEFAULT_TTL:10m}
     ttls:
       fx-rates: ${CACHE_TTL_FX_RATES:15m}
+      fx-rate-tables: ${CACHE_TTL_FX_RATE_TABLES:15m}
       care-categories: ${CACHE_TTL_CARE_CATEGORIES:1h}
       commercial-policy: ${CACHE_TTL_COMMERCIAL_POLICY:10m}
   security:

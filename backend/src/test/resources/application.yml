@@ -7,8 +7,10 @@ spring:
   jpa:
     hibernate.ddl-auto: validate
   flyway.enabled: true
+# Readable console output for test runs; the application itself emits ECS JSON.
+logging.structured.format.console: ""
 app:
-  # No Redis in the test JVM. CacheCachingTest re-enables caching with a map cache manager to prove
+  # No Redis in the test JVM. ReferenceDataCachingTest re-enables caching with a map cache manager to prove
   # the @Cacheable/@CacheEvict wiring; every other test exercises the uncached, authoritative path.
   cache.enabled: false
   security.enabled: false

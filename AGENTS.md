@@ -92,10 +92,28 @@ CORS preflights and health probes are never counted. Policy tests: `frontend/e2e
 (`GATEWAY_TEST_URL=http://localhost:8081`, which simulates clients via `CF-Connecting-IP`).
 
 Redis is the shared cache. Only reference data is cached, declared in `CacheNames`:
-`fx-rates` (15m), `care-categories` (1h), `commercial-policy` (10m); TTLs are configured under
-`app.cache.*`. Live workflow, payment, authorization and clinical state is never cached. A Redis
-outage degrades to a database read (`CacheConfig.cacheErrorHandler`) rather than failing a request.
+`fx-rates` + `fx-rate-tables` (15m), `care-categories` (1h), `commercial-policy` (10m); TTLs are configured
+under `app.cache.*`. Each cache has one value type declared by its owning module (`CacheSpec`), stored as
+plain typed JSON under `rehletshifaa:cache:v1:` (bump the version on an incompatible type change); the
+manager refuses undeclared cache names and applies puts/evictions after commit. Live workflow, payment,
+authorization and clinical state is never cached. A Redis outage degrades to a database read with a
+throttled `event.code=CACHE_UNAVAILABLE` warning; commands fail fast while disconnected.
 `RequestRateLimiter` also counts in Redis so the write budget is shared across backend instances.
+
+## 2b. Logging and observability
+
+Backend logs are Spring Boot native ECS JSON on stdout (`LOG_FORMAT=` for plain text); the gateway access
+log uses the same ECS names. Correlation id = `X-Request-ID` = ECS `http.request.id` = `requestId` in every
+error body = `audit_events.correlation_id`. Stable codes go in `event.code`. Never log exception messages
+from mail/identity providers or encrypted fields (names, task titles). Opt-in Elasticsearch/Kibana/Filebeat:
+`docker-compose.observability.yml` (see `infrastructure/observability/README.md`; ~3 GB RAM, stop it when idle).
+
+## 2c. Persistence
+
+Spring Data JPA (owner decision 2026-10-06; `docs/platform-control-plane/technical-decisions.md` §29). Read
+`docs/platform-control-plane/jpa-migration-status.md` before touching persistence. Repositories extend
+`BaseRepository` (use `lockById` for row locks). Prove mappings on PostgreSQL with `PostgresJpaMappingTest`.
+No new `JdbcClient` use: `ArchitectureRulesTest` only allows the listed not-yet-converted classes (the list shrinks).
 
 ## 3. Technology map
 

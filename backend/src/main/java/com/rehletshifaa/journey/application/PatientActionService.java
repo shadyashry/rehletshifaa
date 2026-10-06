@@ -1,9 +1,18 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.casemanagement.application.CaseStatusLog;
+import com.rehletshifaa.casemanagement.domain.CaseStatus;
+import com.rehletshifaa.casemanagement.domain.CaseTask;
+import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.WorkDtos.*;
+import com.rehletshifaa.journey.domain.PatientActionItem;
+import com.rehletshifaa.journey.infrastructure.PatientActionItemRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.api.FieldValidationException;
+import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
+
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,7 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * "The journey needs one specific thing from this patient."
@@ -29,6 +38,11 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class PatientActionService {
+    private final PatientActionItemRepository actionItems;
+    private final CaseStatusLog statusLog;
+    private final CaseTaskRepository tasks;
+    private final MedicalCaseRepository cases;
+    private final AuditTrail auditTrail;
     private static final String TASK_TYPE = "INFORMATION_REQUEST";
     private static final String REVIEW_TYPE = "REVIEW_PATIENT_RESPONSE";
     private static final Set<String> KINDS = Set.of("INFORMATION", "DOCUMENT");
@@ -42,7 +56,7 @@ public class PatientActionService {
     private final Clock clock;
 
     public PatientActionService(JdbcClient jdbc, StaffWorkService work,
-                                CryptoService crypto, Clock clock) {
+                                CryptoService crypto, Clock clock, AuditTrail auditTrail, MedicalCaseRepository cases, CaseTaskRepository tasks, CaseStatusLog statusLog, PatientActionItemRepository actionItems) { this.actionItems = actionItems; this.statusLog = statusLog; this.tasks = tasks; this.cases = cases; this.auditTrail = auditTrail;
         this.jdbc = jdbc; this.work = work; this.crypto = crypto; this.clock = clock;
     }
 
@@ -71,33 +85,21 @@ public class PatientActionService {
         UUID taskId = openRequestId(caseId);
         if (taskId == null) {
             taskId = UUID.randomUUID();
-            jdbc.sql("INSERT INTO case_tasks(id,case_id,task_type,title,description,owner_subject,owner_role,visibility_scope,priority,status,blocking,due_at,created_by,created_at,updated_at,version) "
-                            + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
-                    .params(taskId, caseId, TASK_TYPE, encrypt(title(language)), encryptNullable(message), null, "PATIENT",
-                            "PATIENT_ACTION", StaffWorkService.derivePriority(command.blocking(), command.dueAt(), now), "OPEN", command.blocking(), timestamp(command.dueAt()),
-                            actorSubject, timestamp(now), timestamp(now))
-                    .update();
+            tasks.saveAndFlush(new CaseTask(taskId, caseId, TASK_TYPE, encrypt(title(language)), encryptNullable(message), null, "PATIENT", "PATIENT_ACTION", StaffWorkService.derivePriority(command.blocking(), command.dueAt(), now), command.blocking(), command.dueAt(), actorSubject, now));
         } else {
-            jdbc.sql("UPDATE case_tasks SET description=COALESCE(?,description),blocking=?,due_at=?,updated_at=?,version=version+1 WHERE id=?")
-                    .params(encryptNullable(message), command.blocking(), timestamp(command.dueAt()), timestamp(now), taskId).update();
+            tasks.renewPatientAction(taskId, encryptNullable(message), command.blocking(), micros(command.dueAt()), micros(now));
         }
         int order = count("SELECT count(*) FROM patient_action_items WHERE task_id=?", taskId);
         for (RequestedItem item : items) {
             // Re-requesting the same thing must not duplicate the line the patient sees.
-            jdbc.sql("INSERT INTO patient_action_items(id,task_id,item_kind,item_code,label,required,sort_order,created_at) "
-                            + "SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM patient_action_items WHERE task_id=? AND item_code=? AND completed_at IS NULL)")
-                    .params(UUID.randomUUID(), taskId, item.kind(), item.code(), encrypt(item.label().trim()),
-                            item.required(), order++, timestamp(now), taskId, item.code())
-                    .update();
+            int sortOrder = order++; if (!actionItems.hasOpen(taskId, item.code())) actionItems.saveAndFlush(new PatientActionItem(taskId, item.kind(), item.code(), encrypt(item.label().trim()), item.required(), sortOrder, now));
         }
 
         // Preserved legacy behaviour: only a blocking request parks the journey stage.
         if (command.blocking() && Set.of("RECEIVED", "INTAKE_REVIEW", "READY_FOR_CONSULTANT").contains(status)) {
-            jdbc.sql("UPDATE medical_cases SET status='INFORMATION_REQUIRED',updated_at=?,version=version+1 WHERE id=? AND status=?")
-                    .params(timestamp(now), caseId, status).update();
-            jdbc.sql("INSERT INTO case_status_history(id,case_id,from_status,to_status,actor_subject,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?)")
-                    .params(UUID.randomUUID(), caseId, status, "INFORMATION_REQUIRED", actorSubject, actorRole,
-                            message == null ? "Information requested from the patient" : message, timestamp(now)).update();
+            cases.moveStatus(caseId, CaseStatus.valueOf(status), CaseStatus.INFORMATION_REQUIRED, micros(now));
+            statusLog.record(caseId, status, "INFORMATION_REQUIRED", actorSubject, actorRole,
+                            message == null ? "Information requested from the patient" : message, now);
         }
         work.setWaitingOn(caseId, "PATIENT", command.blocking()
                 ? "Waiting for information requested from the patient"
@@ -141,9 +143,7 @@ public class PatientActionService {
         if (TERMINAL.contains(status)) throw new ApiException(409, "CASE_NOT_ACTIONABLE", "This patient action is no longer available");
         Instant now = clock.instant();
         UUID id = UUID.randomUUID();
-        jdbc.sql("INSERT INTO case_tasks(id,case_id,task_type,title,description,owner_subject,owner_role,visibility_scope,priority,status,blocking,created_by,created_at,updated_at,version) VALUES(?,?,?,?,NULL,NULL,'PATIENT','PATIENT_ACTION',?,'OPEN',?,?,?, ?,0)")
-                .params(id, caseId, type, encrypt(label), StaffWorkService.derivePriority(blocking, null, now), blocking,
-                        actorSubject, timestamp(now), timestamp(now)).update();
+        tasks.saveAndFlush(new CaseTask(id, caseId, type, encrypt(label), null, null, "PATIENT", "PATIENT_ACTION", StaffWorkService.derivePriority(blocking, null, now), blocking, null, actorSubject, now));
         work.setWaitingOn(caseId, "PATIENT", "Waiting for the patient's current Journey action");
         audit(caseId, "JOURNEY_PATIENT_ACTION_OPENED", actorSubject, "SYSTEM", id, type);
         return id;
@@ -153,8 +153,7 @@ public class PatientActionService {
     @Transactional
     public void completeJourneyAction(UUID caseId, UUID taskId, String evidence) {
         Instant now = clock.instant();
-        int changed = jdbc.sql("UPDATE case_tasks SET status='COMPLETED',completed_at=?,completion_evidence=?,updated_at=?,version=version+1 WHERE id=? AND case_id=? AND visibility_scope='PATIENT_ACTION' AND status IN ('OPEN','IN_PROGRESS')")
-                .params(timestamp(now), encrypt(evidence), timestamp(now), taskId, caseId).update();
+        int changed = tasks.completePatientAction(taskId, caseId, encrypt(evidence), micros(now));
         if (changed != 1) throw new ApiException(409, "PATIENT_ACTION_STALE", "This patient action is no longer active");
     }
 
@@ -206,9 +205,7 @@ public class PatientActionService {
         UUID taskId = openRequestId(caseId);
         if (taskId == null) throw new ApiException(409, "NO_OPEN_PATIENT_ACTION", "There is no open information request for this case");
         applyResponses(taskId, request.items(), "PATIENT_REPORTED", channel, actorSubject, true);
-        jdbc.sql("UPDATE case_tasks SET status='COMPLETED',completed_at=?,completion_evidence=?,updated_at=?,version=version+1 WHERE id=? AND status IN ('OPEN','IN_PROGRESS')")
-                .params(timestamp(clock.instant()), encrypt("Recorded by staff from the patient via " + channel),
-                        timestamp(clock.instant()), taskId).update();
+        tasks.complete(taskId, encrypt("Recorded by staff from the patient via " + channel), micros(clock.instant()));
         work.refreshWaitingOn(caseId, "STAFF", "Patient information recorded by the coordinator");
         restoreStage(caseId);
         audit(caseId, "PATIENT_INFORMATION_RECORDED_ON_BEHALF", actorSubject, actorRole, taskId,
@@ -235,12 +232,10 @@ public class PatientActionService {
                 boolean document = "DOCUMENT".equals(item.kind());
                 String value = response.value() == null ? null : response.value().trim();
                 if (document && response.documentId() != null) {
-                    jdbc.sql("UPDATE patient_action_items SET document_id=?,response_text=?,source=?,channel=?,recorded_by=?,completed_at=? WHERE id=? AND task_id=?")
-                            .params(response.documentId(), encryptNullable(value), source, channel, recordedBy, timestamp(now), item.id(), taskId).update();
+                    actionItems.recordDocument(item.id(), taskId, response.documentId(), encryptNullable(value), source, channel, recordedBy, micros(now));
                     answered = true;
                 } else if (value != null && !value.isBlank()) {
-                    jdbc.sql("UPDATE patient_action_items SET response_text=?,source=?,channel=?,recorded_by=?,completed_at=? WHERE id=? AND task_id=?")
-                            .params(encrypt(value), source, channel, recordedBy, timestamp(now), item.id(), taskId).update();
+                    actionItems.recordAnswer(item.id(), taskId, encrypt(value), source, channel, recordedBy, micros(now));
                     answered = true;
                 }
             }
@@ -254,8 +249,7 @@ public class PatientActionService {
     /** Close the patient action and open the coordinator's review work item. */
     private void completeAction(UUID caseId, UUID taskId, String note, String who) {
         Instant now = clock.instant();
-        int closed = jdbc.sql("UPDATE case_tasks SET status='COMPLETED',completed_at=?,completion_evidence=?,updated_at=?,version=version+1 WHERE id=? AND status IN ('OPEN','IN_PROGRESS')")
-                .params(timestamp(now), encrypt("Information supplied by " + who), timestamp(now), taskId).update();
+        int closed = tasks.complete(taskId, encrypt("Information supplied by " + who), micros(now));
         work.refreshWaitingOn(caseId, "STAFF", "Patient responded — awaiting coordinator review");
         if (closed != 1) return; // already completed: never open a second review or send a second notification
         restoreStage(caseId);
@@ -271,12 +265,10 @@ public class PatientActionService {
     /** A blocking request parked the stage; answering it returns the case to intake review. */
     private void restoreStage(UUID caseId) {
         Instant now = clock.instant();
-        int changed = jdbc.sql("UPDATE medical_cases SET status='INTAKE_REVIEW',updated_at=?,version=version+1 WHERE id=? AND status='INFORMATION_REQUIRED'")
-                .params(timestamp(now), caseId).update();
+        int changed = cases.moveStatus(caseId, CaseStatus.INFORMATION_REQUIRED, CaseStatus.INTAKE_REVIEW, micros(now));
         if (changed == 1)
-            jdbc.sql("INSERT INTO case_status_history(id,case_id,from_status,to_status,actor_subject,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?)")
-                    .params(UUID.randomUUID(), caseId, "INFORMATION_REQUIRED", "INTAKE_REVIEW", "SYSTEM", "SYSTEM",
-                            "Patient supplied the requested information", timestamp(now)).update();
+            statusLog.record(caseId, "INFORMATION_REQUIRED", "INTAKE_REVIEW", "SYSTEM", "SYSTEM",
+                            "Patient supplied the requested information", now);
     }
 
     // ---------------- helpers ----------------
@@ -308,9 +300,6 @@ public class PatientActionService {
     private String decrypt(String value) { return com.rehletshifaa.shared.crypto.EncryptedText.decodeNullable(crypto, value); }
 
     private void audit(UUID caseId, String type, String subject, String role, UUID entityId, String reason) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, subject == null ? "SYSTEM" : subject, role == null ? "SYSTEM" : role,
-                        caseId, "CaseTask", entityId.toString(), "REQUEST", "SUCCESS", reason, timestamp(clock.instant()))
-                .update();
+        auditTrail.event(type).actor(subject == null ? "SYSTEM" : subject, role == null ? "SYSTEM" : role).caseId(caseId).entity("CaseTask", entityId).action("REQUEST").reason(reason).record();
     }
 }

@@ -1,6 +1,6 @@
 package com.rehletshifaa.security;
 
-import org.slf4j.Logger;
+import com.rehletshifaa.shared.cache.RedisFailureLog;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -22,7 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 public class RequestRateLimiter {
-    private static final Logger log = LoggerFactory.getLogger(RequestRateLimiter.class);
+    // Falls back to this instance only; logged once a minute so an outage is visible but not a flood.
+    private final RedisFailureLog failures = new RedisFailureLog(LoggerFactory.getLogger(RequestRateLimiter.class));
     private static final String KEY_PREFIX = "rehletshifaa:ratelimit:";
 
     private final ObjectProvider<StringRedisTemplate> redis;
@@ -42,7 +43,7 @@ public class RequestRateLimiter {
                 if (count != null && count == 1L) template.expire(key, Duration.ofSeconds(windowSeconds * 2));
                 if (count != null) return count;
             } catch (RuntimeException e) {
-                log.warn("Rate-limit counter unavailable, falling back to this instance only: {}", e.toString());
+                failures.report("rate-limit count", "rate-limit", RedisFailureLog.UNAVAILABLE, e);
             }
         }
         return countLocally(clientKey, windowSeconds);

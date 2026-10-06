@@ -1,8 +1,12 @@
 package com.rehletshifaa.coordination.infrastructure;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rehletshifaa.casemanagement.domain.CaseAssignment;
+import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
+import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
 import com.rehletshifaa.coordination.domain.Routing.*;
 import com.rehletshifaa.shared.api.ApiException;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -12,16 +16,19 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
 
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
 @Repository
 public class CoordinationRepository {
+    private final CaseTaskRepository tasks;
+    private final CaseAssignmentRepository assignments;
     public static final String FUNCTION = "CARE_COORDINATION";
     private static final String ACTIVE_MEMBERSHIP = "m.status='ACTIVE' AND m.effective_from<=? AND (m.effective_to IS NULL OR m.effective_to>?)";
     private final JdbcClient jdbc;
     private final ObjectMapper json;
 
-    public CoordinationRepository(JdbcClient jdbc, ObjectMapper json) { this.jdbc = jdbc; this.json = json; }
+    public CoordinationRepository(JdbcClient jdbc, ObjectMapper json, CaseAssignmentRepository assignments, CaseTaskRepository tasks) { this.tasks = tasks; this.assignments = assignments; this.jdbc = jdbc; this.json = json; }
 
     public String encode(Object value) { try { return json.writeValueAsString(value); } catch (Exception e) { throw new IllegalStateException(e); } }
     public <T> T decode(String value, Class<T> type) { try { return json.readValue(value, type); } catch (Exception e) { throw new IllegalStateException("Invalid persisted routing data", e); } }
@@ -161,18 +168,15 @@ public class CoordinationRepository {
     }
     public long routedCases() { return count("SELECT COUNT(DISTINCT case_id) FROM coordination_decisions"); }
     public void queue(UUID task, UUID team, String reason, Instant now) {
-        update("UPDATE case_tasks SET coordination_team_id=?,coordination_queue_reason=?,coordination_queued_at=COALESCE(coordination_queued_at,?) WHERE id=?", team, reason, timestamp(now), task);
+        tasks.queue(task, team, reason, micros(now));
     }
     /** Replaces the case's primary Coordinator and moves their open coordinator work to the new owner. */
     public void owner(CaseFacts c, String selected, String actor, String reason, Instant now) {
         if (Objects.equals(c.owner(), selected)) return;
-        update("UPDATE case_assignments SET status='ENDED',ended_at=?,version=version+1 WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status IN ('ACTIVE','PENDING')",
-                timestamp(now), c.id());
+        assignments.endOpen(c.id(), "COORDINATOR", "PRIMARY", micros(now));
         if (selected != null)
-            update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,'COORDINATOR','PRIMARY','ACTIVE',?,?,?,?,0)",
-                    UUID.randomUUID(), c.id(), selected, reason, actor, timestamp(now), timestamp(now));
-        update("UPDATE case_tasks SET owner_subject=?,updated_at=?,version=version+1 WHERE case_id=? AND owner_role='COORDINATOR' AND visibility_scope='INTERNAL' "
-                + "AND status IN ('OPEN','IN_PROGRESS') AND (owner_subject IS NULL OR owner_subject=?)", selected, timestamp(now), c.id(), c.owner());
+            assignments.saveAndFlush(CaseAssignment.active(c.id(), selected, "COORDINATOR", "PRIMARY", reason, actor, now));
+        tasks.handOverCoordinatorWork(c.id(), selected, c.owner(), micros(now));
     }
 
     // ---- Decisions ----

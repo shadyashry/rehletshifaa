@@ -29,7 +29,7 @@ Keep byte-identical copies of the supplied blueprint/master under the canonical 
 
 Add `com.rehletshifaa.access`, `provider`, and `coordination` alongside the existing `journey` module. Use `domain`, `application`, `infrastructure`, and thin `api` packages. Reuse UUID, `Clock`, `SqlValues`, `ApiException`, encryption, and transaction conventions.
 
-Most current journey data uses `JdbcClient` directly in application services, not JPA entities. New control-plane persistence will use typed domain records with `JdbcClient` repositories in `infrastructure`; application services own transactions. This satisfies the master spec's repository boundary without rewriting legacy services. No new persistence library is needed.
+Most current journey data uses `JdbcClient` directly in application services, not JPA entities. New control-plane persistence will use typed domain records with `JdbcClient` repositories in `infrastructure`; application services own transactions. This satisfies the master spec's repository boundary without rewriting legacy services. No new persistence library is needed. **Superseded 2026-10-06 by §29 (Spring Data JPA).**
 
 Keep access evaluation independent of the journey/provider implementation. Define resource/subject facts and the decision contract in access; calling business services supply authoritative facts. Avoid access importing JourneyService while JourneyService imports access. Preserve `ArchitectureRulesTest.businessModulesAreFreeOfCycles`.
 
@@ -408,3 +408,42 @@ Implementation sequence: V36/domain/repository; permission cutover and configura
   MANAGES grants are answered truthfully. The UI words the answer; it never evaluates access.
 - **Organization-row price authorization (M-4) is not changed here**: fixing it removes the only path to organization
   default prices, which is a business decision on ownership → Phase 8D.
+
+## 29. Persistence moves to Spring Data JPA — 2026-10-06 (Claude Code, owner decision)
+
+- **Supersedes the §2 choice of `JdbcClient` repositories.** The owner chose JPA-first persistence (Spring Data
+  derived queries → Specifications → JPQL/HQL; native SQL only by documented exception). CL5's goal (no SQL in
+  application services) is kept; the mechanism is now entities + repositories instead of JdbcClient repositories.
+- **Ownership follows the module graph.** Each table's entity lives in the lowest module that uses it
+  (`<module>/domain`), its Spring Data repository in `<module>/infrastructure` (or package-private beside a
+  `shared` service). Upper modules depend downward; `businessModulesAreFreeOfCycles` still holds.
+- **Transition invariant (mixed JDBC/JPA in one transaction).** A table is "write-converted" only when *every*
+  INSERT/UPDATE/DELETE on it goes through JPA, flushed immediately (`saveAndFlush`, matching the timing of the JDBC
+  statement it replaced). Remaining JDBC reads then always see current rows, and no JDBC write can leave a managed
+  entity stale. Reads migrate file by file afterwards. Tracker: `jpa-migration-status.md`.
+- **Conventions.** Application-minted UUIDs extend `AssignedIdEntity` (`Persistable`, so `save` is a persist, not
+  a merge). Instants are truncated with `SqlValues.micros` (same precision rule as `timestamp()`). Business
+  `version` columns that are not optimistic-lock counters stay plain fields; real optimistic locks use `@Version`.
+  Encrypted columns keep ciphertext in the entity; services encrypt/decrypt as before.
+- **Audit.** `AuditTrail` is the only writer of `audit_events` (25 inline INSERTs removed); it fills the previously
+  unused `correlation_id` from the request's `http.request.id`.
+- **Flowable exclusions moved** from a nested `@EnableAutoConfiguration` on `FlowableRuntimeConfiguration` to
+  `@SpringBootApplication(excludeName=…)`: the nested annotation registered `journey.infrastructure` as a second
+  auto-configuration package and scanned its JPA repositories twice.
+- **Addendum (same day, after the write migration).**
+  - *Stores and repositories.* A Spring Data interface is a `…Repository`; a class that composes several of them
+    behind one domain-shaped API is a `…Store` (`StaffLifecycleStore`, `JourneyDefinitionStore`). The former JDBC
+    classes `Journey{Definition,Deployment,Shadow,CaseBinding,CaseAdmission,StageProjection}Repository` were renamed
+    accordingly.
+  - *Case tables belong to `casemanagement`*, which depends only on directory, notification, security and below;
+    `access` and `clinic` read them through its repositories. A lower module that needs a fact owned higher up asks
+    a port it declares (`SubmissionDocuments`, implemented by `document`) rather than reading the table.
+  - *Entities co-written by JPQL* (`MedicalCase`, `CaseAssignment`, `CaseTask`, proposal versions, onboarding…) are
+    `@DynamicUpdate`, so an entity flush writes only the columns it changed and never overwrites a guarded update.
+  - *Idempotent inserts* keyed by a unique column are HQL `INSERT … VALUES … ON CONFLICT DO NOTHING` (race-safe). H2
+    cannot emulate `ON CONFLICT` for `INSERT … SELECT`; the eligibility check runs in Java first.
+  - *Tests that change rows with raw SQL inside a transaction* flush before and clear after (`raw()` helpers), or the
+    persistence context serves the pre-SQL state.
+  - *Ratchet.* `ArchitectureRulesTest.newPersistenceCodeUsesSpringDataJpa` forbids `JdbcClient` outside an explicit
+    list of not-yet-converted classes, and `everyJdbcClientExceptionStillNeedsIt` fails when a listed class no longer
+    needs it — the list can only shrink.

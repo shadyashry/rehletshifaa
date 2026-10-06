@@ -1,14 +1,16 @@
 package com.rehletshifaa.journey.api;
+import com.rehletshifaa.journey.application.ConsultantOnboardingService;
 import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.PricingCatalogService;import jakarta.validation.Valid;import org.springframework.format.annotation.DateTimeFormat;import org.springframework.http.HttpStatus;import org.springframework.http.MediaType;import org.springframework.web.bind.annotation.*;import org.springframework.web.multipart.MultipartFile;import java.io.IOException;import java.time.LocalDate;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/admin") public class AdminJourneyController{
- private final JourneyService service;private final PricingCatalogService pricing;public AdminJourneyController(JourneyService service,PricingCatalogService pricing){this.service=service;this.pricing=pricing;}
- @PostMapping("/practitioners")public IdResponse create(@Valid @RequestBody PractitionerRequest request){return service.createPractitioner(request);}
- @PostMapping("/practitioners/{id}/credentials")public IdResponse credential(@PathVariable UUID id,@Valid @RequestBody CredentialRequest request){return service.addCredential(id,request);}
- @PostMapping("/practitioners/{id}/decision")public IdResponse decision(@PathVariable UUID id,@RequestParam boolean approved,@RequestParam(required=false)String reason){return service.verifyPractitioner(id,approved,reason);}
- @PostMapping("/practitioners/{id}/resend-invite")public IdResponse resendPractitionerInvite(@PathVariable UUID id,@RequestParam(defaultValue="en")String locale){return service.resendPractitionerInvite(id,locale);}
- @PostMapping("/practitioners/{id}/disable")public IdResponse disablePractitioner(@PathVariable UUID id){return service.setPractitionerEnabled(id,false);}
- @PostMapping("/practitioners/{id}/enable")public IdResponse enablePractitioner(@PathVariable UUID id){return service.setPractitionerEnabled(id,true);}
+ private final JourneyService service;private final PricingCatalogService pricing;private final ConsultantOnboardingService onboarding;
+ public AdminJourneyController(JourneyService service,PricingCatalogService pricing,ConsultantOnboardingService onboarding){this.service=service;this.pricing=pricing;this.onboarding=onboarding;}
+ @PostMapping("/practitioners")public IdResponse create(@Valid @RequestBody PractitionerRequest request){return onboarding.createPractitioner(request);}
+ @PostMapping("/practitioners/{id}/credentials")public IdResponse credential(@PathVariable UUID id,@Valid @RequestBody CredentialRequest request){return onboarding.addCredential(id,request);}
+ @PostMapping("/practitioners/{id}/decision")public IdResponse decision(@PathVariable UUID id,@RequestParam boolean approved,@RequestParam(required=false)String reason){return onboarding.verifyPractitioner(id,approved,reason);}
+ @PostMapping("/practitioners/{id}/resend-invite")public IdResponse resendPractitionerInvite(@PathVariable UUID id,@RequestParam(defaultValue="en")String locale){return onboarding.resendPractitionerInvite(id,locale);}
+ @PostMapping("/practitioners/{id}/disable")public IdResponse disablePractitioner(@PathVariable UUID id){return onboarding.setPractitionerEnabled(id,false);}
+ @PostMapping("/practitioners/{id}/enable")public IdResponse enablePractitioner(@PathVariable UUID id){return onboarding.setPractitionerEnabled(id,true);}
  // --- Price catalog, specialty templates and exchange rates ---
  @GetMapping("/practitioners")public List<PractitionerSummaryView>practitioners(){return pricing.practitioners();}
  @GetMapping("/service-templates")public List<ServiceTemplateView>templates(@RequestParam(required=false)String careCategory){return pricing.templates(careCategory);}

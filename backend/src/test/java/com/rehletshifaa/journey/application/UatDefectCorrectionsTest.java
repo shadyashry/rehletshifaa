@@ -550,7 +550,7 @@ class UatDefectCorrectionsTest {
     }
 
     @Autowired(required = false) org.springframework.cache.CacheManager cacheManager;
-    private void evictFxCache() { if (cacheManager == null) return; var cache = cacheManager.getCache(com.rehletshifaa.shared.cache.CacheNames.FX_RATES); if (cache != null) cache.clear(); }
+    private void evictFxCache() { if (cacheManager == null) return; var cache = cacheManager.getCache(com.rehletshifaa.shared.cache.CacheNames.FX_RATES); if (cache != null) cache.clear(); var tables = cacheManager.getCache(com.rehletshifaa.shared.cache.CacheNames.FX_RATE_TABLES); if (tables != null) tables.clear(); }
 
     private void seedDepositPolicy(BigDecimal egp) {
         jdbc.update("UPDATE deposit_policies SET active=FALSE");

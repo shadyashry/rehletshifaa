@@ -1138,7 +1138,7 @@ Implementation slices (kept green independently):
 | CL2 | Replace `LEGACY` Journey admission with explicit `STANDARD` versus `JOURNEY`; route every standard intake through governed team/capacity eligibility and remove unrestricted self-claim | PLANNED |
 | CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | PLANNED |
 | CL4 | Remove obsolete patient/provider/plaintext compatibility data paths and finalize clean pre-production schema | PLANNED |
-| CL5 | Introduce persistence ports/repositories and move all SQL/JDBC out of application services module by module, beginning with authority/identity/intake | PLANNED |
+| CL5 | Move all SQL/JDBC out of application services module by module — **now via Spring Data JPA** (owner decision 2026-10-06, technical-decisions §29); live tracker `jpa-migration-status.md` | IN PROGRESS — all writes JPA except coordination own tables (after CL2) and the local seeder; 17 classes still read with JdbcClient (ratchet in `ArchitectureRulesTest`) |
 | CL6 | Enforce the boundaries with ArchUnit, finish documentation/test cleanup, run focused and full backend gates | PLANNED |
 | CL7 | Add JaCoCo/Sonar configuration and run Sonar for the sole Maven backend when a Sonar server/project/token and scanner plugin are available | PLANNED |
 
@@ -1156,6 +1156,12 @@ safe removal of `backend/target/test-classes` plus offline test compilation pass
 passed 5 tests; `IdentityOperationIntegrationTest` and `WorkforceIdentityAdoptionIntegrationTest` passed 10 tests.
 The first in-sandbox integration attempt could not create the JDK HTTP client's loopback pipe and was rerun outside
 that restriction; this was an environment permission failure, not a product-test failure.
+
+**Claude fix to V72 (2026-10-06):** `decisionCheckConstraints` counted PostgreSQL's NOT NULL constraint (listed in
+`information_schema.check_constraints` as `decision IS NOT NULL`) as a third decision CHECK, so V72 failed on every
+PostgreSQL database (H2 passed) and the dev backend could not start. It now skips that clause; verified by applying all
+migrations to a fresh PostgreSQL 17 (`PostgresJpaMappingTest`). PostgreSQL DDL is transactional, so the failed attempts left the dev database at V71; V72 applies on the next start
+unless its preflight finds LEGACY admissions or unnamed patients (then reset the pre-production database).
 
 **Next exact action:** implement the CL2 standard-intake contract with a single lock order, durable no-candidate
 queue and no unrestricted self-claim, then obtain Astra review before continuing to patient readiness. Preserve

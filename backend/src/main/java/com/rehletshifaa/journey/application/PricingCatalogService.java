@@ -1,27 +1,31 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.clinic.domain.CatalogEntry;
+import com.rehletshifaa.clinic.infrastructure.CatalogEntryRepository;
+import com.rehletshifaa.directory.domain.PractitionerProfile;
+import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
+import com.rehletshifaa.journey.domain.ServiceTemplate;
+import com.rehletshifaa.journey.domain.ServiceTemplateItem;
+import com.rehletshifaa.journey.infrastructure.ServiceTemplateItemRepository;
+import com.rehletshifaa.journey.infrastructure.ServiceTemplateRepository;
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.currency.CurrencyService;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.identity.KeycloakStaffIdentityService;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.Instant;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
-
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 
 /**
  * Per-consultant price catalog, specialty templates and exchange-rate administration.
@@ -30,84 +34,119 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class PricingCatalogService {
-    private final JdbcClient jdbc;
+    private final CatalogEntryRepository catalog;
+    private final ServiceTemplateRepository templates;
+    private final ServiceTemplateItemRepository templateItems;
+    private final PractitionerProfileRepository practitioners;
+    private final AuditTrail auditTrail;
     private final Authority authority;
     private final Clock clock;
     private final CurrencyService currency;
     private final CryptoService crypto;
     private final KeycloakStaffIdentityService identity;
 
-    public PricingCatalogService(JdbcClient jdbc, Authority authority, Clock clock, CurrencyService currency,CryptoService crypto,KeycloakStaffIdentityService identity) {
-        this.jdbc = jdbc; this.authority = authority; this.clock = clock; this.currency = currency;this.crypto=crypto;this.identity=identity;
+    public PricingCatalogService(CatalogEntryRepository catalog, ServiceTemplateRepository templates, ServiceTemplateItemRepository templateItems,
+                                 PractitionerProfileRepository practitioners, Authority authority, Clock clock, CurrencyService currency,
+                                 CryptoService crypto, KeycloakStaffIdentityService identity, AuditTrail auditTrail) {
+        this.catalog = catalog; this.templates = templates; this.templateItems = templateItems; this.practitioners = practitioners;
+        this.authority = authority; this.clock = clock; this.currency = currency; this.crypto = crypto; this.identity = identity;
+        this.auditTrail = auditTrail;
     }
 
     // ---- Specialty templates (admin) ----
     public List<ServiceTemplateView> templates(String careCategory) {
         authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
-        String sql = "SELECT id,care_category,name,reference_standard,guidance_note FROM service_templates WHERE active" +
-                (careCategory == null || careCategory.isBlank() ? "" : " AND care_category=?") + " ORDER BY care_category";
-        var spec = (careCategory == null || careCategory.isBlank())
-                ? jdbc.sql(sql) : jdbc.sql(sql).param(careCategory.trim());
-        return spec.query((rs, n) -> template(rs)).list();
+        var found = careCategory == null || careCategory.isBlank()
+                ? templates.findByActiveTrueOrderByCareCategory() : templates.findByCareCategoryAndActiveTrueOrderByCareCategory(careCategory.trim());
+        return found.stream().map(PricingCatalogService::view).toList();
     }
 
     public List<ServiceTemplateItemView> templateItems(UUID templateId) {
         authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
-        return jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order,active FROM service_template_items WHERE template_id=? ORDER BY active DESC,sort_order,service_name")
-                .param(templateId)
-                .query((rs, n) -> templateItem(rs)).list();
+        return templateItems.findByTemplateIdOrderByActiveDescSortOrderAscServiceNameAsc(templateId).stream().map(PricingCatalogService::view).toList();
     }
 
+    @Transactional
+    public ServiceTemplateView updateTemplate(UUID id, ServiceTemplateUpdateRequest request) {
+        var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
+        ServiceTemplate template = activeTemplate(id);
+        template.describe(request.name().trim(), request.referenceStandard(), request.guidanceNote(), clock.instant());
+        templates.saveAndFlush(template);
+        audit(actor, "SERVICE_TEMPLATE_UPDATED", id.toString());
+        return view(template);
+    }
 
-    @Transactional public ServiceTemplateView updateTemplate(UUID id,ServiceTemplateUpdateRequest request){var actor=authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);int changed=jdbc.sql("UPDATE service_templates SET name=?,reference_standard=?,guidance_note=?,updated_at=? WHERE id=? AND active").params(request.name().trim(),request.referenceStandard(),request.guidanceNote(),timestamp(clock.instant()),id).update();if(changed!=1)throw new ApiException(404,"TEMPLATE_NOT_FOUND","The care-area template was not found");audit(actor,"SERVICE_TEMPLATE_UPDATED",id.toString());return templateById(id);}
-    @Transactional public ServiceTemplateItemView addTemplateItem(UUID templateId,ServiceTemplateItemRequest request){var actor=authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);templateById(templateId);Integer exists=jdbc.sql("SELECT count(*) FROM service_template_items WHERE template_id=? AND service_code=?").params(templateId,request.serviceCode().trim()).query(Integer.class).single();if(exists!=null&&exists>0)throw new ApiException(409,"TEMPLATE_CODE_EXISTS","This service code already exists in the template");jdbc.sql("INSERT INTO service_template_items(id,template_id,service_code,service_name,category,suggested_price_egp,sort_order,active) VALUES(?,?,?,?,?,?,?,?)").params(UUID.randomUUID(),templateId,request.serviceCode().trim(),request.serviceName().trim(),request.category(),request.suggestedPriceEgp(),request.sortOrder()==null?0:request.sortOrder(),request.active()==null||request.active()).update();audit(actor,"SERVICE_TEMPLATE_ITEM_CREATED",templateId.toString());return templateItemByCode(templateId,request.serviceCode().trim());}
-    @Transactional public ServiceTemplateItemView updateTemplateItem(UUID templateId,String code,ServiceTemplateItemRequest request){var actor=authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);int changed=jdbc.sql("UPDATE service_template_items SET service_name=?,category=?,suggested_price_egp=?,sort_order=?,active=? WHERE template_id=? AND service_code=?").params(request.serviceName().trim(),request.category(),request.suggestedPriceEgp(),request.sortOrder()==null?0:request.sortOrder(),request.active()==null||request.active(),templateId,code).update();if(changed!=1)throw new ApiException(404,"TEMPLATE_ITEM_NOT_FOUND","The template service was not found");audit(actor,"SERVICE_TEMPLATE_ITEM_UPDATED",templateId+":"+code);return templateItemByCode(templateId,code);}
+    @Transactional
+    public ServiceTemplateItemView addTemplateItem(UUID templateId, ServiceTemplateItemRequest request) {
+        var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
+        activeTemplate(templateId);
+        String code = request.serviceCode().trim();
+        if (templateItems.existsByTemplateIdAndServiceCode(templateId, code))
+            throw new ApiException(409, "TEMPLATE_CODE_EXISTS", "This service code already exists in the template");
+        ServiceTemplateItem item = templateItems.saveAndFlush(new ServiceTemplateItem(templateId, code, request.serviceName().trim(), request.category(),
+                request.suggestedPriceEgp(), request.sortOrder() == null ? 0 : request.sortOrder(), request.active() == null || request.active()));
+        audit(actor, "SERVICE_TEMPLATE_ITEM_CREATED", templateId.toString());
+        return view(item);
+    }
+
+    @Transactional
+    public ServiceTemplateItemView updateTemplateItem(UUID templateId, String code, ServiceTemplateItemRequest request) {
+        var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
+        ServiceTemplateItem item = templateItems.findByTemplateIdAndServiceCode(templateId, code)
+                .orElseThrow(() -> new ApiException(404, "TEMPLATE_ITEM_NOT_FOUND", "The template service was not found"));
+        item.update(request.serviceName().trim(), request.category(), request.suggestedPriceEgp(), request.sortOrder() == null ? 0 : request.sortOrder(),
+                request.active() == null || request.active());
+        templateItems.saveAndFlush(item);
+        audit(actor, "SERVICE_TEMPLATE_ITEM_UPDATED", templateId + ":" + code);
+        return view(item);
+    }
 
     // ---- Consultant catalog (admin managed) ----
     public List<PractitionerSummaryView> practitioners() {
         authority.authorize(Permission.CREDENTIAL_READ);
-        return jdbc.sql("SELECT id,external_subject,display_name,specialty,subspecialty,care_category,credentialing_status,availability_status,email_encrypted,account_status,invited_at FROM practitioner_profiles WHERE practitioner_type='CONSULTANT' ORDER BY display_name")
-                .query((rs, n) -> {String subject=rs.getString("external_subject"),stored=rs.getString("account_status");return new PractitionerSummaryView(rs.getObject("id", UUID.class), rs.getString("display_name"), rs.getString("specialty"), rs.getString("subspecialty"), rs.getString("care_category"), rs.getString("credentialing_status"), rs.getString("availability_status"),crypto.decrypt(rs.getString("email_encrypted")),identity.status(subject,stored),rs.getTimestamp("invited_at")==null?null:rs.getTimestamp("invited_at").toInstant());}).list();
+        return practitioners.findByPractitionerTypeOrderByDisplayName("CONSULTANT").stream()
+                .map(p -> new PractitionerSummaryView(p.getId(), p.getDisplayName(), p.getSpecialty(), p.getSubspecialty(), p.getCareCategory(),
+                        p.getCredentialingStatus(), p.getAvailabilityStatus(), crypto.decrypt(p.getEmailEncrypted()),
+                        identity.status(p.getExternalSubject(), p.getAccountStatus()), p.getInvitedAt()))
+                .toList();
     }
 
     public List<CatalogServiceView> practitionerCatalog(UUID practitionerId) {
         authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         requirePractitioner(practitionerId);
-        return catalogRows("SELECT * FROM consultant_service_catalog WHERE practitioner_id=? ORDER BY active DESC,category,service_name", practitionerId);
+        return catalog.findByPractitionerIdOrderByActiveDescCategoryAscServiceNameAsc(practitionerId).stream().map(PricingCatalogService::view).toList();
     }
 
     @Transactional
     public CatalogServiceView addCatalogService(UUID practitionerId, CatalogServiceRequest request) {
         var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         requirePractitioner(practitionerId);
-        Integer exists = jdbc.sql("SELECT count(*) FROM consultant_service_catalog WHERE practitioner_id=? AND service_code=?")
-                .params(practitionerId, request.serviceCode().trim()).query(Integer.class).single();
-        if (exists != null && exists > 0) throw new ApiException(409, "SERVICE_CODE_EXISTS", "A service with this code already exists for the consultant");
-        UUID id = UUID.randomUUID();
-        jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,valid_until,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)")
-                .params(id, practitionerId, request.serviceCode().trim(), request.serviceName().trim(), request.category(), request.priceEgp(),
-                        request.active() == null || request.active(), request.validUntil(), actor.subject(), timestamp(clock.instant()), timestamp(clock.instant())).update();
-        audit(actor, "CATALOG_SERVICE_CREATED", id.toString());
-        return catalogById(id);
+        String code = request.serviceCode().trim();
+        if (catalog.existsByPractitionerIdAndServiceCode(practitionerId, code))
+            throw new ApiException(409, "SERVICE_CODE_EXISTS", "A service with this code already exists for the consultant");
+        CatalogEntry entry = catalog.saveAndFlush(CatalogEntry.platformManaged(practitionerId, code, request.serviceName().trim(), request.category(),
+                request.priceEgp(), request.active() == null || request.active(), request.validUntil(), actor.subject(), clock.instant()));
+        audit(actor, "CATALOG_SERVICE_CREATED", entry.getId().toString());
+        return view(entry);
     }
 
     @Transactional
     public CatalogServiceView updateCatalogService(UUID practitionerId, UUID serviceId, CatalogServiceRequest request) {
         var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
-        int changed = jdbc.sql("UPDATE consultant_service_catalog SET service_name=?,category=?,price_egp=?,active=?,valid_until=?,updated_at=?,version=version+1 WHERE id=? AND practitioner_id=?")
-                .params(request.serviceName().trim(), request.category(), request.priceEgp(),
-                        request.active() == null || request.active(), request.validUntil(), timestamp(clock.instant()), serviceId, practitionerId).update();
-        if (changed != 1) throw new ApiException(404, "CATALOG_SERVICE_NOT_FOUND", "The catalog service was not found for this consultant");
+        CatalogEntry entry = lockedEntry(practitionerId, serviceId);
+        entry.edit(request.serviceName().trim(), request.category(), request.priceEgp(), request.active() == null || request.active(),
+                request.validUntil(), clock.instant());
+        catalog.saveAndFlush(entry);
         audit(actor, "CATALOG_SERVICE_UPDATED", serviceId.toString());
-        return catalogById(serviceId);
+        return view(entry);
     }
 
     @Transactional
     public void deactivateCatalogService(UUID practitionerId, UUID serviceId) {
         var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
-        int changed = jdbc.sql("UPDATE consultant_service_catalog SET active=FALSE,updated_at=?,version=version+1 WHERE id=? AND practitioner_id=?")
-                .params(timestamp(clock.instant()), serviceId, practitionerId).update();
-        if (changed != 1) throw new ApiException(404, "CATALOG_SERVICE_NOT_FOUND", "The catalog service was not found for this consultant");
+        CatalogEntry entry = lockedEntry(practitionerId, serviceId);
+        entry.deactivate(clock.instant());
+        catalog.saveAndFlush(entry);
         audit(actor, "CATALOG_SERVICE_DEACTIVATED", serviceId.toString());
     }
 
@@ -120,9 +159,9 @@ public class PricingCatalogService {
     public IdResponse seedFromTemplate(UUID practitionerId, UUID templateId) {
         var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         String careArea = requirePractitionerCareArea(practitionerId);
-        String templateArea = jdbc.sql("SELECT care_category FROM service_templates WHERE id=? AND active").param(templateId).query(String.class).optional()
+        ServiceTemplate template = templates.findByIdAndActiveTrue(templateId)
                 .orElseThrow(() -> new ApiException(404, "TEMPLATE_NOT_FOUND", "The service template was not found"));
-        if (!templateArea.equals(careArea))
+        if (!template.getCareCategory().equals(careArea))
             throw new ApiException(409, "TEMPLATE_CARE_AREA_MISMATCH", "The template care area does not match the consultant's care area");
         int added = copyTemplateToCatalog(practitionerId, templateId, actor.subject());
         audit(actor, "CATALOG_SEEDED_FROM_TEMPLATE", practitionerId.toString());
@@ -134,9 +173,9 @@ public class PricingCatalogService {
     public IdResponse deriveFromCareArea(UUID practitionerId) {
         var actor = authority.authorize(Permission.CONSULTANT_CATALOG_MANAGE);
         String careArea = requirePractitionerCareArea(practitionerId);
-        UUID templateId = jdbc.sql("SELECT id FROM service_templates WHERE care_category=? AND active").param(careArea).query(UUID.class).optional()
+        ServiceTemplate template = templates.findFirstByCareCategoryAndActiveTrue(careArea)
                 .orElseThrow(() -> new ApiException(409, "NO_TEMPLATE_FOR_CARE_AREA", "No service template exists yet for the care area: " + careArea));
-        int added = copyTemplateToCatalog(practitionerId, templateId, actor.subject());
+        int added = copyTemplateToCatalog(practitionerId, template.getId(), actor.subject());
         audit(actor, "CATALOG_DERIVED_FROM_CARE_AREA", practitionerId.toString());
         return new IdResponse(practitionerId, added + " added");
     }
@@ -148,31 +187,33 @@ public class PricingCatalogService {
      */
     void autoDeriveOnCreate(UUID practitionerId, String careArea, String bySubject) {
         if (careArea == null || careArea.isBlank()) return;
-        UUID templateId = jdbc.sql("SELECT id FROM service_templates WHERE care_category=? AND active").param(careArea).query(UUID.class).optional().orElse(null);
-        if (templateId == null) return;
-        copyTemplateToCatalog(practitionerId, templateId, bySubject);
+        templates.findFirstByCareCategoryAndActiveTrue(careArea).ifPresent(t -> copyTemplateToCatalog(practitionerId, t.getId(), bySubject));
     }
 
+    /** Copies the template's active services; codes already on the consultant's list are left untouched. */
     private int copyTemplateToCatalog(UUID practitionerId, UUID templateId, String bySubject) {
-        List<ServiceTemplateItemView> items = jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order,active FROM service_template_items WHERE template_id=? AND active ORDER BY sort_order,service_name")
-                .param(templateId)
-                .query((rs, n) -> templateItem(rs)).list();
         int added = 0;
-        for (ServiceTemplateItemView item : items) {
-            boolean priced=item.suggestedPriceEgp()!=null&&item.suggestedPriceEgp().signum()>0;
-            added += jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) " +
-                            "SELECT ?,?,?,?,?,?,?, ?,?,?,0 WHERE NOT EXISTS(SELECT 1 FROM consultant_service_catalog c WHERE c.practitioner_id=? AND c.service_code=?)")
-                    .params(UUID.randomUUID(), practitionerId, item.serviceCode(), item.serviceName(), item.category(),
-                            priced?item.suggestedPriceEgp():java.math.BigDecimal.ZERO,priced,
-                            bySubject, timestamp(clock.instant()), timestamp(clock.instant()), practitionerId, item.serviceCode()).update();
+        for (ServiceTemplateItem item : templateItems.findByTemplateIdAndActiveTrueOrderBySortOrderAscServiceNameAsc(templateId)) {
+            if (catalog.existsByPractitionerIdAndServiceCode(practitionerId, item.getServiceCode())) continue;
+            boolean priced = item.getSuggestedPriceEgp() != null && item.getSuggestedPriceEgp().signum() > 0;
+            catalog.saveAndFlush(CatalogEntry.platformManaged(practitionerId, item.getServiceCode(), item.getServiceName(), item.getCategory(),
+                    priced ? item.getSuggestedPriceEgp() : BigDecimal.ZERO, priced, null, bySubject, clock.instant()));
+            added++;
         }
         return added;
     }
 
-    private ServiceTemplateView templateById(UUID id){return jdbc.sql("SELECT id,care_category,name,reference_standard,guidance_note FROM service_templates WHERE id=? AND active").param(id).query((rs,n)->template(rs)).optional().orElseThrow(()->new ApiException(404,"TEMPLATE_NOT_FOUND","The care-area template was not found"));}
-    private ServiceTemplateItemView templateItemByCode(UUID id,String code){return jdbc.sql("SELECT service_code,service_name,category,suggested_price_egp,sort_order,active FROM service_template_items WHERE template_id=? AND service_code=?").params(id,code).query((rs,n)->templateItem(rs)).optional().orElseThrow(()->new ApiException(404,"TEMPLATE_ITEM_NOT_FOUND","The template service was not found"));}
-    private ServiceTemplateView template(java.sql.ResultSet rs)throws java.sql.SQLException{return new ServiceTemplateView(rs.getObject("id",UUID.class),rs.getString("care_category"),rs.getString("name"),rs.getString("reference_standard"),rs.getString("guidance_note"));}
-    private ServiceTemplateItemView templateItem(java.sql.ResultSet rs)throws java.sql.SQLException{return new ServiceTemplateItemView(rs.getString("service_code"),rs.getString("service_name"),rs.getString("category"),rs.getBigDecimal("suggested_price_egp"),rs.getInt("sort_order"),rs.getBoolean("active"));}
+    private ServiceTemplate activeTemplate(UUID id) {
+        return templates.findByIdAndActiveTrue(id).orElseThrow(() -> new ApiException(404, "TEMPLATE_NOT_FOUND", "The care-area template was not found"));
+    }
+
+    private static ServiceTemplateView view(ServiceTemplate t) {
+        return new ServiceTemplateView(t.getId(), t.getCareCategory(), t.getName(), t.getReferenceStandard(), t.getGuidanceNote());
+    }
+
+    private static ServiceTemplateItemView view(ServiceTemplateItem i) {
+        return new ServiceTemplateItemView(i.getServiceCode(), i.getServiceName(), i.getCategory(), i.getSuggestedPriceEgp(), i.getSortOrder(), i.isActive());
+    }
 
     // ---- Bulk import (CSV; Excel via "Save As CSV") ----
     /**
@@ -200,27 +241,30 @@ public class PricingCatalogService {
             String priceStr = cell(r, col, "price_egp");
             if (code.isBlank() && name.isBlank() && priceStr.isBlank()) continue; // blank line
             String error = null;
-            java.math.BigDecimal price = null;
-            try { price = new java.math.BigDecimal(priceStr.trim()); } catch (Exception e) { error = "Invalid price"; }
+            BigDecimal price = null;
+            try { price = new BigDecimal(priceStr.trim()); } catch (Exception e) { error = "Invalid price"; }
             if (code.isBlank() || name.isBlank()) error = "service_code and service_name are required";
             else if (code.length() > 60) error = "service_code is too long (max 60)";
             else if (price != null && price.signum() < 0) error = "Price cannot be negative";
             else if (!seen.add(code)) error = "Duplicate service_code in file";
             if (error != null) { errors++; rows.add(new CatalogImportRow(i + 1, code, name, category, price, "ERROR", error)); continue; }
             boolean active = parseActive(cell(r, col, "active"));
-            var existing = jdbc.sql("SELECT service_name,category,price_egp,active FROM consultant_service_catalog WHERE practitioner_id=? AND service_code=?")
-                    .params(practitionerId, code).query((rs, n) -> new String[]{rs.getString("service_name"), rs.getString("category"), rs.getBigDecimal("price_egp").toPlainString(), String.valueOf(rs.getBoolean("active"))}).optional().orElse(null);
+            CatalogEntry existing = catalog.findByPractitionerIdAndServiceCode(practitionerId, code).orElse(null);
             String action;
             if (existing == null) {
                 action = "NEW"; added++;
-                if (commit) jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)")
-                        .params(UUID.randomUUID(), practitionerId, code, name.trim(), blankToNull(category), price, active, actor.subject(), timestamp(clock.instant()), timestamp(clock.instant())).update();
-            } else if (name.trim().equals(existing[0]) && java.util.Objects.equals(blankToNull(category), existing[1]) && price.compareTo(new java.math.BigDecimal(existing[2])) == 0 && active == Boolean.parseBoolean(existing[3])) {
+                if (commit) catalog.saveAndFlush(CatalogEntry.platformManaged(practitionerId, code, name.trim(), blankToNull(category), price, active,
+                        null, actor.subject(), clock.instant()));
+            } else if (name.trim().equals(existing.getServiceName()) && java.util.Objects.equals(blankToNull(category), existing.getCategory())
+                    && price.compareTo(existing.getPriceEgp()) == 0 && active == existing.isActive()) {
                 action = "UNCHANGED"; unchanged++;
             } else {
                 action = "UPDATE"; updated++;
-                if (commit) jdbc.sql("UPDATE consultant_service_catalog SET service_name=?,category=?,price_egp=?,active=?,updated_at=?,version=version+1 WHERE practitioner_id=? AND service_code=?")
-                        .params(name.trim(), blankToNull(category), price, active, timestamp(clock.instant()), practitionerId, code).update();
+                if (commit) {
+                    CatalogEntry entry = lockedEntry(practitionerId, existing.getId());
+                    entry.importValues(name.trim(), blankToNull(category), price, active, clock.instant());
+                    catalog.saveAndFlush(entry);
+                }
             }
             rows.add(new CatalogImportRow(i + 1, code, name, category, price, action, null));
         }
@@ -256,11 +300,9 @@ public class PricingCatalogService {
     public List<CatalogServiceView> myCatalog() {
         var actor = authority.authorize(Permission.WORK_QUEUE_VIEW);
         if (!actor.has(Role.CONSULTANT)) throw new ApiException(403, "PERMISSION_NOT_HELD", "Only consultants have a catalog");
-        UUID practitionerId = jdbc.sql("SELECT id FROM practitioner_profiles WHERE external_subject=? AND credentialing_status='VERIFIED'")
-                .param(actor.subject()).query(UUID.class).optional()
+        UUID practitionerId = practitioners.findFirstByExternalSubjectAndCredentialingStatus(actor.subject(), "VERIFIED").map(PractitionerProfile::getId)
                 .orElseThrow(() -> new ApiException(403, "DOCTOR_NOT_VERIFIED", "The doctor account is not linked to a verified practitioner profile"));
-        LocalDate today = LocalDate.now(clock);
-        return catalogRows("SELECT * FROM consultant_service_catalog WHERE practitioner_id=? AND active AND (valid_until IS NULL OR valid_until>=?) AND (effective_from IS NULL OR effective_from<=?) ORDER BY category,service_name", practitionerId, today, today);
+        return catalog.findOffered(practitionerId, LocalDate.now(clock)).stream().map(PricingCatalogService::view).toList();
     }
 
     // ---- Exchange rates ----
@@ -281,27 +323,27 @@ public class PricingCatalogService {
 
     // ---- helpers ----
     private void requirePractitioner(UUID practitionerId) {
-        Integer found = jdbc.sql("SELECT count(*) FROM practitioner_profiles WHERE id=?").param(practitionerId).query(Integer.class).single();
-        if (found == null || found == 0) throw new ApiException(404, "PRACTITIONER_NOT_FOUND", "The consultant profile was not found");
+        if (!practitioners.existsById(practitionerId)) throw new ApiException(404, "PRACTITIONER_NOT_FOUND", "The consultant profile was not found");
     }
+
     private String requirePractitionerCareArea(UUID practitionerId) {
-        String careArea = jdbc.sql("SELECT care_category FROM practitioner_profiles WHERE id=?").param(practitionerId).query(String.class).optional()
-                .orElseThrow(() -> new ApiException(404, "PRACTITIONER_NOT_FOUND", "The consultant profile was not found"));
+        String careArea = practitioners.findById(practitionerId)
+                .orElseThrow(() -> new ApiException(404, "PRACTITIONER_NOT_FOUND", "The consultant profile was not found")).getCareCategory();
         if (careArea == null || careArea.isBlank())
             throw new ApiException(409, "CONSULTANT_CARE_AREA_REQUIRED", "Set the consultant's care area before building their price list");
         return careArea;
     }
-    private List<CatalogServiceView> catalogRows(String sql, Object... params) {
-        return jdbc.sql(sql).params(params).query((rs, n) -> new CatalogServiceView(
-                rs.getObject("id", UUID.class), rs.getString("service_code"), rs.getString("service_name"), rs.getString("category"),
-                rs.getBigDecimal("price_egp"), rs.getBoolean("active"), rs.getObject("valid_until", LocalDate.class))).list();
+
+    private CatalogEntry lockedEntry(UUID practitionerId, UUID serviceId) {
+        return catalog.lockById(serviceId).filter(e -> e.getPractitionerId().equals(practitionerId))
+                .orElseThrow(() -> new ApiException(404, "CATALOG_SERVICE_NOT_FOUND", "The catalog service was not found for this consultant"));
     }
-    private CatalogServiceView catalogById(UUID id) {
-        return catalogRows("SELECT * FROM consultant_service_catalog WHERE id=?", id).stream().findFirst()
-                .orElseThrow(() -> new ApiException(404, "CATALOG_SERVICE_NOT_FOUND", "The catalog service was not found"));
+
+    private static CatalogServiceView view(CatalogEntry e) {
+        return new CatalogServiceView(e.getId(), e.getServiceCode(), e.getServiceName(), e.getCategory(), e.getPriceEgp(), e.isActive(), e.getValidUntil());
     }
+
     private void audit(Actor actor, String type, String entityId) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, actor.subject(), actor.label(), null, "PricingCatalog", entityId, "MANAGE", "SUCCESS", null, timestamp(clock.instant())).update();
+        auditTrail.event(type).actor(actor.subject(), actor.label()).entity("PricingCatalog", entityId).action("MANAGE").record();
     }
 }

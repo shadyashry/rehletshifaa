@@ -100,16 +100,60 @@ class ArchitectureRulesTest {
     }
 
     /**
-     * One persistence API across the codebase. JdbcTemplate's string-first overloads are the easy place
-     * for a concatenated query to appear; JdbcClient makes named, bound parameters the default path.
+     * JdbcTemplate's string-first overloads are the easy place for a concatenated query to appear; the remaining
+     * plain-SQL reads use JdbcClient, whose named, bound parameters are the default path.
      */
     @Test
     void persistenceUsesOneClientApi() {
         ArchRule rule = noClasses().that().resideInAPackage("com.rehletshifaa..")
                 .should().dependOnClassesThat().haveNameMatching(
                         "org[.]springframework[.]jdbc[.]core[.](Named)?(Parameter)?JdbcTemplate")
-                .because("JdbcClient is the one persistence API in this codebase");
+                .because("JdbcClient is the only plain-SQL API, and it is being retired");
         rule.check(production);
+    }
+
+    /**
+     * technical-decisions.md §29: persistence is Spring Data JPA. These classes still hold plain-SQL reads (and, for
+     * the coordination store and the local seeder, writes) and are converted file by file; the list may only shrink.
+     * {@link #everyJdbcClientExceptionStillNeedsIt} removes a class from it as soon as it no longer needs JdbcClient.
+     */
+    private static final java.util.Set<String> JDBC_NOT_YET_CONVERTED = java.util.Set.of(
+            "com.rehletshifaa.casemanagement.application.CaseNumberGenerator", // nextval: JPQL has no sequence function
+            "com.rehletshifaa.coordination.application.CoordinationReadService",
+            "com.rehletshifaa.coordination.infrastructure.CoordinationRepository", // writes deferred until CL2 lands
+            "com.rehletshifaa.journey.application.CaseActionService",
+            "com.rehletshifaa.journey.application.CaseHandoffService",
+            "com.rehletshifaa.journey.application.ConsultantReferralService",
+            "com.rehletshifaa.journey.application.IdentityVerificationService",
+            "com.rehletshifaa.journey.application.JourneyCaseRelationships",
+            "com.rehletshifaa.journey.application.JourneyService",
+            "com.rehletshifaa.journey.application.OnboardingService",
+            "com.rehletshifaa.journey.application.PatientAccountService",
+            "com.rehletshifaa.journey.application.PatientActionService",
+            "com.rehletshifaa.journey.application.PatientActivationService",
+            "com.rehletshifaa.journey.application.PaymentService",
+            "com.rehletshifaa.journey.application.PublicCaseAccessService",
+            "com.rehletshifaa.journey.application.StaffWorkService",
+            "com.rehletshifaa.shared.config.LocalDemoDataSeeder"); // @Profile("local") only
+
+    @Test
+    void newPersistenceCodeUsesSpringDataJpa() {
+        noClasses().that().resideInAPackage("com.rehletshifaa..")
+                .and(com.tngtech.archunit.base.DescribedPredicate.describe("are not awaiting JPA conversion",
+                        (com.tngtech.archunit.core.domain.JavaClass c) -> !JDBC_NOT_YET_CONVERTED.contains(c.getName())))
+                .should().dependOnClassesThat().haveFullyQualifiedName("org.springframework.jdbc.core.simple.JdbcClient")
+                .because("persistence is Spring Data JPA (technical-decisions.md §29); JdbcClient is retired file by file")
+                .check(production);
+    }
+
+    @Test
+    void everyJdbcClientExceptionStillNeedsIt() {
+        java.util.List<String> converted = JDBC_NOT_YET_CONVERTED.stream()
+                .filter(name -> !production.contain(name) || production.get(name).getDirectDependenciesFromSelf().stream()
+                        .noneMatch(d -> d.getTargetClass().getName().equals("org.springframework.jdbc.core.simple.JdbcClient")))
+                .sorted().toList();
+        org.assertj.core.api.Assertions.assertThat(converted)
+                .as("classes that no longer use JdbcClient: remove them from JDBC_NOT_YET_CONVERTED").isEmpty();
     }
 
     @Test

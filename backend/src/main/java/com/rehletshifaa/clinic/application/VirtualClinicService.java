@@ -1,6 +1,21 @@
 package com.rehletshifaa.clinic.application;
 
 import com.rehletshifaa.clinic.api.ClinicDtos.*;
+import com.rehletshifaa.clinic.domain.CareCategory;
+import com.rehletshifaa.clinic.domain.CatalogEntry;
+import com.rehletshifaa.clinic.domain.ClinicServiceChange;
+import com.rehletshifaa.clinic.domain.ConsultationSlot;
+import com.rehletshifaa.clinic.domain.VirtualClinic;
+import com.rehletshifaa.clinic.infrastructure.CareCategoryRepository;
+import com.rehletshifaa.clinic.infrastructure.CatalogEntryRepository;
+import com.rehletshifaa.clinic.infrastructure.ClinicServiceChangeRepository;
+import com.rehletshifaa.clinic.infrastructure.ConsultationSlotRepository;
+import com.rehletshifaa.clinic.infrastructure.VirtualClinicRepository;
+import com.rehletshifaa.directory.domain.PracticeManager;
+import com.rehletshifaa.directory.domain.PractitionerProfile;
+import com.rehletshifaa.directory.infrastructure.PracticeManagerRepository;
+import com.rehletshifaa.directory.infrastructure.PractitionerCredentialRepository;
+import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
 import com.rehletshifaa.identity.IdentityProvisioningPort;
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
@@ -8,20 +23,22 @@ import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.audit.AuditEventRepository;
+import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.*;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * The consultant's virtual clinic: one per consultant, owned by the consultant, optionally helped by practice
@@ -46,19 +63,34 @@ public class VirtualClinicService {
             "IN_PERSON_CONSULTATION", "Consultation", "FOLLOW_UP_CONSULTATION", "Follow-up", "PROFESSIONAL_FEE", "Professional fees",
             "OTHER_PROFESSIONAL_SERVICE", "Professional services");
     private static final String BASE_CURRENCY = "EGP";
+    private static final String PENDING = "PENDING_APPROVAL";
     private static final Duration MAX_SLOT = Duration.ofHours(8);
 
-    private final JdbcClient jdbc;
+    private final VirtualClinicRepository clinics;
+    private final ConsultationSlotRepository slots;
+    private final ClinicServiceChangeRepository serviceChanges;
+    private final CatalogEntryRepository catalog;
+    private final CareCategoryRepository careCategories;
+    private final PractitionerProfileRepository practitioners;
+    private final PractitionerCredentialRepository credentials;
+    private final PracticeManagerRepository practiceManagers;
+    private final AuditEventRepository auditEvents;
+    private final AuditTrail auditTrail;
     private final Authority authority;
     private final ConsultantEligibilityService eligibility;
     private final IdentityProvisioningPort identities;
     private final CryptoService crypto;
     private final Clock clock;
 
-    public VirtualClinicService(JdbcClient jdbc, Authority authority, ConsultantEligibilityService eligibility,
+    public VirtualClinicService(VirtualClinicRepository clinics, ConsultationSlotRepository slots, ClinicServiceChangeRepository serviceChanges,
+                                CatalogEntryRepository catalog, CareCategoryRepository careCategories, PractitionerProfileRepository practitioners,
+                                PractitionerCredentialRepository credentials, PracticeManagerRepository practiceManagers,
+                                AuditEventRepository auditEvents, AuditTrail auditTrail, Authority authority, ConsultantEligibilityService eligibility,
                                 IdentityProvisioningPort identities, CryptoService crypto, Clock clock) {
-        this.jdbc = jdbc; this.authority = authority; this.eligibility = eligibility; this.identities = identities;
-        this.crypto = crypto; this.clock = clock;
+        this.clinics = clinics; this.slots = slots; this.serviceChanges = serviceChanges; this.catalog = catalog;
+        this.careCategories = careCategories; this.practitioners = practitioners; this.credentials = credentials;
+        this.practiceManagers = practiceManagers; this.auditEvents = auditEvents; this.auditTrail = auditTrail; this.authority = authority;
+        this.eligibility = eligibility; this.identities = identities; this.crypto = crypto; this.clock = clock;
     }
 
     // ================= access =================
@@ -72,10 +104,9 @@ public class VirtualClinicService {
     /** Idempotently create the clinic row for a consultant (consultants created after V53, or seeded directly). */
     @Transactional
     public void ensureClinic(UUID practitionerId) {
-        Instant now = clock.instant();
-        jdbc.sql("INSERT INTO virtual_clinics(practitioner_id,created_at,updated_at,version) SELECT id,?,? ,0 FROM practitioner_profiles "
-                        + "WHERE id=? AND practitioner_type='CONSULTANT' AND NOT EXISTS(SELECT 1 FROM virtual_clinics WHERE practitioner_id=?)")
-                .params(timestamp(now), timestamp(now), practitionerId, practitionerId).update();
+        if (clinics.existsById(practitionerId)) return;
+        if (practitioners.findById(practitionerId).filter(p -> "CONSULTANT".equals(p.getPractitionerType())).isPresent())
+            clinics.open(practitionerId, micros(clock.instant()));
     }
 
     ClinicActor access(UUID practitionerId) {
@@ -86,20 +117,17 @@ public class VirtualClinicService {
             return new ClinicActor(actor, practitionerId, true, Set.of(SCHEDULE, PROFILE, SERVICES));
         }
         // A manager's access ends with the consultant's account: a disabled consultant's clinic is closed to delegates.
-        var delegation = jdbc.sql("SELECT m.can_manage_schedule,m.can_manage_profile,m.can_manage_services FROM practice_managers m "
-                        + "JOIN practitioner_profiles p ON p.id=m.practitioner_id WHERE m.practitioner_id=? AND m.manager_subject=? "
-                        + "AND m.status='ACTIVE' AND p.account_status<>'DISABLED' AND p.disabled_at IS NULL")
-                .params(practitionerId, actor.subject())
-                .query((rs, n) -> permissions(rs)).optional();
+        var delegation = practiceManagers.findByPractitionerIdAndManagerSubjectAndStatus(practitionerId, actor.subject(), "ACTIVE")
+                .filter(m -> practitioners.findById(practitionerId).map(PractitionerProfile::isAccountEnabled).orElse(false));
         if (delegation.isEmpty()) throw new ApiException(403, "CLINIC_ACCESS_DENIED", "This account does not have access to this virtual clinic");
-        return new ClinicActor(actor, practitionerId, false, delegation.get());
+        return new ClinicActor(actor, practitionerId, false, permissions(delegation.get()));
     }
 
-    private static Set<String> permissions(ResultSet rs) throws SQLException {
+    private static Set<String> permissions(PracticeManager m) {
         Set<String> granted = new TreeSet<>();
-        if (rs.getBoolean("can_manage_schedule")) granted.add(SCHEDULE);
-        if (rs.getBoolean("can_manage_profile")) granted.add(PROFILE);
-        if (rs.getBoolean("can_manage_services")) granted.add(SERVICES);
+        if (m.canManageSchedule()) granted.add(SCHEDULE);
+        if (m.canManageProfile()) granted.add(PROFILE);
+        if (m.canManageServices()) granted.add(SERVICES);
         return granted;
     }
 
@@ -118,102 +146,96 @@ public class VirtualClinicService {
         var actor = com.rehletshifaa.authority.application.Principal.current();
         List<ClinicSummary> out = new ArrayList<>();
         if (authority.held(actor).roles().contains(Role.CONSULTANT))
-            jdbc.sql("SELECT id,display_name FROM practitioner_profiles WHERE external_subject=? AND practitioner_type='CONSULTANT'")
-                    .param(actor.subject())
-                    .query((rs, n) -> out.add(new ClinicSummary(rs.getObject("id", UUID.class), rs.getString("display_name"), "OWNER", List.of(PROFILE, SCHEDULE, SERVICES))))
-                    .list();
-        jdbc.sql("SELECT p.id,p.display_name,m.can_manage_schedule,m.can_manage_profile,m.can_manage_services FROM practice_managers m "
-                        + "JOIN practitioner_profiles p ON p.id=m.practitioner_id WHERE m.manager_subject=? AND m.status='ACTIVE' "
-                        + "AND p.account_status<>'DISABLED' AND p.disabled_at IS NULL ORDER BY p.display_name")
-                .param(actor.subject())
-                .query((rs, n) -> out.add(new ClinicSummary(rs.getObject("id", UUID.class), rs.getString("display_name"), "PRACTICE_MANAGER", List.copyOf(permissions(rs)))))
-                .list();
+            practitioners.findByExternalSubjectAndPractitionerType(actor.subject(), "CONSULTANT")
+                    .forEach(p -> out.add(new ClinicSummary(p.getId(), p.getDisplayName(), "OWNER", List.of(PROFILE, SCHEDULE, SERVICES))));
+        List<PracticeManager> delegations = practiceManagers.findByManagerSubjectAndStatus(actor.subject(), "ACTIVE");
+        Map<UUID, PractitionerProfile> consultants = practitioners.findAllById(delegations.stream().map(PracticeManager::getPractitionerId).toList())
+                .stream().filter(PractitionerProfile::isAccountEnabled).collect(Collectors.toMap(PractitionerProfile::getId, Function.identity()));
+        delegations.stream().filter(m -> consultants.containsKey(m.getPractitionerId()))
+                .sorted(Comparator.comparing(m -> consultants.get(m.getPractitionerId()).getDisplayName()))
+                .forEach(m -> out.add(new ClinicSummary(m.getPractitionerId(), consultants.get(m.getPractitionerId()).getDisplayName(),
+                        "PRACTICE_MANAGER", List.copyOf(permissions(m)))));
         return out;
     }
 
     public ClinicView clinic(UUID practitionerId) {
         ClinicActor who = access(practitionerId);
         Instant now = clock.instant();
-        var clinic = jdbc.sql("SELECT * FROM virtual_clinics WHERE practitioner_id=?").param(practitionerId)
-                .query((rs, n) -> new ClinicRow(rs.getString("public_display_name"), rs.getString("public_headline"), rs.getString("public_bio"),
-                        rs.getString("public_languages"), instant(rs, "published_at"), rs.getString("draft_display_name"), rs.getString("draft_headline"),
-                        rs.getString("draft_bio"), rs.getString("draft_languages"), rs.getString("draft_status"), instant(rs, "draft_updated_at"),
-                        rs.getString("draft_updated_by"), rs.getBoolean("manager_changes_require_approval"), rs.getLong("version")))
-                .single();
+        VirtualClinic clinic = clinics.findById(practitionerId)
+                .orElseThrow(() -> new ApiException(404, "CLINIC_NOT_FOUND", "The virtual clinic was not found"));
         ProfessionalView professional = professional(practitionerId);
-        PublicProfileView published = new PublicProfileView(clinic.publicName(), clinic.publicHeadline(), clinic.publicBio(), clinic.publicLanguages(), clinic.publishedAt());
-        ProfileDraftView draft = !who.can(PROFILE) || "NONE".equals(clinic.draftStatus()) ? null
-                : new ProfileDraftView(clinic.draftName(), clinic.draftHeadline(), clinic.draftBio(), clinic.draftLanguages(), clinic.draftStatus(),
-                        clinic.draftUpdatedAt(), actorName(practitionerId, clinic.draftUpdatedBy()), actorRole(practitionerId, clinic.draftUpdatedBy()));
+        PublicProfileView published = new PublicProfileView(clinic.getPublicDisplayName(), clinic.getPublicHeadline(), clinic.getPublicBio(),
+                clinic.getPublicLanguages(), clinic.getPublishedAt());
+        ProfileDraftView draft = !who.can(PROFILE) || "NONE".equals(clinic.getDraftStatus()) ? null
+                : new ProfileDraftView(clinic.getDraftDisplayName(), clinic.getDraftHeadline(), clinic.getDraftBio(), clinic.getDraftLanguages(),
+                        clinic.getDraftStatus(), clinic.getDraftUpdatedAt(), actorName(practitionerId, clinic.getDraftUpdatedBy()),
+                        actorRole(practitionerId, clinic.getDraftUpdatedBy()));
         List<ServiceView> services = who.can(SERVICES) ? services(practitionerId) : List.of();
-        List<ServiceChangeView> pending = who.can(SERVICES) ? changes(practitionerId, "c.status='PENDING_APPROVAL'", null) : List.of();
-        List<SlotView> slots = who.can(SCHEDULE) ? jdbc.sql("SELECT * FROM consultation_slots WHERE practitioner_id=? AND ends_at>? ORDER BY starts_at LIMIT 200")
-                .params(practitionerId, timestamp(now.minus(Duration.ofDays(1)))).query(this::slot).list() : List.of();
+        List<ServiceChangeView> pending = who.can(SERVICES) ? views(practitionerId, serviceChanges.findPending(practitionerId)) : List.of();
+        List<SlotView> schedule = who.can(SCHEDULE)
+                ? slots.findTop200ByPractitionerIdAndEndsAtAfterOrderByStartsAt(practitionerId, now.minus(Duration.ofDays(1))).stream()
+                        .map(VirtualClinicService::view).toList()
+                : List.of();
         List<ManagerView> managers = who.owner() ? managers(practitionerId) : List.of();
         return new ClinicView(practitionerId, who.owner() ? "OWNER" : "PRACTICE_MANAGER", List.copyOf(new TreeSet<>(who.permissions())),
-                professional, published, draft, clinic.managerChangesRequireApproval(), services, pending, slots, managers, clinic.version());
+                professional, published, draft, clinic.isManagerChangesRequireApproval(), services, pending, schedule, managers, clinic.getVersion());
     }
 
     private ProfessionalView professional(UUID practitionerId) {
-        var p = jdbc.sql("SELECT p.display_name,p.specialty,p.subspecialty,p.care_category,p.credentialing_status,p.languages,p.availability_status,"
-                        + "p.expected_review_hours,p.version,c.name_en,c.name_ar FROM practitioner_profiles p LEFT JOIN care_categories c ON c.slug=p.care_category WHERE p.id=?")
-                .param(practitionerId)
-                .query((rs, n) -> new Object[]{rs.getString("display_name"), rs.getString("specialty"), rs.getString("subspecialty"), rs.getString("care_category"),
-                        rs.getString("credentialing_status"), rs.getString("languages"), rs.getString("availability_status"), rs.getObject("expected_review_hours"),
-                        rs.getLong("version"), rs.getString("name_en"), rs.getString("name_ar")})
-                .single();
-        boolean current = jdbc.sql("SELECT COUNT(*) FROM practitioner_credentials WHERE practitioner_id=? AND status='VERIFIED' AND (expires_at IS NULL OR expires_at>?)")
-                .params(practitionerId, timestamp(clock.instant())).query(Long.class).single() > 0;
-        String area = (String) p[3];
-        return new ProfessionalView((String) p[0], (String) p[1], (String) p[2], area, (String) p[9], (String) p[10], (String) p[4], current,
-                eligibility.capabilities(practitionerId), (String) p[5], (String) p[6], (Integer) p[7], eligibility.isEligible(practitionerId, area), (Long) p[8]);
+        PractitionerProfile p = practitioners.findById(practitionerId)
+                .orElseThrow(() -> new ApiException(404, "PRACTITIONER_NOT_FOUND", "Consultant profile was not found"));
+        String area = p.getCareCategory();
+        Optional<CareCategory> category = area == null ? Optional.empty() : careCategories.findBySlug(area);
+        boolean current = credentials.hasCurrentVerified(practitionerId, micros(clock.instant()));
+        return new ProfessionalView(p.getDisplayName(), p.getSpecialty(), p.getSubspecialty(), area,
+                category.map(CareCategory::getNameEn).orElse(null), category.map(CareCategory::getNameAr).orElse(null),
+                p.getCredentialingStatus(), current, eligibility.capabilities(practitionerId), p.getLanguages(), p.getAvailabilityStatus(),
+                p.getExpectedReviewHours(), eligibility.isEligible(practitionerId, area), p.getVersion());
     }
 
     private List<ServiceView> services(UUID practitionerId) {
-        return jdbc.sql("SELECT * FROM consultant_service_catalog WHERE practitioner_id=? ORDER BY active DESC,service_name").param(practitionerId)
-                .query((rs, n) -> new ServiceView(rs.getObject("id", UUID.class), rs.getString("service_code"), rs.getString("service_name"),
-                        rs.getString("service_kind"), rs.getString("description"), rs.getString("included_scope"), rs.getString("excluded_scope"),
-                        rs.getString("currency"), rs.getBigDecimal("price_egp"), rs.getBigDecimal("price_max_egp"), localDate(rs, "effective_from"),
-                        localDate(rs, "valid_until"), rs.getBoolean("active"), rs.getString("approval_status"), rs.getInt("revision")))
-                .list();
+        return catalog.findByPractitionerIdOrderByActiveDescServiceNameAsc(practitionerId).stream()
+                .map(s -> new ServiceView(s.getId(), s.getServiceCode(), s.getServiceName(), s.getServiceKind(), s.getDescription(),
+                        s.getIncludedScope(), s.getExcludedScope(), s.getCurrency(), s.getPriceEgp(), s.getPriceMaxEgp(), s.getEffectiveFrom(),
+                        s.getValidUntil(), s.isActive(), s.getApprovalStatus(), s.getRevision()))
+                .toList();
     }
 
     /** Applied changes of one service, newest first: its version history. */
     public List<ServiceChangeView> serviceHistory(UUID practitionerId, UUID serviceId) {
         ClinicActor who = access(practitionerId);
         require(who, SERVICES);
-        return changes(practitionerId, "c.catalog_service_id=? AND c.status='APPLIED'", serviceId);
+        return views(practitionerId, serviceChanges.findApplied(practitionerId, serviceId));
     }
 
-    private List<ServiceChangeView> changes(UUID practitionerId, String where, UUID serviceId) {
-        var query = jdbc.sql("SELECT c.* FROM clinic_service_changes c WHERE c.practitioner_id=? AND " + where + " ORDER BY c.proposed_at DESC,c.applied_revision DESC NULLS LAST,c.id");
-        query = serviceId == null ? query.param(practitionerId) : query.params(practitionerId, serviceId);
-        return query.query((rs, n) -> new ServiceChangeView(rs.getObject("id", UUID.class), rs.getObject("catalog_service_id", UUID.class),
-                        rs.getString("change_type"), rs.getString("service_code"), rs.getString("service_name"), rs.getString("service_kind"),
-                        rs.getString("description"), rs.getString("included_scope"), rs.getString("excluded_scope"), rs.getString("currency"),
-                        rs.getBigDecimal("price_egp"), rs.getBigDecimal("price_max_egp"), localDate(rs, "effective_from"), localDate(rs, "valid_until"),
-                        rs.getString("status"), actorName(practitionerId, rs.getString("proposed_by")), rs.getString("proposed_by_role"),
-                        instant(rs, "proposed_at"), actorName(practitionerId, rs.getString("decided_by")), instant(rs, "decided_at"),
-                        rs.getString("decision_reason"), (Integer) rs.getObject("applied_revision"), rs.getLong("version")))
-                .list();
+    private List<ServiceChangeView> views(UUID practitionerId, List<ClinicServiceChange> changes) {
+        return changes.stream().map(c -> view(practitionerId, c)).toList();
+    }
+
+    private ServiceChangeView view(UUID practitionerId, ClinicServiceChange c) {
+        return new ServiceChangeView(c.getId(), c.getCatalogServiceId(), c.getChangeType(), c.getServiceCode(), c.getServiceName(),
+                c.getServiceKind(), c.getDescription(), c.getIncludedScope(), c.getExcludedScope(), c.getCurrency(), c.getPriceEgp(),
+                c.getPriceMaxEgp(), c.getEffectiveFrom(), c.getValidUntil(), c.getStatus(), actorName(practitionerId, c.getProposedBy()),
+                c.getProposedByRole(), c.getProposedAt(), actorName(practitionerId, c.getDecidedBy()), c.getDecidedAt(), c.getDecisionReason(),
+                c.getAppliedRevision(), c.getVersion());
     }
 
     private List<ManagerView> managers(UUID practitionerId) {
-        return jdbc.sql("SELECT * FROM practice_managers WHERE practitioner_id=? ORDER BY status,invited_at").param(practitionerId)
-                .query((rs, n) -> new ManagerView(rs.getObject("id", UUID.class), crypto.decrypt(rs.getString("display_name_encrypted")),
-                        rs.getString("email_encrypted") == null ? null : crypto.decrypt(rs.getString("email_encrypted")), rs.getString("status"),
-                        List.copyOf(permissions(rs)), instant(rs, "invited_at"), rs.getLong("version")))
-                .list();
+        return practiceManagers.findByPractitionerIdOrderByStatusAscInvitedAtAsc(practitionerId).stream()
+                .map(m -> new ManagerView(m.getId(), crypto.decrypt(m.getDisplayNameEncrypted()),
+                        m.getEmailEncrypted() == null ? null : crypto.decrypt(m.getEmailEncrypted()), m.getStatus(),
+                        List.copyOf(permissions(m)), m.getInvitedAt(), m.getVersion()))
+                .toList();
     }
 
     /** The clinic's change history. Consultant only: it names who changed what. */
     public List<ClinicAuditEntry> auditHistory(UUID practitionerId) {
         requireOwner(access(practitionerId));
-        return jdbc.sql("SELECT event_type,action,actor_subject,actor_role,reason,occurred_at FROM audit_events WHERE entity_type='VirtualClinic' AND entity_id=? ORDER BY occurred_at DESC LIMIT 200")
-                .param(practitionerId.toString())
-                .query((rs, n) -> new ClinicAuditEntry(rs.getString("event_type"), rs.getString("action"), actorName(practitionerId, rs.getString("actor_subject")),
-                        rs.getString("actor_role"), rs.getString("reason"), instant(rs, "occurred_at")))
-                .list();
+        return auditEvents.findByEntityTypeAndEntityIdOrderByOccurredAtDesc("VirtualClinic", practitionerId.toString(), PageRequest.of(0, 200))
+                .stream()
+                .map(e -> new ClinicAuditEntry(e.getEventType(), e.getAction(), actorName(practitionerId, e.getActorSubject()), e.getActorRole(),
+                        e.getReason(), e.getOccurredAt()))
+                .toList();
     }
 
     // ================= consultant-only controls =================
@@ -222,8 +244,11 @@ public class VirtualClinicService {
     public IdResult setAvailability(UUID practitionerId, AvailabilityRequest request) {
         ClinicActor who = access(practitionerId);
         requireOwner(who);
-        int changed = jdbc.sql("UPDATE practitioner_profiles SET availability_status=?,expected_review_hours=COALESCE(?,expected_review_hours),updated_at=?,version=version+1 WHERE id=? AND version=?")
-                .params(request.availabilityStatus(), request.expectedReviewHours(), timestamp(clock.instant()), practitionerId, request.expectedVersion()).update();
+        Instant now = micros(clock.instant());
+        // Omitted review hours keep the current value.
+        int changed = request.expectedReviewHours() == null
+                ? practitioners.setAvailability(practitionerId, request.expectedVersion(), request.availabilityStatus(), now)
+                : practitioners.setAvailabilityAndReviewHours(practitionerId, request.expectedVersion(), request.availabilityStatus(), request.expectedReviewHours(), now);
         if (changed != 1) throw conflict();
         audit(who, "CLINIC_AVAILABILITY_CHANGED", "UPDATE", request.availabilityStatus());
         return new IdResult(practitionerId, request.availabilityStatus());
@@ -233,7 +258,9 @@ public class VirtualClinicService {
     public IdResult updateSettings(UUID practitionerId, ClinicSettingsRequest request) {
         ClinicActor who = access(practitionerId);
         requireOwner(who);
-        bumpClinic(practitionerId, request.expectedVersion(), "manager_changes_require_approval=?", request.managerChangesRequireApproval());
+        VirtualClinic clinic = lockedClinic(practitionerId, request.expectedVersion());
+        clinic.requireManagerApproval(request.managerChangesRequireApproval(), clock.instant());
+        clinics.saveAndFlush(clinic);
         audit(who, "CLINIC_SETTINGS_CHANGED", "UPDATE", "Manager service and price changes " + (request.managerChangesRequireApproval() ? "require" : "do not require") + " consultant approval");
         return new IdResult(practitionerId, "UPDATED");
     }
@@ -246,12 +273,12 @@ public class VirtualClinicService {
         ClinicActor who = access(practitionerId);
         require(who, PROFILE);
         if (publish) requireOwner(who);
-        Instant now = clock.instant();
-        bumpClinic(practitionerId, request.expectedVersion(),
-                "draft_display_name=?,draft_headline=?,draft_bio=?,draft_languages=?,draft_status='PENDING_APPROVAL',draft_updated_by=?,draft_updated_at=?",
-                trim(request.displayName()), trim(request.headline()), trim(request.bio()), trim(request.languages()), who.actor().subject(), timestamp(now));
+        VirtualClinic clinic = lockedClinic(practitionerId, request.expectedVersion());
+        clinic.saveDraft(trim(request.displayName()), trim(request.headline()), trim(request.bio()), trim(request.languages()),
+                who.actor().subject(), clock.instant());
+        clinics.saveAndFlush(clinic);
         audit(who, "CLINIC_PROFILE_DRAFT_SAVED", "UPDATE", null);
-        if (!publish) return new IdResult(practitionerId, "PENDING_APPROVAL");
+        if (!publish) return new IdResult(practitionerId, PENDING);
         return approveProfile(practitionerId, new VersionedRequest(request.expectedVersion() + 1));
     }
 
@@ -259,12 +286,9 @@ public class VirtualClinicService {
     public IdResult approveProfile(UUID practitionerId, VersionedRequest request) {
         ClinicActor who = access(practitionerId);
         requireOwner(who);
-        int changed = jdbc.sql("UPDATE virtual_clinics SET public_display_name=draft_display_name,public_headline=draft_headline,public_bio=draft_bio,"
-                        + "public_languages=draft_languages,published_at=?,published_by=?,draft_display_name=NULL,draft_headline=NULL,draft_bio=NULL,"
-                        + "draft_languages=NULL,draft_status='NONE',draft_updated_by=NULL,draft_updated_at=NULL,updated_at=?,version=version+1 "
-                        + "WHERE practitioner_id=? AND version=? AND draft_status='PENDING_APPROVAL'")
-                .params(timestamp(clock.instant()), who.actor().subject(), timestamp(clock.instant()), practitionerId, request.expectedVersion()).update();
-        if (changed != 1) throw conflict();
+        VirtualClinic clinic = lockedClinic(practitionerId, request.expectedVersion());
+        if (!clinic.publishDraft(who.actor().subject(), clock.instant())) throw conflict();
+        clinics.saveAndFlush(clinic);
         audit(who, "CLINIC_PROFILE_PUBLISHED", "APPROVE", null);
         return new IdResult(practitionerId, "PUBLISHED");
     }
@@ -273,8 +297,9 @@ public class VirtualClinicService {
     public IdResult discardProfileDraft(UUID practitionerId, VersionedRequest request) {
         ClinicActor who = access(practitionerId);
         requireOwner(who);
-        bumpClinic(practitionerId, request.expectedVersion(),
-                "draft_display_name=NULL,draft_headline=NULL,draft_bio=NULL,draft_languages=NULL,draft_status='NONE',draft_updated_by=NULL,draft_updated_at=NULL");
+        VirtualClinic clinic = lockedClinic(practitionerId, request.expectedVersion());
+        clinic.discardDraft(clock.instant());
+        clinics.saveAndFlush(clinic);
         audit(who, "CLINIC_PROFILE_DRAFT_DISCARDED", "REJECT", null);
         return new IdResult(practitionerId, "DISCARDED");
     }
@@ -292,60 +317,54 @@ public class VirtualClinicService {
         require(who, SERVICES);
         Instant now = clock.instant();
         LocalDate today = LocalDate.now(clock);
-        Current base = null;
+        CatalogEntry base = null;
         String type = request.changeType();
         if (!"CREATE".equals(type)) {
             if (request.serviceId() == null) throw new ApiException(400, "SERVICE_REQUIRED", "Select the service to change");
-            base = current(practitionerId, request.serviceId());
-            long pending = jdbc.sql("SELECT COUNT(*) FROM clinic_service_changes WHERE catalog_service_id=? AND status='PENDING_APPROVAL'")
-                    .param(request.serviceId()).query(Long.class).single();
-            if (pending > 0) throw new ApiException(409, "CHANGE_ALREADY_PENDING", "A change to this service is already waiting for the consultant's approval");
+            base = catalog.findByIdAndPractitionerId(request.serviceId(), practitionerId)
+                    .orElseThrow(() -> new ApiException(404, "SERVICE_NOT_FOUND", "The service was not found in this clinic"));
+            if (serviceChanges.existsByCatalogServiceIdAndStatus(request.serviceId(), PENDING))
+                throw new ApiException(409, "CHANGE_ALREADY_PENDING", "A change to this service is already waiting for the consultant's approval");
         }
         // A retire/activate carries the service as it stands; a create/update carries the requested values.
         boolean statusOnly = "RETIRE".equals(type) || "ACTIVATE".equals(type);
-        if ("RETIRE".equals(type) && !base.active()) throw new ApiException(409, "SERVICE_ALREADY_RETIRED", "This service is already retired");
-        if ("ACTIVATE".equals(type) && base.active()) throw new ApiException(409, "SERVICE_ALREADY_ACTIVE", "This service is already active");
-        String code = statusOnly || "UPDATE".equals(type) ? base.code() : required(request.serviceCode(), "SERVICE_CODE_REQUIRED", "Enter a service code").toUpperCase(Locale.ROOT);
-        String name = statusOnly ? base.name() : required(request.serviceName(), "SERVICE_NAME_REQUIRED", "Enter the service name");
-        String kind = statusOnly ? Objects.requireNonNullElse(base.kind(), "OTHER_PROFESSIONAL_SERVICE") : required(request.serviceKind(), "SERVICE_KIND_REQUIRED", "Select the kind of service");
+        if ("RETIRE".equals(type) && !base.isActive()) throw new ApiException(409, "SERVICE_ALREADY_RETIRED", "This service is already retired");
+        if ("ACTIVATE".equals(type) && base.isActive()) throw new ApiException(409, "SERVICE_ALREADY_ACTIVE", "This service is already active");
+        String code = statusOnly || "UPDATE".equals(type) ? base.getServiceCode() : required(request.serviceCode(), "SERVICE_CODE_REQUIRED", "Enter a service code").toUpperCase(Locale.ROOT);
+        String name = statusOnly ? base.getServiceName() : required(request.serviceName(), "SERVICE_NAME_REQUIRED", "Enter the service name");
+        String kind = statusOnly ? Objects.requireNonNullElse(base.getServiceKind(), "OTHER_PROFESSIONAL_SERVICE") : required(request.serviceKind(), "SERVICE_KIND_REQUIRED", "Select the kind of service");
         if (!KINDS.contains(kind)) throw new ApiException(400, "SERVICE_KIND_NOT_ALLOWED", "Only the consultant's own professional services can be listed in the virtual clinic");
-        String currency = statusOnly ? base.currency() : Objects.requireNonNullElse(trim(request.currency()), BASE_CURRENCY).toUpperCase(Locale.ROOT);
+        String currency = statusOnly ? base.getCurrency() : Objects.requireNonNullElse(trim(request.currency()), BASE_CURRENCY).toUpperCase(Locale.ROOT);
         if (!BASE_CURRENCY.equals(currency)) throw new ApiException(400, "CURRENCY_NOT_SUPPORTED", "Clinic prices are held in EGP; patients see their currency on the proposal");
-        BigDecimal price = statusOnly ? base.price() : request.priceEgp();
+        BigDecimal price = statusOnly ? base.getPriceEgp() : request.priceEgp();
         if (price == null) throw new ApiException(400, "PRICE_REQUIRED", "Enter the price");
-        BigDecimal max = statusOnly ? base.priceMax() : request.priceMaxEgp();
+        BigDecimal max = statusOnly ? base.getPriceMaxEgp() : request.priceMaxEgp();
         if (max != null && max.compareTo(price) < 0) throw new ApiException(400, "PRICE_RANGE_INVALID", "The upper price must not be below the price");
         LocalDate effective = statusOnly ? today : Objects.requireNonNullElse(request.effectiveFrom(), today);
-        LocalDate until = statusOnly ? base.validUntil() : request.validUntil();
+        LocalDate until = statusOnly ? base.getValidUntil() : request.validUntil();
         if (until != null && until.isBefore(effective)) throw new ApiException(400, "EXPIRY_BEFORE_EFFECTIVE_DATE", "The expiry date must be on or after the effective date");
-        if ("CREATE".equals(type)) {
-            long clash = jdbc.sql("SELECT COUNT(*) FROM consultant_service_catalog WHERE practitioner_id=? AND service_code=?").params(practitionerId, code).query(Long.class).single()
-                    + jdbc.sql("SELECT COUNT(*) FROM clinic_service_changes WHERE practitioner_id=? AND service_code=? AND change_type='CREATE' AND status='PENDING_APPROVAL'").params(practitionerId, code).query(Long.class).single();
-            if (clash > 0) throw new ApiException(409, "SERVICE_CODE_EXISTS", "This clinic already has a service with this code");
-        }
-        UUID id = UUID.randomUUID();
-        jdbc.sql("INSERT INTO clinic_service_changes(id,practitioner_id,catalog_service_id,change_type,service_code,service_name,service_kind,description,included_scope,"
-                        + "excluded_scope,currency,price_egp,price_max_egp,effective_from,valid_until,base_version,status,proposed_by,proposed_by_role,proposed_at,version) "
-                        + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
-                .params(id, practitionerId, base == null ? null : request.serviceId(), type, code, name.trim(), kind,
-                        statusOnly ? base.description() : trim(request.description()), statusOnly ? base.included() : trim(request.includedScope()),
-                        statusOnly ? base.excluded() : trim(request.excludedScope()), currency, price, max, effective, until,
-                        base == null ? null : base.version(), "PENDING_APPROVAL", who.actor().subject(), who.role(), timestamp(now))
-                .update();
+        if ("CREATE".equals(type) && (catalog.existsByPractitionerIdAndServiceCode(practitionerId, code)
+                || serviceChanges.existsByPractitionerIdAndServiceCodeAndChangeTypeAndStatus(practitionerId, code, "CREATE", PENDING)))
+            throw new ApiException(409, "SERVICE_CODE_EXISTS", "This clinic already has a service with this code");
+        var proposal = new ClinicServiceChange.Proposal(code, name.trim(), kind,
+                statusOnly ? base.getDescription() : trim(request.description()), statusOnly ? base.getIncludedScope() : trim(request.includedScope()),
+                statusOnly ? base.getExcludedScope() : trim(request.excludedScope()), currency, price, max, effective, until);
+        ClinicServiceChange change = serviceChanges.saveAndFlush(new ClinicServiceChange(practitionerId, base == null ? null : base.getId(), type,
+                proposal, base == null ? null : base.getVersion(), who.actor().subject(), who.role(), now));
         audit(who, "CLINIC_SERVICE_CHANGE_PROPOSED", type, code);
         boolean autoApply = !who.owner() && !managerApprovalRequired(practitionerId);
-        if (who.owner() || autoApply) apply(who, id, who.owner() ? "CONSULTANT_APPROVED" : "APPLIED_WITHOUT_APPROVAL",
+        if (who.owner() || autoApply) apply(who, change, who.owner() ? "CONSULTANT_APPROVED" : "APPLIED_WITHOUT_APPROVAL",
                 who.owner() ? null : "Applied without consultant approval (clinic setting)");
-        return changes(practitionerId, "c.id=?", id).getFirst();
+        return view(practitionerId, change);
     }
 
     @Transactional
     public ServiceChangeView approveServiceChange(UUID practitionerId, UUID changeId, ChangeDecisionRequest request) {
         ClinicActor who = access(practitionerId);
         requireOwner(who);
-        pendingChange(practitionerId, changeId, request.expectedVersion());
-        apply(who, changeId, "CONSULTANT_APPROVED", trim(request.reason()));
-        return changes(practitionerId, "c.id=?", changeId).getFirst();
+        ClinicServiceChange change = pendingChange(practitionerId, changeId, request.expectedVersion());
+        apply(who, change, "CONSULTANT_APPROVED", trim(request.reason()));
+        return view(practitionerId, change);
     }
 
     @Transactional
@@ -353,79 +372,48 @@ public class VirtualClinicService {
         ClinicActor who = access(practitionerId);
         requireOwner(who);
         String reason = required(request.reason(), "REJECTION_REASON_REQUIRED", "Give the reason for rejecting this change");
-        pendingChange(practitionerId, changeId, request.expectedVersion());
-        int changed = jdbc.sql("UPDATE clinic_service_changes SET status='REJECTED',decided_by=?,decided_at=?,decision_reason=?,version=version+1 WHERE id=? AND status='PENDING_APPROVAL' AND version=?")
-                .params(who.actor().subject(), timestamp(clock.instant()), reason, changeId, request.expectedVersion()).update();
-        if (changed != 1) throw conflict();
+        ClinicServiceChange change = pendingChange(practitionerId, changeId, request.expectedVersion());
+        change.reject(who.actor().subject(), clock.instant(), reason);
+        serviceChanges.saveAndFlush(change);
         audit(who, "CLINIC_SERVICE_CHANGE_REJECTED", "REJECT", reason);
-        return changes(practitionerId, "c.id=?", changeId).getFirst();
+        return view(practitionerId, change);
     }
 
-    private void pendingChange(UUID practitionerId, UUID changeId, long expectedVersion) {
-        var row = jdbc.sql("SELECT status,version FROM clinic_service_changes WHERE id=? AND practitioner_id=?").params(changeId, practitionerId)
-                .query((rs, n) -> Map.entry(rs.getString("status"), rs.getLong("version"))).optional()
+    /** The change, locked, provided it is still pending at the version the consultant saw. */
+    private ClinicServiceChange pendingChange(UUID practitionerId, UUID changeId, long expectedVersion) {
+        ClinicServiceChange change = serviceChanges.lockById(changeId).filter(c -> c.getPractitionerId().equals(practitionerId))
                 .orElseThrow(() -> new ApiException(404, "SERVICE_CHANGE_NOT_FOUND", "The change was not found in this clinic"));
-        if (!"PENDING_APPROVAL".equals(row.getKey())) throw new ApiException(409, "SERVICE_CHANGE_NOT_PENDING", "This change has already been decided");
-        if (row.getValue() != expectedVersion) throw conflict();
+        if (!change.isPending()) throw new ApiException(409, "SERVICE_CHANGE_NOT_PENDING", "This change has already been decided");
+        if (change.getVersion() != expectedVersion) throw conflict();
+        return change;
     }
 
-    /** Apply a change to the live catalogue. The catalogue revision must still be the one the change was prepared on. */
-    private void apply(ClinicActor who, UUID changeId, String approvalStatus, String decisionReason) {
+    /** Apply a change to the live catalogue. The catalogue version must still be the one the change was prepared on. */
+    private void apply(ClinicActor who, ClinicServiceChange change, String approvalStatus, String decisionReason) {
         Instant now = clock.instant();
-        ChangeRow c = jdbc.sql("SELECT * FROM clinic_service_changes WHERE id=?").param(changeId)
-                .query((rs, n) -> new ChangeRow(rs.getString("change_type"), rs.getString("service_code"), rs.getString("service_name"),
-                        rs.getString("service_kind"), rs.getString("description"), rs.getString("included_scope"), rs.getString("excluded_scope"),
-                        rs.getString("currency"), rs.getBigDecimal("price_egp"), rs.getBigDecimal("price_max_egp"), localDate(rs, "effective_from"),
-                        localDate(rs, "valid_until"), rs.getObject("catalog_service_id", UUID.class), (Long) rs.getObject("base_version")))
-                .single();
-        String approvedBy = who.owner() ? who.actor().subject() : null;
-        Object approvedAt = who.owner() ? timestamp(now) : null;
-        UUID serviceId = c.serviceId();
-        int revision;
-        if ("CREATE".equals(c.type())) {
-            serviceId = UUID.randomUUID();
-            revision = 1;
-            jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,valid_until,created_by,created_at,updated_at,version,"
-                            + "service_kind,description,included_scope,excluded_scope,currency,price_max_egp,effective_from,revision,approval_status,approved_by,approved_at,updated_by) "
-                            + "VALUES(?,?,?,?,?,?,TRUE,?,?,?,?,0,?,?,?,?,?,?,?,1,?,?,?,?)")
-                    .params(serviceId, who.practitionerId(), c.code(), c.name(), KIND_CATEGORY.get(c.kind()), c.price(), c.until(), who.actor().subject(),
-                            timestamp(now), timestamp(now), c.kind(), c.description(), c.included(), c.excluded(), c.currency(), c.max(), c.effective(),
-                            approvalStatus, approvedBy, approvedAt, who.actor().subject())
-                    .update();
+        String by = who.actor().subject();
+        String approvedBy = who.owner() ? by : null;
+        String category = KIND_CATEGORY.get(change.getServiceKind());
+        CatalogEntry entry;
+        if ("CREATE".equals(change.getChangeType())) {
+            entry = CatalogEntry.fromClinic(who.practitionerId(), change, category, approvalStatus, approvedBy, by, now);
         } else {
-            revision = jdbc.sql("SELECT revision FROM consultant_service_catalog WHERE id=?").param(serviceId).query(Integer.class).single() + 1;
             // The optimistic check is on the catalogue row's version, which platform price-list edits bump too.
-            int changed = jdbc.sql("UPDATE consultant_service_catalog SET service_name=?,service_kind=?,category=?,description=?,included_scope=?,excluded_scope=?,"
-                            + "currency=?,price_egp=?,price_max_egp=?,effective_from=?,valid_until=?,active=?,revision=?,approval_status=?,approved_by=?,approved_at=?,updated_by=?,"
-                            + "updated_at=?,version=version+1 WHERE id=? AND practitioner_id=? AND version=?")
-                    .params(c.name(), c.kind(), KIND_CATEGORY.get(c.kind()), c.description(), c.included(), c.excluded(), c.currency(), c.price(), c.max(),
-                            c.effective(), c.until(), !"RETIRE".equals(c.type()), revision, approvalStatus, approvedBy, approvedAt, who.actor().subject(),
-                            timestamp(now), serviceId, who.practitionerId(), c.baseVersion())
-                    .update();
-            if (changed != 1) throw new ApiException(409, "SERVICE_CHANGED_SINCE_PREPARED", "The service changed after this change was prepared; reject it and prepare a new one");
+            entry = catalog.lockById(change.getCatalogServiceId())
+                    .filter(e -> e.getPractitionerId().equals(who.practitionerId()))
+                    .filter(e -> change.getBaseVersion() != null && e.getVersion() == change.getBaseVersion())
+                    .orElseThrow(() -> new ApiException(409, "SERVICE_CHANGED_SINCE_PREPARED", "The service changed after this change was prepared; reject it and prepare a new one"));
+            entry.applyClinicChange(change, category, !"RETIRE".equals(change.getChangeType()), approvalStatus, approvedBy, by, now);
         }
-        jdbc.sql("UPDATE clinic_service_changes SET status='APPLIED',catalog_service_id=?,applied_revision=?,decided_by=?,decided_at=?,decision_reason=?,version=version+1 WHERE id=?")
-                .params(serviceId, revision, who.actor().subject(), timestamp(now), decisionReason, changeId).update();
-        audit(who, "CLINIC_SERVICE_CHANGE_APPLIED", c.type(), c.code() + " r" + revision + " " + approvalStatus);
-    }
-
-    private record ChangeRow(String type, String code, String name, String kind, String description, String included, String excluded,
-                             String currency, BigDecimal price, BigDecimal max, LocalDate effective, LocalDate until, UUID serviceId,
-                             Long baseVersion) {}
-
-    private record Current(String code, String name, String kind, String description, String included, String excluded, String currency,
-                           BigDecimal price, BigDecimal priceMax, LocalDate validUntil, boolean active, long version) {}
-
-    private Current current(UUID practitionerId, UUID serviceId) {
-        return jdbc.sql("SELECT * FROM consultant_service_catalog WHERE id=? AND practitioner_id=?").params(serviceId, practitionerId)
-                .query((rs, n) -> new Current(rs.getString("service_code"), rs.getString("service_name"), rs.getString("service_kind"), rs.getString("description"),
-                        rs.getString("included_scope"), rs.getString("excluded_scope"), rs.getString("currency"), rs.getBigDecimal("price_egp"),
-                        rs.getBigDecimal("price_max_egp"), localDate(rs, "valid_until"), rs.getBoolean("active"), rs.getLong("version")))
-                .optional().orElseThrow(() -> new ApiException(404, "SERVICE_NOT_FOUND", "The service was not found in this clinic"));
+        catalog.saveAndFlush(entry);
+        change.applied(entry.getId(), entry.getRevision(), by, now, decisionReason);
+        serviceChanges.saveAndFlush(change);
+        audit(who, "CLINIC_SERVICE_CHANGE_APPLIED", change.getChangeType(), change.getServiceCode() + " r" + entry.getRevision() + " " + approvalStatus);
     }
 
     private boolean managerApprovalRequired(UUID practitionerId) {
-        return jdbc.sql("SELECT manager_changes_require_approval FROM virtual_clinics WHERE practitioner_id=?").param(practitionerId).query(Boolean.class).single();
+        return clinics.findById(practitionerId).map(VirtualClinic::isManagerChangesRequireApproval)
+                .orElseThrow(() -> new ApiException(404, "CLINIC_NOT_FOUND", "The virtual clinic was not found"));
     }
 
     // ================= schedule =================
@@ -435,14 +423,10 @@ public class VirtualClinicService {
         ClinicActor who = access(practitionerId);
         require(who, SCHEDULE);
         validateSlot(practitionerId, request, null);
-        UUID id = UUID.randomUUID();
-        Instant now = clock.instant();
-        jdbc.sql("INSERT INTO consultation_slots(id,practitioner_id,starts_at,ends_at,consultation_mode,status,admin_note,created_by,created_at,updated_by,updated_at,version) VALUES(?,?,?,?,?,'OPEN',?,?,?,?,?,0)")
-                .params(id, practitionerId, timestamp(request.startsAt()), timestamp(request.endsAt()), request.mode(), trim(request.note()),
-                        who.actor().subject(), timestamp(now), who.actor().subject(), timestamp(now))
-                .update();
-        audit(who, "CLINIC_SLOT_CREATED", "CREATE", id.toString());
-        return slot(practitionerId, id);
+        ConsultationSlot slot = slots.saveAndFlush(new ConsultationSlot(practitionerId, request.startsAt(), request.endsAt(), request.mode(),
+                trim(request.note()), who.actor().subject(), clock.instant()));
+        audit(who, "CLINIC_SLOT_CREATED", "CREATE", slot.getId().toString());
+        return view(slot);
     }
 
     @Transactional
@@ -451,43 +435,39 @@ public class VirtualClinicService {
         require(who, SCHEDULE);
         if (request.expectedVersion() == null) throw new ApiException(400, "EXPECTED_VERSION_REQUIRED", "Reload the schedule and try again");
         validateSlot(practitionerId, request, slotId);
-        int changed = jdbc.sql("UPDATE consultation_slots SET starts_at=?,ends_at=?,consultation_mode=?,admin_note=?,updated_by=?,updated_at=?,version=version+1 WHERE id=? AND practitioner_id=? AND status='OPEN' AND version=?")
-                .params(timestamp(request.startsAt()), timestamp(request.endsAt()), request.mode(), trim(request.note()), who.actor().subject(),
-                        timestamp(clock.instant()), slotId, practitionerId, request.expectedVersion())
-                .update();
-        if (changed != 1) throw conflict();
+        ConsultationSlot slot = openSlot(practitionerId, slotId, request.expectedVersion());
+        slot.reschedule(request.startsAt(), request.endsAt(), request.mode(), trim(request.note()), who.actor().subject(), clock.instant());
+        slots.saveAndFlush(slot);
         audit(who, "CLINIC_SLOT_UPDATED", "UPDATE", slotId.toString());
-        return slot(practitionerId, slotId);
+        return view(slot);
     }
 
     @Transactional
     public SlotView cancelSlot(UUID practitionerId, UUID slotId, VersionedRequest request) {
         ClinicActor who = access(practitionerId);
         require(who, SCHEDULE);
-        int changed = jdbc.sql("UPDATE consultation_slots SET status='CANCELLED',updated_by=?,updated_at=?,version=version+1 WHERE id=? AND practitioner_id=? AND status='OPEN' AND version=?")
-                .params(who.actor().subject(), timestamp(clock.instant()), slotId, practitionerId, request.expectedVersion()).update();
-        if (changed != 1) throw conflict();
+        ConsultationSlot slot = openSlot(practitionerId, slotId, request.expectedVersion());
+        slot.cancel(who.actor().subject(), clock.instant());
+        slots.saveAndFlush(slot);
         audit(who, "CLINIC_SLOT_CANCELLED", "CANCEL", slotId.toString());
-        return slot(practitionerId, slotId);
+        return view(slot);
+    }
+
+    private ConsultationSlot openSlot(UUID practitionerId, UUID slotId, long expectedVersion) {
+        return slots.lockById(slotId).filter(s -> s.getPractitionerId().equals(practitionerId) && s.isOpenAt(expectedVersion))
+                .orElseThrow(VirtualClinicService::conflict);
     }
 
     private void validateSlot(UUID practitionerId, SlotRequest request, UUID exclude) {
         if (!request.endsAt().isAfter(request.startsAt())) throw new ApiException(400, "SLOT_WINDOW_INVALID", "The slot must end after it starts");
         if (Duration.between(request.startsAt(), request.endsAt()).compareTo(MAX_SLOT) > 0) throw new ApiException(400, "SLOT_TOO_LONG", "A consultation slot can be at most 8 hours");
         if (request.startsAt().isBefore(clock.instant())) throw new ApiException(400, "SLOT_IN_PAST", "Consultation slots must start in the future");
-        long overlap = jdbc.sql("SELECT COUNT(*) FROM consultation_slots WHERE practitioner_id=? AND status='OPEN' AND starts_at<? AND ends_at>? AND id<>?")
-                .params(practitionerId, timestamp(request.endsAt()), timestamp(request.startsAt()), exclude == null ? UUID.randomUUID() : exclude)
-                .query(Long.class).single();
-        if (overlap > 0) throw new ApiException(409, "SLOT_OVERLAP", "This slot overlaps another open consultation slot");
+        if (slots.overlaps(practitionerId, micros(request.startsAt()), micros(request.endsAt()), exclude == null ? UUID.randomUUID() : exclude))
+            throw new ApiException(409, "SLOT_OVERLAP", "This slot overlaps another open consultation slot");
     }
 
-    private SlotView slot(UUID practitionerId, UUID slotId) {
-        return jdbc.sql("SELECT * FROM consultation_slots WHERE id=? AND practitioner_id=?").params(slotId, practitionerId).query(this::slot).single();
-    }
-
-    private SlotView slot(ResultSet rs, int n) throws SQLException {
-        return new SlotView(rs.getObject("id", UUID.class), instant(rs, "starts_at"), instant(rs, "ends_at"), rs.getString("consultation_mode"),
-                rs.getString("status"), rs.getString("admin_note"), rs.getLong("version"));
+    private static SlotView view(ConsultationSlot s) {
+        return new SlotView(s.getId(), s.getStartsAt(), s.getEndsAt(), s.getConsultationMode(), s.getStatus(), s.getAdminNote(), s.getVersion());
     }
 
     // ================= practice managers =================
@@ -498,18 +478,15 @@ public class VirtualClinicService {
         requireOwner(who);
         authority.authorize(Permission.CLINIC_APPROVE, Resource.ofClinic(practitionerId));
         String email = request.email().trim().toLowerCase(Locale.ROOT);
-        long existing = jdbc.sql("SELECT COUNT(*) FROM practice_managers WHERE practitioner_id=? AND email_hash=?").params(practitionerId, hash(email)).query(Long.class).single();
-        if (existing > 0) throw new ApiException(409, "PRACTICE_MANAGER_EXISTS", "This person is already listed as a practice manager; update or reinstate them instead");
+        if (practiceManagers.existsByPractitionerIdAndEmailHash(practitionerId, hash(email)))
+            throw new ApiException(409, "PRACTICE_MANAGER_EXISTS", "This person is already listed as a practice manager; update or reinstate them instead");
         var account = identities.invite(request.name().trim(), email, "ar".equals(request.locale()) ? "ar" : "en");
         if (account.subject().equals(who.actor().subject())) throw new ApiException(409, "PRACTICE_MANAGER_IS_CONSULTANT", "You cannot be your own practice manager");
         UUID id = UUID.randomUUID();
         Instant now = clock.instant();
         Set<String> granted = new HashSet<>(request.permissions());
-        jdbc.sql("INSERT INTO practice_managers(id,practitioner_id,manager_subject,display_name_encrypted,email_encrypted,email_hash,status,can_manage_schedule,can_manage_profile,"
-                        + "can_manage_services,invited_by,invited_at,updated_at,version) VALUES(?,?,?,?,?,?,'ACTIVE',?,?,?,?,?,?,0)")
-                .params(id, practitionerId, account.subject(), crypto.encrypt(request.name().trim()), crypto.encrypt(email), hash(email),
-                        granted.contains(SCHEDULE), granted.contains(PROFILE), granted.contains(SERVICES), who.actor().subject(), timestamp(now), timestamp(now))
-                .update();
+        practiceManagers.saveAndFlush(new PracticeManager(id, practitionerId, account.subject(), crypto.encrypt(request.name().trim()), crypto.encrypt(email),
+                hash(email), granted.contains(SCHEDULE), granted.contains(PROFILE), granted.contains(SERVICES), who.actor().subject(), now));
         audit(who, "CLINIC_MANAGER_INVITED", "CREATE", "Practice manager " + id + " permissions " + new TreeSet<>(granted));
         return manager(practitionerId, id);
     }
@@ -521,11 +498,9 @@ public class VirtualClinicService {
         authority.authorize(Permission.CLINIC_APPROVE, Resource.ofClinic(practitionerId));
         Set<String> granted = new HashSet<>(request.permissions());
         Instant now = clock.instant();
-        int changed = jdbc.sql("UPDATE practice_managers SET can_manage_schedule=?,can_manage_profile=?,can_manage_services=?,status=?,revoked_by=?,revoked_at=?,updated_at=?,version=version+1 "
-                        + "WHERE id=? AND practitioner_id=? AND version=?")
-                .params(granted.contains(SCHEDULE), granted.contains(PROFILE), granted.contains(SERVICES), request.active() ? "ACTIVE" : "REVOKED",
-                        request.active() ? null : who.actor().subject(), request.active() ? null : timestamp(now), timestamp(now), managerId, practitionerId, request.expectedVersion())
-                .update();
+        int changed = practiceManagers.update(managerId, practitionerId, request.expectedVersion(), granted.contains(SCHEDULE), granted.contains(PROFILE),
+                granted.contains(SERVICES), request.active() ? "ACTIVE" : "REVOKED", request.active() ? null : who.actor().subject(),
+                request.active() ? null : micros(now), micros(now));
         if (changed != 1) throw conflict();
         audit(who, request.active() ? "CLINIC_MANAGER_UPDATED" : "CLINIC_MANAGER_REVOKED", request.active() ? "UPDATE" : "REVOKE",
                 "Practice manager " + managerId + " permissions " + new TreeSet<>(granted));
@@ -538,35 +513,31 @@ public class VirtualClinicService {
 
     // ================= helpers =================
 
-    private void bumpClinic(UUID practitionerId, long expectedVersion, String set, Object... values) {
-        List<Object> params = new ArrayList<>(Arrays.asList(values));
-        params.add(timestamp(clock.instant()));
-        params.add(practitionerId);
-        params.add(expectedVersion);
-        int changed = jdbc.sql("UPDATE virtual_clinics SET " + set + ",updated_at=?,version=version+1 WHERE practitioner_id=? AND version=?").params(params).update();
-        if (changed != 1) throw conflict();
+    /** The clinic, locked, provided it is still at the version the caller saw. */
+    private VirtualClinic lockedClinic(UUID practitionerId, long expectedVersion) {
+        return clinics.lockById(practitionerId).filter(c -> c.getVersion() == expectedVersion).orElseThrow(VirtualClinicService::conflict);
     }
 
     /** A name for a subject that acted in this clinic — the consultant or one of its managers. Never the subject itself. */
     private String actorName(UUID practitionerId, String subject) {
         if (subject == null) return null;
-        String consultant = jdbc.sql("SELECT display_name FROM practitioner_profiles WHERE id=? AND external_subject=?").params(practitionerId, subject).query(String.class).optional().orElse(null);
-        if (consultant != null) return consultant;
-        return jdbc.sql("SELECT display_name_encrypted FROM practice_managers WHERE practitioner_id=? AND manager_subject=?").params(practitionerId, subject)
-                .query(String.class).optional().map(crypto::decrypt).orElse(null);
+        return consultantNamed(practitionerId, subject).map(PractitionerProfile::getDisplayName)
+                .or(() -> practiceManagers.findFirstByPractitionerIdAndManagerSubject(practitionerId, subject)
+                        .map(m -> crypto.decrypt(m.getDisplayNameEncrypted())))
+                .orElse(null);
     }
 
     private String actorRole(UUID practitionerId, String subject) {
         if (subject == null) return null;
-        long consultant = jdbc.sql("SELECT COUNT(*) FROM practitioner_profiles WHERE id=? AND external_subject=?").params(practitionerId, subject).query(Long.class).single();
-        return consultant > 0 ? "CONSULTANT" : "PRACTICE_MANAGER";
+        return consultantNamed(practitionerId, subject).isPresent() ? "CONSULTANT" : "PRACTICE_MANAGER";
+    }
+
+    private Optional<PractitionerProfile> consultantNamed(UUID practitionerId, String subject) {
+        return practitioners.findById(practitionerId).filter(p -> subject.equals(p.getExternalSubject()));
     }
 
     private void audit(ClinicActor who, String type, String action, String detail) {
-        jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?)")
-                .params(UUID.randomUUID(), type, who.actor().subject(), who.owner() ? "DOCTOR" : "PRACTICE_MANAGER", "VirtualClinic",
-                        who.practitionerId().toString(), action, "SUCCESS", detail, timestamp(clock.instant()))
-                .update();
+        auditTrail.event(type).actor(who.actor().subject(), who.owner() ? "DOCTOR" : "PRACTICE_MANAGER").entity("VirtualClinic", who.practitionerId()).action(action).reason(detail).record();
     }
 
     private static ApiException conflict() {
@@ -583,15 +554,6 @@ public class VirtualClinicService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
-
-    private static LocalDate localDate(ResultSet rs, String column) throws SQLException {
-        return rs.getObject(column, LocalDate.class);
-    }
-
     private static String hash(String email) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(email.getBytes(StandardCharsets.UTF_8)));
@@ -599,8 +561,4 @@ public class VirtualClinicService {
             throw new IllegalStateException(e);
         }
     }
-
-    private record ClinicRow(String publicName, String publicHeadline, String publicBio, String publicLanguages, Instant publishedAt,
-                             String draftName, String draftHeadline, String draftBio, String draftLanguages, String draftStatus,
-                             Instant draftUpdatedAt, String draftUpdatedBy, boolean managerChangesRequireApproval, long version) {}
 }

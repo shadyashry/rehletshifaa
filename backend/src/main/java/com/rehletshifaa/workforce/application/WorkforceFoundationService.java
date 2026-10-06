@@ -1,30 +1,60 @@
 package com.rehletshifaa.workforce.application;
 
 import com.rehletshifaa.shared.crypto.CryptoService;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.rehletshifaa.workforce.domain.WorkforceCurrentManager;
+import com.rehletshifaa.workforce.domain.WorkforceLeadDesignation;
+import com.rehletshifaa.workforce.domain.WorkforcePerson;
+import com.rehletshifaa.workforce.domain.WorkforceReportingLine;
+import com.rehletshifaa.workforce.domain.WorkforceRoleAssignment;
+import com.rehletshifaa.workforce.domain.WorkforceTeam;
+import com.rehletshifaa.workforce.domain.WorkforceTeamMembership;
+import com.rehletshifaa.workforce.infrastructure.WorkforceCatalogueRepository;
+import com.rehletshifaa.workforce.infrastructure.WorkforceCurrentManagerRepository;
+import com.rehletshifaa.workforce.infrastructure.WorkforceLeadDesignationRepository;
+import com.rehletshifaa.workforce.infrastructure.WorkforcePersonRepository;
+import com.rehletshifaa.workforce.infrastructure.WorkforceReportingLineRepository;
+import com.rehletshifaa.workforce.infrastructure.WorkforceRoleAssignmentRepository;
+import com.rehletshifaa.workforce.infrastructure.WorkforceTeamMembershipRepository;
+import com.rehletshifaa.workforce.infrastructure.WorkforceTeamRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
-/** WF-13/WF-17 read models: role/function catalogue, people with their effective roles, and teams. */
+/**
+ * WF-13/WF-17 read models: role/function catalogue, people with their effective roles, and teams.
+ * Each view loads every child set in one query and groups in memory (no query per row).
+ */
 @Service
 public class WorkforceFoundationService {
-    private final JdbcClient jdbc;
+    private static final String ACTIVE = "ACTIVE";
+    private final WorkforceCatalogueRepository catalogue;
+    private final WorkforcePersonRepository people;
+    private final WorkforceRoleAssignmentRepository assignments;
+    private final WorkforceTeamRepository teams;
+    private final WorkforceTeamMembershipRepository memberships;
+    private final WorkforceLeadDesignationRepository leads;
+    private final WorkforceCurrentManagerRepository currentManagers;
+    private final WorkforceReportingLineRepository reportingLines;
     private final WorkforceAccessPolicy access;
     private final CryptoService crypto;
     private final Clock clock;
 
-    public WorkforceFoundationService(JdbcClient jdbc, WorkforceAccessPolicy access, CryptoService crypto, Clock clock) {
-        this.jdbc = jdbc;
-        this.access = access;
-        this.crypto = crypto;
-        this.clock = clock;
+    public WorkforceFoundationService(WorkforceCatalogueRepository catalogue, WorkforcePersonRepository people,
+                                      WorkforceRoleAssignmentRepository assignments, WorkforceTeamRepository teams,
+                                      WorkforceTeamMembershipRepository memberships, WorkforceLeadDesignationRepository leads,
+                                      WorkforceCurrentManagerRepository currentManagers, WorkforceReportingLineRepository reportingLines,
+                                      WorkforceAccessPolicy access, CryptoService crypto, Clock clock) {
+        this.catalogue = catalogue; this.people = people; this.assignments = assignments; this.teams = teams;
+        this.memberships = memberships; this.leads = leads; this.currentManagers = currentManagers;
+        this.reportingLines = reportingLines; this.access = access; this.crypto = crypto; this.clock = clock;
     }
 
     public record RoleView(String key, String displayName) {}
@@ -38,45 +68,53 @@ public class WorkforceFoundationService {
     @Transactional(readOnly = true)
     public List<FunctionView> catalogue() {
         access.require(WorkforceAccessPolicy.Action.READ);
-        return jdbc.sql("SELECT function_key,display_name FROM workforce_functions WHERE active=TRUE ORDER BY function_key")
-                .query((rs, n) -> new FunctionView(rs.getString(1), rs.getString(2),
-                        jdbc.sql("SELECT role_key,display_name FROM workforce_role_catalogue WHERE function_key=? AND active=TRUE ORDER BY role_key")
-                                .param(rs.getString(1)).query((roles, row) -> new RoleView(roles.getString(1), roles.getString(2))).list()))
-                .list();
+        Map<String, List<RoleView>> roles = catalogue.findActiveRoles().stream().collect(Collectors.groupingBy(
+                r -> r.getFunctionKey(), Collectors.mapping(r -> new RoleView(r.getKey(), r.getDisplayName()), Collectors.toList())));
+        return catalogue.findActiveFunctions().stream()
+                .map(f -> new FunctionView(f.getKey(), f.getDisplayName(), roles.getOrDefault(f.getKey(), List.of()))).toList();
     }
 
     @Transactional(readOnly = true)
     public List<PersonView> people() {
         access.require(WorkforceAccessPolicy.Action.READ);
-        Instant now = clock.instant();
-        return jdbc.sql("SELECT subject,display_name_encrypted,lifecycle_status FROM workforce_people ORDER BY subject")
-                .query((rs, n) -> new PersonView(rs.getString(1), crypto.decrypt(rs.getString(2)), rs.getString(3),
-                        jdbc.sql("SELECT role_key FROM workforce_role_assignments WHERE subject=? AND status='ACTIVE' "
-                                        + "AND effective_from<=? AND (effective_to IS NULL OR effective_to>?) ORDER BY role_key")
-                                .params(rs.getString(1), timestamp(now), timestamp(now)).query(String.class).list()))
-                .list();
+        Map<String, List<String>> roles = assignments.findAllEffective(micros(clock.instant())).stream().collect(Collectors.groupingBy(
+                WorkforceRoleAssignment::getSubject, Collectors.mapping(WorkforceRoleAssignment::getRoleKey, Collectors.toList())));
+        return people.findAllByOrderBySubjectAsc().stream()
+                .map(p -> new PersonView(p.getSubject(), crypto.decrypt(p.getDisplayNameEncrypted()), p.getLifecycleStatus(),
+                        roles.getOrDefault(p.getSubject(), List.of())))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public List<TeamView> teams() {
         access.require(WorkforceAccessPolicy.Action.READ);
-        return jdbc.sql("SELECT id,function_key,name,status,revision FROM workforce_teams ORDER BY function_key,name,id")
-                .query((rs, n) -> {
-                    UUID id = rs.getObject("id", UUID.class);
-                    String function = rs.getString("function_key");
-                    List<TeamMemberView> members = jdbc.sql("SELECT m.subject,p.display_name_encrypted,m.id membership_id,m.revision membership_revision,"
-                                    + "l.id lead_id,l.revision lead_revision,cm.manager_subject,rl.revision manager_revision "
-                                    + "FROM workforce_team_memberships m JOIN workforce_people p ON p.subject=m.subject "
-                                    + "LEFT JOIN workforce_lead_designations l ON l.team_id=m.team_id AND l.subject=m.subject AND l.status='ACTIVE' "
-                                    + "LEFT JOIN workforce_current_managers cm ON cm.function_key=? AND cm.staff_subject=m.subject "
-                                    + "LEFT JOIN workforce_reporting_lines rl ON rl.id=cm.reporting_line_id "
-                                    + "WHERE m.team_id=? AND m.status='ACTIVE' ORDER BY m.subject")
-                            .params(function, id)
-                            .query((member, row) -> new TeamMemberView(member.getString("subject"),
-                                    crypto.decrypt(member.getString("display_name_encrypted")), member.getObject("membership_id", UUID.class),
-                                    member.getLong("membership_revision"), member.getObject("lead_id") != null, member.getObject("lead_id", UUID.class),
-                                    (Long) member.getObject("lead_revision"), member.getString("manager_subject"), (Long) member.getObject("manager_revision"))).list();
-                    return new TeamView(id, function, rs.getString("name"), rs.getString("status"), rs.getLong("revision"), members);
-                }).list();
+        List<WorkforceTeam> all = teams.findAllOrdered();
+        if (all.isEmpty()) return List.of();
+        List<UUID> teamIds = all.stream().map(WorkforceTeam::getId).toList();
+        Map<UUID, List<WorkforceTeamMembership>> membersByTeam = memberships.findByTeamIdInAndStatusOrderBySubject(teamIds, ACTIVE).stream()
+                .collect(Collectors.groupingBy(WorkforceTeamMembership::getTeamId));
+        List<String> subjects = membersByTeam.values().stream().flatMap(List::stream).map(WorkforceTeamMembership::getSubject).distinct().toList();
+        Map<String, WorkforcePerson> persons = people.findAllById(subjects).stream()
+                .collect(Collectors.toMap(WorkforcePerson::getSubject, Function.identity()));
+        Map<String, WorkforceLeadDesignation> activeLeads = leads.findByTeamIdInAndStatus(teamIds, ACTIVE).stream()
+                .collect(Collectors.toMap(l -> l.getTeamId() + "|" + l.getSubject(), Function.identity(), (a, b) -> a));
+        Map<String, WorkforceCurrentManager> pointers = (subjects.isEmpty() ? List.<WorkforceCurrentManager>of()
+                : currentManagers.findByStaffSubjectIn(subjects)).stream()
+                .collect(Collectors.toMap(c -> c.getFunctionKey() + "|" + c.getStaffSubject(), Function.identity()));
+        Map<UUID, Long> lineRevisions = reportingLines.findAllById(pointers.values().stream().map(WorkforceCurrentManager::getReportingLineId).toList())
+                .stream().collect(Collectors.toMap(WorkforceReportingLine::getId, WorkforceReportingLine::getRevision));
+        return all.stream().map(team -> new TeamView(team.getId(), team.getFunctionKey(), team.getName(), team.getStatus(), team.getRevision(),
+                membersByTeam.getOrDefault(team.getId(), List.of()).stream()
+                        // Every membership has a person row (foreign key), as the inner join this replaces assumed.
+                        .filter(m -> persons.containsKey(m.getSubject()))
+                        .map(m -> {
+                            WorkforceLeadDesignation lead = activeLeads.get(team.getId() + "|" + m.getSubject());
+                            WorkforceCurrentManager pointer = pointers.get(team.getFunctionKey() + "|" + m.getSubject());
+                            return new TeamMemberView(m.getSubject(), crypto.decrypt(persons.get(m.getSubject()).getDisplayNameEncrypted()),
+                                    m.getId(), m.getRevision(), lead != null, lead == null ? null : lead.getId(),
+                                    lead == null ? null : lead.getRevision(), pointer == null ? null : pointer.getManagerSubject(),
+                                    pointer == null ? null : lineRevisions.get(pointer.getReportingLineId()));
+                        }).toList()))
+                .toList();
     }
 }

@@ -149,6 +149,25 @@ services:
         condition: service_healthy
     networks: [app]
 
+  # Shared reference-data cache and rate-limit counters. Never authoritative: the backend reads PostgreSQL
+  # when Redis is unavailable, so there is no persistence and no published port; only the app network
+  # reaches it, and only with the password.
+  redis:
+    <<: *service-defaults
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --save '' --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru"]
+    read_only: true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 192m
+    networks: [app]
+
   clamav:
     <<: *service-defaults
     image: clamav/clamav:stable-debian13-slim
@@ -182,6 +201,9 @@ services:
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/rehletshifaa/protocol/openid-connect/certs
       CLAIM_TOKEN_PEPPER: ${CLAIM_TOKEN_PEPPER:?Set CLAIM_TOKEN_PEPPER}
       PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:?Set PII_ENCRYPTION_KEY}
+      APP_ENVIRONMENT: production
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
       CLAIM_TOKEN_EXPIRY_SECONDS: ${CLAIM_TOKEN_EXPIRY_SECONDS:-900}
       CLAIM_TOKEN_MAX_ATTEMPTS: ${CLAIM_TOKEN_MAX_ATTEMPTS:-5}
       STORAGE_MODE: s3
@@ -244,6 +266,9 @@ services:
         condition: service_completed_successfully
       clamav:
         condition: service_healthy
+      # Started, not healthy: the backend serves from PostgreSQL while Redis is unavailable.
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
       interval: 15s

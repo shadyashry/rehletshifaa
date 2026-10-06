@@ -8,9 +8,9 @@ import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.journey.domain.JourneyModel.Status;
-import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingStore;
+import com.rehletshifaa.journey.infrastructure.JourneyDefinitionStore;
+import com.rehletshifaa.journey.infrastructure.JourneyDeploymentStore;
 import com.rehletshifaa.shared.api.ApiException;
 import jakarta.validation.Validator;
 import org.springframework.beans.factory.ObjectProvider;
@@ -32,9 +32,9 @@ public class JourneyCaseVerificationService {
     public record Create(String commandKey, CreateCaseRequest intake) {}
     public record View(UUID caseId, UUID journeyVersionId, String state) {}
 
-    private final JourneyDefinitionRepository definitions;
-    private final JourneyDeploymentRepository deployments;
-    private final JourneyCaseBindingRepository bindings;
+    private final JourneyDefinitionStore definitions;
+    private final JourneyDeploymentStore deployments;
+    private final JourneyCaseBindingStore bindings;
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final CaseService cases;
     private final Authority authorization;
@@ -43,8 +43,8 @@ public class JourneyCaseVerificationService {
     private final Validator validator;
     private final boolean enabled;
 
-    public JourneyCaseVerificationService(JourneyDefinitionRepository definitions, JourneyDeploymentRepository deployments,
-            JourneyCaseBindingRepository bindings, ObjectProvider<JourneyRuntimePort> runtimes, CaseService cases,
+    public JourneyCaseVerificationService(JourneyDefinitionStore definitions, JourneyDeploymentStore deployments,
+            JourneyCaseBindingStore bindings, ObjectProvider<JourneyRuntimePort> runtimes, CaseService cases,
             Authority authorization, GovernanceAuditLog audit, ObjectMapper mapper, Validator validator,
             @Value("${app.journey.runtime.case-verification-enabled:false}") boolean enabled) {
         this.definitions=definitions; this.deployments=deployments; this.bindings=bindings; this.runtimes=runtimes;
@@ -98,7 +98,7 @@ public class JourneyCaseVerificationService {
         return view(bindings.lock(caseId,subject));
     }
 
-    private View view(JourneyCaseBindingRepository.Binding binding) {
+    private View view(JourneyCaseBindingStore.Binding binding) {
         String state=binding.engineReference()==null?"BOUND":runtime().inspect(binding.engineReference()).completed()?"COMPLETED":"RUNNING";
         return new View(binding.caseId(),binding.versionId(),state);
     }

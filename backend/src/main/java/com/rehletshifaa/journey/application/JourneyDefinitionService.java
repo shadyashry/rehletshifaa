@@ -5,7 +5,7 @@ import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.journey.domain.*;
-import com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository;
+import com.rehletshifaa.journey.infrastructure.JourneyDefinitionStore;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +14,10 @@ import static com.rehletshifaa.journey.domain.JourneyModel.*;
 
 @Service
 public class JourneyDefinitionService {
-    private final JourneyDefinitionRepository repository;private final Authority authorization;
+    private final JourneyDefinitionStore repository;private final Authority authorization;
     private final GovernanceAuditLog audit;private final JourneyGraphValidator validator;private final JourneySimulator simulator;private final JourneyStageRegistry registry;
     private final JourneyDeploymentService deployment;
-    public JourneyDefinitionService(JourneyDefinitionRepository repository,Authority authorization,GovernanceAuditLog audit,JourneyGraphValidator validator,JourneySimulator simulator,JourneyStageRegistry registry,JourneyDeploymentService deployment){this.repository=repository;this.authorization=authorization;this.audit=audit;this.validator=validator;this.simulator=simulator;this.registry=registry;this.deployment=deployment;}
+    public JourneyDefinitionService(JourneyDefinitionStore repository,Authority authorization,GovernanceAuditLog audit,JourneyGraphValidator validator,JourneySimulator simulator,JourneyStageRegistry registry,JourneyDeploymentService deployment){this.repository=repository;this.authorization=authorization;this.audit=audit;this.validator=validator;this.simulator=simulator;this.registry=registry;this.deployment=deployment;}
     public List<HistoryEntry> history(UUID definition,int offset){authorize(Permission.JOURNEY_READ);repository.definition(definition,false);if(offset<0)invalid("Offset must be nonnegative.");return repository.history(definition,offset);}
     public List<Definition> list(){authorize(Permission.JOURNEY_READ);return repository.definitions();}
     /**

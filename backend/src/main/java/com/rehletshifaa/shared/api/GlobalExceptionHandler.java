@@ -17,7 +17,9 @@ import java.time.Instant; import java.util.*;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log=LoggerFactory.getLogger(GlobalExceptionHandler.class);
-    @ExceptionHandler(ApiException.class) ResponseEntity<ApiError> api(ApiException e,HttpServletRequest request){return response(e.status(),e.code(),e.getMessage(),List.of(),request);}
+    /** ECS field carrying the stable API error code, so Kibana can search failures by code. */
+    static final String EVENT_CODE="event.code";
+    @ExceptionHandler(ApiException.class) ResponseEntity<ApiError> api(ApiException e,HttpServletRequest request){if(e.status()>=500)log.atWarn().addKeyValue(EVENT_CODE,e.code()).log("Request failed with {} {}",e.status(),e.code());return response(e.status(),e.code(),e.getMessage(),List.of(),request);}
     @ExceptionHandler(FieldValidationException.class) ResponseEntity<ApiError> fieldValidation(FieldValidationException e,HttpServletRequest request){return response(400,"VALIDATION_FAILED",e.getMessage(),e.errors(),request);}
     @ExceptionHandler(MethodArgumentNotValidException.class) ResponseEntity<ApiError> validation(MethodArgumentNotValidException e,HttpServletRequest request){var errors=e.getBindingResult().getFieldErrors().stream().map(x->new ApiError.FieldError(x.getField(),safeValidationMessage(x.getDefaultMessage()))).toList();return response(400,"VALIDATION_FAILED","The request contains invalid fields",errors,request);}
     @ExceptionHandler(HttpMessageNotReadableException.class) ResponseEntity<ApiError> malformed(HttpServletRequest request){return response(400,"MALFORMED_REQUEST","The request body is invalid",List.of(),request);}
@@ -31,8 +33,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.dao.ConcurrencyFailureException.class) ResponseEntity<ApiError> concurrentModification(Exception e,HttpServletRequest request){log.info("Concurrent modification rejected: {}",e.getClass().getSimpleName());return response(409,"CONCURRENT_MODIFICATION","The record was changed by another request; reload and try again",List.of(),request);}
     /** The database is unreachable or timed out: a transient outage, not an application defect, and the transaction did not commit. */
     @ExceptionHandler({org.springframework.dao.DataAccessResourceFailureException.class,org.springframework.transaction.CannotCreateTransactionException.class,org.springframework.dao.QueryTimeoutException.class,org.springframework.dao.TransientDataAccessResourceException.class})
-    ResponseEntity<ApiError> databaseUnavailable(Exception e,HttpServletRequest request){log.error("Database unavailable: {}",e.getClass().getSimpleName());return ResponseEntity.status(503).header(HttpHeaders.RETRY_AFTER,"5").body(response(503,"SERVICE_UNAVAILABLE","The service is temporarily unavailable; try again shortly",List.of(),request).getBody());}
-    @ExceptionHandler(Exception.class) ResponseEntity<ApiError> unknown(Exception e,HttpServletRequest request){log.error("Unhandled request failure",e);return response(500,"INTERNAL_ERROR","The request could not be completed",List.of(),request);}
+    ResponseEntity<ApiError> databaseUnavailable(Exception e,HttpServletRequest request){log.atError().addKeyValue(EVENT_CODE,"SERVICE_UNAVAILABLE").log("Database unavailable: {}",e.getClass().getSimpleName());return ResponseEntity.status(503).header(HttpHeaders.RETRY_AFTER,"5").body(response(503,"SERVICE_UNAVAILABLE","The service is temporarily unavailable; try again shortly",List.of(),request).getBody());}
+    @ExceptionHandler(Exception.class) ResponseEntity<ApiError> unknown(Exception e,HttpServletRequest request){log.atError().addKeyValue(EVENT_CODE,"INTERNAL_ERROR").setCause(e).log("Unhandled request failure");return response(500,"INTERNAL_ERROR","The request could not be completed",List.of(),request);}
     private ResponseEntity<ApiError> response(int status,String code,String message,List<ApiError.FieldError> errors,HttpServletRequest request){String requestId=(String)request.getAttribute("requestId");return ResponseEntity.status(status).body(new ApiError(Instant.now(),code,message,requestId,errors));}
     private String safeValidationMessage(String value){return value==null?"Invalid value":value.replaceAll("[\r\n]"," ");}
 }
