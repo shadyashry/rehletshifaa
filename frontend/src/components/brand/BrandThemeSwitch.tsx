@@ -5,21 +5,21 @@ import type { Locale } from "@/lib/i18n";
 
 /**
  * Brand preview switch, site-wide on the public site and patient portal (the layout hides it in the Control Center,
- * which stays on the bare base tokens). Two candidates: "Petrol & Paper" (`app/theme-petrol.css`, the default) and
- * "Lapis Night" (`app/theme-lapis.css`). The choice is a per-viewer convenience kept in localStorage (memory if
+ * which stays on the bare base tokens). Three candidates: "Petrol & Paper" (`app/theme-petrol.css`, the default),
+ * "Lapis Sky" (`app/theme-lapis.css`) and its night sibling "Lapis Night" (`app/theme-lapis-night.css`). The choice is a per-viewer convenience kept in localStorage (memory if
  * storage is unavailable); `BRAND_THEME_BOOT` applies it before first paint so pages never flash another theme.
  * Remove this component, the boot script and the theme stylesheets once the final brand is chosen.
  */
-type BrandTheme = "petrol" | "lapis";
-const THEMES: readonly BrandTheme[] = ["petrol", "lapis"];
+type BrandTheme = "petrol" | "lapis" | "night";
+const THEMES: readonly BrandTheme[] = ["petrol", "lapis", "night"];
 const DEFAULT_THEME: BrandTheme = "petrol";
-const SWATCH: Record<BrandTheme, [string, string]> = { petrol: ["#0e4f55", "#e07a5f"], lapis: ["#1f3c88", "#1c7fd1"] };
+const SWATCH: Record<BrandTheme, [string, string]> = { petrol: ["#0e4f55", "#e07a5f"], lapis: ["#1f3c88", "#1c7fd1"], night: ["#0e1a3d", "#e2b962"] };
 const KEY = "rs:brand-theme-preview";
-const FAVICON: Partial<Record<BrandTheme, string>> = { lapis: "/brand/favicon-lapis.png" };
+const FAVICON: Partial<Record<BrandTheme, string>> = { lapis: "/brand/favicon-lapis.png", night: "/brand/favicon-lapis.png" };
 
 /** Inline <head> script: applies the saved theme (Petrol & Paper by default) before first paint, never inside the
  * Control Center, which keeps the bare base tokens. */
-export const BRAND_THEME_BOOT = `(function(){if(/\\/portal\\/control-center(\\/|$)/.test(location.pathname))return;var t="petrol";try{var s=localStorage.getItem("${KEY}");if(s==="lapis")t=s}catch(e){}document.documentElement.setAttribute("data-brand-theme",t)})()`;
+export const BRAND_THEME_BOOT = `(function(){if(/\\/portal\\/control-center(\\/|$)/.test(location.pathname))return;var t="petrol";try{var s=localStorage.getItem("${KEY}");if(s==="lapis"||s==="night")t=s}catch(e){}document.documentElement.setAttribute("data-brand-theme",t)})()`;
 const listeners = new Set<() => void>();
 let memory: BrandTheme | null = null;
 
@@ -43,8 +43,8 @@ function subscribe(listener: () => void) {
 }
 
 const COPY = {
-  en: { label: "Brand preview", petrol: "Petrol & Paper", lapis: "Lapis Night", short: { petrol: "Petrol", lapis: "Lapis" } },
-  ar: { label: "معاينة الهوية", petrol: "البترولي والورقي", lapis: "سماء اللازورد", short: { petrol: "البترولي", lapis: "اللازورد" } },
+  en: { label: "Brand preview", petrol: "Petrol & Paper", lapis: "Lapis Sky", night: "Lapis Night", short: { petrol: "Petrol", lapis: "Sky", night: "Night" } },
+  ar: { label: "معاينة الهوية", petrol: "البترولي والورقي", lapis: "سماء اللازورد", night: "ليل اللازورد", short: { petrol: "البترولي", lapis: "السماء", night: "الليل" } },
 } as const;
 
 export function BrandThemeSwitch({ locale }: { locale: Locale }) {
@@ -54,7 +54,7 @@ export function BrandThemeSwitch({ locale }: { locale: Locale }) {
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.brandTheme = theme;
-    // The browser-tab icon follows the theme: Lapis shows its own three-colour mark; Petrol keeps the original icon.
+    // The browser-tab icon follows the theme: both Lapis themes show their three-colour mark; Petrol keeps the original icon.
     const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (icon) {
       icon.dataset.originalHref ??= icon.href;
