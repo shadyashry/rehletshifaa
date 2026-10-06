@@ -30,6 +30,15 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select c.waitingOn from MedicalCase c where c.id = :id")
     Optional<String> findWaitingOn(@Param("id") UUID id);
 
+    /** The case facts that decide its current action: stage and travel-package interest. */
+    interface ActionFacts { CaseStatus getStatus(); Boolean getTravelPackageRequested(); }
+
+    @Query("select c.status as status, c.travelPackageRequested as travelPackageRequested from MedicalCase c where c.id = :id")
+    Optional<ActionFacts> findActionFacts(@Param("id") UUID id);
+
+    @Query("select c.waitingReason from MedicalCase c where c.id = :id")
+    Optional<String> findWaitingReason(@Param("id") UUID id);
+
     /** A status transition guarded by the status the caller saw. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update MedicalCase c set c.status = :to, c.updatedAt = :now, c.version = c.version + 1 where c.id = :id and c.status = :from")

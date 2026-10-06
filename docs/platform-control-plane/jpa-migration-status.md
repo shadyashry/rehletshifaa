@@ -287,6 +287,24 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **584 tests, 0 failures** (2 skipped); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`CaseActionService` converted** (CL5 read slice 2; removed from `JDBC_NOT_YET_CONVERTED`, 16 → 15).
+  Its reads moved to a new `journey.application.CaseActionQueryService`; `CaseActionService` keeps the resolver, the
+  shared Operations-assignment policy and the repair writes, and reads only through the query service. Public contract
+  (`resolve`, `assertOperationsAssignable`, `operationsAssignable`, `readinessBlockers`, `reconcileWaitingOn`, the
+  readiness event listener, `CONSULTANT_OWNED`, `patientGate`), ordering, filtering and authorization unchanged.
+  Queries added: `MedicalCaseRepository.findActionFacts` (stage + travel-package interest; 404 when absent) and
+  `findWaitingReason`; `CaseAssignmentRepository.findOpenOnCase` (pending/active assignments, newest first — answers the
+  active primary coordinator, "pending for me" and "Operations/Finance already assigned" from one read instead of a
+  query per question); `CaseTaskRepository.findOpenInternalWorkOf` (my open internal item: blocking, then
+  `URGENT/HIGH/NORMAL/other`, then oldest; `Limit.of(1)`); `ProposalVersionRepository.findApprovalGates` (latest
+  version's status, finance/operations gates, document type); `PatientIdentityVerificationRepository.isUnderReviewForCase`.
+  A resolve now reads the case facts, assignments and latest proposal once (before: facts up to three times, the proposal
+  twice, one count per assignment question, and `operationsAssignable` re-ran the readiness reads); nothing the resolve writes
+  (obsolete work, waiting-on) changes them. Ownership: case-table queries in `casemanagement`, proposal and identity
+  queries in `journey`. New test `myCurrentWorkItemIsTheBlockingOneThenTheMostUrgentThenTheOldest`.
+  Verification: full suite **585 tests, 0 failures** (2 skipped); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -299,9 +317,9 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 16 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService` converted) — `JourneyService`
+- **Reads:** 15 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService` and `CaseActionService` converted) — `JourneyService`
   (~85 statements), `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
-  `PatientAccountService`, `CaseActionService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
+  `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
   `org.springframework.jdbc..`/`java.sql..` type (CL6), and no repository may declare a native query.
@@ -309,8 +327,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 ## Next slice
 
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
-remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` is
-done (2026-10-07); next `CaseActionService`, then `JourneyService` split by view, then the rest of the list, one service
+remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
+`CaseActionService` are done (2026-10-07); next `JourneyService` split by view, then the rest of the list, one service
 per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move

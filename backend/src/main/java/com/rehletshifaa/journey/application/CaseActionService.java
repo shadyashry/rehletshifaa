@@ -4,19 +4,18 @@ import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.journey.api.WorkDtos.PatientActionView;
+import com.rehletshifaa.journey.application.CaseActionQueryService.Facts;
+import com.rehletshifaa.journey.application.CaseActionQueryService.Proposal;
+import com.rehletshifaa.journey.application.CaseActionQueryService.WorkItem;
 import com.rehletshifaa.shared.api.ApiException;
 
 import org.springframework.context.event.EventListener;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Clock;
-import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * Resolves, for one person looking at one case, what is true now and what they can validly do now.
@@ -56,7 +55,7 @@ public class CaseActionService {
     /** Readiness steps the onboarding link completes in one go; shown as a single "activate your profile" blocker. */
     private static final Set<String> PROFILE_CODES = Set.of("ACCOUNT_NOT_ACTIVATED", "CONSENTS_INCOMPLETE", "ONBOARDING_INCOMPLETE", "REPRESENTATIVE_AUTH_MISSING");
 
-    private final JdbcClient jdbc;
+    private final CaseActionQueryService queries;
     private final CustomerReadinessService readiness;
     private final PaymentService payment;
     private final StaffWorkService work;
@@ -64,32 +63,37 @@ public class CaseActionService {
     private final ProposalAccessService proposals;
     private final Clock clock;
 
-    public CaseActionService(JdbcClient jdbc, CustomerReadinessService readiness, PaymentService payment,
+    public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionService patientActions, ProposalAccessService proposals, Clock clock) {
-        this.jdbc = jdbc; this.readiness = readiness; this.payment = payment; this.work = work;
+        this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
         this.patientActions = patientActions; this.proposals = proposals; this.clock = clock;
     }
 
     // ---------------- the contract the page renders ----------------
 
+    /**
+     * Case facts, assignments and the latest proposal are read once per resolve; nothing this method writes (obsolete
+     * work, waiting-on) changes them, so every rule below answers from the same snapshot.
+     */
     @Transactional
     public CaseActionsView resolve(UUID caseId, Actor actor) {
-        Facts f = facts(caseId);
+        Facts f = queries.facts(caseId);
         closeObsoleteWork(caseId, f.status());
         PatientActionView patientAction = patientActions.openAction(caseId);
         List<BlockerView> blockers = READINESS_STAGES.contains(f.status()) ? readinessBlockers(caseId) : List.of();
         boolean patientBlocked = blockers.stream().anyMatch(CaseActionService::patientGate);
-        WorkItem mine = myWork(caseId, actor.subject());
+        WorkItem mine = queries.myWork(caseId, actor.subject());
         String waitingOn = reconcileWaitingOn(caseId, f.status(), blockers, patientAction, mine);
-        String waitingReason = jdbc.sql("SELECT waiting_reason FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
+        String waitingReason = queries.waitingReason(caseId);
 
         boolean patient = actor.role() == Role.PATIENT || actor.role() == Role.PATIENT_REPRESENTATIVE;
         if (patient) return patientView(caseId, f, waitingOn, waitingReason, patientAction, blockers);
 
         boolean coordinator = actor.role() == Role.COORDINATOR;
         boolean owned = coordinator && actor.subject().equals(f.coordinatorSubject());
-        CurrentActionView current = currentAction(caseId, f, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
-        List<String> available = coordinator && owned ? availableActions(caseId, f, patientAction, blockers)
+        Proposal proposal = queries.latestProposal(caseId);
+        CurrentActionView current = currentAction(caseId, f, proposal, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
+        List<String> available = coordinator && owned ? availableActions(f, proposal, patientAction, blockers)
                 : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of();
         return new CaseActionsView(f.status(), waitingOn, waitingReason, current, blockers, available);
     }
@@ -149,11 +153,11 @@ public class CaseActionService {
         return none();
     }
 
-    private CurrentActionView currentAction(UUID caseId, Facts f, Actor actor, boolean coordinator, boolean owned,
+    private CurrentActionView currentAction(UUID caseId, Facts f, Proposal proposal, Actor actor, boolean coordinator, boolean owned,
                                             WorkItem mine, PatientActionView patientAction, List<BlockerView> blockers, boolean patientBlocked) {
         if (coordinator && !owned)
             return "RECEIVED".equals(f.status()) && f.coordinatorSubject() == null ? simple("CLAIM_CASE", "CLAIM") : simple("VIEW_ONLY", "NONE");
-        if (!coordinator && pendingAssignment(caseId, actor)) return simple("ACCEPT_ASSIGNMENT", "ACCEPT");
+        if (!coordinator && f.pendingFor(actor.subject(), actor.label())) return simple("ACCEPT_ASSIGNMENT", "ACCEPT");
         // Work that is mine and not itself waiting on the patient is what the workflow is waiting for.
         if (mine != null && !(READINESS_GATED_WORK.contains(mine.type()) && patientBlocked)) return workItem(mine);
         if (patientAction != null) return simple("WAIT_PATIENT_INFORMATION", "WAIT");
@@ -162,27 +166,26 @@ public class CaseActionService {
             return new CurrentActionView("WAIT_PATIENT_READINESS", "WAIT", null, null, null, null, null, null, false, first.code());
         }
         if (mine != null) return workItem(mine);
-        return stageFallback(caseId, f, actor, coordinator);
+        return stageFallback(caseId, f, proposal, actor, coordinator, blockers);
     }
 
     /** Only reached when nothing is assigned: describe the stage honestly, including "nothing to do yet". */
-    private CurrentActionView stageFallback(UUID caseId, Facts f, Actor actor, boolean coordinator) {
+    private CurrentActionView stageFallback(UUID caseId, Facts f, Proposal proposal, Actor actor, boolean coordinator, List<BlockerView> blockers) {
         String s = f.status();
         if (coordinator) {
             if (CONSULTANT_ASSIGNABLE.contains(s)) return simple("ASSIGN_CONSULTANT", "FOCUS");
             if (Set.of("CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW").contains(s)) return simple("WAIT_CONSULTANT", "WAIT");
             if (PROPOSAL_WORK_STAGES.contains(s)) return simple("PREPARE_PROPOSAL", "FOCUS");
-            if (Set.of("PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL").contains(s)) return internalApprovalStep(caseId, f);
+            if (Set.of("PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL").contains(s)) return internalApprovalStep(f, proposal);
             if ("PATIENT_DECISION".equals(s)) return simple("WAIT_PATIENT_DECISION", "WAIT");
             if ("ACCEPTED".equals(s)) return payment.depositSatisfied(caseId) ? none() : simple("WAIT_PAYMENT", "WAIT");
             if ("TRAVEL_COORDINATION".equals(s)) {
-                if (hasAssignment(caseId, "OPERATIONS")) return simple("WAIT_OPERATIONS", "WAIT");
-                return operationsAssignable(caseId) ? simple("ASSIGN_OPERATIONS", "FOCUS") : none();
+                if (f.hasAssignment("OPERATIONS")) return simple("WAIT_OPERATIONS", "WAIT");
+                return operationsAssignable(f, blockers) ? simple("ASSIGN_OPERATIONS", "FOCUS") : none();
             }
             return none();
         }
         if (actor.role() == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
-        Proposal proposal = latestProposal(caseId);
         if (actor.role() == Role.OPERATIONS) {
             if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
             if ("PROPOSAL_PREPARATION".equals(s) && f.travelPackage() && proposal != null && !proposal.operationsDone()
@@ -200,13 +203,12 @@ public class CaseActionService {
      * manually priced services. Whoever is still missing is the coordinator's next step; once everybody is
      * assigned the ball is theirs, and once the gates are clear the step is the release itself.
      */
-    private CurrentActionView internalApprovalStep(UUID caseId, Facts f) {
-        Proposal p = latestProposal(caseId);
+    private CurrentActionView internalApprovalStep(Facts f, Proposal p) {
         if (p == null) return simple("PREPARE_PROPOSAL", "FOCUS");
         boolean opsNeeded = f.travelPackage() && !p.finalQuote() && !p.operationsDone();
         boolean finNeeded = p.requiresFinance() && !p.financeDone();
-        if (opsNeeded && !hasAssignment(caseId, "OPERATIONS")) return simple("ASSIGN_OPERATIONS", "FOCUS");
-        if (finNeeded && !hasAssignment(caseId, "FINANCE")) return simple("ASSIGN_FINANCE", "FOCUS");
+        if (opsNeeded && !f.hasAssignment("OPERATIONS")) return simple("ASSIGN_OPERATIONS", "FOCUS");
+        if (finNeeded && !f.hasAssignment("FINANCE")) return simple("ASSIGN_FINANCE", "FOCUS");
         if (opsNeeded || finNeeded) return simple("WAIT_INTERNAL_APPROVAL", "WAIT");
         return simple("RELEASE_PROPOSAL", "FOCUS");
     }
@@ -215,17 +217,16 @@ public class CaseActionService {
      * Optional, state-valid operations for the owning coordinator. Utilities and exceptions only — the
      * next workflow step is the current action, never an entry here.
      */
-    private List<String> availableActions(UUID caseId, Facts f, PatientActionView patientAction, List<BlockerView> blockers) {
+    private List<String> availableActions(Facts f, Proposal p, PatientActionView patientAction, List<BlockerView> blockers) {
         List<String> actions = new ArrayList<>();
         String s = f.status();
         if (patientAction != null) {
             if (patientAction.items().stream().anyMatch(i -> !i.completed())) actions.add("RECORD_PATIENT_RESPONSE");
         } else if (!TERMINAL.contains(s) && !CONSULTANT_OWNED.contains(s)) actions.add("REQUEST_INFORMATION");
-        Proposal p = latestProposal(caseId);
         if (p != null && Set.of("RELEASED", "VIEWED").contains(p.status())) actions.add("RESEND_PROPOSAL_LINK");
         if (blockers.stream().anyMatch(b -> "PROFILE_NOT_ACTIVATED".equals(b.code()))) actions.add("RESEND_ONBOARDING_LINK");
         if (CONSULTANT_ASSIGNABLE.contains(s)) actions.add("ASSIGN_CONSULTANT");
-        if (operationsAssignable(caseId)) actions.add("ASSIGN_OPERATIONS");
+        if (operationsAssignable(f, blockers)) actions.add("ASSIGN_OPERATIONS");
         if ("PROPOSAL_PREPARATION".equals(s) && p != null && p.requiresFinance() && !p.financeDone()) actions.add("ASSIGN_FINANCE");
         if ("INFORMATION_REQUIRED".equals(s)) actions.add("MOVE_TO_INTAKE_REVIEW");
         if (!TRAVEL_PACKAGE_LOCKED.contains(s)) actions.add("SET_TRAVEL_PACKAGE");
@@ -243,7 +244,15 @@ public class CaseActionService {
      * there is no deposit-only gate (CL3).
      */
     public void assertOperationsAssignable(UUID caseId) {
-        Facts f = facts(caseId);
+        assertOperationsAssignable(queries.facts(caseId), () -> readinessBlockers(caseId));
+    }
+
+    public boolean operationsAssignable(UUID caseId) {
+        try { assertOperationsAssignable(caseId); return true; } catch (ApiException e) { return false; }
+    }
+
+    /** The same policy over facts and readiness already read (readiness is only consulted in TRAVEL_COORDINATION). */
+    private static void assertOperationsAssignable(Facts f, Supplier<List<BlockerView>> blockers) {
         String status = f.status();
         if ("PROPOSAL_PREPARATION".equals(status)) {
             if (f.travelPackage()) return;
@@ -251,13 +260,13 @@ public class CaseActionService {
         }
         if (!"TRAVEL_COORDINATION".equals(status))
             throw new ApiException(409, "CASE_NOT_READY_FOR_ASSIGNMENT", "Operations is assigned once the coordination deposit is settled and treatment coordination starts");
-        List<String> outstanding = readinessBlockers(caseId).stream().filter(CaseActionService::patientGate).map(BlockerView::labelEn).toList();
+        List<String> outstanding = blockers.get().stream().filter(CaseActionService::patientGate).map(BlockerView::labelEn).toList();
         if (!outstanding.isEmpty())
             throw new ApiException(409, "COORDINATION_NOT_READY", "The patient has not completed the steps needed before coordination starts: " + String.join("; ", outstanding));
     }
 
-    public boolean operationsAssignable(UUID caseId) {
-        try { assertOperationsAssignable(caseId); return true; } catch (ApiException e) { return false; }
+    private static boolean operationsAssignable(Facts f, List<BlockerView> blockers) {
+        try { assertOperationsAssignable(f, () -> blockers); return true; } catch (ApiException e) { return false; }
     }
 
     /**
@@ -276,7 +285,7 @@ public class CaseActionService {
                 // Onboarding starts when the patient acknowledges the estimate; a case without it needs staff to start it.
                 case "ONBOARDING_NOT_STARTED" -> out.add(new BlockerView(b.code(), "Onboarding not started", "لم يبدأ التسجيل", "STAFF", true));
                 case "CONTACT_NOT_VERIFIED" -> out.add(new BlockerView(b.code(), "Contact channel verification", "تأكيد وسيلة التواصل", "PATIENT", true));
-                case "IDENTITY_NOT_VERIFIED" -> out.add(identityUnderReview(caseId)
+                case "IDENTITY_NOT_VERIFIED" -> out.add(queries.identityUnderReview(caseId)
                         ? new BlockerView(b.code(), "Identity review", "مراجعة الهوية", "STAFF", false)
                         : new BlockerView(b.code(), "Identity verification", "التحقق من الهوية", "PATIENT", false));
                 default -> { if (!profile || !PROFILE_CODES.contains(b.code())) out.add(new BlockerView(b.code(), b.labelEn(), b.labelAr(), "PATIENT", true)); }
@@ -299,7 +308,7 @@ public class CaseActionService {
      */
     @Transactional
     public String reconcileWaitingOn(UUID caseId) {
-        Facts f = facts(caseId);
+        Facts f = queries.facts(caseId);
         List<BlockerView> blockers = READINESS_STAGES.contains(f.status()) ? readinessBlockers(caseId) : List.of();
         return reconcileWaitingOn(caseId, f.status(), blockers, patientActions.openAction(caseId), null);
     }
@@ -322,61 +331,6 @@ public class CaseActionService {
         }
         if (!Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(status))
             work.closeWorkItems(caseId, "TRAVEL", "Superseded — treatment coordination is already under way");
-    }
-
-    // ---------------- reads ----------------
-
-    private record Facts(String status, String coordinatorSubject, boolean travelPackage) {}
-    private record WorkItem(UUID id, String type, String title, String context, Instant dueAt, long version) {}
-    private record Proposal(String status, boolean requiresFinance, boolean operationsDone, boolean financeDone, boolean finalQuote) {}
-
-    private Facts facts(UUID caseId) {
-        String status = status(caseId);
-        String coordinator = jdbc.sql("SELECT assignee_subject FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' ORDER BY assigned_at DESC LIMIT 1")
-                .param(caseId).query(String.class).optional().orElse(null);
-        boolean travel = Boolean.TRUE.equals(jdbc.sql("SELECT travel_package_requested FROM medical_cases WHERE id=?").param(caseId).query(Boolean.class).optional().orElse(false));
-        return new Facts(status, coordinator, travel);
-    }
-
-    private String status(UUID caseId) {
-        return jdbc.sql("SELECT status FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional()
-                .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
-    }
-
-    /** The one open item assigned to this person: blocking first, then by priority, then oldest. */
-    private WorkItem myWork(UUID caseId, String subject) {
-        return jdbc.sql("SELECT id,task_type,title,description,due_at,version FROM case_tasks WHERE case_id=? AND owner_subject=? AND visibility_scope='INTERNAL' AND status IN ('OPEN','IN_PROGRESS') "
-                        + "ORDER BY CASE WHEN blocking THEN 0 ELSE 1 END,CASE priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END,created_at LIMIT 1")
-                .params(caseId, subject).query(this::mapWork).optional().orElse(null);
-    }
-
-    private WorkItem mapWork(ResultSet rs, int n) throws SQLException {
-        OffsetDateTime due = rs.getObject("due_at", OffsetDateTime.class);
-        return new WorkItem(rs.getObject("id", UUID.class), rs.getString("task_type"), work.decryptText(rs.getString("title")),
-                work.decryptText(rs.getString("description")), due == null ? null : due.toInstant(), rs.getLong("version"));
-    }
-
-    private boolean pendingAssignment(UUID caseId, Actor actor) {
-        Integer n = jdbc.sql("SELECT count(*) FROM case_assignments WHERE case_id=? AND assignee_subject=? AND assignee_role=? AND status='PENDING'")
-                .params(caseId, actor.subject(), actor.label()).query(Integer.class).single();
-        return n != null && n > 0;
-    }
-
-    private boolean hasAssignment(UUID caseId, String role) {
-        Integer n = jdbc.sql("SELECT count(*) FROM case_assignments WHERE case_id=? AND assignee_role=? AND status IN ('PENDING','ACTIVE')")
-                .params(caseId, role).query(Integer.class).single();
-        return n != null && n > 0;
-    }
-
-    private boolean identityUnderReview(UUID caseId) {
-        Integer n = jdbc.sql("SELECT count(*) FROM patient_identity_verifications WHERE patient_id=(SELECT patient_id FROM medical_cases WHERE id=?) AND status IN ('PENDING','MANUAL_REVIEW')")
-                .param(caseId).query(Integer.class).single();
-        return n != null && n > 0;
-    }
-
-    private Proposal latestProposal(UUID caseId) {
-        return jdbc.sql("SELECT pv.status,pv.requires_finance_approval,pv.operations_completed_at,pv.finance_approved_at,pv.document_type FROM proposal_versions pv JOIN proposals p ON p.id=pv.proposal_id WHERE p.case_id=? ORDER BY pv.version_number DESC LIMIT 1")
-                .param(caseId).query((rs, n) -> new Proposal(rs.getString("status"), rs.getBoolean("requires_finance_approval"), rs.getObject("operations_completed_at") != null, rs.getObject("finance_approved_at") != null, "FINAL_TREATMENT_QUOTE".equals(rs.getString("document_type")))).optional().orElse(null);
     }
 
     private CurrentActionView workItem(WorkItem w) {

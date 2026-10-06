@@ -22,6 +22,15 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
             order by a.assignedAt desc""")
     java.util.List<CaseAssignee> findActiveCoordinators(@Param("caseIds") java.util.Collection<UUID> caseIds);
 
+    interface OpenAssignment { String getSubject(); String getRole(); String getType(); String getStatus(); }
+
+    /** The case's pending and active assignments, newest first. */
+    @Query("""
+            select a.assigneeSubject as subject, a.assigneeRole as role, a.assignmentType as type, a.status as status from CaseAssignment a
+            where a.caseId = :caseId and a.status in ('PENDING', 'ACTIVE')
+            order by a.assignedAt desc""")
+    java.util.List<OpenAssignment> findOpenOnCase(@Param("caseId") UUID caseId);
+
     /** Cases a consultant holds in an assignment status, excluding cases that are no longer live. */
     @Query("""
             select count(distinct a.caseId) from CaseAssignment a join MedicalCase c on c.id = a.caseId

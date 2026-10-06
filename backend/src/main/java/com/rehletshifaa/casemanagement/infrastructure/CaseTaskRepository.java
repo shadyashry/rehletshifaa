@@ -32,6 +32,18 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
     java.util.List<UUID> findOpenInternalOfType(@Param("caseId") UUID caseId, @Param("type") String type,
                                                 org.springframework.data.domain.Limit limit);
 
+    interface CaseWorkRow { UUID getId(); String getTaskType(); String getTitle(); String getDescription(); Instant getDueAt(); Long getVersion(); }
+
+    /** The subject's open internal work on one case: blocking first, then most urgent, then oldest (pass {@code Limit.of(1)}). */
+    @Query("""
+            select t.id as id, t.taskType as taskType, t.title as title, t.description as description, t.dueAt as dueAt, t.version as version
+            from CaseTask t
+            where t.caseId = :caseId and t.ownerSubject = :owner and t.visibilityScope = 'INTERNAL' and t.status in ('OPEN', 'IN_PROGRESS')
+            order by case when t.blocking = true then 0 else 1 end,
+                case t.priority when 'URGENT' then 0 when 'HIGH' then 1 when 'NORMAL' then 2 else 3 end, t.createdAt""")
+    java.util.List<CaseWorkRow> findOpenInternalWorkOf(@Param("caseId") UUID caseId, @Param("owner") String owner,
+                                                       org.springframework.data.domain.Limit limit);
+
     /** One row of a staff member's work queue: the task with the case facts needed to act on it. */
     interface OpenWorkRow {
         UUID getId(); UUID getCaseId(); String getTaskType(); String getTitle(); String getDescription(); String getPriority();

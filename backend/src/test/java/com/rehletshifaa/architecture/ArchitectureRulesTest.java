@@ -215,7 +215,6 @@ class ArchitectureRulesTest {
             "com.rehletshifaa.casemanagement.application.CaseNumberGenerator", // nextval: JPQL has no sequence function
             "com.rehletshifaa.coordination.application.CoordinationReadService",
             "com.rehletshifaa.coordination.infrastructure.CoordinationRepository", // reads only (writes are JPA)
-            "com.rehletshifaa.journey.application.CaseActionService",
             "com.rehletshifaa.journey.application.CaseHandoffService",
             "com.rehletshifaa.journey.application.ConsultantReferralService",
             "com.rehletshifaa.journey.application.IdentityVerificationService",

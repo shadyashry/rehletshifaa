@@ -29,6 +29,19 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
             from ProposalVersion v join Proposal p on p.id = v.proposalId where p.caseId = :caseId order by v.versionNumber desc""")
     List<PatientFacing> latestForCase(@Param("caseId") UUID caseId, org.springframework.data.domain.Pageable page);
 
+    /** Where a version stands in internal approval before release. */
+    interface ApprovalGates {
+        String getStatus(); Boolean getRequiresFinanceApproval(); Instant getOperationsCompletedAt(); Instant getFinanceApprovedAt();
+        String getDocumentType();
+    }
+
+    /** The approval gates of the case proposal's versions, latest first (pass {@code Limit.of(1)} for the current one). */
+    @Query("""
+            select v.status as status, v.requiresFinanceApproval as requiresFinanceApproval, v.operationsCompletedAt as operationsCompletedAt,
+                v.financeApprovedAt as financeApprovedAt, v.documentType as documentType
+            from ProposalVersion v join Proposal p on p.id = v.proposalId where p.caseId = :caseId order by v.versionNumber desc""")
+    List<ApprovalGates> findApprovalGates(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
     @Query("select count(v) > 0 from ProposalVersion v join Proposal p on p.id = v.proposalId where p.caseId = :caseId and v.status = 'ACCEPTED'")
     boolean hasAcceptedForCase(@Param("caseId") UUID caseId);
 

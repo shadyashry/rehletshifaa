@@ -19,6 +19,12 @@ public interface PatientIdentityVerificationRepository extends BaseRepository<Pa
     @Query("select count(v) > 0 from PatientIdentityVerification v where v.patientId = :patientId and v.status = 'VERIFIED' and (v.expiresAt is null or v.expiresAt > :now)")
     boolean hasCurrentVerified(@Param("patientId") UUID patientId, @Param("now") Instant now);
 
+    /** The case's patient has an identity check waiting for the provider or a reviewer. */
+    @Query("""
+            select count(v) > 0 from PatientIdentityVerification v, MedicalCase c
+            where c.id = :caseId and v.patientId = c.patientId and v.status in ('PENDING', 'MANUAL_REVIEW')""")
+    boolean isUnderReviewForCase(@Param("caseId") UUID caseId);
+
     /** A reviewer decides a pending check; an assurance level left out keeps the provider's. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

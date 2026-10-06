@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.*;
 class CoordinatorCaseActionsTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired PatientActivationService activation; @Autowired PaymentService payment; @Autowired CaseActionService caseActions;
-    @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff;
+    @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff; @Autowired StaffWorkService work;
     @Autowired PatientAccountService account; @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort;
     @org.junit.jupiter.api.BeforeEach void resetIdentity() { ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).reset(); }
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
@@ -74,6 +74,28 @@ class CoordinatorCaseActionsTest {
 
         journey.assign(ctx.caseId(), new AssignmentRequest("finance-subject", "FINANCE", "PRIMARY", null, "Approve terms")); em.flush();
         assertThat(journey.workspace(ctx.caseId()).actions().currentAction().code()).isEqualTo("WAIT_INTERNAL_APPROVAL");
+    }
+
+    @Test void myCurrentWorkItemIsTheBlockingOneThenTheMostUrgentThenTheOldest() throws Exception {
+        var ctx = recommended();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        UUID records = work.openWorkItem(new com.rehletshifaa.journey.api.WorkDtos.NewWorkItem(ctx.caseId(), "CHECK_RECORDS", "Check records", null,
+                "coordinator-subject", "COORDINATOR", false, null, "test", "WORK_ITEM_ASSIGNED", "test-records:" + ctx.caseId(), false));
+        UUID call = work.openWorkItem(new com.rehletshifaa.journey.api.WorkDtos.NewWorkItem(ctx.caseId(), "CALL_PATIENT", "Call the patient", null,
+                "coordinator-subject", "COORDINATOR", false, null, "test", "WORK_ITEM_ASSIGNED", "test-call:" + ctx.caseId(), false));
+        Instant t0 = Instant.parse("2026-01-01T00:00:00Z");
+        raw("UPDATE case_tasks SET blocking=FALSE,priority='LOW',created_at=? WHERE case_id=? AND id NOT IN (?,?)", t0, ctx.caseId(), records, call);
+        raw("UPDATE case_tasks SET blocking=FALSE,priority='NORMAL',created_at=? WHERE id=?", t0.plusSeconds(60), records);
+        raw("UPDATE case_tasks SET blocking=FALSE,priority='NORMAL',created_at=? WHERE id=?", t0.plusSeconds(120), call);
+        assertThat(journey.workspace(ctx.caseId()).actions().currentAction().workItemId()).isEqualTo(records); // same priority: oldest
+
+        raw("UPDATE case_tasks SET priority='URGENT' WHERE id=?", call);
+        assertThat(journey.workspace(ctx.caseId()).actions().currentAction().workItemId()).isEqualTo(call); // most urgent
+
+        raw("UPDATE case_tasks SET blocking=TRUE WHERE case_id=? AND task_type='PREPARE_PROPOSAL'", ctx.caseId());
+        CurrentActionView current = journey.workspace(ctx.caseId()).actions().currentAction();
+        assertThat(current.workType()).isEqualTo("PREPARE_PROPOSAL"); // blocking work first, whatever its priority
+        assertThat(current.code()).isEqualTo("WORK_ITEM");
     }
 
     @Test void anAcknowledgedProposalNeverShowsPrepareProposalEvenFromStaleData() throws Exception {
