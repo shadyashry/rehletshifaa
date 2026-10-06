@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import { SpecialtyMotif } from "@/components/care-areas/SpecialtyMotif";
 import { ConsultantPortrait } from "@/components/ConsultantProfileCard";
-import { FocusMap } from "@/components/consultants/ProfileVisuals";
+import { FiguresCard, FocusMap } from "@/components/consultants/ProfileVisuals";
 import { careAreaMeta } from "@/lib/care-area-catalog";
 import { CONSULTANT_SLUGS, consultantUi, getConsultant, getConsultants } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
@@ -141,14 +141,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
             <h1 className="mt-6 text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal">{profile.name}</h1>
             <p className="mt-2 text-[1rem] leading-7 text-ink-600">{profile.role}</p>
 
-            <dl className={`mt-6 grid divide-x divide-border-subtle rounded-[16px] bg-surface-default py-3.5 shadow-[0_20px_40px_-34px_rgba(36,64,74,0.6)] ring-1 ring-border-card rtl:divide-x-reverse ${stats.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
-              {stats.map((stat) => (
-                <div key={stat.label} className="flex flex-col px-3 text-center">
-                  <dd className="order-1 text-[1.75rem] font-semibold tabular-nums leading-none tracking-[-0.02em] text-brand-800">{stat.value}</dd>
-                  <dt className="order-2 mt-1.5 text-[0.75rem] leading-4 text-ink-500">{stat.label}</dt>
-                </div>
-              ))}
-            </dl>
+            <FiguresCard stats={stats} className="mt-6" />
 
             <dl className="mt-6 border-t border-border-subtle">
               {facts.map(({ label, value }) => (

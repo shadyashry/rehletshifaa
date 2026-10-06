@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 
 import { CaseRouter } from "@/components/care-areas/CaseRouter";
 import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
+import { SpecialtyMotif } from "@/components/care-areas/SpecialtyMotif";
 import { ConsultantCard } from "@/components/consultants/ConsultantCard";
-import { HeroStats } from "@/components/HeroStats";
+import { FiguresCard, FocusMap } from "@/components/consultants/ProfileVisuals";
 import { TrackedLink } from "@/components/TrackedLink";
 import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
 import { consultantUi, universityFacultySlugs } from "@/lib/consultants";
@@ -20,8 +21,8 @@ const fill = (template: string, values: Record<string, string | number>) =>
 
 /**
  * One template for every care-area page, so the nine areas read as one system with equal standing:
- * 1. hero — body system, area, three derived facts, the action, and a snapshot of the area (sub-areas and
- *    the Consultants who lead it, in the area's system tint);
+ * 1. hero — washed with the body system's tint and line drawing: body system, area, three derived figures, the action,
+ *    and a snapshot of the area (its sub-areas mapped around the area icon, and the Consultants who lead it);
  * 2. scope — numbered cards of what the area covers, with "you might contact us if" signs where we have
  *    them, and the suitability note;
  * 3. the Consultants who lead it — the same cards as the Consultants panel;
@@ -61,7 +62,10 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
   return (
     <>
       {/* 1 — hero */}
-      <section className="page-hero border-b border-border-subtle bg-surface-pearl bg-[radial-gradient(70%_120%_at_88%_-10%,var(--color-surface-clinical),var(--color-surface-pearl)_72%)]">
+      <section className="page-hero relative isolate overflow-hidden border-b border-border-subtle bg-surface-pearl">
+        {/* The body system's tint and line drawing wash the top of the hero, then fade into the pearl page — as on a Consultant's profile. */}
+        <div aria-hidden className={`absolute inset-x-0 top-0 -z-10 h-full ${style.soft} [mask-image:linear-gradient(to_bottom,black_45%,transparent)]`} />
+        <SpecialtyMotif system={area.system} className="absolute -end-24 -top-28 -z-10 h-[20rem] w-[44rem] opacity-40 [mask-image:linear-gradient(to_left,black_30%,transparent_75%)] rtl:-scale-x-100" />
         <div className="container-site grid gap-9 pb-12 pt-8 md:pt-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pb-14">
           <div>
             <nav aria-label={t.careAreas} className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-ink-500">
@@ -102,7 +106,8 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
                   </ul>
                 </div>
               ) : (
-                <HeroStats
+                <FiguresCard
+                  className="max-w-[26rem]"
                   stats={[
                     { value: area.consultants.length, label: area.consultants.length === 1 ? t.stats.consultantsOne : t.stats.consultants },
                     { value: facultyCount, label: facultyCount === 1 ? t.stats.facultyOne : t.stats.faculty },
@@ -123,28 +128,11 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
             </div>
           </div>
 
-          {/* The area snapshot: icon, sub-areas, and the Consultants who lead it. */}
+          {/* The area snapshot: the area as a hub with its sub-areas (the profile's focus map), and the Consultants who lead it. */}
           <figure aria-hidden className={`hero-island relative mx-auto w-full max-w-[26rem] overflow-hidden rounded-[22px] border border-border-card bg-surface-default shadow-[0_30px_60px_-42px_rgba(36,64,74,0.6)] ${singleConsultant ? "hidden lg:block" : ""}`}>
-            <div className={`relative px-6 pb-6 pt-6 ${style.soft}`}>
-              <CareAreaIcon name={area.icon} strokeWidth={0.7} className={`pointer-events-none absolute end-3 top-3 h-28 w-28 opacity-[0.16] ${style.line}`} />
-              <span className={`relative grid h-14 w-14 place-items-center rounded-2xl bg-surface-default text-brand-800 shadow-[0_10px_24px_-14px_rgba(36,64,74,0.6)] ring-1 ${style.ring}`}>
-                <CareAreaIcon name={area.icon} size={26} strokeWidth={1.6} />
-              </span>
-              <p className="relative mt-4 text-[1.125rem] font-semibold leading-snug text-brand-900">{area.title}</p>
-              <p className="relative mt-0.5 text-[0.8125rem] font-medium text-ink-500">{system.title}</p>
-            </div>
-            <ul className="divide-y divide-border-subtle px-6">
-              {area.facets.map((facet) => (
-                <li key={facet} className="flex items-center gap-3 py-3 text-[0.9375rem] font-medium text-brand-900">
-                  <span className={`grid h-6 w-6 flex-none place-items-center rounded-full ${style.well}`}>
-                    <Check size={13} strokeWidth={2.4} className="text-brand-700" />
-                  </span>
-                  {facet}
-                </li>
-              ))}
-            </ul>
+            <FocusMap bare anchor={area.title} areas={area.facets} icon={area.icon} system={area.system} />
             {area.consultants.length > 0 ? (
-              <div className="mt-1 flex items-center gap-3 border-t border-border-subtle bg-surface-pearl px-6 py-4">
+              <div className="flex items-center gap-3 border-t border-border-subtle bg-surface-pearl px-6 py-4">
                 <span className="flex -space-x-2 rtl:space-x-reverse">
                   {area.consultants.slice(0, 4).map((profile) => (
                     <span key={profile.slug} className={`grid h-9 w-9 place-items-center rounded-full text-[0.75rem] font-semibold tracking-[0.03em] text-brand-800 ring-2 ring-surface-pearl ${style.well}`}>
@@ -179,7 +167,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
             {scope.map((section, index) => (
               <article key={section.title} className="flex flex-col rounded-[18px] border border-border-card bg-surface-default p-6 shadow-[0_1px_2px_rgba(36,64,74,0.04)] sm:p-7">
                 <div className="flex items-center gap-3.5">
-                  <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-full text-[0.8125rem] font-semibold tabular-nums text-brand-800 ring-1 ${style.well} ${style.ring}`}>
+                  <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand-700 text-[0.8125rem] font-semibold tabular-nums text-white shadow-[0_10px_20px_-12px_rgba(31,107,115,0.9)]">
                     {scope.length === 1 ? <CareAreaIcon name={area.icon} size={18} strokeWidth={1.8} /> : String(index + 1).padStart(2, "0")}
                   </span>
                   <h3 className="text-[1.125rem] font-semibold leading-snug text-brand-900 [text-wrap:balance]">{section.title}</h3>
