@@ -282,6 +282,8 @@ class SecureJourneyCorrectionsTest {
         assertThat(owner(doneWork)).isEqualTo("coordinator-subject");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_role='COORDINATOR' AND visibility_scope='INTERNAL' AND status IN ('OPEN','IN_PROGRESS') AND (owner_subject IS NULL OR owner_subject<>'replacement-coordinator')",Long.class,created.caseId())).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_notifications WHERE recipient_subject='replacement-coordinator' AND event_type='CASE_OWNERSHIP_TRANSFERRED'",Long.class)).isEqualTo(1);
+        // Claim and transfer can share a clock tick; pin that case so the history order never depends on row ids.
+        jdbc.update("UPDATE case_assignments SET assigned_at=(SELECT max(assigned_at) FROM case_assignments WHERE case_id=?) WHERE case_id=? AND assignee_role='COORDINATOR'",created.caseId(),created.caseId());
         var history=journey.assignmentHistory(created.caseId());
         assertThat(history.getFirst().role()).isEqualTo("COORDINATOR");assertThat(history.getFirst().assigneeName()).isEqualTo("Replacement Coordinator");assertThat(history.getFirst().status()).isEqualTo("ACTIVE");
         assertThat(history.getFirst().assignedByKind()).isEqualTo("PERSON");assertThat(history.getFirst().assignedByName()).isEqualTo("Team Lead");assertThat(history.getFirst().reason()).isEqualTo("Leave coverage");
