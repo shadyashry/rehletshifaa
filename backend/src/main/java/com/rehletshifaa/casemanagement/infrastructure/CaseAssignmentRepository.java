@@ -13,6 +13,15 @@ import java.util.UUID;
 public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment, UUID> {
     long countByAssigneeSubjectAndStatusIn(String assigneeSubject, java.util.Collection<String> statuses);
 
+    interface CaseAssignee { UUID getCaseId(); String getSubject(); }
+
+    /** Active coordinators of the given cases, newest assignment first (the first row per case is its coordinator). */
+    @Query("""
+            select a.caseId as caseId, a.assigneeSubject as subject from CaseAssignment a
+            where a.caseId in :caseIds and a.assigneeRole = 'COORDINATOR' and a.status = 'ACTIVE'
+            order by a.assignedAt desc""")
+    java.util.List<CaseAssignee> findActiveCoordinators(@Param("caseIds") java.util.Collection<UUID> caseIds);
+
     /** Cases a consultant holds in an assignment status, excluding cases that are no longer live. */
     @Query("""
             select count(distinct a.caseId) from CaseAssignment a join MedicalCase c on c.id = a.caseId

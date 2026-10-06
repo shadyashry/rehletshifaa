@@ -13,6 +13,45 @@ import java.util.UUID;
 public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
     boolean existsByCaseIdAndBlockingTrueAndStatusIn(UUID caseId, java.util.Collection<String> statuses);
 
+    /** Open blocking work of one visibility scope (who has the ball). */
+    boolean existsByCaseIdAndBlockingTrueAndVisibilityScopeAndStatusIn(UUID caseId, String visibilityScope,
+                                                                      java.util.Collection<String> statuses);
+
+    /** Open blocking work of one visibility scope owned by a role. */
+    boolean existsByCaseIdAndBlockingTrueAndVisibilityScopeAndOwnerRoleAndStatusIn(UUID caseId, String visibilityScope, String ownerRole,
+                                                                                  java.util.Collection<String> statuses);
+
+    boolean existsByCaseIdAndVisibilityScopeAndOwnerRoleAndStatusIn(UUID caseId, String visibilityScope, String ownerRole,
+                                                                    java.util.Collection<String> statuses);
+
+    /** The newest open internal work item of a type on the case (pass {@code Limit.of(1)}). */
+    @Query("""
+            select t.id from CaseTask t
+            where t.caseId = :caseId and t.taskType = :type and t.visibilityScope = 'INTERNAL' and t.status in ('OPEN', 'IN_PROGRESS')
+            order by t.createdAt desc""")
+    java.util.List<UUID> findOpenInternalOfType(@Param("caseId") UUID caseId, @Param("type") String type,
+                                                org.springframework.data.domain.Limit limit);
+
+    /** One row of a staff member's work queue: the task with the case facts needed to act on it. */
+    interface OpenWorkRow {
+        UUID getId(); UUID getCaseId(); String getTaskType(); String getTitle(); String getDescription(); String getPriority();
+        String getStatus(); Boolean getBlocking(); Instant getDueAt(); Instant getCreatedAt(); Long getVersion();
+        String getCaseNumber(); com.rehletshifaa.casemanagement.domain.CaseStatus getCaseStatus(); String getWaitingOn();
+        String getCareCategory(); String getPatientName();
+    }
+
+    /** Open work owned by the subject: most urgent first, then soonest due (undated last), then oldest. */
+    @Query("""
+            select t.id as id, t.caseId as caseId, t.taskType as taskType, t.title as title, t.description as description,
+                t.priority as priority, t.status as status, t.blocking as blocking, t.dueAt as dueAt, t.createdAt as createdAt,
+                t.version as version, c.caseNumber as caseNumber, c.status as caseStatus, c.waitingOn as waitingOn,
+                c.careCategory as careCategory, trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as patientName
+            from CaseTask t join MedicalCase c on c.id = t.caseId left join PatientProfile p on p.id = c.patientId
+            where t.ownerSubject = :owner and t.status in ('OPEN', 'IN_PROGRESS')
+            order by case t.priority when 'URGENT' then 0 when 'HIGH' then 1 when 'NORMAL' then 2 else 3 end,
+                t.dueAt nulls last, t.createdAt""")
+    java.util.List<OpenWorkRow> findOpenWorkOf(@Param("owner") String owner);
+
     /** The signed-in patient owns this patient action of their own (unmerged) case. */
     @Query("""
             select count(t) > 0 from CaseTask t join MedicalCase c on c.id = t.caseId join PatientProfile p on p.id = c.patientId

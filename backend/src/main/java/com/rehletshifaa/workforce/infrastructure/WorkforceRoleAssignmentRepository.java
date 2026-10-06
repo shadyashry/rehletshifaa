@@ -16,6 +16,10 @@ public interface WorkforceRoleAssignmentRepository extends BaseRepository<Workfo
 
     boolean existsBySubjectAndRoleKeyAndSource(String subject, String roleKey, String source);
 
+    /** The alphabetically first role key among the subject's ACTIVE assignments (any effective date), or null. */
+    @Query("select min(a.roleKey) from WorkforceRoleAssignment a where a.subject = :subject and a.status = 'ACTIVE'")
+    String findLowestActiveRoleKey(@Param("subject") String subject);
+
     /** Effective assignments of the given subjects at {@code at}, ordered by subject then role. */
     @Query("select a from WorkforceRoleAssignment a where a.subject in :subjects and " + EFFECTIVE_AT + " order by a.subject, a.roleKey")
     List<WorkforceRoleAssignment> findEffective(@Param("subjects") Collection<String> subjects, @Param("at") Instant at);

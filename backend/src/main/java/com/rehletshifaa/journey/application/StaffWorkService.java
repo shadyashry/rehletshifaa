@@ -1,29 +1,27 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
 import com.rehletshifaa.casemanagement.domain.CaseTask;
 import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
+import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
 import com.rehletshifaa.journey.api.WorkDtos.*;
 import com.rehletshifaa.journey.infrastructure.StaffNotificationRepository;
 import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
+import com.rehletshifaa.workforce.infrastructure.WorkforcePersonRepository;
+import com.rehletshifaa.workforce.infrastructure.WorkforceRoleAssignmentRepository;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -42,13 +40,17 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  * </ul>
  *
  * <p>Every write here is idempotent by key, so a replayed domain event cannot produce a duplicate work
- * item, a duplicate notification or a duplicate email.
+ * item, a duplicate notification or a duplicate email. The staff member's own queue and inbox are read by
+ * {@link StaffWorkQueryService}.
  */
 @Service
 public class StaffWorkService {
     private final StaffNotificationRepository notifications;
     private final CaseTaskRepository tasks;
     private final MedicalCaseRepository cases;
+    private final WorkforcePersonRepository people;
+    private final WorkforceRoleAssignmentRepository roleAssignments;
+    private final PractitionerProfileRepository practitioners;
     private final NotificationOutbox notificationOutbox;
     private final AuditTrail auditTrail;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StaffWorkService.class);
@@ -56,17 +58,19 @@ public class StaffWorkService {
     /** Responsibility values a case can carry; kept in sync with the database check constraint. */
     private static final Set<String> WAITING = Set.of("STAFF", "PATIENT", "CONSULTANT", "HOSPITAL", "TRAVEL_TEAM", "PAYMENT", "EXTERNAL", "NONE");
 
-    private final JdbcClient jdbc;
-    private final Authority authority;
     private final IntakeLifecycleService intake;
     private final CryptoService crypto;
     private final Clock clock;
     private final String teamMailbox;
 
-    public StaffWorkService(JdbcClient jdbc, Authority authority, IntakeLifecycleService intake, CryptoService crypto,
-                            Clock clock, @Value("${app.mail.coordinator}") String teamMailbox, AuditTrail auditTrail, NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseTaskRepository tasks, StaffNotificationRepository notifications) { this.notifications = notifications; this.tasks = tasks; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
-        this.jdbc = jdbc; this.authority = authority; this.intake = intake; this.crypto = crypto;
-        this.clock = clock; this.teamMailbox = teamMailbox;
+    public StaffWorkService(IntakeLifecycleService intake, CryptoService crypto, Clock clock,
+                            @Value("${app.mail.coordinator}") String teamMailbox, AuditTrail auditTrail,
+                            NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseTaskRepository tasks,
+                            StaffNotificationRepository notifications, WorkforcePersonRepository people,
+                            WorkforceRoleAssignmentRepository roleAssignments, PractitionerProfileRepository practitioners) {
+        this.notifications = notifications; this.tasks = tasks; this.cases = cases; this.notificationOutbox = notificationOutbox;
+        this.auditTrail = auditTrail; this.people = people; this.roleAssignments = roleAssignments; this.practitioners = practitioners;
+        this.intake = intake; this.crypto = crypto; this.clock = clock; this.teamMailbox = teamMailbox;
     }
 
     // ---------------- work items ----------------
@@ -81,8 +85,7 @@ public class StaffWorkService {
     @Transactional
     public UUID openWorkItem(NewWorkItem item) {
         Instant now = clock.instant();
-        UUID existing = jdbc.sql("SELECT id FROM case_tasks WHERE case_id=? AND task_type=? AND visibility_scope='INTERNAL' AND status IN ('OPEN','IN_PROGRESS') ORDER BY created_at DESC LIMIT 1")
-                .params(item.caseId(), item.type()).query(UUID.class).optional().orElse(null);
+        UUID existing = tasks.findOpenInternalOfType(item.caseId(), item.type(), Limit.of(1)).stream().findFirst().orElse(null);
         if (existing != null) {
             // Keep the owner accurate when work comes back to a different (or newly resolved) coordinator.
             if (item.ownerSubject() != null)
@@ -130,33 +133,6 @@ public class StaffWorkService {
         if (fresh && item.email()) emailStaff(item.ownerSubject(), item.ownerRole(), item.caseId(), item.title(), key, now);
     }
 
-    /** Work assigned to me right now, newest priority first, with the context needed to act. */
-    @Transactional(readOnly = true)
-    public List<WorkItemView> myWork() {
-        var actor = authority.authorize(Permission.TASK_WORK);
-        return jdbc.sql("SELECT t.id,t.case_id,t.task_type,t.title,t.description,t.priority,t.status,t.blocking,t.due_at,t.created_at,t.version,"
-                        + "c.case_number,c.status case_status,c.waiting_on,c.care_category," + com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL + " patient_name,"
-                        + "(SELECT count(*) FROM medical_documents d WHERE d.case_id=c.id AND d.status<>'REJECTED') document_count,"
-                        + "(SELECT a.assignee_subject FROM case_assignments a WHERE a.case_id=c.id AND a.assignee_role='COORDINATOR' AND a.status='ACTIVE' ORDER BY a.assigned_at DESC LIMIT 1) coordinator_subject "
-                        + "FROM case_tasks t JOIN medical_cases c ON c.id=t.case_id LEFT JOIN patient_profiles p ON p.id=c.patient_id "
-                        + "WHERE t.owner_subject=? AND t.status IN ('OPEN','IN_PROGRESS') "
-                        + "ORDER BY CASE t.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END,t.due_at NULLS LAST,t.created_at")
-                .param(actor.subject()).query(this::mapWork).list();
-    }
-
-    private WorkItemView mapWork(ResultSet rs, int n) throws SQLException {
-        Instant due = rs.getObject("due_at", java.time.OffsetDateTime.class) == null ? null
-                : rs.getObject("due_at", java.time.OffsetDateTime.class).toInstant();
-        Instant created = rs.getObject("created_at", java.time.OffsetDateTime.class).toInstant();
-        return new WorkItemView(rs.getObject("id", UUID.class), rs.getObject("case_id", UUID.class),
-                rs.getString("case_number"), rs.getString("patient_name"), rs.getString("case_status"),
-                rs.getString("waiting_on"), rs.getString("care_category"), staffDisplayName(rs.getString("coordinator_subject")), rs.getLong("document_count"),
-                rs.getString("task_type"), decrypt(rs.getString("title")),
-                decrypt(rs.getString("description")), rs.getString("priority"), rs.getString("status"),
-                rs.getBoolean("blocking"), due, due != null && due.isBefore(clock.instant()), created,
-                rs.getLong("version"));
-    }
-
     // ---------------- staff notification centre ----------------
 
     /**
@@ -172,18 +148,6 @@ public class StaffWorkService {
             emailStaff(recipientSubject, null, caseId, title, idempotencyKey, now);
     }
 
-    @Transactional(readOnly = true)
-    public NotificationFeed myNotifications() {
-        var actor = com.rehletshifaa.authority.application.Principal.current();
-        List<NotificationView> items = jdbc.sql("SELECT n.id,n.case_id,n.task_id,n.event_type,n.title,n.context,n.created_at,n.read_at,c.case_number "
-                        + "FROM staff_notifications n LEFT JOIN medical_cases c ON c.id=n.case_id WHERE n.recipient_subject=? "
-                        + "ORDER BY n.created_at DESC LIMIT 30")
-                .param(actor.subject()).query(this::mapNotification).list();
-        Integer unread = jdbc.sql("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND read_at IS NULL")
-                .param(actor.subject()).query(Integer.class).single();
-        return new NotificationFeed(unread == null ? 0 : unread, items);
-    }
-
     /** Marking a notification read is purely an inbox action — the related work item stays open. */
     @Transactional
     public int markRead(UUID id) {
@@ -194,17 +158,7 @@ public class StaffWorkService {
         } else {
             notifications.markAllRead(actor.subject(), micros(now));
         }
-        Integer unread = jdbc.sql("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND read_at IS NULL")
-                .param(actor.subject()).query(Integer.class).single();
-        return unread == null ? 0 : unread;
-    }
-
-    private NotificationView mapNotification(ResultSet rs, int n) throws SQLException {
-        return new NotificationView(rs.getObject("id", UUID.class), rs.getObject("case_id", UUID.class),
-                rs.getString("case_number"), rs.getObject("task_id", UUID.class), rs.getString("event_type"),
-                decrypt(rs.getString("title")), decrypt(rs.getString("context")),
-                rs.getObject("created_at", java.time.OffsetDateTime.class).toInstant(),
-                rs.getObject("read_at") != null);
+        return (int) notifications.countByRecipientSubjectAndReadAtIsNull(actor.subject());
     }
 
     private boolean insertNotification(String recipient, UUID caseId, UUID taskId, String eventType,
@@ -231,8 +185,7 @@ public class StaffWorkService {
             log.warn("No work email on file for {} {}; in-app notification only", recipient.role(), subject);
             return;
         }
-        String caseNumber = caseId == null ? null : jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?")
-                .param(caseId).query(String.class).optional().orElse(null);
+        String caseNumber = caseId == null ? null : cases.findCaseNumber(caseId).orElse(null);
         String template = "DOCTOR".equals(recipient.role()) ? "consultant-work-assigned"
                 : coordinator ? "coordinator-work-assigned" : "staff-work-assigned";
         notificationOutbox.enqueueOnce("STAFF_WORK", "EMAIL", address, template, intake.encryptedJson("{\"title\":\"" + json(title) + "\",\"case\":\"" + json(caseNumber) + "\",\"role\":\"" + json(recipient.role()) + "\"}"), "work-email:" + key, now);
@@ -246,12 +199,12 @@ public class StaffWorkService {
      */
     private Recipient resolveRecipient(String subject, String roleHint) {
         boolean doctor = "DOCTOR".equals(roleHint);
-        Recipient staff = doctor ? null : jdbc.sql("SELECT p.email_encrypted,(SELECT MIN(a.role_key) FROM workforce_role_assignments a "
-                        + "WHERE a.subject=p.subject AND a.status='ACTIVE') role_key FROM workforce_people p WHERE p.subject=?").param(subject)
-                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")), rs.getString("role_key"))).optional().orElse(null);
+        Recipient staff = doctor ? null : people.findById(subject)
+                .map(p -> new Recipient(decryptNullable(p.getEmailEncrypted()), roleAssignments.findLowestActiveRoleKey(subject)))
+                .orElse(null);
         if (staff != null) return staff;
-        Recipient practitioner = jdbc.sql("SELECT email_encrypted FROM practitioner_profiles WHERE external_subject=?").param(subject)
-                .query((rs, n) -> new Recipient(decryptNullable(rs.getString("email_encrypted")), "DOCTOR")).optional().orElse(null);
+        Recipient practitioner = practitioners.findByExternalSubject(subject)
+                .map(p -> new Recipient(decryptNullable(p.getEmailEncrypted()), "DOCTOR")).orElse(null);
         if (practitioner != null) return practitioner;
         return new Recipient(null, roleHint);
     }
@@ -288,18 +241,18 @@ public class StaffWorkService {
     @Transactional
     public String reconcileWaitingOn(UUID caseId, String fallback, String reason, boolean patientOwed) {
         String resolved = resolveWaitingOn(caseId, fallback, patientOwed);
-        String current = jdbc.sql("SELECT waiting_on FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
+        String current = cases.findWaitingOn(caseId).orElse(null);
         if (resolved.equals(current)) return resolved;
         setWaitingOn(caseId, resolved, reason != null ? reason : defaultReason(resolved));
         return resolved;
     }
 
     private String resolveWaitingOn(UUID caseId, String fallback, boolean patientOwed) {
-        if (blockingWork(caseId, "visibility_scope='PATIENT_ACTION'")) return "PATIENT";
+        if (tasks.existsByCaseIdAndBlockingTrueAndVisibilityScopeAndStatusIn(caseId, "PATIENT_ACTION", OPEN)) return "PATIENT";
         if (patientOwed) return "PATIENT";
-        if (blockingWork(caseId, "visibility_scope='INTERNAL' AND owner_role='DOCTOR'")) return "CONSULTANT";
+        if (tasks.existsByCaseIdAndBlockingTrueAndVisibilityScopeAndOwnerRoleAndStatusIn(caseId, "INTERNAL", "DOCTOR", OPEN)) return "CONSULTANT";
         if (STAGE_DECIDES.contains(fallback)) return fallback;
-        if (blockingWork(caseId, "visibility_scope='INTERNAL'")) return "STAFF";
+        if (tasks.existsByCaseIdAndBlockingTrueAndVisibilityScopeAndStatusIn(caseId, "INTERNAL", OPEN)) return "STAFF";
         return WAITING.contains(fallback) ? fallback : "STAFF";
     }
 
@@ -322,15 +275,7 @@ public class StaffWorkService {
     /** True when an open internal work item is owned by the given staff role on this case. */
     @Transactional(readOnly = true)
     public boolean hasOpenWork(UUID caseId, String ownerRole) {
-        Integer open = jdbc.sql("SELECT count(*) FROM case_tasks WHERE case_id=? AND visibility_scope='INTERNAL' AND owner_role=? AND status IN ('OPEN','IN_PROGRESS')")
-                .params(caseId, ownerRole).query(Integer.class).single();
-        return open != null && open > 0;
-    }
-
-    private boolean blockingWork(UUID caseId, String predicate) {
-        Integer open = jdbc.sql("SELECT count(*) FROM case_tasks WHERE case_id=? AND blocking=TRUE AND status IN ('OPEN','IN_PROGRESS') AND " + predicate)
-                .param(caseId).query(Integer.class).single();
-        return open != null && open > 0;
+        return tasks.existsByCaseIdAndVisibilityScopeAndOwnerRoleAndStatusIn(caseId, "INTERNAL", ownerRole, OPEN);
     }
 
     private static String defaultReason(String actor) {
@@ -354,13 +299,6 @@ public class StaffWorkService {
     }
 
     // ---------------- helpers ----------------
-
-    /** Coordinator names come from the staff directory; a subject is never handed to the interface. */
-    private String staffDisplayName(String subject) {
-        if (subject == null || subject.isBlank()) return null;
-        return jdbc.sql("SELECT display_name_encrypted FROM workforce_people WHERE subject=?").param(subject)
-                .query(String.class).optional().map(crypto::decrypt).orElse(null);
-    }
 
     private String encrypt(String value) { return "enc:" + crypto.encrypt(value); }
     private String encryptNullable(String value) { return value == null || value.isBlank() ? null : "enc:" + crypto.encrypt(value.trim()); }

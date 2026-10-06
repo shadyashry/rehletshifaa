@@ -15,6 +15,9 @@ public interface PractitionerProfileRepository extends BaseRepository<Practition
 
     boolean existsByExternalSubject(String externalSubject);
 
+    /** {@code external_subject} is unique. */
+    java.util.Optional<PractitionerProfile> findByExternalSubject(String externalSubject);
+
     List<PractitionerProfile> findByExternalSubjectAndPractitionerType(String externalSubject, String practitionerType);
 
     List<PractitionerProfile> findByPractitionerTypeOrderByDisplayName(String practitionerType);

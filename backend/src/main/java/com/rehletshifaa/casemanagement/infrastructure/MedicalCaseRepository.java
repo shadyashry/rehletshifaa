@@ -23,6 +23,13 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     /** Row lock for the DRAFT→RECEIVED submission: a concurrent submit waits, then sees RECEIVED and is rejected. */
     default Optional<MedicalCase> findForSubmission(UUID id) { return lockById(id); }
 
+    @Query("select c.caseNumber from MedicalCase c where c.id = :id")
+    Optional<String> findCaseNumber(@Param("id") UUID id);
+
+    /** Who the case currently waits on, as stored (not through a possibly stale managed instance). */
+    @Query("select c.waitingOn from MedicalCase c where c.id = :id")
+    Optional<String> findWaitingOn(@Param("id") UUID id);
+
     /** A status transition guarded by the status the caller saw. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update MedicalCase c set c.status = :to, c.updatedAt = :now, c.version = c.version + 1 where c.id = :id and c.status = :from")

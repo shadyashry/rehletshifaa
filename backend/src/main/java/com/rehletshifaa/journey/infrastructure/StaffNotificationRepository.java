@@ -10,6 +10,21 @@ import java.time.Instant;
 import java.util.UUID;
 
 public interface StaffNotificationRepository extends BaseRepository<StaffNotification, UUID> {
+    long countByRecipientSubjectAndReadAtIsNull(String recipientSubject);
+
+    interface FeedRow {
+        UUID getId(); UUID getCaseId(); String getCaseNumber(); UUID getTaskId(); String getEventType(); String getTitle();
+        String getContext(); Instant getCreatedAt(); Instant getReadAt();
+    }
+
+    /** The recipient's notifications, newest first, with the case number when there is a case. */
+    @Query("""
+            select n.id as id, n.caseId as caseId, c.caseNumber as caseNumber, n.taskId as taskId, n.eventType as eventType,
+                n.title as title, n.context as context, n.createdAt as createdAt, n.readAt as readAt
+            from StaffNotification n left join MedicalCase c on c.id = n.caseId
+            where n.recipientSubject = :recipient order by n.createdAt desc""")
+    java.util.List<FeedRow> findFeed(@Param("recipient") String recipient, org.springframework.data.domain.Limit limit);
+
     /** Creates the notification unless one with the key exists. @return 1 when created */
     @Modifying(flushAutomatically = true)
     @Query("""

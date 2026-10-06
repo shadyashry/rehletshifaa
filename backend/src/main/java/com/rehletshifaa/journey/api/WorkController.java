@@ -1,5 +1,6 @@
 package com.rehletshifaa.journey.api;
 
+import com.rehletshifaa.journey.application.StaffWorkQueryService;
 import com.rehletshifaa.journey.application.StaffWorkService;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,15 +19,16 @@ import static com.rehletshifaa.journey.api.WorkDtos.*;
 @RequestMapping("/api/v1")
 public class WorkController {
     private final StaffWorkService work;
+    private final StaffWorkQueryService queries;
 
-    public WorkController(StaffWorkService work) { this.work = work; }
+    public WorkController(StaffWorkService work, StaffWorkQueryService queries) { this.work = work; this.queries = queries; }
 
     /** My Work: every open action assigned to me, across all my cases. */
     @GetMapping("/work/mine")
-    public List<WorkItemView> myWork() { return work.myWork(); }
+    public List<WorkItemView> myWork() { return queries.myWork(); }
 
     @GetMapping("/notifications")
-    public NotificationFeed notifications() { return work.myNotifications(); }
+    public NotificationFeed notifications() { return queries.myNotifications(); }
 
     /** Marks one notification (or all of them) read. This never completes the related work item. */
     @PostMapping("/notifications/read")

@@ -227,7 +227,6 @@ class ArchitectureRulesTest {
             "com.rehletshifaa.journey.application.PatientActivationService",
             "com.rehletshifaa.journey.application.PaymentService",
             "com.rehletshifaa.journey.application.PublicCaseAccessService",
-            "com.rehletshifaa.journey.application.StaffWorkService",
             "com.rehletshifaa.shared.config.LocalDemoDataSeeder"); // @Profile("local") only
 
     /**

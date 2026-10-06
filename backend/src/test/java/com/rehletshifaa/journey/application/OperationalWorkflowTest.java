@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional
 class OperationalWorkflowTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
-    @Autowired PatientActionService patientActions; @Autowired StaffWorkService work;
+    @Autowired PatientActionService patientActions; @Autowired StaffWorkService work; @Autowired StaffWorkQueryService queries;
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
@@ -242,12 +242,35 @@ class OperationalWorkflowTest {
         em.flush();
 
         authenticate("coordinator-subject", Role.COORDINATOR);
-        List<WorkItemView> mine = work.myWork();
+        List<WorkItemView> mine = queries.myWork();
         assertThat(mine).extracting(WorkItemView::title).contains("Review patient information").doesNotContain("Not mine");
         WorkItemView item = mine.stream().filter(w -> "REVIEW".equals(w.type())).findFirst().orElseThrow();
         assertThat(item.caseNumber()).isNotBlank();
         assertThat(item.patientName()).isEqualTo("Workflow Patient");
         assertThat(item.priority()).isEqualTo("NORMAL"); // routine work is never "high" merely for being new
+    }
+
+    @Test void myWorkOrdersByUrgencyThenDueDateAcrossCasesAndNamesEachCasesCoordinator() throws Exception {
+        seedCoordinatorProfile();
+        UUID first = ownedCase();
+        UUID second = ownedCase("+254700000041", "second@local.test");
+        Instant now = Instant.now();
+        work.openWorkItem(new NewWorkItem(first, "UNDATED", "Undated", null, "coordinator-subject",
+                "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "order-1:" + first, false));
+        work.openWorkItem(new NewWorkItem(second, "LATER", "Due later", null, "coordinator-subject",
+                "COORDINATOR", false, now.plusSeconds(3 * 86400), "SYSTEM", "WORK_ASSIGNED", "order-2:" + second, false));
+        work.openWorkItem(new NewWorkItem(first, "BLOCKING", "Blocking", null, "coordinator-subject",
+                "COORDINATOR", true, null, "SYSTEM", "WORK_ASSIGNED", "order-3:" + first, false));
+        em.flush();
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        List<WorkItemView> mine = queries.myWork().stream().filter(w -> Set.of("UNDATED", "LATER", "BLOCKING").contains(w.type())).toList();
+        // HIGH before NORMAL; among NORMAL the dated item first, the undated one last.
+        assertThat(mine).extracting(WorkItemView::type).containsExactly("BLOCKING", "LATER", "UNDATED");
+        assertThat(mine).extracting(WorkItemView::caseId).containsExactly(first, second, first);
+        assertThat(mine).extracting(WorkItemView::coordinatorName).containsOnly("Coordinator One");
+        assertThat(mine).extracting(WorkItemView::documentCount).containsOnly(0L);
+        assertThat(mine.get(1).caseNumber()).isNotEqualTo(mine.get(0).caseNumber());
     }
 
     @Test void assignedWorkNotifiesTheOwnerAndReadingItDoesNotCompleteTheWork() throws Exception {
@@ -256,7 +279,7 @@ class OperationalWorkflowTest {
                 "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, true));
         em.flush();
         authenticate("coordinator-subject", Role.COORDINATOR);
-        NotificationFeed feed = work.myNotifications();
+        NotificationFeed feed = queries.myNotifications();
         assertThat(feed.unread()).isEqualTo(1);
         assertThat(feed.items()).singleElement().satisfies(n -> {
             assertThat(n.title()).isEqualTo("Review patient information");
@@ -264,8 +287,8 @@ class OperationalWorkflowTest {
         });
         assertThat(work.markRead(feed.items().get(0).id())).isZero();
         // Reading is an inbox action only: the work item is untouched.
-        assertThat(work.myWork()).extracting(WorkItemView::title).contains("Review patient information");
-        assertThat(work.myNotifications().items().get(0).read()).isTrue();
+        assertThat(queries.myWork()).extracting(WorkItemView::title).contains("Review patient information");
+        assertThat(queries.myNotifications().items().get(0).read()).isTrue();
     }
 
     @Test void aRepeatedTriggerDoesNotDuplicateWorkOrNotifications() throws Exception {
@@ -293,8 +316,8 @@ class OperationalWorkflowTest {
                 "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "work-1:" + caseId, false));
         em.flush();
         authenticate("other-coordinator", Role.COORDINATOR);
-        assertThat(work.myNotifications().items()).isEmpty();
-        assertThat(work.myWork()).isEmpty();
+        assertThat(queries.myNotifications().items()).isEmpty();
+        assertThat(queries.myWork()).isEmpty();
     }
 
 
@@ -384,7 +407,7 @@ class OperationalWorkflowTest {
         assignConsultant(caseId);
         authenticate("doctor-subject", Role.CONSULTANT);
         assertThat(journey.assignedCases(com.rehletshifaa.authority.domain.Role.CONSULTANT)).extracting(CaseView::id).doesNotContain(caseId);
-        assertThat(work.myWork()).extracting(WorkItemView::type).contains("CONSULTANT_ASSIGNMENT");
+        assertThat(queries.myWork()).extracting(WorkItemView::type).contains("CONSULTANT_ASSIGNMENT");
     }
 
     @Test void anotherConsultantCannotAcceptSomebodyElsesAssignment() throws Exception {
@@ -429,7 +452,7 @@ class OperationalWorkflowTest {
         UUID caseId = readyForConsultant();
         assignConsultant(caseId); em.flush();
         authenticate("doctor-subject", Role.CONSULTANT);
-        var assignment = work.myWork().stream().filter(w -> "CONSULTANT_ASSIGNMENT".equals(w.type())).findFirst().orElseThrow();
+        var assignment = queries.myWork().stream().filter(w -> "CONSULTANT_ASSIGNMENT".equals(w.type())).findFirst().orElseThrow();
         assertThat(assignment.caseNumber()).isNotBlank();
         assertThat(assignment.patientName()).isEqualTo("Consultant Patient");
         assertThat(assignment.careCategory()).isEqualTo("cardiology");
@@ -446,11 +469,11 @@ class OperationalWorkflowTest {
         assignConsultant(caseId); em.flush();
         authenticate("doctor-subject", Role.CONSULTANT);
 
-        assertThat(work.myNotifications().unread()).isEqualTo(1);
-        work.myNotifications(); work.myNotifications(); // polling must not mutate state
+        assertThat(queries.myNotifications().unread()).isEqualTo(1);
+        queries.myNotifications(); queries.myNotifications(); // polling must not mutate state
         em.flush();
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND read_at IS NULL", "doctor-subject")).isEqualTo(1);
-        assertThat(work.myNotifications().unread()).isEqualTo(1);
+        assertThat(queries.myNotifications().unread()).isEqualTo(1);
     }
 
     @Test void acknowledgingOneNotificationMarksOnlyThatOne() throws Exception {
@@ -460,12 +483,12 @@ class OperationalWorkflowTest {
         assignConsultant(second); em.flush();
 
         authenticate("doctor-subject", Role.CONSULTANT);
-        var feed = work.myNotifications();
+        var feed = queries.myNotifications();
         assertThat(feed.unread()).isEqualTo(2);
         assertThat(work.markRead(feed.items().get(0).id())).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND read_at IS NULL", "doctor-subject")).isEqualTo(1);
         // Reading a notification never completes the work it refers to.
-        assertThat(work.myWork()).extracting(WorkItemView::type).contains("CONSULTANT_ASSIGNMENT");
+        assertThat(queries.myWork()).extracting(WorkItemView::type).contains("CONSULTANT_ASSIGNMENT");
     }
 
     @Test void aRepeatedAssignmentEventDoesNotDuplicateTheNotification() throws Exception {

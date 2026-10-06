@@ -50,7 +50,7 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional
 class UatDefectCorrectionsTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
-    @Autowired ProposalAccessService proposalAccess; @Autowired StaffWorkService work; @Autowired CaseHandoffService handoff;
+    @Autowired ProposalAccessService proposalAccess; @Autowired StaffWorkService work; @Autowired StaffWorkQueryService queries; @Autowired CaseHandoffService handoff;
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
@@ -224,7 +224,7 @@ class UatDefectCorrectionsTest {
         journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "pod", "Clinical review")); em.flush();
         assertThat(jdbc.queryForObject("SELECT priority FROM case_tasks WHERE case_id=? AND task_type='CONSULTANT_ASSIGNMENT'", String.class, caseId)).isEqualTo("NORMAL");
         authenticate("doctor-subject", Role.CONSULTANT);
-        assertThat(work.myWork()).filteredOn(w -> w.caseId().equals(caseId)).extracting(w -> w.priority()).containsExactly("NORMAL");
+        assertThat(queries.myWork()).filteredOn(w -> w.caseId().equals(caseId)).extracting(w -> w.priority()).containsExactly("NORMAL");
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND priority IN ('HIGH','URGENT')", caseId)).isZero();
     }
 

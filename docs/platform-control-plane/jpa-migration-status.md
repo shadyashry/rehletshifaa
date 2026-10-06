@@ -270,6 +270,23 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   entities in `..domain..`; application services may not use the EntityManager/criteria/Hibernate API
   (technical-decisions §29, CL6 addendum). The allowlist is unchanged (17 classes).
 
+- 2026-10-07 — **`StaffWorkService` converted** (CL5 read slice 1; removed from `JDBC_NOT_YET_CONVERTED`, 17 → 16).
+  The staff member's own read models moved to a new `journey.application.StaffWorkQueryService` (`myWork`,
+  `myNotifications`; `WorkController` calls it — HTTP contract, authorization (`TASK_WORK` / signed-in subject),
+  ordering, the 30-item feed and the encrypted-text handling unchanged). My Work is assembled from at most four queries
+  whatever its length: `CaseTaskRepository.findOpenWorkOf` (task + case + patient display name, same `URGENT/HIGH/NORMAL`
+  → due date `nulls last` → created order), then batched `MedicalDocumentRepository.countByCaseExcluding` (non-rejected
+  documents per case), `CaseAssignmentRepository.findActiveCoordinators` (newest active coordinator per case) and
+  `WorkforcePersonRepository.findAllById` (coordinator names) — the per-row name lookup (N+1) is gone. `StaffWorkService`
+  keeps the commands and reads through repositories: `findOpenInternalOfType` (dedup), three derived `exists…` checks
+  (waiting-on precedence, `hasOpenWork`), `MedicalCaseRepository.findCaseNumber`/`findWaitingOn`,
+  `StaffNotificationRepository.findFeed`/`countByRecipientSubjectAndReadAtIsNull`,
+  `WorkforceRoleAssignmentRepository.findLowestActiveRoleKey` and `PractitionerProfileRepository.findByExternalSubject`
+  (work-email recipient). Ownership: case-table queries in `casemanagement`, document counts in `document`, names in
+  `workforce`, notifications in `journey`. New test `myWorkOrdersByUrgencyThenDueDateAcrossCasesAndNamesEachCasesCoordinator`.
+  Verification: full suite **584 tests, 0 failures** (2 skipped); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -282,9 +299,9 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 17 classes still read with `JdbcClient` — `JourneyService` (~85 statements), `PaymentService`,
-  `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`, `PatientAccountService`,
-  `StaffWorkService`, `CaseActionService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
+- **Reads:** 16 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService` converted) — `JourneyService`
+  (~85 statements), `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
+  `PatientAccountService`, `CaseActionService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
   `org.springframework.jdbc..`/`java.sql..` type (CL6), and no repository may declare a native query.
@@ -292,7 +309,9 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 ## Next slice
 
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
-remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). Start with
-`StaffWorkService` and `CaseActionService` (work queues), then `JourneyService` split by view. Each slice removes its
+remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` is
+done (2026-10-07); next `CaseActionService`, then `JourneyService` split by view, then the rest of the list, one service
+per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.
