@@ -78,16 +78,17 @@ public class PaymentService {
         if (policy == null || policy.coordinationEgp() == null || policy.coordinationEgp().signum() <= 0) return;
         record Fx(String currency, BigDecimal rate, LocalDate date, String source) {}
         Fx fx = jdbc.sql("SELECT currency,fx_rate,fx_rate_date,fx_source FROM proposal_versions WHERE id=?").param(versionId)
-                .query((rs, n) -> new Fx(rs.getString("currency"), rs.getBigDecimal("fx_rate"), rs.getObject("fx_rate_date", LocalDate.class), rs.getString("fx_source"))).optional().orElse(new Fx("EGP", BigDecimal.ONE, null, "BASE"));
+                .query((rs, n) -> new Fx(rs.getString("currency"), rs.getBigDecimal("fx_rate"), rs.getObject("fx_rate_date", LocalDate.class), rs.getString("fx_source"))).optional().orElseThrow(() -> new ApiException(409, "PROPOSAL_NOT_FOUND", "The acknowledged proposal version was not found"));
+        if (fx.currency() == null) throw new ApiException(409, "PROPOSAL_CURRENCY_MISSING", "The acknowledged proposal has no currency");
         // The deposit is quoted in the proposal's currency at the proposal's own snapshot rate. A released
         // foreign-currency proposal always carries one; the base currency is the only legitimate "rate 1".
-        if (fx.rate() == null && fx.currency() != null && !"EGP".equals(fx.currency()))
+        if (fx.rate() == null && !"EGP".equals(fx.currency()))
             throw new ApiException(409, "PROPOSAL_FX_SNAPSHOT_MISSING", "The accepted proposal has no exchange-rate snapshot");
         BigDecimal rate = fx.rate() == null ? BigDecimal.ONE : fx.rate();
         BigDecimal totalEgp = policy.coordinationEgp();
         BigDecimal totalDisplay = totalEgp.multiply(rate).setScale(2, RoundingMode.HALF_UP);
         UUID depositId = UUID.randomUUID(); java.time.Instant now = clock.instant();
-        deposits.saveAndFlush(new Deposit(depositId, caseId, versionId, new Deposit.Quote(fx.currency() == null ? "EGP" : fx.currency(), rate, fx.date(), fx.source(), totalEgp, totalDisplay), policy.id(), policy.version(), "SYSTEM", now));
+        deposits.saveAndFlush(new Deposit(depositId, caseId, versionId, new Deposit.Quote(fx.currency(), rate, fx.date(), fx.source(), totalEgp, totalDisplay), policy.id(), policy.version(), "SYSTEM", now));
         // Raising the deposit is not the end of the story: with an offline process a person has to arrange
         // it, so the case gains real staff work rather than sitting silently waiting for money to appear.
         events.publishEvent(new CaseEvents.DepositRequired(caseId));

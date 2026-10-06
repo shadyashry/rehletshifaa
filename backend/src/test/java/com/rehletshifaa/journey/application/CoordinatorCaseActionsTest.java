@@ -42,6 +42,8 @@ class CoordinatorCaseActionsTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired PatientActivationService activation; @Autowired PaymentService payment; @Autowired CaseActionService caseActions;
     @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff;
+    @Autowired PatientAccountService account; @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort;
+    @org.junit.jupiter.api.BeforeEach void resetIdentity() { ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).reset(); }
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
 
     /** Raw SQL behind JPA's back: flush pending entity changes first, then drop managed instances the SQL made stale. */
@@ -112,7 +114,7 @@ class CoordinatorCaseActionsTest {
     @Test void contactVerificationOutranksTheDepositAndClearsIntoStaffDepositWork() throws Exception {
         var ctx = acknowledged();
         // Activating with a corrected number voids that channel's possession proof: verification is pending again.
-        activation.activate(ctx.token, grant(ctx), request("+254700000099")); em.flush();
+        activation.activate(ctx.token, grant(ctx), request("+254700000099")); em.flush(); finishAccountSetup(ctx.caseId);
         authenticate("coordinator-subject", Role.COORDINATOR);
         CaseActionsView blocked = journey.workspace(ctx.caseId).actions();
         assertThat(blocked.waitingOn()).isEqualTo("PATIENT");
@@ -137,7 +139,7 @@ class CoordinatorCaseActionsTest {
 
     @Test void operationsAssignmentIsRefusedWhileTheDepositIsUnsettledEvenWhenCalledDirectly() throws Exception {
         var ctx = acknowledged();
-        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
         authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.workspace(ctx.caseId).actions().availableActions()).doesNotContain("ASSIGN_OPERATIONS");
         assertThatThrownBy(() -> journey.assign(ctx.caseId, new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", null, "Too early")))
@@ -147,7 +149,7 @@ class CoordinatorCaseActionsTest {
 
     @Test void aSettledDepositMakesTreatmentCoordinationTheCurrentActionAndOpensOperationsAssignment() throws Exception {
         var ctx = acknowledged();
-        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
         settleDeposit(ctx); em.flush();
         authenticate("coordinator-subject", Role.COORDINATOR);
         CaseActionsView a = journey.workspace(ctx.caseId).actions();
@@ -182,7 +184,7 @@ class CoordinatorCaseActionsTest {
         SecurityContextHolder.clearContext();
 
         // The patient finishes their profile: that was the last gate, so the case crosses now — once.
-        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
         assertThat(status(ctx.caseId)).isEqualTo("TRAVEL_COORDINATION");
         assertThat(count("SELECT count(*) FROM case_status_history WHERE case_id=? AND to_status='TRAVEL_COORDINATION'", ctx.caseId)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='TRAVEL'", ctx.caseId)).isEqualTo(1);
@@ -225,7 +227,7 @@ class CoordinatorCaseActionsTest {
                 .anySatisfy(b -> assertThat(b).contains("deposit"))
                 .anySatisfy(b -> assertThat(b).contains("profile activation"));
         assertThat(policy.mayEnter(ctx.caseId, "ACCEPTED", "TRAVEL_COORDINATION")).isFalse();
-        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
         assertThat(policy.entryBlockers(ctx.caseId, "TRAVEL_COORDINATION")).singleElement().asString().contains("deposit");
         settleDeposit(ctx); em.flush();
         assertThat(policy.entryBlockers(ctx.caseId, "TRAVEL_COORDINATION")).isEmpty();
@@ -238,7 +240,7 @@ class CoordinatorCaseActionsTest {
     @Test void aLaterContactVerificationCompletesTheGateAndRepeatedEventsAreSafe() throws Exception {
         var ctx = acknowledged();
         // A corrected number voids the channel's possession proof; the deposit settles meanwhile.
-        activation.activate(ctx.token, grant(ctx), request("+254700000099")); em.flush();
+        activation.activate(ctx.token, grant(ctx), request("+254700000099")); em.flush(); finishAccountSetup(ctx.caseId);
         settleDeposit(ctx); em.flush();
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
         assertThat(policy.entryBlockers(ctx.caseId, "TRAVEL_COORDINATION")).singleElement().asString().contains("contact channel verification");
@@ -288,7 +290,7 @@ class CoordinatorCaseActionsTest {
         assertThat(journey.workspace(ctx.caseId).caseSummary().status()).isEqualTo("ACCEPTED");
 
         SecurityContextHolder.clearContext();
-        activation.activate(onboardingTokenFor(ctx.caseId), grant(new Ctx(ctx.caseId, ctx.versionId, onboardingTokenFor(ctx.caseId), ctx.caseNumber)), request("+254700000020")); em.flush();
+        activation.activate(onboardingTokenFor(ctx.caseId), grant(new Ctx(ctx.caseId, ctx.versionId, onboardingTokenFor(ctx.caseId), ctx.caseNumber)), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
         authenticate("coordinator-subject", Role.COORDINATOR);
         assertThatThrownBy(() -> journey.resendOnboardingLink(ctx.caseId)).isInstanceOf(ApiException.class).hasMessageContaining("already activated");
         // And the proposal link cannot be resent either — the acknowledged version is no longer decidable.
@@ -405,6 +407,15 @@ class CoordinatorCaseActionsTest {
         String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id JOIN proposal_share_tokens st ON st.id=ch.share_token_id WHERE st.token_hash=? AND o.channel=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), channel));
         return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code");
     }
+    /** The current activation contract: the profile is complete, then the patient finishes identity-provider setup and signs in. */
+    private void finishAccountSetup(UUID caseId) {
+        String subject = jdbc.queryForObject("SELECT p.external_subject FROM patient_profiles p JOIN medical_cases c ON c.patient_id=p.id WHERE c.id=?", String.class, caseId);
+        ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).completeSetup(subject);
+        authenticate(subject, Role.PATIENT);
+        account.session(); em.flush();
+        SecurityContextHolder.clearContext();
+    }
+
     private void authenticate(String subject, Role... roles) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, roles); }
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }

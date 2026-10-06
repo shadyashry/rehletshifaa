@@ -1,10 +1,12 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.journey.api.JourneyDtos.*;
-import com.rehletshifaa.journey.api.WorkDtos.PatientActionView;
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.domain.Role;
+import com.rehletshifaa.journey.api.JourneyDtos.*;
+import com.rehletshifaa.journey.api.WorkDtos.PatientActionView;
 import com.rehletshifaa.shared.api.ApiException;
+
+import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -237,8 +239,8 @@ public class CaseActionService {
      * Operations is assigned to arrange travel and arrival. Before the proposal is released it may be
      * pulled in for the travel-package plan (gated by the proposal itself); after acceptance it is only
      * valid once the coordination deposit is settled — the case is then in TRAVEL_COORDINATION — and the
-     * patient has finished the profile steps only they can complete. Cases that predate the onboarding
-     * layer keep the deposit-only gate, exactly like {@link CustomerReadinessService#assertReadyForCommitment}.
+     * patient has finished the profile steps only they can complete. Every case needs current onboarding evidence;
+     * there is no deposit-only gate (CL3).
      */
     public void assertOperationsAssignable(UUID caseId) {
         Facts f = facts(caseId);
@@ -264,8 +266,6 @@ public class CaseActionService {
      * (offline model) and is queued behind anything the patient still has to do.
      */
     public List<BlockerView> readinessBlockers(UUID caseId) {
-        Integer records = jdbc.sql("SELECT count(*) FROM patient_onboardings WHERE case_id=?").param(caseId).query(Integer.class).single();
-        if (records == null || records == 0) return List.of(); // predates the onboarding layer: deposit-only gate applies
         CustomerReadiness r = readiness.compute(caseId);
         List<BlockerView> out = new ArrayList<>();
         boolean profile = r.blockingItems().stream().anyMatch(b -> "ACCOUNT_NOT_ACTIVATED".equals(b.code()));
@@ -273,6 +273,8 @@ public class CaseActionService {
         for (BlockingItem b : r.blockingItems()) {
             switch (b.code()) {
                 case "DEPOSIT_UNPAID" -> {}
+                // Onboarding starts when the patient acknowledges the estimate; a case without it needs staff to start it.
+                case "ONBOARDING_NOT_STARTED" -> out.add(new BlockerView(b.code(), "Onboarding not started", "لم يبدأ التسجيل", "STAFF", true));
                 case "CONTACT_NOT_VERIFIED" -> out.add(new BlockerView(b.code(), "Contact channel verification", "تأكيد وسيلة التواصل", "PATIENT", true));
                 case "IDENTITY_NOT_VERIFIED" -> out.add(identityUnderReview(caseId)
                         ? new BlockerView(b.code(), "Identity review", "مراجعة الهوية", "STAFF", false)
@@ -285,6 +287,10 @@ public class CaseActionService {
             out.add(new BlockerView("DEPOSIT_UNPAID", "Coordination deposit", "وديعة التنسيق", patientOwed ? "LATER" : "STAFF", true));
         return out;
     }
+
+    /** A patient step changed (contact, consents, onboarding, account): who has the ball may have changed with it. */
+    @EventListener
+    public void on(CaseEvents.PatientReadinessChanged event) { reconcileWaitingOn(event.caseId()); }
 
     /**
      * Who has the ball, re-derived from what is outstanding right now. Also called by the transitions

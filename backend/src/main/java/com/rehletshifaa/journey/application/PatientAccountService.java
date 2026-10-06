@@ -33,6 +33,7 @@ import com.rehletshifaa.shared.util.PatientNames;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -65,6 +66,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
  */
 @Service
 public class PatientAccountService {
+    private final ApplicationEventPublisher events;
     private final PatientIdentityVerificationRepository identityVerifications;
     private final ConsentRecordRepository consentRecords;
     private final CaseAccessLinkRepository accessLinks;
@@ -90,7 +92,7 @@ public class PatientAccountService {
     private final Authority authority;
     private final Clock clock;
 
-    public PatientAccountService(JdbcClient jdbc, PatientIdentityPort identity, IntakeLifecycleService intake, com.rehletshifaa.casemanagement.application.CaseService caseService, Authority authority, Clock clock, AuditTrail auditTrail, NotificationOutbox notificationOutbox, PatientProfileRepository patients, PatientRepresentativeRepository representatives, CaseSubmissionContactRepository contacts, PatientOnboardingRepository onboardings, PatientAccountLinkRequestRepository linkRequests, MedicalCaseRepository cases, CaseAccessLinkRepository accessLinks, ConsentRecordRepository consentRecords, PatientIdentityVerificationRepository identityVerifications) { this.identityVerifications = identityVerifications; this.consentRecords = consentRecords; this.accessLinks = accessLinks; this.cases = cases; this.linkRequests = linkRequests; this.onboardings = onboardings; this.contacts = contacts; this.representatives = representatives; this.patients = patients; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
+    public PatientAccountService(JdbcClient jdbc, PatientIdentityPort identity, IntakeLifecycleService intake, com.rehletshifaa.casemanagement.application.CaseService caseService, Authority authority, Clock clock, AuditTrail auditTrail, NotificationOutbox notificationOutbox, PatientProfileRepository patients, PatientRepresentativeRepository representatives, CaseSubmissionContactRepository contacts, PatientOnboardingRepository onboardings, PatientAccountLinkRequestRepository linkRequests, MedicalCaseRepository cases, CaseAccessLinkRepository accessLinks, ConsentRecordRepository consentRecords, PatientIdentityVerificationRepository identityVerifications, ApplicationEventPublisher events) { this.events = events; this.identityVerifications = identityVerifications; this.consentRecords = consentRecords; this.accessLinks = accessLinks; this.cases = cases; this.linkRequests = linkRequests; this.onboardings = onboardings; this.contacts = contacts; this.representatives = representatives; this.patients = patients; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
         this.jdbc = jdbc; this.identity = identity; this.intake = intake; this.caseService = caseService; this.authority = authority; this.clock = clock;
     }
 
@@ -388,8 +390,14 @@ public class PatientAccountService {
         audit(caseId, "PATIENT_ACCOUNT_LINK_REQUESTED", patientId, "Contact email already has an account; neutral continuation link sent (" + origin + ")");
     }
 
+    /**
+     * The account is usable only now (profile complete AND identity-provider setup finished), so this is when the
+     * patient's readiness changes: a deposit-settled case may move into treatment coordination, and the ball passes to
+     * staff. Nothing is announced when the account was already active.
+     */
     private void markActive(UUID patientId, Instant now, boolean emailProven) {
-        changeProfile(patientId, p -> p.activateAccount(emailProven, now));
+        if (changeProfile(patientId, p -> p.activateAccount(emailProven, now)))
+            cases.findIdsByPatientId(patientId).forEach(caseId -> events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId)));
     }
 
     /** Applies one guarded change to the locked, current patient row; saves only when the guard held. */

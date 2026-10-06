@@ -252,3 +252,6 @@ query services after CL2 is green is the step that moves this to B.
   activates the account. The proposal-path tests that were masked by the routing failure now pass.
 - Effect on §14/§15: the "CL2 baseline" debt row is closed and testability improves; the remaining items (read models,
   OpenTelemetry, Elastic TLS, CL3) are unchanged. The verdict stays **C** until the read models are converted.
+- **CL3 completed the same day:** no deposit-only readiness gate, account activation is a readiness change, no EGP/rate-1
+  deposit fallback. The full backend suite is green (570 tests, 0 failures), which closes the testability observation
+  in §15.

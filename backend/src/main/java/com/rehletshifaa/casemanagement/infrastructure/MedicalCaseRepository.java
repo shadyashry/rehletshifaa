@@ -12,6 +12,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID> {
+    @Query("select c.id from MedicalCase c where c.patientId = :patientId")
+    java.util.List<UUID> findIdsByPatientId(@Param("patientId") UUID patientId);
+
     /** Patient merge: rows of the folded patient move to the surviving one. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update MedicalCase x set x.patientId = :into where x.patientId = :from")

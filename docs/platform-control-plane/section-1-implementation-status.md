@@ -1136,7 +1136,7 @@ Implementation slices (kept green independently):
 |---|---|---|
 | CL1 | Remove Keycloak business-role compatibility provisioning and its patient-role mutation | DONE |
 | CL2 | Replace `LEGACY` Journey admission with explicit `STANDARD` versus `JOURNEY`; route every standard intake through governed team/capacity eligibility and remove unrestricted self-claim | DONE (2026-10-06, Claude) — see "CL2 delivered" below |
-| CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | PLANNED |
+| CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | DONE (2026-10-06, Claude) — see "CL3 delivered" below |
 | CL4 | Remove obsolete patient/provider/plaintext compatibility data paths and finalize clean pre-production schema | PLANNED |
 | CL5 | Move all SQL/JDBC out of application services module by module — **now via Spring Data JPA** (owner decision 2026-10-06, technical-decisions §29); live tracker `jpa-migration-status.md` | IN PROGRESS — all writes JPA except the local seeder; 17 classes still read with JdbcClient (ratchet in `ArchitectureRulesTest`) |
 | CL6 | Enforce the boundaries with ArchUnit, finish documentation/test cleanup, run focused and full backend gates | PLANNED |
@@ -1185,12 +1185,28 @@ Completed:
 Verification: full backend suite 570 tests, **8 failures (was 101)**, all in CL3 territory (below); `PostgresJpaMappingTest`
 PASS.
 
-**Next exact action:** obtain Astra review of CL2, then CL3. The 8 remaining failures are CL3 test debt: Codex tightened
-`CustomerReadinessService` so an account is activated only when the profile *and* the Keycloak account are ACTIVE (the
-old rule accepted an active profile or any linked login). `CoordinatorCaseActionsTest` (6) and
-`PatientActivationJourneyTest` (2) still assume profile completion alone activates the account; decide the evidence
-model in CL3 and move their fixtures to complete account setup. Preserve unrelated brand/theme work and do not run
-concurrent builds that share `backend/target`.
+**CL3 delivered (2026-10-06, Claude; the owner asked to proceed before the Astra review).**
+
+- *No deposit-only gate.* `CaseActionService.readinessBlockers` no longer returns nothing for a case without an onboarding
+  record: every case is judged by `CustomerReadinessService`. A missing onboarding shows as a STAFF blocker
+  (`ONBOARDING_NOT_STARTED`, onboarding starts at acknowledgement), so Operations cannot be assigned and the case does
+  not enter TRAVEL_COORDINATION without it.
+- *Account activation is a readiness change.* Activation requires the profile and the identity-provider account to be
+  ACTIVE (Codex's rule). Completing account setup now publishes `PatientReadinessChanged` for the patient's cases, so a
+  deposit-settled ACCEPTED case moves into treatment coordination, and `CaseActionService` re-derives waiting-on on that
+  event (previously only profile activation did, which no longer activates the account).
+- *No commercial fallback.* The coordination deposit is no longer quoted in EGP at rate 1 when the acknowledged proposal
+  version is missing or has no currency; it is refused (`PROPOSAL_NOT_FOUND`, `PROPOSAL_CURRENCY_MISSING`). Rate 1 stays
+  only for an EGP proposal.
+- *Tests on the current contract.* `CoordinatorCaseActionsTest` completes identity-provider setup after profile
+  activation and resets the identity simulator per test; the missing-onboarding test now expects the case to stay
+  ACCEPTED.
+
+Verification: full backend suite **570 tests, 0 failures**; `PostgresJpaMappingTest` PASS.
+
+**Next exact action:** Astra review of CL2 and CL3 together, then CL4 (obsolete patient/provider/plaintext compatibility
+data paths and the final pre-production schema). Preserve unrelated brand/theme work and do not run concurrent builds
+that share `backend/target`.
 
 ### Open evidence and next exact action
 

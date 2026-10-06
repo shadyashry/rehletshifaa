@@ -63,7 +63,7 @@ public final class JourneyDtos {
         public ReviewDecisionRequest(String decision,String recommendedTreatment,String risksAndLimitations,List<CostEstimateItem>costEstimates){this(decision,recommendedTreatment,risksAndLimitations,costEstimates,null);}
     }
     // Patient-facing proposal view. Never exposes provider net cost, margin rate, or profit. fxRateDate is the day of the
-    // exchange rate frozen on the version at release (null for legacy versions), so the patient can be told which rate applies.
+    // exchange rate frozen on the version at release (null until the version is released), so the patient can be told which rate applies.
     public record PublicProposalView(String caseNumber,String patientName,String documentType,int versionNumber,String currency,List<ProposalItemView>items,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax,String assumptions,String includedServices,String excludedServices,String scopeChangeReason,String paymentTerms,String refundTerms,String disclaimers,Instant validUntil,boolean decided,String decisionState,String recommendedTreatment,String risksAndLimitations,String notes,BigDecimal depositDueDisplay,BigDecimal depositPaidDisplay,String consultantName,java.time.LocalDate fxRateDate) {}
     // channel is the currently-selected/default OTP channel; whatsappHint/emailHint are non-null only when
     // that channel is on file for the patient, so the UI can offer a switch without leaking real contacts.

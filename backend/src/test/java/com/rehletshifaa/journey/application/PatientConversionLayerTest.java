@@ -282,7 +282,8 @@ class PatientConversionLayerTest {
         assertThat(readiness.compute(ctx.caseId).blockingItems()).extracting(BlockingItem::code).contains("ONBOARDING_NOT_STARTED");
         assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "CONFIRMED")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("start onboarding");
-        assertThat(status(ctx.caseId)).isEqualTo("TRAVEL_COORDINATION");
+        // CL3: no deposit-only gate — without onboarding evidence the case does not even enter treatment coordination.
+        assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
     }
 
     @Test void completedProfileWithPendingAccountDoesNotSatisfyAccountReadiness() throws Exception {
