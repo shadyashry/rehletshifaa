@@ -1,24 +1,59 @@
 import { ArrowRight } from "lucide-react";
-import Link from "next/link";
 
-import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import { TrackedLink } from "@/components/TrackedLink";
 import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
+import { CareSelector, type SelectorSystem } from "./CareSelector";
+
+const SHOWN_MONOGRAMS = 4;
 
 /**
- * The care areas as a compact atlas — the homepage preview of the Care Areas page. Every area has equal
- * standing (no featured specialty): six body-system panels, each with a tinted header and its areas as
- * link rows that name how many Consultants lead them. The same systems, tints and icons as the Care
- * Areas page and the Consultants panel, so the three read as one system.
+ * The care areas on the homepage — a preview of the Care Areas page, built as a selector rather than an index: the
+ * six body systems as one numbered list, and the chosen system's care areas, Consultants and scope beside it. Every
+ * area keeps equal standing (no featured specialty); the same systems, tones and icons as the Care Areas page and the
+ * Consultants panel, so the three read as one system.
  */
 export function CarePathways({ locale, d }: { locale: Locale; d: Dictionary }) {
+  const ar = locale === "ar";
   const areas = careAreaAtlas(locale, d);
-  const systems = careAtlasSystems(areas, d);
   const consultants = (n: number) =>
     n === 1 ? d.home.areasConsultantsOne : n === 2 ? d.home.areasConsultantsTwo : d.home.areasConsultantsMany.replace("{n}", String(n));
+  // "Dr A and Dr B", "Dr A, Dr B and 2 more" — names build trust where initials alone cannot.
+  const names = (list: readonly string[]) => {
+    const shown = list.slice(0, 2);
+    const rest = list.length - shown.length;
+    if (ar) return rest > 0 ? `${shown.join("، ")} و${rest} آخرون` : shown.join(" و");
+    return rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(" and ");
+  };
+  const areaCount = (n: number) =>
+    ar ? (n === 1 ? "مجال رعاية واحد" : n === 2 ? "مجالا رعاية" : `${n} مجالات رعاية`) : n === 1 ? "1 care area" : `${n} care areas`;
+
+  const systems: SelectorSystem[] = careAtlasSystems(areas, d).map((system) => {
+    const people = system.areas.flatMap((area) => area.consultants);
+    return {
+      key: system.key,
+      title: system.title,
+      body: system.body,
+      meta: `${areaCount(system.areas.length)} · ${consultants(people.length)}`,
+      monograms: people.slice(0, SHOWN_MONOGRAMS).map((profile) => profile.initials),
+      more: Math.max(0, people.length - SHOWN_MONOGRAMS),
+      consultants: consultants(people.length),
+      names: names(people.map((profile) => profile.name)),
+      areas: system.areas.map((area) => ({
+        slug: area.slug,
+        href: localeHref(locale, area.slug),
+        title: area.title,
+        // What the area actually covers (its focus areas) says more than a short restatement of its name.
+        short: area.facets.length > 0 ? area.facets.slice(0, 3).join(" · ") : area.short,
+        facets: area.facets,
+        icon: area.icon,
+        consultants: area.consultants.length > 0 ? consultants(area.consultants.length) : "",
+        people: area.consultants.slice(0, 3).map((profile) => profile.initials),
+      })),
+    };
+  });
 
   return (
     <section aria-labelledby="home-areas-title" className="bg-surface-pearl pb-[clamp(2.75rem,2rem+2.2vw,4.5rem)] pt-[clamp(2rem,1.5rem+1.8vw,3.25rem)]">
@@ -35,41 +70,19 @@ export function CarePathways({ locale, d }: { locale: Locale; d: Dictionary }) {
           </TrackedLink>
         </div>
 
-        <div className="mt-7 grid gap-4 sm:mt-8 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
-          {systems.map((system) => {
-            const style = SYSTEM_STYLES[system.key];
-            return (
-              <section key={system.key} aria-labelledby={`home-system-${system.key}`} className="flex flex-col overflow-hidden rounded-[16px] border border-border-card bg-surface-default shadow-[0_1px_2px_rgba(36,64,74,0.04)]">
-                <div className={`flex items-start gap-3 px-5 pb-3 pt-4 sm:pb-4 sm:pt-5 ${style.soft}`}>
-                  <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 flex-none rounded-full ${style.dot}`} />
-                  <div className="min-w-0">
-                    <h3 id={`home-system-${system.key}`} className="text-[1.0625rem] font-semibold leading-6 text-brand-900">{system.title}</h3>
-                    <p className="mt-0.5 hidden text-[0.875rem] leading-5 text-ink-600 sm:block">{system.body}</p>
-                  </div>
-                </div>
-                <ul className="flex flex-1 flex-col divide-y divide-border-subtle">
-                  {system.areas.map((area) => (
-                    <li key={area.slug} className="flex-1">
-                      <Link
-                        href={localeHref(locale, area.slug)}
-                        className="group flex h-full min-h-[3.75rem] items-center gap-3.5 px-5 py-3 sm:min-h-[4.25rem] sm:py-3.5 transition-colors hover:bg-surface-pearl focus-visible:bg-surface-pearl focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600"
-                      >
-                        <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-xl text-brand-800 ring-1 ${style.well} ${style.ring}`}>
-                          <CareAreaIcon name={area.icon} size={19} strokeWidth={1.7} />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[1rem] font-semibold leading-snug text-brand-900 group-hover:text-brand-700">{area.title}</span>
-                          {area.consultants.length > 0 ? <span className="mt-0.5 block text-[0.8125rem] leading-5 text-ink-500">{consultants(area.consultants.length)}</span> : null}
-                        </span>
-                        <ArrowRight size={16} aria-hidden="true" className="flex-none text-brand-600 transition-transform group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-        </div>
+        <CareSelector
+          systems={systems}
+          copy={{
+            listLabel: ar ? "أجهزة الجسم" : "Body systems",
+            ledBy: ar ? "بقيادة" : "Led by",
+            unsure: ar ? "لست متأكدًا أيّها يناسبك؟" : "Not sure which one fits?",
+            unsureAction: ar ? "أرسل حالتك، وسيوجّهها منسّقك إلى الاستشاري المناسب." : "Send your case — your coordinator routes it to the right Consultant.",
+            sendHref: localeHref(locale, "send-my-case"),
+            nextTitle: ar ? "هل حالتك ضمن «{system}»؟" : "Is your case about {system}?",
+            nextBody: ar ? "أرسلها كما هي، ويؤكّد منسّقك الاستشاري المناسب قبل أي قرار." : "Send it as it is — your coordinator confirms the right Consultant before anything is decided.",
+            nextAction: d.home.primaryAction,
+          }}
+        />
       </div>
     </section>
   );

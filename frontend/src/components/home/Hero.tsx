@@ -1,4 +1,4 @@
-import { ArrowRight, Check, HandHeart, Languages, Stethoscope, UserRoundCheck } from "lucide-react";
+import { ArrowRight, Check, HandHeart, HeartPulse, Languages, Stethoscope, UserRoundCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -25,8 +25,8 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
     : "A patient listening as a Consultant calmly explains his medical report, with the care coordinator present";
 
   const trust = arabic
-    ? [[Stethoscope, "مراجعة بقيادة استشاري"], [UserRoundCheck, "منسّق واحد طوال الرحلة"], [Languages, "بالعربية والإنجليزية"], [HandHeart, "لا التزام عند البدء"]] as const
-    : [[Stethoscope, "Consultant-led review"], [UserRoundCheck, "One coordinator throughout"], [Languages, "Arabic & English"], [HandHeart, "No commitment to start"]] as const;
+    ? [[Stethoscope, "مراجعة بقيادة استشاري"], [UserRoundCheck, "منسّق واحد طوال الرحلة"], [HeartPulse, "متابعة بعد عودتك"], [Languages, "بالعربية والإنجليزية"], [HandHeart, "لا التزام عند البدء"]] as const
+    : [[Stethoscope, "Consultant-led review"], [UserRoundCheck, "One coordinator throughout"], [HeartPulse, "Follow-up after you return"], [Languages, "Arabic & English"], [HandHeart, "No commitment to start"]] as const;
 
   return (
     <section className="home-hero bg-surface-pearl">
@@ -84,11 +84,12 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
         </figure>
       </div>
 
-      {/* The reassurance rail: one line of four, separated by hairlines, on the clinical mist. */}
+      {/* The reassurance rail: one line of five, separated by hairlines, on the clinical mist. On phones the fifth
+          promise (no commitment) closes the two-column grid on a line of its own. */}
       <div className="home-hero-rail border-y border-border-clinical bg-surface-clinical">
-        <ul className="container-site grid grid-cols-2 gap-y-3.5 py-[1.125rem] lg:grid-cols-4 lg:divide-x lg:divide-border-clinical lg:py-0">
+        <ul className="container-site grid grid-cols-2 gap-y-3.5 py-[1.125rem] lg:grid-cols-5 lg:divide-x lg:divide-border-clinical lg:py-0">
           {trust.map(([Icon, label]) => (
-            <li key={label} className="flex items-center gap-2.5 text-[0.875rem] font-semibold leading-5 text-ink-700 lg:justify-center lg:py-[1.125rem]">
+            <li key={label} className="flex items-center gap-2.5 text-[0.875rem] font-semibold leading-5 text-ink-700 last:col-span-2 lg:justify-center lg:px-2 lg:py-[1.125rem] lg:last:col-span-1">
               <span aria-hidden className="grid h-8 w-8 flex-none place-items-center rounded-full bg-surface-elevated text-brand-600 ring-1 ring-border-clinical">
                 <Icon size={15} strokeWidth={1.9} />
               </span>

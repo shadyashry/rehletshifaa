@@ -6,6 +6,7 @@ import { BRAND_THEME_BOOT, BrandThemeSwitch } from "@/components/brand/BrandThem
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { HideInControlCenter, SiteMain } from "@/components/nav/HideInControlCenter";
+import { MobileCaseBar } from "@/components/nav/MobileCaseBar";
 import { getDictionary } from "@/lib/dictionary";
 import { fontVariables } from "@/lib/fonts";
 import { isLocale, locales } from "@/lib/i18n";
@@ -47,6 +48,11 @@ export default async function LocaleLayout({
         <AuthProvider><SiteMain>{children}</SiteMain></AuthProvider>
         <HideInControlCenter>
           <Footer locale={locale} d={d} />
+          <MobileCaseBar
+            locale={locale}
+            label={d.home.primaryAction}
+            note={locale === "ar" ? "لا التزام عند البدء — نرشدك خطوة بخطوة." : "No commitment to start — we guide every step."}
+          />
           <BrandThemeSwitch locale={locale} />
         </HideInControlCenter>
         <AnalyticsScripts />

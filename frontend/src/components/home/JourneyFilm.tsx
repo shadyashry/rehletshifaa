@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, HeartPulse } from "lucide-react";
 
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
@@ -31,23 +31,33 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
         </div>
 
         <div className="mt-7 grid gap-8 sm:mt-9 lg:mt-10 lg:grid-cols-[minmax(0,56fr)_minmax(0,44fr)] lg:items-center lg:gap-16">
-          <ol className="relative">
-            {steps.map((step, index) => (
-              <li key={step.title} className="relative flex gap-4 pb-6 last:pb-0 sm:gap-5 lg:pb-7">
-                {/* The connector flows from this marker to the next. */}
-                {index < last && (
-                  <JourneyLine className="absolute start-[4px] top-9 h-[calc(100%-2.25rem)] w-6 rtl:-scale-x-100 sm:start-[6px] sm:w-7" />
-                )}
-                <span aria-hidden className="journey-marker relative z-[1] flex-none sm:h-9 sm:w-9 sm:text-[0.8125rem]">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <div className="min-w-0 pt-1">
-                  <h3 className="text-[1.0625rem] font-semibold leading-6 text-brand-900 min-[360px]:text-[1.125rem] lg:text-[1.25rem] lg:leading-7">{step.title}</h3>
-                  <p className="mt-1 max-w-[46ch] text-[0.9375rem] leading-6 text-ink-600 lg:text-[1rem] lg:leading-7">{step.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <div>
+            <ol className="relative">
+              {steps.map((step, index) => (
+                <li key={step.title} className="relative flex gap-4 pb-6 last:pb-0 sm:gap-5 lg:pb-7">
+                  {/* The connector flows from this marker to the next. */}
+                  {index < last && (
+                    <JourneyLine className="absolute start-[4px] top-9 h-[calc(100%-2.25rem)] w-6 rtl:-scale-x-100 sm:start-[6px] sm:w-7" />
+                  )}
+                  <span aria-hidden className="journey-marker relative z-[1] flex-none sm:h-9 sm:w-9 sm:text-[0.8125rem]">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <div className="min-w-0 pt-1">
+                    <h3 className="text-[1.0625rem] font-semibold leading-6 text-brand-900 min-[360px]:text-[1.125rem] lg:text-[1.25rem] lg:leading-7">{step.title}</h3>
+                    <p className="mt-1 max-w-[46ch] text-[0.9375rem] leading-6 text-ink-600 lg:text-[1rem] lg:leading-7">{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            {/* The journey does not end at the decision or at the flight home: the care continues. */}
+            <p className="journey-afterward mt-6 flex items-start gap-3 rounded-[12px] border border-border-subtle bg-surface-default px-4 py-3.5 text-[0.9375rem] leading-6 text-ink-700 sm:ms-[3.25rem] lg:mt-7">
+              <HeartPulse size={18} strokeWidth={1.9} aria-hidden="true" className="mt-0.5 flex-none text-accent-700" />
+              <span>
+                <strong className="font-semibold text-brand-900">{arabic ? "وبعد عودتك إلى بلدك" : "And after you return home"}</strong>
+                {arabic ? " — يبقى استشاريك ومنسّقك معك لمتابعة تعافيك." : " — your Consultant and coordinator stay with you to follow up on your recovery."}
+              </span>
+            </p>
+          </div>
 
           <div className="w-full sm:mx-auto sm:max-w-[620px] lg:mx-0 lg:max-w-none">
             <JourneyVideo src={source} poster={poster} label={v.label} watch={v.watch} duration={v.duration} play={d.home.videoPlay} />

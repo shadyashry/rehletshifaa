@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------
    Brand preview — "Petrol & Paper" (أزرق بترولي)
    ---------------------------------------------------------------------------
-   The Original teal identity, edited down rather than decorated — a third candidate beside it. Fewer, firmer choices:
+   The teal identity, edited down rather than decorated. Fewer, firmer choices:
      · one deep petrol (#0e4f55 family) carries headings' weight, actions and
        the closing panel — no mint washes, no glows, no gradients;
      · two surfaces only: white and one warm paper (#f7f4ee), with warm
@@ -77,33 +77,34 @@
   --color-border-clinical: #e3ded4;
   --color-accent-clinical: #5fb3ac;
 
-  /* Care-area systems: six calm colour families from one muted clinical spectrum, tuned to sit beside petrol,
-     paper and coral. Each has a well (tint), a ring (hairline), a line (marks) and a deep tone (text, icons; AA on
-     white and on its well, white icons 6.3:1+). */
-  --color-system-heart-well: #e3f0ed;
-  --color-system-heart-ring: #c4dfda;
-  --color-system-heart-line: #2f8a83;
-  --sys-heart-deep: #1b625c;
-  --color-system-neuro-well: #e5edf4;
-  --color-system-neuro-ring: #c9d8e6;
-  --color-system-neuro-line: #5a84a6;
-  --sys-neuro-deep: #365f80;
-  --color-system-movement-well: #f3ebdc;
-  --color-system-movement-ring: #e4d5b8;
-  --color-system-movement-line: #b08a4e;
-  --sys-movement-deep: #6f5326;
-  --color-system-digestive-well: #eaf0e1;
-  --color-system-digestive-ring: #d3dfc2;
-  --color-system-digestive-line: #7e9a5a;
-  --sys-digestive-deep: #4d6630;
-  --color-system-surgery-well: #ecebf5;
-  --color-system-surgery-ring: #d5d1e8;
-  --color-system-surgery-line: #8a7fb3;
-  --sys-surgery-deep: #564b88;
-  --color-system-women-well: #f7e8e3;
-  --color-system-women-ring: #ecd0c8;
-  --color-system-women-line: #c97c6a;
-  --sys-women-deep: #954a3b;
+  /* Care-area systems: one hue family, six tones. The petrol family steps from green-teal (01) through petrol to
+     blue-petrol (06), so read in order the atlas is one sweep of the brand colour, never a rainbow of categories.
+     Each tone has a well (tint), a ring (hairline), a line (marks) and a deep shade (text and icons: 6.9:1+ on its
+     well; white icons 8:1+). */
+  --color-system-heart-well: #e1f2ea;
+  --color-system-heart-ring: #bddbcd;
+  --color-system-heart-line: #358d64;
+  --sys-heart-deep: #165a3a;
+  --color-system-neuro-well: #e1f2ee;
+  --color-system-neuro-ring: #bddbd4;
+  --color-system-neuro-line: #358d77;
+  --sys-neuro-deep: #165a49;
+  --color-system-movement-well: #e1f2f1;
+  --color-system-movement-ring: #bddbda;
+  --color-system-movement-line: #358d8a;
+  --sys-movement-deep: #165a58;
+  --color-system-digestive-well: #e1eff2;
+  --color-system-digestive-ring: #bdd6db;
+  --color-system-digestive-line: #357e8d;
+  --sys-digestive-deep: #164f5a;
+  --color-system-surgery-well: #e1ecf2;
+  --color-system-surgery-ring: #bdd0db;
+  --color-system-surgery-line: #356d8d;
+  --sys-surgery-deep: #16415a;
+  --color-system-women-well: #e1e8f2;
+  --color-system-women-ring: #bdcadb;
+  --color-system-women-line: #355b8d;
+  --sys-women-deep: #16345a;
 
   /* The old sand/champagne hospitality accent folds into the petrol family. */
   --color-accent-warm: var(--color-brand-400);
@@ -119,7 +120,7 @@
 
   --radius-card: 0.5rem;
   --shadow-card: 0 1px 2px rgba(20, 38, 43, 0.05);
-  --original-shadow-raised: 0 1px 2px rgba(20, 38, 43, 0.06), 0 12px 28px -20px rgba(20, 38, 43, 0.28);
+  --petrol-shadow-raised: 0 1px 2px rgba(20, 38, 43, 0.06), 0 12px 28px -20px rgba(20, 38, 43, 0.28);
 }
 
 @layer components {
@@ -195,7 +196,7 @@
   }
   :root[data-brand-theme="petrol"] .home-hero .home-hero-card {
     border-color: var(--color-line);
-    box-shadow: var(--original-shadow-raised);
+    box-shadow: var(--petrol-shadow-raised);
   }
   :root[data-brand-theme="petrol"] .page-hero-aside {
     border: 1px solid var(--color-line);
@@ -358,12 +359,6 @@
   margin-top: 0.875rem;
 }
 
-/* Care-area cards: the header band sits on paper with a hairline under it. */
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] > div:first-child {
-  background: var(--paper);
-  border-bottom: 1px solid var(--color-line);
-}
-
 /* ---------------------------------------------------------------------------
    Precision details — the small things a well-run clinic gets right.
    Each detail is exact and quiet: one warm note (coral), one action colour
@@ -465,23 +460,6 @@
   100% { transform: scale(1.45); opacity: 0; }
 }
 
-/* Care-area rows: on hover a petrol bar marks the row you are about to open. */
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] {
-  transition: border-color 0.2s ease;
-}
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"]:hover {
-  border-color: var(--color-line-strong);
-}
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] li > a {
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
-}
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] li > a:hover {
-  box-shadow: inset 2px 0 0 var(--color-brand-600);
-}
-:root[data-brand-theme="petrol"][dir="rtl"] #main section[aria-labelledby^="home-system-"] li > a:hover {
-  box-shadow: inset -2px 0 0 var(--color-brand-600);
-}
-
 /* The Consultants' facts read as measurements: brand numerals, tabular, each with a coral tick. */
 :root[data-brand-theme="petrol"] .promise-panel dd {
   font-family: var(--font-brand-latin), var(--font-latin), sans-serif;
@@ -561,98 +539,474 @@
   box-shadow: none;
 }
 
-/* ---------------------------------------------------------------------------
-   The care atlas (home): six body systems, each in its own calm colour family.
-   An index numeral like a medical atlas, the system's tint fading from the
-   header down the card (so a one-specialty card reads as space, not emptiness),
-   icon tiles in the system's colour that fill on hover, a gentle lift.
---------------------------------------------------------------------------- */
-:root[data-brand-theme="petrol"] #main section[aria-labelledby="home-system-heart"] { --sys: var(--color-system-heart-line); --sys-well: var(--color-system-heart-well); --sys-ring: var(--color-system-heart-ring); --sys-deep: var(--sys-heart-deep); }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby="home-system-neuro"] { --sys: var(--color-system-neuro-line); --sys-well: var(--color-system-neuro-well); --sys-ring: var(--color-system-neuro-ring); --sys-deep: var(--sys-neuro-deep); }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby="home-system-movement"] { --sys: var(--color-system-movement-line); --sys-well: var(--color-system-movement-well); --sys-ring: var(--color-system-movement-ring); --sys-deep: var(--sys-movement-deep); }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby="home-system-digestive"] { --sys: var(--color-system-digestive-line); --sys-well: var(--color-system-digestive-well); --sys-ring: var(--color-system-digestive-ring); --sys-deep: var(--sys-digestive-deep); }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby="home-system-surgery"] { --sys: var(--color-system-surgery-line); --sys-well: var(--color-system-surgery-well); --sys-ring: var(--color-system-surgery-ring); --sys-deep: var(--sys-surgery-deep); }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby="home-system-women"] { --sys: var(--color-system-women-line); --sys-well: var(--color-system-women-well); --sys-ring: var(--color-system-women-ring); --sys-deep: var(--sys-women-deep); }
+/* ===========================================================================
+   Experience layer — how the page behaves, not only how it looks.
+   Principles: motion explains (arrival, progress, cause → effect), never
+   decorates; only opacity/transform animate (no layout shift); the hero
+   headline and photo paint immediately (LCP is never held back); everything
+   collapses to static for reduced motion; scroll-driven effects are
+   progressive (browsers without them simply show the final state).
+   =========================================================================== */
 
-:root[data-brand-theme="petrol"] #main section[aria-labelledby="home-areas-title"] {
-  counter-reset: care-system;
+/* ---- Reading comfort ---- */
+:root[data-brand-theme="petrol"] {
+  scroll-padding-top: 6.5rem; /* anchors (#how-it-works) land below the floating header */
+  -webkit-tap-highlight-color: transparent;
 }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] {
-  counter-increment: care-system;
-  border-color: var(--sys-ring, var(--color-border-card));
-  background: linear-gradient(180deg, #ffffff 40%, color-mix(in srgb, var(--sys-well) 70%, #ffffff) 100%);
-  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+:root[data-brand-theme="petrol"] #main :is(p, li, dd) {
+  text-wrap: pretty; /* no single-word last lines */
 }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"]:hover {
-  border-color: var(--sys);
-  box-shadow: 0 22px 40px -30px color-mix(in srgb, var(--sys-deep) 70%, transparent);
+
+/* ---- Touch and press feedback: every action answers the finger ---- */
+:root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-inverse, .btn-outline):active {
+  transform: scale(0.98);
 }
+
+/* ---- The primary action: a single soft light passes across it on hover ---- */
+:root[data-brand-theme="petrol"] .btn-primary {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+:root[data-brand-theme="petrol"] .btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.2) 50%, transparent 65%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+/* ---- Footer links draw their underline like the content links ---- */
+:root[data-brand-theme="petrol"] .footer-link {
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+  transition: color 0.18s ease, background-size 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+:root[data-brand-theme="petrol"][dir="rtl"] .footer-link {
+  background-position: 100% 100%;
+}
+:root[data-brand-theme="petrol"] .footer-link:hover {
+  color: var(--color-brand-700);
+  background-size: 100% 1px;
+}
+
+/* ---- The film: the still leans in slightly when you reach for it ---- */
+:root[data-brand-theme="petrol"] #how-it-works figure img {
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.6s ease;
+}
+:root[data-brand-theme="petrol"] #how-it-works figure:hover img {
+  transform: scale(1.03);
+}
+
+/* ---- The case form: where a patient acts, every state is explicit ---- */
+/* The label of the field you are in takes the action colour. */
+:root[data-brand-theme="petrol"] form.card label:focus-within > span:first-child {
+  color: var(--color-brand-700);
+}
+:root[data-brand-theme="petrol"] form.card .field {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+:root[data-brand-theme="petrol"] form.card .field:hover:not(:focus) {
+  border-color: var(--color-brand-300);
+}
+/* Steps: the current step carries a halo; the progress track is paper, the fill petrol. */
+:root[data-brand-theme="petrol"] form.card .step-dot {
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+:root[data-brand-theme="petrol"] form.card .step-dot[data-active="true"] {
+  background: var(--color-brand-700);
+  border-color: var(--color-brand-700);
+  box-shadow: 0 0 0 4px var(--color-brand-100);
+}
+:root[data-brand-theme="petrol"] form.card ol .h-1 {
+  height: 3px;
+  background: var(--paper-deep);
+}
+:root[data-brand-theme="petrol"] form.card ol .h-1 > div {
+  transition-duration: 0.6s;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* "Who is this case for?" choices answer hover and selection. */
+:root[data-brand-theme="petrol"] form.card [role="radiogroup"] > label {
+  border-radius: 0.5rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+}
+:root[data-brand-theme="petrol"] form.card [role="radiogroup"] > label:has(input:checked) {
+  border-color: var(--color-brand-600);
+  background: var(--color-brand-50);
+  box-shadow: 0 0 0 3px var(--color-brand-100);
+}
+:root[data-brand-theme="petrol"] form.card [role="radiogroup"] > label:has(input:focus-visible) {
+  outline: 2px solid var(--color-brand-600);
+  outline-offset: 2px;
+}
+/* The upload area: an inviting, clearly droppable surface. */
+:root[data-brand-theme="petrol"] form.card label:has(> input[type="file"]) {
+  background: var(--paper);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+:root[data-brand-theme="petrol"] form.card label:has(> input[type="file"]):hover {
+  background: var(--color-brand-50);
+  border-color: var(--color-brand-600);
+}
+:root[data-brand-theme="petrol"] form.card label:has(> input[type="file"]) > span:first-child {
+  color: var(--color-brand-700);
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  :root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"]:hover {
-    transform: translateY(-3px);
+  /* The light passing across the primary action. */
+  :root[data-brand-theme="petrol"] .btn-primary:hover::after {
+    transform: translateX(120%);
+    transition: transform 0.75s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  :root[data-brand-theme="petrol"] form.card [role="radiogroup"] > label:hover {
+    transform: translateY(-1px);
+  }
+  :root[data-brand-theme="petrol"] form.card label:has(> input[type="file"]):hover > span:first-child {
+    transform: translateY(-2px);
+  }
+
+  /* ---- Arrival: the hero composes itself in reading order (the headline is never hidden) ---- */
+  @keyframes petrol-rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes petrol-settle-photo {
+    from { transform: scale(1.06); }
+    to { transform: scale(1); }
+  }
+  @keyframes petrol-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  :root[data-brand-theme="petrol"] .home-hero p:has(+ h1) {
+    animation: petrol-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  :root[data-brand-theme="petrol"] .home-hero h1 ~ :is(p, div) {
+    animation: petrol-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  :root[data-brand-theme="petrol"] .home-hero h1 + p { animation-delay: 0.12s; }
+  :root[data-brand-theme="petrol"] .home-hero h1 + p + div { animation-delay: 0.22s; }
+  :root[data-brand-theme="petrol"] .home-hero h1 + p + div + div { animation-delay: 0.34s; }
+  :root[data-brand-theme="petrol"] .home-hero figure > div img {
+    animation: petrol-settle-photo 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  :root[data-brand-theme="petrol"] .home-hero-card {
+    animation: petrol-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.45s both;
+  }
+  :root[data-brand-theme="petrol"] .home-hero-rail li {
+    animation: petrol-fade 0.6s ease both;
+  }
+  :root[data-brand-theme="petrol"] .home-hero-rail li:nth-child(1) { animation-delay: 0.55s; }
+  :root[data-brand-theme="petrol"] .home-hero-rail li:nth-child(2) { animation-delay: 0.65s; }
+  :root[data-brand-theme="petrol"] .home-hero-rail li:nth-child(3) { animation-delay: 0.75s; }
+  :root[data-brand-theme="petrol"] .home-hero-rail li:nth-child(4) { animation-delay: 0.85s; }
+
+  @supports (animation-timeline: view()) {
+    /* ---- Scroll: the header firms up, and a coral hairline measures how far you have read ---- */
+    @keyframes petrol-header-firm {
+      to { box-shadow: 0 22px 44px -26px rgba(14, 79, 85, 0.45); }
+    }
+    @keyframes petrol-progress {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+    :root[data-brand-theme="petrol"] .site-header > .container-site {
+      animation: petrol-header-firm linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 160px;
+    }
+    :root[data-brand-theme="petrol"] .site-header::after {
+      content: "";
+      position: absolute;
+      inset-inline: 0;
+      bottom: -1px;
+      height: 2px;
+      background: var(--color-coral);
+      transform-origin: left center;
+      animation: petrol-progress linear both;
+      animation-timeline: scroll(root);
+      pointer-events: none;
+    }
+    :root[data-brand-theme="petrol"][dir="rtl"] .site-header::after {
+      transform-origin: right center;
+    }
+
+    /* ---- Content arrives as you reach it ---- */
+    @keyframes petrol-arrive {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: none; }
+    }
+    :root[data-brand-theme="petrol"] :is(
+      .care-selector,
+      section[aria-labelledby="trust-title"] ul.grid > li,
+      .promise-section ol > li,
+      .canvas-hospitality ol > li,
+      #how-it-works ol > li
+    ) {
+      animation: petrol-arrive linear both;
+      animation-timeline: view();
+      animation-range: entry 5% entry 75%;
+    }
+    /* Neighbours in a row arrive a beat apart. */
+    :root[data-brand-theme="petrol"] :is(.canvas-hospitality ol > li:nth-child(even), section[aria-labelledby="trust-title"] ul.grid > li:nth-child(even)) {
+      animation-range: entry 15% entry 85%;
+    }
+
+    /* ---- The journey progresses as you read it: each step fills as it reaches the middle of the screen ---- */
+    @keyframes petrol-step-reached {
+      from { background: #ffffff; color: var(--color-brand-700); box-shadow: inset 0 0 0 1.5px var(--color-coral); }
+      to { background: var(--color-brand-700); color: #ffffff; box-shadow: 0 0 0 4px var(--color-brand-100); }
+    }
+    :root[data-brand-theme="petrol"] #how-it-works ol > li:not(:first-child) .journey-marker {
+      animation: petrol-step-reached linear both;
+      animation-timeline: view();
+      animation-range: cover 38% cover 48%;
+    }
   }
 }
 
-/* Header: the system's tint, its index numeral, a haloed dot. */
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] > div:first-child {
-  position: relative;
-  background: var(--sys-well);
-  border-bottom: 1px solid var(--sys-ring);
-  padding-inline-end: 4.75rem;
+/* ---------------------------------------------------------------------------
+   Final review fixes
+--------------------------------------------------------------------------- */
+
+/* Privacy: the list's rules are straight lines. (The radius family rule above must not round them into arcs.) */
+:root[data-brand-theme="petrol"] #main section[aria-labelledby="trust-title"] ul.grid > li {
+  border-radius: 0;
 }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] > div:first-child::after {
-  content: counter(care-system, decimal-leading-zero);
-  position: absolute;
-  top: 0.85rem;
-  inset-inline-end: 1.15rem;
-  font-family: var(--font-brand-latin), var(--font-latin), sans-serif;
-  font-size: 2.5rem;
+
+/* One heading weight across sections ("Senior Consultants" carried an extra bold). */
+:root[data-brand-theme="petrol"] .promise-section .headline {
   font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.04em;
-  color: var(--sys);
-  opacity: 0.32;
-  font-variant-numeric: tabular-nums;
-}
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] > div:first-child > span[aria-hidden] {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sys) 22%, transparent);
-}
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] > div:first-child h3 {
-  color: var(--color-brand-900);
 }
 
-/* Rows: system-tinted dividers, a system-coloured marker and wash on hover. */
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] ul > li {
-  border-color: color-mix(in srgb, var(--sys-ring) 80%, transparent);
+/* Consultant principles: each icon in a small petrol tile (the same tile as the care selector), aligned to its title;
+   quiet rules between. */
+:root[data-brand-theme="petrol"] .promise-section ol > li {
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  column-gap: 1rem;
+  align-items: start;
 }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] li > a:hover {
-  background: color-mix(in srgb, var(--sys-well) 55%, transparent);
-  box-shadow: inset 3px 0 0 var(--sys-deep);
+:root[data-brand-theme="petrol"] .promise-section ol > li + li {
+  border-top: 1px solid var(--color-line);
+  padding-top: 1.5rem;
 }
-:root[data-brand-theme="petrol"][dir="rtl"] #main section[aria-labelledby^="home-system-"] li > a:hover {
-  box-shadow: inset -3px 0 0 var(--sys-deep);
+:root[data-brand-theme="petrol"] .promise-section ol {
+  gap: 1.5rem;
 }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] li > a > span.min-w-0 > span:last-child:not(:first-child) {
-  color: var(--sys-deep);
-  font-variant-numeric: tabular-nums;
+:root[data-brand-theme="petrol"] .promise-section ol > li > span[aria-hidden] {
+  width: 2.5rem;
+  height: 2.5rem;
+  justify-items: center;
+  background: var(--color-brand-50);
+  box-shadow: inset 0 0 0 1px var(--color-brand-100);
+  color: var(--color-brand-700);
 }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] li > a > svg {
-  color: var(--sys-deep);
+:root[data-brand-theme="petrol"] .promise-section ol > li > span[aria-hidden] svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+:root[data-brand-theme="petrol"] .promise-section ol > li > div {
+  padding-top: 0.3rem;
 }
 
-/* Icon tiles: the system's well and deep stroke; they fill solid when the row is hovered. */
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] li > a > span[aria-hidden] {
+/* The facts panel sits on paper, so it anchors the white section; numerals set tight. */
+:root[data-brand-theme="petrol"] .promise-section .promise-panel {
+  background: var(--paper);
+  border-color: var(--color-line);
+}
+:root[data-brand-theme="petrol"] .promise-panel dd {
+  letter-spacing: -0.02em;
+}
+:root[data-brand-theme="petrol"] .promise-panel > div:first-child > span[aria-hidden] > span:not(:first-child) {
+  box-shadow: inset 0 0 0 1px var(--color-brand-300), 0 0 0 2px var(--paper);
+}
+
+/* ---------------------------------------------------------------------------
+   Care selector panel — the chosen body system, answered in three beats:
+   what it is (a mark of its own, its scope), who will look at your case (named
+   Consultants), and what to do next (a step in the words of your choice).
+--------------------------------------------------------------------------- */
+:root[data-brand-theme="petrol"] .care-selector-panel {
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(20, 38, 43, 0.04), 0 24px 48px -36px color-mix(in srgb, var(--sys-deep) 55%, transparent);
+}
+
+/* Head: the tone, the system's own mark drawn large and faint at the far edge, position "01 / 06". */
+:root[data-brand-theme="petrol"] .care-selector-panel-head {
+  overflow: hidden;
+  padding: 1.75rem 1.75rem 1.5rem;
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--sys-well) 100%, transparent) 0%, transparent 60%),
+    linear-gradient(180deg, var(--sys-well) 0%, color-mix(in srgb, var(--sys-well) 30%, #ffffff) 100%);
+}
+:root[data-brand-theme="petrol"] .care-selector-panel-art {
+  display: block;
+  position: absolute;
+  top: -1.75rem;
+  inset-inline-end: -1.5rem;
   color: var(--sys-deep);
+  opacity: 0.08;
+  pointer-events: none;
+}
+:root[data-brand-theme="petrol"] .care-selector-panel-art svg {
+  width: 11.5rem;
+  height: 11.5rem;
+}
+:root[data-brand-theme="petrol"] .care-selector-panel-head > :not(.care-selector-panel-art) {
+  position: relative;
+}
+:root[data-brand-theme="petrol"] .care-selector-panel-total {
+  display: inline;
+  color: var(--color-ink-400);
+  font-weight: 500;
+}
+:root[data-brand-theme="petrol"] .care-selector-panel-head h3 {
+  font-family: var(--font-brand-latin), var(--font-latin), sans-serif;
+  font-size: clamp(1.5rem, 1.25rem + 0.6vw, 1.875rem);
+  letter-spacing: -0.025em;
+}
+:root[data-brand-theme="petrol"][dir="rtl"] .care-selector-panel-head h3 {
+  font-family: var(--font-brand-arabic), var(--font-arabic), sans-serif;
+  letter-spacing: 0;
+}
+:root[data-brand-theme="petrol"] .care-selector-panel-head .care-selector-monogram {
+  width: 2.5rem;
+  height: 2.5rem;
   background: #ffffff;
-  border-radius: 0.5rem;
-  box-shadow: inset 0 0 0 1px var(--sys-ring);
-  transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+  border-color: var(--sys-ring);
+  font-size: 0.8125rem;
 }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] li > a:hover > span[aria-hidden] {
-  color: #ffffff;
-  background: var(--sys-deep);
-  box-shadow: inset 0 0 0 1px var(--sys-deep);
+:root[data-brand-theme="petrol"] .care-selector-names {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
 }
-:root[data-brand-theme="petrol"] #main section[aria-labelledby^="home-system-"] li > a:hover > span.min-w-0 > span:first-child {
+
+/* Rows: scope as tags, the area's own Consultants, a round go control that fills on hover. */
+:root[data-brand-theme="petrol"] .care-selector-area {
+  padding: 1.25rem 1.75rem;
+  gap: 1.125rem;
+}
+:root[data-brand-theme="petrol"] .care-selector-area-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+}
+:root[data-brand-theme="petrol"] .care-selector-area-short {
+  display: none;
+}
+:root[data-brand-theme="petrol"] .care-selector-area-facets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+:root[data-brand-theme="petrol"] .care-selector-facet {
+  padding: 0.3rem 0.625rem;
+  border: 1px solid var(--sys-ring);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--sys-well) 60%, #ffffff);
   color: var(--sys-deep);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.1rem;
+  white-space: nowrap;
+}
+:root[data-brand-theme="petrol"] .care-selector-area-count {
+  margin-top: 0.5rem;
+  color: var(--color-ink-500);
+  font-weight: 500;
+}
+:root[data-brand-theme="petrol"] .care-selector-area-people {
+  display: none;
+}
+@media (min-width: 40rem) {
+  :root[data-brand-theme="petrol"] .care-selector-area-people {
+    display: flex;
+    flex: none;
+  }
+  :root[data-brand-theme="petrol"] .care-selector-area-people > span {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    margin-inline-start: -0.5rem;
+    border: 1px solid var(--sys-ring);
+    border-radius: 9999px;
+    background: #ffffff;
+    box-shadow: 0 0 0 2px #ffffff;
+    color: var(--sys-deep);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  :root[data-brand-theme="petrol"] .care-selector-area-people > span:first-child {
+    margin-inline-start: 0;
+  }
+}
+:root[data-brand-theme="petrol"] .care-selector-area-go {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid var(--sys-ring);
+  border-radius: 9999px;
+  color: var(--sys-deep);
+  transition: background-color 0.22s ease, border-color 0.22s ease, color 0.22s ease;
+}
+:root[data-brand-theme="petrol"] .care-selector-area-go .care-selector-arrow {
+  color: currentColor;
+}
+:root[data-brand-theme="petrol"] .care-selector-area:hover .care-selector-area-go {
+  border-color: var(--sys-deep);
+  background: var(--sys-deep);
+  color: #ffffff;
+}
+
+/* Foot: the next step, in the words of the system just chosen. */
+:root[data-brand-theme="petrol"] .care-selector-panel-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.875rem 1.25rem;
+  padding: 1.25rem 1.75rem;
+  border-top: 1px solid var(--sys-ring);
+  background: color-mix(in srgb, var(--sys-well) 45%, var(--paper));
+}
+@media (max-width: 39.99rem) {
+  :root[data-brand-theme="petrol"] .care-selector-panel-head {
+    padding: 1.375rem 1.25rem 1.25rem;
+  }
+  :root[data-brand-theme="petrol"] .care-selector-area {
+    padding: 1.125rem 1.25rem;
+  }
+  :root[data-brand-theme="petrol"] .care-selector-panel-foot {
+    padding: 1.125rem 1.25rem;
+  }
+  :root[data-brand-theme="petrol"] .care-selector-panel-foot .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+  :root[data-brand-theme="petrol"] .care-selector-panel-art svg {
+    width: 8.5rem;
+    height: 8.5rem;
+  }
+}
+
+/* The panel's own next step replaces the generic "Not sure which one fits?" box beside the list. */
+:root[data-brand-theme="petrol"] .care-selector-unsure {
+  display: none;
+}
+/* Phones: one compact line of scope instead of wrapping tags. */
+@media (max-width: 39.99rem) {
+  :root[data-brand-theme="petrol"] .care-selector-area-short {
+    display: block;
+  }
+  :root[data-brand-theme="petrol"] .care-selector-area-facets {
+    display: none;
+  }
 }

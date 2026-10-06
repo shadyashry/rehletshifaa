@@ -7,12 +7,12 @@ afterEach(() => { cleanup(); try { localStorage.clear(); } catch { /* jsdom stor
 // The module keeps the last choice in memory across tests; each test starts by choosing explicitly or reading pressed state.
 
 describe("BrandThemeSwitch — site-wide brand preview", () => {
-  it("offers exactly the four candidates: Original, Petrol & Paper, Lapis Night and Papyrus", () => {
+  it("offers exactly the two candidates: Petrol & Paper and Lapis Night", () => {
     render(<BrandThemeSwitch locale="en" />);
-    expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Original", "Petrol & Paper", "Lapis Night", "Papyrus"]);
+    expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Petrol & Paper", "Lapis Night"]);
   });
 
-  it("switches the whole document between Original and Lapis Night and remembers the choice", () => {
+  it("switches the whole document between Petrol & Paper and Lapis Night and remembers the choice", () => {
     render(<BrandThemeSwitch locale="en" />);
     fireEvent.click(screen.getByRole("button", { name: "Lapis Night" }));
     expect(document.documentElement.dataset.brandTheme).toBe("lapis");
@@ -20,8 +20,7 @@ describe("BrandThemeSwitch — site-wide brand preview", () => {
     expect(localStorage.getItem("rs:brand-theme-preview")).toBe("lapis");
     fireEvent.click(screen.getByRole("button", { name: "Petrol & Paper" }));
     expect(document.documentElement.dataset.brandTheme).toBe("petrol");
-    fireEvent.click(screen.getByRole("button", { name: "Original" }));
-    expect(document.documentElement.dataset.brandTheme).toBe("original");
+    expect(localStorage.getItem("rs:brand-theme-preview")).toBe("petrol");
   });
 
   it("boot script is valid JavaScript: applies the saved theme, but never inside the Control Center", () => {
@@ -34,10 +33,9 @@ describe("BrandThemeSwitch — site-wide brand preview", () => {
     };
     expect(boot("/en/care-areas")).toBe("lapis");
     expect(boot("/en/care-areas", "petrol")).toBe("petrol");
-    expect(boot("/en/care-areas", "papyrus")).toBe("papyrus");
-    expect(boot("/en/care-areas", null)).toBe("original"); // the polished Original is the public default
-    expect(boot("/en", "malachite")).toBe("original"); // retired candidates fall back to Original
-    expect(boot("/en", "serene")).toBe("original");
+    expect(boot("/en/care-areas", null)).toBe("petrol"); // Petrol & Paper is the public default
+    // Retired candidates fall back to the default.
+    for (const retired of ["original", "papyrus", "malachite", "serene"]) expect(boot("/en", retired)).toBe("petrol");
     expect(boot("/ar/portal/control-center/coordination")).toBeUndefined();
   });
 
