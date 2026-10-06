@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import type { CareAreaIconName, CareSystem } from "@/lib/care-area-catalog";
@@ -10,6 +10,8 @@ import type { Locale } from "@/lib/i18n";
 import { ConsultantCard } from "./ConsultantCard";
 
 export type PanelEntry = { profile: ConsultantProfile; system: CareSystem; icon: CareAreaIconName; href: string; viewOf: string };
+
+const noSubscribe = () => () => {};
 
 type Copy = {
   search: string;
@@ -39,6 +41,8 @@ export function ConsultantPanel({ entries, systems, locale, copy }: {
 }) {
   const [query, setQuery] = useState("");
   const [system, setSystem] = useState<CareSystem | "">("");
+  // The chips only work once React has hydrated; until then they say so rather than silently dropping a click.
+  const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
   const needle = query.trim().normalize("NFKC").toLocaleLowerCase(locale);
   const matches = (entry: PanelEntry) => {
     const p = entry.profile;
@@ -72,7 +76,7 @@ export function ConsultantPanel({ entries, systems, locale, copy }: {
           />
         </div>
         <div role="group" aria-label={copy.systems} className="mt-4 flex flex-wrap gap-1.5 sm:gap-2">
-          <button type="button" aria-pressed={system === ""} onClick={() => setSystem("")} className={chip(system === "")}>
+          <button type="button" aria-pressed={system === ""} aria-disabled={!hydrated || undefined} onClick={() => setSystem("")} className={chip(system === "")}>
             {copy.all}
             <span className={`tabular-nums ${system === "" ? "text-white/75" : "text-ink-400"}`}>{searched.length}</span>
           </button>
@@ -80,7 +84,7 @@ export function ConsultantPanel({ entries, systems, locale, copy }: {
             const n = searched.filter((entry) => entry.system === s.key).length;
             const active = system === s.key;
             return (
-              <button key={s.key} type="button" aria-pressed={active} onClick={() => setSystem(active ? "" : s.key)} disabled={n === 0 && !active} className={`${chip(active)} disabled:cursor-not-allowed disabled:opacity-45`}>
+              <button key={s.key} type="button" aria-pressed={active} aria-disabled={!hydrated || undefined} onClick={() => setSystem(active ? "" : s.key)} disabled={n === 0 && !active} className={`${chip(active)} disabled:cursor-not-allowed disabled:opacity-45`}>
                 <span aria-hidden className={`h-2 w-2 rounded-full ${active ? "bg-white" : SYSTEM_STYLES[s.key].dot}`} />
                 {s.title}
                 <span className={`tabular-nums ${active ? "text-white/75" : "text-ink-400"}`}>{n}</span>
