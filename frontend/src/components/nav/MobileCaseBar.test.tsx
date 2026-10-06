@@ -35,7 +35,7 @@ describe("MobileCaseBar — the phone's persistent case action", () => {
   });
 
   it("never appears where the patient is already in a task", () => {
-    for (const path of ["/en/send-my-case", "/ar/portal", "/en/portal/cases/1", "/en/proposal/abc", "/en/track-case"]) {
+    for (const path of ["/en/send-my-case", "/ar/portal", "/en/portal/cases/1", "/en/proposal/abc", "/en/track-case", "/en/consultants/hamdy-abdelazeem"]) {
       nav.pathname = path;
       const { container, unmount } = bar();
       expect(container).toBeEmptyDOMElement();

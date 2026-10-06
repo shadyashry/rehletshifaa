@@ -8,8 +8,8 @@ import { TrackedLink } from "@/components/TrackedLink";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 
-/** Routes where the bar would compete with the task in hand: the case form itself, the patient's own areas. */
-const QUIET_ROUTES = /^\/[a-z]{2}\/(send-my-case|portal|proposal|activate|status|track-case)(\/|$)/;
+/** Routes where the bar would compete with the task in hand: the case form itself, the patient's own areas — and a Consultant's profile, which reads as a CV with no sales actions. */
+const QUIET_ROUTES = /^\/[a-z]{2}\/(send-my-case|portal|proposal|activate|status|track-case|consultants\/[^/]+)(\/|$)/;
 /** Scrolled past the opening screen, where the page's own primary action sits. */
 const REVEAL_AFTER = 560;
 
