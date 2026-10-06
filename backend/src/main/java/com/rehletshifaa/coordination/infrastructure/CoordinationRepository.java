@@ -3,6 +3,12 @@ package com.rehletshifaa.coordination.infrastructure;
 import com.rehletshifaa.casemanagement.domain.CaseAssignment;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
+import com.rehletshifaa.coordination.domain.ConsultantRoutingPreference;
+import com.rehletshifaa.coordination.domain.CoordinationDecision;
+import com.rehletshifaa.coordination.domain.CoordinationPolicyVersion;
+import com.rehletshifaa.coordination.domain.CoordinationTeamProfile;
+import com.rehletshifaa.coordination.domain.CoordinatorCapacity;
 import com.rehletshifaa.coordination.domain.Routing.*;
 import com.rehletshifaa.shared.api.ApiException;
 
@@ -28,15 +34,29 @@ public class CoordinationRepository {
     private final JdbcClient jdbc;
     private final ObjectMapper json;
 
-    public CoordinationRepository(JdbcClient jdbc, ObjectMapper json, CaseAssignmentRepository assignments, CaseTaskRepository tasks) { this.tasks = tasks; this.assignments = assignments; this.jdbc = jdbc; this.json = json; }
+    private final MedicalCaseRepository cases;
+    private final CoordinationRoutingLockRepository routingLock;
+    private final CoordinationTeamProfileRepository profiles;
+    private final CoordinatorCapacityRepository capacities;
+    private final CoordinationPolicyVersionRepository policyVersions;
+    private final ConsultantRoutingPreferenceRepository preferenceVersions;
+    private final CoordinationDecisionRepository decisions;
+
+    public CoordinationRepository(JdbcClient jdbc, ObjectMapper json, CaseAssignmentRepository assignments, CaseTaskRepository tasks, MedicalCaseRepository cases,
+                                  CoordinationRoutingLockRepository routingLock, CoordinationTeamProfileRepository profiles, CoordinatorCapacityRepository capacities,
+                                  CoordinationPolicyVersionRepository policyVersions, ConsultantRoutingPreferenceRepository preferenceVersions,
+                                  CoordinationDecisionRepository decisions) {
+        this.jdbc = jdbc; this.json = json; this.assignments = assignments; this.tasks = tasks; this.cases = cases; this.routingLock = routingLock;
+        this.profiles = profiles; this.capacities = capacities; this.policyVersions = policyVersions; this.preferenceVersions = preferenceVersions;
+        this.decisions = decisions;
+    }
 
     public String encode(Object value) { try { return json.writeValueAsString(value); } catch (Exception e) { throw new IllegalStateException(e); } }
     public <T> T decode(String value, Class<T> type) { try { return json.readValue(value, type); } catch (Exception e) { throw new IllegalStateException("Invalid persisted routing data", e); } }
 
-    public void lock() { jdbc.sql("SELECT id FROM coordination_routing_lock WHERE id=1 FOR UPDATE").query(Integer.class).single(); }
+    public void lock() { routingLock.acquire(); }
     public void lockCase(UUID id) {
-        jdbc.sql("SELECT id FROM medical_cases WHERE id=? FOR UPDATE").param(id).query(UUID.class).optional()
-                .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
+        cases.lockById(id).orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
     }
 
     // ---- Teams (workforce teams of the care-coordination function, with their routing profile) ----
@@ -48,12 +68,10 @@ public class CoordinationRepository {
     public Optional<Team> team(UUID id) { return teams().stream().filter(t -> t.id().equals(id)).findFirst(); }
     public void profile(UUID team, TeamProfile p, long revision, String actor, Instant now) {
         if (revision == -1) {
-            if (count("SELECT COUNT(*) FROM coordination_team_profiles WHERE team_id=?", team) > 0) stale(0);
-            update("INSERT INTO coordination_team_profiles(team_id,care_areas,languages,fallback_team_id,updated_by,updated_at,revision) VALUES(?,?,?,?,?,?,0)",
-                    team, join(p.careAreas()), join(p.languages()), p.fallbackTeam(), actor, timestamp(now));
+            if (profiles.existsById(team)) stale(0);
+            profiles.saveAndFlush(new CoordinationTeamProfile(team, join(p.careAreas()), join(p.languages()), p.fallbackTeam(), actor, now));
         } else {
-            stale(update("UPDATE coordination_team_profiles SET care_areas=?,languages=?,fallback_team_id=?,updated_by=?,updated_at=?,revision=revision+1 WHERE team_id=? AND revision=?",
-                    join(p.careAreas()), join(p.languages()), p.fallbackTeam(), actor, timestamp(now), team, revision));
+            stale(profiles.change(team, revision, join(p.careAreas()), join(p.languages()), p.fallbackTeam(), actor, micros(now)));
         }
     }
     /** Active memberships of care-coordination teams at {@code at}: subject → teams. */
@@ -79,12 +97,10 @@ public class CoordinationRepository {
     }
     public void capacity(Capacity c, String actor, Instant now) {
         if (c.revision() == -1) {
-            if (count("SELECT COUNT(*) FROM coordinator_capacity WHERE subject=?", c.subject()) > 0) stale(0);
-            update("INSERT INTO coordinator_capacity(subject,maximum,on_duty,languages,care_areas,updated_by,updated_at,revision) VALUES(?,?,?,?,?,?,?,0)",
-                    c.subject(), c.maximum(), c.onDuty(), join(c.languages()), join(c.careAreas()), actor, timestamp(now));
+            if (capacities.existsById(c.subject())) stale(0);
+            capacities.saveAndFlush(new CoordinatorCapacity(c.subject(), c.maximum(), c.onDuty(), join(c.languages()), join(c.careAreas()), actor, now));
         } else {
-            stale(update("UPDATE coordinator_capacity SET maximum=?,on_duty=?,languages=?,care_areas=?,updated_by=?,updated_at=?,revision=revision+1 WHERE subject=? AND revision=?",
-                    c.maximum(), c.onDuty(), join(c.languages()), join(c.careAreas()), actor, timestamp(now), c.subject(), c.revision()));
+            stale(capacities.change(c.subject(), c.revision(), c.maximum(), c.onDuty(), join(c.languages()), join(c.careAreas()), actor, micros(now)));
         }
     }
 
@@ -95,8 +111,7 @@ public class CoordinationRepository {
                         instant(r, "effective_to"), decode(r.getString("configuration"), PolicyConfig.class))).list();
     }
     public void policy(Policy p, String actor, Instant now) {
-        update("INSERT INTO coordination_policy_versions(id,version_number,effective_from,effective_to,configuration,created_by,created_at) VALUES(?,?,?,?,?,?,?)",
-                p.id(), p.version(), timestamp(p.effectiveFrom()), timestamp(p.effectiveTo()), encode(p.configuration()), actor, timestamp(now));
+        policyVersions.saveAndFlush(new CoordinationPolicyVersion(p.id(), p.version(), p.effectiveFrom(), p.effectiveTo(), encode(p.configuration()), actor, now));
     }
     public List<Preference> preferences(UUID consultant) {
         return jdbc.sql("SELECT * FROM consultant_routing_preferences WHERE consultant_id=? ORDER BY version_number DESC").param(consultant)
@@ -109,8 +124,8 @@ public class CoordinationRepository {
         return result;
     }
     public void preference(Preference p, String actor, Instant now) {
-        update("INSERT INTO consultant_routing_preferences(id,consultant_id,version_number,effective_from,effective_to,coordinator_subject,team_id,fallback_team_id,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                p.id(), p.consultantId(), p.version(), timestamp(p.effectiveFrom()), timestamp(p.effectiveTo()), p.coordinator(), p.team(), p.fallbackTeam(), actor, timestamp(now));
+        preferenceVersions.saveAndFlush(new ConsultantRoutingPreference(p.id(), p.consultantId(), p.version(), p.effectiveFrom(), p.effectiveTo(),
+                new ConsultantRoutingPreference.Choice(p.coordinator(), p.team(), p.fallbackTeam()), actor, now));
     }
     public boolean consultant(UUID id) {
         return count("SELECT COUNT(*) FROM practitioner_profiles WHERE id=? AND practitioner_type='CONSULTANT'", id) > 0;
@@ -171,8 +186,8 @@ public class CoordinationRepository {
         tasks.queue(task, team, reason, micros(now));
     }
     /** Replaces the case's primary Coordinator and moves their open coordinator work to the new owner. */
-    public void owner(CaseFacts c, String selected, String actor, String reason, Instant now) {
-        if (Objects.equals(c.owner(), selected)) return;
+    public void owner(CaseFacts c, String selected, String actor, String reason, boolean reRecord, Instant now) {
+        if (Objects.equals(c.owner(), selected) && !reRecord) return;
         assignments.endOpen(c.id(), "COORDINATOR", "PRIMARY", micros(now));
         if (selected != null)
             assignments.saveAndFlush(CaseAssignment.active(c.id(), selected, "COORDINATOR", "PRIMARY", reason, actor, now));
@@ -198,8 +213,7 @@ public class CoordinationRepository {
     public void decision(Decision d, String actor, String key, String request) {
         if (d.policyId() == null && !("NO_ROUTING_POLICY".equals(d.path()) && d.selectedOwner() == null))
             throw new IllegalArgumentException("Only an unassigned no-policy queue decision may lack a policy");
-        update("INSERT INTO coordination_decisions(id,case_id,actor_subject,command_key,request_data,policy_id,result_data,created_at) VALUES(?,?,?,?,?,?,?,?)",
-                d.id(), d.caseId(), actor, key, request, d.policyId(), encode(d), timestamp(d.evaluatedAt()));
+        decisions.saveAndFlush(new CoordinationDecision(d.id(), d.caseId(), actor, key, request, d.policyId(), encode(d), d.evaluatedAt()));
     }
 
     private Team team(ResultSet r) throws SQLException {
@@ -215,7 +229,6 @@ public class CoordinationRepository {
         return new Preference(r.getObject("id", UUID.class), r.getObject("consultant_id", UUID.class), r.getInt("version_number"), instant(r, "effective_from"),
                 instant(r, "effective_to"), r.getString("coordinator_subject"), r.getObject("team_id", UUID.class), r.getObject("fallback_team_id", UUID.class));
     }
-    private int update(String sql, Object... args) { return jdbc.sql(sql).params(args).update(); }
     private long count(String sql, Object... args) { return jdbc.sql(sql).params(args).query(Long.class).single(); }
     private static Set<String> split(String s) { return s.isBlank() ? Set.of() : Set.copyOf(Arrays.asList(s.split(","))); }
     private static String join(Set<String> s) { return String.join(",", new TreeSet<>(s)); }

@@ -253,6 +253,7 @@ class SecureJourneyCorrectionsTest {
         com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "lead-subject", "COORDINATOR_LEAD", crypto.encrypt("Team Lead"));
         com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "coordinator-subject", "COORDINATOR", crypto.encrypt("Original Coordinator"));
         com.rehletshifaa.workforce.WorkforceTestData.leadTeam(jdbc, "CARE_COORDINATION", "lead-subject", "coordinator-subject","replacement-coordinator");
+        for(String target:new String[]{"replacement-coordinator","lead-subject"})com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, target);
         authenticate("lead-subject",Role.COORDINATOR);
         journey.reassignCoordinator(created.caseId(),new CoordinatorReassignmentRequest("replacement-coordinator","Workload rebalance"));
         authenticate("coordinator-subject",Role.COORDINATOR);
@@ -270,6 +271,7 @@ class SecureJourneyCorrectionsTest {
         for(String[] person:new String[][]{{"replacement-coordinator","COORDINATOR","Replacement Coordinator"},{"lead-subject","COORDINATOR_LEAD","Team Lead"},{"coordinator-subject","COORDINATOR","Original Coordinator"},{"disabled-coordinator","COORDINATOR","Disabled Coordinator"}})
             com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, person[0], person[1], crypto.encrypt(person[2]));
         com.rehletshifaa.workforce.WorkforceTestData.leadTeam(jdbc, "CARE_COORDINATION", "lead-subject", "coordinator-subject","replacement-coordinator","disabled-coordinator");
+        for(String target:new String[]{"replacement-coordinator","lead-subject"})com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, target);
         jdbc.update("UPDATE workforce_people SET lifecycle_status='SIGNIN_DISABLED' WHERE subject='disabled-coordinator'");
         UUID coordinatorWork=workItem(created.caseId(),"coordinator-subject","COORDINATOR","OPEN"),operationsWork=workItem(created.caseId(),"operations-subject","OPERATIONS","OPEN"),doneWork=workItem(created.caseId(),"coordinator-subject","COORDINATOR","COMPLETED");
         authenticate("lead-subject",Role.COORDINATOR);
@@ -298,6 +300,7 @@ class SecureJourneyCorrectionsTest {
         for(String[] person:new String[][]{{"new-owner","COORDINATOR","New Owner"},{"lead-subject","COORDINATOR_LEAD","Team Lead"},{"coordinator-subject","COORDINATOR","Original Coordinator"},{"disabled-coordinator","COORDINATOR","Disabled Coordinator"}})
             com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, person[0], person[1], crypto.encrypt(person[2]));
         com.rehletshifaa.workforce.WorkforceTestData.leadTeam(jdbc, "CARE_COORDINATION", "lead-subject", "coordinator-subject","new-owner","disabled-coordinator");
+        for(String target:new String[]{"new-owner","lead-subject"})com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, target);
         jdbc.update("UPDATE workforce_people SET lifecycle_status='SIGNIN_DISABLED' WHERE subject='disabled-coordinator'");
         String caseNumber=jdbc.queryForObject("SELECT case_number FROM medical_cases WHERE id=?",String.class,created.caseId());
         // Unauthorized and refused transfers notify nobody.

@@ -3,6 +3,8 @@ package com.rehletshifaa.coordination.application;
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.casemanagement.domain.MedicalCase;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.coordination.domain.Routing.*;
 import com.rehletshifaa.coordination.infrastructure.CoordinationRepository;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
@@ -11,6 +13,7 @@ import com.rehletshifaa.journey.application.StaffWorkService;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.workforce.application.WorkforceDirectory;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,7 @@ import static com.rehletshifaa.coordination.application.CoordinationConfiguratio
  */
 @Service
 public class AssignmentEngine implements CoordinatorRoutingPort {
+    private final MedicalCaseRepository cases;
     private static final Set<String> ACTIONS = Set.of("AUTO", "ASSIGN", "REASSIGN", "QUEUE");
     private static final Set<String> CLOSED = Set.of("DRAFT", "CLOSED", "CANCELLED");
     private final CoordinationRepository repo;
@@ -44,7 +48,7 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
 
     public AssignmentEngine(CoordinationRepository repo, CoordinationConfigurationService config, CoordinatorEligibilityService eligibility,
                             CoordinatorScoringService scoring, Authority authority, WorkforceDirectory workforce, GovernanceAuditLog audit,
-                            StaffWorkService work, Clock clock) {
+                            StaffWorkService work, Clock clock, MedicalCaseRepository cases) { this.cases = cases;
         this.repo = repo; this.config = config; this.eligibility = eligibility; this.scoring = scoring; this.authority = authority;
         this.workforce = workforce; this.audit = audit; this.work = work; this.clock = clock;
     }
@@ -210,7 +214,11 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
         Decision d = new Decision(id, c.id(), p == null ? null : p.id(), p == null ? 0 : p.version(), preference == null ? null : preference.id(), c.owner(), selection.subject(),
                 selection.team(), selection.path(), explanation, candidates, selection.scores(), command.source(), command.reason(), now,
                 c.revision() + 1, CoordinatorScoringService.ALGORITHM);
-        repo.owner(c, selection.subject(), command.action().equals("AUTO") ? "ROUTING_ENGINE" : actor, explanation, now);
+        // A person's command records their own reason, and every manual (re)assignment is its own history entry, even to the
+        // current owner; automatic routing records the engine's explanation and leaves an unchanged owner alone.
+        boolean manual = !command.action().equals("AUTO");
+        repo.owner(c, selection.subject(), manual ? actor : "ROUTING_ENGINE", manual && command.reason() != null ? command.reason() : explanation,
+                manual && selection.subject() != null, now);
         if (selection.subject() == null) {
             UUID task = work.openWorkItem(new NewWorkItem(c.id(), "COORDINATION_ROUTING", "Coordinator assignment needed",
                     "Review the coordination queue", null, "COORDINATOR", false, p == null ? null : now.plus(Duration.ofHours(p.configuration().queueHours())),
@@ -221,9 +229,13 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
                         "Review the coordination queue", "routing:" + id + ":" + manager.subject(), true);
         } else {
             work.closeWorkItems(c.id(), "COORDINATION_ROUTING", "Coordination queue resolved");
-            if (!Objects.equals(c.owner(), selection.subject()))
-                work.notifyStaff(selection.subject(), c.id(), null, "COORDINATOR_ASSIGNED", "Care coordination assigned",
-                        "Review your work queue", "routing:" + id + ":" + selection.subject(), true);
+            // Nobody is told about a case they already own, or one they claimed or took over themselves.
+            if (!Objects.equals(c.owner(), selection.subject()) && !selection.subject().equals(actor)) {
+                if (c.owner() == null)
+                    work.notifyStaff(selection.subject(), c.id(), null, "COORDINATOR_ASSIGNED", "Care coordination assigned",
+                            "Review your work queue", "routing:" + id + ":" + selection.subject(), true);
+                else transferred(c, selection.subject(), actor, id);
+            }
         }
         repo.decision(d, actor, command.key(), payload);
         audit.record(actor, id.toString(), selection.subject() == null ? "COORDINATION_QUEUED" : "COORDINATOR_ASSIGNMENT_DECIDED", "SUCCESS",
@@ -231,6 +243,25 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
         if (resolvesQueue)
             audit.record(actor, id.toString(), "COORDINATION_QUEUE_RESOLVED", "SUCCESS", "case=" + c.id() + "; owner=" + selection.subject() + "; team=" + selection.team());
         return d;
+    }
+
+    /**
+     * OPS-1: the new owner of a transferred case is told in-app and by work email, inside this transaction, so a refused
+     * or rolled-back transfer notifies nobody. Case number and staff names only: the reason, patient details and
+     * documents stay in the case.
+     */
+    private void transferred(CaseFacts c, String newOwner, String actor, UUID decision) {
+        String caseNumber = cases.findById(c.id()).map(MedicalCase::getCaseNumber).orElse("");
+        String from = name(c.owner()), by = name(actor);
+        work.notifyStaff(newOwner, c.id(), null, "CASE_OWNERSHIP_TRANSFERRED", "A case has been transferred to you",
+                "You are now the owner of case " + caseNumber + (from == null ? "" : " (previously " + from + ")")
+                        + (by == null ? "" : ", transferred by " + by)
+                        + ". Open coordinator work on the case is now yours; the reason is in the assignment history.",
+                "ownership-transfer:" + decision, true);
+    }
+
+    private String name(String subject) {
+        return subject == null ? null : workforce.contact(subject).map(WorkforceDirectory.Contact::displayName).orElse(null);
     }
 
     private Selection choose(CaseFacts c, Policy p, Preference preference, List<Candidate> candidates) {

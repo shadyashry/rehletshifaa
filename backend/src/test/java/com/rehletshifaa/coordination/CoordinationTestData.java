@@ -12,7 +12,11 @@ import java.util.UUID;
 public final class CoordinationTestData {
     private CoordinationTestData() {}
 
-    /** Cardiology journey fixtures use the same governed team, capacity and policy facts as live routing. */
+    /**
+     * A general intake Coordinator under the same governed team, capacity and policy facts as live routing: the team and
+     * capacity serve every care area (an empty set), so uncategorised intake cases are eligible too, and the policy maps
+     * cardiology to that team.
+     */
     public static void eligibleCoordinator(JdbcTemplate jdbc, String subject) {
         Instant now = Instant.now();
         Instant from = now.minusSeconds(3600);
@@ -29,10 +33,10 @@ public final class CoordinationTestData {
                             + "VALUES(?,?,?,?,'ACTIVE','TEST','Journey routing fixture',0)", UUID.randomUUID(), team, subject, from);
         } else team = teams.getFirst();
         jdbc.update("INSERT INTO coordination_team_profiles(team_id,care_areas,languages,updated_by,updated_at,revision) "
-                        + "SELECT ?,'cardiology','en','TEST',?,0 WHERE NOT EXISTS(SELECT 1 FROM coordination_team_profiles WHERE team_id=?)",
+                        + "SELECT ?,'','en','TEST',?,0 WHERE NOT EXISTS(SELECT 1 FROM coordination_team_profiles WHERE team_id=?)",
                 team, now, team);
         jdbc.update("INSERT INTO coordinator_capacity(subject,maximum,on_duty,languages,care_areas,updated_by,updated_at,revision) "
-                        + "SELECT ?,100,TRUE,'en','cardiology','TEST',?,0 WHERE NOT EXISTS(SELECT 1 FROM coordinator_capacity WHERE subject=?)",
+                        + "SELECT ?,100,TRUE,'en','','TEST',?,0 WHERE NOT EXISTS(SELECT 1 FROM coordinator_capacity WHERE subject=?)",
                 subject, now, subject);
         if (jdbc.queryForObject("SELECT COUNT(*) FROM coordination_policy_versions WHERE effective_from<=? "
                 + "AND (effective_to IS NULL OR effective_to>?)", Long.class, now, now) == 0) {

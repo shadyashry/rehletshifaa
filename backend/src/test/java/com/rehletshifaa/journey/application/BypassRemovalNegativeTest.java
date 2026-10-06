@@ -57,7 +57,8 @@ class BypassRemovalNegativeTest {
         em.clear();
         caseId = created.caseId();
         auth("owner-coordinator", Role.COORDINATOR);
-        journey.claimCoordinatorCase(caseId, null);
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "owner-coordinator");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, caseId, "owner-coordinator")) journey.claimCoordinatorCase(caseId, null);
     }
 
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }

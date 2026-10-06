@@ -120,7 +120,7 @@ class ArchitectureRulesTest {
     private static final java.util.Set<String> JDBC_NOT_YET_CONVERTED = java.util.Set.of(
             "com.rehletshifaa.casemanagement.application.CaseNumberGenerator", // nextval: JPQL has no sequence function
             "com.rehletshifaa.coordination.application.CoordinationReadService",
-            "com.rehletshifaa.coordination.infrastructure.CoordinationRepository", // writes deferred until CL2 lands
+            "com.rehletshifaa.coordination.infrastructure.CoordinationRepository", // reads only (writes are JPA)
             "com.rehletshifaa.journey.application.CaseActionService",
             "com.rehletshifaa.journey.application.CaseHandoffService",
             "com.rehletshifaa.journey.application.ConsultantReferralService",

@@ -62,7 +62,8 @@ class JourneyServiceIntegrationTest {
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?",created.caseId()); // manual estimate + travel -> full ops+finance chain
 
-        authenticate("coordinator-subject",Role.COORDINATOR);journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        authenticate("coordinator-subject",Role.COORDINATOR);com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long intakeVersion=journey.workspace(created.caseId()).caseSummary().version();
         var ready=journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",intakeVersion));assertThat(ready.status()).isEqualTo("READY_FOR_CONSULTANT");
         UUID practitionerId=UUID.randomUUID();
@@ -109,7 +110,8 @@ class JourneyServiceIntegrationTest {
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         // travel_package_requested stays false -> Operations not required.
-        authenticate("coordinator-subject",Role.COORDINATOR);journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        authenticate("coordinator-subject",Role.COORDINATOR);com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",v));
         UUID practitionerId=UUID.randomUUID();
@@ -135,7 +137,8 @@ class JourneyServiceIntegrationTest {
         var created=cases.create(new CreateCaseRequest("Deposit", "Patient","Kenya","+254700000092","Cardiac reports","en",true,null,"dep@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
-        authenticate("coordinator-subject",Role.COORDINATOR);journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        authenticate("coordinator-subject",Role.COORDINATOR);com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",v));
         UUID practitionerId=UUID.randomUUID();
@@ -175,7 +178,8 @@ class JourneyServiceIntegrationTest {
         var created=cases.create(new CreateCaseRequest("Resend", "Patient","Kenya","+254700000091","Cardiac reports","en",true,null,"rs@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
-        authenticate("coordinator-subject",Role.COORDINATOR);journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        authenticate("coordinator-subject",Role.COORDINATOR);com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",v));
         UUID practitionerId=UUID.randomUUID();
@@ -208,7 +212,8 @@ class JourneyServiceIntegrationTest {
         var created=cases.create(new CreateCaseRequest("FX", "Patient","Kuwait","+96500000010","Cardiac reports","en",true,null,"fx@local.test","Asia/Kuwait","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
-        authenticate("coordinator-subject",Role.COORDINATOR);journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        authenticate("coordinator-subject",Role.COORDINATOR);com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",v));
         UUID practitionerId=UUID.randomUUID();
@@ -236,7 +241,8 @@ class JourneyServiceIntegrationTest {
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         // travel stays false -> Operations not required.
-        authenticate("coordinator-subject",Role.COORDINATOR);journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        authenticate("coordinator-subject",Role.COORDINATOR);com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",v));
         UUID practitionerId=UUID.randomUUID();
@@ -268,7 +274,8 @@ class JourneyServiceIntegrationTest {
         var created=cases.create(new CreateCaseRequest("Margin", "Patient","Kenya","+254700000077","Cardiac reports","en",true,null,"mg@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
-        authenticate("coordinator-subject",Role.COORDINATOR);journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        authenticate("coordinator-subject",Role.COORDINATOR);com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",v));
         UUID practitionerId=UUID.randomUUID();
@@ -330,7 +337,8 @@ class JourneyServiceIntegrationTest {
         var created=cases.create(new CreateCaseRequest("Final", "Patient","Kenya","+254700000090","Cardiac reports","en",true,null,"fq2@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
-        authenticate("coordinator-subject",Role.COORDINATOR);journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        authenticate("coordinator-subject",Role.COORDINATOR);com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","Intake complete",v));
         UUID practitionerId=UUID.randomUUID();

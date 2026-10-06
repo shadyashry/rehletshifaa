@@ -71,8 +71,10 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | casemanagement | `medical_cases` | W | casemanagement,clinic,coordination,journey |
 | directory | `practitioner_credentials` | W | clinic,journey |
 | clinic | `virtual_clinics` | R | clinic |
-| coordination | `coordination_routing_lock` | — | coordination |
-| coordination | `coordination_team_profiles` | — | coordination |
+| coordination | `coordination_routing_lock` | W | coordination |
+| coordination | `coordination_decisions` | W | coordination |
+| coordination | `coordination_policy_versions` | W | coordination |
+| coordination | `coordination_team_profiles` | W | coordination |
 | identity | `identity_operations` | W | access,identity |
 | identity | `identity_reconciliation_discrepancies` | W | identity |
 | identity | `identity_reconciliation_runs` | W | identity |
@@ -236,7 +238,7 @@ touches it). Either implement the feature or drop them before `main` (pre-produc
   verification, account-link requests, patient action items, portal preferences — 16 tables, 55 writes. Idempotent
   inserts keyed by a unique column (staff notifications, payment ledger) are HQL `INSERT … ON CONFLICT DO NOTHING`
   (race-safe; the `WHERE NOT EXISTS` they replace was not); update-then-insert upserts load or create the entity.
-  **Deferred:** the coordination tables (`coordination_*`, `coordinator_capacity`, `consultant_routing_preferences`)
+  **Deferred:** the coordination tables (`coordination_*`, `coordinator_capacity`, `consultant_routing_preferences`) *(Converted 2026-10-06 after CL2.)*
   until the in-progress CL2 routing slice lands — it is rewriting `CoordinationRepository`.
   Verification: full suite = baseline; `PostgresJpaMappingTest` PASS.
 
@@ -261,12 +263,11 @@ touches it). Either implement the feature or drop them before `main` (pre-produc
   counter table would add a hot row lock to every intake.
 - `LocalDemoDataSeeder` (`@Profile("local")`, runs once at startup) still writes with JDBC until it moves to its own
   dev-data package.
-- `CoordinationRepository` keeps its own-table writes (`coordination_*`, `coordinator_capacity`,
-  `consultant_routing_preferences`) until the in-progress CL2 routing slice lands; its case-table writes are JPA.
 
 ## Where it stands (2026-10-06)
 
-- **Writes:** every table is JPA-written except the three exceptions above. The patient merge (`mergePatient`) was the
+- **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
+  2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
 - **Reads:** 17 classes still read with `JdbcClient` — `JourneyService` (~85 statements), `PaymentService`,
   `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`, `PatientAccountService`,
@@ -280,5 +281,4 @@ Convert the read models, one service per slice, as query services rather than li
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). Start with
 `StaffWorkService` and `CaseActionService` (work queues), then `JourneyService` split by view. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`. Prerequisite for confidence: the CL2 routing baseline (101 failures) must be
-green, because ~50 proposal-path tests stop at coordinator routing today. Move `LocalDemoDataSeeder` to a `devdata`
-package; convert the coordination writes after CL2.
+green (done 2026-10-06: 8 CL3 readiness failures remain). Move `LocalDemoDataSeeder` to a `devdata` package.

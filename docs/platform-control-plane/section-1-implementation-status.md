@@ -1135,10 +1135,10 @@ Implementation slices (kept green independently):
 | Slice | Scope | State |
 |---|---|---|
 | CL1 | Remove Keycloak business-role compatibility provisioning and its patient-role mutation | DONE |
-| CL2 | Replace `LEGACY` Journey admission with explicit `STANDARD` versus `JOURNEY`; route every standard intake through governed team/capacity eligibility and remove unrestricted self-claim | PLANNED |
+| CL2 | Replace `LEGACY` Journey admission with explicit `STANDARD` versus `JOURNEY`; route every standard intake through governed team/capacity eligibility and remove unrestricted self-claim | DONE (2026-10-06, Claude) — see "CL2 delivered" below |
 | CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | PLANNED |
 | CL4 | Remove obsolete patient/provider/plaintext compatibility data paths and finalize clean pre-production schema | PLANNED |
-| CL5 | Move all SQL/JDBC out of application services module by module — **now via Spring Data JPA** (owner decision 2026-10-06, technical-decisions §29); live tracker `jpa-migration-status.md` | IN PROGRESS — all writes JPA except coordination own tables (after CL2) and the local seeder; 17 classes still read with JdbcClient (ratchet in `ArchitectureRulesTest`) |
+| CL5 | Move all SQL/JDBC out of application services module by module — **now via Spring Data JPA** (owner decision 2026-10-06, technical-decisions §29); live tracker `jpa-migration-status.md` | IN PROGRESS — all writes JPA except the local seeder; 17 classes still read with JdbcClient (ratchet in `ArchitectureRulesTest`) |
 | CL6 | Enforce the boundaries with ArchUnit, finish documentation/test cleanup, run focused and full backend gates | PLANNED |
 | CL7 | Add JaCoCo/Sonar configuration and run Sonar for the sole Maven backend when a Sonar server/project/token and scanner plugin are available | PLANNED |
 
@@ -1163,9 +1163,34 @@ PostgreSQL database (H2 passed) and the dev backend could not start. It now skip
 migrations to a fresh PostgreSQL 17 (`PostgresJpaMappingTest`). PostgreSQL DDL is transactional, so the failed attempts left the dev database at V71; V72 applies on the next start
 unless its preflight finds LEGACY admissions or unnamed patients (then reset the pre-production database).
 
-**Next exact action:** implement the CL2 standard-intake contract with a single lock order, durable no-candidate
-queue and no unrestricted self-claim, then obtain Astra review before continuing to patient readiness. Preserve
-unrelated brand/theme work and do not run concurrent builds that share `backend/target`.
+**CL2 delivered (2026-10-06, Claude, continuing Codex's in-progress work).** The admission vocabulary was already
+`COORDINATION` (the standard path) versus `JOURNEY` (V72), and the claim path already required governed eligibility.
+Completed:
+
+- *Routed intake starts intake review.* A standard (`COORDINATION`) admission routed to an eligible Coordinator moves the
+  case RECEIVED → INTAKE_REVIEW (history actor `ROUTING_ENGINE`), exactly as a claim does; with nobody eligible or no
+  policy it stays RECEIVED with the durable queue item. Before, a routed case sat in RECEIVED with no owner action.
+- *Notifications.* Nobody is notified about a case they claimed or took over themselves. A transfer from one owner to
+  another sends the OPS-1 `CASE_OWNERSHIP_TRANSFERRED` notification and work email again (case number and staff names
+  only); CL2 had replaced it with a generic notice.
+- *Assignment history keeps the person's reason* for manual (re)assignments, and every manual reassignment is its own
+  history entry even to the current owner; automatic routing records the engine's explanation.
+- *Single lock order* unchanged: case row → routing lock (engine) and case → governance → routing (admission).
+- *Tests moved to the governed contract.* `CoordinationTestData.eligibleCoordinator` now models a general intake
+  Coordinator (team and capacity serve every care area); all claim sites use it; transfer targets are made eligible;
+  assertions that predate the durable queue now exclude the team-level `COORDINATION_ROUTING` item.
+- *Persistence.* The coordination own-table writes (policies, preferences, team profiles, capacity, decisions, routing
+  lock) are now JPA (`jpa-migration-status.md`).
+
+Verification: full backend suite 570 tests, **8 failures (was 101)**, all in CL3 territory (below); `PostgresJpaMappingTest`
+PASS.
+
+**Next exact action:** obtain Astra review of CL2, then CL3. The 8 remaining failures are CL3 test debt: Codex tightened
+`CustomerReadinessService` so an account is activated only when the profile *and* the Keycloak account are ACTIVE (the
+old rule accepted an active profile or any linked login). `CoordinatorCaseActionsTest` (6) and
+`PatientActivationJourneyTest` (2) still assume profile completion alone activates the account; decide the evidence
+model in CL3 and move their fixtures to complete account setup. Preserve unrelated brand/theme work and do not run
+concurrent builds that share `backend/target`.
 
 ### Open evidence and next exact action
 

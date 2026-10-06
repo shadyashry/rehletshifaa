@@ -487,7 +487,8 @@ class OperationalWorkflowTest {
         cases.submit(created.caseId()); em.flush(); em.clear();
         seedDoctorProfile();seedCoordinatorProfile();
         authenticate("coordinator-subject", Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(), "pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "pod");
         long version = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "Ready", version));
         em.flush(); SecurityContextHolder.clearContext();
@@ -531,7 +532,8 @@ class OperationalWorkflowTest {
         var created = cases.create(new CreateCaseRequest("Workflow", "Patient", "Kenya", whatsapp, "Reports", "en", true, null, email, "Africa/Nairobi"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject", Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(), "pod"); // claiming moves the case into INTAKE_REVIEW
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "pod"); // claiming moves the case into INTAKE_REVIEW
         em.flush(); SecurityContextHolder.clearContext();
         return created.caseId();
     }

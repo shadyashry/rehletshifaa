@@ -238,3 +238,17 @@ semantics, safe shared caching, searchable correlated logs). It is not B yet bec
 is only half met — 17 read-heavy classes still issue SQL — and because the journey module's read models and the CL2
 baseline leave a large part of the patient journey without passing tests. Converting the remaining read models as
 query services after CL2 is green is the step that moves this to B.
+
+---
+
+## Addendum — CL2 completed (2026-10-06, same day)
+
+- The CL2 standard-intake contract is finished (details: `section-1-implementation-status.md`, "CL2 delivered"): a routed
+  standard intake starts intake review; self-claims and self-takeovers notify nobody; transfers send the OPS-1
+  notification again; manual (re)assignments keep the person's reason.
+- The coordination module's own tables are now JPA-written, so **every production write is JPA** except the
+  `local`-profile seeder.
+- Full suite: 570 tests, **8 failures (was 101)**, all CL3 readiness tests that still assume profile completion alone
+  activates the account. The proposal-path tests that were masked by the routing failure now pass.
+- Effect on §14/§15: the "CL2 baseline" debt row is closed and testability improves; the remaining items (read models,
+  OpenTelemetry, Elastic TLS, CL3) are unchanged. The verdict stays **C** until the read models are converted.

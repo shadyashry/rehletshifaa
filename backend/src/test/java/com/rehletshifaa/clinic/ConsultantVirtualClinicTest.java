@@ -348,7 +348,8 @@ class ConsultantVirtualClinicTest {
         var created = cases.create(new CreateCaseRequest("Case", "Patient", "Kenya", "+254700000020", "Cardiac reports", "en", true, null, "link@local.test", "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject", Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "ready", v));
         return created.caseId();

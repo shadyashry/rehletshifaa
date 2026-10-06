@@ -42,6 +42,9 @@ class PatientActivationJourneyTest {
     @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort; com.rehletshifaa.identity.LocalPatientIdentitySimulator identity;
     @org.junit.jupiter.api.BeforeEach void simulator() { identity = (com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort; identity.reset(); }
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+
+    /** Raw SQL behind JPA's back: flush pending entity changes first, then drop managed instances the SQL made stale. */
+    private int raw(String sql, Object... args) { em.flush(); int changed = jdbc.update(sql, args); em.clear(); return changed; }
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---------- secure continuation link ----------
@@ -72,7 +75,7 @@ class PatientActivationJourneyTest {
         accepted();
         assertThatThrownBy(() -> publicCases.onboardingSummary("clearly-invalid-token")).isInstanceOf(ApiException.class);
         String token = onboardingToken();
-        jdbc.update("UPDATE case_access_links SET expires_at=? WHERE purpose='ONBOARDING'", Instant.now().minusSeconds(60));
+        raw("UPDATE case_access_links SET expires_at=? WHERE purpose='ONBOARDING'", Instant.now().minusSeconds(60));
         assertThatThrownBy(() -> publicCases.onboardingSummary(token)).isInstanceOf(ApiException.class);
     }
 
@@ -250,7 +253,7 @@ class PatientActivationJourneyTest {
 
     @Test void aCancelledCaseCannotBeActivated() throws Exception {
         var ctx = accepted(); String g = grant(ctx);
-        jdbc.update("UPDATE medical_cases SET status='CANCELLED' WHERE id=?", ctx.caseId);
+        raw("UPDATE medical_cases SET status='CANCELLED' WHERE id=?", ctx.caseId);
         assertThatThrownBy(() -> activation.activate(ctx.token, g, request("Link Patient")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("no longer active");
     }
@@ -292,7 +295,7 @@ class PatientActivationJourneyTest {
     @Test void readingAHistoricalDepositNeverRewritesItsTerms() throws Exception {
         var ctx = accepted();
         String legacy = "Refundable in full before case coordination begins; non-refundable once coordination has started.";
-        jdbc.update("UPDATE deposit_components SET cancellation_terms=? WHERE deposit_id IN (SELECT id FROM deposits WHERE case_id=?)", legacy, ctx.caseId);
+        raw("UPDATE deposit_components SET cancellation_terms=? WHERE deposit_id IN (SELECT id FROM deposits WHERE case_id=?)", legacy, ctx.caseId);
         activation.deposit(ctx.token, grant(ctx));
         activation.prefill(ctx.token, grant(ctx)); em.flush();
         assertThat(jdbc.queryForObject("SELECT dc.cancellation_terms FROM deposit_components dc JOIN deposits d ON d.id=dc.deposit_id WHERE d.case_id=?", String.class, ctx.caseId))
@@ -391,21 +394,21 @@ class PatientActivationJourneyTest {
         var ctx = accepted(); String g = grant(ctx);
         activation.activate(ctx.token, g, request("Link Patient")); em.flush();
         // Missing setup never becomes a credential that can bind an arbitrary signed-in identity.
-        jdbc.update("UPDATE patient_profiles SET external_subject=NULL,account_status='NOT_PROVISIONED',account_setup_requested_at=NULL WHERE id=?", patientId(ctx.caseId));
+        raw("UPDATE patient_profiles SET external_subject=NULL,account_status='NOT_PROVISIONED',account_setup_requested_at=NULL WHERE id=?", patientId(ctx.caseId));
         assertThatThrownBy(() -> activation.portalAccess(ctx.token, g))
                 .isInstanceOf(ApiException.class).hasMessageContaining("Resume profile submission");
     }
     @Test void anAlreadyLinkedProfileIsSentStraightToSignIn() throws Exception {
         var ctx = accepted(); String g = grant(ctx);
         activation.activate(ctx.token, g, request("Link Patient")); em.flush();
-        jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=?", "already-bound", patientId(ctx.caseId));
+        raw("UPDATE patient_profiles SET external_subject=? WHERE id=?", "already-bound", patientId(ctx.caseId));
         var handoff = activation.portalAccess(ctx.token, g);
         assertThat(handoff.alreadyLinked()).isTrue();
     }
 
     @Test void activationRefusesMissingOnboardingAndDoesNotCreateEvidence() throws Exception {
         var ctx = accepted(); String g = grant(ctx);
-        jdbc.update("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
+        raw("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
         assertThatThrownBy(() -> activation.activate(ctx.token, g, request("Link Patient")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("start onboarding");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM patient_onboardings WHERE case_id=?", Integer.class, ctx.caseId)).isZero();
@@ -415,7 +418,7 @@ class PatientActivationJourneyTest {
     @Test void activeProfileReplayDoesNotReplaceAccountEmail() throws Exception {
         var ctx = accepted(); String g = grant(ctx);
         activation.activate(ctx.token, g, request("Link Patient")); em.flush();
-        jdbc.update("UPDATE patient_profiles SET external_subject=NULL,account_status='NOT_PROVISIONED',account_setup_requested_at=NULL WHERE id=?", patientId(ctx.caseId));
+        raw("UPDATE patient_profiles SET external_subject=NULL,account_status='NOT_PROVISIONED',account_setup_requested_at=NULL WHERE id=?", patientId(ctx.caseId));
         ProfileActivationRequest submitted = request("Link Patient");
         var changed = new ProfileActivationRequest(submitted.givenName(), submitted.familyName(), submitted.singleLegalName(), submitted.preferredName(),
                 "replacement@local.test", submitted.phone(), submitted.mobileOwner(), submitted.dateOfBirth(), submitted.nationality(), submitted.countryOfResidence(),
@@ -496,7 +499,7 @@ class PatientActivationJourneyTest {
     private Ctx releasePreliminary(String whatsapp, String email) throws Exception {
         var created = cases.create(new CreateCaseRequest("Link", "Patient", "Kenya", whatsapp, "Cardiac reports", "en", true, null, email, "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
-        jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
+        raw("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
         authenticate("coordinator-subject", Role.COORDINATOR);
         com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
         if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject"))
@@ -509,7 +512,7 @@ class PatientActivationJourneyTest {
         journey.acceptDoctorAssignment(created.caseId(), doctorAssignment.id(), new AssignmentDecisionRequest(true,null));
         var review = journey.saveClinicalReview(created.caseId(), new ClinicalReviewRequest("Reviewed", "SUITABLE", null, "Imaging", "Recommended intervention", "Alt", "Risks", "Seq", "7 days", "Follow-up"));
         journey.approveClinicalReview(created.caseId(), review.id());
-        jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",
+        raw("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,price_egp,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?)",
                 UUID.randomUUID(), review.id(), "Consultant treatment package", new BigDecimal("1000.00"), "EGP", 0, new BigDecimal("1000.00"), true);
         authenticate("coordinator-subject", Role.COORDINATOR);
         var proposal = journey.createProposal(created.caseId(), new ProposalDraftRequest(review.id(), "en", "Plan", "EGP", "Incl", "Excl", "Deposit", "Refund", "Not consent", Instant.now().plusSeconds(86400), List.of(new ProposalItemRequest("MEDICAL", "Treatment package", BigDecimal.ONE, new BigDecimal("1000.00"), false, 0)), null));
@@ -546,7 +549,7 @@ class PatientActivationJourneyTest {
     private UUID patientId(UUID caseId) { return jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?", UUID.class, caseId); }
     private String profileStatus(UUID caseId) { return jdbc.queryForObject("SELECT profile_status FROM patient_profiles WHERE id=?", String.class, patientId(caseId)); }
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
-    private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }
+    private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); raw("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); raw("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }
     private void seedStaff() { if (count("SELECT count(*) FROM workforce_people WHERE subject=?", "operations-subject") > 0) return; com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "operations-subject", "OPERATIONS", crypto.encrypt("Operations One")); com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-subject", "FINANCE", crypto.encrypt("Finance One")); }
     private void authenticate(String subject, Role... roles) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, roles); }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }

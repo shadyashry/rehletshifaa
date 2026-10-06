@@ -304,7 +304,9 @@ class UatDefectCorrectionsTest {
         assertThat(mail.templateKey()).isEqualTo("new-case-received");
         assertThat(mail.data().get("case")).isEqualTo(created.caseNumber());
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE case_id=?", created.caseId())).isZero();
-        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=?", created.caseId())).isZero();
+        // CL2: the only work is the team-level routing queue item, owned by nobody until a Coordinator is assigned.
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_subject IS NOT NULL", created.caseId())).isZero();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='COORDINATION_ROUTING'", created.caseId())).isEqualTo(1);
         authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.coordinatorQueue()).extracting(CaseView::id).contains(created.caseId());
         assertThat(journey.coordinatorQueue().stream().filter(c -> c.id().equals(created.caseId())).findFirst().orElseThrow().coordinatorSubject()).isNull();
@@ -438,7 +440,8 @@ class UatDefectCorrectionsTest {
         cases.submit(created.caseId()); em.flush(); em.clear();
         seedDoctorProfile(); seedCoordinatorProfile();
         authenticate("coordinator-subject", Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(), "pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "pod");
         em.flush(); SecurityContextHolder.clearContext();
         return created.caseId();
     }

@@ -81,6 +81,8 @@ class JourneyStageProjectionIntegrationTest {
         return bound.caseId();
     }
     long countForCase(String table, UUID caseId) { return jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE case_id=?", Long.class, caseId); }
+    /** Work items projected from journey stages (staff work and patient actions); routing's queue item for an unowned coordinator stage is not one. */
+    long journeyTasks(UUID caseId) { return jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type<>'COORDINATION_ROUTING'", Long.class, caseId); }
     Projection byNode(List<Projection> all, String nodeKey) { return all.stream().filter(p -> p.nodeKey().equals(nodeKey)).findFirst().orElseThrow(); }
     long activeEngineTasks(UUID caseId, String nodeKey) {
         return engine.getTaskService().createTaskQuery().processInstanceBusinessKey("case:" + caseId).taskDefinitionKey("n_" + nodeKey).count();
@@ -96,7 +98,7 @@ class JourneyStageProjectionIntegrationTest {
         assertThat(review.stageType()).isEqualTo("STAFF_TASK");
         assertThat(review.status()).isEqualTo("OPEN");
         assertThat(review.versionId()).isEqualTo(version.id());
-        assertThat(countForCase("case_tasks", caseId)).isEqualTo(1);
+        assertThat(journeyTasks(caseId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT task_type FROM case_tasks WHERE id=?", String.class, review.caseTaskId())).isEqualTo("JOURNEY:review");
         assertThat(jdbc.queryForObject("SELECT owner_role FROM case_tasks WHERE id=?", String.class, review.caseTaskId())).isEqualTo("COORDINATOR");
         assertThat(jdbc.queryForObject("SELECT visibility_scope FROM case_tasks WHERE id=?", String.class, review.caseTaskId())).isEqualTo("INTERNAL");
@@ -109,14 +111,14 @@ class JourneyStageProjectionIntegrationTest {
         var first = projections.sync(caseId);
         var second = projections.sync(caseId);
         assertThat(second).isEqualTo(first);
-        assertThat(countForCase("case_tasks", caseId)).isEqualTo(1);
+        assertThat(journeyTasks(caseId)).isEqualTo(1);
         assertThat(countForCase("journey_stage_projections", caseId)).isEqualTo(1);
     }
 
     @Test void concurrentProjectionCreatesNoDuplicate() throws Exception {
         UUID caseId = admitAndStart();
         race(() -> projections.sync(caseId));
-        assertThat(countForCase("case_tasks", caseId)).isEqualTo(1);
+        assertThat(journeyTasks(caseId)).isEqualTo(1);
         assertThat(countForCase("journey_stage_projections", caseId)).isEqualTo(1);
     }
 
@@ -138,7 +140,7 @@ class JourneyStageProjectionIntegrationTest {
         var first = projections.completeWorkItem(caseId, "review", null);
         var second = projections.completeWorkItem(caseId, "review", null);
         assertThat(second).isEqualTo(first);
-        assertThat(countForCase("case_tasks", caseId)).isEqualTo(2);
+        assertThat(journeyTasks(caseId)).isEqualTo(2);
         assertThat(activeEngineTasks(caseId, "provide")).isEqualTo(1);
     }
 
@@ -151,7 +153,7 @@ class JourneyStageProjectionIntegrationTest {
                 .hasMessageContaining("No projected Journey stage");
         assertThat(activeEngineTasks(caseId, "review")).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT status FROM journey_stage_projections WHERE case_id=? AND node_key='review'", String.class, caseId)).isEqualTo("OPEN");
-        assertThat(countForCase("case_tasks", caseId)).isEqualTo(1);
+        assertThat(journeyTasks(caseId)).isEqualTo(1);
     }
 
     @Test void finalRegisteredPatientHandlerPublishesWithoutBypassingCompilation() {

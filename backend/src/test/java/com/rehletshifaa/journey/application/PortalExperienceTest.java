@@ -32,6 +32,8 @@ class PortalExperienceTest {
     private void auth(String subject,Role...roles){com.rehletshifaa.authority.TestPrincipals.signIn(jdbc,crypto,subject,roles);}
     private UUID intake(){var result=cases.create(new CreateCaseRequest("Private", "Patient","Kenya","+254700000023","Needs cardiac review","en",true,null,null,null,"cardiology"));cases.submit(result.caseId());em.flush();em.clear();return result.caseId();}
     private WorkforceTestData workforce(){return new WorkforceTestData(jdbc,crypto,Instant.now());}
+    /** Governed routing facts (team profile, capacity, effective policy) that make {@code subject} eligible to claim. */
+    private void eligible(String...subjects){for(String s:subjects)com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc,s);}
     /** An active team in the function, led by {@code lead}, with the given members (the lead is a member too). */
     private UUID team(String function,String lead,String...members){
         UUID team=UUID.randomUUID();Instant from=Instant.now().minusSeconds(3600);
@@ -53,11 +55,12 @@ class PortalExperienceTest {
         assertThatThrownBy(()->journey.workspace(id)).isInstanceOf(ApiException.class);
         assertThatThrownBy(()->journey.assertCanRead(id)).isInstanceOf(ApiException.class);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_INTAKE_PREVIEWED'",Integer.class,id)).isEqualTo(1);
+        eligible("coordinator-a");
         journey.claimCoordinatorCase(id,null);
         assertThat(journey.workspace(id).intakeSummary()).isEqualTo("Needs cardiac review");
         auth("coordinator-b",Role.COORDINATOR);
         assertThatThrownBy(()->journey.intakePreview(id)).isInstanceOf(ApiException.class);
-        assertThatThrownBy(()->journey.claimCoordinatorCase(id,null)).isInstanceOf(ApiException.class).hasMessageContaining("primary coordinator");
+        assertThatThrownBy(()->journey.claimCoordinatorCase(id,null)).isInstanceOf(ApiException.class).hasMessageContaining("CASE_INTAKE"); // refused before the owner is revealed
         assertThat(journey.coordinatorQueue()).extracting(c->c.id()).doesNotContain(id);
         auth("doctor",Role.CONSULTANT);assertThatThrownBy(()->journey.intakePreview(id)).isInstanceOf(ApiException.class);
     }
@@ -66,6 +69,7 @@ class PortalExperienceTest {
         UUID leadTeam=team("CARE_COORDINATION","lead","report","sublead");
         team("CARE_COORDINATION","sublead","deep");
         UUID mine=intake(),deep=intake(),outside=intake(),unowned=intake();
+        eligible("report","deep","outside","sublead");
         auth("report",Role.COORDINATOR);journey.claimCoordinatorCase(mine,null);
         auth("deep",Role.COORDINATOR);journey.claimCoordinatorCase(deep,null);
         auth("outside",Role.COORDINATOR);journey.claimCoordinatorCase(outside,null);

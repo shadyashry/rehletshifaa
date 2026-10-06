@@ -1,13 +1,17 @@
 package com.rehletshifaa.journey.application;
 
-import com.rehletshifaa.shared.audit.GovernanceAuditLog;
+import com.rehletshifaa.casemanagement.application.CaseStatusLog;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
-import com.rehletshifaa.journey.domain.JourneyAdmission.Decision;
+import com.rehletshifaa.casemanagement.domain.CaseStatus;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.domain.JourneyAdmission.Authority;
+import com.rehletshifaa.journey.domain.JourneyAdmission.Decision;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionStore;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionStore.Admission;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingStore;
 import com.rehletshifaa.journey.infrastructure.JourneyDeploymentStore;
+import com.rehletshifaa.shared.audit.GovernanceAuditLog;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -20,13 +24,16 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import java.security.MessageDigest;
+
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
-import java.time.Clock;
-import java.time.Instant;
+
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * Selects the current intake authority under the database admission policy. Reacts to the
@@ -51,6 +58,8 @@ import java.time.Instant;
  */
 @Service
 public class JourneyProductionIntakeService {
+    private final CaseStatusLog statusLog;
+    private final MedicalCaseRepository cases;
     private static final Logger log = LoggerFactory.getLogger(JourneyProductionIntakeService.class);
 
     private final JourneyAdmissionPolicyService policies;
@@ -70,7 +79,7 @@ public class JourneyProductionIntakeService {
             com.rehletshifaa.journey.infrastructure.JourneyDefinitionStore definitions,
             JourneyDeploymentStore deployments, JourneyCaseBindingStore bindings, JourneyCaseAdmissionStore admissions,
             ObjectProvider<JourneyRuntimePort> runtimes, JourneyProjectionService projections, GovernanceAuditLog audit,
-            CoordinatorRoutingPort routing, PlatformTransactionManager transactions, MeterRegistry meters, Clock clock) {
+            CoordinatorRoutingPort routing, PlatformTransactionManager transactions, MeterRegistry meters, Clock clock, MedicalCaseRepository cases, CaseStatusLog statusLog) { this.statusLog = statusLog; this.cases = cases;
         this.policies=policies; this.definitions=definitions; this.deployments = deployments; this.bindings = bindings;
         this.admissions = admissions; this.runtimes = runtimes; this.projections = projections; this.audit = audit; this.routing = routing;
         this.separate = new TransactionTemplate(transactions);
@@ -83,6 +92,11 @@ public class JourneyProductionIntakeService {
     @Transactional
     public void onCaseSubmitted(IntakeEvents.CaseSubmitted event) {
         admitIfEligible(event.caseId());
+    }
+
+    private void startIntakeReview(UUID caseId, String owner, Instant at) {
+        if (cases.moveStatus(caseId, CaseStatus.RECEIVED, CaseStatus.INTAKE_REVIEW, micros(at)) == 1)
+            statusLog.record(caseId, "RECEIVED", "INTAKE_REVIEW", "ROUTING_ENGINE", "SYSTEM", "Routed to eligible Coordinator " + owner, at);
     }
 
     /** New-case-only: a case already admitted or bound (any mode) is never re-evaluated — authority never switches. */
@@ -107,7 +121,9 @@ public class JourneyProductionIntakeService {
 
         if (!decision.journey()) {
             record(caseId, decision);
-            routing.routeCoordinationIntake(caseId);
+            // A standard intake routed to an eligible Coordinator starts intake review, exactly as a claim does; with nobody
+            // eligible (or no routing policy) it stays RECEIVED with a queue item for the Care Coordination Manager.
+            routing.routeCoordinationIntake(caseId).ifPresent(owner -> startIntakeReview(caseId, owner, evaluatedAt));
             audit.record("SYSTEM", caseId.toString(), "COORDINATION_ADMISSION_SELECTED", "SUCCESS", evidence(decision));
             count(decision);
             return;

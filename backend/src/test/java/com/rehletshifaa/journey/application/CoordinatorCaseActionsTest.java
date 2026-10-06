@@ -43,6 +43,9 @@ class CoordinatorCaseActionsTest {
     @Autowired PatientActivationService activation; @Autowired PaymentService payment; @Autowired CaseActionService caseActions;
     @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff;
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+
+    /** Raw SQL behind JPA's back: flush pending entity changes first, then drop managed instances the SQL made stale. */
+    private int raw(String sql, Object... args) { em.flush(); int changed = jdbc.update(sql, args); em.clear(); return changed; }
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---------- stale work ----------
@@ -61,7 +64,7 @@ class CoordinatorCaseActionsTest {
     @Test void beforeReleaseTheMissingInternalSignOffIsTheCurrentAction() throws Exception {
         var ctx = recommended();
         // A manually priced service on the recommendation: Finance must approve before release.
-        jdbc.update("UPDATE clinical_review_cost_estimates SET catalog_service_id=NULL,requires_finance_approval=TRUE WHERE clinical_review_id=?", ctx.reviewId());
+        raw("UPDATE clinical_review_cost_estimates SET catalog_service_id=NULL,requires_finance_approval=TRUE WHERE clinical_review_id=?", ctx.reviewId());
         createProposal(ctx); em.flush();
         CaseActionsView a = journey.workspace(ctx.caseId()).actions();
         assertThat(a.currentAction().code()).isEqualTo("ASSIGN_FINANCE");
@@ -74,7 +77,7 @@ class CoordinatorCaseActionsTest {
     @Test void anAcknowledgedProposalNeverShowsPrepareProposalEvenFromStaleData() throws Exception {
         var ctx = acknowledged();
         // Data from before the fix: an item that was never closed when the proposal was created.
-        jdbc.update("UPDATE case_tasks SET status='OPEN',completed_at=NULL WHERE case_id=? AND task_type='PREPARE_PROPOSAL'", ctx.caseId);
+        raw("UPDATE case_tasks SET status='OPEN',completed_at=NULL WHERE case_id=? AND task_type='PREPARE_PROPOSAL'", ctx.caseId);
         authenticate("coordinator-subject", Role.COORDINATOR);
         CaseWorkspace ws = journey.workspace(ctx.caseId);
 
@@ -118,7 +121,7 @@ class CoordinatorCaseActionsTest {
         assertThat(blocked.availableActions()).doesNotContain("ASSIGN_OPERATIONS", "RESEND_ONBOARDING_LINK");
 
         // The patient verifies the new channel: the patient blocker closes and the deposit becomes our move.
-        jdbc.update("UPDATE patient_profiles SET phone_verified_at=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", Instant.now(), ctx.caseId);
+        raw("UPDATE patient_profiles SET phone_verified_at=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", Instant.now(), ctx.caseId);
         CaseActionsView ours = journey.workspace(ctx.caseId).actions();
         assertThat(ours.waitingOn()).isEqualTo("STAFF");
         assertThat(ours.currentAction().code()).isEqualTo("WORK_ITEM");
@@ -296,7 +299,7 @@ class CoordinatorCaseActionsTest {
     @Test void aCoordinatorWhoDoesNotOwnTheCaseGetsNoActions() throws Exception {
         var ctx = acknowledged();
         com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "other-coordinator", "COORDINATOR_LEAD", crypto.encrypt("Lead"));
-        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+        raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
                 UUID.randomUUID(), ctx.caseId, "other-coordinator", "COORDINATOR", "SECONDARY", "ACTIVE", "Observer", "system", Instant.now(), Instant.now());
         authenticate("other-coordinator", Role.COORDINATOR, Role.COORDINATOR);
         CaseActionsView a = journey.workspace(ctx.caseId).actions();
@@ -313,7 +316,8 @@ class CoordinatorCaseActionsTest {
         var created = cases.create(new CreateCaseRequest("Case", "Patient", "Kenya", "+254700000020", "Cardiac reports", "en", true, null, "link@local.test", "Africa/Nairobi", "cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject", Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "ready", v));
         UUID catalogId = seedDoctorWithCatalog(); seedStaff();
@@ -362,7 +366,7 @@ class CoordinatorCaseActionsTest {
 
     /** An Operations assignment that outlived the pre-release travel-package step; the deposit gate refuses a new one at this stage. */
     private void seedOperationsAssignment(Ctx ctx) {
-        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+        raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
                 UUID.randomUUID(), ctx.caseId, "operations-subject", "OPERATIONS", "PRIMARY", "ACTIVE", "Travel package", "coordinator-subject", Instant.now(), Instant.now());
     }
 
@@ -376,9 +380,9 @@ class CoordinatorCaseActionsTest {
 
     private UUID seedDoctorWithCatalog() {
         UUID id = UUID.randomUUID(), catalogId = UUID.randomUUID();
-        jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now());
-        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now());
-        jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", catalogId, id, "CARD-CONSULT", "Diagnostic cardiology consultation", "Consultation", new BigDecimal("3500.00"), true, "admin-subject", Instant.now(), Instant.now());
+        raw("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now());
+        raw("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now());
+        raw("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", catalogId, id, "CARD-CONSULT", "Diagnostic cardiology consultation", "Consultation", new BigDecimal("3500.00"), true, "admin-subject", Instant.now(), Instant.now());
         return catalogId;
     }
     private void seedStaff() {
