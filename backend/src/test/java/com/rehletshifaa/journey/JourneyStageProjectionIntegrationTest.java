@@ -275,13 +275,13 @@ class JourneyStageProjectionIntegrationTest {
 
     // ---------------- Integration: no regression on existing behaviour ----------------
 
-    @Test void existingActiveLegacyCasesRemainUnchanged() {
-        var legacy = cases.create(intake());
-        cases.submit(legacy.caseId());
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_case_bindings WHERE case_id=?", Integer.class, legacy.caseId())).isZero();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_stage_projections WHERE case_id=?", Integer.class, legacy.caseId())).isZero();
-        assertThat(cases.findById(legacy.caseId()).getStatus().name()).isEqualTo("RECEIVED");
-        assertThatThrownBy(() -> projections.sync(legacy.caseId())).hasMessageContaining("not found");
+    @Test void coordinationCasesGetNoJourneyProjection() {
+        var standard = cases.create(intake());
+        cases.submit(standard.caseId());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_case_bindings WHERE case_id=?", Integer.class, standard.caseId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_stage_projections WHERE case_id=?", Integer.class, standard.caseId())).isZero();
+        assertThat(cases.findById(standard.caseId()).getStatus().name()).isEqualTo("RECEIVED");
+        assertThatThrownBy(() -> projections.sync(standard.caseId())).hasMessageContaining("not found");
     }
 
     List<List<Projection>> race(Callable<List<Projection>> action) throws Exception {

@@ -16,10 +16,9 @@ import java.util.UUID;
  *
  * <p>Requires the target consultant's subject as a completion parameter ({@code "consultantSubject"}) —
  * this action has no default target, unlike {@code REQUEST_INFORMATION}/{@code PROVIDE_INFORMATION}.
- * {@code JourneyService.assign} performs its own actor/case-ownership authorization from the calling
- * thread's security context (the legacy {@code ActorContext}/{@code ActorRole} system) independently of
- * this slice's {@code journey.work.execute} check — Journey coexists with, and does not replace, that
- * existing guard (see technical-decisions.md §18).
+ * {@code JourneyService.assign} performs its own database-authority check ({@code CASE_COORDINATE} on the
+ * case) for the calling principal, independently of this slice's {@code journey.work.execute} check —
+ * Journey does not replace that guard (see technical-decisions.md §18).
  */
 @Component
 public class AssignConsultantActionHandler implements JourneyActionHandler {

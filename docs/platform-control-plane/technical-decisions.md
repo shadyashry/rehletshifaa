@@ -444,6 +444,17 @@ Implementation sequence: V36/domain/repository; permission cutover and configura
     cannot emulate `ON CONFLICT` for `INSERT … SELECT`; the eligibility check runs in Java first.
   - *Tests that change rows with raw SQL inside a transaction* flush before and clear after (`raw()` helpers), or the
     persistence context serves the pre-SQL state.
-  - *Ratchet.* `ArchitectureRulesTest.newPersistenceCodeUsesSpringDataJpa` forbids `JdbcClient` outside an explicit
-    list of not-yet-converted classes, and `everyJdbcClientExceptionStillNeedsIt` fails when a listed class no longer
-    needs it — the list can only shrink.
+  - *Ratchet.* `ArchitectureRulesTest.newPersistenceCodeUsesSpringDataJpa` forbids the plain-SQL APIs
+    (`org.springframework.jdbc..`, `java.sql..`) outside an explicit list of not-yet-converted classes, and
+    `everyJdbcClientExceptionStillNeedsIt` fails when a listed class no longer needs `JdbcClient` — the list can only
+    shrink.
+- **Addendum (CL6, 2026-10-06): enforced boundaries.** `ArchitectureRulesTest` also fails on: a controller outside
+  `..api..` or any HTTP entry point (including the flat `identity` controllers) touching persistence, Spring Data
+  repositories, `..infrastructure..` (except the mock-storage `Local*` stand-ins) or `@Transactional`; an application
+  service using the EntityManager/criteria/Hibernate API; a domain class depending on api/application/infrastructure;
+  a Spring Data repository outside the persistence layer or an `@Entity` outside `..domain..`; any native query
+  (`@Query(nativeQuery=true)`, `@NativeQuery`, `createNativeQuery`); token-role authorities or role checks
+  (`JwtGrantedAuthoritiesConverter`, `SimpleGrantedAuthority`, `@PreAuthorize`/`@Secured`/`@RolesAllowed`,
+  `hasRole`…) and Keycloak role-mapping/role-claim strings in sources; retired compatibility names (`Legacy*`,
+  `*Compatibility*`, `compatibilityRole`, provider organizations). Exceptions are explicit and shrink-only; there are
+  two: `JDBC_NOT_YET_CONVERTED` and the `Local*` storage controllers.

@@ -130,7 +130,7 @@ class JourneyCutoverIntegrationTest {
         assertThat(counter("journey.admission", "decision", "JOURNEY", "reason", "POLICY_MATCHED")).isEqualTo(before + 1);
     }
 
-    @Test void noApprovedPolicyDefaultsToLegacyAndReplayAfterActivationPreservesThatDecision() {
+    @Test void noApprovedPolicyDefaultsToCoordinationAndReplayAfterActivationPreservesThatDecision() {
         var before = admission(coordinationBeforePolicy);
         assertThat(before.decision()).isEqualTo("COORDINATION");
         assertThat(before.reason()).isEqualTo("ADMISSION_NOT_ACTIVE");
@@ -145,7 +145,7 @@ class JourneyCutoverIntegrationTest {
 
     // ---- Non-matching eligibility → coordination ------------------------------------------------------------------
 
-    @Test void nonMatchingAndUncategorizedCasesStayLegacyAndAreRecorded() {
+    @Test void nonMatchingAndUncategorizedCasesStayOnCoordinationAndAreRecorded() {
         for (String category : new String[]{"rheumatology-rehabilitation", "orthopedics", null}) {
             UUID caseId = submit(category);
             var a = admission(caseId);
@@ -190,7 +190,7 @@ class JourneyCutoverIntegrationTest {
 
     // ---- 6. Journey not ready → coordination, readiness category recorded ---------------------------------------------
 
-    @Test void matchingPolicyWithoutRuntimeReadyVersionStaysLegacyWithReadinessReason() {
+    @Test void matchingPolicyWithoutRuntimeReadyVersionStaysOnCoordinationWithReadinessReason() {
         var originals = jdbc.queryForList("SELECT journey_version_id,graph_hash FROM journey_deployments");
         tx(() -> jdbc.update("UPDATE journey_deployments SET graph_hash='mismatch'"));
         try {

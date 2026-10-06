@@ -5,7 +5,7 @@
 - **Web:** Next.js App Router renders localized marketing, intake, and role portals. Browser OIDC Authorization Code + PKCE supplies short-lived access tokens; tokens use session storage rather than persistent local storage.
 - **API:** A Spring Boot modular monolith owns validation, state transitions, upload authorization, notification orchestration, and operational controls.
 - **Database:** PostgreSQL stores cases and document metadata. Flyway is the only schema-change mechanism.
-- **Identity:** Keycloak-compatible OIDC tokens map approved realm roles into Spring Security authorities. API services additionally enforce patient ownership or active case assignment. The Keycloak-hosted login/registration/reset/OTP pages use the branded `rehletshifaa` login theme (`infrastructure/keycloak/themes`) — bilingual EN/AR with RTL; the portal passes `ui_locales` on sign-in. See [commercial-workflow-status.md](commercial-workflow-status.md#keycloak-custom-login-theme-done).
+- **Identity:** Keycloak OIDC tokens prove identity only: the backend grants no authority from token claims and Keycloak holds no business roles. Every business decision is resolved from database authority (workforce role assignments, platform role assignments, patient ownership, delegation, active case assignment); `ArchitectureRulesTest` keeps it that way. The Keycloak-hosted login/registration/reset/OTP pages use the branded `rehletshifaa` login theme (`infrastructure/keycloak/themes`) — bilingual EN/AR with RTL; the portal passes `ui_locales` on sign-in. See [commercial-workflow-status.md](commercial-workflow-status.md#keycloak-custom-login-theme-done).
 - **Object storage:** Medical files are private. The API issues short-lived presigned PUT URLs, enforces quotas, quarantines and scans content, and issues audited short-lived GET URLs only for clean objects.
 - **Notifications:** A transactional outbox retries SMTP and WhatsApp delivery with idempotency keys, exponential delay, and a terminal dead-letter state. Templates contain no clinical narrative.
 
@@ -26,13 +26,13 @@ Several concepts are kept strictly distinct (see `end-to-end-workflows.md`). OTP
 
 - **Provisional patient profile** (`PROVISIONAL_PROFILE`) — created internally on submission; no account, no legal identity proofing.
 - **Contact-verified secure access** (`CONTACT_VERIFIED`) — an OTP-protected, purpose-scoped, expiring proof that the patient controls one *registered* contact channel (`WHATSAPP_VERIFIED` → `phone_verified_at`, `EMAIL_VERIFIED` → `email_verified_at`). It proves contact possession only, never legal identity, and never changes case status.
-- **Account activation** (`ACCOUNT_ACTIVATED`) — offered after a proposal is acknowledged/accepted; activation links the provisional profile and all its cases to the authenticated subject. Activation **only** links `external_subject` and consumes the one-time token — it never sets a contact-verification timestamp and is not identity verification.
+- **Account activation** (`ACCOUNT_ACTIVATED`) — offered after a proposal is acknowledged; the patient completes the profile, Keycloak's setup email creates the credential, and the first authenticated portal session marks the account ACTIVE (see "Canonical patient, contacts and accounts" below). It never sets a contact-verification timestamp and is not identity verification.
 - **Legal identity verification** (`IDENTITY_VERIFIED`) — a configured identity-proofing process for the patient or authorized representative (`patient_identity_verifications`, behind `IdentityVerificationPort`). Minimum-necessary data only; legal name/DOB encrypted, document reference masked, no biometrics stored.
 - **Onboarding completion** (`ONBOARDING_COMPLETED`) — required profile/declarations/representative details and applicable consents complete (`patient_onboardings`, never folded into `medical_cases.status`).
 - **Deposit satisfaction** (`DEPOSIT_SATISFIED`) — no deposit required, or PAID, or an authorized Finance waiver (`deposits.waived_at`).
 - **Customer readiness** (`COORDINATION_READY`) — the single backend-computed `CustomerReadiness` DTO combining all applicable gates; enforced server-side before chargeable/non-cancellable coordination.
 
-Purpose-scoped links (`case_access_links`, `proposal_share_tokens`), verification challenges (`case_access_challenges`, `proposal_access_challenges`), and activation tokens (`account_activations`) store only pepper-hashed secrets. Raw OTPs and link tokens are encrypted inside the notification outbox; the initial status token is also returned once to the submitting browser for the confirmation-page link.
+Purpose-scoped links (`case_access_links`, `proposal_share_tokens`) and verification challenges (`case_access_challenges`, `proposal_access_challenges`) store only pepper-hashed secrets. Raw OTPs and link tokens are encrypted inside the notification outbox; the initial status token is also returned once to the submitting browser for the confirmation-page link.
 
 ### Canonical patient, contacts and accounts (V30)
 
@@ -40,8 +40,8 @@ Purpose-scoped links (`case_access_links`, `proposal_share_tokens`), verificatio
 
 | Concept | Where | Notes |
 | --- | --- | --- |
-| Patient | `patient_profiles` (`given_name`, `family_name`, `preferred_name`, `name_source`, `email`, `whatsapp_number`, `mobile_owner`) | Structured names; `full_name` is a display/legacy value, never authoritative. `mobile_owner` = PATIENT / REPRESENTATIVE / NULL (not yet clarified). |
-| Case | `medical_cases.patient_id` | `medical_cases.full_name/whatsapp_number` are **snapshots** taken at intake; every case view renders the canonical name (`PatientNames.DISPLAY_SQL`). |
+| Patient | `patient_profiles` (`given_name` (required), `family_name`, `preferred_name`, `email`, `whatsapp_number`) | Structured names only. A number on the patient is the patient's own; a representative's number lives on the submission contact. |
+| Case | `medical_cases.patient_id` (NOT NULL) | The case holds no copy of the patient's name or number; every case view renders the canonical name (`PatientNames.DISPLAY_SQL`). |
 | Case submission contact | `case_submission_contacts` (one per case) | Who submitted and how to reach them: `contact_role` PATIENT or REPRESENTATIVE, name, relationship, email, WhatsApp. `CaseContactResolver` routes OTPs/links to the patient's own channel when present, else the submitter's; a code delivered to the submitter's channel never stamps the patient's `*_verified_at`. |
 | Representative | `patient_representatives` | Existing delegation model (subject ↔ patient, relationship, permissions); portal queries already honour it. |
 | Profile status | `profile_status` (PENDING/ACTIVE), `profile_completed_at` | Information completeness. Independent of payment and of the account. |
@@ -50,7 +50,7 @@ Purpose-scoped links (`case_access_links`, `proposal_share_tokens`), verificatio
 
 Journey: Send My Case (who is this for → given/family names → contact; email optional) → `Complete Profile` from the secure onboarding link (same patient row pre-filled; account email **mandatory**; mobile ownership explicit; case data read-only) → `PatientAccountService.ensureAccount` → Keycloak setup email → password created in Keycloak → redirect `/{lang}/portal?case=…&continue=1` → session registered → current case opened. A returning patient signs in and creates further cases with `POST /patient/cases` (same patient, no re-registration). `app.identity-admin.mode=simulator` (tests, unconfigured local runs) swaps the provider for an in-memory `LocalPatientIdentitySimulator`; production refuses to start on it.
 
-**Legacy data (V30 migration behaviour):** rows created before structured names keep `full_name` as their display name with `name_source='LEGACY_FULL_NAME'` and `given_name/family_name` NULL — no string is ever split. The patient is asked to confirm the structured name on their next profile completion (`OnboardingPrefill.nameConfirmationRequired`). Existing bound profiles (`external_subject` set) are backfilled to `account_status='ACTIVE'`; every pre-existing number is treated as the patient's own (`mobile_owner='PATIENT'`) because that was the only intake option; cases without a `case_submission_contacts` row are read as submitted by the patient.
+**No compatibility data paths (V72/V73, pre-production clean cutover):** every patient has a structured given name, every case has a canonical patient and a submission contact, and there is no `full_name`, `name_source`, `mobile_owner` or one-time activation-token table. The migrations refuse, rather than repair, a database that still holds such rows; reset the pre-production database instead.
 
 ## Domain and state
 
@@ -86,8 +86,8 @@ function are supported, with recursive report lookup for supervisory case visibi
 
 The `clinic` module (`com.rehletshifaa.clinic`) owns the one-per-consultant virtual clinic, practice-manager
 delegations, consultation slots, governed service/price changes, structured consultant capabilities and the single
-consultant-eligibility rule (`ConsultantEligibilityService`). It depends only on `provider` (credential authority check),
-`identity`, `security` and `shared`; `journey` depends on it for assignment eligibility, and consultant referrals live
+consultant-eligibility rule (`ConsultantEligibilityService`). It depends on `directory` (practitioner and credential records),
+`authority`, `casemanagement`, `workforce`, `identity` and `shared`; `journey` depends on it for assignment eligibility, and consultant referrals live
 in `journey` (`ConsultantReferralService`). It never uses provider organizations or memberships. Practice-manager
 authority is a database delegation checked per call — not a realm role — and grants no case access. Details:
 [consultant-virtual-clinic.md](consultant-virtual-clinic.md).
@@ -96,8 +96,8 @@ authority is a database delegation checked per call — not a realm role — and
 
 The browser is untrusted. MIME type, size, consent, case status, Turnstile token, and upload completion are verified server-side. Presigned URLs grant access to one random object key for a short period and do not grant bucket-list or read access.
 
-Anonymous access is restricted to case intake, presigned upload/confirmation, submission, and the purpose-scoped public status/proposal flows. Status and information-response links require link validity plus an OTP-derived short-lived grant; proposal detail and decisions require the equivalent proposal grant. Authenticated endpoints require role checks plus patient ownership, active delegation, or pending/active case assignment. Sensitive approvals require a recent OIDC authentication time (with token issue time as the standards-compatible fallback), and the web client initiates OIDC reauthentication when required. Audit events record identity, role, case, entity, action, outcome, reason, correlation, and time.
+Anonymous access is restricted to case intake, presigned upload/confirmation, submission, and the purpose-scoped public status/proposal flows. Status and information-response links require link validity plus an OTP-derived short-lived grant; proposal detail and decisions require the equivalent proposal grant. Authenticated endpoints require a database-authority permission check plus patient ownership, active delegation, or pending/active case assignment. Sensitive approvals require a recent OIDC authentication time (with token issue time as the standards-compatible fallback), and the web client initiates OIDC reauthentication when required. Audit events record identity, role, case, entity, action, outcome, reason, correlation, and time.
 
 ## Observability
 
-Every request receives or propagates an `X-Correlation-ID`. Application logs are structured and avoid case narrative, contact details, filenames, and uploaded content. Only the liveness/readiness health endpoint is exposed by default.
+Every request receives or propagates an `X-Request-ID` (the correlation id in logs, error bodies and audit events). Application logs are structured and avoid case narrative, contact details, filenames, and uploaded content. Only the liveness/readiness health endpoint is exposed by default.

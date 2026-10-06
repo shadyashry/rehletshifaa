@@ -19,9 +19,8 @@ JdbcClient → Spring Data JPA conversion; update it at every slice boundary.
    guarded `UPDATE … WHERE status=?/version=?` returning a count → `@Modifying` JPQL returning `int` (same guard);
    `INSERT … WHERE NOT EXISTS`/`ON CONFLICT` → existence check + unique constraint, isolated with
    `REQUIRES_NEW` when a race must not abort the caller (see `FxRateRefresher`).
-4. **Verification per slice:** `mvn -o -q test`, then compare failing tests with the baseline (101 failures from the
-   in-progress CL2 routing work on 2026-10-06, all "An effective routing policy is required"/eligibility); a slice may
-   not add a failure. `ArchitectureRulesTest` must stay green.
+4. **Verification per slice:** `mvn -o -q test` must stay at **0 failures** (the CL2/CL3 baseline failures are gone
+   since 2026-10-06), then the PostgreSQL proof (`PostgresJpaMappingTest`). `ArchitectureRulesTest` must stay green.
 
 ## Status
 
@@ -266,6 +265,11 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   construction (`patient_id` NOT NULL); `PatientProfile` lost `mobile_owner`; `case_claim_challenges` dropped.
   Verification: full suite 574/0; `PostgresJpaMappingTest` PASS.
 
+- 2026-10-06 — CL6 boundary enforcement: the ratchet now covers every plain-SQL type (`org.springframework.jdbc..`,
+  `java.sql..`), not only `JdbcClient`; native queries are forbidden; repositories must sit in the persistence layer and
+  entities in `..domain..`; application services may not use the EntityManager/criteria/Hibernate API
+  (technical-decisions §29, CL6 addendum). The allowlist is unchanged (17 classes).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -282,12 +286,13 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`, `PatientAccountService`,
   `StaffWorkService`, `CaseActionService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
-  listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient`.
+  listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
+  `org.springframework.jdbc..`/`java.sql..` type (CL6), and no repository may declare a native query.
 
 ## Next slice
 
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). Start with
 `StaffWorkService` and `CaseActionService` (work queues), then `JourneyService` split by view. Each slice removes its
-class from `JDBC_NOT_YET_CONVERTED`. Prerequisite for confidence: the CL2 routing baseline (101 failures) must be
-green (done 2026-10-06: 8 CL3 readiness failures remain). Move `LocalDemoDataSeeder` to a `devdata` package.
+class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
+`LocalDemoDataSeeder` to a `devdata` package.

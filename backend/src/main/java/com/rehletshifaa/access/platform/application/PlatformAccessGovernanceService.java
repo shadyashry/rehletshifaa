@@ -143,7 +143,7 @@ public class PlatformAccessGovernanceService {
 
     /** Call after the lifecycle mutation, in the same transaction as {@link #lockLifecycleGovernance()}. */
     public void assertAdministratorInvariant() {
-        // Compatibility mode: legacy authority continues to operate until the first target assignment is provisioned.
+        // Before the governance bootstrap there is no System Administrator set to protect.
         if (repository.governanceInitialized()) assertInvariant(clock.instant());
     }
 

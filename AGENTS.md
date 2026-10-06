@@ -113,7 +113,12 @@ from mail/identity providers or encrypted fields (names, task titles). Opt-in El
 Spring Data JPA (owner decision 2026-10-06; `docs/platform-control-plane/technical-decisions.md` §29). Read
 `docs/platform-control-plane/jpa-migration-status.md` before touching persistence. Repositories extend
 `BaseRepository` (use `lockById` for row locks). Prove mappings on PostgreSQL with `PostgresJpaMappingTest`.
-No new `JdbcClient` use: `ArchitectureRulesTest` only allows the listed not-yet-converted classes (the list shrinks).
+No new plain SQL: `ArchitectureRulesTest` allows `org.springframework.jdbc..`/`java.sql..` only in the listed
+not-yet-converted classes (`JDBC_NOT_YET_CONVERTED`, shrink-only), and no native queries. The same test enforces the
+layers (controllers → application use cases → repositories in `..infrastructure..`, entities in `..domain..`), that
+tokens carry no business authority (no role mapping from Keycloak), and that retired compatibility names
+(`Legacy*`, `compatibilityRole`, provider organizations) stay gone. Add an exception only as an explicit, documented,
+shrink-only list.
 
 ## 3. Technology map
 

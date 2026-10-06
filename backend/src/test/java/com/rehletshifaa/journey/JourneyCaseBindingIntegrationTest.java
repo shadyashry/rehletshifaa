@@ -73,13 +73,13 @@ class JourneyCaseBindingIntegrationTest {
                 .containsExactly("caseId","journeyVersionId","state");
     }
 
-    @Test void legacyCasesCannotBeAdoptedAndNoNormalCreationBinds() {
-        var legacy=cases.create(intake()); cases.submit(legacy.caseId());
+    @Test void coordinationCasesCannotBeAdoptedAndNoNormalCreationBinds() {
+        var standard=cases.create(intake()); cases.submit(standard.caseId());
         var draft=cases.create(intake());
-        assertThatThrownBy(()->verification.start(legacy.caseId())).hasMessageContaining("not found");
+        assertThatThrownBy(()->verification.start(standard.caseId())).hasMessageContaining("not found");
         assertThatThrownBy(()->verification.start(draft.caseId())).hasMessageContaining("not found");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_case_bindings WHERE case_id IN (?,?)",Integer.class,legacy.caseId(),draft.caseId())).isZero();
-        assertThat(cases.findById(legacy.caseId()).getStatus().name()).isEqualTo("RECEIVED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_case_bindings WHERE case_id IN (?,?)",Integer.class,standard.caseId(),draft.caseId())).isZero();
+        assertThat(cases.findById(standard.caseId()).getStatus().name()).isEqualTo("RECEIVED");
     }
 
     @Test void newerPublicationAndRetirementCannotRepinBoundCases() {

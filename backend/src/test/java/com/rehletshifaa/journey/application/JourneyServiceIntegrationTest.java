@@ -35,7 +35,7 @@ class JourneyServiceIntegrationTest {
     @Autowired com.rehletshifaa.journey.application.ConsultantOnboardingService onboarding;
     @AfterEach void clearSecurity(){SecurityContextHolder.clearContext();}
 
-    @Test void credentialDecisionRequiresIndependentReviewerEvenForLegacyAdministrators() {
+    @Test void credentialDecisionRequiresIndependentReviewerEvenForSystemAdministrators() {
         UUID practitioner=UUID.randomUUID(), credential=UUID.randomUUID();
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
                 practitioner,"self-reviewer","Reviewer","Reviewer","UNDER_REVIEW","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());

@@ -185,7 +185,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     private record AssignmentCard(UUID id,String status){}
     public StaffProfileView myCoordinatorProfile(){var actor=authority.authorize(Permission.COORDINATION_QUEUE);String role="COORDINATOR";return workforceDirectory.contact(actor.subject()).map(c->new StaffProfileView(c.displayName(),role)).orElse(new StaffProfileView(null,null));}
     public DoctorProfileView myDoctorProfile(){var actor=authority.authorize(Permission.WORK_QUEUE_VIEW);if(!actor.has(Role.CONSULTANT))throw new ApiException(403,"PERMISSION_NOT_HELD","Only consultants have a consultant profile");return jdbc.sql("SELECT display_name,specialty,subspecialty,care_category,availability_status,credentialing_status FROM practitioner_profiles WHERE external_subject=?").param(actor.subject()).query((rs,n)->new DoctorProfileView(rs.getString("display_name"),rs.getString("specialty"),rs.getString("subspecialty"),rs.getString("care_category"),rs.getString("availability_status"),rs.getString("credentialing_status"))).optional().orElse(new DoctorProfileView(null,null,null,null,null,null));}
-    public List<VerifiedDoctorView> verifiedDoctors(){authority.authorize(Permission.COORDINATION_QUEUE);return jdbc.sql("SELECT id,external_subject,display_name,specialty,subspecialty,availability_status,care_category FROM practitioner_profiles p WHERE credentialing_status='VERIFIED' AND practitioner_type='CONSULTANT' AND availability_status='AVAILABLE' AND external_subject IS NOT NULL ORDER BY display_name").query((rs,n)->new LegacyDoctor(rs.getObject("id",UUID.class),new VerifiedDoctorView(rs.getString("external_subject"),rs.getString("display_name"),rs.getString("specialty"),rs.getString("subspecialty"),rs.getString("availability_status"),rs.getString("care_category")))).list().stream().filter(row->consultants.isEligible(row.id(),row.view().careCategory())).map(LegacyDoctor::view).toList();}
+    public List<VerifiedDoctorView> verifiedDoctors(){authority.authorize(Permission.COORDINATION_QUEUE);return jdbc.sql("SELECT id,external_subject,display_name,specialty,subspecialty,availability_status,care_category FROM practitioner_profiles p WHERE credentialing_status='VERIFIED' AND practitioner_type='CONSULTANT' AND availability_status='AVAILABLE' AND external_subject IS NOT NULL ORDER BY display_name").query((rs,n)->new DoctorCandidate(rs.getObject("id",UUID.class),new VerifiedDoctorView(rs.getString("external_subject"),rs.getString("display_name"),rs.getString("specialty"),rs.getString("subspecialty"),rs.getString("availability_status"),rs.getString("care_category")))).list().stream().filter(row->consultants.isEligible(row.id(),row.view().careCategory())).map(DoctorCandidate::view).toList();}
     /** Eligible consultants for a case's care area (or a corrected one), with the facts the coordinator chooses on. No identity-provider subjects. */
     public List<EligibleConsultantView> eligibleConsultants(UUID caseId,String careArea){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));String area=hasText(careArea)?careArea.trim():jdbc.sql("SELECT care_category FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);return consultants.eligible(area);}
     /** Assign a named consultant by practitioner id: the same eligibility, ownership and state rules as {@link #assign}. */
@@ -458,7 +458,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         return new IdResponse(caseId,"RECORDED");
     }
 
-    /** Legacy triggers (status transition, consultant INFO decision) reuse the same structured operation. */
+    /** Other triggers (status transition, consultant INFO decision) reuse the same structured operation. */
     private void requestPatientInformation(UUID caseId,String message,Actor actor){
         String language=caseView(caseId).preferredLanguage();
         String text=hasText(message)?message:"Your coordinator needs additional information to continue your case.";
@@ -916,5 +916,5 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     private static Instant instant(ResultSet rs,String column)throws SQLException{return rs.getObject(column,OffsetDateTime.class).toInstant();}
     private static Instant instantNullable(ResultSet rs,String column)throws SQLException{OffsetDateTime value=rs.getObject(column,OffsetDateTime.class);return value==null?null:value.toInstant();}
     private record CaseState(String status,long version){}
-    private record LegacyDoctor(UUID id,VerifiedDoctorView view){}
+    private record DoctorCandidate(UUID id,VerifiedDoctorView view){}
 }

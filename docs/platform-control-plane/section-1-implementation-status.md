@@ -1139,10 +1139,10 @@ Implementation slices (kept green independently):
 | CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | DONE (2026-10-06, Claude) — see "CL3 delivered" below |
 | CL4 | Remove obsolete patient/provider/plaintext compatibility data paths and finalize clean pre-production schema | DONE (2026-10-06, Claude) — see "CL4 delivered" below |
 | CL5 | Move all SQL/JDBC out of application services module by module — **now via Spring Data JPA** (owner decision 2026-10-06, technical-decisions §29); live tracker `jpa-migration-status.md` | IN PROGRESS — all writes JPA except the local seeder; 17 classes still read with JdbcClient (ratchet in `ArchitectureRulesTest`) |
-| CL6 | Enforce the boundaries with ArchUnit, finish documentation/test cleanup, run focused and full backend gates | PLANNED |
-| CL7 | Add JaCoCo/Sonar configuration and run Sonar for the sole Maven backend when a Sonar server/project/token and scanner plugin are available | PLANNED |
+| CL6 | Enforce the boundaries with ArchUnit, finish documentation/test cleanup, run focused and full backend gates | DONE (2026-10-06, Claude) — see "CL6 delivered" below |
+| CL7 | Add JaCoCo/Sonar configuration and run Sonar for the sole Maven backend when a Sonar server/project/token and scanner plugin are available | BLOCKED — no Sonar server/project/token; no Sonar scanner in the offline Maven cache |
 
-Baseline inventory: one Maven backend; 70 production classes currently use `JdbcClient`, including 46 application
+Baseline inventory (at approval, 2026-10-05 — historical; CL1–CL4 removed every runtime legacy path named here): one Maven backend; 70 production classes currently use `JdbcClient`, including 46 application
 classes. No Sonar or JaCoCo configuration exists and the Sonar Maven scanner is not present in the offline Maven
 cache. Runtime legacy behavior still exists in Journey admission, coordinator self-claim, onboarding/readiness,
 patient-name/plaintext fallbacks and Keycloak compatibility-role provisioning. Provider-organization legacy tables
@@ -1234,19 +1234,53 @@ PostgreSQL 17 (V73 applied). One earlier full run had a single failure in
 the history is ordered `assigned_at DESC, id`, so two assignments in the same microsecond fall back to UUID order. It
 passed alone twice and in the next full run; it is a pre-existing ordering tie, not a CL4 change.
 
-**Next exact action:** CL6 — enforce the boundaries with ArchUnit (application layer free of SQL/JDBC and compatibility
-dependencies, module graph), finish documentation/test cleanup, run focused and full gates. CL7 stays blocked: no Sonar
-server/project/token and no Sonar scanner in the offline Maven cache. The remaining CL5 read conversions (17 classes in
-`ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`) follow as their own phases, one service per session, rewritten as query
-services. Preserve unrelated brand/theme work and do not run concurrent builds that share `backend/target`.
+**CL6 delivered (2026-10-06, Claude).** No product behaviour change. Every rule was probed against the current code
+first; each holds today or the small violation it revealed was fixed.
 
-### Open evidence and next exact action
+- *Rules added to `ArchitectureRulesTest`* (13 → 22 tests; details in technical-decisions §29, CL6 addendum):
+  controllers live in `..api..`; every HTTP entry point (including the flat `identity` controllers, now covered by
+  annotation) stays out of persistence, Spring Data repositories, `..infrastructure..` and `@Transactional`;
+  application services do not use the EntityManager/criteria/Hibernate API; `..domain..` does not depend on
+  api/application/infrastructure; repositories stay in the persistence layer and `@Entity` classes in `..domain..`;
+  no native queries; the JdbcClient ratchet now covers all plain-SQL types (`org.springframework.jdbc..`, `java.sql..`:
+  RowMapper, ResultSet, Timestamp…); tokens carry no business authority (no token-role converter, granted authority,
+  `@PreAuthorize`/`@Secured`/`@RolesAllowed` or `hasRole`-style checks) and no source touches Keycloak role mappings
+  or role claims; retired compatibility names (`Legacy*`, `*Compatibility*`, `compatibilityRole`, provider
+  organizations) stay gone.
+- *Exception lists* (explicit, shrink-only): `JDBC_NOT_YET_CONVERTED` (unchanged, 17 classes) and the mock-storage
+  `Local*` controllers (unchanged). No new exception was needed.
+- *Not added (recorded, not violations of the target):* application → `..api..` DTOs (1,945 dependencies; services
+  return the api records) and infrastructure → application ports (adapters implement ports declared in application).
+  Moving DTOs out of `..api..` would be its own refactor.
+- *Code fixed:* `JourneyService.LegacyDoctor` renamed `DoctorCandidate`; stale comments that described removed
+  authority (`ActorContext`/`ActorRole`), "compatibility mode" governance and "legacy" behaviour reworded.
+  The CL4 flaky `SecureJourneyCorrectionsTest.transferMovesOpenCoordinatorWork…` ordering was fixed separately by
+  `6eb6aa8` (`assignmentHistory` breaks a same-instant tie: active, then later-ended, then id; the test pins the tie);
+  CL6 was rebased onto it.
+- *Tests renamed* (subjects that no longer exist under that name; no assertion changed): `signInWithLegacyRole` →
+  `signInAs`; Journey cutover/binding/projection/parity tests now say *coordination* (the standard path) instead of
+  *legacy*; `JourneyParityHarness` fields `legacy*` → `coordination*`. No test was obsolete enough to delete:
+  `LegacyStatusMigrationTest` still tests the V6 migration, and `CleanPatientSchemaMigrationTest` the V73 refusals.
+- *Docs:* `docs/architecture.md` no longer describes realm-role authorities, activation tokens, `full_name`/
+  `mobile_owner` or the V30 legacy-data behaviour, nor the removed `provider` module or `X-Correlation-ID`; AGENTS §2c,
+  technical-decisions §29 and `jpa-migration-status.md` (stale 101-failure baseline removed) describe the enforced
+  rules; `implementation-status.md`, `migration-inventory.md` and `test-status.md` carry a historical-log banner; the
+  P1–P6 "next exact action" below is no longer presented as current.
+
+Verification: `ArchitectureRulesTest` 22/22; full backend suite **583 tests, 0 failures** (2 skipped); PostgreSQL
+proof `PostgresJpaMappingTest` **PASS** on a freshly reset PostgreSQL 17 (V1–V73).
+
+**Next exact action:** CL5 read conversions, one service per session, each rewritten as a query service and removed
+from `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`: start with `StaffWorkService`, then `CaseActionService`, then
+`JourneyService` split by view. CL7 is **blocked** (no Sonar server/project/token; no Sonar scanner in the offline
+Maven cache). The independent Astra review of CL2+CL3 is still owed and needs a reviewer the owner chooses. Preserve
+unrelated brand/theme work and do not run concurrent builds that share `backend/target`.
+
+### Open evidence (P1–P6, 2026-10-05)
 
 - No approved implementation gap remains in P1–P6. OD-02 and Practice Manager consent remain excluded.
-- The canonical tunnel stack was not rebuilt and live identity/browser tests were not run in this slice. Nothing
-  was published, pushed, merged or enabled, and no development volume was deleted. Existing historical live
-  evidence remains historical rather than a fresh claim.
-- **Next exact action:** preserve the unrelated AGENTS/checkpoint and frontend brand/theme work, review the targeted
-  P1–P6 diff, then commit only if the owner requests it. If fresh deployment evidence is requested, use the
-  canonical tunnel overlay and exercise the distinct holder/admin/manager identities without enabling Journey
-  admission merely for demonstration.
+- The canonical tunnel stack was not rebuilt and live identity/browser tests were not run for P1–P6 or CL1–CL6.
+  Nothing was published, pushed or enabled, and no development volume was deleted. Existing historical live evidence
+  remains historical rather than a fresh claim. If fresh deployment evidence is requested, use the canonical tunnel
+  overlay and exercise the distinct holder/admin/manager identities without enabling Journey admission merely for
+  demonstration. The current next action is the one at the end of the CL6 note above.

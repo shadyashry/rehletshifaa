@@ -16,8 +16,8 @@ import java.util.UUID;
  * {@code noRollbackFor=ApiException.class} lets that write survive a standalone (non-Journey) call, but
  * {@link JourneyProjectionService}'s class-level {@code @Transactional} has no such override: if this
  * exception were allowed to propagate out of {@link #complete}, its proxy boundary would mark the shared
- * transaction rollback-only on the way out and silently undo the expiry write, diverging from legacy
- * behavior. Catching it here — and only this specific outcome — keeps that write intact and lets the
+ * transaction rollback-only on the way out and silently undo the expiry write, diverging from the
+ * standalone call. Catching it here — and only this specific outcome — keeps that write intact and lets the
  * PatientAction complete normally; the caller-supplied {@code PROPOSAL_NEEDS_REWORK} fact (computed the
  * same proactive way any caller already can, from the same {@code validUntil} the domain call itself
  * checked) then routes the compiled graph back to {@code PREPARE_PROPOSAL} exactly as an explicit

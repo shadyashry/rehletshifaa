@@ -33,8 +33,8 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  * recorded by a coordinator on the patient's behalf) and handing the case back to the coordinator are one
  * coherent domain operation, so "Request more information" can never again be just a status change.
  *
- * <p>Responsibility (waiting-on) moves; the journey stage does not, except for the one legacy behaviour
- * that is deliberately preserved: a blocking request still parks the case in INFORMATION_REQUIRED.
+ * <p>Responsibility (waiting-on) moves; the journey stage does not, except in one deliberate case:
+ * a blocking request parks the case in INFORMATION_REQUIRED.
  */
 @Service
 public class PatientActionService {
@@ -95,7 +95,7 @@ public class PatientActionService {
             int sortOrder = order++; if (!actionItems.hasOpen(taskId, item.code())) actionItems.saveAndFlush(new PatientActionItem(taskId, item.kind(), item.code(), encrypt(item.label().trim()), item.required(), sortOrder, now));
         }
 
-        // Preserved legacy behaviour: only a blocking request parks the journey stage.
+        // Only a blocking request parks the journey stage.
         if (command.blocking() && Set.of("RECEIVED", "INTAKE_REVIEW", "READY_FOR_CONSULTANT").contains(status)) {
             cases.moveStatus(caseId, CaseStatus.valueOf(status), CaseStatus.INFORMATION_REQUIRED, micros(now));
             statusLog.record(caseId, status, "INFORMATION_REQUIRED", actorSubject, actorRole,

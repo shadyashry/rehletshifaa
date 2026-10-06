@@ -1,5 +1,10 @@
 # Platform Control Plane — migration inventory
 
+> **Historical log.** Entries are kept as written at the time. Paths they describe as current may since have been
+> removed by the pre-production clean cutover (CL1–CL6: `LEGACY` Journey admission, Keycloak business roles /
+> `compatibilityRole`, provider organizations, patient plaintext/`full_name`/`mobile_owner`, claim codes). The live
+> state is `section-1-implementation-status.md` ("Clean-code and no-legacy continuation") and `jpa-migration-status.md`.
+
 ## Phase 8A secure public-intake status — 2026-09-23 (Codex)
 
 - V50 (additive, H2-safe SQL) creates `case_intake_grants`: one row per draft case, hash-only bearer storage, explicit expiry/consumption timestamps and FK cascade. V1–V49 are untouched.

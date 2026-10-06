@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Legacy-vs-runtime business-outcome comparator (Phase 4B item E). A scenario is a case id plus, at each
+ * Coordination-path-vs-runtime business-outcome comparator (Phase 4B item E). A scenario is a case id plus, at each
  * checkpoint, the outcome the *actual* production {@code CaseTransitionPolicy}/{@code JourneyService}
  * contract requires — read from the code, never guessed — compared against what running the Journey
  * runtime path actually produced. Deterministic and test-friendly by construction: it only reads
@@ -31,9 +31,9 @@ final class JourneyParityHarness {
                         List<String> openPatientActionTypes, boolean hasActiveCoordinatorAssignment,
                         boolean hasActiveDoctorAssignment) {}
 
-    record Expected(String scenario, String legacyStatus, String legacyWaitingOn, List<String> legacyOpenInternalWorkTypes,
-                    List<String> legacyOpenPatientActionTypes, boolean legacyActiveCoordinatorAssignment,
-                    boolean legacyActiveDoctorAssignment) {}
+    record Expected(String scenario, String coordinationStatus, String coordinationWaitingOn, List<String> coordinationOpenInternalWorkTypes,
+                    List<String> coordinationOpenPatientActionTypes, boolean coordinationActiveCoordinatorAssignment,
+                    boolean coordinationActiveDoctorAssignment) {}
 
     static CaseSnapshot snapshot(JdbcTemplate jdbc, UUID caseId) {
         String status = jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId);
@@ -50,14 +50,14 @@ final class JourneyParityHarness {
         return n == null ? 0 : n;
     }
 
-    /** Compares the actual runtime snapshot against the documented legacy expectation for one checkpoint. */
+    /** Compares the actual runtime snapshot against the documented coordination-path expectation for one checkpoint. */
     static Result compare(Expected expected, CaseSnapshot actual) {
-        if (!expected.legacyStatus().equals(actual.status())) return Result.STATUS_MISMATCH;
-        if (!expected.legacyWaitingOn().equals(actual.waitingOn())) return Result.WAITING_ON_MISMATCH;
-        if (!expected.legacyOpenInternalWorkTypes().equals(actual.openInternalWorkTypes())) return Result.WORKITEM_MISMATCH;
-        if (!expected.legacyOpenPatientActionTypes().equals(actual.openPatientActionTypes())) return Result.PATIENT_ACTION_MISMATCH;
-        if (expected.legacyActiveCoordinatorAssignment() != actual.hasActiveCoordinatorAssignment()
-                || expected.legacyActiveDoctorAssignment() != actual.hasActiveDoctorAssignment()) return Result.ASSIGNMENT_MISMATCH;
+        if (!expected.coordinationStatus().equals(actual.status())) return Result.STATUS_MISMATCH;
+        if (!expected.coordinationWaitingOn().equals(actual.waitingOn())) return Result.WAITING_ON_MISMATCH;
+        if (!expected.coordinationOpenInternalWorkTypes().equals(actual.openInternalWorkTypes())) return Result.WORKITEM_MISMATCH;
+        if (!expected.coordinationOpenPatientActionTypes().equals(actual.openPatientActionTypes())) return Result.PATIENT_ACTION_MISMATCH;
+        if (expected.coordinationActiveCoordinatorAssignment() != actual.hasActiveCoordinatorAssignment()
+                || expected.coordinationActiveDoctorAssignment() != actual.hasActiveDoctorAssignment()) return Result.ASSIGNMENT_MISMATCH;
         return Result.PASS;
     }
 }

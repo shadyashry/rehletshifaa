@@ -130,7 +130,7 @@ class JourneyActionDispatchIntegrationTest {
         jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,created_at) VALUES(?,?,'MEDICAL_LICENSE','VERIFIED',?)", UUID.randomUUID(), id, past);
         return id;
     }
-    void signInWithLegacyRole(String subject, Role role) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, role); }
+    void signInAs(String subject, Role role) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, role); }
     void manager(String subject) { com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, subject, Role.CARE_COORDINATION_MANAGER); }
     void coordinator(String subject) {
         com.rehletshifaa.workforce.WorkforceTestData.staffWithEmail(jdbc, subject, "COORDINATOR", crypto.encrypt(subject), crypto.encrypt(subject + "@example.test"));
@@ -328,7 +328,7 @@ class JourneyActionDispatchIntegrationTest {
 
         UUID targetConsultant = verifiedConsultant("cardiology");
         coordinator("routing-a");
-        signInWithLegacyRole("routing-a", Role.COORDINATOR);
+        signInAs("routing-a", Role.COORDINATOR);
         var completed = projections.completeWorkItem(bound.caseId(), "assign", Map.of("consultantSubject", targetConsultant.toString()), null);
         assertThat(completed).allMatch(p -> "COMPLETED".equals(p.status()));
         assertThat(jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, bound.caseId())).isEqualTo("CONSULTANT_ASSIGNMENT_PENDING");
@@ -375,7 +375,7 @@ class JourneyActionDispatchIntegrationTest {
         return published;
     }
 
-    @Test void recordClinicalDecisionWrongLegacyActorDeniedWithoutAdvancingRuntime() {
+    @Test void recordClinicalDecisionWrongActorDeniedWithoutAdvancingRuntime() {
         var clinicalVersion = publishVersion("Clinical decision", clinicalDecisionGraph());
         var bound = verification.create(clinicalVersion.definitionId(), clinicalVersion.id(),
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(), intake()));
@@ -384,9 +384,9 @@ class JourneyActionDispatchIntegrationTest {
         assertThat(projected).hasSize(1);
 
         // "maker" holds journey.work.execute (PLATFORM, this case has no resolved provider) — Access
-        // Governance allows — but signs in here with legacy ActorRole.COORDINATOR, not DOCTOR, so
+        // Governance allows — but signs in here as a Coordinator, not the assigned Consultant, so
         // JourneyService.reviewDecision's own independent check must still deny.
-        signInWithLegacyRole("maker", Role.COORDINATOR);
+        signInAs("maker", Role.COORDINATOR);
         var decision = new ReviewDecisionRequest("ACCEPT", "Recommended treatment", null, List.of(), "EGP");
         assertThatThrownBy(() -> projections.completeWorkItem(bound.caseId(), "clinical", Map.of(), decision, null))
                 .hasMessageContaining("do not include this action");
@@ -411,12 +411,12 @@ class JourneyActionDispatchIntegrationTest {
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(), intake()));
         verification.start(bound.caseId()); // case status is RECEIVED — never a state createProposal accepts
         var projected = syncAsMaker(bound.caseId());
-        // JourneyService.createProposal also requires legacy case ownership before it ever reaches the
+        // JourneyService.createProposal also requires case ownership before it ever reaches the
         // state check — give "maker" that ownership directly so the test isolates the state guard.
         jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,'COORDINATOR','PRIMARY','ACTIVE','Fixture ownership','TEST',?,0)",
                 UUID.randomUUID(), bound.caseId(), "maker", java.time.Instant.now().minusSeconds(60));
 
-        signInWithLegacyRole("maker", Role.COORDINATOR);
+        signInAs("maker", Role.COORDINATOR);
         var draft = new ProposalDraftRequest(UUID.randomUUID(), "en", null, "EGP", null, null, null, null, null,
                 java.time.Instant.now().plusSeconds(3600), List.of(), null);
         assertThatThrownBy(() -> projections.completeWorkItem(bound.caseId(), "prepare", Map.of(), draft, null))

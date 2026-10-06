@@ -18,8 +18,8 @@ import java.util.UUID;
  * <p>Requires the full {@link ReviewDecisionRequest} as the completion payload — this action's decision
  * (ACCEPT/INFO/NOT_SUITABLE/RETURN_TO_COORDINATOR/REASSIGN), recommended treatment/risks and cost estimates
  * are not scalar values a string parameter map can reasonably carry. {@code JourneyService.reviewDecision}
- * performs its own independent {@code ActorRole.DOCTOR} + active-assignment authorization from the calling
- * thread's security context (see technical-decisions.md §19) — unchanged and not bypassed by
+ * performs its own database-authority check ({@code CLINICAL_REVIEW}, or {@code CLINICAL_APPROVE} to accept,
+ * on the case) for the calling principal (see technical-decisions.md §19) — unchanged and not bypassed by
  * {@code journey.work.execute}.
  */
 @Component
