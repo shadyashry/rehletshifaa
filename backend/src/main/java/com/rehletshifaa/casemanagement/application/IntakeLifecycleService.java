@@ -10,7 +10,6 @@ import com.rehletshifaa.casemanagement.domain.MedicalCase;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAccessLinkRepository;
 import com.rehletshifaa.casemanagement.infrastructure.CaseSubmissionContactRepository;
 import com.rehletshifaa.casemanagement.infrastructure.ConsentRecordRepository;
-import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.directory.domain.PatientProfile;
 import com.rehletshifaa.directory.infrastructure.PatientProfileRepository;
 import com.rehletshifaa.notification.application.NotificationOutbox;
@@ -40,7 +39,6 @@ public class IntakeLifecycleService {
     private final ConsentRecordRepository consents;
     private final CaseSubmissionContactRepository contacts;
     private final CaseStatusLog statusLog;
-    private final MedicalCaseRepository cases;
     private final PatientProfileRepository patients;
     private final NotificationOutbox notificationOutbox;
     private final AuditTrail auditTrail;
@@ -49,29 +47,35 @@ public class IntakeLifecycleService {
     private final String pepper;
     private final String coordinatorEmail;
     public IntakeLifecycleService(Clock clock, @Value("${app.claim.pepper}")String pepper,
-                                  @Value("${app.claim.expiry-seconds}")long expirySeconds,
-                                  @Value("${app.claim.max-attempts}")int maxAttempts,
                                   @Value("${app.mail.coordinator}")String coordinatorEmail,
-                                  CryptoService crypto, AuditTrail auditTrail, NotificationOutbox notificationOutbox, PatientProfileRepository patients, MedicalCaseRepository cases, CaseStatusLog statusLog, CaseSubmissionContactRepository contacts, ConsentRecordRepository consents, CaseAccessLinkRepository links, SubmissionDocuments submissionDocuments) { this.submissionDocuments = submissionDocuments; this.links = links; this.consents = consents; this.contacts = contacts; this.statusLog = statusLog; this.cases = cases; this.patients = patients; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
+                                  CryptoService crypto, AuditTrail auditTrail, NotificationOutbox notificationOutbox, PatientProfileRepository patients, CaseStatusLog statusLog, CaseSubmissionContactRepository contacts, ConsentRecordRepository consents, CaseAccessLinkRepository links, SubmissionDocuments submissionDocuments) { this.submissionDocuments = submissionDocuments; this.links = links; this.consents = consents; this.contacts = contacts; this.statusLog = statusLog; this.patients = patients; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
         this.clock=clock;this.pepper=pepper;this.coordinatorEmail=coordinatorEmail;this.crypto=crypto;
     }
 
     /**
-     * Creates the provisional patient record, links it to the draft case, and records consent.
-     * No verification challenge (OTP) is generated here: a draft may still be receiving document
-     * uploads, and we must not start an expiry clock before the case is actually submitted.
+     * Creates the provisional patient record a new intake case belongs to.
+     * The submitter's channels are the PATIENT's only when the patient is submitting. A representative's
+     * email/WhatsApp is recorded on the submission contact and never promoted into the patient's identity.
+     * Email captured here is a candidate contact — unverified until the patient proves ownership later.
      */
-    @Transactional public void createFoundation(MedicalCase medicalCase, CreateCaseRequest request) {
+    @Transactional public UUID registerPatient(CreateCaseRequest request) {
         Instant now=clock.instant(); UUID patientId=UUID.randomUUID();
         String given=PatientNames.clean(request.givenName()), family=blankToNull(PatientNames.clean(request.familyName()));
-        String displayName=PatientNames.display(given,family);
         boolean self=!request.forSomeoneElse();
-        // The submitter's channels are the PATIENT's only when the patient is submitting. A representative's
-        // email/WhatsApp is recorded on the submission contact and never promoted into the patient's identity.
-        // Email captured here is a candidate contact — unverified until the patient proves ownership later.
-        patients.saveAndFlush(PatientProfile.submitted(patientId,given,family,request.country().trim(),self?request.whatsappNumber().trim():null,self?"PATIENT":null,
+        patients.saveAndFlush(PatientProfile.submitted(patientId,given,family,request.country().trim(),self?request.whatsappNumber().trim():null,
                 self?blankToNull(request.email()):null,request.preferredLanguage(),blankToNull(request.timeZone()),now));
-        medicalCase.belongsTo(patientId);cases.saveAndFlush(medicalCase);
+        return patientId;
+    }
+
+    /**
+     * Records who submitted the draft case and their consent. No verification challenge (OTP) is generated here: a
+     * draft may still be receiving document uploads, and we must not start an expiry clock before the case is
+     * actually submitted.
+     */
+    @Transactional public void createFoundation(MedicalCase medicalCase, CreateCaseRequest request) {
+        Instant now=clock.instant(); UUID patientId=medicalCase.getPatientId();
+        String displayName=PatientNames.display(request.givenName(),request.familyName());
+        boolean self=!request.forSomeoneElse();
         var rep=request.representative();
         contacts.saveAndFlush(new CaseSubmissionContact(medicalCase.getId(),patientId,self?"PATIENT":"REPRESENTATIVE",self?displayName:PatientNames.clean(rep==null?null:rep.name()), self?null:(rep==null?null:rep.relationship()),blankToNull(request.email()),request.whatsappNumber().trim(),request.preferredLanguage(),now));
         String consentText="ar".equals(request.preferredLanguage()) ? "أوافق على معالجة المعلومات التي أقدمها لغرض تنسيق حالتي الطبية." : "I consent to processing the information I submit for the purpose of coordinating my medical case.";
@@ -83,21 +87,23 @@ public class IntakeLifecycleService {
      * A returning, signed-in patient starting another case: the SAME canonical patient owns the new case.
      * No patient row, submission contact or consent is duplicated beyond what this case needs.
      */
-    @Transactional public void createFoundationForExistingPatient(MedicalCase medicalCase, UUID patientId, String consentLanguage) {
-        Instant now=clock.instant();
-        medicalCase.belongsTo(patientId);cases.saveAndFlush(medicalCase);
-        patients.findById(patientId).ifPresent(p->contacts.saveAndFlush(new CaseSubmissionContact(medicalCase.getId(),patientId,"PATIENT",p.getDisplayName(),null,p.getEmail(),p.getWhatsappNumber(),p.getPreferredLanguage(),now)));
+    @Transactional public void createFoundationForExistingPatient(MedicalCase medicalCase, String consentLanguage) {
+        Instant now=clock.instant(); UUID patientId=medicalCase.getPatientId();
+        PatientProfile p=patients.findById(patientId).orElseThrow();
+        contacts.saveAndFlush(new CaseSubmissionContact(medicalCase.getId(),patientId,"PATIENT",p.getDisplayName(),null,p.getEmail(),p.getWhatsappNumber(),p.getPreferredLanguage(),now));
         String consentText="ar".equals(consentLanguage) ? "أوافق على معالجة المعلومات التي أقدمها لغرض تنسيق حالتي الطبية." : "I consent to processing the information I submit for the purpose of coordinating my medical case.";
         consents.saveAndFlush(new ConsentRecord(UUID.randomUUID(),patientId,medicalCase.getId(),new ConsentRecord.Terms("DATA_PROCESSING","intake-v1",consentLanguage,consentText,"Medical case coordination","Submitted case data"),"WEB","patient",now));
         audit("CASE_INTAKE_CREATED","patient","PATIENT",medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"CREATE","SUCCESS","Returning patient",now);
     }
 
-    public record PatientSnapshot(String displayName, String country, String whatsapp, String language) {}
-    /** What a new case needs from an existing canonical patient (display-name snapshot + contact defaults). */
+    public record PatientSnapshot(String country, String whatsapp, String language) {}
+    /**
+     * What a new case needs from an existing canonical patient. Only the patient's OWN number counts: a number a
+     * representative once submitted with is theirs, never a default for the patient's next case.
+     */
     public java.util.Optional<PatientSnapshot> patientSnapshot(UUID patientId) {
         return patients.findById(patientId).filter(p->p.getMergedIntoPatientId()==null)
-            .map(p->new PatientSnapshot(p.getDisplayName(),p.getCountry(),p.getWhatsappNumber()!=null?p.getWhatsappNumber()
-                :contacts.findFirstByPatientIdOrderByCreatedAtDesc(p.getId()).map(CaseSubmissionContact::getWhatsappNumber).orElse(null),p.getPreferredLanguage()));
+            .map(p->new PatientSnapshot(p.getCountry(),p.getWhatsappNumber(),p.getPreferredLanguage()));
     }
 
     public void validateSubmittable(UUID caseId) {
@@ -117,7 +123,10 @@ public class IntakeLifecycleService {
         links.saveAndFlush(new CaseAccessLink(linkId,medicalCase.getId(),patientId,"STATUS",hash(linkToken),now.plus(Duration.ofDays(30)),now));
         String lang="ar".equals(medicalCase.getPreferredLanguage())?"ar":"en";
         String payload=encryptedJson("{\"token\":\""+linkToken+"\",\"lang\":\""+lang+"\"}");
-        notificationOutbox.enqueueOnce("CASE_STATUS_LINK", "WHATSAPP", medicalCase.getWhatsappNumber(), "case-status-link", payload, "case-status:"+linkId, now);
+        // The link goes to whoever submitted the case, on the number they submitted with.
+        String submitterWhatsapp=contacts.findByCaseId(medicalCase.getId()).map(CaseSubmissionContact::getWhatsappNumber)
+                .orElseThrow(()->new IllegalStateException("Case "+medicalCase.getId()+" has no submission contact"));
+        notificationOutbox.enqueueOnce("CASE_STATUS_LINK", "WHATSAPP", submitterWhatsapp, "case-status-link", payload, "case-status:"+linkId, now);
         notificationOutbox.enqueueOnce("NEW_CASE", "EMAIL", coordinatorEmail, "new-case-received", encryptedJson("{\"case\":\""+medicalCase.getCaseNumber()+"\"}"), "case-submitted:"+medicalCase.getId(), now);
         audit("CASE_SUBMITTED","guest","GUEST",medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"SUBMIT","SUCCESS",null,now);
         return linkToken;

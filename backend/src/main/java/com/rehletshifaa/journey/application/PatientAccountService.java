@@ -258,7 +258,7 @@ public class PatientAccountService {
         try {
             if (!identity.available()) return;
             record S(UUID patientId, String email, String lang) {}
-            S s = jdbc.sql("SELECT c.patient_id,sc.email,c.preferred_language FROM medical_cases c LEFT JOIN case_submission_contacts sc ON sc.case_id=c.id WHERE c.id=?")
+            S s = jdbc.sql("SELECT c.patient_id,sc.email,c.preferred_language FROM medical_cases c JOIN case_submission_contacts sc ON sc.case_id=c.id WHERE c.id=?")
                     .param(event.caseId()).query((rs, n) -> new S(rs.getObject("patient_id", UUID.class), rs.getString("email"), rs.getString("preferred_language"))).optional().orElse(null);
             if (s == null || s.email() == null || s.patientId() == null) return;
             String normalized = normalizeEmail(s.email());
@@ -275,10 +275,10 @@ public class PatientAccountService {
         var actor = authority.authorize(Permission.ACCOUNT_BINDING);
         LinkRequest r = requireLink(token, actor);
         record C(String caseNumber, String givenName, String familyName, String role, String relationship) {}
-        C c = jdbc.sql("SELECT c.case_number,p.given_name,p.family_name,sc.contact_role,sc.relationship_to_patient FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id LEFT JOIN case_submission_contacts sc ON sc.case_id=c.id WHERE c.id=?")
+        C c = jdbc.sql("SELECT c.case_number,p.given_name,p.family_name,sc.contact_role,sc.relationship_to_patient FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id JOIN case_submission_contacts sc ON sc.case_id=c.id WHERE c.id=?")
                 .param(r.caseId()).query((rs, n) -> new C(rs.getString("case_number"), rs.getString("given_name"), rs.getString("family_name"), rs.getString("contact_role"), rs.getString("relationship_to_patient"))).single();
         return new AccountLinkRequestView(c.caseNumber(), PatientNames.display(c.givenName(), c.familyName()), r.origin(),
-                c.role() == null ? "PATIENT" : c.role(), c.relationship(), r.resolution());
+                c.role(), c.relationship(), r.resolution());
     }
 
     /**

@@ -152,5 +152,5 @@ public class CoordinationReadService {
         return load;
     }
 
-    private String decrypt(String value) { try { return value == null ? null : crypto.decrypt(value); } catch (RuntimeException e) { return null; } }
+    private String decrypt(String value) { return value == null ? null : crypto.decrypt(value); }
 }

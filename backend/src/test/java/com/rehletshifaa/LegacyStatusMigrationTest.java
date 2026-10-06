@@ -39,7 +39,8 @@ class LegacyStatusMigrationTest {
         insertLegacyCase(jdbc, "RS-2020-000005", "PROPOSAL_READY");
         insertLegacyCase(jdbc, "RS-2020-000006", "CLAIM_PENDING");
 
-        Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();
+        // Up to V72: V73 requires every case to belong to a canonical patient, which these V1-shaped rows never had.
+        Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("72").load().migrate();
 
         assertThat(status(jdbc, "RS-2020-000001")).isEqualTo("RECEIVED");
         assertThat(status(jdbc, "RS-2020-000002")).isEqualTo("INTAKE_REVIEW");

@@ -1137,7 +1137,7 @@ Implementation slices (kept green independently):
 | CL1 | Remove Keycloak business-role compatibility provisioning and its patient-role mutation | DONE |
 | CL2 | Replace `LEGACY` Journey admission with explicit `STANDARD` versus `JOURNEY`; route every standard intake through governed team/capacity eligibility and remove unrestricted self-claim | DONE (2026-10-06, Claude) — see "CL2 delivered" below |
 | CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | DONE (2026-10-06, Claude) — see "CL3 delivered" below |
-| CL4 | Remove obsolete patient/provider/plaintext compatibility data paths and finalize clean pre-production schema | PLANNED |
+| CL4 | Remove obsolete patient/provider/plaintext compatibility data paths and finalize clean pre-production schema | DONE (2026-10-06, Claude) — see "CL4 delivered" below |
 | CL5 | Move all SQL/JDBC out of application services module by module — **now via Spring Data JPA** (owner decision 2026-10-06, technical-decisions §29); live tracker `jpa-migration-status.md` | IN PROGRESS — all writes JPA except the local seeder; 17 classes still read with JdbcClient (ratchet in `ArchitectureRulesTest`) |
 | CL6 | Enforce the boundaries with ArchUnit, finish documentation/test cleanup, run focused and full backend gates | PLANNED |
 | CL7 | Add JaCoCo/Sonar configuration and run Sonar for the sole Maven backend when a Sonar server/project/token and scanner plugin are available | PLANNED |
@@ -1204,9 +1204,41 @@ PASS.
 
 Verification: full backend suite **570 tests, 0 failures**; `PostgresJpaMappingTest` PASS.
 
-**Next exact action:** Astra review of CL2 and CL3 together, then CL4 (obsolete patient/provider/plaintext compatibility
-data paths and the final pre-production schema). Preserve unrelated brand/theme work and do not run concurrent builds
-that share `backend/target`.
+**CL4 delivered (2026-10-06, Claude).** Inventory and decision per item (pre-production clean cutover: no data kept):
+
+| Item found | Decision |
+|---|---|
+| `medical_cases.full_name`, `medical_cases.whatsapp_number` — V1 plaintext copies of the patient's name and number, written at intake; the name was never read, the number only addressed the status link | **Removed** (V73). The status link goes to the submission contact's number (the same number the copy held) |
+| `medical_cases.patient_id` nullable since V2 (cases before patient records) | **NOT NULL** (V73). The patient is registered before the case row (`IntakeLifecycleService.registerPatient`); `MedicalCase` takes it in its constructor; `belongsTo` is gone. Case reads join the patient (no "no canonical name" branch) |
+| "No submission contact = pre-V30 case submitted by the patient" (`PatientActivationService` `sub == null` branches, `LEFT JOIN … role == null ? "PATIENT"` in `PatientAccountService`) | **Removed.** Every case has a contact (V73 preflight); a missing one is an error |
+| `patient_profiles.mobile_owner` — V30 "NULL = not yet clarified (legacy rows)"; the code only ever wrote `PATIENT` with a number, NULL without | **Removed** (V73). A number on the patient is the patient's own; the activation prefill still reports `PATIENT`/`REPRESENTATIVE`/null, now derived |
+| Returning-patient snapshot fell back to the latest submission contact's number (a representative's number became the default of the patient's next case) | **Removed.** Only the patient's own number counts; without one the existing `MOBILE_REQUIRED` refusal applies |
+| `CoordinationReadService.decrypt` returned null on any decryption failure | **Removed.** Undecryptable staff names now fail like every other encrypted read. (All `enc:` text already went through the strict `EncryptedText`; no plaintext read fallback remained) |
+| `case_claim_challenges` (V2 claim codes, superseded by secure status links and account-link requests), the `case-claim-code`, `case-submitted` and `account-activation` templates and the unused `app.claim.expiry-seconds`/`max-attempts` settings | **Removed** (V73 drops the table; `app.claim.pepper` and `intake-grant-expiry-seconds` stay). `deploy/oracle` still passes the two dead env vars — harmless, left for that deployment's owner |
+| Provider-organization remnants | **None left.** V62 dropped every table; the final PostgreSQL schema has no provider-organization column or view (`provider_membership_details_v` in the JPA tracker was stale) |
+| `medical_cases.country` (case-level intake country, shown on queues) | **Kept** — a case fact, not identity |
+| Patient name/contact columns on `patient_profiles` and `case_submission_contacts` are plaintext | **Kept** — current design, not a compatibility path; encrypting patient PII would be a new decision |
+| Dead tables V64 (Practice Manager invitations/delegation history), V65 (owner commissioning/recovery) | **Kept, listed** — they back features gated on PM consent and OD-02 |
+| `idempotency_records` (V2) | **Kept, listed** — technical-decisions §13.8 still names durable idempotency keys; owner decision |
+| `platform_access_roles` | **Not dead** — the FK catalogue behind `platform_role_assignments.role_key` |
+
+Migration `V73__finalize_clean_patient_schema` (Java, the V72 pattern) refuses — rather than mutates — cases without a
+canonical patient, cases without a submission contact, and patient numbers whose owner is NULL/REPRESENTATIVE; then sets
+`medical_cases.patient_id` NOT NULL, drops the two case columns, `mobile_owner` (+ its check) and `case_claim_challenges`.
+`CleanPatientSchemaMigrationTest` proves each refusal and the final schema; `LegacyStatusMigrationTest` now stops at V72
+(its V1-shaped rows have no patient).
+
+Verification: full backend suite **574 tests, 0 failures** (2 skipped); `PostgresJpaMappingTest` **PASS** on a fresh
+PostgreSQL 17 (V73 applied). One earlier full run had a single failure in
+`SecureJourneyCorrectionsTest.transferMovesOpenCoordinatorWork…` (assignment history first entry was the ended owner):
+the history is ordered `assigned_at DESC, id`, so two assignments in the same microsecond fall back to UUID order. It
+passed alone twice and in the next full run; it is a pre-existing ordering tie, not a CL4 change.
+
+**Next exact action:** CL6 — enforce the boundaries with ArchUnit (application layer free of SQL/JDBC and compatibility
+dependencies, module graph), finish documentation/test cleanup, run focused and full gates. CL7 stays blocked: no Sonar
+server/project/token and no Sonar scanner in the offline Maven cache. The remaining CL5 read conversions (17 classes in
+`ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`) follow as their own phases, one service per session, rewritten as query
+services. Preserve unrelated brand/theme work and do not run concurrent builds that share `backend/target`.
 
 ### Open evidence and next exact action
 

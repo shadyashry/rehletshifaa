@@ -816,9 +816,9 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
      * round-trips for every case in a queue.
      */
     private CaseView mapCase(ResultSet rs)throws SQLException{return new CaseView(rs.getObject("id",UUID.class),rs.getString("case_number"),rs.getString("status"),patientName(rs),rs.getString("country"),rs.getString("preferred_language"),rs.getString("care_category"),instant(rs,"created_at"),instant(rs,"updated_at"),rs.getLong("version"),null,null,null,null,rs.getBoolean("travel_package_requested"),rs.getString("waiting_on"),rs.getString("waiting_reason"));}
-    /** Canonical structured patient display name; the case row's own full_name remains an intake snapshot only. */
-    private static String patientName(ResultSet rs)throws SQLException{String canonical=rs.getString("patient_name");if(canonical==null||canonical.isBlank())throw new SQLException("Patient profile has no canonical structured name");return canonical;}
-    private static final String CASE_SELECT="SELECT c.*,"+com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL+" patient_name FROM medical_cases c LEFT JOIN patient_profiles p ON p.id=c.patient_id";
+    /** Canonical structured patient display name: every case belongs to a patient with a given name (V72, V73). */
+    private static String patientName(ResultSet rs)throws SQLException{return rs.getString("patient_name");}
+    private static final String CASE_SELECT="SELECT c.*,"+com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL+" patient_name FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id";
 
     /** Resolves coordinator/doctor subjects and their display names for a whole page of cases in three queries. */
     private List<CaseView> withAssignments(List<CaseView> cases){

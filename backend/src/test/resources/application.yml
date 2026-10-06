@@ -16,8 +16,6 @@ app:
   security.enabled: false
   claim:
     pepper: test-only-claim-pepper
-    expiry-seconds: 900
-    max-attempts: 5
   storage.mode: mock
   public-base-url: http://localhost:8080
   storage.max-bytes: 15728640

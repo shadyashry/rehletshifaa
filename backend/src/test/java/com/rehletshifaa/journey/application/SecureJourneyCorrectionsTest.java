@@ -53,7 +53,6 @@ class SecureJourneyCorrectionsTest {
     @Test void statusAccessIsOnlyCreatedAfterSubmission() {
         var created=cases.create(new CreateCaseRequest("Draft", "Patient","Kenya","+254700000010","Reports","en",true,null,"d@local.test","Africa/Nairobi"));
         em.flush();
-        assertThat(count("SELECT count(*) FROM case_claim_challenges WHERE case_id=?",created.caseId())).isZero();
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE 'claim:%' AND destination=?","+254700000010")).isZero();
         var submitted=cases.submit(created.caseId()); em.flush();
         assertThat(submitted.statusToken()).isNotBlank();

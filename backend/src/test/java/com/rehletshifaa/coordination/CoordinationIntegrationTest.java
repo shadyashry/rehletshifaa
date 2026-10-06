@@ -359,9 +359,11 @@ class CoordinationIntegrationTest {
         return id;
     }
     UUID medicalCase(UUID doctor) {
-        UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO medical_cases(id,case_number,full_name,country,whatsapp_number,preferred_language,status,consent_timestamp,created_at,updated_at,version,care_category) VALUES(?,?,'Test','AE','000','en','READY_FOR_CONSULTANT',?,?,?,0,'cardiology')",
-                id, "R-" + id.toString().substring(0, 10), past, past, past);
+        UUID id = UUID.randomUUID(), patient = UUID.randomUUID();
+        jdbc.update("INSERT INTO patient_profiles(id,given_name,country,preferred_language,created_at,updated_at,version) VALUES(?,'Test','AE','en',?,?,0)",
+                patient, past, past);
+        jdbc.update("INSERT INTO medical_cases(id,case_number,patient_id,country,preferred_language,status,consent_timestamp,created_at,updated_at,version,care_category) VALUES(?,?,?,'AE','en','READY_FOR_CONSULTANT',?,?,?,0,'cardiology')",
+                id, "R-" + id.toString().substring(0, 10), patient, past, past, past);
         jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,'DOCTOR','PRIMARY','ACTIVE','Fixture assignment','TEST',?,0)",
                 UUID.randomUUID(), id, doctor.toString(), past);
         return id;

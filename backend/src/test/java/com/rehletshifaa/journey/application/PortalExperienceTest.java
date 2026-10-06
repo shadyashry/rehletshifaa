@@ -108,6 +108,6 @@ class PortalExperienceTest {
         portal.savePreferences(new PreferencesRequest("New display","en"));
         assertThat(portal.preferences().displayName()).isEqualTo("New display");
         auth("person-b",Role.COORDINATOR);assertThat(portal.preferences().displayName()).isNull();
-        assertThat(jdbc.queryForObject("SELECT full_name FROM medical_cases WHERE id=?",String.class,id)).isEqualTo("Private Patient");
+        assertThat(jdbc.queryForObject("SELECT p.given_name||' '||p.family_name FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?",String.class,id)).isEqualTo("Private Patient");
     }
 }

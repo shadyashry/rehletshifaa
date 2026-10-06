@@ -38,7 +38,8 @@ public final class ActivationDtos {
      *
      * <p>{@code candidateEmail} is offered only when the on-file address is the patient's own; a
      * representative's address is never a candidate account email. {@code knownMobile} is the number we have
-     * (patient's or submitter's) with {@code mobileOwner} = PATIENT / REPRESENTATIVE / null (not yet clarified).
+     * (patient's or submitter's) with {@code mobileOwner} = PATIENT (on the patient) / REPRESENTATIVE (a representative
+     * submitted it) / null (the patient submitted it but it is not on their profile: the form asks whose it is).
      */
     public record OnboardingPrefill(String caseNumber, String caseStatus, String onboardingState, boolean profileActive,
                                     boolean accountLinked, AccountSetup account,

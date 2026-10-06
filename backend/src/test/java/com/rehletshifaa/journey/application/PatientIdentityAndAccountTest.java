@@ -59,10 +59,9 @@ class PatientIdentityAndAccountTest {
         UUID patientId = patientId(created.caseId());
         assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("Mohamed Ahmed");
         assertThat(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("El Sayed");
-        // The case row only carries a display snapshot; the patient row is the identity.
-        assertThat(jdbc.queryForObject("SELECT full_name FROM medical_cases WHERE id=?", String.class, created.caseId())).isEqualTo("Mohamed Ahmed El Sayed");
+        // The patient row is the identity; the case row carries no copy of the name or number.
         assertThat(jdbc.queryForObject("SELECT contact_role FROM case_submission_contacts WHERE case_id=?", String.class, created.caseId())).isEqualTo("PATIENT");
-        assertThat(jdbc.queryForObject("SELECT mobile_owner FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("PATIENT");
+        assertThat(jdbc.queryForObject("SELECT whatsapp_number FROM patient_profiles WHERE id=?", String.class, patientId)).isNotNull();
     }
 
     @Test void aSingleLegalNameIsSupportedDeliberatelyNotByInventingASurname() {
@@ -70,7 +69,6 @@ class PatientIdentityAndAccountTest {
                 .isInstanceOf(FieldValidationException.class);
         var created = cases.create(new CreateCaseRequest("MYSELF", "Ayaan", "", true, null, "Kenya", "+254700000002", null, "en", true, null, null, null, null, null));
         assertThat(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId(created.caseId()))).isNull();
-        assertThat(jdbc.queryForObject("SELECT full_name FROM medical_cases WHERE id=?", String.class, created.caseId())).isEqualTo("Ayaan");
     }
 
     @Test void emailStaysOptionalAtSendMyCase() {
@@ -205,8 +203,8 @@ class PatientIdentityAndAccountTest {
 
     @Test void aNumberVerifiedAsAnotherAccountsPersonalMobileIsNeverSilentlyReVerified() throws Exception {
         UUID other = UUID.randomUUID();
-        jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,family_name,country,whatsapp_number,mobile_owner,phone_verified_at,preferred_language,account_status,profile_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
-                other, "other-active-subject", "Other", "Person", "Kenya", "+254700000016", "PATIENT", Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now());
+        jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,family_name,country,whatsapp_number,phone_verified_at,preferred_language,account_status,profile_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0)",
+                other, "other-active-subject", "Other", "Person", "Kenya", "+254700000016", Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now());
         var ctx = accepted(request("Link", "Patient", "+254700000016", null));
         String g = grant(ctx); // OTP on the shared number: possession, not exclusive identity
         activation.activate(ctx.token, g, profile("Link", "Patient", "sec16@local.test", "+254700000016", "PATIENT")); em.flush();
@@ -324,7 +322,6 @@ class PatientIdentityAndAccountTest {
         assertThat(count("SELECT count(*) FROM patient_profiles")).isEqualTo(patients);
         assertThat(identity.accounts()).isEqualTo(1);
         assertThat(identity.setupMails()).hasSize(mails); // no new account setup
-        assertThat(jdbc.queryForObject("SELECT full_name FROM medical_cases WHERE id=?", String.class, next.caseId())).isEqualTo("Link Patient");
         assertThat(jdbc.queryForObject("SELECT contact_role FROM case_submission_contacts WHERE case_id=?", String.class, next.caseId())).isEqualTo("PATIENT");
         assertThat(journey.patientCases()).extracting(CaseView::caseNumber).contains(ctx.caseNumber, next.caseNumber());
     }
@@ -403,8 +400,8 @@ class PatientIdentityAndAccountTest {
     }
     private UUID seedLinkedPatient(String subject, String given, String family, String email) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,family_name,country,whatsapp_number,mobile_owner,email,email_verified_at,preferred_language,account_status,profile_status,profile_completed_at,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
-                id, subject, given, family, "Egypt", "+201000009999", "PATIENT", email, Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now(), Instant.now());
+        jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,family_name,country,whatsapp_number,email,email_verified_at,preferred_language,account_status,profile_status,profile_completed_at,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
+                id, subject, given, family, "Egypt", "+201000009999", email, Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now(), Instant.now());
         return id;
     }
     private String linkToken(UUID patientId) throws Exception {

@@ -125,11 +125,10 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | journey | `treatment_episodes` | W | journey |
 | notification | `notification_outbox` | W | casemanagement,journey,notification |
 | notification | `whatsapp_delivery_events` | W | notification |
-| journey | `case_claim_challenges` | dead |  |
 | journey | `commercial_policies` | R |  |
 | shared | `fx_rates` | R |  |
 | (none) | `idempotency_records` | dead |  |
-| (none) | `platform_access_roles` | dead |  |
+| access | `platform_access_roles` | FK catalogue (no entity) | authority (`platform_role_assignments.role_key`) |
 | (none) | `platform_governance_commissioning` | dead |  |
 | (none) | `platform_governance_commissioning_decisions` | dead |  |
 | (none) | `platform_governance_commissioning_participants` | dead |  |
@@ -137,7 +136,6 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | (none) | `platform_owner_recovery_requests` | dead |  |
 | (none) | `practice_manager_delegation_history` | dead |  |
 | (none) | `practice_manager_invitations` | dead |  |
-| (none) | `provider_membership_details_v` | dead |  |
 | workforce | `access_subjects` | W | access,authority,coordination,identity,workforce |
 | workforce | `workforce_current_managers` | W | access,workforce |
 | workforce | `workforce_functions` | W (read-only entity) | clinic,workforce |
@@ -155,11 +153,18 @@ they convert with `practitioner_profiles`. `audit_events` reads remaining:
 
 ## Dead schema (owner decision needed)
 
-Created by migrations but read/written by no code: `idempotency_records` (V2), `platform_access_roles` (V56),
-`platform_governance_commissioning`, `…_decisions`, `…_participants`, `platform_owner_recovery_requests`,
-`platform_owner_recovery_evidence` (V65), `practice_manager_invitations`, `practice_manager_delegation_history` (V64),
-`provider_membership_details_v` (V59), `case_claim_challenges` (its only reference was the patient merge, which no longer
-touches it). Either implement the feature or drop them before `main` (pre-production rule).
+Created by migrations but read/written by no code (reviewed in CL4, 2026-10-06):
+
+| Table | Why it stays |
+|---|---|
+| `platform_governance_commissioning`, `…_decisions`, `…_participants`, `platform_owner_recovery_requests`, `platform_owner_recovery_evidence` (V65) | Back owner commissioning/recovery, gated on OD-02 |
+| `practice_manager_invitations`, `practice_manager_delegation_history` (V64) | Back the Practice Manager consent flow, gated until its consent state machine exists |
+| `idempotency_records` (V2) | technical-decisions §13.8 still names durable idempotency keys; implement or drop is an owner decision |
+
+Either implement the feature or drop them before `main` (pre-production rule). Resolved in CL4: `case_claim_challenges`
+dropped by V73 (claim codes were superseded by secure status links and account-link requests);
+`provider_membership_details_v` was already gone (V62); `platform_access_roles` is not dead — it is the FK catalogue of
+`platform_role_assignments.role_key`.
 
 ## Delivered
 
@@ -256,6 +261,10 @@ touches it). Either implement the feature or drop them before `main` (pre-produc
   `JourneyCutoverStatusService` are JDBC-free. All 14 tables are **R** (reads too). Version listing loads deployments in
   one query instead of one per version. Fixed while converting: a case with no care area must not read as "not found".
   Verification: full suite = baseline; journey cutover/intake/binding suites 29/29; `PostgresJpaMappingTest` PASS.
+
+- 2026-10-06 — CL4 schema cleanup (V73): `MedicalCase` lost `full_name`/`whatsapp_number` and requires `patientId` at
+  construction (`patient_id` NOT NULL); `PatientProfile` lost `mobile_owner`; `case_claim_challenges` dropped.
+  Verification: full suite 574/0; `PostgresJpaMappingTest` PASS.
 
 ## Known exceptions to the rules
 

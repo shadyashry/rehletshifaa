@@ -19,9 +19,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 @Table(name = "medical_cases")
 public class MedicalCase extends AssignedIdEntity {
     @Column(name="case_number", nullable=false, unique=true, length=20) private String caseNumber;
-    @Column(name="full_name", nullable=false, length=120) private String fullName;
     @Column(nullable=false, length=80) private String country;
-    @Column(name="whatsapp_number", nullable=false, length=32) private String whatsappNumber;
     @Column(name="condition_description", length=2000) private String conditionDescription;
     @Column(name="care_category", length=60) private String careCategory;
     @Column(name="preferred_language", nullable=false, length=8) private String preferredLanguage;
@@ -32,30 +30,29 @@ public class MedicalCase extends AssignedIdEntity {
     @Column(name="created_at", nullable=false) private Instant createdAt;
     @Column(name="updated_at", nullable=false) private Instant updatedAt;
     @Column(nullable=false) private long version;
-    @Column(name="patient_id") private UUID patientId;
+    @Column(name="patient_id", nullable=false) private UUID patientId;
     @Column(name="claimed_at") private Instant claimedAt;
     @Column(name="waiting_on", nullable=false, length=20) private String waitingOn;
     @Column(name="waiting_reason", length=240) private String waitingReason;
     @Column(name="waiting_since") private Instant waitingSince;
 
     protected MedicalCase() {}
-    public MedicalCase(UUID id, String caseNumber, String fullName, String country, String whatsappNumber, String conditionDescription, String preferredLanguage, Instant now) {
-        this(id, caseNumber, fullName, country, whatsappNumber, conditionDescription, preferredLanguage, null, now);
-    }
-    public MedicalCase(UUID id, String caseNumber, String fullName, String country, String whatsappNumber, String conditionDescription, String preferredLanguage, String careCategory, Instant now) {
+    /**
+     * A draft case of an existing canonical patient. The patient's name and channels live on {@code patient_profiles}
+     * and the case's submission contact, never on the case row.
+     */
+    public MedicalCase(UUID id, String caseNumber, UUID patientId, String country, String conditionDescription, String preferredLanguage, String careCategory, Instant now) {
         super(id);
-        this.caseNumber = caseNumber; this.fullName = fullName.trim(); this.country = country.trim(); this.whatsappNumber = whatsappNumber.trim();
+        this.caseNumber = caseNumber; this.patientId = java.util.Objects.requireNonNull(patientId, "patientId"); this.country = country.trim();
         this.conditionDescription = conditionDescription == null || conditionDescription.isBlank() ? null : conditionDescription.trim();
         this.careCategory = careCategory;
         this.preferredLanguage = preferredLanguage; this.status = CaseStatus.DRAFT; this.waitingOn = "STAFF";
         this.consentTimestamp = micros(now); this.createdAt = micros(now); this.updatedAt = micros(now);
     }
     public void submit(Instant now) { if (status != CaseStatus.DRAFT) throw new IllegalStateException("Case is not in draft state"); status = CaseStatus.RECEIVED; submittedAt = micros(now); updatedAt = micros(now); version++; }
-    /** Links the case to its canonical patient (intake bookkeeping: not a case revision). */
-    public void belongsTo(UUID patientId) { this.patientId = patientId; }
     public UUID getPatientId() { return patientId; }
-    public String getCaseNumber() { return caseNumber; } public String getFullName() { return fullName; }
-    public String getCountry() { return country; } public String getWhatsappNumber() { return whatsappNumber; } public String getConditionDescription() { return conditionDescription; }
+    public String getCaseNumber() { return caseNumber; }
+    public String getCountry() { return country; } public String getConditionDescription() { return conditionDescription; }
     public String getCareCategory() { return careCategory; }
     public String getPreferredLanguage() { return preferredLanguage; } public CaseStatus getStatus() { return status; } public Instant getSubmittedAt() { return submittedAt; }
     public long getVersion() { return version; }

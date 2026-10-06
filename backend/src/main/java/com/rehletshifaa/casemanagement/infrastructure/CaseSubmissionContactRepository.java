@@ -14,8 +14,6 @@ public interface CaseSubmissionContactRepository extends BaseRepository<CaseSubm
     @Query("update CaseSubmissionContact x set x.patientId = :into where x.patientId = :from")
     int moveToPatient(@Param("from") UUID from, @Param("into") UUID into);
 
-    java.util.Optional<CaseSubmissionContact> findFirstByPatientIdOrderByCreatedAtDesc(UUID patientId);
-
     java.util.Optional<CaseSubmissionContact> findByCaseId(UUID caseId);
 
     /** The submitter turned out to be a representative; a relationship already recorded is kept. */

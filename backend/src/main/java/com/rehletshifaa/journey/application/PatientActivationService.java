@@ -147,7 +147,7 @@ public class PatientActivationService {
                 emailChanged, phoneChanged || phoneClaimedElsewhere, now))
             patients.saveAndFlush(profile);
         // The intake number belonged to the person who submitted the case: keep it there, never on the patient.
-        if ("REPRESENTATIVE".equals(clean.mobileOwner()) && sub != null && "PATIENT".equals(sub.role()))
+        if ("REPRESENTATIVE".equals(clean.mobileOwner()) && "PATIENT".equals(sub.role()))
             contacts.markOtherNumberAsRepresentative(caseId, clean.phone());
 
         recordConsents(patientId, caseId, clean.consents(), clean.language(), now);
@@ -198,8 +198,9 @@ public class PatientActivationService {
 
         // Who owns the mobile decides whether it is stored on the patient at all.
         String owner = trimToNull(r.mobileOwner()) == null ? null : r.mobileOwner().trim().toUpperCase(Locale.ROOT);
-        String known = current.phone() != null ? current.phone() : sub == null ? null : sub.whatsapp();
-        if (owner == null) owner = current.mobileOwner() != null ? current.mobileOwner() : (sub != null && "REPRESENTATIVE".equals(sub.role())) ? "REPRESENTATIVE" : known == null ? "PATIENT" : null;
+        String known = current.phone() != null ? current.phone() : sub.whatsapp();
+        // A number on the patient is always their own; otherwise a representative submitter's number is theirs.
+        if (owner == null) owner = current.phone() != null ? "PATIENT" : "REPRESENTATIVE".equals(sub.role()) ? "REPRESENTATIVE" : known == null ? "PATIENT" : null;
         if (owner == null) errors.reject("mobileOwner", "Tell us whether this number is yours or a family member's.");
         else if (!OWNERS.contains(owner)) errors.reject("mobileOwner", "Select a valid option.");
         String phone = normalizePhone(r.phone());
@@ -232,7 +233,7 @@ public class PatientActivationService {
 
     /** Is this number the verified personal mobile of a different patient who already has an account? */
     private boolean verifiedElsewhere(UUID patientId, String phone) {
-        Integer n = jdbc.sql("SELECT count(*) FROM patient_profiles WHERE id<>? AND whatsapp_number=? AND phone_verified_at IS NOT NULL AND external_subject IS NOT NULL AND mobile_owner='PATIENT'")
+        Integer n = jdbc.sql("SELECT count(*) FROM patient_profiles WHERE id<>? AND whatsapp_number=? AND phone_verified_at IS NOT NULL AND external_subject IS NOT NULL")
                 .params(patientId, phone).query(Integer.class).single();
         return n != null && n > 0;
     }
@@ -296,12 +297,12 @@ public class PatientActivationService {
         DepositSummary deposit = depositSummary(caseId);
         AccountSetup state = account.state(patientId);
         boolean active = "ACTIVE".equals(p.status());
-        boolean submittedBySelf = sub == null || "PATIENT".equals(sub.role());
+        boolean submittedBySelf = "PATIENT".equals(sub.role());
         // Only the patient's OWN address is a candidate account email. A representative's is never offered.
         String candidateEmail = p.email() != null ? p.email() : null;
         // The number we hold: the patient's when they have one, otherwise the submitter's, with its owner.
-        String knownMobile = p.phone() != null ? p.phone() : sub == null ? null : sub.whatsapp();
-        String mobileOwner = p.phone() != null ? p.mobileOwner() : (sub != null && "REPRESENTATIVE".equals(sub.role())) ? "REPRESENTATIVE" : null;
+        String knownMobile = p.phone() != null ? p.phone() : sub.whatsapp();
+        String mobileOwner = p.phone() != null ? "PATIENT" : "REPRESENTATIVE".equals(sub.role()) ? "REPRESENTATIVE" : null;
         return new OnboardingPrefill(c.number(), c.status(), onboarding, active, p.subject() != null, state,
                 p.givenName(), p.familyName(), p.preferredName(),
                 candidateEmail, p.emailVerified(), knownMobile, mobileOwner, p.phoneVerified() && p.phone() != null,
@@ -349,12 +350,12 @@ public class PatientActivationService {
 
     // ---- data access ----
     private record Profile(UUID patientId, String status, String subject, String givenName, String familyName, String preferredName,
-                           String email, String phone, String mobileOwner, String country, String nationality, LocalDate dateOfBirth, String sex, String language,
+                           String email, String phone, String country, String nationality, LocalDate dateOfBirth, String sex, String language,
                            boolean emailVerified, boolean phoneVerified) {}
     private record Submission(String role, String name, String relationship, String email, String whatsapp) {}
 
     private static final String PROFILE_COLUMNS =
-            "id,profile_status,external_subject,given_name,family_name,preferred_name,email,whatsapp_number,mobile_owner,country,nationality,date_of_birth,sex,preferred_language,email_verified_at,phone_verified_at";
+            "id,profile_status,external_subject,given_name,family_name,preferred_name,email,whatsapp_number,country,nationality,date_of_birth,sex,preferred_language,email_verified_at,phone_verified_at";
 
     private Profile loadProfile(UUID patientId) {
         return jdbc.sql("SELECT " + PROFILE_COLUMNS + " FROM patient_profiles WHERE id=?").param(patientId)
@@ -367,14 +368,14 @@ public class PatientActivationService {
     private Profile mapProfile(ResultSet rs, int n) throws SQLException {
         return new Profile(rs.getObject("id", UUID.class), rs.getString("profile_status"), rs.getString("external_subject"),
                 rs.getString("given_name"), rs.getString("family_name"), rs.getString("preferred_name"),
-                rs.getString("email"), rs.getString("whatsapp_number"), rs.getString("mobile_owner"), rs.getString("country"), rs.getString("nationality"),
+                rs.getString("email"), rs.getString("whatsapp_number"), rs.getString("country"), rs.getString("nationality"),
                 rs.getObject("date_of_birth", LocalDate.class), rs.getString("sex"), rs.getString("preferred_language"),
                 rs.getObject("email_verified_at") != null, rs.getObject("phone_verified_at") != null);
     }
     private Submission submission(UUID caseId) {
         return jdbc.sql("SELECT contact_role,contact_name,relationship_to_patient,email,whatsapp_number FROM case_submission_contacts WHERE case_id=?").param(caseId)
                 .query((rs, n) -> new Submission(rs.getString("contact_role"), rs.getString("contact_name"), rs.getString("relationship_to_patient"), rs.getString("email"), rs.getString("whatsapp_number")))
-                .optional().orElse(null);
+                .optional().orElseThrow(() -> new IllegalStateException("Case " + caseId + " has no submission contact"));
     }
     private String subjectType(UUID patientId) {
         return jdbc.sql("SELECT subject_type FROM patient_onboardings WHERE patient_id=? ORDER BY created_at DESC LIMIT 1")

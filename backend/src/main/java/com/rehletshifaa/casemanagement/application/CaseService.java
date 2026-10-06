@@ -16,14 +16,14 @@ public class CaseService {
     private final MedicalCaseRepository cases; private final CaseNumberGenerator numbers; private final IntakeLifecycleService intake; private final CaseIntakeGrantService intakeGrants; private final Clock clock; private final org.springframework.context.ApplicationEventPublisher events;
     public CaseService(MedicalCaseRepository cases, CaseNumberGenerator numbers, IntakeLifecycleService intake, CaseIntakeGrantService intakeGrants, Clock clock, org.springframework.context.ApplicationEventPublisher events) { this.cases=cases; this.numbers=numbers; this.intake=intake;this.intakeGrants=intakeGrants;this.clock=clock;this.events=events; }
     /**
-     * Create the draft case together with its canonical patient and submission contact. The case row keeps
-     * a display-name SNAPSHOT of the patient (audit/history only); identity lives on patient_profiles.
+     * Create the draft case together with its canonical patient and submission contact. The patient's name and
+     * channels live on patient_profiles and the submission contact, never on the case row.
      */
     @Transactional public CreateCaseResponse create(CreateCaseRequest request) {
         validateNames(request);
         Instant now = clock.instant();
-        String displayName = PatientNames.display(request.givenName(), request.familyName());
-        var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), displayName, request.country(), request.whatsappNumber(), request.conditionDescription(), request.preferredLanguage(), request.careArea(), now);
+        UUID patientId = intake.registerPatient(request);
+        var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), patientId, request.country(), request.conditionDescription(), request.preferredLanguage(), request.careArea(), now);
         if (Boolean.TRUE.equals(request.travelPackageRequested())) medicalCase.setTravelPackageRequested(true);
         cases.saveAndFlush(medicalCase); intake.createFoundation(medicalCase,request);
         return new CreateCaseResponse(medicalCase.getId(), medicalCase.getCaseNumber(), medicalCase.getStatus().name(),intakeGrants.issue(medicalCase.getId()));
@@ -37,9 +37,9 @@ public class CaseService {
         IntakeLifecycleService.PatientSnapshot p = intake.patientSnapshot(patientId)
                 .orElseThrow(() -> new ApiException(404, "PATIENT_NOT_FOUND", "Patient profile was not found"));
         if (p.whatsapp() == null) throw new ApiException(409, "MOBILE_REQUIRED", "Add a WhatsApp number to your profile before starting a new case");
-        var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), p.displayName(), p.country(), p.whatsapp(), request.conditionDescription(), p.language(), request.careArea(), now);
+        var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), patientId, p.country(), request.conditionDescription(), p.language(), request.careArea(), now);
         if (Boolean.TRUE.equals(request.travelPackageRequested())) medicalCase.setTravelPackageRequested(true);
-        cases.saveAndFlush(medicalCase); intake.createFoundationForExistingPatient(medicalCase, patientId, p.language());
+        cases.saveAndFlush(medicalCase); intake.createFoundationForExistingPatient(medicalCase, p.language());
         return new CreateCaseResponse(medicalCase.getId(), medicalCase.getCaseNumber(), medicalCase.getStatus().name(),intakeGrants.issue(medicalCase.getId()));
     }
     /** Structured-name rules that bean validation cannot express across fields. */

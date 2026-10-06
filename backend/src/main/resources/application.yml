@@ -119,8 +119,6 @@ app:
     phishing-resistant-acr-values: ${PHISHING_RESISTANT_ACR_VALUES:3}
   claim:
     pepper: ${CLAIM_TOKEN_PEPPER:local-development-pepper-only}
-    expiry-seconds: ${CLAIM_TOKEN_EXPIRY_SECONDS:900}
-    max-attempts: ${CLAIM_TOKEN_MAX_ATTEMPTS:5}
     intake-grant-expiry-seconds: ${INTAKE_GRANT_EXPIRY_SECONDS:7200}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
   web-base-url: ${APP_WEB_BASE_URL:http://localhost:3000}

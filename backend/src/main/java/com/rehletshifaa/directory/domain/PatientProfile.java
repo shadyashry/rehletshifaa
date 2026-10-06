@@ -41,7 +41,6 @@ public class PatientProfile extends AssignedIdEntity {
     @Column(name = "given_name", nullable = false, length = 80) private String givenName;
     @Column(name = "family_name", length = 80) private String familyName;
     @Column(name = "preferred_name", length = 80) private String preferredName;
-    @Column(name = "mobile_owner", length = 20) private String mobileOwner;
     @Column(name = "account_status", nullable = false, length = 24) private String accountStatus;
     @Column(name = "account_setup_requested_at") private Instant accountSetupRequestedAt;
     @Column(name = "account_activated_at") private Instant accountActivatedAt;
@@ -50,11 +49,14 @@ public class PatientProfile extends AssignedIdEntity {
 
     protected PatientProfile() {}
 
-    /** A patient as submitted at intake: PENDING profile, no account. Contact channels only when the submitter is the patient. */
-    public static PatientProfile submitted(UUID id, String givenName, String familyName, String country, String whatsappNumber, String mobileOwner,
+    /**
+     * A patient as submitted at intake: PENDING profile, no account. Contact channels only when the submitter is the
+     * patient: a number stored here is always the patient's own (a representative's stays on the submission contact).
+     */
+    public static PatientProfile submitted(UUID id, String givenName, String familyName, String country, String whatsappNumber,
                                            String email, String preferredLanguage, String timeZone, Instant now) {
         PatientProfile p = new PatientProfile(id);
-        p.givenName = givenName; p.familyName = familyName; p.country = country; p.whatsappNumber = whatsappNumber; p.mobileOwner = mobileOwner;
+        p.givenName = givenName; p.familyName = familyName; p.country = country; p.whatsappNumber = whatsappNumber;
         p.email = email; p.preferredLanguage = preferredLanguage; p.timeZone = timeZone; p.createdAt = micros(now); p.updatedAt = micros(now);
         p.profileStatus = "PENDING"; p.accountStatus = "NOT_PROVISIONED";
         return p;
@@ -140,7 +142,7 @@ public class PatientProfile extends AssignedIdEntity {
     /** Withdraws the mobile number when it was in fact the submitter's. */
     public boolean withdrawPhone(java.util.Collection<String> submitterNumbers, Instant at) {
         if (whatsappNumber == null || !submitterNumbers.contains(whatsappNumber)) return false;
-        whatsappNumber = null; mobileOwner = null; phoneVerifiedAt = null; updatedAt = micros(at);
+        whatsappNumber = null; phoneVerifiedAt = null; updatedAt = micros(at);
         return true;
     }
 
@@ -159,7 +161,7 @@ public class PatientProfile extends AssignedIdEntity {
         if ("ACTIVE".equals(profileStatus)) return false;
         Instant now = micros(at);
         givenName = c.givenName(); familyName = c.familyName(); preferredName = c.preferredName(); email = c.email();
-        whatsappNumber = c.phone(); mobileOwner = c.phone() == null ? null : "PATIENT"; country = c.country();
+        whatsappNumber = c.phone(); country = c.country();
         nationality = c.nationality(); dateOfBirth = c.dateOfBirth(); sex = c.sex(); preferredLanguage = c.language();
         if (resetEmailVerification) emailVerifiedAt = null;
         if (resetPhoneVerification) phoneVerifiedAt = null;
