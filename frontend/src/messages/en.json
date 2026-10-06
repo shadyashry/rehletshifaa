@@ -782,17 +782,20 @@
   "consultantProfile": {
     "verified": "CV-sourced profile",
     "highlights": "Professional highlights",
-    "latestQualification": "Latest qualification",
-    "basedIn": "Based in",
-    "timeline": "Qualifications timeline",
     "sourcesTitle": "Profile sources",
     "relatedTitle": "Other Consultants in {system}",
     "relatedFallback": "More Consultants",
     "allConsultants": "Meet all Consultants",
     "reviewNote": "Credentials are reviewed before clinical matching",
-    "overview": "Overview",
-    "specialty": "Specialty",
     "matchNote": "You don’t need to choose a Consultant — your coordinator matches your case to the right specialist by clinical need.",
-    "matchLink": "Send your case"
+    "matchLink": "Send your case",
+    "statYears": "years since graduation",
+    "statQualifications": "qualifications",
+    "statFocus": "clinical focus areas",
+    "careerPath": "Career path",
+    "kindQualification": "Qualification",
+    "kindAppointment": "Appointment",
+    "furtherQualifications": "Further qualifications",
+    "appointmentsTitle": "Appointments & memberships"
   }
 }
