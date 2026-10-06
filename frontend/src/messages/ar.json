@@ -782,20 +782,20 @@
   "consultantProfile": {
     "verified": "ملف مستند إلى السيرة الذاتية",
     "highlights": "أبرز الإنجازات",
+    "latestQualification": "أحدث مؤهل",
+    "basedIn": "مكان الممارسة",
+    "timeline": "المسار الأكاديمي",
     "sourcesTitle": "مصادر الملف",
     "relatedTitle": "استشاريون آخرون في {system}",
     "relatedFallback": "استشاريون آخرون",
     "allConsultants": "تعرّف على جميع الاستشاريين",
     "reviewNote": "تُراجع المؤهلات قبل التوجيه السريري",
+    "overview": "نبذة",
+    "specialty": "التخصص",
     "matchNote": "لا تحتاج إلى اختيار استشاري، إذ يوجّه منسقك حالتك إلى الأخصائي المناسب وفق الحاجة السريرية.",
     "matchLink": "أرسل حالتك",
     "statYears": "سنة منذ التخرج",
     "statQualifications": "مؤهلات",
-    "statFocus": "مجالات تركيز سريري",
-    "careerPath": "المسار المهني",
-    "kindQualification": "مؤهل",
-    "kindAppointment": "منصب",
-    "furtherQualifications": "مؤهلات أخرى",
-    "appointmentsTitle": "المناصب والعضويات"
+    "statFocus": "مجالات تركيز"
   }
 }

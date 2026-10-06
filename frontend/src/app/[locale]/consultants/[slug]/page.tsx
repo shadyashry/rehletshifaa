@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ArrowRight, Award, BookOpen, ChevronRight, ExternalLink, FileText, Landmark, MapPin, Presentation } from "lucide-react";
+import { ArrowRight, Award, BookOpen, Building2, ChevronRight, ExternalLink, FileText, Landmark, Presentation, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import { SpecialtyMotif } from "@/components/care-areas/SpecialtyMotif";
 import { ConsultantPortrait } from "@/components/ConsultantProfileCard";
-import { CareerTimeline, FocusMap, type CareerEvent } from "@/components/consultants/ProfileVisuals";
+import { FocusMap } from "@/components/consultants/ProfileVisuals";
 import { careAreaMeta } from "@/lib/care-area-catalog";
 import { CONSULTANT_SLUGS, consultantUi, getConsultant, getConsultants } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
@@ -36,10 +36,8 @@ function highlightIcon(text: string) {
   return Award;
 }
 
-/** Latest four-digit year in a qualification line; undefined when none is stated. */
+/** Latest four-digit year in a CV line; undefined when none is stated. */
 const yearOf = (text: string) => text.match(/(?:19|20)\d{2}/g)?.at(-1);
-/** The start year of an appointment ("since June 2023" / "منذ يونيو 2023"); undefined when none is stated. */
-const sinceOf = (text: string) => text.match(/(?:since|منذ)[^0-9]{0,24}((?:19|20)\d{2})/i)?.[1];
 
 /** A CV line split for setting: the title before the first comma (Latin or Arabic) and the institution/detail after it, with a trailing year removed. */
 function splitLine(text: string) {
@@ -49,37 +47,37 @@ function splitLine(text: string) {
   return comma > 0 ? { head: body.slice(0, comma), rest: body.slice(comma + 1).trim() } : { head: body, rest: "" };
 }
 
-/** The institution alone: the detail before any further comma or a "(… CV)" note. */
-const placeOf = (rest: string) => rest.split(/[,،]\s/)[0].replace(/\s*\([^)]*\)\s*$/, "").trim();
-
-function Section({ id, title, tone = "white", children }: { id: string; title: string; tone?: "white" | "clinical"; children: ReactNode }) {
+/** One CV section: a plain typographic heading over its content, separated from the next by a hairline. */
+function CvSection({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-title`} className={`py-14 md:py-20 ${tone === "clinical" ? "canvas-clinical" : "bg-surface-default"}`}>
-      <div className="container-site">
-        <h2 id={`${id}-title`} className="text-[1.5rem] font-semibold leading-tight tracking-[-0.015em] text-brand-900 rtl:tracking-normal sm:text-[1.875rem]">{title}</h2>
-        <div className="mt-8 md:mt-10">{children}</div>
-      </div>
+    <section aria-labelledby={`${id}-title`} className="border-t border-border-subtle py-9 first:border-t-0 first:pt-0 md:py-10">
+      <h2 id={`${id}-title`} className="text-[1.25rem] font-semibold leading-snug tracking-[-0.01em] text-brand-900 rtl:tracking-normal">{title}</h2>
+      <div className="mt-5">{children}</div>
     </section>
   );
 }
 
-/** A CV entry: the title set firm, its institution and dates quieter beneath, between hairlines. */
-function Entry({ text }: { text: string }) {
+/** A CV entry: a small icon tile, the title set firm, its institution and dates quieter beneath. */
+function Entry({ text, icon }: { text: string; icon: ReactNode }) {
   const { head, rest } = splitLine(text);
   return (
-    <li className="border-t border-border-subtle py-4 first:border-t-0 first:pt-0">
-      <p className="text-[1rem] font-semibold leading-7 text-brand-900">{head}</p>
-      {rest ? <p className="text-[0.9375rem] leading-6 text-ink-500">{rest}</p> : null}
+    <li className="flex gap-3.5 py-3 first:pt-0 last:pb-0">
+      <span aria-hidden className="mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-[10px] bg-surface-clinical text-brand-700 ring-1 ring-border-clinical">{icon}</span>
+      <p className="min-w-0">
+        <span className="block text-[1rem] font-medium leading-7 text-brand-900">{head}</span>
+        {rest ? <span className="block text-[0.9375rem] leading-6 text-ink-500">{rest}</span> : null}
+      </p>
     </li>
   );
 }
 
 /**
- * A Consultant's profile — visual, but with no sales furniture. A specialty-tinted hero carries the identity (portrait
- * mark, care area, name, role, location, summary) and three figures from the CV. Then the clinical focus as a map
- * around the specialty, highlights as icon tiles, the career as a dated path, appointments and memberships, and the
- * sources. The page has no buttons of its own: one quiet line at the end says the patient never has to choose, and
- * the header keeps the single "Start my case". Other Consultants in the same body system follow as a name list.
+ * A Consultant's profile, set as a clinical dossier — no sales furniture. On desktop a fixed identity column (portrait
+ * mark with the specialty icon, name, role, three figures from the CV, the facts a patient checks first) sits beside
+ * the CV itself: overview, clinical focus drawn as a map around the specialty, highlights marked by kind, qualifications
+ * as a dated timeline, appointments, standing and sources, separated by hairlines. The specialty's tint and line
+ * drawing wash the top of the page. The page carries no buttons of its own: one quiet line at the end says the patient
+ * never has to choose, and the header keeps the single "Start my case". Other Consultants follow as a list of names.
  */
 export default async function ConsultantProfilePage({ params }: Props) {
   const { locale, slug } = await params;
@@ -92,142 +90,142 @@ export default async function ConsultantProfilePage({ params }: Props) {
   const meta = careAreaMeta(profile.careAreaHref) ?? { system: "heart" as const, icon: "heart" as const };
   const style = SYSTEM_STYLES[meta.system];
   const systemTitle = d.careAreasPage.systems[meta.system].title;
+  const same = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
 
-  const events: CareerEvent[] = [
-    ...profile.qualifications.map((text) => ({ text, year: yearOf(text), kind: "qualification" as const })),
-    ...profile.appointments.map((text) => ({ text, year: sinceOf(text), kind: "appointment" as const })),
-  ]
-    .filter((e): e is typeof e & { year: string } => e.year !== undefined)
-    .map(({ text, year, kind }, index) => ({ ...splitLine(text), year, kind, index }))
-    .sort((a, b) => a.year.localeCompare(b.year) || (a.kind === b.kind ? a.index - b.index : a.kind === "qualification" ? -1 : 1))
-    .map(({ head, rest, year, kind }) => ({ year, kind, title: head, place: placeOf(rest) }));
-  const undated = profile.qualifications.filter((text) => !yearOf(text));
-  const showPath = events.length >= 2;
+  const timeline = profile.qualifications
+    .map((text, index) => ({ text, year: yearOf(text), index }))
+    .sort((a, b) => (b.year ?? "0").localeCompare(a.year ?? "0") || a.index - b.index);
+  const latest = timeline[0] ? { ...splitLine(timeline[0].text), year: timeline[0].year } : undefined;
+
+  const facts = [
+    same(profile.specialty, profile.expertise.anchor) ? null : { label: t.specialty, value: profile.specialty },
+    profile.distinction ? { label: ui.verifiedRole, value: profile.distinction } : null,
+    latest ? { label: t.latestQualification, value: [latest.head, latest.year].filter(Boolean).join(locale === "ar" ? "، " : ", ") } : null,
+    { label: t.basedIn, value: profile.location },
+  ].filter((fact) => fact !== null);
 
   const firstYear = profile.qualifications.map(yearOf).filter((y) => y !== undefined).sort()[0];
   const stats = [
     firstYear ? { value: String(new Date().getFullYear() - Number(firstYear)), label: t.statYears } : null,
     { value: String(profile.qualifications.length), label: t.statQualifications },
     { value: String(profile.focusAreas.length), label: t.statFocus },
-  ].filter((s) => s !== null);
+  ].filter((stat) => stat !== null);
 
   const all = getConsultants(locale).filter((p) => p.slug !== profile.slug);
   const sameSystem = all.filter((p) => careAreaMeta(p.careAreaHref)?.system === meta.system);
   const related = (sameSystem.length ? sameSystem : all).slice(0, 3);
 
   return (
-    <>
-      <section className="relative isolate overflow-hidden border-b border-border-subtle bg-surface-pearl">
-        <div aria-hidden className={`absolute inset-0 -z-20 ${style.soft}`} />
-        <SpecialtyMotif system={meta.system} className="absolute -end-24 -top-16 -z-10 h-[34rem] w-[56rem] opacity-55 [mask-image:linear-gradient(to_left,black_35%,transparent_80%)] rtl:-scale-x-100" />
-        <div className="container-site pb-12 pt-8 md:pb-16 md:pt-10">
-          <nav aria-label={ui.back} className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-ink-500">
-            <Link href={localeHref(locale, "consultants")} className="rounded px-0.5 hover:text-brand-700">{ui.back}</Link>
-            <ChevronRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />
-            <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden className={`h-2 w-2 rounded-full ${style.dot}`} />
-              {systemTitle}
+    <div className="relative isolate overflow-x-clip bg-surface-default">
+      {/* The specialty's tint and line drawing wash the top of the page, then fade into the white reading surface. */}
+      <div aria-hidden className={`absolute inset-x-0 top-0 -z-10 h-[24rem] ${style.soft} [mask-image:linear-gradient(to_bottom,black_45%,transparent)]`} />
+      <SpecialtyMotif system={meta.system} className="absolute -end-24 -top-28 -z-10 h-[20rem] w-[44rem] opacity-40 [mask-image:linear-gradient(to_left,black_30%,transparent_75%)] rtl:-scale-x-100" />
+      <div className="container-site pb-16 pt-8 md:pb-20 md:pt-10">
+        <nav aria-label={ui.back} className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-ink-500">
+          <Link href={localeHref(locale, "consultants")} className="rounded px-0.5 hover:text-brand-700">{ui.back}</Link>
+          <ChevronRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />
+          <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden className={`h-2 w-2 rounded-full ${style.dot}`} />
+            {systemTitle}
+          </span>
+        </nav>
+
+        <div className="mt-8 grid gap-10 md:mt-10 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-16 xl:grid-cols-[19rem_minmax(0,1fr)] xl:gap-24">
+          <header className="lg:top-28 lg:self-start lg:[@media(min-height:50rem)]:sticky">
+            <span className="relative inline-block rounded-full bg-surface-default/80 p-1.5 shadow-[0_20px_40px_-28px_rgba(36,64,74,0.6)] ring-1 ring-border-card">
+              <ConsultantPortrait profile={profile} size="lg" />
+              <span aria-hidden className="absolute -bottom-0.5 -end-0.5 grid h-9 w-9 place-items-center rounded-full bg-brand-700 text-white ring-4 ring-surface-default">
+                <CareAreaIcon name={meta.icon} size={17} strokeWidth={2} />
+              </span>
             </span>
-          </nav>
+            <h1 className="mt-6 text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal">{profile.name}</h1>
+            <p className="mt-2 text-[1rem] leading-7 text-ink-600">{profile.role}</p>
 
-          <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-14">
-            <div className="min-w-0">
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                <span className="relative inline-block w-fit flex-none rounded-full bg-surface-default/70 p-2 shadow-[0_20px_40px_-28px_rgba(36,64,74,0.6)] ring-1 ring-border-card">
-                  <ConsultantPortrait profile={profile} size="lg" />
-                  <span aria-hidden className="absolute -bottom-0.5 -end-0.5 grid h-10 w-10 place-items-center rounded-full bg-brand-700 text-white ring-4 ring-surface-pearl">
-                    <CareAreaIcon name={meta.icon} size={18} strokeWidth={2} />
-                  </span>
-                </span>
-                <div className="min-w-0">
-                  <p className={`inline-flex items-center gap-1.5 rounded-full bg-surface-default/80 px-3 py-1 text-[0.8125rem] font-semibold text-brand-800 ring-1 ${style.ring}`}>
-                    <CareAreaIcon name={meta.icon} size={14} strokeWidth={1.9} />
-                    {profile.careAreaLabel}
-                  </p>
-                  <h1 className="mt-3 text-[2rem] font-semibold leading-[1.08] tracking-[-0.025em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal sm:text-[2.75rem]">{profile.name}</h1>
-                  <p className="mt-2 text-[1.0625rem] leading-7 text-ink-700">{profile.role}</p>
-                </div>
-              </div>
-
-              <p className="mt-7 max-w-[64ch] text-[1.0625rem] leading-8 text-ink-700">{profile.summary}</p>
-
-              <p className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.875rem] leading-6 text-ink-600">
-                <span className="inline-flex items-center gap-1.5"><MapPin size={15} aria-hidden="true" className="text-brand-600" />{profile.location}</span>
-                <span title={t.reviewNote} className="inline-flex items-center gap-1.5"><FileText size={15} aria-hidden="true" className="text-brand-600" />{t.verified}</span>
-                <Link href={localeHref(locale, profile.careAreaHref)} className="inline-flex items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800">
-                  {ui.careArea}
-                  <ArrowRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />
-                </Link>
-              </p>
-            </div>
-
-            <dl className={`grid divide-x divide-border-subtle overflow-hidden rounded-[20px] bg-surface-default/85 shadow-[0_30px_60px_-44px_rgba(36,64,74,0.6)] ring-1 ring-border-card backdrop-blur rtl:divide-x-reverse ${stats.length === 3 ? "grid-cols-3 lg:w-[26rem]" : "grid-cols-2 lg:w-[18rem]"}`}>
-              {stats.map((s) => (
-                <div key={s.label} className="flex flex-col px-4 py-5 sm:px-6 sm:py-6">
-                  <dt className="order-2 mt-2 text-[0.8125rem] leading-5 text-ink-500">{s.label}</dt>
-                  <dd className="order-1 text-[2.25rem] font-semibold tabular-nums leading-none tracking-[-0.03em] text-brand-800 sm:text-[2.75rem]">{s.value}</dd>
+            <dl className={`mt-6 grid divide-x divide-border-subtle rounded-[16px] bg-surface-default py-3.5 shadow-[0_20px_40px_-34px_rgba(36,64,74,0.6)] ring-1 ring-border-card rtl:divide-x-reverse ${stats.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+              {stats.map((stat) => (
+                <div key={stat.label} className="flex flex-col px-3 text-center">
+                  <dd className="order-1 text-[1.75rem] font-semibold tabular-nums leading-none tracking-[-0.02em] text-brand-800">{stat.value}</dd>
+                  <dt className="order-2 mt-1.5 text-[0.75rem] leading-4 text-ink-500">{stat.label}</dt>
                 </div>
               ))}
             </dl>
-          </div>
-        </div>
-      </section>
 
-      <Section id="focus" title={ui.focus}>
-        <FocusMap anchor={profile.expertise.anchor} areas={profile.focusAreas} icon={meta.icon} system={meta.system} />
-      </Section>
+            <dl className="mt-6 border-t border-border-subtle">
+              {facts.map(({ label, value }) => (
+                <div key={label} className="border-b border-border-subtle py-3.5">
+                  <dt className="text-[0.8125rem] leading-5 text-ink-500">{label}</dt>
+                  <dd className="mt-0.5 text-[0.9375rem] font-medium leading-6 text-brand-900">{value}</dd>
+                </div>
+              ))}
+            </dl>
 
-      {profile.achievements?.length ? (
-        <Section id="highlights" title={t.highlights} tone="clinical">
-          <ul className="grid gap-5 md:grid-cols-3">
-            {profile.achievements.map((achievement) => {
-              const Icon = highlightIcon(achievement);
-              return (
-                <li key={achievement} className="rounded-[20px] bg-surface-default p-6 shadow-[0_20px_40px_-34px_rgba(36,64,74,0.5)] ring-1 ring-border-card sm:p-7">
-                  <span aria-hidden className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-700 text-white shadow-[0_12px_24px_-14px_rgba(31,107,115,0.9)]"><Icon size={21} strokeWidth={1.8} /></span>
-                  <p className="mt-5 text-[1rem] leading-7 text-brand-900">{achievement}</p>
-                </li>
-              );
-            })}
-          </ul>
-        </Section>
-      ) : null}
+            <p title={t.reviewNote} className="mt-4 flex items-center gap-2 text-[0.8125rem] leading-5 text-ink-500">
+              <FileText size={14} aria-hidden="true" className="flex-none" />
+              {t.verified}
+            </p>
+            <Link href={localeHref(locale, profile.careAreaHref)} className="mt-3 inline-flex items-center gap-2 text-[0.875rem] font-semibold text-brand-700 hover:text-brand-800">
+              <CareAreaIcon name={meta.icon} size={15} strokeWidth={1.9} />
+              {ui.careArea}
+            </Link>
+          </header>
 
-      <Section id="career" title={showPath ? t.careerPath : ui.qualifications} tone={profile.achievements?.length ? "white" : "clinical"}>
-        {showPath ? (
-          <>
-            <CareerTimeline events={events} labels={{ qualification: t.kindQualification, appointment: t.kindAppointment }} />
-            {undated.length ? (
-              <div className="mt-10 border-t border-border-subtle pt-6">
-                <h3 className="text-[0.8125rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">{t.furtherQualifications}</h3>
-                <ul className="mt-4 grid gap-x-10 md:grid-cols-2">{undated.map((item) => <Entry key={item} text={item} />)}</ul>
-              </div>
+          <div className="min-w-0 max-w-[46rem]">
+            <CvSection id="overview" title={t.overview}>
+              <p className="text-[1.0625rem] leading-8 text-ink-700">{profile.summary}</p>
+            </CvSection>
+
+            <CvSection id="focus" title={ui.focus}>
+              <FocusMap anchor={profile.expertise.anchor} areas={profile.focusAreas} icon={meta.icon} system={meta.system} />
+            </CvSection>
+
+            {profile.achievements?.length ? (
+              <CvSection id="highlights" title={t.highlights}>
+                <ul className="grid gap-4">
+                  {profile.achievements.map((achievement) => {
+                    const Icon = highlightIcon(achievement);
+                    return (
+                      <li key={achievement} className="flex gap-4">
+                        <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand-700 text-white shadow-[0_10px_20px_-12px_rgba(31,107,115,0.9)]"><Icon size={18} strokeWidth={1.8} /></span>
+                        <p className="pt-1.5 text-[1rem] leading-7 text-ink-700">{achievement}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CvSection>
             ) : null}
-          </>
-        ) : (
-          <ul className="grid max-w-[48rem]">{profile.qualifications.map((item) => <Entry key={item} text={item} />)}</ul>
-        )}
-      </Section>
 
-      <section aria-labelledby="appointments-title" className="border-t border-border-subtle bg-surface-pearl py-14 md:py-20">
-        <div className="container-site">
-          <h2 id="appointments-title" className="text-[1.5rem] font-semibold leading-tight tracking-[-0.015em] text-brand-900 rtl:tracking-normal sm:text-[1.875rem]">{t.appointmentsTitle}</h2>
-          <div className="mt-8 grid gap-10 md:mt-10 lg:grid-cols-2 lg:gap-16">
-            <div>
-              <h3 className="text-[0.8125rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">{ui.appointments}</h3>
-              <ul className="mt-4 grid">{profile.appointments.map((item) => <Entry key={item} text={item} />)}</ul>
-            </div>
+            <CvSection id="qualifications" title={ui.qualifications}>
+              <ol aria-label={t.timeline}>
+                {timeline.map((item, index) => {
+                  const { head, rest } = splitLine(item.text);
+                  const last = index === timeline.length - 1;
+                  return (
+                    <li key={item.text} className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-4 sm:grid-cols-[4rem_minmax(0,1fr)]">
+                      <span className={`text-[0.9375rem] font-semibold tabular-nums leading-7 ${item.year ? "text-brand-700" : "text-ink-500"}`}>{item.year ?? "—"}</span>
+                      <p className={`relative min-w-0 ps-7 ${last ? "" : "pb-6"}`}>
+                        <span aria-hidden className={`absolute start-0 top-[0.5625rem] h-2.5 w-2.5 rounded-full ring-4 ring-surface-default ${index === 0 ? "bg-brand-700" : "bg-brand-300"}`} />
+                        {last ? null : <span aria-hidden className="absolute bottom-0 start-[0.28125rem] top-6 w-px bg-border-clinical" />}
+                        <span className="block text-[1rem] font-medium leading-7 text-brand-900">{head}</span>
+                        {rest ? <span className="block text-[0.9375rem] leading-6 text-ink-500">{rest}</span> : null}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ol>
+            </CvSection>
+
+            <CvSection id="appointments" title={ui.appointments}>
+              <ul className="grid">{profile.appointments.map((item) => <Entry key={item} text={item} icon={<Building2 size={16} strokeWidth={1.8} />} />)}</ul>
+            </CvSection>
+
             {profile.professionalStanding.length ? (
-              <div>
-                <h3 className="text-[0.8125rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">{ui.standing}</h3>
-                <ul className="mt-4 grid">{profile.professionalStanding.map((item) => <Entry key={item} text={item} />)}</ul>
-              </div>
+              <CvSection id="standing" title={ui.standing}>
+                <ul className="grid">{profile.professionalStanding.map((item) => <Entry key={item} text={item} icon={<ShieldCheck size={16} strokeWidth={1.8} />} />)}</ul>
+              </CvSection>
             ) : null}
-          </div>
 
-          <div className="mt-12 grid gap-6 border-t border-border-subtle pt-8 lg:grid-cols-2 lg:gap-16">
-            <div>
-              <h3 className="text-[0.8125rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">{t.sourcesTitle}</h3>
+            <section aria-labelledby="sources-title" className="border-t border-border-subtle pt-9 md:pt-10">
+              <h2 id="sources-title" className="text-[0.8125rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">{t.sourcesTitle}</h2>
               <p className="mt-2 text-[0.875rem] leading-6 text-ink-500">{profile.verification}</p>
               {profile.externalLinks?.length ? (
                 <div className="mt-3 flex flex-wrap gap-4">
@@ -239,17 +237,18 @@ export default async function ConsultantProfilePage({ params }: Props) {
                   ))}
                 </div>
               ) : null}
-            </div>
-            <p className="text-[0.9375rem] leading-7 text-ink-600 lg:pt-6">
+            </section>
+
+            <p className="mt-10 border-t border-border-subtle pt-6 text-[0.9375rem] leading-7 text-ink-600">
               {t.matchNote}{" "}
               <Link href={localeHref(locale, "send-my-case")} className="font-semibold text-brand-700 underline decoration-brand-300 underline-offset-4 hover:decoration-brand-700">{t.matchLink}</Link>
             </p>
           </div>
         </div>
-      </section>
+      </div>
 
       {related.length ? (
-        <section aria-labelledby="related-consultants-title" className="border-t border-border-subtle bg-surface-default py-12 md:py-14">
+        <section aria-labelledby="related-consultants-title" className="border-t border-border-subtle py-12 md:py-14">
           <div className="container-site">
             <div className="flex flex-wrap items-baseline justify-between gap-4">
               <h2 id="related-consultants-title" className="text-[1.25rem] font-semibold leading-snug text-brand-900">
@@ -260,25 +259,22 @@ export default async function ConsultantProfilePage({ params }: Props) {
                 <ArrowRight size={15} aria-hidden="true" className="rtl:-scale-x-100" />
               </Link>
             </div>
-            <ul className="mt-6 grid gap-4 md:grid-cols-3">
-              {related.map((p) => {
-                const s = SYSTEM_STYLES[careAreaMeta(p.careAreaHref)?.system ?? meta.system];
-                return (
-                  <li key={p.slug}>
-                    <Link href={localeHref(locale, `consultants/${p.slug}`)} className="group flex items-center gap-4 rounded-[18px] bg-surface-default p-4 ring-1 ring-border-card transition-[box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_-30px_rgba(36,64,74,0.55)] motion-reduce:transform-none">
-                      <span className={`rounded-full p-1 ${s.well}`}><ConsultantPortrait profile={p} size="sm" /></span>
-                      <span className="min-w-0">
-                        <span className="block font-semibold leading-6 text-brand-900 group-hover:text-brand-700">{p.name}</span>
-                        <span className="line-clamp-1 text-[0.875rem] leading-6 text-ink-500">{p.specialty}</span>
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
+            <ul className="mt-6 grid border-t border-border-subtle md:grid-cols-3 md:gap-x-10">
+              {related.map((p) => (
+                <li key={p.slug} className="border-b border-border-subtle md:border-b-0">
+                  <Link href={localeHref(locale, `consultants/${p.slug}`)} className="group flex items-center gap-4 py-5">
+                    <span className={`rounded-full p-1 ${SYSTEM_STYLES[careAreaMeta(p.careAreaHref)?.system ?? meta.system].well}`}><ConsultantPortrait profile={p} size="sm" /></span>
+                    <span className="min-w-0">
+                      <span className="block font-semibold leading-6 text-brand-900 group-hover:text-brand-700">{p.name}</span>
+                      <span className="line-clamp-1 text-[0.875rem] leading-6 text-ink-500">{p.specialty}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </section>
       ) : null}
-    </>
+    </div>
   );
 }
