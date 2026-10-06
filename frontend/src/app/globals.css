@@ -761,139 +761,44 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Care selector (home): six body systems as a list, the chosen one in a panel.
-   Every colour comes from the system's tone (--sys, --sys-well, --sys-ring,
-   --sys-deep, set per system from the active theme's system tokens).
+   Care systems grid (home): six calm white cards, all visible. Every colour
+   comes from the system's tone (--sys, --sys-well, --sys-ring, --sys-deep, set
+   per card from the active theme's system tokens) and appears only in the icon,
+   the faces' initials and the hover state.
 --------------------------------------------------------------------------- */
 @layer components {
-  /* Phones and tablets: a row of chips; the chosen chip is filled with its tone. */
-  .care-selector-tab {
-    border-color: var(--color-line);
-    background: var(--color-surface-default);
-    color: var(--color-ink-700);
+  .care-grid-card {
+    border-color: var(--color-border-subtle);
+    box-shadow: 0 1px 2px rgba(20, 38, 43, 0.04);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
-  .care-selector-tab .care-selector-index {
-    color: var(--sys-deep);
-  }
-  .care-selector-tab[data-selected="true"] {
-    border-color: var(--sys-deep);
-    background: var(--sys-deep);
-    color: #ffffff;
-  }
-  .care-selector-tab[data-selected="true"] .care-selector-index {
-    color: rgba(255, 255, 255, 0.75);
-  }
-  .care-selector-tab:focus-visible {
-    outline: 2px solid var(--color-brand-600);
-    outline-offset: 2px;
-  }
-
-  /* Desktop: a quiet list; the chosen row is lifted onto white, marked by its tone at the start edge. */
-  @media (min-width: 64rem) {
-    .care-selector-tab {
-      border-color: transparent;
-      background: transparent;
-    }
-    .care-selector-tab:hover:not([data-selected="true"]) {
-      background: color-mix(in srgb, var(--sys-well) 55%, transparent);
-    }
-    .care-selector-tab .care-selector-index {
-      color: var(--sys);
-    }
-    .care-selector-tab .care-selector-title {
-      color: var(--color-brand-900);
-    }
-    .care-selector-tab .care-selector-arrow {
-      opacity: 0;
-      color: var(--sys-deep);
-      transition: opacity 0.2s ease, translate 0.2s ease;
-    }
-    .care-selector-tab:hover .care-selector-arrow {
-      opacity: 0.45;
-    }
-    .care-selector-tab[data-selected="true"] {
-      border-color: var(--sys-ring);
-      background: var(--color-surface-default);
-      color: inherit;
-      box-shadow: inset 3px 0 0 var(--sys-deep), 0 12px 28px -24px rgba(20, 38, 43, 0.4);
-    }
-    [dir="rtl"] .care-selector-tab[data-selected="true"] {
-      box-shadow: inset -3px 0 0 var(--sys-deep), 0 12px 28px -24px rgba(20, 38, 43, 0.4);
-    }
-    .care-selector-tab[data-selected="true"] .care-selector-index {
-      color: var(--sys-deep);
-    }
-    .care-selector-tab[data-selected="true"] .care-selector-title {
-      color: var(--sys-deep);
-    }
-    .care-selector-tab[data-selected="true"] .care-selector-arrow {
-      opacity: 1;
-    }
-  }
-
-  /* Optional panel furniture, off by default; a theme opts in (Petrol & Paper does). */
-  .care-selector-panel-art,
-  .care-selector-panel-total,
-  .care-selector-names,
-  .care-selector-area-facets,
-  .care-selector-area-people,
-  .care-selector-panel-foot {
-    display: none;
-  }
-
-  /* The panel: the system's tone in the head, fading into the page; its care areas as rows. */
-  .care-selector-panel {
+  .care-grid-card:hover {
     border-color: var(--sys-ring);
+    box-shadow: 0 1px 2px rgba(20, 38, 43, 0.04), 0 18px 36px -28px rgba(20, 38, 43, 0.35);
   }
-  .care-selector-panel-head {
-    background: linear-gradient(180deg, var(--sys-well) 0%, color-mix(in srgb, var(--sys-well) 35%, var(--color-surface-default)) 100%);
-    border-bottom: 1px solid var(--sys-ring);
-  }
-  .care-selector-panel-index {
-    color: var(--sys-deep);
-  }
-  .care-selector-monogram {
-    border: 1px solid var(--sys-ring);
-    background: var(--color-surface-default);
-    color: var(--sys-deep);
-  }
-  .care-selector-areas > li {
-    border-color: color-mix(in srgb, var(--sys-ring) 70%, transparent);
-  }
-  .care-selector-area:hover {
-    background: color-mix(in srgb, var(--sys-well) 45%, transparent);
-  }
-  .care-selector-area-icon {
+  .care-grid-icon {
     background: var(--sys-well);
     color: var(--sys-deep);
-    box-shadow: inset 0 0 0 1px var(--sys-ring);
   }
-  .care-selector-area:hover .care-selector-area-icon {
-    background: var(--sys-deep);
-    color: #ffffff;
-    box-shadow: none;
+  .care-grid-area {
+    transition: color 0.18s ease;
   }
-  .care-selector-area-count {
+  .care-grid-area:hover {
     color: var(--sys-deep);
   }
-  .care-selector-area .care-selector-arrow {
-    color: var(--sys-deep);
-    transition: translate 0.2s ease;
+  .care-grid-arrow {
+    color: var(--color-ink-300);
+    transition: color 0.18s ease, translate 0.18s ease;
   }
-  .care-selector-area:hover .care-selector-arrow {
+  .care-grid-area:hover .care-grid-arrow {
+    color: var(--sys-deep);
     translate: 3px 0;
   }
-  [dir="rtl"] .care-selector-area:hover .care-selector-arrow {
+  [dir="rtl"] .care-grid-area:hover .care-grid-arrow {
     translate: -3px 0;
   }
-
-  @media (prefers-reduced-motion: no-preference) {
-    @keyframes care-selector-in {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: none; }
-    }
-    .care-selector-panel:not([hidden]) {
-      animation: care-selector-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-    }
+  .care-grid-face {
+    background: var(--sys-well);
+    color: var(--sys-deep);
   }
 }

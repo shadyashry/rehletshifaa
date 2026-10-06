@@ -77,34 +77,34 @@
   --color-border-clinical: #e3ded4;
   --color-accent-clinical: #5fb3ac;
 
-  /* Care-area systems: one hue family, six tones. The petrol family steps from green-teal (01) through petrol to
-     blue-petrol (06), so read in order the atlas is one sweep of the brand colour, never a rainbow of categories.
-     Each tone has a well (tint), a ring (hairline), a line (marks) and a deep shade (text and icons: 6.9:1+ on its
-     well; white icons 8:1+). */
-  --color-system-heart-well: #e1f2ea;
-  --color-system-heart-ring: #bddbcd;
-  --color-system-heart-line: #358d64;
-  --sys-heart-deep: #165a3a;
-  --color-system-neuro-well: #e1f2ee;
-  --color-system-neuro-ring: #bddbd4;
-  --color-system-neuro-line: #358d77;
-  --sys-neuro-deep: #165a49;
-  --color-system-movement-well: #e1f2f1;
-  --color-system-movement-ring: #bddbda;
-  --color-system-movement-line: #358d8a;
-  --sys-movement-deep: #165a58;
-  --color-system-digestive-well: #e1eff2;
-  --color-system-digestive-ring: #bdd6db;
-  --color-system-digestive-line: #357e8d;
-  --sys-digestive-deep: #164f5a;
-  --color-system-surgery-well: #e1ecf2;
-  --color-system-surgery-ring: #bdd0db;
-  --color-system-surgery-line: #356d8d;
-  --sys-surgery-deep: #16415a;
-  --color-system-women-well: #e1e8f2;
-  --color-system-women-ring: #bdcadb;
-  --color-system-women-line: #355b8d;
-  --sys-women-deep: #16345a;
+  /* Care-area systems: six steps across the cool brand family — sea green, teal, cyan, steel, blue, slate — far
+     enough apart to tell at a glance, close enough to read as one family. Identity comes first from each system's icon;
+     the tone supports it. Each step has a well (tint), a ring (hairline), a line (marks) and a deep shade (text and
+     icons: 6.4:1+ on its well; white icons 7.2:1+). */
+  --color-system-heart-well: #e2f5ec;
+  --color-system-heart-ring: #bcdccc;
+  --color-system-heart-line: #3b9166;
+  --sys-heart-deep: #1b5f3d;
+  --color-system-neuro-well: #e2f6f3;
+  --color-system-neuro-ring: #baded8;
+  --color-system-neuro-line: #379585;
+  --sys-neuro-deep: #186256;
+  --color-system-movement-well: #e1f4f7;
+  --color-system-movement-ring: #b9dcdf;
+  --color-system-movement-line: #358d97;
+  --sys-movement-deep: #175c63;
+  --color-system-digestive-well: #e2f0f6;
+  --color-system-digestive-ring: #bad3de;
+  --color-system-digestive-line: #377995;
+  --sys-digestive-deep: #184c62;
+  --color-system-surgery-well: #e3ebf5;
+  --color-system-surgery-ring: #bdcbdb;
+  --color-system-surgery-line: #3d638f;
+  --sys-surgery-deep: #1c3b5e;
+  --color-system-women-well: #e4e8f4;
+  --color-system-women-ring: #c0c5d8;
+  --color-system-women-line: #435489;
+  --sys-women-deep: #202e5b;
 
   /* The old sand/champagne hospitality accent folds into the petrol family. */
   --color-accent-warm: var(--color-brand-400);
@@ -740,7 +740,7 @@
       to { opacity: 1; transform: none; }
     }
     :root[data-brand-theme="petrol"] :is(
-      .care-selector,
+      .care-grid > li,
       section[aria-labelledby="trust-title"] ul.grid > li,
       .promise-section ol > li,
       .canvas-hospitality ol > li,
@@ -822,191 +822,4 @@
 }
 :root[data-brand-theme="petrol"] .promise-panel > div:first-child > span[aria-hidden] > span:not(:first-child) {
   box-shadow: inset 0 0 0 1px var(--color-brand-300), 0 0 0 2px var(--paper);
-}
-
-/* ---------------------------------------------------------------------------
-   Care selector panel — the chosen body system, answered in three beats:
-   what it is (a mark of its own, its scope), who will look at your case (named
-   Consultants), and what to do next (a step in the words of your choice).
---------------------------------------------------------------------------- */
-:root[data-brand-theme="petrol"] .care-selector-panel {
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 2px rgba(20, 38, 43, 0.04), 0 24px 48px -36px color-mix(in srgb, var(--sys-deep) 55%, transparent);
-}
-
-/* Head: the tone, the system's own mark drawn large and faint at the far edge, position "01 / 06". */
-:root[data-brand-theme="petrol"] .care-selector-panel-head {
-  overflow: hidden;
-  padding: 1.75rem 1.75rem 1.5rem;
-  background:
-    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--sys-well) 100%, transparent) 0%, transparent 60%),
-    linear-gradient(180deg, var(--sys-well) 0%, color-mix(in srgb, var(--sys-well) 30%, #ffffff) 100%);
-}
-:root[data-brand-theme="petrol"] .care-selector-panel-art {
-  display: block;
-  position: absolute;
-  top: -1.75rem;
-  inset-inline-end: -1.5rem;
-  color: var(--sys-deep);
-  opacity: 0.08;
-  pointer-events: none;
-}
-:root[data-brand-theme="petrol"] .care-selector-panel-art svg {
-  width: 11.5rem;
-  height: 11.5rem;
-}
-:root[data-brand-theme="petrol"] .care-selector-panel-head > :not(.care-selector-panel-art) {
-  position: relative;
-}
-:root[data-brand-theme="petrol"] .care-selector-panel-total {
-  display: inline;
-  color: var(--color-ink-400);
-  font-weight: 500;
-}
-:root[data-brand-theme="petrol"] .care-selector-panel-head h3 {
-  font-family: var(--font-brand-latin), var(--font-latin), sans-serif;
-  font-size: clamp(1.5rem, 1.25rem + 0.6vw, 1.875rem);
-  letter-spacing: -0.025em;
-}
-:root[data-brand-theme="petrol"][dir="rtl"] .care-selector-panel-head h3 {
-  font-family: var(--font-brand-arabic), var(--font-arabic), sans-serif;
-  letter-spacing: 0;
-}
-:root[data-brand-theme="petrol"] .care-selector-panel-head .care-selector-monogram {
-  width: 2.5rem;
-  height: 2.5rem;
-  background: #ffffff;
-  border-color: var(--sys-ring);
-  font-size: 0.8125rem;
-}
-:root[data-brand-theme="petrol"] .care-selector-names {
-  display: block;
-  margin-top: 0.125rem;
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
-}
-
-/* Rows: scope as tags, the area's own Consultants, a round go control that fills on hover. */
-:root[data-brand-theme="petrol"] .care-selector-area {
-  padding: 1.25rem 1.75rem;
-  gap: 1.125rem;
-}
-:root[data-brand-theme="petrol"] .care-selector-area-icon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 0.75rem;
-}
-:root[data-brand-theme="petrol"] .care-selector-area-short {
-  display: none;
-}
-:root[data-brand-theme="petrol"] .care-selector-area-facets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
-}
-:root[data-brand-theme="petrol"] .care-selector-facet {
-  padding: 0.3rem 0.625rem;
-  border: 1px solid var(--sys-ring);
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--sys-well) 60%, #ffffff);
-  color: var(--sys-deep);
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.1rem;
-  white-space: nowrap;
-}
-:root[data-brand-theme="petrol"] .care-selector-area-count {
-  margin-top: 0.5rem;
-  color: var(--color-ink-500);
-  font-weight: 500;
-}
-:root[data-brand-theme="petrol"] .care-selector-area-people {
-  display: none;
-}
-@media (min-width: 40rem) {
-  :root[data-brand-theme="petrol"] .care-selector-area-people {
-    display: flex;
-    flex: none;
-  }
-  :root[data-brand-theme="petrol"] .care-selector-area-people > span {
-    display: grid;
-    width: 2rem;
-    height: 2rem;
-    place-items: center;
-    margin-inline-start: -0.5rem;
-    border: 1px solid var(--sys-ring);
-    border-radius: 9999px;
-    background: #ffffff;
-    box-shadow: 0 0 0 2px #ffffff;
-    color: var(--sys-deep);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }
-  :root[data-brand-theme="petrol"] .care-selector-area-people > span:first-child {
-    margin-inline-start: 0;
-  }
-}
-:root[data-brand-theme="petrol"] .care-selector-area-go {
-  display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
-  place-items: center;
-  border: 1px solid var(--sys-ring);
-  border-radius: 9999px;
-  color: var(--sys-deep);
-  transition: background-color 0.22s ease, border-color 0.22s ease, color 0.22s ease;
-}
-:root[data-brand-theme="petrol"] .care-selector-area-go .care-selector-arrow {
-  color: currentColor;
-}
-:root[data-brand-theme="petrol"] .care-selector-area:hover .care-selector-area-go {
-  border-color: var(--sys-deep);
-  background: var(--sys-deep);
-  color: #ffffff;
-}
-
-/* Foot: the next step, in the words of the system just chosen. */
-:root[data-brand-theme="petrol"] .care-selector-panel-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.875rem 1.25rem;
-  padding: 1.25rem 1.75rem;
-  border-top: 1px solid var(--sys-ring);
-  background: color-mix(in srgb, var(--sys-well) 45%, var(--paper));
-}
-@media (max-width: 39.99rem) {
-  :root[data-brand-theme="petrol"] .care-selector-panel-head {
-    padding: 1.375rem 1.25rem 1.25rem;
-  }
-  :root[data-brand-theme="petrol"] .care-selector-area {
-    padding: 1.125rem 1.25rem;
-  }
-  :root[data-brand-theme="petrol"] .care-selector-panel-foot {
-    padding: 1.125rem 1.25rem;
-  }
-  :root[data-brand-theme="petrol"] .care-selector-panel-foot .btn-primary {
-    width: 100%;
-    justify-content: center;
-  }
-  :root[data-brand-theme="petrol"] .care-selector-panel-art svg {
-    width: 8.5rem;
-    height: 8.5rem;
-  }
-}
-
-/* The panel's own next step replaces the generic "Not sure which one fits?" box beside the list. */
-:root[data-brand-theme="petrol"] .care-selector-unsure {
-  display: none;
-}
-/* Phones: one compact line of scope instead of wrapping tags. */
-@media (max-width: 39.99rem) {
-  :root[data-brand-theme="petrol"] .care-selector-area-short {
-    display: block;
-  }
-  :root[data-brand-theme="petrol"] .care-selector-area-facets {
-    display: none;
-  }
 }
