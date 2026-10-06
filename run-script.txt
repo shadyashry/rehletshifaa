@@ -1,3 +1,0 @@
-docker compose -f docker-compose.yml -f docker-compose.tunnel.yml down
-
-docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build

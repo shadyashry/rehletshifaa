@@ -26,3 +26,9 @@ output/
 /RehletShifaaQATestProtocol.pdf
 /rehletshifaa-tester-access-guide.pdf
 .cloudflared-runtime/
+.tunnels/
+.codex-tmp/
+/tmp/
+/eslint.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
