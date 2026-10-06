@@ -5,8 +5,17 @@ import java.util.UUID;
 public interface CoordinatorRoutingPort {
     /**
      * The case's Coordinator for Journey-projected COORDINATOR work: the current owner, or one chosen by the effective
-     * routing policy. Never throws: with no policy, nobody eligible, or a routing failure it resolves to
-     * {@code empty()} and the work stays unassigned for the coordination queue.
+     * routing policy. Missing policy or candidates produces durable coordination queue evidence. Persistence
+     * failures propagate and roll back the caller's transaction.
      */
     Optional<String> routeCoordinatorWork(UUID caseId);
+
+    /** Current coordination intake uses the same eligibility, assignment and durable queue rules. */
+    Optional<String> routeCoordinationIntake(UUID caseId);
+
+    /** Authenticated Coordinator may claim only if eligible under the current routing policy. */
+    UUID claimCoordinatorCase(UUID caseId);
+
+    /** Manager or relationship-scoped Coordinator lead reassigns to an eligible target. */
+    UUID reassignCoordinator(UUID caseId, String target, String reason);
 }

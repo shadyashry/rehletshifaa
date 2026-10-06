@@ -374,8 +374,8 @@ public class StaffWorkService {
 
     private String encrypt(String value) { return "enc:" + crypto.encrypt(value); }
     private String encryptNullable(String value) { return value == null || value.isBlank() ? null : "enc:" + crypto.encrypt(value.trim()); }
-    private String decrypt(String value) { return value == null ? null : value.startsWith("enc:") ? crypto.decrypt(value.substring(4)) : value; }
-    /** Work-item text as stored by this service (encrypted at rest, legacy rows plain). */
+    private String decrypt(String value) { return com.rehletshifaa.shared.crypto.EncryptedText.decodeNullable(crypto, value); }
+    /** Work-item text as stored by this service (encrypted at rest). */
     public String decryptText(String stored) { return decrypt(stored); }
     private static String json(String value) { return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\""); }
 

@@ -221,6 +221,7 @@ class PostActivationLandingTest {
         cases.submit(created.caseId()); em.flush(); em.clear();
         seedDoctorProfile(); seedCoordinatorProfile();
         authenticate("coordinator-subject", Role.COORDINATOR);
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
         journey.claimCoordinatorCase(created.caseId(), "pod");
         em.flush(); SecurityContextHolder.clearContext();
         return created.caseId();

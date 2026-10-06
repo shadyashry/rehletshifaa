@@ -47,7 +47,7 @@ class AuthorityIntegrationTest {
         WorkforceTestData.leadTeam(jdbc, "CARE_COORDINATION", "a-lead", "a-owner");
         Instant now = clock.instant();
         UUID patient = UUID.randomUUID();
-        jdbc.update("INSERT INTO patient_profiles(id,external_subject,full_name,country,whatsapp_number,preferred_language,created_at,updated_at,version) "
+        jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,country,whatsapp_number,preferred_language,created_at,updated_at,version) "
                 + "VALUES(?,?,?,?,?,'en',?,?,0)", patient, "a-patient", "Patient", "Kenya", "+254700000555", now, now);
         caseId = UUID.randomUUID();
         jdbc.update("INSERT INTO medical_cases(id,case_number,full_name,country,whatsapp_number,preferred_language,status,consent_timestamp,created_at,updated_at,version,patient_id) "

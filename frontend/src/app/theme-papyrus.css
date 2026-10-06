@@ -1,0 +1,571 @@
+/* ---------------------------------------------------------------------------
+   Brand preview — "Papyrus" (البردي)
+   ---------------------------------------------------------------------------
+   Egypt wrote the first surgical case book: the Edwin Smith Papyrus (c. 1600 BC)
+   sets out 48 cases, each examined, diagnosed and answered. Its scribes wrote the
+   headings in red ochre — the rubric — and the text in carbon black.
+
+   RehletShifaa does the same thing today: a patient abroad sends a case; a named
+   Consultant reads it and answers; a coordinator carries it to arrival, treatment
+   and the follow-up at home. So the identity treats every case as a respected
+   case file, made by hand:
+     · papyrus paper with a faint fibre weave; carbon ink for the words;
+     · red ochre (the rubric) marks only what matters: the action, the section
+       numbers, the route;
+     · Nile teal carries the care signals (checks, icons);
+     · a serif voice for headings — read, not marketed;
+     · the case-file furniture: numbered sections, a tear-off intake slip, a
+       print mounted on layered paper, Consultant monograms as ink stamps, a
+       dotted travel route, a ledger double rule.
+
+   `BrandThemeSwitch` sets data-brand-theme="papyrus". Every text pairing is WCAG
+   2.2 AA (ink on papyrus 14.5:1, body 10:1, muted 5.4:1, rubric 5.5:1, white on
+   rubric 6.3:1, Nile teal 5.4:1).
+--------------------------------------------------------------------------- */
+
+:root[data-brand-theme="papyrus"] {
+  --papyrus: #f5eee1;
+  --papyrus-deep: #ebe1cd;
+  --papyrus-fresh: #fffcf6;
+  --carbon: #221d17;
+  --rubric: #a3401f;
+  --rubric-deep: #8c3519;
+  --nile: #1e6b70;
+  --papyrus-serif: "Iowan Old Style", "Charter", "Georgia", "Noto Serif", "Cambria", serif;
+  /* Fibre weave: papyrus is laid in two layers — the top strips run across, the lower ones down. Irregular
+     periods, the across-strips a little stronger, both barely there, so the paper reads as made, not ruled. */
+  --papyrus-fibre:
+    repeating-linear-gradient(0deg, rgba(122, 92, 50, 0.022) 0 1px, transparent 1px 5px, rgba(122, 92, 50, 0.012) 5px 6px, transparent 6px 13px),
+    repeating-linear-gradient(0deg, rgba(122, 92, 50, 0.02) 0 2px, transparent 2px 31px),
+    repeating-linear-gradient(90deg, rgba(122, 92, 50, 0.01) 0 1px, transparent 1px 17px, rgba(122, 92, 50, 0.008) 17px 18px, transparent 18px 43px);
+
+  /* Rubric ramp: the action, links, eyebrows */
+  --color-brand-50: #f8ece4;
+  --color-brand-100: #f0d9cb;
+  --color-brand-200: #e6c0aa;
+  --color-brand-300: #d59a7b;
+  --color-brand-400: #c26a48; /* marks and rules only */
+  --color-brand-500: #b0502e;
+  --color-brand-600: #a3401f; /* action, links — 5.5:1 on papyrus, white 6.3:1 */
+  --color-brand-700: #8c3519; /* hover — white 8:1 */
+  --color-brand-800: #6e2a14;
+  --color-brand-900: #221d17; /* headings: carbon ink */
+  --color-brand-950: #17130f;
+
+  /* Nile teal: the care signals */
+  --color-accent-50: #eef5f4;
+  --color-accent-100: #dbeae8;
+  --color-accent-200: #b9d6d3;
+  --color-accent-500: #2a7d80;
+  --color-accent-600: #1e6b70;
+  --color-accent-700: #1e6b70;
+  --color-accent-800: #154f53;
+
+  --color-ink-900: #221d17;
+  --color-ink-800: #2c261f;
+  --color-ink-700: #362f27;
+  --color-ink-600: #40382e; /* body — 10:1 */
+  --color-ink-500: #524839;
+  --color-ink-400: #6a5f50; /* muted — 5.4:1 */
+  --color-ink-300: #b3a68f;
+
+  --color-surface-default: var(--papyrus-fresh);
+  --color-surface-elevated: var(--papyrus-fresh);
+  --color-surface-pearl: var(--papyrus);
+  --color-surface-clinical: var(--papyrus-fresh);
+  --color-surface-sage: var(--papyrus-deep);
+  --color-surface-ivory: var(--papyrus);
+  --color-surface-warm: var(--papyrus-deep);
+  --color-surface-hospitality: var(--papyrus-deep);
+  --color-mist: var(--papyrus);
+  --color-mist-deep: var(--papyrus-deep);
+  --color-wash-aqua: var(--papyrus-deep);
+  --color-wash-sky: var(--papyrus-deep);
+  --color-wash-peach: var(--papyrus-deep);
+  --color-wash-lavender: var(--papyrus-deep);
+
+  --color-line: #e0d5c1;
+  --color-line-strong: #c9bba2;
+  --color-border-subtle: #e0d5c1;
+  --color-border-card: #ddd1bb;
+  --color-border-clinical: #e0d5c1;
+  --color-accent-clinical: var(--nile);
+  --color-accent-warm: var(--rubric);
+  --color-accent-sand: var(--rubric);
+  --color-sand-700: var(--rubric);
+
+  --color-system-heart-well: var(--papyrus);
+  --color-system-neuro-well: var(--papyrus);
+  --color-system-movement-well: var(--papyrus);
+  --color-system-digestive-well: var(--papyrus);
+  --color-system-surgery-well: var(--papyrus);
+  --color-system-women-well: var(--papyrus);
+  --color-system-heart-ring: var(--color-border-card);
+  --color-system-neuro-ring: var(--color-border-card);
+  --color-system-movement-ring: var(--color-border-card);
+  --color-system-digestive-ring: var(--color-border-card);
+  --color-system-surgery-ring: var(--color-border-card);
+  --color-system-women-ring: var(--color-border-card);
+
+  /* Logo: the mark keeps its teal family so the brand stays recognisable — a Nile heart and "Shifaa", a softer
+     Nile hand, carbon "Rehlet" — and the head (the patient, the person the whole case is about) and the i-dot are
+     written in rubric. */
+  --logo-ink: var(--carbon);
+  --logo-accent: var(--nile);
+  --logo-dot: var(--rubric);
+  --logo-part-body: var(--nile);
+  --logo-part-hand: #5c9f9b;
+  --logo-part-head: var(--rubric);
+
+  --color-text-heading: #221d17;
+  --color-text-body: #40382e;
+  --color-text-muted: #6a5f50;
+  --color-coral: #c26a48;
+
+  --radius-card: 0.25rem;
+  --shadow-card: none;
+}
+
+@layer components {
+  /* ---- Type: a serif voice for what is said; the sans stays for what is read quickly ---- */
+  :root[data-brand-theme="papyrus"] :is(.display, .headline, .statement, .page-hero h1) {
+    font-family: var(--papyrus-serif);
+    font-weight: 400;
+    letter-spacing: -0.012em;
+  }
+  :root[data-brand-theme="papyrus"] .display {
+    line-height: 1.06;
+    font-size: clamp(2.15rem, 1.65rem + 1.75vw, 3.35rem);
+  }
+  :root[data-brand-theme="papyrus"][dir="rtl"] :is(.display, .headline, .statement, .page-hero h1) {
+    font-family: var(--font-brand-arabic), var(--font-arabic), Tahoma, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.3;
+  }
+  :root[data-brand-theme="papyrus"] .eyebrow {
+    color: var(--rubric);
+    letter-spacing: 0.16em;
+  }
+
+  /* ---- Controls: the action is written in rubric ---- */
+  :root[data-brand-theme="papyrus"] :is(.btn-primary, .btn-secondary, .btn-inverse, .btn-outline) {
+    border-radius: 0.25rem;
+    box-shadow: none;
+    background-image: none;
+  }
+  :root[data-brand-theme="papyrus"] :is(.btn-primary, .btn-secondary, .btn-inverse):hover {
+    transform: none;
+    box-shadow: none;
+  }
+  :root[data-brand-theme="papyrus"] .btn-secondary {
+    color: var(--carbon);
+    background: transparent;
+    border-color: var(--carbon);
+  }
+  :root[data-brand-theme="papyrus"] .btn-secondary:hover {
+    color: var(--papyrus-fresh);
+    background: var(--carbon);
+    border-color: var(--carbon);
+  }
+  :root[data-brand-theme="papyrus"] :focus-visible {
+    outline-color: var(--nile);
+  }
+  :root[data-brand-theme="papyrus"] .field {
+    border-color: var(--color-line-strong);
+    border-radius: 0.25rem;
+    background: var(--papyrus-fresh);
+  }
+  :root[data-brand-theme="papyrus"] .field:focus {
+    border-color: var(--nile);
+    box-shadow: 0 0 0 3px var(--color-accent-100);
+  }
+
+  /* ---- Heroes: papyrus with its fibre ---- */
+  :root[data-brand-theme="papyrus"] :is(.home-hero, .page-hero) {
+    background-color: var(--papyrus);
+    background-image: var(--papyrus-fibre);
+  }
+  :root[data-brand-theme="papyrus"] .page-hero {
+    border-bottom: 1px solid var(--color-line);
+  }
+  /* The interior hero visual: a print mounted on layered paper. */
+  :root[data-brand-theme="papyrus"] .page-hero-aside {
+    border: 1px solid var(--color-line);
+    border-radius: 0.125rem;
+    background: var(--papyrus-fresh);
+    padding: 1.25rem;
+    box-shadow: 14px 14px 0 0 var(--papyrus-deep);
+  }
+  :root[data-brand-theme="papyrus"][dir="rtl"] .page-hero-aside {
+    box-shadow: -14px 14px 0 0 var(--papyrus-deep);
+  }
+
+  /* ---- The route: steps joined by a dotted travel line, numerals in rubric ---- */
+  :root[data-brand-theme="papyrus"] :is(.journey-path, .journey-path-warm) {
+    stroke: var(--rubric);
+    stroke-width: 1.6;
+    stroke-dasharray: 0.5 6;
+  }
+  :root[data-brand-theme="papyrus"] :is(.journey-marker, .journey-marker-warm) {
+    background: var(--papyrus-fresh);
+    color: var(--rubric);
+    font-family: var(--papyrus-serif);
+    font-weight: 400;
+    font-size: 0.95rem;
+    box-shadow: inset 0 0 0 1px var(--rubric);
+  }
+
+  /* ---- Section rhythm: papyrus, fresh paper, and the warm travel band ---- */
+  :root[data-brand-theme="papyrus"] .canvas-clinical {
+    background: var(--papyrus-fresh);
+    border-block: 1px solid var(--color-line);
+  }
+  :root[data-brand-theme="papyrus"] .canvas-hospitality {
+    background-color: var(--papyrus-deep);
+    background-image: var(--papyrus-fibre);
+  }
+
+  /* ---- The Consultants panel: a ledger card ---- */
+  :root[data-brand-theme="papyrus"] .promise-section .promise-panel {
+    background: var(--papyrus);
+    backdrop-filter: none;
+    box-shadow: none;
+    border-color: var(--color-line-strong);
+    border-radius: 0.25rem;
+  }
+
+  /* ---- Closing call to action: carbon ink, the one rubric action ---- */
+  :root[data-brand-theme="papyrus"] .on-dark .btn-inverse {
+    background: var(--rubric);
+    border-color: var(--rubric);
+    color: #ffffff;
+  }
+  :root[data-brand-theme="papyrus"] .on-dark .btn-inverse:hover {
+    background: var(--rubric-deep);
+    border-color: var(--rubric-deep);
+    color: #ffffff;
+  }
+
+  /* ---- Footer: deep papyrus under a ledger double rule ---- */
+  :root[data-brand-theme="papyrus"] .site-footer {
+    border-top: 3px double var(--color-line-strong);
+    background-image: var(--papyrus-fibre);
+  }
+
+  :root[data-brand-theme="papyrus"] ::selection {
+    background: var(--color-brand-100);
+    color: var(--carbon);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Utility overrides. Tailwind utilities outrank @layer components, so the
+   component-level utilities that need the case-file furniture are re-styled
+   here, unlayered and scoped to this theme.
+--------------------------------------------------------------------------- */
+
+/* Numbered sections on the home page, as in a case file: "01 · A CLEAR PROCESS". */
+:root[data-brand-theme="papyrus"] #main:has(.home-hero) {
+  counter-reset: rubric;
+}
+:root[data-brand-theme="papyrus"] #main:has(.home-hero) section .eyebrow:not(:is(.home-hero-card, .promise-panel, figure) *) {
+  counter-increment: rubric;
+}
+:root[data-brand-theme="papyrus"] #main:has(.home-hero) section .eyebrow:not(:is(.home-hero-card, .promise-panel, figure) *)::before {
+  content: counter(rubric, decimal-leading-zero) "\2002\00B7\2002";
+  font-family: var(--papyrus-serif);
+  font-size: 1.05em;
+  letter-spacing: 0;
+}
+
+/* The hero eyebrow's marker: the scribes' red verse point. */
+:root[data-brand-theme="papyrus"] .home-hero p:has(+ h1) > span[aria-hidden] {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin-top: 0.5rem;
+  background: var(--rubric);
+}
+:root[data-brand-theme="papyrus"] .home-hero p:has(+ h1) {
+  color: var(--carbon);
+}
+
+/* The hero photograph: a print on a fresh-paper mat, laid over a second sheet. */
+:root[data-brand-theme="papyrus"] .home-hero figure > div {
+  border-radius: 0.125rem;
+  border-color: var(--color-line);
+  box-shadow:
+    0 0 0 10px var(--papyrus-fresh),
+    0 0 0 11px var(--color-line),
+    20px 20px 0 11px var(--papyrus-deep);
+}
+:root[data-brand-theme="papyrus"][dir="rtl"] .home-hero figure > div {
+  box-shadow:
+    0 0 0 10px var(--papyrus-fresh),
+    0 0 0 11px var(--color-line),
+    -20px 20px 0 11px var(--papyrus-deep);
+}
+
+/* "Start with what you have": a tear-off intake slip with a perforated top edge. */
+:root[data-brand-theme="papyrus"] .home-hero-card {
+  border-radius: 0.125rem;
+  border-color: var(--color-line-strong);
+  background: var(--papyrus-fresh);
+  box-shadow: 0 14px 28px -22px rgba(34, 29, 23, 0.45);
+  padding-top: 1.125rem;
+}
+:root[data-brand-theme="papyrus"] .home-hero-card::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0.75rem;
+  top: 0.4rem;
+  height: 3px;
+  background: radial-gradient(circle, var(--color-line-strong) 1.1px, transparent 1.6px) 0 50% / 9px 3px repeat-x;
+}
+:root[data-brand-theme="papyrus"] .home-hero-card > p:first-child {
+  color: var(--rubric);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+:root[data-brand-theme="papyrus"][dir="rtl"] .home-hero-card > p:first-child {
+  font-size: 0.875rem;
+  letter-spacing: 0;
+}
+
+/* The hero's supporting statement: a rubric rule. */
+:root[data-brand-theme="papyrus"] .home-hero .border-s-\[3px\] {
+  border-inline-start-width: 2px;
+  border-color: var(--rubric);
+}
+
+/* The reassurance rail: the carbon spine of the file. */
+:root[data-brand-theme="papyrus"] .home-hero-rail {
+  --color-surface-clinical: var(--carbon);
+  --color-border-clinical: #3d352b;
+  --color-ink-700: var(--papyrus);
+  --color-brand-600: #e9b48f;
+}
+:root[data-brand-theme="papyrus"] .home-hero-rail li > span[aria-hidden] {
+  width: auto;
+  height: auto;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Section rhythm and the one radius family. */
+:root[data-brand-theme="papyrus"] #how-it-works,
+:root[data-brand-theme="papyrus"] section[aria-labelledby="trust-title"] {
+  background-color: var(--papyrus-fresh);
+}
+:root[data-brand-theme="papyrus"] section[aria-labelledby="trust-title"] {
+  border-block: 1px solid var(--color-line);
+}
+:root[data-brand-theme="papyrus"] #main :is(.rounded-\[14px\], .rounded-\[16px\], .rounded-\[18px\], .rounded-2xl, .rounded-xl) {
+  border-radius: 0.25rem;
+}
+:root[data-brand-theme="papyrus"] #main section[aria-labelledby^="home-system-"] {
+  box-shadow: none;
+}
+:root[data-brand-theme="papyrus"] #main section[aria-labelledby^="home-system-"] > div:first-child {
+  background: var(--papyrus);
+  border-bottom: 1px solid var(--color-line);
+}
+
+/* Consultant monograms: verified ink stamps, each set down by hand. */
+:root[data-brand-theme="papyrus"] .promise-panel > div:first-child > span[aria-hidden] > span {
+  background: var(--papyrus-fresh);
+  color: var(--rubric);
+  font-family: var(--papyrus-serif);
+  box-shadow: inset 0 0 0 1.5px var(--rubric), 0 0 0 2px var(--papyrus);
+  outline: 1px dashed var(--color-brand-300);
+  outline-offset: -5px;
+}
+:root[data-brand-theme="papyrus"] .promise-panel > div:first-child > span[aria-hidden] > span:nth-child(odd) {
+  transform: rotate(-7deg);
+}
+:root[data-brand-theme="papyrus"] .promise-panel > div:first-child > span[aria-hidden] > span:nth-child(even) {
+  transform: rotate(5deg);
+}
+:root[data-brand-theme="papyrus"] .promise-panel > div:first-child > span[aria-hidden] > span:first-child {
+  background: var(--rubric);
+  color: #ffffff;
+  outline-color: rgba(255, 255, 255, 0.55);
+}
+:root[data-brand-theme="papyrus"] .promise-panel dd {
+  font-family: var(--papyrus-serif);
+  font-weight: 400;
+}
+
+/* Consultant principles: plain Nile-teal icons. */
+:root[data-brand-theme="papyrus"] .promise-section ol > li > span[aria-hidden] {
+  background: transparent;
+  box-shadow: none;
+  justify-items: start;
+  color: var(--nile);
+}
+
+/* Privacy: a ruled list, not a feature grid. */
+:root[data-brand-theme="papyrus"] section[aria-labelledby="trust-title"] ul.grid {
+  row-gap: 0;
+  column-gap: 2.5rem;
+}
+:root[data-brand-theme="papyrus"] section[aria-labelledby="trust-title"] ul.grid > li {
+  border-width: 1px 0 0;
+  border-color: var(--color-line-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 1.5rem 0 1.75rem;
+}
+:root[data-brand-theme="papyrus"] section[aria-labelledby="trust-title"] ul.grid > li:hover {
+  border-color: var(--rubric);
+  box-shadow: none;
+}
+:root[data-brand-theme="papyrus"] section[aria-labelledby="trust-title"] ul.grid > li span[aria-hidden] {
+  width: auto;
+  height: auto;
+  background: transparent;
+  box-shadow: none;
+  color: var(--nile);
+}
+:root[data-brand-theme="papyrus"] section[aria-labelledby="trust-title"] ul.grid > li:last-child span[aria-hidden] {
+  color: var(--color-alert-700);
+}
+:root[data-brand-theme="papyrus"] section[aria-labelledby="trust-title"] ul.grid > li .sm\:mt-5 {
+  margin-top: 0.875rem;
+}
+/* "Who works with your case": the case strip in carbon. */
+:root[data-brand-theme="papyrus"] section[aria-labelledby="trust-title"] figure .bg-brand-700 {
+  background-color: var(--carbon);
+}
+
+/* The closing panel: carbon ink with its own faint fibre. */
+:root[data-brand-theme="papyrus"] .on-dark {
+  border-radius: 0.25rem;
+  background-color: var(--carbon);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(245, 238, 225, 0.03) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(90deg, rgba(245, 238, 225, 0.025) 0 1px, transparent 1px 13px);
+}
+
+/* The serif keeps one weight: a `font-bold` utility on a heading would turn the written voice into a shout. */
+:root[data-brand-theme="papyrus"]:not([dir="rtl"]) :is(.display, .headline, .statement) {
+  font-weight: 400;
+}
+
+/* The ledger card lies flat on the page. */
+:root[data-brand-theme="papyrus"] .promise-section .promise-panel {
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* The logo mark drawn in its three parts (heart, hand, head) instead of the bitmap. */
+:root[data-brand-theme="papyrus"] .logo-mark-parts {
+  display: block;
+}
+:root[data-brand-theme="papyrus"] .logo-mark .logo-mark-img {
+  visibility: hidden;
+}
+
+/* ---------------------------------------------------------------------------
+   Signature moments
+--------------------------------------------------------------------------- */
+
+/* The review seal, pressed onto the corner of the hero print: the promise the platform rests on
+   ("Consultant-led review"), set as a hand-pressed stamp rather than a badge. */
+:root[data-brand-theme="papyrus"] .home-hero figure {
+  position: relative;
+}
+:root[data-brand-theme="papyrus"] .home-hero figure::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -2.25rem;
+  inset-inline-start: -2.25rem;
+  width: clamp(5.25rem, 4rem + 3vw, 7.25rem);
+  aspect-ratio: 1;
+  background: url("/brand/seal-papyrus-en.svg") center / contain no-repeat;
+  transform: rotate(-12deg);
+  filter: drop-shadow(0 6px 10px rgba(34, 29, 23, 0.18));
+  pointer-events: none;
+}
+:root[data-brand-theme="papyrus"][dir="rtl"] .home-hero figure::after {
+  background-image: url("/brand/seal-papyrus-ar.svg");
+  transform: rotate(10deg);
+}
+@media (max-width: 40rem) {
+  :root[data-brand-theme="papyrus"] .home-hero figure::after {
+    top: -1.5rem;
+    inset-inline-start: auto;
+    inset-inline-end: -0.5rem;
+  }
+}
+
+/* The opening of the hero text: a rubric initial, as a scribe would begin a case. Latin only — Arabic letters join. */
+:root[data-brand-theme="papyrus"]:not([dir="rtl"]) .home-hero h1 + p::first-letter {
+  float: left;
+  margin: 0.32rem 0.55rem 0 0;
+  font-family: var(--papyrus-serif);
+  font-size: 3.6em;
+  line-height: 0.72;
+  color: var(--rubric);
+}
+
+/* The closing panel and the interior lists speak in the same serif voice as the headings. */
+:root[data-brand-theme="papyrus"]:not([dir="rtl"]) .on-dark :is(h2, h3) {
+  font-family: var(--papyrus-serif);
+  font-weight: 400;
+  font-size: 1.6em;
+  letter-spacing: -0.01em;
+}
+
+/* Interior heroes: plain papyrus, no glow. */
+:root[data-brand-theme="papyrus"] .page-hero {
+  background-color: var(--papyrus);
+  background-image: var(--papyrus-fibre);
+}
+:root[data-brand-theme="papyrus"] .page-hero > div[aria-hidden].blur-3xl {
+  display: none;
+}
+
+/* ---- Motion: the slip is handed over, the seal is pressed, the stamps land. Never for reduced motion. ---- */
+@keyframes papyrus-slip {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes papyrus-seal {
+  0% { opacity: 0; transform: scale(1.5) rotate(-30deg); }
+  70% { opacity: 1; transform: scale(0.94) rotate(-10deg); }
+  100% { opacity: 1; transform: scale(1) rotate(-12deg); }
+}
+@keyframes papyrus-seal-rtl {
+  0% { opacity: 0; transform: scale(1.5) rotate(28deg); }
+  70% { opacity: 1; transform: scale(0.94) rotate(8deg); }
+  100% { opacity: 1; transform: scale(1) rotate(10deg); }
+}
+@keyframes papyrus-stamp {
+  from { opacity: 0; transform: scale(1.35) rotate(var(--tilt, 0deg)); }
+  to { opacity: 1; transform: scale(1) rotate(var(--tilt, 0deg)); }
+}
+:root[data-brand-theme="papyrus"] .promise-panel > div:first-child > span[aria-hidden] > span:nth-child(odd) { --tilt: -7deg; }
+:root[data-brand-theme="papyrus"] .promise-panel > div:first-child > span[aria-hidden] > span:nth-child(even) { --tilt: 5deg; }
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-brand-theme="papyrus"] .home-hero-card {
+    animation: papyrus-slip 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.2s both;
+  }
+  :root[data-brand-theme="papyrus"] .home-hero figure::after {
+    animation: papyrus-seal 0.55s cubic-bezier(0.3, 0.7, 0.3, 1) 0.75s both;
+  }
+  :root[data-brand-theme="papyrus"][dir="rtl"] .home-hero figure::after {
+    animation-name: papyrus-seal-rtl;
+  }
+  @supports (animation-timeline: view()) {
+    :root[data-brand-theme="papyrus"] .promise-panel > div:first-child > span[aria-hidden] > span {
+      animation: papyrus-stamp linear both;
+      animation-timeline: view();
+      animation-range: entry 30% cover 40%;
+    }
+  }
+}

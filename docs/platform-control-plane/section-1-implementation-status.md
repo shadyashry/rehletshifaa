@@ -1111,6 +1111,56 @@ fixed by adding a distinct second Care Coordination Manager. That reviewer then 
 so a complete second-pass review could not be obtained. The primary review plus ArchUnit and the full backend gate
 found and fixed the identity→access dependency cycle.
 
+## Clean-code and no-legacy continuation (approved 2026-10-05)
+
+The owner approved a pre-production clean cutover across the platform: remove runtime compatibility branches,
+fallback data states and legacy business-role provisioning rather than preserve historical data. Patient submission
+must still remain available when governed Journey admission is paused or ineligible; those cases use the current
+standard coordination path, not a legacy authority. Existing product invariants (database authority, independent
+approval, MFA/activation, patient activation without document verification, pinned Journey cases and transactional
+authorization) remain mandatory.
+
+The target architecture applies SOLID boundaries throughout the backend:
+
+- controllers depend on application use cases;
+- application services orchestrate domain policy through ports and contain no SQL/JDBC;
+- infrastructure repositories own persistence SQL and transaction-safe locking primitives;
+- database authority is exclusive, so Keycloak carries identity/authentication state but no business-role mapping;
+- historical compatibility names, fields and migrations that are not on `main` are removed or rewritten to the
+  final pre-production design instead of receiving backfills or parity adapters;
+- architecture tests prevent new application-layer SQL and compatibility dependencies.
+
+Implementation slices (kept green independently):
+
+| Slice | Scope | State |
+|---|---|---|
+| CL1 | Remove Keycloak business-role compatibility provisioning and its patient-role mutation | DONE |
+| CL2 | Replace `LEGACY` Journey admission with explicit `STANDARD` versus `JOURNEY`; route every standard intake through governed team/capacity eligibility and remove unrestricted self-claim | PLANNED |
+| CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | PLANNED |
+| CL4 | Remove obsolete patient/provider/plaintext compatibility data paths and finalize clean pre-production schema | PLANNED |
+| CL5 | Introduce persistence ports/repositories and move all SQL/JDBC out of application services module by module, beginning with authority/identity/intake | PLANNED |
+| CL6 | Enforce the boundaries with ArchUnit, finish documentation/test cleanup, run focused and full backend gates | PLANNED |
+| CL7 | Add JaCoCo/Sonar configuration and run Sonar for the sole Maven backend when a Sonar server/project/token and scanner plugin are available | PLANNED |
+
+Baseline inventory: one Maven backend; 70 production classes currently use `JdbcClient`, including 46 application
+classes. No Sonar or JaCoCo configuration exists and the Sonar Maven scanner is not present in the offline Maven
+cache. Runtime legacy behavior still exists in Journey admission, coordinator self-claim, onboarding/readiness,
+patient-name/plaintext fallbacks and Keycloak compatibility-role provisioning. Provider-organization legacy tables
+are not runtime dependencies: V62 already drops them; their remaining mentions are historical migration text.
+
+CL1 removed the `compatibilityRole` provisioning contract, all staff/Consultant realm-role writes, patient `PATIENT`
+realm-role assignment and the corresponding recovery mutation. Keycloak now owns authentication state and required
+actions only; application/database records exclusively resolve business authority. Durable provisioning markers,
+recovery, invitations, identity-adoption collision handling, activation and MFA gates are unchanged. Verification:
+safe removal of `backend/target/test-classes` plus offline test compilation passed; `IdentityProvisioningPortTest`
+passed 5 tests; `IdentityOperationIntegrationTest` and `WorkforceIdentityAdoptionIntegrationTest` passed 10 tests.
+The first in-sandbox integration attempt could not create the JDK HTTP client's loopback pipe and was rerun outside
+that restriction; this was an environment permission failure, not a product-test failure.
+
+**Next exact action:** implement the CL2 standard-intake contract with a single lock order, durable no-candidate
+queue and no unrestricted self-claim, then obtain Astra review before continuing to patient readiness. Preserve
+unrelated brand/theme work and do not run concurrent builds that share `backend/target`.
+
 ### Open evidence and next exact action
 
 - No approved implementation gap remains in P1–P6. OD-02 and Practice Manager consent remain excluded.

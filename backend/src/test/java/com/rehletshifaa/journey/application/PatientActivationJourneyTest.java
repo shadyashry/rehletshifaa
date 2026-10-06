@@ -107,8 +107,8 @@ class PatientActivationJourneyTest {
         var ctx = accepted();
         var result = activation.activate(ctx.token, grant(ctx), request("محمد عبد الله"));
         assertThat(result.profileActive()).isTrue();
-        assertThat(jdbc.queryForObject("SELECT full_name FROM patient_profiles WHERE id=?", String.class, patientId(ctx.caseId)))
-                .isEqualTo("محمد عبد الله Patient");
+        assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId(ctx.caseId)))
+                .isEqualTo("محمد عبد الله");
     }
 
     @Test void missingConsentBlocksActivation() throws Exception {
@@ -143,13 +143,14 @@ class PatientActivationJourneyTest {
         assertThat(result.currentAction()).isEqualTo(PatientAction.SET_UP_ACCOUNT);
         assertThat(result.account().status()).isEqualTo(AccountStatus.SETUP_PENDING);
         assertThat(result.deposit().satisfied()).isFalse();
-        assertThat(result.waitingOn()).isEqualTo("STAFF");
+        assertThat(result.waitingOn()).isEqualTo("PATIENT");
 
         // Once the account is usable, the offline deposit is what remains — and it is staff's move, not the patient's.
         finishAccountSetup(ctx); em.flush();
         var afterSetup = activation.prefill(ctx.token, grant(ctx));
         assertThat(afterSetup.journeyStage()).isEqualTo(JourneyStage.DEPOSIT);
         assertThat(afterSetup.currentAction()).isEqualTo(PatientAction.NONE);
+        assertThat(afterSetup.waitingOn()).isEqualTo("STAFF");
     }
 
     @Test void completingTheProfileCreatesNoPaymentOfItsOwn() throws Exception {
@@ -204,6 +205,8 @@ class PatientActivationJourneyTest {
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_REQUIRED'", "coordinator-subject")).isEqualTo(1);
 
         activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("PATIENT");
+        finishAccountSetup(ctx); em.flush();
         assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("STAFF");
     }
 
@@ -301,6 +304,7 @@ class PatientActivationJourneyTest {
     @Test void settlingTheDepositContinuesTheJourneyAndRestoresTheCoordinator() throws Exception {
         var ctx = accepted();
         activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
+        finishAccountSetup(ctx); em.flush();
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED"); // still awaiting the deposit
 
         settleDeposit(ctx, "pay-1"); em.flush();
@@ -319,6 +323,7 @@ class PatientActivationJourneyTest {
     @Test void aDuplicateSettlementDoesNotDuplicateTasksOrEvents() throws Exception {
         var ctx = accepted();
         activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
+        finishAccountSetup(ctx); em.flush();
         settleDeposit(ctx, "pay-1"); em.flush();
         settleDeposit(ctx, "pay-2"); em.flush(); // a second authoritative receipt on an already-paid deposit
 
@@ -343,9 +348,6 @@ class PatientActivationJourneyTest {
     @Test void theAcceptedPatientReceivesOneContinuationMessageOnly() throws Exception {
         var ctx = accepted();
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='PROFILE_ACTIVATION'")).isEqualTo(1);
-        assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='ACCOUNT_ACTIVATION'")).isZero();
-        // The account-binding capability itself is preserved — it is simply no longer a second customer journey.
-        assertThat(count("SELECT count(*) FROM account_activations WHERE case_id=?", ctx.caseId)).isEqualTo(1);
     }
 
     @Test void portalAccessIsRefusedUntilTheProfileIsActive() throws Exception {
@@ -368,7 +370,6 @@ class PatientActivationJourneyTest {
         assertThat(identity.setupMails().get(0).redirectPath()).contains("/portal?case=" + ctx.caseId);
         // No account-binding credential is minted any more: the provider-owned account IS the binding.
         var handoff = activation.portalAccess(ctx.token, g); em.flush();
-        assertThat(handoff.activationToken()).isNull();
         assertThat(handoff.account().awaitingEmail()).isTrue();
 
         // The patient creates the password in the provider, then signs in: the first authenticated entry
@@ -386,19 +387,13 @@ class PatientActivationJourneyTest {
         assertThat(activation.portalAccess(ctx.token, g).alreadyLinked()).isTrue();
     }
 
-    @Test void aLegacyCompleteProfileWithoutAnyAccountStillGetsTheOneTimeBinding() throws Exception {
+    @Test void completedProfileWithoutAccountSetupRequiresCurrentSetupFlow() throws Exception {
         var ctx = accepted(); String g = grant(ctx);
         activation.activate(ctx.token, g, request("Link Patient")); em.flush();
-        // Simulate a profile completed before provider-owned provisioning existed.
+        // Missing setup never becomes a credential that can bind an arbitrary signed-in identity.
         jdbc.update("UPDATE patient_profiles SET external_subject=NULL,account_status='NOT_PROVISIONED',account_setup_requested_at=NULL WHERE id=?", patientId(ctx.caseId));
-        var handoff = activation.portalAccess(ctx.token, g); em.flush();
-        assertThat(handoff.alreadyLinked()).isFalse();
-        assertThat(handoff.activationToken()).isNotBlank();
-        authenticate("portal-patient-subject", Role.PATIENT);
-        assertThat(journey.activateAccount(handoff.activationToken()).status()).isEqualTo("ACTIVATED");
-        assertThat(journey.patientCases()).extracting(CaseView::caseNumber).contains(ctx.caseNumber);
-        assertThatThrownBy(() -> journey.activateAccount(handoff.activationToken()))
-                .isInstanceOf(ApiException.class).hasMessageContaining("already been used");
+        assertThatThrownBy(() -> activation.portalAccess(ctx.token, g))
+                .isInstanceOf(ApiException.class).hasMessageContaining("Resume profile submission");
     }
     @Test void anAlreadyLinkedProfileIsSentStraightToSignIn() throws Exception {
         var ctx = accepted(); String g = grant(ctx);
@@ -406,7 +401,27 @@ class PatientActivationJourneyTest {
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=?", "already-bound", patientId(ctx.caseId));
         var handoff = activation.portalAccess(ctx.token, g);
         assertThat(handoff.alreadyLinked()).isTrue();
-        assertThat(handoff.activationToken()).isNull();
+    }
+
+    @Test void activationRefusesMissingOnboardingAndDoesNotCreateEvidence() throws Exception {
+        var ctx = accepted(); String g = grant(ctx);
+        jdbc.update("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
+        assertThatThrownBy(() -> activation.activate(ctx.token, g, request("Link Patient")))
+                .isInstanceOf(ApiException.class).hasMessageContaining("start onboarding");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM patient_onboardings WHERE case_id=?", Integer.class, ctx.caseId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT profile_status FROM patient_profiles WHERE id=?", String.class, patientId(ctx.caseId))).isNotEqualTo("ACTIVE");
+    }
+
+    @Test void activeProfileReplayDoesNotReplaceAccountEmail() throws Exception {
+        var ctx = accepted(); String g = grant(ctx);
+        activation.activate(ctx.token, g, request("Link Patient")); em.flush();
+        jdbc.update("UPDATE patient_profiles SET external_subject=NULL,account_status='NOT_PROVISIONED',account_setup_requested_at=NULL WHERE id=?", patientId(ctx.caseId));
+        ProfileActivationRequest submitted = request("Link Patient");
+        var changed = new ProfileActivationRequest(submitted.givenName(), submitted.familyName(), submitted.singleLegalName(), submitted.preferredName(),
+                "replacement@local.test", submitted.phone(), submitted.mobileOwner(), submitted.dateOfBirth(), submitted.nationality(), submitted.countryOfResidence(),
+                submitted.preferredLanguage(), submitted.sex(), submitted.consents());
+        activation.activate(ctx.token, g, changed); em.flush();
+        assertThat(jdbc.queryForObject("SELECT email FROM patient_profiles WHERE id=?", String.class, patientId(ctx.caseId))).isEqualTo(submitted.email());
     }
 
     // ---------- authorization ----------
@@ -483,7 +498,9 @@ class PatientActivationJourneyTest {
         cases.submit(created.caseId()); em.flush(); em.clear();
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
         authenticate("coordinator-subject", Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject"))
+            journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "ready", v));
         seedDoctor(); seedStaff();

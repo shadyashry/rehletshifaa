@@ -17,7 +17,7 @@ type AccountStatus = "NOT_PROVISIONED" | "SETUP_PENDING" | "ACTIVE";
 type Account = { status: AccountStatus; emailHint: string | null; awaitingEmail: boolean; emailSent: boolean };
 type Prefill = {
   caseNumber: string; caseStatus: string; onboardingState: string | null; profileActive: boolean; accountLinked: boolean; account: Account;
-  givenName: string | null; familyName: string | null; preferredName: string | null; legacyFullName: string | null; nameConfirmationRequired: boolean;
+  givenName: string | null; familyName: string | null; preferredName: string | null;
   candidateEmail: string | null; emailVerified: boolean;
   knownMobile: string | null; mobileOwner: "PATIENT" | "REPRESENTATIVE" | null; phoneVerified: boolean;
   dateOfBirth: string | null; nationality: string | null; countryOfResidence: string | null; preferredLanguage: string | null; sex: string | null;
@@ -43,8 +43,6 @@ const copy = {
     formTitle: "Complete your profile",
     formIntro: "We've filled in what you already shared. Please review it and complete what's missing.",
     prefilledNote: "Pre-filled from your case",
-    legacyNameTitle: "Please confirm your name",
-    legacyNameIntro: (n: string) => `We have your name as “${n}”. Please enter it as given name(s) and family name so it matches your records — we never split names automatically.`,
     submittedByRep: (n: string, r: string) => `This case was submitted by ${n} (${r}). The details below are about the patient.`,
     sectionAbout: "Personal details", sectionContact: "Contact", sectionAgreements: "Agreements",
     givenName: "Given name(s)", familyName: "Family name / surname", singleName: "I have a single legal name (no family name)",
@@ -119,8 +117,6 @@ const copy = {
     formTitle: "أكمل ملفك الشخصي",
     formIntro: "أدخلنا مسبقًا ما شاركته معنا. يرجى مراجعته وإكمال الناقص فقط.",
     prefilledNote: "معبأ مسبقًا من حالتك",
-    legacyNameTitle: "يرجى تأكيد اسمك",
-    legacyNameIntro: (n: string) => `لدينا اسمك كالتالي: «${n}». يرجى إدخاله كاسم أول واسم عائلة ليطابق سجلاتك — لا نقسّم الأسماء تلقائيًا أبدًا.`,
     submittedByRep: (n: string, r: string) => `قُدّمت هذه الحالة بواسطة ${n} (${r}). البيانات أدناه تخص المريض.`,
     sectionAbout: "البيانات الشخصية", sectionContact: "التواصل", sectionAgreements: "الموافقات",
     givenName: "الاسم الأول (الأسماء الشخصية)", familyName: "اسم العائلة / اللقب", singleName: "لديّ اسم قانوني واحد فقط (بدون اسم عائلة)",
@@ -417,19 +413,17 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
   }, [call, grant]);
 
   /**
-   * Continue into the normal authenticated portal. With provider-owned accounts the patient simply signs in
-   * with the password they created; the portal opens straight on this case. A legacy profile without any
-   * account receives the old one-time binding credential instead.
+   * Continue into the authenticated portal using the account the patient set up, on this case.
    */
   async function openPortal() {
     if (busy || !grant) return;
     setBusy(true); setNotice(null);
     try {
-      const handoff: { activationToken: string | null; alreadyLinked: boolean; account: Account; caseId: string } = await call("/portal-access", { grant });
+      const handoff: { alreadyLinked: boolean; account: Account; caseId: string } = await call("/portal-access", { grant });
       setAccount(handoff.account);
       if (!handoff.alreadyLinked && handoff.account.awaitingEmail) { setStage("account"); setBusy(false); return; }
       const portal = `/${locale}/portal?case=${encodeURIComponent(handoff.caseId)}`;
-      window.location.assign(handoff.activationToken ? `${portal}&activate=${encodeURIComponent(handoff.activationToken)}` : `${portal}&signin=1`);
+      window.location.assign(`${portal}&signin=1`);
     } catch (e) { setNotice(describe(e)); setBusy(false); }
   }
 
@@ -500,12 +494,6 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
           <p className="lead mt-3">{t.formIntro}</p>
           {prefill.submittedBy === "REPRESENTATIVE" && prefill.representativeName && (
             <p className="mt-4 rounded-xl bg-mist p-4 text-sm leading-6 text-ink-700">{t.submittedByRep(prefill.representativeName, relationshipLabel)}</p>
-          )}
-          {prefill.nameConfirmationRequired && prefill.legacyFullName && (
-            <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4">
-              <p className="font-semibold text-brand-900">{t.legacyNameTitle}</p>
-              <p className="mt-1 text-sm leading-6 text-ink-700">{t.legacyNameIntro(prefill.legacyFullName)}</p>
-            </div>
           )}
 
           <Fieldset legend={t.sectionAbout}>

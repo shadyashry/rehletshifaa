@@ -28,6 +28,7 @@ class NotificationOutboxProcessorTest {
     AtomicInteger sends;
     RuntimeException providerError;
     NotificationOutboxProcessor processor;
+    CryptoService crypto;
 
     @BeforeEach void setup() {
         store = mock(NotificationOutboxStore.class);
@@ -42,13 +43,14 @@ class NotificationOutboxProcessorTest {
                 return "provider-ref";
             }
         };
+        crypto = new CryptoService("notification-test-key");
         processor = new NotificationOutboxProcessor(store, List.of(channel), new ObjectMapper(), "http://localhost:3000",
-                mock(CryptoService.class), metrics, Clock.fixed(NOW, ZoneOffset.UTC));
+                crypto, metrics, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     NotificationOutboxStore.OutboxMessage claimed(String template, Instant leaseExpiresAt) {
         var message = new NotificationOutboxStore.OutboxMessage(UUID.randomUUID(), "EMAIL", "p@example.test", template,
-                "{\"code\":\"123456\"}", 1, 5, "key-1", leaseExpiresAt);
+                "enc:" + crypto.encrypt("{\"code\":\"123456\"}"), 1, 5, "key-1", leaseExpiresAt);
         when(store.claim(anyInt())).thenReturn(List.of(message));
         return message;
     }
@@ -117,5 +119,17 @@ class NotificationOutboxProcessorTest {
         verify(store).recordFailure(message.id(), 1, 1, "TEMPLATE_FAILURE"); // attempts>=max: DEAD_LETTER
         assertThat(sends).hasValue(0);
         assertThat(count("dead_letter")).isEqualTo(1);
+    }
+
+    @Test void plaintextTemplateDataIsRejectedBeforeDelivery() {
+        var message = new NotificationOutboxStore.OutboxMessage(UUID.randomUUID(), "EMAIL", "p@example.test", "case-access-code",
+                "{\"code\":\"123456\"}", 1, 5, "key-plain", NOW.plusSeconds(NotificationOutboxStore.LEASE_SECONDS));
+        when(store.claim(anyInt())).thenReturn(List.of(message));
+        when(store.recordFailure(any(), anyInt(), anyInt(), anyString())).thenReturn(true);
+
+        processor.dispatch();
+
+        verify(store).recordFailure(message.id(), 1, 1, "TEMPLATE_FAILURE");
+        assertThat(sends).hasValue(0);
     }
 }

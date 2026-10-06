@@ -17,7 +17,6 @@ import static com.rehletshifaa.journey.api.PatientJourneyActionDtos.*;
   journey.completeAuthenticatedPatientAction(caseId,actionId,new ReviewProposalActionHandler.AuthenticatedDecision(request.proposalVersionId(),request.decision()),Map.of("PROPOSAL_ACCEPTED",accepted));
   return new IdResponse(actionId,"COMPLETED");
  }
- @PostMapping("/account/activate")public IdResponse activate(@Valid @RequestBody ActivateAccountRequest request){return service.activateAccount(request.activationToken());}
  /** Every authenticated portal entry: the first sign-in after identity-provider setup marks the account ACTIVE and says which case to open. */
  @PostMapping("/account/session")public AccountSessionView session(){return account.session();}
  /** Profile & Security: the patient's own account facts, separate from any case. */

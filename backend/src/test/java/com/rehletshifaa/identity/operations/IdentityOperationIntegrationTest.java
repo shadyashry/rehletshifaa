@@ -105,7 +105,7 @@ class IdentityOperationIntegrationTest {
                 Map.of("name", "Queued Staff", "email", "queued@example.test", "locale", "en"));
         transactions.executeWithoutResult(status -> events.publishEvent(event));
         when(identities.recover("workforce-invite:" + invitationId)).thenReturn(Optional.empty());
-        when(identities.inviteTracked("Queued Staff", "queued@example.test", "en", "workforce-invite:" + invitationId, null))
+        when(identities.inviteTracked("Queued Staff", "queued@example.test", "en", "workforce-invite:" + invitationId))
                 .thenReturn(new IdentityProvisioningPort.IdentityAccount("created-subject", "queued@example.test", "INVITED", now));
 
         processor.dispatch();

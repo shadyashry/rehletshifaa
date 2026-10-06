@@ -10,9 +10,7 @@ import java.time.Instant;
 public interface IdentityProvisioningPort {
     IdentityAccount invite(String name, String email, String locale);
     default IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker){return invite(name,email,locale);}
-    default IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker,String compatibilityRole){return inviteTracked(name,email,locale,operationMarker);}
     default java.util.Optional<IdentityAccount> recover(String operationMarker){return java.util.Optional.empty();}
-    void setCompatibilityRole(String subject, String role);
     void resend(String subject, String locale);
     void setEnabled(String subject, boolean enabled);
     void logout(String subject);

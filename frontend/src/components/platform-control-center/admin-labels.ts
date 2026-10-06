@@ -27,7 +27,6 @@ const clinicianStatus: Record<string, Entry> = {
   ACTIVE: { en: "Active", ar: "نشط", tone: "success" },
   SUSPENDED: { en: "Suspended", ar: "موقوف", tone: "danger" },
   OFFBOARDED: { en: "Offboarded", ar: "منتهٍ", tone: "neutral" },
-  LEGACY_UNREVIEWED: { en: "Imported — review needed", ar: "سجل مستورد — يحتاج مراجعة", tone: "warning" },
 };
 const orgStatus: Record<string, Entry> = {
   DRAFT: { en: "Setup in progress", ar: "الإعداد قيد التنفيذ", tone: "warning" },
@@ -114,7 +113,7 @@ export type SetupArea = "details" | "professional" | "working" | "organization";
 const blockers: Record<string, { area: SetupArea; en: string; ar: string }> = {
   IDENTITY_NOT_PROVISIONED: { area: "details", en: "The sign-in account has not been created yet.", ar: "لم يُنشأ حساب الدخول بعد." },
   MEMBERSHIP_INACTIVE: { area: "details", en: "Their organization membership is not active yet.", ar: "عضويته في المؤسسة غير نشطة بعد." },
-  PROVIDER_PROFILE_INCOMPLETE: { area: "organization", en: "The organization's profile or legacy-record review is incomplete. This can't be completed from the Control Center yet.", ar: "ملف المؤسسة أو مراجعة سجلها القديم غير مكتملة. لا يمكن إكمال ذلك من مركز التحكم بعد." },
+  PROVIDER_PROFILE_INCOMPLETE: { area: "organization", en: "The organization's profile is incomplete. This can't be completed from the Control Center yet.", ar: "ملف المؤسسة غير مكتمل. لا يمكن إكمال ذلك من مركز التحكم بعد." },
   CLINICIAN_PROFILE_INCOMPLETE: { area: "professional", en: "Professional details are missing.", ar: "البيانات المهنية غير مكتملة." },
   CREDENTIAL_POLICY_UNCONFIGURED: { area: "professional", en: "No credential requirements exist for this country yet — contact the platform team.", ar: "لا توجد متطلبات اعتماد لهذه الدولة بعد — تواصل مع فريق المنصة." },
   CREDENTIAL_MISSING: { area: "professional", en: "A required credential has not been added.", ar: "لم يُضف اعتماد مطلوب." },

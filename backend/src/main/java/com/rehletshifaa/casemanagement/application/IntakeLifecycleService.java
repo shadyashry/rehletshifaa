@@ -44,13 +44,13 @@ public class IntakeLifecycleService {
     @Transactional public void createFoundation(MedicalCase medicalCase, CreateCaseRequest request) {
         Instant now=clock.instant(); UUID patientId=UUID.randomUUID();
         String given=PatientNames.clean(request.givenName()), family=blankToNull(PatientNames.clean(request.familyName()));
-        String displayName=PatientNames.display(given,family,null);
+        String displayName=PatientNames.display(given,family);
         boolean self=!request.forSomeoneElse();
         // The submitter's channels are the PATIENT's only when the patient is submitting. A representative's
         // email/WhatsApp is recorded on the submission contact and never promoted into the patient's identity.
         // Email captured here is a candidate contact — unverified until the patient proves ownership later.
-        jdbc.sql("INSERT INTO patient_profiles(id,full_name,given_name,family_name,name_source,country,whatsapp_number,mobile_owner,email,preferred_language,time_zone,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)")
-            .params(patientId,displayName,given,family,"STRUCTURED",request.country().trim(),self?request.whatsappNumber().trim():null,self?"PATIENT":null,
+        jdbc.sql("INSERT INTO patient_profiles(id,given_name,family_name,country,whatsapp_number,mobile_owner,email,preferred_language,time_zone,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)")
+            .params(patientId,given,family,request.country().trim(),self?request.whatsappNumber().trim():null,self?"PATIENT":null,
                     self?blankToNull(request.email()):null,request.preferredLanguage(),blankToNull(request.timeZone()),timestamp(now),timestamp(now)).update();
         jdbc.sql("UPDATE medical_cases SET patient_id=? WHERE id=?").params(patientId,medicalCase.getId()).update();
         var rep=request.representative();

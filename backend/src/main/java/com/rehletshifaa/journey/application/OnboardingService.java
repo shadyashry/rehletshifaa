@@ -31,7 +31,6 @@ public class OnboardingService {
     private static final Duration ONBOARDING_TTL = Duration.ofDays(45);
     private static final Set<String> ONBOARDING_CONSENTS = Set.of(
             "PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "MEDICAL_INFORMATION_SHARING", "TELECONSULTATION", "DEPOSIT_CANCELLATION_TERMS", "REPRESENTATIVE_AUTHORIZATION");
-    private static final Set<String> PROGRESSED = Set.of("TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED");
 
     public OnboardingService(JdbcClient jdbc, Authority authority, Clock clock, CustomerReadinessService readiness, IdentityVerificationService identity, org.springframework.context.ApplicationEventPublisher events) {
         this.jdbc = jdbc; this.authority = authority; this.clock = clock; this.readiness = readiness; this.identity = identity; this.events = events;
@@ -54,15 +53,14 @@ public class OnboardingService {
 
     /** Record the contact-verification timestamp on the case's active onboarding (idempotent). */
     @Transactional public void markContactVerified(UUID caseId, Instant now) {
-        jdbc.sql("UPDATE patient_onboardings SET contact_verified_at=COALESCE(contact_verified_at,?),updated_at=? WHERE case_id=? AND state NOT IN ('COMPLETED','CANCELLED','LEGACY_EXEMPT')")
+        jdbc.sql("UPDATE patient_onboardings SET contact_verified_at=COALESCE(contact_verified_at,?),updated_at=? WHERE case_id=? AND state NOT IN ('COMPLETED','CANCELLED')")
                 .params(timestamp(now), timestamp(now), caseId).update();
     }
 
-    /** Patient-facing onboarding for a case, lazily creating/legacy-exempting where safe. */
-    @Transactional public OnboardingView myOnboarding(UUID caseId) {
+    /** Patient-facing onboarding created by the acknowledged-estimate workflow. */
+    @Transactional(readOnly = true) public OnboardingView myOnboarding(UUID caseId) {
         var actor = authority.authorize(Permission.PATIENT_SELF_SERVICE);
         requirePatientOnCase(caseId, actor);
-        ensureRecord(caseId);
         return buildView(caseId);
     }
 
@@ -116,7 +114,7 @@ public class OnboardingService {
         requirePatientOnCase(caseId, actor);
         Onboarding ob = requireOnboarding(caseId);
         if (ob.version() != request.expectedVersion()) throw new ApiException(409, "ONBOARDING_VERSION_CONFLICT", "Your onboarding was updated in another session");
-        if ("COMPLETED".equals(ob.state()) || "LEGACY_EXEMPT".equals(ob.state())) return buildView(caseId);
+        if ("COMPLETED".equals(ob.state())) return buildView(caseId);
         if (!readiness.readyToSubmit(caseId)) {
             CustomerReadiness r = readiness.compute(caseId);
             String reasons = r.blockingItems().stream().filter(b -> !"ONBOARDING_INCOMPLETE".equals(b.code())).map(BlockingItem::labelEn).reduce((a, b) -> a + "; " + b).orElse("required steps");
@@ -132,25 +130,6 @@ public class OnboardingService {
     }
 
     // ---- internals ----
-    private void ensureRecord(UUID caseId) {
-        Integer exists = jdbc.sql("SELECT count(*) FROM patient_onboardings WHERE case_id=?").param(caseId).query(Integer.class).single();
-        if (exists != null && exists > 0) return;
-        // Lazy creation / documented safe backfill for cases that acknowledged before this layer existed.
-        record C(UUID patientId, String status) {}
-        C c = jdbc.sql("SELECT patient_id,status FROM medical_cases WHERE id=?").param(caseId).query((rs, n) -> new C(rs.getObject("patient_id", UUID.class), rs.getString("status"))).optional().orElse(null);
-        if (c == null || c.patientId() == null) return;
-        UUID ackVersion = jdbc.sql("SELECT pv.id FROM proposal_versions pv JOIN proposals p ON p.id=pv.proposal_id WHERE p.case_id=? AND pv.document_type='PRELIMINARY_ESTIMATE' AND pv.status IN ('ACCEPTED','VIEWED') ORDER BY pv.version_number DESC LIMIT 1")
-                .param(caseId).query(UUID.class).optional().orElse(null);
-        boolean progressed = PROGRESSED.contains(c.status());
-        if (ackVersion == null && !progressed && !"ACCEPTED".equals(c.status())) return; // not yet acknowledged — nothing to resume
-        Instant now = clock.instant(); UUID id = UUID.randomUUID();
-        String state = progressed ? "LEGACY_EXEMPT" : "IN_PROGRESS";
-        jdbc.sql("INSERT INTO patient_onboardings(id,patient_id,case_id,proposal_version_id,state,started_at,expires_at,created_at,updated_at,version) " +
-                        "SELECT ?,?,?,?,?,?,?,?,?,0 WHERE NOT EXISTS(SELECT 1 FROM patient_onboardings WHERE case_id=?)")
-                .params(id, c.patientId(), caseId, ackVersion, state, timestamp(now), timestamp(now.plus(ONBOARDING_TTL)), timestamp(now), timestamp(now), caseId).update();
-        audit(caseId, progressed ? "PATIENT_ONBOARDING_LEGACY_EXEMPTED" : "PATIENT_ONBOARDING_CREATED", id, state, "SYSTEM", "PATIENT");
-    }
-
     private OnboardingView buildView(UUID caseId) {
         Onboarding ob = requireOnboarding(caseId);
         String caseNumber = jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?").param(caseId).query(String.class).single();

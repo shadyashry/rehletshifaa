@@ -130,6 +130,10 @@ public class CoordinationRepository {
                 .param(id).query(String.class).optional().orElse(null);
     }
     private long revision(UUID caseId) { return count("SELECT COUNT(*) FROM coordination_decisions WHERE case_id=?", caseId); }
+    public UUID ownerAssignmentId(UUID caseId) {
+        return jdbc.sql("SELECT id FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' ORDER BY assigned_at DESC,id LIMIT 1")
+                .param(caseId).query(UUID.class).single();
+    }
     public long workload(String subject, UUID excludedCase) {
         return count("SELECT COUNT(DISTINCT a.case_id) FROM case_assignments a JOIN medical_cases c ON c.id=a.case_id WHERE a.assignee_subject=? AND a.assignee_role='COORDINATOR' "
                 + "AND a.assignment_type='PRIMARY' AND a.status='ACTIVE' AND c.status NOT IN ('CLOSED','CANCELLED') AND a.case_id<>?", subject, excludedCase);
@@ -188,6 +192,8 @@ public class CoordinationRepository {
                 .query((r, n) -> new Object[]{r.getString(1), r.getString(2), decode(r.getString(3), Decision.class)}).list();
     }
     public void decision(Decision d, String actor, String key, String request) {
+        if (d.policyId() == null && !("NO_ROUTING_POLICY".equals(d.path()) && d.selectedOwner() == null))
+            throw new IllegalArgumentException("Only an unassigned no-policy queue decision may lack a policy");
         update("INSERT INTO coordination_decisions(id,case_id,actor_subject,command_key,request_data,policy_id,result_data,created_at) VALUES(?,?,?,?,?,?,?,?)",
                 d.id(), d.caseId(), actor, key, request, d.policyId(), encode(d), timestamp(d.evaluatedAt()));
     }

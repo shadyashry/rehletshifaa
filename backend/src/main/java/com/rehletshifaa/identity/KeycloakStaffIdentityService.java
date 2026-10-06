@@ -1,7 +1,5 @@
 package com.rehletshifaa.identity;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -19,14 +17,12 @@ import java.util.*;
 @Service
 public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
     private static final List<String> INVITE_ACTIONS=List.of("VERIFY_EMAIL","UPDATE_PASSWORD","CONFIGURE_TOTP");
-    /** Workspace roles the portal understands; Keycloak defaults (offline_access, uma_authorization, default-roles-*) are not reported. */
     private final RestClient http;
-    private final ObjectMapper json;
     private final String baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl;
     private final int inviteLifespan;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public KeycloakStaffIdentityService(org.springframework.web.client.RestClient.Builder http, ObjectMapper json,
+    public KeycloakStaffIdentityService(org.springframework.web.client.RestClient.Builder http,
         @Value("${app.identity-admin.base-url:http://localhost:8180}") String baseUrl,
         @Value("${app.identity-admin.realm:rehletshifaa}") String realm,
         @Value("${app.identity-admin.client-id:staff-identity-admin}") String clientId,
@@ -35,28 +31,23 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
         @Value("${app.web-base-url:http://localhost:3000}") String webBaseUrl,
         @Value("${app.identity-admin.invite-lifespan-seconds:43200}") int inviteLifespan) {
         // The Boot builder carries the finite spring.http.client timeouts; RestClient.create() has none.
-        this(http.build(),json,baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl,inviteLifespan);
+        this(http.build(),baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl,inviteLifespan);
     }
 
-    KeycloakStaffIdentityService(RestClient http,ObjectMapper json,String baseUrl,String realm,String clientId,
+    KeycloakStaffIdentityService(RestClient http,String baseUrl,String realm,String clientId,
             String clientSecret,String webClientId,String webBaseUrl,int inviteLifespan) {
-        this.http=http;this.json=json;this.baseUrl=stripSlash(baseUrl);this.realm=realm;this.clientId=clientId;this.clientSecret=clientSecret;
+        this.http=http;this.baseUrl=stripSlash(baseUrl);this.realm=realm;this.clientId=clientId;this.clientSecret=clientSecret;
         this.webClientId=webClientId;this.webBaseUrl=stripSlash(webBaseUrl);this.inviteLifespan=inviteLifespan;
     }
 
     @Override
     public IdentityAccount invite(String name,String email,String locale) {
-        return invite(name,email,null,locale,null);
+        return createInvitation(name,email,locale,null);
     }
 
-    @Override public IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker){return invite(name,email,null,locale,operationMarker);}
-    @Override public IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker,String compatibilityRole){return invite(name,email,compatibilityRole,locale,operationMarker);}
+    @Override public IdentityAccount inviteTracked(String name,String email,String locale,String operationMarker){return createInvitation(name,email,locale,operationMarker);}
 
-    /** Legacy staff compatibility only; new business services use IdentityProvisioningPort. */
-    public IdentityAccount invite(String name,String email,String role,String locale) {
-        return invite(name,email,role,locale,null);
-    }
-    private IdentityAccount invite(String name,String email,String role,String locale,String operationMarker) {
+    private IdentityAccount createInvitation(String name,String email,String locale,String operationMarker) {
         requireConfigured();
         String normalized=email.trim().toLowerCase(Locale.ROOT);
         if(!findByEmail(normalized).isEmpty())throw new ApiException(409,"STAFF_EMAIL_EXISTS","An identity account already uses this email address");
@@ -68,7 +59,7 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
         try {
             ResponseEntity<Void> response=http.post().uri(admin("/users")).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(user).retrieve().toBodilessEntity();
             String subject=subjectFrom(response.getHeaders().getLocation());
-            try {if(role!=null)replaceStaffRole(subject,role);sendInvite(subject,locale);}
+            try {sendInvite(subject,locale);}
             catch(RuntimeException failure){if(operationMarker==null||operationMarker.isBlank())deleteQuietly(subject);throw failure;}
             return new IdentityAccount(subject,normalized,"INVITED",Instant.now());
         } catch(RestClientResponseException e) {throw identityFailure(e,"Unable to create the staff identity account");}
@@ -131,18 +122,6 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
         } catch (RuntimeException failure) { return EmailResolution.unavailable(); }
     }
 
-
-    private void replaceStaffRole(String subject,String role){
-        Map<String,Object> staffRole=role(role);Map<String,Object> patientRole=role("PATIENT");
-        http.post().uri(admin("/users/"+encode(subject)+"/role-mappings/realm")).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(List.of(staffRole)).retrieve().toBodilessEntity();
-        http.method(HttpMethod.DELETE).uri(admin("/users/"+encode(subject)+"/role-mappings/realm")).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(List.of(patientRole)).retrieve().toBodilessEntity();
-    }
-
-    @Override public void setCompatibilityRole(String subject,String role){requireConfigured();replaceStaffRole(subject,role);}
-
-    private Map<String,Object> role(String name){
-        return http.get().uri(admin("/roles/"+encode(name))).header("Authorization",bearer()).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});
-    }
 
     @Override public void sendPasswordReset(String subject,String locale){
         requireConfigured();

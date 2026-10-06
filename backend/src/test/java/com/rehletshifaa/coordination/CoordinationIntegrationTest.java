@@ -182,6 +182,81 @@ class CoordinationIntegrationTest {
         UUID other = medicalCase(consultant);
         assertThat(engine.routeCoordinatorWork(other)).isEmpty();
         assertThat(repo.owner(other)).isNull();
+        assertThat(repo.queued(other)).isTrue();
+        assertThat(repo.history(other)).singleElement().satisfies(d -> {
+            assertThat(d.path()).isEqualTo("NO_ROUTING_POLICY");
+            assertThat(d.policyId()).isNull();
+            assertThat(d.selectedOwner()).isNull();
+        });
+    }
+
+    @Test void coordinationIntakeWithNoCareAreaAssignsOnlyToUnrestrictedTeam() {
+        jdbc.update("UPDATE medical_cases SET status='RECEIVED',care_category=NULL WHERE id=?", caseId);
+        assertThat(engine.routeCoordinationIntake(caseId)).contains("routing-a");
+        assertThat(repo.history(caseId)).singleElement().satisfies(d -> assertThat(d.source()).isEqualTo("COORDINATION_INTAKE"));
+    }
+
+    @Test void undefinedCareAreaQueuesThenClassificationAllowsRetry() {
+        jdbc.update("UPDATE medical_cases SET status='RECEIVED',care_category=NULL WHERE id=?", caseId);
+        Team current = config.teams().stream().filter(t -> t.id().equals(team)).findFirst().orElseThrow();
+        config.saveProfile(team, new TeamProfile(Set.of("cardiology"), Set.of("en"), null), current.revision(), "Specialist team");
+        assertThat(engine.routeCoordinationIntake(caseId)).isEmpty();
+        assertThat(repo.queued(caseId)).isTrue();
+        assertThat(repo.history(caseId).getFirst().path()).isEqualTo("NO_ELIGIBLE_COORDINATOR");
+        jdbc.update("UPDATE medical_cases SET care_category='cardiology' WHERE id=?", caseId);
+        engine.retryQueued(caseId);
+        assertThat(repo.owner(caseId)).isEqualTo("routing-a");
+        assertThat(repo.queued(caseId)).isFalse();
+    }
+
+    @Test void noEffectivePolicyQueuesOnceAndPolicyActivationAllowsRetry() {
+        jdbc.update("UPDATE coordination_policy_versions SET effective_from=?,effective_to=?", java.sql.Timestamp.from(future), java.sql.Timestamp.from(future.plusSeconds(3600)));
+        assertThat(engine.routeCoordinationIntake(caseId)).isEmpty();
+        assertThat(engine.routeCoordinationIntake(caseId)).isEmpty();
+        assertThat(repo.history(caseId)).singleElement().satisfies(d -> assertThat(d.path()).isEqualTo("NO_ROUTING_POLICY"));
+        assertThat(repo.queued(caseId)).isTrue();
+        jdbc.update("UPDATE coordination_policy_versions SET effective_from=?,effective_to=?", java.sql.Timestamp.from(past), java.sql.Timestamp.from(future));
+        engine.retryQueued(caseId);
+        assertThat(repo.owner(caseId)).isEqualTo("routing-a");
+        assertThat(repo.queued(caseId)).isFalse();
+    }
+
+    @Test void selfClaimRequiresEligibleTeamCareAreaCapacityAndPolicy() {
+        jdbc.update("UPDATE medical_cases SET status='RECEIVED' WHERE id=?", caseId);
+        signIn("routing-a");
+        assertThat(engine.claimCoordinatorCase(caseId)).isNotNull();
+        assertThat(repo.owner(caseId)).isEqualTo("routing-a");
+        signIn("routing-manager");
+        assertThat(repo.history(caseId).getFirst().path()).isEqualTo("COORDINATOR_CLAIM");
+        UUID other = medicalCase(consultant);
+        jdbc.update("INSERT INTO care_categories(slug,name_en,name_ar,sort_order) SELECT 'oncology','Oncology','Oncology',99 "
+                + "WHERE NOT EXISTS(SELECT 1 FROM care_categories WHERE slug='oncology')");
+        jdbc.update("UPDATE medical_cases SET status='RECEIVED',care_category='oncology' WHERE id=?", other);
+        Team current = config.teams().stream().filter(t -> t.id().equals(team)).findFirst().orElseThrow();
+        config.saveProfile(team, new TeamProfile(Set.of("cardiology"), Set.of("en"), null), current.revision(), "Cardiology team");
+        signIn("routing-b");
+        assertThatThrownBy(() -> engine.claimCoordinatorCase(other)).isInstanceOf(ApiException.class).hasMessageContaining("not eligible");
+        assertThat(repo.owner(other)).isNull();
+        signIn("routing-manager");
+        jdbc.update("UPDATE coordination_policy_versions SET effective_from=?,effective_to=?", java.sql.Timestamp.from(future), java.sql.Timestamp.from(future.plusSeconds(3600)));
+        assertThat(engine.routeCoordinationIntake(other)).isEmpty();
+        signIn("routing-b");
+        assertThatThrownBy(() -> engine.claimCoordinatorCase(other)).isInstanceOf(ApiException.class).hasMessageContaining("policy");
+        assertThat(repo.queued(other)).isTrue();
+    }
+
+    @Test void managerReassignmentUsesFullEligibilityAndMovesOnlyCoordinatorWork() {
+        command("AUTO", 0, null);
+        UUID coordinatorTask = task("COORDINATOR", "routing-a");
+        UUID operationsTask = task("OPERATIONS", "operations");
+        capacity("routing-b", 0, true);
+        assertThatThrownBy(() -> engine.reassignCoordinator(caseId, "routing-b", "Capacity denial")).hasMessageContaining("not eligible");
+        assertThat(repo.owner(caseId)).isEqualTo("routing-a");
+        capacity("routing-b", 10, true);
+        assertThat(engine.reassignCoordinator(caseId, "routing-b", "Coverage change")).isNotNull();
+        assertThat(repo.owner(caseId)).isEqualTo("routing-b");
+        assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE id=?", String.class, coordinatorTask)).isEqualTo("routing-b");
+        assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE id=?", String.class, operationsTask)).isEqualTo("operations");
     }
 
     @Test void simulateIsEphemeralAndNeverMutatesRealState() {

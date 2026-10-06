@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(properties="spring.task.scheduling.enabled=false")
 @Transactional
 class SecureJourneyCorrectionsTest {
-    @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases; @Autowired ProposalExpiryService expiry; @Autowired AccountActivationService accountActivations; @Autowired CredentialExpiryService credentialExpiry; @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases; @Autowired ProposalExpiryService expiry; @Autowired CredentialExpiryService credentialExpiry; @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     /** System time plus an offset a test can advance, so writes that must be ordered never share a clock tick. */
     @TestBean Clock clock;
     static Clock clock(){return new AdvanceableClock();}
@@ -87,7 +87,8 @@ class SecureJourneyCorrectionsTest {
         var created=cases.create(new CreateCaseRequest("Action", "Patient","Kenya","+254700000012","Reports","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject",Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(),"pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(),"pod");
         long version=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("INFORMATION_REQUIRED","Please add the missing report",version)); em.flush();
         String token=informationActionToken(created.caseId());
@@ -132,26 +133,9 @@ class SecureJourneyCorrectionsTest {
         var decision=journey.decideProposalPublic(ctx.token,grant.grant(),new PublicProposalDecisionRequest(grant.grant(), "ACCEPTED", "Yes", true));
         assertThat(decision.status()).isEqualTo("ACCEPTED");
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
-        // Exactly one customer-facing message: the secure continuation link. The account-activation record is
-        // kept as an internal capability, but it no longer produces a second competing email.
+        // Exactly one customer-facing message: the secure continuation link.
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE 'onboarding:%'")).isEqualTo(1);
-        assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='ACCOUNT_ACTIVATION'")).isZero();
-        assertThat(count("SELECT count(*) FROM account_activations WHERE case_id=?",ctx.caseId)).isEqualTo(1);
         assertThatThrownBy(()->journey.viewProposal(ctx.token,grant.grant())).isInstanceOf(ApiException.class);
-    }
-
-    @Test void activationLinksExistingProfileAndAllCases() throws Exception {
-        var ctx=releaseProposalWithoutPatientAccount();
-        journey.requestProposalAccess(ctx.token); em.flush();
-        String code=proposalAccessCode(ctx.caseId);
-        var grant=journey.verifyProposalAccess(ctx.token,code);
-        journey.decideProposalPublic(ctx.token,grant.grant(),new PublicProposalDecisionRequest(grant.grant(), "ACCEPTED", null, true)); em.flush();
-        String activation=activationToken(ctx.caseId);
-        authenticate("new-account-subject",Role.PATIENT);
-        var res=journey.activateAccount(activation);
-        assertThat(res.status()).isEqualTo("ACTIVATED");
-        assertThat(journey.patientCases()).extracting(CaseView::caseNumber).contains(ctx.caseNumber);
-        assertThatThrownBy(()->journey.activateAccount(activation)).isInstanceOf(ApiException.class).hasMessageContaining("already been used");
     }
 
     @Test void expiredProposalIsPersistedAndItsLinkIsRevoked() throws Exception {
@@ -263,7 +247,8 @@ class SecureJourneyCorrectionsTest {
         var created=cases.create(new CreateCaseRequest("Rebalance", "Patient","Kenya","+254700000022","Reports","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject",Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(),"pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(),"pod");
         com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "replacement-coordinator", "COORDINATOR", crypto.encrypt("Replacement Coordinator"));
         com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "lead-subject", "COORDINATOR_LEAD", crypto.encrypt("Team Lead"));
         com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "coordinator-subject", "COORDINATOR", crypto.encrypt("Original Coordinator"));
@@ -280,7 +265,8 @@ class SecureJourneyCorrectionsTest {
         var created=cases.create(new CreateCaseRequest("Transfer", "Patient","Kenya","+254700000023","Transfer","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject",Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(),"pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(),"pod");
         for(String[] person:new String[][]{{"replacement-coordinator","COORDINATOR","Replacement Coordinator"},{"lead-subject","COORDINATOR_LEAD","Team Lead"},{"coordinator-subject","COORDINATOR","Original Coordinator"},{"disabled-coordinator","COORDINATOR","Disabled Coordinator"}})
             com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, person[0], person[1], crypto.encrypt(person[2]));
         com.rehletshifaa.workforce.WorkforceTestData.leadTeam(jdbc, "CARE_COORDINATION", "lead-subject", "coordinator-subject","replacement-coordinator","disabled-coordinator");
@@ -307,7 +293,8 @@ class SecureJourneyCorrectionsTest {
         var created=cases.create(new CreateCaseRequest("Ops", "Transferee","Kenya","+254700000031","Private clinical history","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject",Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(),"pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(),"pod");
         for(String[] person:new String[][]{{"new-owner","COORDINATOR","New Owner"},{"lead-subject","COORDINATOR_LEAD","Team Lead"},{"coordinator-subject","COORDINATOR","Original Coordinator"},{"disabled-coordinator","COORDINATOR","Disabled Coordinator"}})
             com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, person[0], person[1], crypto.encrypt(person[2]));
         com.rehletshifaa.workforce.WorkforceTestData.leadTeam(jdbc, "CARE_COORDINATION", "lead-subject", "coordinator-subject","new-owner","disabled-coordinator");
@@ -867,7 +854,8 @@ class SecureJourneyCorrectionsTest {
         var created=cases.create(new CreateCaseRequest("Guard", "Patient","Kenya","+254700000030","Reports","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush();
         authenticate("coordinator-subject",Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(),"pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(),"pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         assertThatThrownBy(()->journey.transition(created.caseId(),new TransitionRequest("PATIENT_DECISION","skip",v)))
             .isInstanceOf(ApiException.class).hasMessageContaining("dedicated authorized operation");
@@ -888,7 +876,8 @@ class SecureJourneyCorrectionsTest {
         var created=cases.create(new CreateCaseRequest("Category", "Patient","Kenya","+254700000031","Reports","en",true,null,null,null));
         cases.submit(created.caseId());em.flush();em.clear();
         authenticate("coordinator-subject",Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(),"intake-pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(),"intake-pod");
         var intake=journey.workspace(created.caseId()).caseSummary();
         assertThat(intake.careCategory()).isNull();
 
@@ -913,7 +902,8 @@ class SecureJourneyCorrectionsTest {
         cases.submit(created.caseId()); em.flush(); em.clear();
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?",created.caseId()); // exercises the Operations gate
         authenticate("coordinator-subject",Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(),"cardiac-pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","ready",v));
         seedDoctor();
@@ -941,7 +931,8 @@ class SecureJourneyCorrectionsTest {
         var created=cases.create(new CreateCaseRequest("Doc", "Patient","Kenya","+254700000021","Reports","en",true,null,null,null,"cardiology"));
         cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject",Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(),"pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(),"pod");
         long v=journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(),new TransitionRequest("READY_FOR_CONSULTANT","ready",v));
         seedDoctor();
@@ -955,8 +946,6 @@ class SecureJourneyCorrectionsTest {
     // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
     private String caseAccessCode(String token,String dest) throws Exception {String raw=payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN case_access_challenges ch ON o.idempotency_key='case-access:'||ch.id JOIN case_access_links l ON l.id=ch.link_id WHERE l.token_hash=? AND o.destination=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1",String.class,intakeLifecycle.hash(token),dest));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}
     private String proposalAccessCode(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id WHERE ch.case_id=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1",String.class,caseId));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}
-    /** Internal binding credential: nothing emails it any more, so the test asks the owning service for one. */
-    private String activationToken(UUID caseId){UUID patientId=jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?",UUID.class,caseId);return accountActivations.issue(patientId,caseId);}
     private String informationActionToken(UUID caseId) throws Exception {String raw=payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE notification_type='PATIENT_ACTION' AND idempotency_key IN (SELECT 'patient-action:'||id FROM case_access_links WHERE case_id=? AND purpose='INFORMATION_RESPONSE') ORDER BY created_at DESC, _ROWID_ DESC LIMIT 1",String.class,caseId));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("token");}
     private String payload(String stored){return stored.startsWith("enc:")?crypto.decrypt(stored.substring(4)):stored;}
     private int count(String sql,Object... args){Integer n=jdbc.queryForObject(sql,Integer.class,args);return n==null?0:n;}

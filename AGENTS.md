@@ -145,6 +145,59 @@ For debugging, start from the failing boundary:
 
 Do not perform broad architecture reviews during a bug fix unless evidence shows the issue is architectural.
 
+## 4a. Model selection and delegation
+
+The owner authorizes sub-agent delegation for this project when it materially improves delivery or review.
+Use sub-agents within the current task; do not create separate user-facing chats unless requested.
+Small, coherent changes should stay with one agent. Delegation does not authorize additional product scope,
+deployment, destructive operations, or bypassing an explicit decision gate.
+
+### Select by complexity and consequence
+
+These are project defaults, informed by [OpenAI model guidance](https://developers.openai.com/api/docs/guides/model-selection)
+(reviewed 2026-10-05), not a requirement to use every model on every task.
+
+| Work | Preferred model | Reasoning | RehletShifaa examples |
+|---|---|---|---|
+| Small, precisely bounded, low-risk work | `gpt-6-luna` | low or medium | Targeted file discovery, summarizing test output, copy/style edits, documentation of already-verified behavior |
+| Normal implementation with clear requirements and established patterns | `gpt-6.1-sol` | medium; high for several interacting components | Control Center forms, API client integration, ordinary service changes, focused regression tests, dev fixtures |
+| Security-sensitive or structurally complex implementation | `gpt-6-astra` | high | Role/scope policy, identity adoption, separation of duties, owner governance, patient-data visibility, migration design, transactional admission and concurrency |
+| Unresolved cross-module failures or independent review of critical changes | `gpt-6-astra` | high; xhigh when specific unresolved reasoning warrants it | Privilege escalation review, conflicting invariants, race conditions, rollback and version-pinning analysis |
+
+Classify by the consequences of a mistake, not patch size. A one-line authorization change belongs in the
+critical category. Do not assign Luna sole responsibility for security policy, identity decisions, migration
+design or final review of sensitive changes. Max/ultra is not a default; increase effort only for a concrete
+unresolved problem, not merely because a task is long.
+
+### Delegation workflow
+
+1. The primary agent owns scope, contracts, integration, final verification and the checkpoint. For the current
+   platform epic, prefer Astra/high for design and critical review, Sol for bounded implementation, and Luna
+   only for suitable small tasks. This does not change the current chat's selected model automatically.
+2. Before spawning, give a concise task, allowed files, relevant requirements/invariants, expected result and
+   verification command. Pass only necessary context; include the applicable `AGENTS.md` instructions and
+   checkpoint references. Use the tool's supported context mode when selecting a different model.
+3. Delegate independent work in parallel after shared API/schema contracts are settled. Give each editable file
+   one owner at a time. Keep migrations, shared authority policy and checkpoint integration under one designated
+   writer. Review agents should be read-only unless explicitly reassigned an implementation task.
+4. Normally use at most two workers plus the primary agent, within the runtime's actual limit. Sub-agents must
+   return to the primary agent before further delegation. Do not duplicate investigations or parallelize tasks
+   whose results depend on unfinished work.
+5. Serialize tests/builds that share output directories, databases, fixtures or the running Docker stack. Do not
+   let one agent clear test classes, rebuild services or mutate live fixtures while another uses them.
+6. Require handbacks with changed files, behavior, tests actually run, failures and unresolved assumptions.
+   Inspect the resulting diff and verify integration; a sub-agent's completion claim is not verification.
+   Obtain independent Astra review for critical authorization, identity, governance and admission changes when
+   that model and delegation are available. Fix findings before claiming completion.
+7. Escalate Luna to Sol when work needs nontrivial design; escalate Sol to Astra when security boundaries,
+   cross-module invariants or concurrency become uncertain, or a focused attempted fix leaves the cause unclear.
+   Pass the evidence and failed approach rather than restarting broad discovery.
+
+Use only model IDs and reasoning levels exposed by the active tool/runtime. If a preferred model is unavailable,
+use a suitable available model (including the current one) and briefly report the substitution. Never claim a
+model was used or switched when it was not. Model unavailability alone should not block useful authorized work;
+report any critical review that could not be obtained. Explicit user model choices take precedence.
+
 ## 5. Verification strategy
 
 Use the smallest verification proportional to the change.

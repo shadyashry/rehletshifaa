@@ -60,7 +60,7 @@ class JourneyCutoverIntegrationTest {
     @Autowired MeterRegistry meters;
     @Autowired MockMvc mvc;
     Version version;
-    UUID legacyBeforePolicy;
+    UUID coordinationBeforePolicy;
     JourneyAdmissionPolicyService.Policy activePolicy;
     JourneyDefinitionIntegrationTest fixture;
 
@@ -80,7 +80,7 @@ class JourneyCutoverIntegrationTest {
         fixture.signIn("checker");
         version = definitions.publish(pending.definitionId(), pending.id(), fixture.change(pending.revision()));
         fixture.clear();
-        legacyBeforePolicy = submit("cardiology");
+        coordinationBeforePolicy = submit("cardiology");
     }
     @BeforeEach void activatePolicy() { activePolicy = activate(version.id()); }
     @AfterEach void clear() { fixture.clear(); }
@@ -131,32 +131,32 @@ class JourneyCutoverIntegrationTest {
     }
 
     @Test void noApprovedPolicyDefaultsToLegacyAndReplayAfterActivationPreservesThatDecision() {
-        var before = admission(legacyBeforePolicy);
-        assertThat(before.decision()).isEqualTo("LEGACY");
+        var before = admission(coordinationBeforePolicy);
+        assertThat(before.decision()).isEqualTo("COORDINATION");
         assertThat(before.reason()).isEqualTo("ADMISSION_NOT_ACTIVE");
         assertThat(before.policyId()).isNull();
         assertThat(before.policyRevision()).isEqualTo("db:none");
-        tx(() -> productionIntake.onCaseSubmitted(new IntakeEvents.CaseSubmitted(legacyBeforePolicy)));
-        assertThat(admission(legacyBeforePolicy)).isEqualTo(before);
-        assertThat(bindings.findByCase(legacyBeforePolicy)).isEmpty();
-        assertThat(instances(legacyBeforePolicy)).isZero();
-        assertThat(audits(legacyBeforePolicy, "LEGACY_ADMISSION_SELECTED")).isEqualTo(1);
+        tx(() -> productionIntake.onCaseSubmitted(new IntakeEvents.CaseSubmitted(coordinationBeforePolicy)));
+        assertThat(admission(coordinationBeforePolicy)).isEqualTo(before);
+        assertThat(bindings.findByCase(coordinationBeforePolicy)).isEmpty();
+        assertThat(instances(coordinationBeforePolicy)).isZero();
+        assertThat(audits(coordinationBeforePolicy, "COORDINATION_ADMISSION_SELECTED")).isEqualTo(1);
     }
 
-    // ---- Non-matching eligibility → legacy ------------------------------------------------------------------
+    // ---- Non-matching eligibility → coordination ------------------------------------------------------------------
 
     @Test void nonMatchingAndUncategorizedCasesStayLegacyAndAreRecorded() {
         for (String category : new String[]{"rheumatology-rehabilitation", "orthopedics", null}) {
             UUID caseId = submit(category);
             var a = admission(caseId);
-            assertThat(a.decision()).as(String.valueOf(category)).isEqualTo("LEGACY");
+            assertThat(a.decision()).as(String.valueOf(category)).isEqualTo("COORDINATION");
             assertThat(a.reason()).isEqualTo("POLICY_NO_MATCH");
             assertThat(a.policyId()).isEqualTo(activePolicy.id().toString());
             assertThat(a.journeyVersionId()).isNull();
             assertThat(bindings.findByCase(caseId)).isEmpty();
             assertThat(instances(caseId)).isZero();
-            assertThat(audits(caseId, "LEGACY_ADMISSION_SELECTED")).isEqualTo(1);
-            assertThat(cases.findById(caseId).getStatus().name()).isEqualTo("RECEIVED"); // legacy never blocks intake
+            assertThat(audits(caseId, "COORDINATION_ADMISSION_SELECTED")).isEqualTo(1);
+            assertThat(cases.findById(caseId).getStatus().name()).isEqualTo("RECEIVED"); // coordination never blocks intake
         }
     }
 
@@ -188,14 +188,14 @@ class JourneyCutoverIntegrationTest {
                 .satisfies(p -> assertThat(p.state()).isEqualTo("SUPERSEDED"));
     }
 
-    // ---- 6. Journey not ready → legacy, readiness category recorded ---------------------------------------------
+    // ---- 6. Journey not ready → coordination, readiness category recorded ---------------------------------------------
 
     @Test void matchingPolicyWithoutRuntimeReadyVersionStaysLegacyWithReadinessReason() {
         var originals = jdbc.queryForList("SELECT journey_version_id,graph_hash FROM journey_deployments");
         tx(() -> jdbc.update("UPDATE journey_deployments SET graph_hash='mismatch'"));
         try {
             UUID caseId = submit("cardiology");
-            assertThat(admission(caseId).decision()).isEqualTo("LEGACY");
+            assertThat(admission(caseId).decision()).isEqualTo("COORDINATION");
             assertThat(admission(caseId).reason()).isEqualTo("GRAPH_MISMATCH");
             assertThat(admission(caseId).policyId()).as("matched policy is still evidenced").isEqualTo(activePolicy.id().toString());
             assertThat(bindings.findByCase(caseId)).isEmpty();
@@ -259,7 +259,7 @@ class JourneyCutoverIntegrationTest {
         fixture.clear();
         UUID fresh = submit("cardiology");
         var pausedAdmission = admission(fresh);
-        assertThat(pausedAdmission.decision()).isEqualTo("LEGACY");
+        assertThat(pausedAdmission.decision()).isEqualTo("COORDINATION");
         assertThat(pausedAdmission.reason()).isEqualTo("ADMISSION_NOT_ACTIVE");
         assertThat(pausedAdmission.policyRevision()).isEqualTo(paused.revisionToken());
         assertThat(bindings.findByCase(fresh)).isEmpty();
@@ -273,7 +273,7 @@ class JourneyCutoverIntegrationTest {
         assertThat(admission(resumed).policyId()).isEqualTo(activePolicy.id().toString());
         tx(() -> productionIntake.onCaseSubmitted(new IntakeEvents.CaseSubmitted(fresh)));
         assertThat(admission(fresh)).isEqualTo(pausedAdmission);
-        assertThat(bindings.findByCase(fresh)).as("the paused-period legacy case remains legacy").isEmpty();
+        assertThat(bindings.findByCase(fresh)).as("the paused-period coordination case remains coordination").isEmpty();
         tx(() -> productionIntake.onCaseSubmitted(new IntakeEvents.CaseSubmitted(bound)));
         assertThat(bindings.findByCase(bound).orElseThrow()).isEqualTo(bindingBefore); // not unbound, restarted or re-pinned
         assertThat(admission(bound)).isEqualTo(admissionBefore); // evidence is never rewritten
@@ -281,7 +281,7 @@ class JourneyCutoverIntegrationTest {
         assertThat(tasks(bound)).isEqualTo(tasksBefore);
         fixture.signIn("maker");
         assertThat(status.caseAdmission(bound).authority()).isEqualTo("JOURNEY");
-        assertThat(status.caseAdmission(fresh).authority()).isEqualTo("LEGACY");
+        assertThat(status.caseAdmission(fresh).authority()).isEqualTo("COORDINATION");
         fixture.grant("case-coordinator", com.rehletshifaa.authority.domain.Role.COORDINATOR);
         jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,'COORDINATOR','PRIMARY','ACTIVE','Fixture ownership','TEST',?,0)",
                 UUID.randomUUID(), bound, "case-coordinator", java.sql.Timestamp.from(clock.instant().minusSeconds(60)));
@@ -346,7 +346,7 @@ class JourneyCutoverIntegrationTest {
             boolean journey = category.equals("cardiology");
             assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_case_bindings WHERE case_id=?", Long.class, caseId)).isEqualTo(journey ? 1 : 0);
             assertThat(instances(caseId)).isEqualTo(journey ? 1 : 0);
-            assertThat(audits(caseId, journey ? "JOURNEY_ADMISSION_SELECTED" : "LEGACY_ADMISSION_SELECTED")).isEqualTo(1);
+            assertThat(audits(caseId, journey ? "JOURNEY_ADMISSION_SELECTED" : "COORDINATION_ADMISSION_SELECTED")).isEqualTo(1);
             assertThat(audits(caseId, "JOURNEY_RUNTIME_START_FAILED")).isZero();
             if (journey) assertThat(jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='JOURNEY:review'", Long.class, caseId)).isEqualTo(1);
         }
@@ -388,12 +388,12 @@ class JourneyCutoverIntegrationTest {
         assertThat(counter("journey.runtime.start", "outcome", "failure")).isEqualTo(failuresBefore + 1);
         fixture.signIn("maker");
         var view = status.caseAdmission(caseId);
-        assertThat(view.authority()).isEqualTo("LEGACY");
+        assertThat(view.authority()).isEqualTo("COORDINATION");
         assertThat(view.latestFailure().category()).isEqualTo("RUNTIME_START_FAILED");
         assertThat(status.status().runtimeStartFailures()).isGreaterThanOrEqualTo(1);
         fixture.clear();
 
-        cases.submit(caseId); // retriable once fixed; never silently re-routed to legacy
+        cases.submit(caseId); // retriable once fixed; never silently re-routed to coordination
         assertThat(admission(caseId).decision()).isEqualTo("JOURNEY");
     }
 
@@ -401,7 +401,7 @@ class JourneyCutoverIntegrationTest {
 
     @Test void statusAndCaseViewsExposeAuthorityPolicyVersionAndZeroAnomalies() throws Exception {
         UUID journeyCase = submit("cardiology");
-        UUID legacyCase = submit("orthopedics");
+        UUID coordinationCase = submit("orthopedics");
         fixture.signIn("maker");
         var s = status.status();
         assertThat(s.productionIntakeEnabled()).isTrue();
@@ -413,7 +413,7 @@ class JourneyCutoverIntegrationTest {
                 .satisfies(p -> assertThat(p.id()).isEqualTo(activePolicy.id().toString()));
         assertThat(s.readiness().category()).isEqualTo("DEPLOYED");
         assertThat(s.journeyAdmitted()).isGreaterThanOrEqualTo(1);
-        assertThat(s.legacyAdmitted()).isGreaterThanOrEqualTo(1);
+        assertThat(s.coordinationAdmitted()).isGreaterThanOrEqualTo(1);
         assertThat(s.anomalies().journeyAdmissionsWithoutStartedBinding()).isZero();
         assertThat(s.anomalies().productionBindingsWithoutJourneyAdmission()).isZero();
 
@@ -426,8 +426,8 @@ class JourneyCutoverIntegrationTest {
         assertThat(j.binding().runtimeStarted()).isTrue();
         assertThat(j.binding().deploymentReadiness()).isEqualTo("DEPLOYED");
         assertThat(j.latestFailure()).isNull();
-        var l = status.caseAdmission(legacyCase);
-        assertThat(l.authority()).isEqualTo("LEGACY");
+        var l = status.caseAdmission(coordinationCase);
+        assertThat(l.authority()).isEqualTo("COORDINATION");
         assertThat(l.admission().reason()).isEqualTo("POLICY_NO_MATCH");
         assertThat(l.binding()).isNull();
         fixture.clear();

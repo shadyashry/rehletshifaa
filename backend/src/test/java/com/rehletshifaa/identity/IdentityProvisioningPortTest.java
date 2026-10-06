@@ -1,6 +1,5 @@
 package com.rehletshifaa.identity;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.http.*;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -19,7 +18,7 @@ class IdentityProvisioningPortTest {
     @BeforeEach void setup() {
         var builder=RestClient.builder();
         server=MockRestServiceServer.bindTo(builder).build();
-        adapter=new KeycloakStaffIdentityService(builder.build(),new ObjectMapper(),BASE,"rehletshifaa",
+        adapter=new KeycloakStaffIdentityService(builder.build(),BASE,"rehletshifaa",
                 "identity-admin","test-only-secret","rehletshifaa-web","https://dev.rehletshifaa.com",43200);
         port=adapter;
     }
@@ -29,13 +28,18 @@ class IdentityProvisioningPortTest {
                 .andExpect(method(HttpMethod.POST)).andRespond(withSuccess("{\"access_token\":\"admin-token\"}",MediaType.APPLICATION_JSON));
     }
     void create() {
+        create(null);
+    }
+    void create(String marker) {
         token();
         server.expect(requestTo(ADMIN+"/users?email=new@example.test&exact=true"))
                 .andExpect(method(HttpMethod.GET)).andRespond(withSuccess("[]",MediaType.APPLICATION_JSON));
         token();
-        server.expect(requestTo(ADMIN+"/users")).andExpect(method(HttpMethod.POST))
+        var expectation=server.expect(requestTo(ADMIN+"/users")).andExpect(method(HttpMethod.POST))
                 .andExpect(content().json("{\"email\":\"new@example.test\",\"enabled\":true,\"requiredActions\":[\"VERIFY_EMAIL\",\"UPDATE_PASSWORD\",\"CONFIGURE_TOTP\"]}"))
-                .andRespond(withCreatedEntity(URI.create(ADMIN+"/users/stable-subject")));
+                ;
+        if(marker!=null)expectation.andExpect(content().json("{\"attributes\":{\"rehletshifaaProvisioningOperation\":[\""+marker+"\"]}}"));
+        expectation.andRespond(withCreatedEntity(URI.create(ADMIN+"/users/stable-subject")));
     }
     void email(boolean success) {
         token();
@@ -50,20 +54,18 @@ class IdentityProvisioningPortTest {
         assertThat(result.email()).isEqualTo("new@example.test");
         assertThat(result.status()).isEqualTo("INVITED");
     }
-    @Test void legacyInvitationRetainsCoarseRoleMapping() {
-        create();
-        for(String role:new String[]{"DOCTOR","PATIENT"}) {
-            token();server.expect(requestTo(ADMIN+"/roles/"+role))
-                    .andRespond(withSuccess("{\"name\":\""+role+"\"}",MediaType.APPLICATION_JSON));
-        }
-        token();server.expect(requestTo(ADMIN+"/users/stable-subject/role-mappings/realm"))
-                .andExpect(method(HttpMethod.POST)).andExpect(content().json("[{\"name\":\"DOCTOR\"}]"))
-                .andRespond(withNoContent());
-        token();server.expect(requestTo(ADMIN+"/users/stable-subject/role-mappings/realm"))
-                .andExpect(method(HttpMethod.DELETE)).andExpect(content().json("[{\"name\":\"PATIENT\"}]"))
-                .andRespond(withNoContent());
-        email(true);
-        assertThat(adapter.invite("Doctor","new@example.test","DOCTOR","en").subject()).isEqualTo("stable-subject");
+    @Test void trackedInvitationRetainsRecoveryMarkerWhenEmailDeliveryFails() {
+        create("operation-1");
+        email(false);
+        token();
+        server.expect(requestTo(ADMIN+"/users?q=rehletshifaaProvisioningOperation:operation-1"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("[{\"id\":\"stable-subject\",\"email\":\"new@example.test\"}]", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> port.inviteTracked("New Member", "new@example.test", "en", "operation-1"))
+                .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
+        assertThat(port.recover("operation-1")).get()
+                .extracting(IdentityProvisioningPort.IdentityAccount::subject).isEqualTo("stable-subject");
     }
     @Test void lifecycleUsesIdentityProviderWithoutBusinessRoleMappings() {
         email(true);

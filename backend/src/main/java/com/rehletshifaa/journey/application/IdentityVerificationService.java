@@ -52,7 +52,7 @@ public class IdentityVerificationService {
                         crypto.encrypt(request.legalName()), request.dateOfBirth() == null ? null : crypto.encrypt(request.dateOfBirth()), request.nationality(), request.documentType(), request.issuingCountry(), mask(request.documentReference()),
                         timestamp(now), timestamp(now), timestamp(now)).update();
         if (onboardingId != null && ("MANUAL_REVIEW".equals(outcome.status()) || "PENDING".equals(outcome.status())))
-            jdbc.sql("UPDATE patient_onboardings SET state='IDENTITY_REVIEW',updated_at=?,version=version+1 WHERE id=? AND state NOT IN ('COMPLETED','CANCELLED','LEGACY_EXEMPT')").params(timestamp(now), onboardingId).update();
+            jdbc.sql("UPDATE patient_onboardings SET state='IDENTITY_REVIEW',updated_at=?,version=version+1 WHERE id=? AND state NOT IN ('COMPLETED','CANCELLED')").params(timestamp(now), onboardingId).update();
         audit(actor.subject(), actor.label(), caseId, "IDENTITY_VERIFICATION_STARTED", id, "provider=" + outcome.provider() + ";status=" + outcome.status());
         return view(id);
     }

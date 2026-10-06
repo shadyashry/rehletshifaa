@@ -32,11 +32,11 @@ public class CoordinatorEligibilityService {
             List<String> exclusions = new ArrayList<>();
             List<UUID> serving = memberships.getOrDefault(capacity.subject(), List.of()).stream()
                     .filter(id -> teams.containsKey(id) && teams.get(id).active())
-                    .filter(id -> teams.get(id).careAreas().isEmpty() || teams.get(id).careAreas().contains(c.careArea()))
+                    .filter(id -> teams.get(id).careAreas().isEmpty() || c.careArea() != null && teams.get(id).careAreas().contains(c.careArea()))
                     .sorted().toList();
             if (!workforce.holds(capacity.subject(), "COORDINATOR")) exclusions.add("NOT_AN_ACTIVE_COORDINATOR");
             if (serving.isEmpty()) exclusions.add("NO_ACTIVE_TEAM");
-            if (!capacity.careAreas().isEmpty() && !capacity.careAreas().contains(c.careArea())) exclusions.add("CARE_AREA_MISMATCH");
+            if (!capacity.careAreas().isEmpty() && (c.careArea() == null || !capacity.careAreas().contains(c.careArea()))) exclusions.add("CARE_AREA_MISMATCH");
             boolean language = capacity.languages().stream().anyMatch(l -> l.equalsIgnoreCase(c.language()));
             if (p.configuration().mandatoryLanguage() && !language) exclusions.add("LANGUAGE_MISMATCH");
             if (p.configuration().requireOnDuty() && !capacity.onDuty()) exclusions.add("OFF_DUTY");

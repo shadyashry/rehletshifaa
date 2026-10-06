@@ -8,7 +8,6 @@ import com.rehletshifaa.journey.api.JourneyDtos.CareCategoryView;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyLiveShadowRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -23,9 +22,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Phase 7B read-only operator surface for the config-controlled cutover. Policies change only by deployment
- * configuration, so there is deliberately no write endpoint here; {@code journey.view} (PLATFORM governance,
- * ADMIN_WEB/API) is the one required permission, checked before any lookup so an unauthorized caller cannot use
+ * Operator admission evidence for the database governed policy. {@code JOURNEY_READ} is checked before any lookup
+ * so an unauthorized caller cannot use
  * case ids as an existence oracle. Responses carry ids, categories and timestamps only — no patient data, no
  * engine references.
  */
@@ -37,8 +35,8 @@ public class JourneyCutoverStatusService {
     public record Anomalies(long journeyAdmissionsWithoutStartedBinding, long productionBindingsWithoutJourneyAdmission) {}
     public record Status(boolean productionIntakeEnabled, boolean runtimeEnabled, boolean configurationValid, List<String> configurationProblems,
                          List<String> unknownCareCategories, String policyRevision, List<PolicyView> policies, ReadinessView readiness,
-                         Map<String, Long> admissions, long journeyAdmitted, long legacyAdmitted, long runtimeStartFailures,
-                         List<String> observedRevisions, Anomalies anomalies, JourneyLiveShadowRepository.Aggregate shadowComparison) {}
+                         Map<String, Long> admissions, long journeyAdmitted, long coordinationAdmitted, long runtimeStartFailures,
+                         List<String> observedRevisions, Anomalies anomalies) {}
     public record AdmissionView(String decision, String reason, String policyId, String policyRevision, UUID journeyVersionId,
                                 String careCategory, Instant evaluatedAt) {}
     public record BindingView(UUID journeyDefinitionId, UUID journeyVersionId, Integer versionNumber, String admissionMode,
@@ -56,14 +54,12 @@ public class JourneyCutoverStatusService {
     private final Authority authorization;
     private final GovernanceAuditLog audit;
     private final JdbcClient jdbc;
-    private final JourneyLiveShadowRepository shadow;
 
     public JourneyCutoverStatusService(JourneyAdmissionPolicyService policies, JourneyDeploymentService readiness, JourneyCaseAdmissionRepository admissions,
             JourneyCaseBindingRepository bindings, JourneyDefinitionRepository definitions, ObjectProvider<JourneyRuntimePort> runtimes,
-            CareCategoryCatalog categories, Authority authorization, GovernanceAuditLog audit, JdbcClient jdbc,
-            JourneyLiveShadowRepository shadow) {
+            CareCategoryCatalog categories, Authority authorization, GovernanceAuditLog audit, JdbcClient jdbc) {
         this.policies = policies; this.readiness = readiness; this.admissions = admissions; this.bindings = bindings; this.definitions = definitions;
-        this.runtimes = runtimes; this.categories = categories; this.authorization = authorization; this.audit = audit; this.jdbc = jdbc; this.shadow = shadow;
+        this.runtimes = runtimes; this.categories = categories; this.authorization = authorization; this.audit = audit; this.jdbc = jdbc;
     }
 
     @Transactional(readOnly = true)
@@ -75,14 +71,14 @@ public class JourneyCutoverStatusService {
         var unknown = configured.stream().flatMap(r -> r.careCategories().stream()).filter(c -> !known.contains(c)).distinct().sorted().toList();
         var counts = admissions.countsByDecisionAndReason();
         long journey = counts.entrySet().stream().filter(e -> e.getKey().startsWith("JOURNEY:")).mapToLong(Map.Entry::getValue).sum();
-        long legacy = counts.entrySet().stream().filter(e -> e.getKey().startsWith("LEGACY:")).mapToLong(Map.Entry::getValue).sum();
+        long coordination = counts.entrySet().stream().filter(e -> e.getKey().startsWith("COORDINATION:")).mapToLong(Map.Entry::getValue).sum();
         return new Status(current != null && "ACTIVE".equals(current.state()), runtimes.getIfAvailable() != null, true, List.of(), unknown,
                 current == null ? "none" : current.revisionToken(),
                 configured.stream().map(r -> new PolicyView(r.id().toString(), "ACTIVE".equals(r.state()), r.eligibilityScope(), r.careCategories(),
                         r.journeyVersionId(), r.versionNumber(), r.state(), r.readiness(), r.preparedBy(), r.approvedBy(), r.pausedBy())).toList(),
                 new ReadinessView(current == null ? "NO_ACTIVE_POLICY" : current.readiness(), current == null ? null : current.journeyVersionId(), current == null ? null : current.versionNumber()),
-                counts, journey, legacy, admissions.failureCount(), admissions.distinctRevisions(),
-                new Anomalies(admissions.journeyAdmissionsWithoutStartedBinding(), admissions.productionBindingsWithoutJourneyAdmission()), shadow.aggregate());
+                counts, journey, coordination, admissions.failureCount(), admissions.distinctRevisions(),
+                new Anomalies(admissions.journeyAdmissionsWithoutStartedBinding(), admissions.productionBindingsWithoutJourneyAdmission()));
     }
 
     @Transactional(readOnly = true)
@@ -100,14 +96,9 @@ public class JourneyCutoverStatusService {
                     b.engineReference() != null, instant(row.get("started_at")), readiness.pinnedReadiness(version));
         }).orElse(null);
         // Authority is the binding, never a re-evaluation of current policy: a bound case stays Journey-owned.
-        return new CaseView(caseId, binding == null ? "LEGACY" : "JOURNEY", admission, binding, admissions.latestFailure(caseId).orElse(null));
+        return new CaseView(caseId, binding == null ? "COORDINATION" : "JOURNEY", admission, binding, admissions.latestFailure(caseId).orElse(null));
     }
 
-    /**
-     * CUTOVER_POLICY_CHANGED: config-controlled policy has no write command, so the change is observed at startup —
-     * recorded once whenever the effective revision differs from the last one recorded. The default (master off,
-     * no policies) configuration records nothing.
-     */
     private void authorize() {
         authorization.require(Permission.JOURNEY_READ);
     }

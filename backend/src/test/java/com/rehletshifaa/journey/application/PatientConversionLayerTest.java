@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.*;
 class PatientConversionLayerTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired OnboardingService onboarding; @Autowired IdentityVerificationService identity; @Autowired PaymentService payment;
-    @Autowired AccountActivationService accountActivations;
+    @Autowired PatientAccountService accounts; @Autowired CustomerReadinessService readiness;
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
@@ -58,20 +58,20 @@ class PatientConversionLayerTest {
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull();
     }
 
-    @Test void accountActivationSetsNeitherVerificationTimestamp() throws Exception {
-        // Verify via EMAIL only (phone stays unverified), acknowledge, then activate. Activation must NOT
-        // set phone_verified_at — the old conflation bug that this regression guards against.
+    @Test void profileActivationSetsNeitherVerificationTimestamp() throws Exception {
+        // Verify via EMAIL only (phone stays unverified), acknowledge, then activate the profile. Profile
+        // activation must NOT set phone_verified_at; only the matching channel's OTP may verify contact.
         var ctx = releasePreliminary();
         journey.requestProposalAccess(ctx.token, "EMAIL"); em.flush();
         var grant = journey.verifyProposalAccess(ctx.token, proposalCode(ctx.token, "EMAIL"));
         journey.decideProposalPublic(ctx.token, grant.grant(), new PublicProposalDecisionRequest(grant.grant(), "ACKNOWLEDGED", null, true)); em.flush();
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull();
         authenticate("patient-subject-a", Role.PATIENT);
-        journey.activateAccount(activationToken(ctx.caseId));
+        startAuthenticatedAccount(ctx, "patient-subject-a");
         assertThat(verifiedAt(ctx.caseId, "phone_verified_at")).isNull(); // activation added no verification
     }
 
-    @Test void defaultChannelRemainsBackwardCompatible() throws Exception {
+    @Test void defaultChannelIsWhatsApp() throws Exception {
         var ctx = releasePreliminary();
         journey.requestProposalAccess(ctx.token); em.flush(); // no channel => default WhatsApp
         assertThat(activeChannel(ctx.caseId)).isEqualTo("WHATSAPP");
@@ -267,19 +267,36 @@ class PatientConversionLayerTest {
                 .isInstanceOf(ApiException.class).hasMessageContaining("not ready");
     }
 
-    @Test void legacyProgressedCaseKeepsDepositOnlyGate() throws Exception {
-        // A case with NO onboarding record (predates this layer) with a paid deposit may still confirm.
+    @Test void paidDepositDoesNotBypassMissingOnboardingForCommitment() throws Exception {
         var ctx = releasePreliminary();
         acknowledge(ctx);
-        jdbc.update("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId); // simulate legacy: no onboarding
+        jdbc.update("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
         UUID depositId = depositId(ctx.caseId);
         authenticate("finance-subject", Role.FINANCE);
-        payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(new BigDecimal("3000.00"), "BANK", "ref-1", "legacy-pay-1"));
+        payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(new BigDecimal("3000.00"), "BANK", "ref-1", "missing-onboarding-pay-1"));
         driveToTravelCoordination(ctx);
         authenticate("operations-subject", Role.OPERATIONS);
-        // Deposit is paid and there is no onboarding record => legacy path allows confirmation.
-        journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "CONFIRMED"));
+        assertThat(readiness.compute(ctx.caseId).blockingItems()).extracting(BlockingItem::code).contains("ONBOARDING_NOT_STARTED");
+        assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "CONFIRMED")))
+                .isInstanceOf(ApiException.class).hasMessageContaining("start onboarding");
         assertThat(status(ctx.caseId)).isEqualTo("TRAVEL_COORDINATION");
+    }
+
+    @Test void completedProfileWithPendingAccountDoesNotSatisfyAccountReadiness() throws Exception {
+        var ctx = onboardedCase();
+        jdbc.update("UPDATE patient_profiles SET account_status='SETUP_PENDING' WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", ctx.caseId);
+        assertThat(readiness.compute(ctx.caseId).accountActivated()).isFalse();
+        assertThat(readiness.compute(ctx.caseId).blockingItems()).extracting(BlockingItem::code).contains("ACCOUNT_NOT_ACTIVATED");
+    }
+
+    @Test void missingOnboardingReadDoesNotInventProgressEvidence() throws Exception {
+        var ctx = onboardedCase();
+        jdbc.update("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
+        jdbc.update("UPDATE medical_cases SET status='TRAVEL_COORDINATION' WHERE id=?", ctx.caseId);
+        authenticate(ctx.patientSubject, Role.PATIENT);
+        assertThatThrownBy(() -> onboarding.myOnboarding(ctx.caseId))
+                .isInstanceOf(ApiException.class).hasMessageContaining("no onboarding");
+        assertThat(count("SELECT count(*) FROM patient_onboardings WHERE case_id=?", ctx.caseId)).isZero();
     }
 
     // ================= helpers =================
@@ -291,7 +308,9 @@ class PatientConversionLayerTest {
         cases.submit(created.caseId()); em.flush(); em.clear();
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
         authenticate("coordinator-subject", Role.COORDINATOR);
-        journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject"))
+            journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "ready", v));
         seedDoctor(); seedStaff();
@@ -328,7 +347,7 @@ class PatientConversionLayerTest {
         var ctx = releasePreliminary(whatsapp, email);
         acknowledge(ctx);
         authenticate(patientSubject, Role.PATIENT);
-        journey.activateAccount(activationToken(ctx.caseId));
+        startAuthenticatedAccount(ctx, patientSubject);
         em.flush(); SecurityContextHolder.clearContext();
         return new Ctx(ctx.caseId, ctx.versionId, ctx.token, ctx.caseNumber, patientSubject);
     }
@@ -373,7 +392,10 @@ class PatientConversionLayerTest {
     private String proposalCode(String token, String channel) throws Exception { String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN proposal_access_challenges ch ON o.idempotency_key='proposal-access:'||ch.id JOIN proposal_share_tokens st ON st.id=ch.share_token_id WHERE st.token_hash=? AND o.channel=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(token), channel)); return json.readValue(raw, new TypeReference<Map<String, String>>() {}).get("code"); }
     private String activeChannel(UUID caseId) { return jdbc.queryForObject("SELECT delivery_channel FROM proposal_access_challenges WHERE case_id=? AND revoked_at IS NULL AND consumed_at IS NULL", String.class, caseId); }
     /** The binding credential is internal now - no customer message carries it, so the test asks for it directly. */
-    private String activationToken(UUID caseId) { UUID patientId = jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?", UUID.class, caseId); return accountActivations.issue(patientId, caseId); }
+    private void startAuthenticatedAccount(Ctx ctx, String subject) {
+        jdbc.update("UPDATE patient_profiles SET external_subject=?,account_status='SETUP_PENDING',profile_status='ACTIVE',profile_completed_at=CURRENT_TIMESTAMP WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", subject, ctx.caseId);
+        accounts.session();
+    }
     private Instant verifiedAt(UUID caseId, String column) { return jdbc.queryForObject("SELECT " + column + " FROM patient_profiles WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", Instant.class, caseId); }
     private UUID depositId(UUID caseId) { return jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, caseId); }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }

@@ -15,7 +15,7 @@ const active = { status: "ACTIVE", emailHint: "li***@local.test", awaitingEmail:
 
 const prefill = {
   caseNumber: "RS-2026-000123", caseStatus: "ACCEPTED", onboardingState: "IN_PROGRESS", profileActive: false, accountLinked: false, account: notProvisioned,
-  givenName: "Link", familyName: "Patient", preferredName: null, legacyFullName: null, nameConfirmationRequired: false,
+  givenName: "Link", familyName: "Patient", preferredName: null,
   candidateEmail: "link@local.test", emailVerified: false,
   knownMobile: "+254700000020", mobileOwner: "PATIENT", phoneVerified: true,
   dateOfBirth: null, nationality: null, countryOfResidence: "KE", preferredLanguage: "en", sex: null,
@@ -144,12 +144,6 @@ describe("ProfileActivation", () => {
     expect(screen.getByLabelText(/^email address/i)).toBeTruthy();
   });
 
-  it("asks a legacy patient to confirm their name instead of splitting it", async () => {
-    await reachForm({}, { givenName: null, familyName: null, legacyFullName: "Maria da Silva Santos", nameConfirmationRequired: true });
-    expect(screen.getByText(/we never split names automatically/i)).toBeTruthy();
-    expect((screen.getByLabelText(/given name/i) as HTMLInputElement).value).toBe("");
-  });
-
   it("shows backend field errors against the right fields and keeps entered data", async () => {
     await reachForm({
       "/activate": () => json({
@@ -222,7 +216,7 @@ describe("ProfileActivation", () => {
     Object.defineProperty(window, "location", { configurable: true, value: { href: "/en/activate/tok-000", assign } });
     await reachForm({
       "/activate": () => json(completed(active, { caseStatus: "TRAVEL_COORDINATION", currentAction: "CONTINUE_IN_PORTAL", journeyStage: "CARE_COORDINATION", deposit: { ...deposit, status: "PAID", satisfied: true, amountPaid: 3000, balance: 0 } })),
-      "/portal-access": () => json({ activationToken: null, alreadyLinked: true, account: active, caseId: "case-1" }),
+      "/portal-access": () => json({ alreadyLinked: true, account: active, caseId: "case-1" }),
     });
     await fillRequired();
     submit();
@@ -231,17 +225,19 @@ describe("ProfileActivation", () => {
     await waitFor(() => expect(assign).toHaveBeenCalledWith("/en/portal?case=case-1&signin=1"));
   });
 
-  it("still hands a legacy account-less profile its one-time binding", async () => {
+  it("returns to account setup when the portal handoff awaits account setup email", async () => {
     const assign = vi.fn();
     Object.defineProperty(window, "location", { configurable: true, value: { href: "/en/activate/tok-000", assign } });
     await reachForm({
       "/activate": () => json(completed(notProvisioned, { currentAction: "CONTINUE_IN_PORTAL", journeyStage: "CARE_COORDINATION", deposit: { ...deposit, satisfied: true } })),
-      "/portal-access": () => json({ activationToken: "bind-123", alreadyLinked: false, account: notProvisioned, caseId: "case-1" }),
+      "/portal-access": () => json({ alreadyLinked: false, account: setupPending, caseId: "case-1" }),
     });
     await fillRequired();
     submit();
     fireEvent.click(await screen.findByRole("button", { name: /go to my case/i }));
-    await waitFor(() => expect(assign).toHaveBeenCalledWith("/en/portal?case=case-1&activate=bind-123"));
+    expect(await screen.findByRole("heading", { name: /profile information is complete/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /resend setup link/i })).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it("reports an invalid or expired link without exposing anything else", async () => {

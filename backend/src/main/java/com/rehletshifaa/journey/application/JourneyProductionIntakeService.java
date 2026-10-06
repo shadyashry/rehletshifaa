@@ -2,7 +2,8 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.shared.audit.GovernanceAuditLog;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
-import com.rehletshifaa.journey.application.JourneyAdmissionDecisionService.Decision;
+import com.rehletshifaa.journey.domain.JourneyAdmission.Decision;
+import com.rehletshifaa.journey.domain.JourneyAdmission.Authority;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository.Admission;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
@@ -14,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -29,7 +29,7 @@ import java.time.Clock;
 import java.time.Instant;
 
 /**
- * Phase 7A — the real production Journey intake hook; Phase 7B — governed by the cutover policy. Reacts to the
+ * Selects the current intake authority under the database admission policy. Reacts to the
  * same {@link IntakeEvents.CaseSubmitted} event {@link PatientAccountService#onCaseSubmitted} already listens to,
  * published inside {@code CaseService.submit()}'s own transaction (DRAFT to RECEIVED). A plain (non-async)
  * {@code @EventListener} runs synchronously in that call and, being {@code @Transactional} with default REQUIRED
@@ -43,10 +43,10 @@ import java.time.Instant;
  *
  * <p>Order of an admission attempt: already admitted or bound → no-op (idempotent redelivery). Otherwise the
  * database policy is read under the shared governance lock and one decision is persisted as immutable evidence.
- * A missing or paused policy records a LEGACY decision, preventing a replay after later activation from adopting an
- * already-submitted case. A LEGACY decision never fails the submission. A JOURNEY decision
+ * A missing or paused policy records a COORDINATION decision and routes or durably queues the case, preventing a
+ * replay after later activation from changing authority. A JOURNEY decision
  * binds, starts and projects; any failure there propagates and rolls back the whole submission (the case returns
- * to DRAFT with no admission, binding or instance) — it is never silently re-routed to legacy. The failure itself
+ * to DRAFT with no admission, binding or instance). The failure itself
  * is recorded in a separate transaction so operators can see it after the rollback.
  */
 @Service
@@ -61,7 +61,7 @@ public class JourneyProductionIntakeService {
     private final ObjectProvider<JourneyRuntimePort> runtimes;
     private final JourneyProjectionService projections;
     private final GovernanceAuditLog audit;
-    private final JdbcClient jdbc;
+    private final CoordinatorRoutingPort routing;
     private final TransactionTemplate separate;
     private final MeterRegistry meters;
     private final Clock clock;
@@ -70,9 +70,9 @@ public class JourneyProductionIntakeService {
             com.rehletshifaa.journey.infrastructure.JourneyDefinitionRepository definitions,
             JourneyDeploymentRepository deployments, JourneyCaseBindingRepository bindings, JourneyCaseAdmissionRepository admissions,
             ObjectProvider<JourneyRuntimePort> runtimes, JourneyProjectionService projections, GovernanceAuditLog audit,
-            JdbcClient jdbc, PlatformTransactionManager transactions, MeterRegistry meters, Clock clock) {
+            CoordinatorRoutingPort routing, PlatformTransactionManager transactions, MeterRegistry meters, Clock clock) {
         this.policies=policies; this.definitions=definitions; this.deployments = deployments; this.bindings = bindings;
-        this.admissions = admissions; this.runtimes = runtimes; this.projections = projections; this.audit = audit; this.jdbc = jdbc;
+        this.admissions = admissions; this.runtimes = runtimes; this.projections = projections; this.audit = audit; this.routing = routing;
         this.separate = new TransactionTemplate(transactions);
         this.separate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.meters = meters;
@@ -87,32 +87,28 @@ public class JourneyProductionIntakeService {
 
     /** New-case-only: a case already admitted or bound (any mode) is never re-evaluated — authority never switches. */
     void admitIfEligible(UUID caseId) {
-        var policy = policies.currentForAdmission(); // also holds the governance lock, linearizing this decision with pause/activation
+        String careCategory = admissions.lockCareCategory(caseId);
         if (admissions.find(caseId).isPresent() || bindings.findByCase(caseId).isPresent()) return; // duplicate delivery
+        var policy = policies.currentForAdmission(); // case → governance → routing; linearizes pause and activation
 
         var runtime = runtimes.getIfAvailable();
-        var row = jdbc.sql("SELECT care_category FROM medical_cases WHERE id=?").param(caseId)
-                .query((r, n) -> java.util.Optional.ofNullable(r.getString("care_category"))).optional();
-        boolean present = row.isPresent();
-        String careCategory = row.flatMap(c -> c).orElse(null);
         Instant evaluatedAt=clock.instant();
         Decision decision;
-        if (!present) decision=new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,"CONTEXT_INCOMPLETE",policy==null?null:policy.id().toString(),policy==null?"db:none":policy.revisionToken(),null,careCategory,evaluatedAt);
-        else if (policy==null || !"ACTIVE".equals(policy.state())) decision=new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,"ADMISSION_NOT_ACTIVE",policy==null?null:policy.id().toString(),policy==null?"db:none":policy.revisionToken(),null,careCategory,evaluatedAt);
-        else if (!policy.matches(careCategory)) decision=new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,"POLICY_NO_MATCH",policy.id().toString(),policy.revisionToken(),null,careCategory,evaluatedAt);
-        else if (runtime==null) decision=new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,"RUNTIME_DISABLED",policy.id().toString(),policy.revisionToken(),null,careCategory,evaluatedAt);
+        if (policy==null || !"ACTIVE".equals(policy.state())) decision=new Decision(Authority.COORDINATION,"ADMISSION_NOT_ACTIVE",policy==null?null:policy.id().toString(),policy==null?"db:none":policy.revisionToken(),null,careCategory,evaluatedAt);
+        else if (!policy.matches(careCategory)) decision=new Decision(Authority.COORDINATION,"POLICY_NO_MATCH",policy.id().toString(),policy.revisionToken(),null,careCategory,evaluatedAt);
+        else if (runtime==null) decision=new Decision(Authority.COORDINATION,"RUNTIME_DISABLED",policy.id().toString(),policy.revisionToken(),null,careCategory,evaluatedAt);
         else {
             var version=definitions.version(policy.journeyVersionId());
             String ready=policies.exactReadiness(version.id());
             decision="DEPLOYED".equals(ready)
-                    ? new Decision(JourneyAdmissionDecisionService.Authority.JOURNEY,"POLICY_MATCHED",policy.id().toString(),policy.revisionToken(),version,careCategory,evaluatedAt)
-                    : new Decision(JourneyAdmissionDecisionService.Authority.LEGACY,ready,policy.id().toString(),policy.revisionToken(),null,careCategory,evaluatedAt);
+                    ? new Decision(Authority.JOURNEY,"POLICY_MATCHED",policy.id().toString(),policy.revisionToken(),version,careCategory,evaluatedAt)
+                    : new Decision(Authority.COORDINATION,ready,policy.id().toString(),policy.revisionToken(),null,careCategory,evaluatedAt);
         }
-        if (!present) { count(decision); return; } // nothing to attach evidence to (FK): counted, not stored
 
         if (!decision.journey()) {
             record(caseId, decision);
-            audit.record("SYSTEM", caseId.toString(), "LEGACY_ADMISSION_SELECTED", "SUCCESS", evidence(decision));
+            routing.routeCoordinationIntake(caseId);
+            audit.record("SYSTEM", caseId.toString(), "COORDINATION_ADMISSION_SELECTED", "SUCCESS", evidence(decision));
             count(decision);
             return;
         }

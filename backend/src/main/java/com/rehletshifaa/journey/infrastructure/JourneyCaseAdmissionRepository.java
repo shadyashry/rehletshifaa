@@ -21,6 +21,18 @@ public class JourneyCaseAdmissionRepository {
 
     public JourneyCaseAdmissionRepository(JdbcClient jdbc) { this.jdbc = jdbc; }
 
+    /** First lock in every admission/routing operation, also reentrant from CaseService.submit. */
+    public String lockCareCategory(UUID caseId) {
+        return jdbc.sql("SELECT care_category FROM medical_cases WHERE id=? FOR UPDATE").param(caseId)
+                .query((r, n) -> java.util.Optional.ofNullable(r.getString(1))).optional()
+                .orElseThrow(() -> new com.rehletshifaa.shared.api.ApiException(404, "CASE_NOT_FOUND", "Case was not found"))
+                .orElse(null);
+    }
+
+    public boolean caseExists(UUID caseId) {
+        return jdbc.sql("SELECT count(*) FROM medical_cases WHERE id=?").param(caseId).query(Long.class).single() == 1;
+    }
+
     public void insert(Admission a) {
         jdbc.sql("INSERT INTO journey_case_admissions(case_id,decision,reason,policy_id,policy_revision,journey_version_id,care_category,evaluated_at) VALUES(?,?,?,?,?,?,?,?)")
                 .params(a.caseId(), a.decision(), a.reason(), a.policyId(), a.policyRevision(), a.journeyVersionId(), a.careCategory(), timestamp(a.evaluatedAt())).update();

@@ -41,7 +41,7 @@ export function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale })
   return (
     <section className="promise-section canvas-clinical py-[clamp(2.5rem,1.9rem+1.8vw,3.75rem)]">
       <div className="container-site grid gap-8 sm:gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-16">
-        <div className="lg:sticky lg:top-24 lg:pt-1">
+        <div className="lg:pt-1">
           <p className="eyebrow">{p.eyebrow}</p>
           <h2 className="headline mt-2 max-w-[14ch] font-bold rtl:max-w-[30ch] [text-wrap:balance]">{p.title}</h2>
           <p className="mt-4 max-w-[44ch] text-[1.0625rem] leading-7 text-ink-700 [text-wrap:pretty] sm:mt-5 sm:leading-[1.7]">{p.body}</p>

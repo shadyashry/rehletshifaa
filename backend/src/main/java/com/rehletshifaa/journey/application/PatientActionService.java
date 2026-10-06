@@ -305,7 +305,7 @@ public class PatientActionService {
     }
     private String encrypt(String value) { return "enc:" + crypto.encrypt(value); }
     private String encryptNullable(String value) { return value == null || value.isBlank() ? null : "enc:" + crypto.encrypt(value.trim()); }
-    private String decrypt(String value) { return value == null ? null : value.startsWith("enc:") ? crypto.decrypt(value.substring(4)) : value; }
+    private String decrypt(String value) { return com.rehletshifaa.shared.crypto.EncryptedText.decodeNullable(crypto, value); }
 
     private void audit(UUID caseId, String type, String subject, String role, UUID entityId, String reason) {
         jdbc.sql("INSERT INTO audit_events(id,event_type,actor_subject,actor_role,case_id,entity_type,entity_id,action,outcome,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")

@@ -35,7 +35,7 @@ const prefill = {
   caseNumber: "RS-2026-000930", caseStatus: "ACCEPTED", onboardingState: "IN_PROGRESS", profileActive: false, accountLinked: false,
   account: { status: "NOT_PROVISIONED", emailHint: null, awaitingEmail: false, emailSent: false },
   currentAction: "COMPLETE_PROFILE", journeyStage: "PROFILE", waitingOn: "STAFF",
-  givenName: "Synthetic", familyName: "Patient", preferredName: null, legacyFullName: null, nameConfirmationRequired: false,
+  givenName: "Synthetic", familyName: "Patient", preferredName: null,
   candidateEmail: "synthetic@local.test", emailVerified: false, knownMobile: "+201000000930", mobileOwner: "PATIENT", phoneVerified: true,
   dateOfBirth: "1985-04-02", nationality: "EG", countryOfResidence: "EG", preferredLanguage: "en", sex: "MALE",
   submittedBy: "PATIENT", representativeName: null, representativeRelationship: null,

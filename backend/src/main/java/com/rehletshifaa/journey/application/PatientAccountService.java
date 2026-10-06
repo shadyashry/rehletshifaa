@@ -196,7 +196,7 @@ public class PatientAccountService {
         UUID currentCase = a == null ? null : jdbc.sql("SELECT id FROM medical_cases WHERE patient_id=? AND status NOT IN ('CLOSED','CANCELLED','DECLINED','EXPIRED') ORDER BY CASE WHEN waiting_on='PATIENT' THEN 0 ELSE 1 END,updated_at DESC LIMIT 1")
                 .param(a.patientId()).query(UUID.class).optional().orElse(null);
         int pendingLinks = claim == null ? 0 : count("SELECT count(*) FROM patient_account_link_requests WHERE email=? AND consumed_at IS NULL AND expires_at>?", claim.email(), timestamp(now));
-        return new AccountSessionView(a != null, a == null ? null : a.patientId(), a == null ? null : PatientNames.display(a.givenName(), a.familyName(), a.fullName()),
+        return new AccountSessionView(a != null, a == null ? null : a.patientId(), a == null ? null : PatientNames.display(a.givenName(), a.familyName()),
                 a == null ? "NOT_PROVISIONED" : a.accountStatus(), currentCase, pendingLinks);
     }
 
@@ -246,10 +246,10 @@ public class PatientAccountService {
     public AccountLinkRequestView linkRequest(String token) {
         var actor = authority.authorize(Permission.ACCOUNT_BINDING);
         LinkRequest r = requireLink(token, actor);
-        record C(String caseNumber, String givenName, String familyName, String fullName, String role, String relationship) {}
-        C c = jdbc.sql("SELECT c.case_number,p.given_name,p.family_name,p.full_name,sc.contact_role,sc.relationship_to_patient FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id LEFT JOIN case_submission_contacts sc ON sc.case_id=c.id WHERE c.id=?")
-                .param(r.caseId()).query((rs, n) -> new C(rs.getString("case_number"), rs.getString("given_name"), rs.getString("family_name"), rs.getString("full_name"), rs.getString("contact_role"), rs.getString("relationship_to_patient"))).single();
-        return new AccountLinkRequestView(c.caseNumber(), PatientNames.display(c.givenName(), c.familyName(), c.fullName()), r.origin(),
+        record C(String caseNumber, String givenName, String familyName, String role, String relationship) {}
+        C c = jdbc.sql("SELECT c.case_number,p.given_name,p.family_name,sc.contact_role,sc.relationship_to_patient FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id LEFT JOIN case_submission_contacts sc ON sc.case_id=c.id WHERE c.id=?")
+                .param(r.caseId()).query((rs, n) -> new C(rs.getString("case_number"), rs.getString("given_name"), rs.getString("family_name"), rs.getString("contact_role"), rs.getString("relationship_to_patient"))).single();
+        return new AccountLinkRequestView(c.caseNumber(), PatientNames.display(c.givenName(), c.familyName()), r.origin(),
                 c.role() == null ? "PATIENT" : c.role(), c.relationship(), r.resolution());
     }
 
@@ -324,7 +324,6 @@ public class PatientAccountService {
     private void mergePatient(UUID from, UUID into, Instant now) {
         for (String table : List.of("medical_cases", "case_submission_contacts", "case_access_links", "consent_records", "patient_onboardings", "patient_identity_verifications", "case_claim_challenges"))
             jdbc.sql("UPDATE " + table + " SET patient_id=? WHERE patient_id=?").params(into, from).update();
-        jdbc.sql("DELETE FROM account_activations WHERE patient_id=?").param(from).update();
         jdbc.sql("DELETE FROM patient_representatives WHERE patient_id=? AND representative_subject IN (SELECT representative_subject FROM patient_representatives WHERE patient_id=?)").params(from, into).update();
         jdbc.sql("UPDATE patient_representatives SET patient_id=? WHERE patient_id=?").params(into, from).update();
         jdbc.sql("UPDATE patient_account_link_requests SET patient_id=? WHERE patient_id=? AND email NOT IN (SELECT email FROM patient_account_link_requests WHERE patient_id=?)").params(into, from, into).update();
@@ -386,10 +385,10 @@ public class PatientAccountService {
     @Transactional(readOnly = true)
     public PatientProfileView myProfile() {
         var actor = authority.authorize(Permission.PATIENT_SELF_SERVICE);
-        return jdbc.sql("SELECT given_name,family_name,full_name,preferred_name,date_of_birth,country,nationality,preferred_language,email,email_verified_at,whatsapp_number,phone_verified_at,account_status FROM patient_profiles WHERE external_subject=? AND merged_into_patient_id IS NULL")
+        return jdbc.sql("SELECT given_name,family_name,preferred_name,date_of_birth,country,nationality,preferred_language,email,email_verified_at,whatsapp_number,phone_verified_at,account_status FROM patient_profiles WHERE external_subject=? AND merged_into_patient_id IS NULL")
                 .param(actor.subject())
                 .query((rs, n) -> new PatientProfileView(rs.getString("given_name"), rs.getString("family_name"),
-                        PatientNames.display(rs.getString("given_name"), rs.getString("family_name"), rs.getString("full_name")), rs.getString("preferred_name"),
+                        PatientNames.display(rs.getString("given_name"), rs.getString("family_name")), rs.getString("preferred_name"),
                         rs.getObject("date_of_birth", java.time.LocalDate.class), rs.getString("country"), rs.getString("nationality"), rs.getString("preferred_language"),
                         rs.getString("email"), rs.getObject("email_verified_at") != null, rs.getString("whatsapp_number"), rs.getObject("phone_verified_at") != null, rs.getString("account_status")))
                 .optional().orElseThrow(() -> new ApiException(404, "PATIENT_PROFILE_NOT_FOUND", "No patient profile is linked to this account"));
@@ -402,11 +401,11 @@ public class PatientAccountService {
         return jdbc.sql("SELECT " + COLUMNS + " FROM patient_profiles WHERE id=?").param(patientId).query(this::mapAccount).optional()
                 .orElseThrow(() -> new ApiException(404, "PATIENT_NOT_FOUND", "Patient profile was not found"));
     }
-    private static final String COLUMNS = "id,external_subject,account_status,account_setup_requested_at,email,email_verified_at,given_name,family_name,full_name";
-    private record Account(UUID patientId, String subject, String accountStatus, Instant setupRequestedAt, String email, Instant emailVerifiedAt, String givenName, String familyName, String fullName) {}
+    private static final String COLUMNS = "id,external_subject,account_status,account_setup_requested_at,email,email_verified_at,given_name,family_name";
+    private record Account(UUID patientId, String subject, String accountStatus, Instant setupRequestedAt, String email, Instant emailVerifiedAt, String givenName, String familyName) {}
     private Account mapAccount(ResultSet rs, int n) throws SQLException {
         return new Account(rs.getObject("id", UUID.class), rs.getString("external_subject"), rs.getString("account_status"), instantNullable(rs, "account_setup_requested_at"),
-                rs.getString("email"), instantNullable(rs, "email_verified_at"), rs.getString("given_name"), rs.getString("family_name"), rs.getString("full_name"));
+                rs.getString("email"), instantNullable(rs, "email_verified_at"), rs.getString("given_name"), rs.getString("family_name"));
     }
     private record LinkRequest(UUID id, UUID patientId, UUID caseId, String email, String origin, Instant expiresAt, Instant consumedAt, String resolution, String resolvedSubject) {}
     private LinkRequest mapLink(ResultSet rs, int n) throws SQLException {

@@ -45,17 +45,16 @@ public class PatientActivationService {
     private final PaymentService payment;
     private final CustomerReadinessService readiness;
     private final CaseHandoffService handoff;
-    private final AccountActivationService accounts;
     private final PatientAccountService account;
     private final CaseActionService caseActions;
     private final Clock clock;
 
     public PatientActivationService(JdbcClient jdbc, PublicCaseAccessService access, PaymentService payment,
                                     CustomerReadinessService readiness, CaseHandoffService handoff,
-                                    AccountActivationService accounts, PatientAccountService account,
+                                    PatientAccountService account,
                                     CaseActionService caseActions, Clock clock) {
         this.jdbc = jdbc; this.access = access; this.payment = payment; this.readiness = readiness;
-        this.handoff = handoff; this.accounts = accounts; this.account = account; this.caseActions = caseActions; this.clock = clock;
+        this.handoff = handoff; this.account = account; this.caseActions = caseActions; this.clock = clock;
     }
 
     /**
@@ -63,8 +62,7 @@ public class PatientActivationService {
      *
      * <p>Same verified onboarding grant, and only once the profile is complete. A patient whose account was
      * provisioned through the identity provider simply signs in ({@code alreadyLinked}); one whose setup is
-     * still in their inbox is told so. Only a legacy profile that predates provider-owned provisioning (no
-     * account at all) receives the old single-use binding credential.
+     * still in their inbox is told so. Missing setup must be resumed through the identity provider.
      */
     @Transactional
     public PortalHandoff portalAccess(String token, String grant) {
@@ -73,10 +71,9 @@ public class PatientActivationService {
         if (!"ACTIVE".equals(current.status()))
             throw new ApiException(409, "PROFILE_NOT_ACTIVE", "Please complete your profile before opening your portal");
         AccountSetup state = account.state(ctx.patientId());
-        if (state.status() == AccountStatus.ACTIVE || current.subject() != null) return new PortalHandoff(null, true, state, ctx.caseId().toString());
-        if (state.awaitingEmail()) return new PortalHandoff(null, false, state, ctx.caseId().toString());
-        String issued = accounts.issue(ctx.patientId(), ctx.caseId());
-        return new PortalHandoff(issued, issued == null, state, ctx.caseId().toString());
+        if (state.status() == AccountStatus.ACTIVE || current.subject() != null) return new PortalHandoff(true, state, ctx.caseId().toString());
+        if (state.awaitingEmail()) return new PortalHandoff(false, state, ctx.caseId().toString());
+        throw new ApiException(409, "ACCOUNT_SETUP_NOT_STARTED", "Resume profile submission to start your identity-provider account setup");
     }
 
     /** Pre-filled onboarding state for a verified grant. Never exposes another patient's data. */
@@ -114,15 +111,11 @@ public class PatientActivationService {
         UUID caseId = ctx.caseId(), patientId = ctx.patientId();
 
         Profile current = loadProfileForUpdate(patientId);
+        OnboardingState onboarding = requireCurrentOnboarding(caseId);
         Submission sub = submission(caseId);
         if ("ACTIVE".equals(current.status())) {
             // Replay after completion: only the account side may still need resuming (never re-provisioned).
-            // A legacy profile (complete, but never given an account) may supply its account email now.
-            String email = normalizeEmail(request == null ? null : request.email());
-            if (email != null && current.subject() == null && EMAIL.matcher(email).matches() && !email.equals(normalizeEmail(current.email())))
-                jdbc.sql("UPDATE patient_profiles SET email=?,email_verified_at=NULL,updated_at=?,version=version+1 WHERE id=? AND external_subject IS NULL")
-                        .params(email, timestamp(clock.instant()), patientId).update();
-            AccountSetup state = account.ensureAccount(patientId, caseId, email != null && current.subject() == null ? email : current.email(), current.language());
+            AccountSetup state = account.ensureAccount(patientId, caseId, current.email(), current.language());
             return result(caseId, patientId, state);
         }
 
@@ -135,12 +128,11 @@ public class PatientActivationService {
         // A number that is another active account's VERIFIED personal mobile is never silently re-verified for
         // a different patient: it stays an unverified contact here until resolved through a controlled path.
         boolean phoneClaimedElsewhere = clean.phone() != null && verifiedElsewhere(patientId, clean.phone());
-        jdbc.sql("UPDATE patient_profiles SET given_name=?,family_name=?,preferred_name=?,name_source='STRUCTURED',full_name=?,email=?,whatsapp_number=?,mobile_owner=?,country=?,nationality=?,date_of_birth=?,sex=?,preferred_language=?,"
+        jdbc.sql("UPDATE patient_profiles SET given_name=?,family_name=?,preferred_name=?,email=?,whatsapp_number=?,mobile_owner=?,country=?,nationality=?,date_of_birth=?,sex=?,preferred_language=?,"
                         + "email_verified_at=CASE WHEN ? THEN NULL ELSE email_verified_at END,"
                         + "phone_verified_at=CASE WHEN ? THEN NULL ELSE phone_verified_at END,"
                         + "profile_status='ACTIVE',profile_completed_at=COALESCE(profile_completed_at,?),activated_at=COALESCE(activated_at,?),updated_at=?,version=version+1 WHERE id=? AND profile_status<>'ACTIVE'")
-                .params(clean.givenName(), clean.familyName(), clean.preferredName(), PatientNames.display(clean.givenName(), clean.familyName(), current.fullName()),
-                        clean.email(), clean.phone(), clean.phone() == null ? null : "PATIENT", clean.countryName(), clean.nationality(),
+                .params(clean.givenName(), clean.familyName(), clean.preferredName(), clean.email(), clean.phone(), clean.phone() == null ? null : "PATIENT", clean.countryName(), clean.nationality(),
                         clean.dateOfBirth(), clean.sex(), clean.language(), emailChanged, phoneChanged || phoneClaimedElsewhere,
                         timestamp(now), timestamp(now), timestamp(now), patientId)
                 .update();
@@ -149,7 +141,7 @@ public class PatientActivationService {
             jdbc.sql("UPDATE case_submission_contacts SET contact_role='REPRESENTATIVE',contact_name=NULL WHERE case_id=? AND whatsapp_number IS NOT NULL AND whatsapp_number<>COALESCE(?, '')").params(caseId, clean.phone()).update();
 
         recordConsents(patientId, caseId, clean.consents(), clean.language(), now);
-        completeOnboarding(caseId, now);
+        completeOnboarding(onboarding, now);
         audit(caseId, "PATIENT_PROFILE_ACTIVATED", patientId, "Profile completed from secure onboarding link");
         // When no deposit is due (policy amount zero, already paid, or waived) the journey continues now.
         if (payment.depositSatisfied(caseId)) handoff.onDepositSettled(caseId);
@@ -256,20 +248,22 @@ public class PatientActivationService {
         }
     }
 
-    /** Complete the existing onboarding record (creating it only if acceptance predates this layer). */
-    private void completeOnboarding(UUID caseId, Instant now) {
-        int changed = jdbc.sql("UPDATE patient_onboardings SET state='COMPLETED',submitted_at=COALESCE(submitted_at,?),completed_at=COALESCE(completed_at,?),updated_at=?,version=version+1 "
-                        + "WHERE case_id=? AND state NOT IN ('COMPLETED','CANCELLED','LEGACY_EXEMPT')")
-                .params(timestamp(now), timestamp(now), timestamp(now), caseId).update();
-        if (changed > 0) return;
-        Integer any = jdbc.sql("SELECT count(*) FROM patient_onboardings WHERE case_id=?").param(caseId).query(Integer.class).single();
-        if (any != null && any > 0) return;
-        UUID patientId = jdbc.sql("SELECT patient_id FROM medical_cases WHERE id=?").param(caseId).query(UUID.class).single();
-        UUID versionId = jdbc.sql("SELECT pv.id FROM proposal_versions pv JOIN proposals p ON p.id=pv.proposal_id WHERE p.case_id=? AND pv.document_type='PRELIMINARY_ESTIMATE' AND pv.status='ACCEPTED' ORDER BY pv.version_number DESC LIMIT 1")
-                .param(caseId).query(UUID.class).optional().orElse(null);
-        jdbc.sql("INSERT INTO patient_onboardings(id,patient_id,case_id,proposal_version_id,state,started_at,submitted_at,completed_at,expires_at,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)")
-                .params(UUID.randomUUID(), patientId, caseId, versionId, "COMPLETED", timestamp(now), timestamp(now), timestamp(now),
-                        timestamp(now.plus(Duration.ofDays(45))), timestamp(now), timestamp(now)).update();
+    private record OnboardingState(UUID id, String state) {}
+
+    private OnboardingState requireCurrentOnboarding(UUID caseId) {
+        OnboardingState onboarding = jdbc.sql("SELECT id,state FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1 FOR UPDATE")
+                .param(caseId).query((rs, n) -> new OnboardingState(rs.getObject("id", UUID.class), rs.getString("state"))).optional()
+                .orElseThrow(() -> new ApiException(409, "ONBOARDING_NOT_STARTED", "Ask your coordinator to start onboarding from your acknowledged estimate"));
+        if (!Set.of("IN_PROGRESS", "IDENTITY_REVIEW", "COMPLETED").contains(onboarding.state()))
+            throw new ApiException(409, "ONBOARDING_NOT_ACTIVE", "Your onboarding is no longer active. Contact your coordinator to resume it");
+        return onboarding;
+    }
+
+    /** Complete only the current onboarding created by estimate acknowledgement. */
+    private void completeOnboarding(OnboardingState onboarding, Instant now) {
+        if ("COMPLETED".equals(onboarding.state())) return;
+        jdbc.sql("UPDATE patient_onboardings SET state='COMPLETED',submitted_at=COALESCE(submitted_at,?),completed_at=COALESCE(completed_at,?),updated_at=?,version=version+1 WHERE id=?")
+                .params(timestamp(now), timestamp(now), timestamp(now), onboarding.id()).update();
     }
 
     // ---- views ----
@@ -281,7 +275,7 @@ public class PatientActivationService {
         String onboarding = jdbc.sql("SELECT state FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1").param(caseId).query(String.class).optional().orElse(null);
         DepositSummary deposit = depositSummary(caseId);
         boolean active = "ACTIVE".equals(p.status());
-        return new ActivationResult(active, accounts.linked(patientId), state, c.number(), c.status(), onboarding, deposit,
+        return new ActivationResult(active, p.subject() != null, state, c.number(), c.status(), onboarding, deposit,
                 journeyStage(active, state, deposit), currentAction(active, state, deposit), waitingOn(caseId));
     }
 
@@ -304,9 +298,8 @@ public class PatientActivationService {
         // The number we hold: the patient's when they have one, otherwise the submitter's, with its owner.
         String knownMobile = p.phone() != null ? p.phone() : sub == null ? null : sub.whatsapp();
         String mobileOwner = p.phone() != null ? p.mobileOwner() : (sub != null && "REPRESENTATIVE".equals(sub.role())) ? "REPRESENTATIVE" : null;
-        boolean legacyName = "LEGACY_FULL_NAME".equals(p.nameSource()) || p.givenName() == null;
-        return new OnboardingPrefill(c.number(), c.status(), onboarding, active, accounts.linked(patientId), state,
-                p.givenName(), p.familyName(), p.preferredName(), legacyName ? p.fullName() : null, legacyName,
+        return new OnboardingPrefill(c.number(), c.status(), onboarding, active, p.subject() != null, state,
+                p.givenName(), p.familyName(), p.preferredName(),
                 candidateEmail, p.emailVerified(), knownMobile, mobileOwner, p.phoneVerified() && p.phone() != null,
                 p.dateOfBirth(), p.nationality(), Countries.toCode(p.country()).orElse(null), p.language(), p.sex(),
                 submittedBySelf ? "PATIENT" : "REPRESENTATIVE", submittedBySelf ? null : sub.name(), submittedBySelf ? null : sub.relationship(),
@@ -351,13 +344,13 @@ public class PatientActivationService {
     }
 
     // ---- data access ----
-    private record Profile(UUID patientId, String status, String subject, String fullName, String givenName, String familyName, String preferredName, String nameSource,
+    private record Profile(UUID patientId, String status, String subject, String givenName, String familyName, String preferredName,
                            String email, String phone, String mobileOwner, String country, String nationality, LocalDate dateOfBirth, String sex, String language,
                            boolean emailVerified, boolean phoneVerified) {}
     private record Submission(String role, String name, String relationship, String email, String whatsapp) {}
 
     private static final String PROFILE_COLUMNS =
-            "id,profile_status,external_subject,full_name,given_name,family_name,preferred_name,name_source,email,whatsapp_number,mobile_owner,country,nationality,date_of_birth,sex,preferred_language,email_verified_at,phone_verified_at";
+            "id,profile_status,external_subject,given_name,family_name,preferred_name,email,whatsapp_number,mobile_owner,country,nationality,date_of_birth,sex,preferred_language,email_verified_at,phone_verified_at";
 
     private Profile loadProfile(UUID patientId) {
         return jdbc.sql("SELECT " + PROFILE_COLUMNS + " FROM patient_profiles WHERE id=?").param(patientId)
@@ -368,8 +361,8 @@ public class PatientActivationService {
                 .query(this::mapProfile).optional().orElseThrow(() -> new ApiException(404, "PATIENT_NOT_FOUND", "Patient profile was not found"));
     }
     private Profile mapProfile(ResultSet rs, int n) throws SQLException {
-        return new Profile(rs.getObject("id", UUID.class), rs.getString("profile_status"), rs.getString("external_subject"), rs.getString("full_name"),
-                rs.getString("given_name"), rs.getString("family_name"), rs.getString("preferred_name"), rs.getString("name_source"),
+        return new Profile(rs.getObject("id", UUID.class), rs.getString("profile_status"), rs.getString("external_subject"),
+                rs.getString("given_name"), rs.getString("family_name"), rs.getString("preferred_name"),
                 rs.getString("email"), rs.getString("whatsapp_number"), rs.getString("mobile_owner"), rs.getString("country"), rs.getString("nationality"),
                 rs.getObject("date_of_birth", LocalDate.class), rs.getString("sex"), rs.getString("preferred_language"),
                 rs.getObject("email_verified_at") != null, rs.getObject("phone_verified_at") != null);

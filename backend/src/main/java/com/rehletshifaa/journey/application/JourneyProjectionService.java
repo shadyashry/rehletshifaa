@@ -57,19 +57,18 @@ public class JourneyProjectionService {
     private final Authority authorization;
     private final PatientJourneyAuthorizationService patientAuthorization;
     private final GovernanceAuditLog audit;
-    private final JourneyLiveShadowService liveShadow;
     private final boolean enabled;
 
     public JourneyProjectionService(JourneyCaseBindingRepository bindings, JourneyDefinitionRepository definitions,
             JourneyStageProjectionRepository projections, ObjectProvider<JourneyRuntimePort> runtimes,
             JourneyActionDispatcher dispatcher, Authority authorization,
-            PatientJourneyAuthorizationService patientAuthorization, GovernanceAuditLog audit, JourneyLiveShadowService liveShadow,
+            PatientJourneyAuthorizationService patientAuthorization, GovernanceAuditLog audit,
             @Value("${app.journey.runtime.case-verification-enabled:false}") boolean verificationEnabled,
             @Value("${app.journey.runtime.production-intake-enabled:false}") boolean productionIntakeEnabled) {
         this.bindings = bindings; this.definitions = definitions; this.projections = projections; this.runtimes = runtimes;
         this.dispatcher = dispatcher; this.authorization = authorization;
         this.patientAuthorization = patientAuthorization;
-        this.audit = audit; this.liveShadow = liveShadow;
+        this.audit = audit;
         // Two independent callers now reach syncInternal: the journey.simulate verification harness and the
         // real production intake hook (JourneyProductionIntakeService, Phase 7A). Either flag is sufficient to
         // let the shared projection machinery run; neither caller grants the other any extra authority — this
@@ -94,7 +93,7 @@ public class JourneyProjectionService {
      * Records a boolean business fact the runtime is currently WAITing on (e.g. {@code CONSULTANT_ACCEPTED})
      * and advances past any WAIT node it now satisfies, then projects whatever human stage is reached next.
      * This is the correct way to unblock a Journey WAIT for an event that happens outside a registered
-     * action (the legacy "Consultant accepts the assignment" step is not itself one of the 11 registered
+     * action (the "Consultant accepts the assignment" step is not itself one of the 11 registered
      * actions) — it never silently auto-advances a WAIT on its own; a fact only becomes true when the real
      * event it represents has actually happened. Same admin/platform-governance boundary as {@link #sync}:
      * recording an external fact is a system event, not a human business action.
@@ -237,10 +236,9 @@ public class JourneyProjectionService {
 
     private void project(UUID caseId, UUID versionId, Node node, String subject, String engineTaskReference) {
         UUID caseTaskId = dispatcher.open(node.action(), new JourneyActionHandler.OpenContext(caseId, versionId, node, subject));
-        UUID projectionId = projections.insert(caseId, versionId, node.key(), node.actorType(), node.type().name(), caseTaskId, engineTaskReference);
+        projections.insert(caseId, versionId, node.key(), node.actorType(), node.type().name(), caseTaskId, engineTaskReference);
         audit.record(subject, caseId.toString(), node.type() == StageType.STAFF_TASK ? "JOURNEY_WORK_ITEM_OPENED" : "JOURNEY_PATIENT_ACTION_OPENED",
                 "SUCCESS", "node=" + node.key() + "; action=" + node.action());
-        liveShadow.compareIsolated(caseId, projectionId, versionId, caseTaskId, node); // observation only: never fails the real action
     }
 
     private static Node node(Version version, String nodeKey) {

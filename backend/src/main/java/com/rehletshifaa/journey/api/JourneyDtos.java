@@ -77,7 +77,6 @@ public final class JourneyDtos {
     public record PublicProposalDecisionRequest(@NotBlank @Size(max=256)String grant,@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,@Size(max=10000)String comment,Boolean acknowledgementAccepted) {
         public PublicProposalDecisionRequest(String grant,String decision,String comment){this(grant,decision,comment,null);}
     }
-    public record ActivateAccountRequest(@NotBlank @Size(max=256)String activationToken) {}
     /** Authenticated account state: which canonical patient this sign-in is, and where to send them. */
     public record AccountSessionView(boolean linked,UUID patientId,String displayName,String accountStatus,UUID currentCaseId,int pendingLinkRequests) {}
     /** The signed-in patient's reusable account facts (Profile & Security). Never carries case, clinical, proposal or deposit data. */

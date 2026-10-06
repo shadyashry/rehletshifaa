@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.*;
  * Patient identity, contact ownership and account setup across Send My Case → Complete Profile → sign in.
  *
  * <p>What is proven: the canonical patient is the internal id (never email/phone/name); structured names are
- * stored and legacy full names are never parsed; a representative's channels are never promoted into the
+ * stored directly; a representative's channels are never promoted into the
  * patient; shared or already-registered email/mobile never merge, reject or reveal anything; account setup is
  * delegated to the identity provider without any password of ours; and every step is idempotent.
  */
@@ -59,7 +59,6 @@ class PatientIdentityAndAccountTest {
         UUID patientId = patientId(created.caseId());
         assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("Mohamed Ahmed");
         assertThat(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("El Sayed");
-        assertThat(jdbc.queryForObject("SELECT name_source FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("STRUCTURED");
         // The case row only carries a display snapshot; the patient row is the identity.
         assertThat(jdbc.queryForObject("SELECT full_name FROM medical_cases WHERE id=?", String.class, created.caseId())).isEqualTo("Mohamed Ahmed El Sayed");
         assertThat(jdbc.queryForObject("SELECT contact_role FROM case_submission_contacts WHERE case_id=?", String.class, created.caseId())).isEqualTo("PATIENT");
@@ -129,7 +128,6 @@ class PatientIdentityAndAccountTest {
         assertThat(pre.givenName()).isEqualTo("Link"); assertThat(pre.familyName()).isEqualTo("Patient");
         assertThat(pre.countryOfResidence()).isEqualTo("KE"); assertThat(pre.knownMobile()).isEqualTo("+254700000010");
         assertThat(pre.candidateEmail()).isNull();
-        assertThat(pre.nameConfirmationRequired()).isFalse();
         assertThatThrownBy(() -> activation.activate(ctx.token, g, profile("Link", "Patient", null, "+254700000010", "PATIENT")))
                 .isInstanceOf(FieldValidationException.class)
                 .satisfies(e -> assertThat(((FieldValidationException) e).errors()).extracting("field").contains("email"));
@@ -207,8 +205,8 @@ class PatientIdentityAndAccountTest {
 
     @Test void aNumberVerifiedAsAnotherAccountsPersonalMobileIsNeverSilentlyReVerified() throws Exception {
         UUID other = UUID.randomUUID();
-        jdbc.update("INSERT INTO patient_profiles(id,external_subject,full_name,given_name,family_name,name_source,country,whatsapp_number,mobile_owner,phone_verified_at,preferred_language,account_status,profile_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
-                other, "other-active-subject", "Other Person", "Other", "Person", "STRUCTURED", "Kenya", "+254700000016", "PATIENT", Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now());
+        jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,family_name,country,whatsapp_number,mobile_owner,phone_verified_at,preferred_language,account_status,profile_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
+                other, "other-active-subject", "Other", "Person", "Kenya", "+254700000016", "PATIENT", Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now());
         var ctx = accepted(request("Link", "Patient", "+254700000016", null));
         String g = grant(ctx); // OTP on the shared number: possession, not exclusive identity
         activation.activate(ctx.token, g, profile("Link", "Patient", "sec16@local.test", "+254700000016", "PATIENT")); em.flush();
@@ -382,26 +380,15 @@ class PatientIdentityAndAccountTest {
         assertThat(count("SELECT count(*) FROM audit_events WHERE event_type='PATIENT_ACCOUNT_ACTIVATED' AND entity_id=?", patientId(ctx.caseId).toString())).isEqualTo(1);
     }
 
-    // ---------- legacy data ----------
-
-    @Test void aLegacyFullNameIsNeverParsedAndMustBeConfirmedByThePatient() throws Exception {
+    @Test void structuredNamesArePrefilledAndUpdatedDirectly() throws Exception {
         var ctx = accepted(request("Link", "Patient", "+254700000040", null));
         UUID patientId = patientId(ctx.caseId);
-        // Simulate a row migrated from before structured names existed.
-        jdbc.update("UPDATE patient_profiles SET given_name=NULL,family_name=NULL,name_source='LEGACY_FULL_NAME',full_name='Maria da Silva Santos' WHERE id=?", patientId);
         String g = grant(ctx);
         var pre = activation.prefill(ctx.token, g);
-        assertThat(pre.nameConfirmationRequired()).isTrue();
-        assertThat(pre.legacyFullName()).isEqualTo("Maria da Silva Santos");
-        assertThat(pre.givenName()).isNull(); assertThat(pre.familyName()).isNull();
-        // Display still works from the preserved legacy name until then.
-        authenticate("coordinator-subject", Role.COORDINATOR);
-        assertThat(journey.coordinatorQueue()).filteredOn(c -> c.id().equals(ctx.caseId)).extracting(CaseView::patientName).containsExactly("Maria da Silva Santos");
-        SecurityContextHolder.clearContext();
+        assertThat(pre.givenName()).isEqualTo("Link"); assertThat(pre.familyName()).isEqualTo("Patient");
         activation.activate(ctx.token, g, profile("Maria", "da Silva Santos", "maria40@local.test", "+254700000040", "PATIENT")); em.flush();
-        assertThat(jdbc.queryForObject("SELECT name_source FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("STRUCTURED");
         assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("Maria");
-        assertThat(jdbc.queryForObject("SELECT full_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("Maria da Silva Santos");
+        assertThat(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("da Silva Santos");
     }
 
     // ================= helpers =================
@@ -416,8 +403,8 @@ class PatientIdentityAndAccountTest {
     }
     private UUID seedLinkedPatient(String subject, String given, String family, String email) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO patient_profiles(id,external_subject,full_name,given_name,family_name,name_source,country,whatsapp_number,mobile_owner,email,email_verified_at,preferred_language,account_status,profile_status,profile_completed_at,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
-                id, subject, given + " " + family, given, family, "STRUCTURED", "Egypt", "+201000009999", "PATIENT", email, Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now(), Instant.now());
+        jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,family_name,country,whatsapp_number,mobile_owner,email,email_verified_at,preferred_language,account_status,profile_status,profile_completed_at,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
+                id, subject, given, family, "Egypt", "+201000009999", "PATIENT", email, Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now(), Instant.now());
         return id;
     }
     private String linkToken(UUID patientId) throws Exception {
@@ -453,6 +440,7 @@ class PatientIdentityAndAccountTest {
         cases.submit(created.caseId()); em.flush(); em.clear();
         jdbc.update("UPDATE medical_cases SET travel_package_requested=true WHERE id=?", created.caseId());
         authenticate("coordinator-subject", Role.COORDINATOR);
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
         journey.claimCoordinatorCase(created.caseId(), "cardiac-pod");
         long v = journey.workspace(created.caseId()).caseSummary().version();
         journey.transition(created.caseId(), new TransitionRequest("READY_FOR_CONSULTANT", "ready", v));

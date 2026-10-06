@@ -26,8 +26,9 @@ public interface PatientIdentityPort {
     Optional<IdentityUser> findBySubject(String subject);
 
     /**
-     * Create a patient account with the PATIENT realm role, no credential, and the required actions
+     * Create an authentication account with no credential and the required actions
      * that make the owner create a password (and verify the address if it is not already proven).
+     * Patient authority stays in the application database.
      *
      * @return the new provider subject (Keycloak user id)
      */

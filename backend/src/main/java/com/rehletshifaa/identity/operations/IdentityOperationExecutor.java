@@ -66,13 +66,10 @@ public class IdentityOperationExecutor {
         IdentityProvisioningPort.IdentityAccount account;
         if (recovered.isPresent()) {
             account = recovered.get();
-            if (payload.compatibilityRole() != null && !payload.compatibilityRole().isBlank())
-                identities.setCompatibilityRole(account.subject(), payload.compatibilityRole());
             identities.resend(account.subject(), payload.locale());
         } else {
             try {
-                account = identities.inviteTracked(payload.name(), payload.email(), payload.locale(), operation.idempotencyKey(),
-                        payload.compatibilityRole());
+                account = identities.inviteTracked(payload.name(), payload.email(), payload.locale(), operation.idempotencyKey());
             } catch (ApiException collision) {
                 if (collision.status()!=409 || operation.type()!=IdentityOperationRequested.Type.CREATE_STAFF
                         || !"WorkforceInvitation".equals(operation.targetType())) throw collision;
@@ -91,5 +88,5 @@ public class IdentityOperationExecutor {
         catch (Exception failure) { throw new IllegalStateException("Identity operation payload is invalid", failure); }
     }
 
-    public record Payload(String name, String email, String locale, String compatibilityRole, String reopen, String resetMfa) {}
+    public record Payload(String name, String email, String locale, String reopen, String resetMfa) {}
 }

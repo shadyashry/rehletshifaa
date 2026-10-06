@@ -42,7 +42,7 @@ public final class ActivationDtos {
      */
     public record OnboardingPrefill(String caseNumber, String caseStatus, String onboardingState, boolean profileActive,
                                     boolean accountLinked, AccountSetup account,
-                                    String givenName, String familyName, String preferredName, String legacyFullName, boolean nameConfirmationRequired,
+                                    String givenName, String familyName, String preferredName,
                                     String candidateEmail, boolean emailVerified,
                                     String knownMobile, String mobileOwner, boolean phoneVerified,
                                     LocalDate dateOfBirth, String nationality, String countryOfResidence, String preferredLanguage, String sex,
@@ -98,8 +98,7 @@ public final class ActivationDtos {
 
     /**
      * Handoff from the case-scoped onboarding session into the normal authenticated portal. {@code alreadyLinked}
-     * means the patient simply signs in with the account they set up; {@code activationToken} is only ever
-     * present for legacy profiles that predate provider-owned provisioning and still need a one-time binding.
+     * means the patient signs in with the account they set up through the identity provider.
      */
-    public record PortalHandoff(String activationToken, boolean alreadyLinked, AccountSetup account, String caseId) {}
+    public record PortalHandoff(boolean alreadyLinked, AccountSetup account, String caseId) {}
 }

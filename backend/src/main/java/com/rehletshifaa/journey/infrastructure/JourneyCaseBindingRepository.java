@@ -25,6 +25,7 @@ public class JourneyCaseBindingRepository {
     }
 
     public Binding lock(UUID caseId, String subject) {
+        lockCase(caseId);
         return jdbc.sql("SELECT * FROM journey_case_bindings WHERE case_id=? AND created_by=? FOR UPDATE")
                 .params(caseId,subject).query(this::map).optional()
                 .orElseThrow(()->new ApiException(404,"JOURNEY_CASE_NOT_FOUND","Journey verification case not found."));
@@ -32,6 +33,7 @@ public class JourneyCaseBindingRepository {
 
     /** Unscoped by creator: for real business completion paths authorized by Access Governance, not harness ownership. */
     public Binding lockByCase(UUID caseId) {
+        lockCase(caseId);
         return jdbc.sql("SELECT * FROM journey_case_bindings WHERE case_id=? FOR UPDATE")
                 .param(caseId).query(this::map).optional()
                 .orElseThrow(()->new ApiException(404,"JOURNEY_CASE_NOT_FOUND","Journey verification case not found."));
@@ -56,5 +58,10 @@ public class JourneyCaseBindingRepository {
     private Binding map(java.sql.ResultSet r, int row) throws java.sql.SQLException {
         return new Binding(r.getObject("case_id",UUID.class),r.getObject("journey_version_id",UUID.class),r.getString("admission_mode"),
                 r.getString("created_by"),r.getString("request_hash"),r.getString("engine_instance_ref"));
+    }
+
+    private void lockCase(UUID caseId) {
+        jdbc.sql("SELECT id FROM medical_cases WHERE id=? FOR UPDATE").param(caseId).query(UUID.class).optional()
+                .orElseThrow(() -> new ApiException(404, "JOURNEY_CASE_NOT_FOUND", "Journey case was not found"));
     }
 }

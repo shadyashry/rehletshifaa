@@ -4,7 +4,6 @@ import com.rehletshifaa.shared.api.ApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
@@ -21,7 +20,8 @@ import java.util.*;
  * Least-privilege Keycloak Admin API implementation of {@link PatientIdentityPort}.
  *
  * <p>Uses the same service-account client as staff provisioning ({@code manage-users}). Accounts are created
- * enabled, with the PATIENT realm role and <em>no credential</em>; Keycloak's own execute-actions email
+ * enabled with <em>no credential</em>; patient authority is resolved from the application database.
+ * Keycloak's own execute-actions email
  * carries the time-limited UPDATE_PASSWORD (+ VERIFY_EMAIL) link, so the password is created inside Keycloak
  * and this application never sees it. Provider errors are translated to neutral API errors — the patient
  * never sees identity-provider terminology.
@@ -80,10 +80,7 @@ public class KeycloakPatientIdentityService implements PatientIdentityPort {
         try {
             ResponseEntity<Void> response = http.post().uri(admin("/users")).header("Authorization", bearer())
                     .contentType(MediaType.APPLICATION_JSON).body(user).retrieve().toBodilessEntity();
-            String subject = subjectFrom(response.getHeaders().getLocation());
-            try { ensurePatientRole(subject); }
-            catch (RuntimeException roleFailure) { deleteQuietly(subject); throw roleFailure; }
-            return subject;
+            return subjectFrom(response.getHeaders().getLocation());
         } catch (RestClientResponseException e) {
             // 409 here means a concurrent creation for the same address; the caller re-resolves by email.
             throw failure(e, e.getStatusCode().value() == 409 ? "This email address is already in use" : "The account could not be created right now");
@@ -126,29 +123,6 @@ public class KeycloakPatientIdentityService implements PatientIdentityPort {
     }
 
     /**
-     * PATIENT is assigned explicitly. The realm has no default business role because workforce and delegate
-     * invitations must never inherit patient authority.
-     */
-    private void ensurePatientRole(String subject) {
-        if (hasRealmRole(subject, "PATIENT")) return;
-        try {
-            Map<String, Object> role = http.get().uri(admin("/roles/PATIENT")).header("Authorization", bearer()).retrieve().body(OBJECT);
-            http.post().uri(admin("/users/" + encode(subject) + "/role-mappings/realm")).header("Authorization", bearer())
-                    .contentType(MediaType.APPLICATION_JSON).body(List.of(role)).retrieve().toBodilessEntity();
-        } catch (RestClientResponseException e) {
-            if (!hasRealmRole(subject, "PATIENT")) throw e;
-        }
-    }
-
-    private boolean hasRealmRole(String subject, String name) {
-        try {
-            List<Map<String, Object>> roles = http.get().uri(admin("/users/" + encode(subject) + "/role-mappings/realm/composite"))
-                    .header("Authorization", bearer()).retrieve().body(OBJECTS);
-            return roles != null && roles.stream().anyMatch(r -> name.equals(r.get("name")));
-        } catch (RestClientResponseException e) { return false; }
-    }
-
-    /**
      * Keycloak's user PUT is a whole-representation replace: a partial body silently clears email, names and
      * attributes. Always read, modify, then write the full representation.
      */
@@ -174,10 +148,6 @@ public class KeycloakPatientIdentityService implements PatientIdentityPort {
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form).retrieve().body(OBJECT);
             return "Bearer " + Objects.requireNonNull(token).get("access_token");
         } catch (RestClientResponseException e) { throw failure(e, "The account service is temporarily unavailable"); }
-    }
-    private void deleteQuietly(String subject) {
-        try { http.method(HttpMethod.DELETE).uri(admin("/users/" + encode(subject))).header("Authorization", bearer()).retrieve().toBodilessEntity(); }
-        catch (Exception ignored) { /* best effort rollback of a half-created account */ }
     }
     private String admin(String path) { return baseUrl + "/admin/realms/" + encode(realm) + path; }
     private void requireConfigured() { if (!available()) throw new ApiException(503, "IDENTITY_ADMIN_NOT_CONFIGURED", "Account setup is not available in this environment"); }

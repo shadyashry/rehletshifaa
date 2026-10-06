@@ -8,7 +8,7 @@ export const ccCopy = {
     nav:{providers:"Organizations", operations:"Provider Operations", access:"Access & Governance"},
     accessRoles:"Roles", accessPermissions:"Permissions", accessEffective:"Effective access", accessAudit:"Audit",
     orgList:"Provider organizations", search:"Find an organization", empty:"No provider organizations to show.",
-    newOrg:"New organization", type:"Type", status:"Status", country:"Country", currency:"Currency", legacyMapping:"Legacy mapping",
+    newOrg:"New organization", type:"Type", status:"Status", country:"Country", currency:"Currency",
     overview:"Overview", clinicalTeam:"Clinical team", practiceTeam:"Practice team", onboarding:"Onboarding & readiness",
     members:"Members", relationships:"Relationships", noMembers:"No members yet.", noRelationships:"No relationships recorded.",
     invite:"Invite member", role:"Role", subject:"Account identifier", name:"Full name", email:"Email", reason:"Reason", locale:"Preferred language",
@@ -78,7 +78,7 @@ export const ccCopy = {
     nav:{providers:"المؤسسات", operations:"عمليات مقدمي الرعاية", access:"الوصول والحوكمة"},
     accessRoles:"الأدوار", accessPermissions:"الصلاحيات", accessEffective:"الوصول الفعلي", accessAudit:"سجل التدقيق",
     orgList:"مؤسسات مقدمي الرعاية", search:"البحث عن مؤسسة", empty:"لا توجد مؤسسات لعرضها.",
-    newOrg:"مؤسسة جديدة", type:"النوع", status:"الحالة", country:"الدولة", currency:"العملة", legacyMapping:"الربط القديم",
+    newOrg:"مؤسسة جديدة", type:"النوع", status:"الحالة", country:"الدولة", currency:"العملة",
     overview:"نظرة عامة", clinicalTeam:"الفريق السريري", practiceTeam:"فريق العيادة", onboarding:"التهيئة والجاهزية",
     members:"الأعضاء", relationships:"العلاقات", noMembers:"لا يوجد أعضاء بعد.", noRelationships:"لا توجد علاقات مسجلة.",
     invite:"دعوة عضو", role:"الدور", subject:"معرّف الحساب", name:"الاسم الكامل", email:"البريد الإلكتروني", reason:"السبب", locale:"اللغة المفضلة",
@@ -148,7 +148,7 @@ const orgStatusAr:Record<string,string>={DRAFT:"مسودة",ONBOARDING:"قيد �
 const memberStatusAr:Record<string,string>={PENDING:"بانتظار التفعيل",ACTIVE:"نشط",REVOKED:"ملغى"};
 const invitationAr:Record<string,string>={PENDING:"بانتظار القبول",ACTIVE:"مقبولة",FAILED:"فشلت"};
 const relationshipTypeAr:Record<string,string>={MANAGES:"يدير",ASSISTS:"يساعد",SUPERVISES:"يشرف على"};
-const onboardingAr:Record<string,string>={INVITED:"تمت الدعوة",PROFILE_INCOMPLETE:"الملف غير مكتمل",DOCUMENTS_SUBMITTED:"تم تقديم المستندات",UNDER_VERIFICATION:"قيد التحقق",MORE_INFORMATION_REQUIRED:"يلزم معلومات إضافية",VERIFIED:"تم التحقق",REJECTED:"مرفوض",OPERATIONAL_SETUP:"الإعداد التشغيلي",ACTIVE:"نشط",SUSPENDED:"موقوف",OFFBOARDED:"منتهٍ",LEGACY_UNREVIEWED:"سجل قديم غير مراجَع"};
+const onboardingAr:Record<string,string>={INVITED:"تمت الدعوة",PROFILE_INCOMPLETE:"الملف غير مكتمل",DOCUMENTS_SUBMITTED:"تم تقديم المستندات",UNDER_VERIFICATION:"قيد التحقق",MORE_INFORMATION_REQUIRED:"يلزم معلومات إضافية",VERIFIED:"تم التحقق",REJECTED:"مرفوض",OPERATIONAL_SETUP:"الإعداد التشغيلي",ACTIVE:"نشط",SUSPENDED:"موقوف",OFFBOARDED:"منتهٍ"};
 const roleAr:Record<string,string>={PROVIDER_OPERATIONS_MANAGER:"مدير عمليات مقدمي الرعاية",ORGANIZATION_OWNER:"مالك المؤسسة",PRACTICE_MANAGER:"مدير العيادة",CONSULTANT:"استشاري",ASSOCIATE_DOCTOR:"طبيب مشارك",CONSULTANT_ASSISTANT:"مساعد الاستشاري"};
 
 function pick(map:Record<string,string>,key:string,locale:Locale){return locale==="ar"?(map[key]??key.toLowerCase().replaceAll("_"," ")):key.charAt(0)+key.slice(1).toLowerCase().replaceAll("_"," ");}

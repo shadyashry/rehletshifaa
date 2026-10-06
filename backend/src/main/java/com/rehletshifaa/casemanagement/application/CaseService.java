@@ -22,7 +22,7 @@ public class CaseService {
     @Transactional public CreateCaseResponse create(CreateCaseRequest request) {
         validateNames(request);
         Instant now = clock.instant();
-        String displayName = PatientNames.display(request.givenName(), request.familyName(), null);
+        String displayName = PatientNames.display(request.givenName(), request.familyName());
         var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), displayName, request.country(), request.whatsappNumber(), request.conditionDescription(), request.preferredLanguage(), request.careArea(), now);
         if (Boolean.TRUE.equals(request.travelPackageRequested())) medicalCase.setTravelPackageRequested(true);
         cases.saveAndFlush(medicalCase); intake.createFoundation(medicalCase,request);

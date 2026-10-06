@@ -18,7 +18,7 @@ const active = { status: "ACTIVE", emailHint: "m***@local.test", awaitingEmail: 
 const prefill = {
   caseNumber: "RS-2026-000030", caseStatus: "ACCEPTED", onboardingState: "IN_PROGRESS",
   profileActive: false, accountLinked: false, account: notProvisioned, currentAction: "COMPLETE_PROFILE", journeyStage: "PROFILE", waitingOn: "STAFF",
-  givenName: "Mohamed", familyName: "Ahmed", preferredName: null, legacyFullName: null, nameConfirmationRequired: false,
+  givenName: "Mohamed", familyName: "Ahmed", preferredName: null,
   candidateEmail: "m@local.test", emailVerified: false, knownMobile: "+201010447898", mobileOwner: "PATIENT", phoneVerified: true,
   dateOfBirth: "1985-04-02", nationality: "EG", countryOfResidence: "KE", preferredLanguage: "en", sex: "MALE",
   submittedBy: "PATIENT", representativeName: null, representativeRelationship: null,

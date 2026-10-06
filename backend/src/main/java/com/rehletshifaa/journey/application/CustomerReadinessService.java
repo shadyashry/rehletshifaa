@@ -39,19 +39,16 @@ public class CustomerReadinessService {
 
     /** Compute readiness for the case's patient. Throws 404 if the case/patient is unknown. */
     public CustomerReadiness compute(UUID caseId) {
-        record P(UUID patientId, String subject, Instant phone, Instant email, String profileStatus, boolean travelPackage) {}
-        P p = jdbc.sql("SELECT p.id,p.external_subject,p.phone_verified_at,p.email_verified_at,p.profile_status,c.travel_package_requested FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?")
-                .param(caseId).query((rs, n) -> new P(rs.getObject("id", UUID.class), rs.getString("external_subject"), instN(rs, "phone_verified_at"), instN(rs, "email_verified_at"), rs.getString("profile_status"), rs.getBoolean("travel_package_requested")))
+        record P(UUID patientId, String subject, Instant phone, Instant email, String profileStatus, String accountStatus, boolean travelPackage) {}
+        P p = jdbc.sql("SELECT p.id,p.external_subject,p.phone_verified_at,p.email_verified_at,p.profile_status,p.account_status,c.travel_package_requested FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?")
+                .param(caseId).query((rs, n) -> new P(rs.getObject("id", UUID.class), rs.getString("external_subject"), instN(rs, "phone_verified_at"), instN(rs, "email_verified_at"), rs.getString("profile_status"), rs.getString("account_status"), rs.getBoolean("travel_package_requested")))
                 .optional().orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
         record OB(String state, String subjectType) {}
         OB ob = jdbc.sql("SELECT state,subject_type FROM patient_onboardings WHERE case_id=? ORDER BY created_at DESC LIMIT 1")
                 .param(caseId).query((rs, n) -> new OB(rs.getString("state"), rs.getString("subject_type"))).optional().orElse(null);
-        // A legacy-reviewed exemption stands in for identity/consent evidence on cases that had already
-        // progressed before this layer existed — we never fabricate successful identity evidence.
-        boolean legacy = ob != null && "LEGACY_EXEMPT".equals(ob.state());
         String subjectType = ob == null ? null : ob.subjectType();
 
-        boolean accountActivated = "ACTIVE".equals(p.profileStatus()) || p.subject() != null;
+        boolean accountActivated = "ACTIVE".equals(p.profileStatus()) && "ACTIVE".equals(p.accountStatus()) && p.subject() != null;
         boolean whats = p.phone() != null, mail = p.email() != null;
         boolean contactVerified = whats || mail;
         String verifiedChannel = whats && mail ? "BOTH" : whats ? "WHATSAPP" : mail ? "EMAIL" : null;
@@ -59,18 +56,18 @@ public class CustomerReadinessService {
         // Legal identity is NOT a gate for profile activation or the coordination deposit. It becomes
         // required only when an operational step needs it (visa / travel package / hospital registration).
         boolean identityRequired = p.travelPackage();
-        boolean identityVerified = legacy || identityVerified(p.patientId());
+        boolean identityVerified = identityVerified(p.patientId());
 
         List<String> required = requiredConsentTypes(subjectType);
-        boolean consentsDone = legacy || required.stream().allMatch(t -> consentPresent(p.patientId(), caseId, t));
-        boolean repValid = legacy || repAuthValid(p.patientId(), subjectType);
+        boolean consentsDone = required.stream().allMatch(t -> consentPresent(p.patientId(), caseId, t));
+        boolean repValid = repAuthValid(p.patientId(), subjectType);
 
         boolean depositWaived = payment.depositWaived(caseId);
         boolean depositSatisfied = payment.depositSatisfied(caseId);
         boolean depositRequired = payment.anticipatedCoordinationDepositEgp(caseId).signum() > 0 && !depositWaived;
         String depositStatus = payment.depositStatusFor(caseId);
 
-        boolean onboardingCompleted = legacy || (ob != null && "COMPLETED".equals(ob.state()));
+        boolean onboardingCompleted = ob != null && "COMPLETED".equals(ob.state());
 
         List<BlockingItem> blocking = new ArrayList<>();
         if (!accountActivated) blocking.add(new BlockingItem("ACCOUNT_NOT_ACTIVATED", "Activate your profile", "فعّل ملفك"));
@@ -79,7 +76,8 @@ public class CustomerReadinessService {
         if (!repValid) blocking.add(new BlockingItem("REPRESENTATIVE_AUTH_MISSING", "Representative authorization required", "مطلوب تفويض ممثّل ساري"));
         if (!consentsDone) blocking.add(new BlockingItem("CONSENTS_INCOMPLETE", "Complete required consents", "أكمل الموافقات المطلوبة"));
         if (depositRequired && !depositSatisfied) blocking.add(new BlockingItem("DEPOSIT_UNPAID", "Pay or waive the coordination deposit", "سداد وديعة التنسيق أو إعفاؤها"));
-        if (!onboardingCompleted && !legacy) blocking.add(new BlockingItem("ONBOARDING_INCOMPLETE", "Review and submit your onboarding", "راجِع وأرسل بيانات التسجيل"));
+        if (ob == null) blocking.add(new BlockingItem("ONBOARDING_NOT_STARTED", "Ask your coordinator to start onboarding from your acknowledged estimate", "اطلب من المنسق بدء التسجيل من التقدير الذي وافقت عليه"));
+        else if (!onboardingCompleted) blocking.add(new BlockingItem("ONBOARDING_INCOMPLETE", "Review and submit your onboarding", "راجِع وأرسل بيانات التسجيل"));
         boolean ready = blocking.isEmpty();
 
         return new CustomerReadiness(accountActivated, contactVerified, verifiedChannel, identityRequired, identityVerified,
@@ -92,16 +90,10 @@ public class CustomerReadinessService {
     }
 
     /**
-     * Server-side enforcement before any chargeable / non-cancellable commitment. Legacy cases with no
-     * onboarding record keep the pre-existing deposit gate; cases that went through this layer must be fully
-     * ready. Returns structured, patient-safe blocking reasons — never a bare 409.
+     * Server-side enforcement before any chargeable / non-cancellable commitment. Every case requires
+     * current onboarding and readiness evidence. Returns patient-safe blocking reasons.
      */
     public void assertReadyForCommitment(UUID caseId) {
-        Integer hasOnboarding = jdbc.sql("SELECT count(*) FROM patient_onboardings WHERE case_id=?").param(caseId).query(Integer.class).single();
-        if (hasOnboarding == null || hasOnboarding == 0) {
-            if (!payment.depositSatisfied(caseId)) throw new ApiException(409, "DEPOSIT_REQUIRED", "The required deposit must be paid before confirming a non-cancellable booking");
-            return;
-        }
         CustomerReadiness r = compute(caseId);
         if (!r.readyForCoordination()) {
             String reasons = r.blockingItems().stream().map(BlockingItem::labelEn).collect(Collectors.joining("; "));

@@ -7,7 +7,6 @@ import com.rehletshifaa.journey.application.*;
 import com.rehletshifaa.journey.domain.JourneyModel.*;
 import com.rehletshifaa.journey.infrastructure.JourneyCaseBindingRepository;
 import com.rehletshifaa.journey.infrastructure.JourneyDeploymentRepository;
-import com.rehletshifaa.journey.infrastructure.JourneyLiveShadowRepository;
 import org.flowable.engine.ProcessEngine;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,8 +51,6 @@ class JourneyProductionIntakeIntegrationTest {
     @Autowired JourneyAdmissionPolicyService policies;
     @Autowired com.rehletshifaa.journey.infrastructure.JourneyCaseAdmissionRepository admissions;
     @Autowired io.micrometer.core.instrument.MeterRegistry meters;
-    @Autowired JourneyLiveShadowService liveShadow;
-    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean JourneyLiveShadowRepository shadowResults;
     Version version;
     JourneyAdmissionPolicyService.Policy policy;
     JourneyDefinitionIntegrationTest fixture;
@@ -123,49 +120,8 @@ class JourneyProductionIntakeIntegrationTest {
         assertThat(task.get("owner_subject")).isNull(); // no Coordinator team fixture exists: the existing no-candidate queue/fallback is used, not an exception
         // Case Owner (case_assignments) is untouched by projecting a WorkItem — the two stay separate.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM case_assignments WHERE case_id=?", Integer.class, caseId)).isZero();
-    }
-
-    @Test void realAdmittedCaseProducesStructuredNonMutatingShadowEvidenceAndAggregation() {
-        UUID caseId = submitRealCase();
-        var row = jdbc.queryForMap("SELECT id,case_task_id FROM journey_stage_projections WHERE case_id=? AND node_key='review'", caseId);
-        UUID projectionId = (UUID) row.get("id");
-        UUID taskId = (UUID) row.get("case_task_id");
-        assertThat(jdbc.queryForMap("SELECT result,category,legacy_outcome,journey_outcome,explanation FROM journey_live_shadow_comparisons WHERE projection_id=?", projectionId))
-                .containsEntry("result", "MATCH");
-
-        // Re-run the real evaluator after removing only its evidence. No workflow/business table may change.
-        jdbc.update("DELETE FROM journey_live_shadow_comparisons WHERE projection_id=?", projectionId);
-        Map<String, Object> before = jdbc.queryForMap("SELECT c.status,c.waiting_on,c.version,(SELECT status FROM case_tasks t WHERE t.id=?) task_status,(SELECT count(*) FROM case_tasks t WHERE t.case_id=c.id) tasks,(SELECT count(*) FROM case_assignments a WHERE a.case_id=c.id) assignments,(SELECT count(*) FROM notification_outbox) notifications FROM medical_cases c WHERE c.id=?", taskId, caseId);
-        long runtimeInstances = engine.getRuntimeService().createProcessInstanceQuery().processInstanceBusinessKey("case:" + caseId).count();
-        Node node = version.graph().nodes().stream().filter(n -> n.key().equals("review")).findFirst().orElseThrow();
-        liveShadow.compare(caseId, projectionId, version.id(), taskId, node);
-        Map<String, Object> after = jdbc.queryForMap("SELECT c.status,c.waiting_on,c.version,(SELECT status FROM case_tasks t WHERE t.id=?) task_status,(SELECT count(*) FROM case_tasks t WHERE t.case_id=c.id) tasks,(SELECT count(*) FROM case_assignments a WHERE a.case_id=c.id) assignments,(SELECT count(*) FROM notification_outbox) notifications FROM medical_cases c WHERE c.id=?", taskId, caseId);
-        assertThat(after).isEqualTo(before);
-        assertThat(engine.getRuntimeService().createProcessInstanceQuery().processInstanceBusinessKey("case:" + caseId).count()).isEqualTo(runtimeInstances);
-        assertThat(shadowResults.aggregate().matches()).isGreaterThanOrEqualTo(1);
-        assertThat(shadowResults.aggregate().journeyVersions()).contains(version.id().toString());
-        assertThat(shadowResults.aggregate().policyRevisions()).contains(admissions.find(caseId).orElseThrow().policyRevision());
-    }
-
-    @Test void aShadowComparatorFailureNeitherFailsNorRollsBackTheRealSubmissionAndIsObservable() {
-        // The evidence row is really written, then the comparator fails: its savepoint must unwind that row only.
-        org.mockito.Mockito.doAnswer(call -> { call.callRealMethod(); throw new org.springframework.dao.DataIntegrityViolationException("shadow evidence rejected"); })
-                .when(shadowResults).insert(org.mockito.ArgumentMatchers.any());
-        double failuresBefore = meters.counter("journey.shadow.comparison.failure", "exception", "DataIntegrityViolationException").count();
-        var created = cases.create(intake());
-
-        var submitted = cases.submit(created.caseId());
-
-        UUID caseId = created.caseId();
-        assertThat(submitted.status()).isEqualTo("RECEIVED");
-        assertThat(cases.findById(caseId).getStatus().name()).isEqualTo("RECEIVED"); // committed, not rolled back
-        assertThat(bindings.findByCase(caseId)).isPresent();
-        assertThat(engine.getRuntimeService().createProcessInstanceQuery().processInstanceBusinessKey("case:" + caseId).count()).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='JOURNEY:review'", Integer.class, caseId)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_stage_projections WHERE case_id=?", Integer.class, caseId)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_live_shadow_comparisons WHERE case_id=?", Integer.class, caseId)).isZero();
-        assertThat(meters.counter("journey.shadow.comparison.failure", "exception", "DataIntegrityViolationException").count()).isEqualTo(failuresBefore + 1);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE entity_id=? AND action='JOURNEY_LIVE_SHADOW_FAILED'", Integer.class, caseId.toString())).isEqualTo(1);
+        assertThat(jdbc.queryForMap("SELECT status,coordination_queue_reason FROM case_tasks WHERE case_id=? AND task_type='COORDINATION_ROUTING'", caseId))
+                .containsEntry("status", "OPEN").containsEntry("coordination_queue_reason", "NO_ROUTING_POLICY");
     }
 
     @Test void completingTheProjectedWorkReachesTheExistingPhase4bRuntimeAndOpensTheNextPatientAction() {

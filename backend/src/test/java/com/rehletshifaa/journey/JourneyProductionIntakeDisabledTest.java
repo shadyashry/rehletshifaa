@@ -23,15 +23,20 @@ class JourneyProductionIntakeDisabledTest {
         var created = cases.create(new CreateCaseRequest("Real", "Patient", "AE", "+971500000003", "Default configuration intake", "en", true, null));
         var submitted = cases.submit(created.caseId());
 
-        assertThat(submitted.status()).isEqualTo("RECEIVED"); // legacy behavior is fully intact
+        assertThat(submitted.status()).isEqualTo("RECEIVED"); // coordination behavior is fully intact
         assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_case_bindings WHERE case_id=?", Integer.class, created.caseId()))
                 .as("no Journey binding is ever created when the intake flag is off (the default)").isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM journey_case_admissions WHERE case_id=?", Integer.class, created.caseId()))
-                .as("the immutable legacy decision prevents a replay after later activation").isOne();
+                .as("the immutable coordination decision prevents a replay after later activation").isOne();
         assertThat(jdbc.queryForMap("SELECT decision,reason,policy_revision FROM journey_case_admissions WHERE case_id=?", created.caseId()))
-                .containsEntry("DECISION", "LEGACY").containsEntry("REASON", "ADMISSION_NOT_ACTIVE")
+                .containsEntry("DECISION", "COORDINATION").containsEntry("REASON", "ADMISSION_NOT_ACTIVE")
                 .containsEntry("POLICY_REVISION", "db:none");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE entity_id=? AND action='LEGACY_ADMISSION_SELECTED'", Integer.class, created.caseId().toString())).isOne();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE entity_id=? AND action='COORDINATION_ADMISSION_SELECTED'", Integer.class, created.caseId().toString())).isOne();
+        assertThat(jdbc.queryForMap("SELECT policy_id,result_data FROM coordination_decisions WHERE case_id=?", created.caseId()))
+                .containsEntry("POLICY_ID", null)
+                .extractingByKey("RESULT_DATA").asString().contains("NO_ROUTING_POLICY");
+        assertThat(jdbc.queryForMap("SELECT status,coordination_queue_reason FROM case_tasks WHERE case_id=? AND task_type='COORDINATION_ROUTING'", created.caseId()))
+                .containsEntry("STATUS", "OPEN").containsEntry("COORDINATION_QUEUE_REASON", "NO_ROUTING_POLICY");
     }
 
     @Test void anonymousSubmissionRequiresTheExactUnconsumedCreatorGrant() {
