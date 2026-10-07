@@ -127,11 +127,16 @@ export function Portal({locale}:{locale:Locale}){
   // activates the account, and the answer says which case is current and whether an "is this you?" question waits.
   const [linkToken,setLinkToken]=useState<string|null>(()=>typeof window==="undefined"?null:new URLSearchParams(window.location.search).get("link"));
   const [landed,setLanded]=useState(false);
-  useEffect(()=>{if(!user||deferPatient||!patientView)return;const params=new URLSearchParams(window.location.search);const link=params.get("link");if(link){params.delete("link");window.history.replaceState({},"",`${window.location.pathname}${params.toString()?`?${params}`:""}`);}void api<{linked:boolean;currentCaseId:string|null;accountStatus:string}>("/patient/account/session",{method:"POST"}).then(session=>{if(session.linked)refreshMe();if(!params.get("case")&&session.currentCaseId&&!link){const url=new URL(window.location.href);url.searchParams.set("case",session.currentCaseId);window.history.replaceState({},"",url);}}).catch(()=>{}).finally(()=>setLanded(true));},[user,patientView,api,deferPatient,refreshMe]);
+  // Once per signed-in subject, not per render of its inputs: a linked session refreshes /me, which briefly clears
+  // patientView, and re-registering on its return would refresh /me again, forever.
+  const sessionRegisteredFor=useRef<string|null>(null);
+  useEffect(()=>{if(!user||deferPatient||!patientView)return;const subject=user.profile.sub;if(sessionRegisteredFor.current===subject)return;sessionRegisteredFor.current=subject;const params=new URLSearchParams(window.location.search);const link=params.get("link");if(link){params.delete("link");window.history.replaceState({},"",`${window.location.pathname}${params.toString()?`?${params}`:""}`);}void api<{linked:boolean;currentCaseId:string|null;accountStatus:string}>("/patient/account/session",{method:"POST"}).then(session=>{if(session.linked)refreshMe();if(!params.get("case")&&session.currentCaseId&&!link){const url=new URL(window.location.href);url.searchParams.set("case",session.currentCaseId);window.history.replaceState({},"",url);}}).catch(()=>{}).finally(()=>setLanded(true));},[user,patientView,api,deferPatient,refreshMe]);
   useEffect(()=>{if(currentRole!=="doctor")return;void api<DoctorProfile>("/doctor/me").then(setDoctorProfile).catch(()=>setDoctorProfile(null));void api<CatalogService[]>("/doctor/catalog").then(setCatalog).catch(()=>setCatalog([]));void api<FxRate[]>("/doctor/fx-rates").then(setFxRates).catch(()=>setFxRates([]));},[currentRole,api]);
   useEffect(()=>{if(currentRole!=="coordinator")return;void api<StaffProfile>("/coordinator/me").then(setCoordinatorProfile).catch(()=>setCoordinatorProfile(null));},[currentRole,api]);
   useEffect(()=>{if(currentRole!=="coordinator")return;void api<VerifiedDoctor[]>("/coordinator/doctors").then(setDoctors).catch(()=>setDoctors([]));void api<CareCategory[]>("/coordinator/care-categories").then(setCategories).catch(()=>setCategories([]));void api<FxRate[]>("/coordinator/fx-rates").then(setFxRates).catch(()=>setFxRates([]));void Promise.all([api<StaffMember[]>("/coordinator/staff?role=COORDINATOR"),api<StaffMember[]>("/coordinator/staff?role=OPERATIONS"),api<StaffMember[]>("/coordinator/staff?role=FINANCE")]).then(rows=>setStaff(rows.flat())).catch(()=>setStaff([]));},[currentRole,api]);
   async function openCase(item:CaseView){
+    // While /me reloads there is no role yet; a role-scoped URL would read /undefined/cases/….
+    if(!currentRole)return;
     const request=++opening.current;setBusy(true);setError("");setDocumentError(false);
     if(!workspace)queuePosition.current=window.scrollY;
     try{
@@ -154,6 +159,7 @@ export function Portal({locale}:{locale:Locale}){
     // notification. Resolve the summary first so the coordinator's preview rule can apply, then open it
     // exactly like a queued case: workspace and documents together. A consultant must never be asked to
     // accept or review an assignment without the patient's file in front of them.
+    if(!currentRole)return;
     try{const ws=await api<Workspace>(`/${currentRole}/cases/${caseId}`);await openCase(ws.caseSummary);}
     catch(e){setError(e instanceof Error?e.message:t.error);}
   }
@@ -163,7 +169,8 @@ export function Portal({locale}:{locale:Locale}){
   function changeQueue(next:QueueState){setQueueState(next);if(user&&currentRole)try{sessionStorage.setItem(`portal-queue:${user.profile.sub}:${currentRole}`,JSON.stringify(next));}catch{}}
   const restored=useRef(false);
   // For patients, wait for the session answer: it may have just pointed ?case= at their current case.
-  useEffect(()=>{if(queueLoading||restored.current||!cases.length)return;if(patientView&&!landed)return;restored.current=true;const id=new URLSearchParams(window.location.search).get("case");
+  // Wait for a role too: while /me reloads, the previous answer's cases are still listed but no case can be opened yet.
+  useEffect(()=>{if(queueLoading||restored.current||!cases.length||!currentRole)return;if(patientView&&!landed)return;restored.current=true;const id=new URLSearchParams(window.location.search).get("case");
     // A patient never lands on a list: the session named their current case; failing that, the most recent one.
     const item=cases.find(c=>c.id===id)??(patientView?cases[0]:undefined);if(item)void openCase(item);});
   // The patient's three destinations are one page with a view switch, kept in the URL so a reload or a shared link lands in the same place.
