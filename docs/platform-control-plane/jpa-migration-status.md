@@ -107,7 +107,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | journey | `journey_versions` | R | journey |
 | journey | `patient_account_link_requests` | R | journey |
 | journey | `patient_action_items` | R | journey |
-| journey | `patient_identity_verifications` | W | journey |
+| journey | `patient_identity_verifications` | R | journey |
 | journey | `patient_onboardings` | W | journey |
 | journey | `payment_events` | R | journey |
 | journey | `portal_preferences` | W | journey |
@@ -494,6 +494,31 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **592 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`IdentityVerificationService` converted** (CL5 read slice 10; removed from `JDBC_NOT_YET_CONVERTED`, 8 → 7).
+  `patient_identity_verifications` is now **R**: no plain-SQL reader is left (`patient_representatives` and
+  `patient_onboardings` stay W — `OnboardingService` and `JourneyCaseRelationships` still read them). The views — one check
+  (returned by `start`/`review`), the patient's latest (`latestForCase`, and `latestForPatient` for the onboarding page) and
+  the reviewer queue — moved to a new `journey.application.IdentityVerificationQueryService`, one query each, selecting only
+  the view columns (never the encrypted legal name/date of birth or the provider reference). The commands read through
+  repositories. Public contract unchanged: `CASE_ACCESS_DENIED` 403 unless the identity is the case's patient or holds an
+  unrevoked, unexpired representation; `REVIEW_REASON_REQUIRED`, `IDENTITY_NOT_FOUND` 404, `IDENTITY_NOT_REVIEWABLE` 409
+  (status check and the guarded `decide`), the 730-day validity, the onboarding hand-offs and the audit case id.
+  - Queries added: `PatientIdentityVerificationRepository.findRow`, `findNewestRowsOf` (`createdAt desc`, `Limit.of(1)`),
+    `findAwaitingReviewRows` (PENDING/MANUAL_REVIEW by `requestedAt`; always set, no NULL sort involved) — one shared `ROW`
+    select — and `findReviewTarget` (status, onboarding and that onboarding's case in one row via a left join; was two reads,
+    the case read after the decision — an onboarding never changes case); `MedicalCaseRepository.findPatientIdAccessibleTo`
+    (the case's patient for its own identity or an active representative, the `findPatientCaseRows` rule);
+    `PatientRepresentativeRepository.findNewestUnrevokedIdsOf` (`effectiveFrom desc`, NOT NULL; expiry not checked, as
+    before). Reused: `PatientOnboardingRepository.findNewestOf` for the case's onboarding.
+  - Locks: none — the service never took a row lock; the decision stays the guarded JPQL `decide`.
+  - New test `identityViewsShowTheLatestCheckTheQueueInRequestOrderAndEachDecisionOnItsCase` (a representative check links the
+    representation and the onboarding; latest-first on the case and the onboarding page; another patient's case is refused;
+    queue in request order, rejected and verified checks leave it; reject keeps the provider's assurance and records the
+    reason; a decided check is not reviewable again; unknown id; verify sets the 730-day expiry, marks the onboarding and
+    audits on the case). It also passes on the pre-conversion service.
+  Verification: full suite **593 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -506,9 +531,9 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 8 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
+- **Reads:** 7 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
   `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
-  `PatientAccountService` and `PatientActionService` converted) — `IdentityVerificationService`, `CaseHandoffService`,
+  `PatientAccountService`, `PatientActionService` and `IdentityVerificationService` converted) — `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions
   (`CoordinationRepository` reads, `CaseNumberGenerator`, `LocalDemoDataSeeder`). They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
@@ -519,7 +544,7 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
 `CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`,
-`PublicCaseAccessService`, `PatientAccountService` and `PatientActionService` are done (2026-10-07); next `IdentityVerificationService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`PublicCaseAccessService`, `PatientAccountService`, `PatientActionService` and `IdentityVerificationService` are done (2026-10-07); next `CaseHandoffService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.

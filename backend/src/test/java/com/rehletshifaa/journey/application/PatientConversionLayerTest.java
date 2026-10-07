@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.*;
 class PatientConversionLayerTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired OnboardingService onboarding; @Autowired IdentityVerificationService identity; @Autowired PaymentService payment;
-    @Autowired PatientAccountService accounts; @Autowired CustomerReadinessService readiness;
+    @Autowired PatientAccountService accounts; @Autowired CustomerReadinessService readiness; @Autowired com.rehletshifaa.authority.application.Authority authority;
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
 
     /** Raw SQL behind JPA's back: flush pending entity changes first, then drop managed instances the SQL made stale. */
@@ -212,6 +212,55 @@ class PatientConversionLayerTest {
         assertThat(jdbc.queryForObject("SELECT status FROM patient_identity_verifications WHERE id=?", String.class, identityId)).isEqualTo("VERIFIED");
         assertThat(jdbc.queryForObject("SELECT legal_name_encrypted FROM patient_identity_verifications WHERE id=?", String.class, identityId)).isNotEqualTo("Jane Doe");
     }
+
+    @Test void identityViewsShowTheLatestCheckTheQueueInRequestOrderAndEachDecisionOnItsCase() throws Exception {
+        var ctx = onboardedCase();
+        var other = onboardedCase("patient-subject-other", "+254700000044", "other@local.test");
+        // The account owner acts for the patient: a representative check names their representation and the case's onboarding.
+        authenticate(ctx.patientSubject, Role.PATIENT);
+        onboarding.setSubject(ctx.caseId, new OnboardingSubjectRequest("REPRESENTATIVE", "Parent", "COORDINATION", Instant.now().plusSeconds(86400), onboarding.myOnboarding(ctx.caseId).version()));
+        UUID first = startIdentityAs(ctx);
+        raw("UPDATE patient_identity_verifications SET requested_at=?,created_at=? WHERE id=?", Instant.now().minusSeconds(120), Instant.now().minusSeconds(120), first);
+        authenticate(ctx.patientSubject, Role.PATIENT);
+        IdentityVerificationView second = identity.start(ctx.caseId, new IdentityStartRequest("REPRESENTATIVE", "Parent", "DOCUMENT", "John Doe", "1980-05-05", "Kenya", "NATIONAL_ID", "Kenya", "12 34 5678"));
+        assertThat(second).extracting(IdentityVerificationView::subjectType, IdentityVerificationView::status, IdentityVerificationView::assuranceLevel,
+                IdentityVerificationView::provider, IdentityVerificationView::documentReferenceMasked, IdentityVerificationView::verifiedAt)
+                .containsExactly("REPRESENTATIVE", "MANUAL_REVIEW", "LOW", "LOCAL_SIMULATOR", "***5678", null);
+        assertThat(jdbc.queryForObject("SELECT representative_id FROM patient_identity_verifications WHERE id=?", UUID.class, second.id()))
+                .isEqualTo(jdbc.queryForObject("SELECT id FROM patient_representatives WHERE representative_subject=? AND patient_id=?", UUID.class, ctx.patientSubject, patientOf(ctx.caseId)));
+        assertThat(jdbc.queryForObject("SELECT onboarding_id FROM patient_identity_verifications WHERE id=?", UUID.class, second.id()))
+                .isEqualTo(onboarding.myOnboarding(ctx.caseId).id());
+        // Latest first for the patient behind the case (also on the onboarding page); another patient's case is refused.
+        assertThat(identity.latestForCase(ctx.caseId, authorityCheck())).isEqualTo(second);
+        assertThat(onboarding.myOnboarding(ctx.caseId).identity()).isEqualTo(second);
+        assertThat(identity.latestForPatient(patientOf(other.caseId))).isNull();
+        assertThatThrownBy(() -> identity.latestForCase(other.caseId, authorityCheck()))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("CASE_ACCESS_DENIED"));
+
+        authenticate("reviewer-subject", Role.PATIENT_IDENTITY_REVIEWER);
+        assertThat(identity.reviewQueue()).extracting(IdentityVerificationView::id).containsSubsequence(first, second.id());
+        IdentityVerificationView rejected = identity.review(first, new IdentityReviewRequest("REJECT", "Document unreadable", null));
+        assertThat(rejected).extracting(IdentityVerificationView::status, IdentityVerificationView::assuranceLevel, IdentityVerificationView::rejectionReason, IdentityVerificationView::verifiedAt, IdentityVerificationView::expiresAt)
+                .containsExactly("REJECTED", "LOW", "Document unreadable", null, null);
+        assertThat(rejected.version()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT case_id FROM audit_events WHERE event_type='IDENTITY_REJECTED' AND entity_id=?", UUID.class, first.toString())).isEqualTo(ctx.caseId);
+        assertThat(identity.reviewQueue()).extracting(IdentityVerificationView::id).doesNotContain(first).contains(second.id());
+        assertThatThrownBy(() -> identity.review(first, new IdentityReviewRequest("VERIFY", "Second look", "HIGH")))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("IDENTITY_NOT_REVIEWABLE"));
+        assertThatThrownBy(() -> identity.review(UUID.randomUUID(), new IdentityReviewRequest("VERIFY", "Unknown", "HIGH")))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("IDENTITY_NOT_FOUND"));
+
+        IdentityVerificationView verified = identity.review(second.id(), new IdentityReviewRequest("VERIFY", "Matches provider record", "HIGH"));
+        assertThat(verified.status()).isEqualTo("VERIFIED");
+        assertThat(verified.assuranceLevel()).isEqualTo("HIGH");
+        assertThat(verified.expiresAt()).isEqualTo(verified.verifiedAt().plus(java.time.Duration.ofDays(730)));
+        assertThat(identity.reviewQueue()).extracting(IdentityVerificationView::id).doesNotContain(first, second.id());
+        assertThat(jdbc.queryForObject("SELECT case_id FROM audit_events WHERE event_type='IDENTITY_VERIFIED' AND entity_id=?", UUID.class, second.id().toString())).isEqualTo(ctx.caseId);
+        assertThat(jdbc.queryForObject("SELECT identity_verified_at FROM patient_onboardings WHERE case_id=?", Instant.class, ctx.caseId)).isNotNull();
+        assertThat(identity.latestForPatient(patientOf(ctx.caseId))).isEqualTo(verified);
+    }
+    private com.rehletshifaa.authority.application.Actor authorityCheck() { return authority.authorize(com.rehletshifaa.authority.domain.Permission.PATIENT_SELF_SERVICE); }
+    private UUID patientOf(UUID caseId) { return jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?", UUID.class, caseId); }
 
     @Test void onboardingConsentDoesNotDuplicateProcedureSpecificConsent() throws Exception {
         var ctx = onboardedCase();

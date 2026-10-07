@@ -16,6 +16,13 @@ public interface PatientRepresentativeRepository extends BaseRepository<PatientR
 
     boolean existsByPatientIdAndRepresentativeSubjectAndRevokedAtIsNull(UUID patientId, String representativeSubject);
 
+    /** The identity's unrevoked relationships to the patient, latest effective first (use with {@code Limit.of(1)}). */
+    @Query("""
+            select r.id from PatientRepresentative r where r.patientId = :patientId and r.representativeSubject = :subject
+                and r.revokedAt is null order by r.effectiveFrom desc""")
+    java.util.List<UUID> findNewestUnrevokedIdsOf(@Param("patientId") UUID patientId, @Param("subject") String subject,
+                                                  org.springframework.data.domain.Limit limit);
+
     /** A representative relationship in force at {@code at} (authority: PATIENT_REPRESENTATIVE role). */
     @Query("""
             select count(r) > 0 from PatientRepresentative r where r.representativeSubject = :subject and r.revokedAt is null

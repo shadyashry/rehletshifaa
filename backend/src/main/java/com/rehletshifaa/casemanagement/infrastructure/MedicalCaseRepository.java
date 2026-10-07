@@ -60,6 +60,13 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select c.patientId from MedicalCase c where c.id = :id")
     Optional<UUID> findPatientId(@Param("id") UUID id);
 
+    /** The case's patient, when the identity is that patient or represents them under an unrevoked, unexpired representation. */
+    @Query("""
+            select p.id from MedicalCase c join PatientProfile p on p.id = c.patientId
+            where c.id = :id and (p.externalSubject = :subject or exists (select 1 from PatientRepresentative r where r.patientId = p.id
+                and r.representativeSubject = :subject and r.revokedAt is null and (r.expiresAt is null or r.expiresAt > :now)))""")
+    Optional<UUID> findPatientIdAccessibleTo(@Param("id") UUID id, @Param("subject") String subject, @Param("now") Instant now);
+
     @Query("select p.preferredLanguage from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
     Optional<String> findPatientPreferredLanguage(@Param("id") UUID id);
 
