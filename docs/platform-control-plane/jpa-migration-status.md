@@ -57,7 +57,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | casemanagement | `case_intake_grants` | R | casemanagement |
 | casemanagement | `case_status_history` | W | casemanagement,journey |
 | casemanagement | `case_submission_contacts` | R | casemanagement,journey |
-| casemanagement | `consent_records` | W | casemanagement,journey |
+| casemanagement | `consent_records` | R | casemanagement,journey |
 | document | `medical_documents` | W | casemanagement,document,journey |
 | clinic | `audit_events` | R | clinic,journey |
 | clinic | `care_categories` | R | clinic,journey |
@@ -108,7 +108,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | journey | `patient_account_link_requests` | R | journey |
 | journey | `patient_action_items` | R | journey |
 | journey | `patient_identity_verifications` | R | journey |
-| journey | `patient_onboardings` | W | journey |
+| journey | `patient_onboardings` | R | journey |
 | journey | `payment_events` | R | journey |
 | journey | `portal_preferences` | W | journey |
 | journey | `proposal_access_challenges` | W | journey |
@@ -544,6 +544,32 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **595 tests, 0 failures** (2 skipped; +2 tests); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`OnboardingService` converted** (CL5 read slice 12; removed from `JDBC_NOT_YET_CONVERTED`, 6 → 5).
+  `patient_onboardings` and `consent_records` are now **R** (no plain-SQL reader is left); `patient_representatives`,
+  `patient_profiles` and `medical_cases` stay W (`JourneyCaseRelationships` and the coordination reads still use them). The
+  onboarding page (`myOnboarding`, `viewForCase` and the view every command returns) moved to a new
+  `journey.application.OnboardingQueryService`: the onboarding row, then the case with its patient in one row (case number,
+  patient and profile summary were three reads), the latest identity check through `IdentityVerificationQueryService`
+  (OnboardingService no longer depends on `IdentityVerificationService`) and the consents covering the case; readiness still
+  comes from `CustomerReadinessService`. The commands read through repositories. Public contract unchanged: `CASE_ACCESS_DENIED`
+  403 unless the identity is the patient or an active representative, `ONBOARDING_NOT_FOUND` 404, `ONBOARDING_VERSION_CONFLICT`
+  409 (version check and the guarded updates), `INVALID_ONBOARDING_CONSENT`, `ONBOARDING_INCOMPLETE`, the 45-day expiry, the
+  idempotent creation on acknowledgement, the representative re-grant, the display-name rule and which consents count.
+  - Queries added: `PatientOnboardingRepository.findNewestRowsOf` (`Row` projection, `createdAt desc`, `Limit.of(1)` — NOT
+    NULL) and `MedicalCaseRepository.findOnboardingHeader` (case number, patient id and profile summary; display name by the
+    `CASE_ROW` rule). Reused: `MedicalCaseRepository.findPatientId` and `findPatientIdAccessibleTo`,
+    `ConsentRecordRepository.findLiveTypesCovering` (the onboarding-type filter moved from SQL to Java, over the same
+    `ONBOARDING_CONSENTS` set the service validates against) and `IdentityVerificationQueryService.latestForPatient`.
+  - Removed: `PatientNames.DISPLAY_SQL` (its last user; the JPQL rule lives in the case queries).
+  - Locks: none — the service never took a row lock; its writes stay the version-guarded JPQL updates.
+  - New test `theOnboardingPageShowsTheCaseItsPatientAndOnlyTheOnboardingConsentsCoveringTheCase` (case number, onboarding row,
+    profile summary with verified flags; a patient-wide consent counts, another case's, a revoked one and a non-onboarding
+    type do not; staff see the same page; a stale version is refused for subject choice and submission; a representative
+    subject bumps the version and requires the representative consent). It also passes on the pre-conversion service. It
+    compares the staff view ignoring `readiness.updatedAt`, which is the compute time.
+  Verification: full suite **596 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -556,10 +582,10 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 6 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
+- **Reads:** 5 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
   `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
-  `PatientAccountService`, `PatientActionService`, `IdentityVerificationService` and `CaseHandoffService` converted) —
-  `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions
+  `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService` and
+  `OnboardingService` converted) — `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions
   (`CoordinationRepository` reads, `CaseNumberGenerator`, `LocalDemoDataSeeder`). They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
   `org.springframework.jdbc..`/`java.sql..` type (CL6), and no repository may declare a native query.
@@ -569,7 +595,7 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
 `CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`,
-`PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`, `IdentityVerificationService` and `CaseHandoffService` are done (2026-10-07); next `OnboardingService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService` and `OnboardingService` are done (2026-10-07); next `JourneyCaseRelationships`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.

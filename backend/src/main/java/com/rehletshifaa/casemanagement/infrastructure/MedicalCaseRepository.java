@@ -74,6 +74,19 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
     Optional<String> findPatientName(@Param("id") UUID id);
 
+    /** The case and its patient as the onboarding page heads them (display name: the {@code CASE_ROW} rule). */
+    interface OnboardingHeader {
+        String getCaseNumber(); UUID getPatientId(); String getFullName(); String getCountry(); String getWhatsappNumber(); String getEmail();
+        Instant getPhoneVerifiedAt(); Instant getEmailVerifiedAt();
+    }
+
+    @Query("""
+            select c.caseNumber as caseNumber, p.id as patientId, trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as fullName,
+                p.country as country, p.whatsappNumber as whatsappNumber, p.email as email, p.phoneVerifiedAt as phoneVerifiedAt,
+                p.emailVerifiedAt as emailVerifiedAt
+            from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id""")
+    Optional<OnboardingHeader> findOnboardingHeader(@Param("id") UUID id);
+
     /** The case's patient's own number, email and language. */
     interface PatientContact { String getWhatsappNumber(); String getEmail(); String getPreferredLanguage(); }
 

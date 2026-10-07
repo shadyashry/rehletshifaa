@@ -24,6 +24,20 @@ public interface PatientOnboardingRepository extends BaseRepository<PatientOnboa
     @Query("select o.id as id, o.state as state from PatientOnboarding o where o.caseId = :caseId order by o.createdAt desc")
     java.util.List<Current> findNewestOf(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
 
+    /** An onboarding as the patient's onboarding page shows it. */
+    interface Row {
+        UUID getId(); String getState(); String getSubjectType(); Instant getStartedAt(); Instant getContactVerifiedAt();
+        Instant getIdentityVerifiedAt(); Instant getSubmittedAt(); Instant getCompletedAt(); Instant getExpiresAt(); Long getVersion();
+    }
+
+    /** The case's onboardings with their steps, newest first (use with {@code Limit.of(1)} for the current one). */
+    @Query("""
+            select o.id as id, o.state as state, o.subjectType as subjectType, o.startedAt as startedAt,
+                o.contactVerifiedAt as contactVerifiedAt, o.identityVerifiedAt as identityVerifiedAt, o.submittedAt as submittedAt,
+                o.completedAt as completedAt, o.expiresAt as expiresAt, o.version as version
+            from PatientOnboarding o where o.caseId = :caseId order by o.createdAt desc""")
+    java.util.List<Row> findNewestRowsOf(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
     /** The subject types of the patient's onboardings, newest first (an element may be null: not chosen yet). */
     @Query("select o.subjectType from PatientOnboarding o where o.patientId = :patientId order by o.createdAt desc")
     java.util.List<String> findNewestSubjectTypesOf(@Param("patientId") UUID patientId, org.springframework.data.domain.Limit limit);

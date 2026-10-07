@@ -14,13 +14,6 @@ public final class PatientNames {
     /** Letters in any script (incl. Arabic), combining marks, spaces and the punctuation real names use. */
     public static final Pattern NAME_PART = Pattern.compile("^[\\p{L}\\p{M}][\\p{L}\\p{M} .'\\-]*$", Pattern.UNICODE_CASE);
 
-    /**
-     * SQL expression for the canonical display name of a {@code patient_profiles} row aliased {@code p}.
-     * H2- and PostgreSQL-safe.
-     */
-    public static final String DISPLAY_SQL =
-            "TRIM(p.given_name||' '||COALESCE(p.family_name,''))";
-
     /** Compose the display name from structured parts and reject an invalid empty canonical name. */
     public static String display(String givenName, String familyName) {
         String given = clean(givenName), family = clean(familyName);

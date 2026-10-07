@@ -151,6 +151,48 @@ class PatientConversionLayerTest {
         assertThat(view.readiness().accountActivated()).isTrue();
     }
 
+    @Test void theOnboardingPageShowsTheCaseItsPatientAndOnlyTheOnboardingConsentsCoveringTheCase() throws Exception {
+        var ctx = onboardedCase();
+        var other = onboardedCase("patient-subject-other", "+254700000045", "other2@local.test");
+        UUID patientId = patientOf(ctx.caseId);
+        authenticate(ctx.patientSubject, Role.PATIENT);
+        onboarding.recordConsent(ctx.caseId, new OnboardingConsentRequest("CROSS_BORDER_CARE", "I agree to cross-border care", "v1", "en", null, null));
+        consent(patientId, null, "PRIVACY_DATA_PROCESSING", null);                                // patient-wide: covers every case
+        consent(patientId, other.caseId, "TELECONSULTATION", null);                               // another case's consent
+        consent(patientId, ctx.caseId, "DEPOSIT_CANCELLATION_TERMS", Instant.now().minusSeconds(60)); // revoked
+        consent(patientId, null, "PROCEDURE_SPECIFIC", null);                                     // not an onboarding consent
+        raw("UPDATE patient_profiles SET phone_verified_at=?, email_verified_at=NULL WHERE id=?", Instant.now(), patientId);
+
+        OnboardingView view = onboarding.myOnboarding(ctx.caseId);
+        assertThat(view.caseNumber()).isEqualTo(ctx.caseNumber);
+        assertThat(view.completedConsentTypes()).containsExactlyInAnyOrder("CROSS_BORDER_CARE", "PRIVACY_DATA_PROCESSING");
+        var p = jdbc.queryForMap("SELECT given_name,family_name,country,whatsapp_number,email FROM patient_profiles WHERE id=?", patientId);
+        String name = (p.get("given_name") + " " + (p.get("family_name") == null ? "" : p.get("family_name"))).trim();
+        assertThat(view.profile()).isEqualTo(new PatientProfileSummary(name, (String) p.get("country"), (String) p.get("whatsapp_number"), (String) p.get("email"), true, false));
+        var row = jdbc.queryForMap("SELECT id,state,subject_type,version FROM patient_onboardings WHERE case_id=?", ctx.caseId);
+        assertThat(view.id()).isEqualTo(row.get("id"));
+        assertThat(view.state()).isEqualTo(row.get("state"));
+        assertThat(view.subjectType()).isEqualTo(row.get("subject_type"));
+        assertThat(view.version()).isEqualTo(((Number) row.get("version")).longValue());
+        assertThat(view.requiredConsentTypes()).doesNotContain("REPRESENTATIVE_AUTHORIZATION");
+        assertThat(onboarding.viewForCase(ctx.caseId)).usingRecursiveComparison().ignoringFields("readiness.updatedAt").isEqualTo(view); // staff see the same page
+
+        // Choosing who onboards needs the version the patient saw; a representative must also authorise.
+        assertThatThrownBy(() -> onboarding.setSubject(ctx.caseId, new OnboardingSubjectRequest("REPRESENTATIVE", "Parent", null, null, view.version() + 1)))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("ONBOARDING_VERSION_CONFLICT"));
+        OnboardingView chosen = onboarding.setSubject(ctx.caseId, new OnboardingSubjectRequest("REPRESENTATIVE", "Parent", null, null, view.version()));
+        assertThat(chosen.subjectType()).isEqualTo("REPRESENTATIVE");
+        assertThat(chosen.version()).isEqualTo(view.version() + 1);
+        assertThat(chosen.requiredConsentTypes()).contains("REPRESENTATIVE_AUTHORIZATION");
+        assertThat(chosen.completedConsentTypes()).containsExactlyInAnyOrder("CROSS_BORDER_CARE", "PRIVACY_DATA_PROCESSING");
+        assertThatThrownBy(() -> onboarding.submit(ctx.caseId, new OnboardingSubmitRequest(view.version())))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("ONBOARDING_VERSION_CONFLICT"));
+    }
+    private void consent(UUID patientId, UUID caseId, String type, Instant revokedAt) {
+        raw("INSERT INTO consent_records(id,patient_id,case_id,consent_type,policy_version,language,exact_text,purpose,scope,channel,captured_by,effective_from,revoked_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(), patientId, caseId, type, "v1", "en", "I agree", "Test", "Test", "ONBOARDING_PORTAL", "test", Instant.now(), revokedAt, Instant.now());
+    }
+
     @Test void patientCannotAccessAnotherPatientsOnboarding() throws Exception {
         var mine = onboardedCase();
         var other = onboardedCase("patient-subject-other", "+254700000044", "other@local.test");

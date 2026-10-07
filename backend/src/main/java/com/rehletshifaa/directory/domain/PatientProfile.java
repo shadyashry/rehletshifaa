@@ -186,7 +186,7 @@ public class PatientProfile extends AssignedIdEntity {
     public String getFamilyName() { return familyName; }
     public String getWhatsappNumber() { return whatsappNumber; }
     public String getPreferredLanguage() { return preferredLanguage; }
-    /** Given name and family name, as {@code PatientNames.DISPLAY_SQL} composes it. */
+    /** Given name and family name, as the case queries compose it ({@code trim(concat(given, ' ', coalesce(family, '')))}). */
     public String getDisplayName() { return (givenName + " " + (familyName == null ? "" : familyName)).trim(); }
     public String getAccountStatus() { return accountStatus; }
     public UUID getMergedIntoPatientId() { return mergedIntoPatientId; }

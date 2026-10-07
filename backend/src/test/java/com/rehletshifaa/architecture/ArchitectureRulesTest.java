@@ -216,7 +216,6 @@ class ArchitectureRulesTest {
             "com.rehletshifaa.coordination.application.CoordinationReadService",
             "com.rehletshifaa.coordination.infrastructure.CoordinationRepository", // reads only (writes are JPA)
             "com.rehletshifaa.journey.application.JourneyCaseRelationships",
-            "com.rehletshifaa.journey.application.OnboardingService",
             "com.rehletshifaa.shared.config.LocalDemoDataSeeder"); // @Profile("local") only
 
     /**
