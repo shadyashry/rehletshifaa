@@ -20,6 +20,7 @@ colors:
   ink-500: "#41555a"
   ink-400: "#5d6e72"
   ink-300: "#a3afb1"
+  ink-350: "#7a898c"
   paper: "#f7f4ee"
   paper-deep: "#efeae0"
   surface-white: "#ffffff"
@@ -251,8 +252,12 @@ A cool, inky petrol family on warm paper, with a single coral accent from the lo
 - **Paper** (paper): the page canvas and alternating section ground; also the facts panel and upload areas.
 - **Deep Paper** (paper-deep): icon wells and progress tracks only.
 - **White** (surface-white): cards, fields, the header bar, and the alternating white sections.
-- **Hairline** (line) and **Strong Hairline** (line-strong): every divider, card edge and field border. Strong
-  Hairline is for field borders, secondary-button edges and the hero photo's frame.
+- **Hairline** (line) and **Strong Hairline** (line-strong): every divider and card edge. Strong Hairline is for
+  secondary-button edges and the hero photo's frame. Both are decorative (below 3:1), so neither may be the only
+  boundary of a control.
+- **Field Edge** (ink-350): the border of every text field, select and composite input (country search, phone
+  prefix). It is the quietest grey that meets WCAG 1.4.11 non-text contrast: 3.63 on white, 3.31 on paper, 3.03 on
+  deep paper.
 
 ### Semantic
 - **Alert** (alert-50 → alert-800): safety notices, errors and unread counts. White on alert-600 clears AA;
@@ -363,7 +368,7 @@ Firm and quiet: flat at rest, petrol for intent, hairlines for structure, motion
 - **Internal Padding:** 1.25rem (asides) to 1.5–2rem (feature cards).
 
 ### Inputs / Fields
-- **Style:** white, Strong Hairline border, 8px radius, about 54px tall (44px in the portal).
+- **Style:** white, Field Edge border, 8px radius, about 54px tall (44px in the portal).
 - **Hover:** the border warms to petrol-300.
 - **Focus:** Petrol border plus a 3px Petrol Tint halo; the field's label also turns Deep Petrol.
 - **Error:** alert-700 border, alert-800 message text.
@@ -387,7 +392,15 @@ fills as it crosses the middle of the screen; step one is always filled ("you ar
 Petrol label text, opened by a 1rem × 2px coral rule. It is the most repeated brand signal on every page.
 
 ### Status badge
-8px, petrol-50 fill, petrol-200 edge, petrol-800 text at 0.8rem/600, for case and workflow states in the portal.
+8px, petrol-50 fill, petrol-200 edge, petrol-800 text at 12px/600, for case and workflow states in the portal.
+
+### Component tokens
+Buttons, status badges, tables, dialogs, fields and cards read component tokens (`--button-*`, `--badge-*`,
+`--table-*`, `--dialog-*`, `--field-*`, `--card-*`, plus `--focus-ring` and `--shadow-raised`). They are declared in
+`globals.css` (`:root` in `@layer base`) as aliases of the ramp and semantic tokens, so they follow the theme
+automatically. `theme-petrol.css` overrides only where Petrol & Paper differs in structure: 8px radii, a flat primary
+hover and the secondary-button hover. New components use these tokens rather than reading ramps or hex values directly.
+The status, chart and dense-table tokens in `docs/ux-redesign/token-proposals.md` (B1–B3) are deferred, not adopted.
 
 ## Do's and Don'ts
 

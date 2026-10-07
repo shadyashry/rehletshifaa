@@ -28,7 +28,9 @@ Update at the end of every phase.
         backlog.md — new **P0**: `WorkspaceView` has no case key, so typed drafts can carry into another patient's case
   - [x] Pro Max token proposals → `docs/ux-redesign/token-proposals.md` (proposals only)
   - [x] shape plans → `plans/patient-proposal.md`, `plans/staff-work-views.md` (drafts)
-  - [ ] GATE 2: token, plan and legal (Arabic terms) decisions; apply approved tokens; commit `feat(tokens)`
+  - [x] GATE 2 decided (see Decisions); approved component tokens + `ink-350` applied to `globals.css` /
+        `theme-petrol.css` / `DESIGN.md`; lint unchanged, typecheck ok, a11y 20/20
+  - [ ] P0 cross-case drafts: branch `fix/workspace-case-key` from `codex/platform-control-plane` (in progress)
 - [ ] **Phase 5 — `/redesign-area` runs**
   - [ ] Patient proposal dialog — GATE 3
   - [ ] Staff work views — GATE 4
@@ -42,6 +44,10 @@ Update at the end of every phase.
 | 2026-10-07 | Public-site pass scope P0 + P1 (done: commits `adcf0d6`…`7061d9c`). | Owner |
 | 2026-10-07 | Portal pass scope P0 + P1; proposal terms behind a disclosure, wording unchanged, flagged pending legal review; staff shell: slim footer only (P2, later). | Owner |
 | 2026-10-07 | `.impeccable/critique/` snapshots are committed (`47291f6`). | Owner |
+| 2026-10-07 | GATE 2 tokens: **A component tokens approved** (button, badge, table, dialog, field, card + `--focus-ring`, `--shadow-raised` rename); **field edge = new `--color-ink-350 #7a898c`** (3.63/3.31/3.03); **B1 status, B2 chart palette, B3 dense-table type deferred** (kept in `token-proposals.md`). Defaults accepted: badge 12px/600; Western digits in Arabic until native review; CC converges colours first; legacy aliases deleted once components use component tokens. | Owner |
+| 2026-10-07 | GATE 2 plans: `plans/patient-proposal.md` and `plans/staff-work-views.md` **approved**. | Owner |
+| 2026-10-07 | GATE 2 legal: **option B** — the proposal decision stays disabled on `/ar` until legally approved Arabic deposit/refund/cancellation terms exist; explain why and offer "Message your coordinator". | Owner |
+| 2026-10-07 | New P0 (cross-case drafts, `WorkspaceView` has no case key) gets its own fix branch from `codex/platform-control-plane`, like the reload loop. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -64,4 +70,5 @@ Update at the end of every phase.
 
 ## Next exact action
 
-GATE 2 — waiting for owner decisions on tokens, plans, legal option and the new P0 (cross-case drafts).
+P0 cross-case drafts: `git switch -c fix/workspace-case-key codex/platform-control-plane`, key `WorkspaceView` by case id,
+add a Playwright test that switches cases and checks drafts are cleared; stop for approval (Gate-1 style). Then Phase 5.

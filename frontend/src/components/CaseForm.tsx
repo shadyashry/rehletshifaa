@@ -390,7 +390,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
           {someoneElse && <p className="mt-1 text-sm text-ink-500">{t.contactRepHint}</p>}
           <div className="mt-4 grid gap-6 sm:grid-cols-2">
             <Field label={d.form.phone} required requiredMark={t.requiredMark} valid={valid.whatsappNumber} error={fieldError("whatsappNumber")} hint={d.form.phoneHint}>
-              <div className={`flex items-stretch overflow-hidden rounded-[0.55rem] border ${fieldError("whatsappNumber") ? "border-alert-700" : "border-line-strong focus-within:border-brand-600 focus-within:shadow-[0_0_0_3px_var(--color-brand-100)]"}`} dir="ltr">
+              <div className={`flex items-stretch overflow-hidden rounded-[0.55rem] border ${fieldError("whatsappNumber") ? "border-alert-700" : "border-[var(--field-border)] focus-within:border-brand-600 focus-within:shadow-[0_0_0_3px_var(--color-brand-100)]"}`} dir="ltr">
                 <input className="min-w-0 flex-1 bg-white px-3 py-2.5 text-ink-900 outline-none" inputMode="tel" autoComplete="tel-national" placeholder={dialCountry ? "100 000 0000" : d.form.dialCodeChoose} aria-label={t.localNumber} value={phoneLocal} onChange={e => { begin(); setPhoneLocal(e.target.value.replace(/[^\d\s()-]/g, "")); }} onBlur={() => touch("whatsappNumber")} />
                 {/* The visible prefix is drawn; a transparent native select over it does the choosing, so keyboards,
                     screen readers and phone pickers all get the platform control. It comes after the number in the DOM
@@ -491,7 +491,7 @@ function CountrySelect({ value, placeholder, emptyLabel, clearLabel, invalid, on
   }
 
   return <div ref={rootRef} className="relative">
-    <div className={`flex items-center rounded-[0.55rem] border bg-white ${invalid ? "border-alert-700" : open ? "border-brand-600 shadow-[0_0_0_3px_var(--color-brand-100)]" : "border-line-strong"}`}>
+    <div className={`flex items-center rounded-[0.55rem] border bg-white ${invalid ? "border-alert-700" : open ? "border-brand-600 shadow-[0_0_0_3px_var(--color-brand-100)]" : "border-[var(--field-border)]"}`}>
       {value && !open && <span className="ps-3 text-lg leading-none" aria-hidden>{flagEmoji(value.iso2)}</span>}
       <Search size={16} aria-hidden className={`ms-3 text-ink-400 ${value && !open ? "hidden" : ""}`} />
       <input

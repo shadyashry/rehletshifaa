@@ -41,6 +41,9 @@
   --color-ink-500: #445c64; /* supporting copy */
   --color-ink-400: #5e747a;
   --color-ink-300: #9fb0b6;
+  /* Field edges: the quietest grey that still meets WCAG 1.4.11 non-text contrast (3.63 on white, 3.31 on paper,
+     3.03 on deep paper). Approved 2026-10-07 (GATE 2); shared by both themes. */
+  --color-ink-350: #7a898c;
 
   /* Surfaces and rules */
   --color-line: #e2ecec;
@@ -128,6 +131,104 @@
    on links (the primary CTA once rendered white-on-white because of this).
 --------------------------------------------------------------------------- */
 @layer base {
+  /* Component tokens (approved 2026-10-07, docs/ux-redesign/token-proposals.md §A3). Each is an alias of a ramp or
+     semantic token, so a theme that re-points the ramps re-points these too; theme-petrol.css overrides only where
+     its structure differs (radius, hover, shadow). Kept out of @theme so they do not generate utilities. */
+  :root {
+    --focus-ring: 3px solid var(--color-brand-600);
+    --shadow-raised: var(--shadow-card);
+
+    --button-radius: 0.75rem;
+    --button-radius-compact: 0.7rem;
+    --button-height: 3rem;
+    --button-height-compact: 2.75rem;
+    --button-height-phone: 2.875rem;
+    --button-padding: 0.7rem 1.35rem;
+    --button-padding-compact: 0.55rem 1.1rem;
+    --button-font-size: 1rem;
+    --button-font-size-compact: 0.9375rem;
+    --button-disabled-opacity: 0.55;
+    --button-primary-bg: var(--color-brand-600);
+    --button-primary-border: var(--color-brand-600);
+    --button-primary-fg: var(--color-surface-default);
+    --button-primary-bg-hover: var(--color-brand-700);
+    --button-primary-shadow-hover: 0 12px 26px -18px rgb(31 107 115 / 0.8);
+    --button-secondary-bg: var(--color-surface-default);
+    --button-secondary-fg: var(--color-brand-900);
+    --button-secondary-border: var(--color-line-strong);
+    --button-secondary-bg-hover: var(--color-brand-50);
+    --button-secondary-fg-hover: var(--color-brand-700);
+    --button-secondary-border-hover: var(--color-brand-600);
+    --button-inverse-bg: var(--color-surface-default);
+    --button-inverse-fg: var(--color-brand-700);
+    --button-inverse-bg-hover: var(--color-brand-50);
+    --button-outline-fg: var(--color-brand-700);
+    --button-outline-border: var(--color-line-strong);
+    --button-outline-bg-hover: var(--color-brand-50);
+    --button-outline-border-hover: var(--color-brand-300);
+    --button-outline-fg-hover: var(--color-brand-800);
+
+    --badge-radius: 0.5rem;
+    --badge-padding: 0.25rem 0.65rem;
+    --badge-font-size: 0.75rem;
+    --badge-font-weight: 600;
+    --badge-bg: var(--color-brand-50);
+    --badge-fg: var(--color-brand-800);
+    --badge-border: var(--color-brand-200);
+
+    --table-bg: var(--color-surface-default);
+    --table-border: var(--color-line);
+    --table-radius: var(--radius-card);
+    --table-header-bg: var(--color-surface-pearl);
+    --table-header-fg: var(--color-ink-500);
+    --table-row-fg: var(--color-ink-600);
+    --table-row-fg-strong: var(--color-ink-900);
+    --table-row-meta-fg: var(--color-ink-400); /* never on deep paper: 4.45:1 there */
+    --table-row-bg-hover: var(--color-brand-50);
+    --table-row-selected-edge: 2px solid var(--color-brand-600);
+    --table-cell-padding: 0.625rem 0.875rem;
+    --table-header-padding: 0.5rem 0.875rem;
+    --table-row-min-height: 2.75rem;
+
+    --dialog-bg: var(--color-surface-default);
+    --dialog-fg: var(--color-ink-900);
+    --dialog-border: var(--color-line);
+    --dialog-radius: 1rem;
+    --dialog-padding: 1.5rem;
+    --dialog-max-width: 30rem;
+    --dialog-shadow: var(--shadow-raised);
+    --dialog-backdrop: color-mix(in srgb, var(--color-brand-950) 50%, transparent);
+
+    --field-bg: var(--color-surface-default);
+    --field-fg: var(--color-ink-900);
+    --field-placeholder: var(--color-ink-400);
+    --field-border: var(--color-ink-350);
+    --field-border-hover: var(--color-brand-300);
+    --field-border-focus: var(--color-brand-600);
+    --field-focus-halo: 3px var(--color-brand-100);
+    --field-label-fg-focus: var(--color-brand-700);
+    --field-border-error: var(--color-alert-700);
+    --field-error-fg: var(--color-alert-800);
+    --field-radius: 0.75rem;
+    --field-height: 3.35rem;
+    --field-height-compact: 2.75rem;
+    --field-padding: 0.8rem 0.9rem;
+    --field-disabled-bg: var(--color-surface-pearl);
+    --choice-checked-bg: var(--color-brand-50);
+    --choice-checked-border: var(--color-brand-600);
+
+    --card-bg: var(--color-surface-default);
+    --card-fg: var(--color-ink-600);
+    --card-bg-inset: var(--color-surface-pearl);
+    --card-border: var(--color-line);
+    --card-radius: var(--radius-card);
+    --card-shadow: var(--shadow-card);
+    --card-shadow-raised: var(--shadow-raised);
+    --card-padding: 1.5rem;
+    --card-padding-compact: 1.25rem;
+    --card-tab-edge: 2px solid var(--color-brand-600);
+  }
+
   * {
     box-sizing: border-box;
   }
@@ -180,7 +281,7 @@
   }
 
   :focus-visible {
-    outline: 3px solid var(--color-brand-600);
+    outline: var(--focus-ring);
     outline-offset: 3px;
     border-radius: 3px;
   }
@@ -189,7 +290,7 @@
      (~3:1). Same selector as preflight so this later rule wins. */
   input::placeholder,
   textarea::placeholder {
-    color: var(--color-ink-400);
+    color: var(--field-placeholder);
     opacity: 1;
   }
 
@@ -328,11 +429,11 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    min-height: 3rem;
-    padding: 0.7rem 1.35rem;
-    border-radius: 0.75rem;
+    min-height: var(--button-height);
+    padding: var(--button-padding);
+    border-radius: var(--button-radius);
     font-weight: 600;
-    font-size: 1rem;
+    font-size: var(--button-font-size);
     text-align: center;
     transition:
       transform 0.18s ease,
@@ -344,40 +445,40 @@
 
   /* Healing Teal is the single primary-action colour. */
   .btn-primary {
-    background: var(--color-brand-600);
-    color: #ffffff;
-    border: 1px solid var(--color-brand-600);
+    background: var(--button-primary-bg);
+    color: var(--button-primary-fg);
+    border: 1px solid var(--button-primary-border);
   }
 
   .btn-primary:hover {
-    background: var(--color-brand-700);
-    border-color: var(--color-brand-700);
+    background: var(--button-primary-bg-hover);
+    border-color: var(--button-primary-bg-hover);
     transform: translateY(-1px);
-    box-shadow: 0 12px 26px -18px rgba(31, 107, 115, 0.8);
+    box-shadow: var(--button-primary-shadow-hover);
   }
 
   .btn-secondary {
-    color: var(--color-brand-900);
-    background: #ffffff;
-    border: 1px solid var(--color-line-strong);
+    color: var(--button-secondary-fg);
+    background: var(--button-secondary-bg);
+    border: 1px solid var(--button-secondary-border);
   }
 
   .btn-secondary:hover {
-    border-color: var(--color-brand-600);
-    color: var(--color-brand-700);
-    background: var(--color-brand-50);
+    border-color: var(--button-secondary-border-hover);
+    color: var(--button-secondary-fg-hover);
+    background: var(--button-secondary-bg-hover);
   }
 
   /* White action on a teal surface. */
   .btn-inverse {
-    background: #ffffff;
-    color: var(--color-brand-700);
-    border: 1px solid #ffffff;
+    background: var(--button-inverse-bg);
+    color: var(--button-inverse-fg);
+    border: 1px solid var(--button-inverse-bg);
   }
 
   .btn-inverse:hover {
-    background: var(--color-brand-50);
-    border-color: var(--color-brand-50);
+    background: var(--button-inverse-bg-hover);
+    border-color: var(--button-inverse-bg-hover);
   }
 
   /* Secondary account action (Sign in): a refined outline, never a second filled CTA. */
@@ -386,30 +487,30 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    min-height: 2.75rem;
+    min-height: var(--button-height-compact);
     padding: 0.55rem 1.15rem;
-    border-radius: 0.7rem;
-    border: 1px solid var(--color-line-strong);
+    border-radius: var(--button-radius-compact);
+    border: 1px solid var(--button-outline-border);
     background: transparent;
-    color: var(--color-brand-700);
+    color: var(--button-outline-fg);
     font-weight: 600;
-    font-size: 0.9375rem;
+    font-size: var(--button-font-size-compact);
     white-space: nowrap;
     transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
   }
 
   /* In the header the primary action sits beside the outlined Sign in as a pair of the same height. */
   .site-header .btn-primary {
-    min-height: 2.75rem;
-    padding: 0.55rem 1.1rem;
-    font-size: 0.9375rem;
-    border-radius: 0.7rem;
+    min-height: var(--button-height-compact);
+    padding: var(--button-padding-compact);
+    font-size: var(--button-font-size-compact);
+    border-radius: var(--button-radius-compact);
   }
 
   .btn-outline:hover {
-    background: var(--color-brand-50);
-    border-color: var(--color-brand-300);
-    color: var(--color-brand-800);
+    background: var(--button-outline-bg-hover);
+    border-color: var(--button-outline-border-hover);
+    color: var(--button-outline-fg-hover);
   }
 
   /* The RehletShifaa care-journey motif: one thin flowing connector between numbered moments. Drawn
@@ -487,10 +588,10 @@
   }
 
   .card {
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-card);
-    background: #ffffff;
-    box-shadow: var(--shadow-card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    background: var(--card-bg);
+    box-shadow: var(--card-shadow);
   }
 
   .journey-scene {
@@ -499,12 +600,12 @@
 
   .field {
     width: 100%;
-    min-height: 3.35rem;
-    padding: 0.8rem 0.9rem;
-    border: 1px solid var(--color-line-strong);
-    border-radius: 0.75rem;
-    background: #ffffff;
-    color: var(--color-ink-900);
+    min-height: var(--field-height);
+    padding: var(--field-padding);
+    border: 1px solid var(--field-border);
+    border-radius: var(--field-radius);
+    background: var(--field-bg);
+    color: var(--field-fg);
   }
 
   .surface-muted {
@@ -539,17 +640,17 @@
   }
 
   .field:focus {
-    border-color: var(--color-brand-600);
-    box-shadow: 0 0 0 3px var(--color-brand-100);
+    border-color: var(--field-border-focus);
+    box-shadow: 0 0 0 var(--field-focus-halo);
     outline: 0;
   }
 
   .field-error {
-    border-color: var(--color-alert-700);
+    border-color: var(--field-border-error);
   }
 
   .error-text {
-    color: var(--color-alert-800);
+    color: var(--field-error-fg);
     font-size: 0.86rem;
   }
 
@@ -694,7 +795,7 @@
   .btn-primary,
   .btn-secondary,
   .btn-inverse {
-    min-height: 2.875rem;
+    min-height: var(--button-height-phone);
     padding: 0.6rem 1.2rem;
     font-size: 0.9375rem;
   }
@@ -724,18 +825,18 @@
   .portal-shell { min-height: 70vh; padding-block: 2rem 4rem; font-size: 1rem; line-height: 1.65; }
   .portal-shell .headline { font-size: clamp(1.5rem, 3vw, 2rem); }
   .portal-shell .title { font-size: 1.1rem; }
-  .portal-shell .btn-primary, .portal-shell .btn-secondary, .account-dialog .btn-primary { min-height: 2.75rem; padding: .6rem 1rem; font-size: .9rem; }
-  .portal-shell .field, .account-dialog .field { min-height: 2.75rem; padding-block: .6rem; font-size: .95rem; }
-  .portal-shell button:disabled, .account-dialog button:disabled, .portal-account button:disabled { opacity: .55; cursor: not-allowed; }
+  .portal-shell .btn-primary, .portal-shell .btn-secondary, .account-dialog .btn-primary { min-height: var(--button-height-compact); padding: .6rem 1rem; font-size: var(--button-font-size-compact); }
+  .portal-shell .field, .account-dialog .field { min-height: var(--field-height-compact); padding-block: .6rem; font-size: .95rem; }
+  .portal-shell button:disabled, .account-dialog button:disabled, .portal-account button:disabled { opacity: var(--button-disabled-opacity); cursor: not-allowed; }
   .portal-shell .card { box-shadow: var(--shadow-card); }
   .portal-shell fieldset:disabled { opacity: .65; }
   .portal-shell h2, .portal-shell h3 { scroll-margin-top: 7rem; }
-  .status-badge { display: inline-flex; border: 1px solid var(--color-brand-200); border-radius: .5rem; padding: .25rem .65rem; background: var(--color-brand-50); color: var(--color-brand-800); font-size: .8rem; font-weight: 600; }
+  .status-badge { display: inline-flex; border: 1px solid var(--badge-border); border-radius: var(--badge-radius); padding: var(--badge-padding); background: var(--badge-bg); color: var(--badge-fg); font-size: var(--badge-font-size); font-weight: var(--badge-font-weight); }
   .account-option { display: flex; align-items: center; gap: .75rem; width: 100%; min-height: 2.75rem; padding: .65rem .75rem; text-align: start; border-radius: .5rem; font-size: .9rem; }
   .account-option:hover { background: var(--color-brand-50); }
   .portal-account summary::-webkit-details-marker { display: none; }
-  .account-dialog { margin: auto; padding: 1.5rem; width: min(30rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; border: 1px solid var(--color-line); border-radius: 1rem; background: white; color: var(--color-ink-900); }
-  .account-dialog::backdrop { background: #1c333a80; }
+  .account-dialog { margin: auto; padding: var(--dialog-padding); width: min(var(--dialog-max-width), calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius); background: var(--dialog-bg); color: var(--dialog-fg); box-shadow: var(--dialog-shadow); }
+  .account-dialog::backdrop { background: var(--dialog-backdrop); }
   .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: .5rem; }
   .icon-button:hover { background: var(--color-brand-50); }
 }
