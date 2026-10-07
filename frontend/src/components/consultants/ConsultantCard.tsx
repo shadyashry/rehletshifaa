@@ -8,7 +8,7 @@ import type { ConsultantProfile } from "@/lib/consultants";
 
 /**
  * One Consultant on the panel: a body-system tinted header (identity mark, care area, credential signals),
- * then name, specialty, verified role, one professional distinction, three clinical-focus facets and the
+ * then name, specialty, role, one professional distinction, three clinical-focus facets and the
  * location. The whole card opens the full profile; no ratings, rankings or superlatives.
  */
 export function ConsultantCard({ profile, system, icon, href, labels, featured = false }: {

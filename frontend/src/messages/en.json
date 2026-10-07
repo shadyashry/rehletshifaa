@@ -152,7 +152,7 @@
     "finalBody": "Send what you already have. We'll guide you through the next step.",
     "finalNote": "Starting a case does not commit you to treatment or travel.",
     "slogan": "You see the full picture first. The decision stays yours.",
-    "areasIntro": "Organised by body system, each led by named, verified Consultants — or send your case and we will route it for you.",
+    "areasIntro": "Organised by body system, each led by named Consultants — or send your case and we will route it for you.",
     "areasAction": "View care area",
     "cardiologyFacets": ["Coronary", "Structural heart", "Heart rhythm"],
     "consultantsPromise": {
@@ -190,8 +190,8 @@
     "areasConsultantsMany": "{n} Consultants",
     "panel": {
       "title": "The Consultants behind your care",
-      "body": "Senior specialists, verified before any case is matched to them.",
-      "consultants": "Verified Consultants",
+      "body": "Senior specialists whose credentials are reviewed before any case is matched to them.",
+      "consultants": "Consultants",
       "faculty": "University faculty",
       "areas": "Care areas",
       "link": "Meet the Consultants"
@@ -522,7 +522,7 @@
   "careAreasPage": {
     "eyebrow": "Care areas",
     "title": "Choose the care area closest to your need",
-    "intro": "Consultant-led review across {count} care areas, each led by named, verified senior Consultants. Explore by body system — or send your case and we will route it for you.",
+    "intro": "Consultant-led review across {count} care areas, each led by named senior Consultants. Explore by body system — or send your case and we will route it for you.",
     "tabsLabel": "Care areas",
     "tabs": {
       "cardiology": "Cardiology",
@@ -536,7 +536,7 @@
     },
     "stats": {
       "areas": "Care areas",
-      "consultants": "Verified Consultants",
+      "consultants": "Consultants",
       "faculty": "University faculty"
     },
     "explore": "Explore the care areas",
@@ -548,7 +548,7 @@
     "atlas": {
       "eyebrow": "The care atlas",
       "title": "{count} care areas, organised by body system",
-      "intro": "Each care area is led by verified Consultants who own the clinical decision. Choose the one closest to your need — or let your coordinator choose for you.",
+      "intro": "Each care area is led by named Consultants who own the clinical decision. Choose the one closest to your need — or let your coordinator choose for you.",
       "index": "Jump to a body system",
       "areasOne": "1 care area",
       "areasMany": "{n} care areas",
@@ -598,7 +598,7 @@
         },
         {
           "title": "Matched Consultant",
-          "body": "A verified senior Consultant reviews your case and owns the clinical decision."
+          "body": "A senior Consultant in the right specialty reviews your case and owns the clinical decision."
         }
       ]
     }
@@ -684,7 +684,7 @@
   },
   "consultantsPage": {
     "stats": {
-      "consultants": "Verified Consultants",
+      "consultants": "Consultants",
       "faculty": "University faculty",
       "areas": "Care areas"
     },
@@ -725,8 +725,8 @@
           "body": "Degrees, board fellowships and appointments are checked with institutional sources."
         },
         {
-          "title": "Verified before matching",
-          "body": "Only verified Consultants are matched to a patient's case."
+          "title": "Reviewed before matching",
+          "body": "A Consultant is matched to a patient's case only after this credential review."
         }
       ],
       "disclaimer": "Profiles draw on supplied CVs and the sources identified on each profile. The order of profiles is not a ranking, and no credential is an outcome guarantee."
@@ -747,7 +747,7 @@
         },
         {
           "title": "Your Consultant reviews",
-          "body": "A verified senior Consultant reviews your case and owns the clinical decision."
+          "body": "A senior Consultant in the right specialty reviews your case and owns the clinical decision."
         }
       ]
     }
@@ -756,10 +756,10 @@
     "careAreas": "Care areas",
     "meet": "Meet the Consultants",
     "stats": {
-      "consultants": "Verified Consultants",
+      "consultants": "Consultants",
       "faculty": "University faculty",
       "focus": "Clinical focus areas",
-      "consultantsOne": "Verified Consultant",
+      "consultantsOne": "Consultant",
       "facultyOne": "University faculty member"
     },
     "snapshotLed": "Led by",
@@ -770,7 +770,7 @@
     "signsFallback": "Send us your case if…",
     "consultantsEyebrow": "The Consultants",
     "consultantsTitle": "Who leads {area}",
-    "consultantsIntro": "Verified senior specialists. Your coordinator matches your case to the most appropriate one.",
+    "consultantsIntro": "Senior specialists in this area. Your coordinator matches your case to the most appropriate one.",
     "relatedEyebrow": "Keep exploring",
     "relatedTitle": "Other care areas",
     "sameSystem": "Also in {system}",

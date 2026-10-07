@@ -27,8 +27,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /**
  * The Consultants page is a trust page, not a marketplace. The hero shows how a case reaches a Consultant
- * (the patient never has to pick); the panel lists every verified Consultant grouped by the same body
- * systems as the Care Areas atlas, with search and filters; then how profiles are verified, and the
+ * (the patient never has to pick); the panel lists every named Consultant grouped by the same body
+ * systems as the Care Areas atlas, with search and filters; then how profiles are reviewed, and the
  * closing router. No featured row, ratings or rankings — the order of profiles carries no meaning.
  */
 export default async function Consultants({ params }: Props) {

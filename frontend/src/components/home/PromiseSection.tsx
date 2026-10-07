@@ -13,7 +13,7 @@ const SHOWN_MONOGRAMS = 5;
  * The claim the whole platform rests on — a named Consultant owns the clinical decision — set as an
  * editorial statement on the clinical mist: the statement in the 5-column, and in the 7-column three
  * principles, each with one meaningful icon (numerals are kept for real sequences only). Beneath, the evidence: the panel of
- * verified Consultants as monograms with three derived facts and one way to meet them.
+ * named Consultants as monograms with three derived facts and one way to meet them.
  */
 export function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale }) {
   const p = d.home.consultantsPromise;
@@ -30,12 +30,12 @@ export function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale })
     ? [
         ["الاختصاص المناسب", "يُختار حسب الحاجة السريرية."],
         ["مسؤولية واضحة", "استشاري واحد يملك التوصية."],
-        ["مؤهلات موثّقة", "يجري التحقق منها قبل توجيه أي حالة."],
+        ["مراجعة المؤهلات", "تُراجَع قبل توجيه أي حالة."],
       ]
     : [
         ["Right specialty", "Matched to the clinical need."],
         ["Clear responsibility", "One Consultant owns the recommendation."],
-        ["Verified credentials", "Checked before any case is matched."],
+        ["Credential review", "Reviewed before any case is matched."],
       ];
 
   return (
