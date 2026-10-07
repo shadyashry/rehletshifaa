@@ -219,6 +219,53 @@ class ConsultantVirtualClinicTest {
         assertThat(count("SELECT count(*) FROM case_assignments WHERE case_id=? AND assignee_subject='doctor-a' AND status='ACTIVE'", caseId)).isEqualTo(1);
     }
 
+    // ================= referral views =================
+
+    @Test void referralListsAreNewestFirstNameEveryConsultantAndShowEachPersonTheirRelation() throws Exception {
+        UUID caseId = underReviewBy("doctor-a", doctorA);
+        authenticate("doctor-a", Role.CONSULTANT);
+        var transfer = referrals.create(caseId, new CreateReferralRequest("TRANSFER", "Needs structural heart expertise", null, "Structural heart", doctorB));
+        var opinion = referrals.create(caseId, new CreateReferralRequest("SECOND_OPINION", "Borderline indication", null, null, null));
+        em.flush();
+        jdbc.update("UPDATE consultant_referrals SET created_at=? WHERE id=?", Instant.now().minus(1, ChronoUnit.HOURS), transfer.id());
+        em.clear();
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        referrals.confirm(caseId, opinion.id(), new ConfirmReferralRequest(doctorC, "orthopedics", "Ortho view", opinion.version()));
+        assertThatThrownBy(() -> referrals.confirm(caseId, UUID.randomUUID(), new ConfirmReferralRequest(doctorB, null, null, 0)))
+                .isInstanceOf(ApiException.class).extracting("code").isEqualTo("REFERRAL_NOT_FOUND");
+        em.flush();
+        var all = referrals.forCoordinator(caseId);
+        assertThat(all).extracting(ReferralView::id).containsExactly(opinion.id(), transfer.id());
+        assertThat(all).allSatisfy(r -> {
+            assertThat(r.viewerRelation()).isEqualTo("COORDINATOR");
+            assertThat(r.fromConsultantName()).isEqualTo("Dr A");
+        });
+        assertThat(all.get(0)).satisfies(r -> {
+            assertThat(r.status()).isEqualTo("AWAITING_CONSULTANT");
+            assertThat(r.clinicalReason()).isEqualTo("Borderline indication");
+            assertThat(r.targetCareArea()).isEqualTo("orthopedics");
+            assertThat(r.targetConsultantName()).isEqualTo("Dr C");
+            assertThat(r.suggestedConsultantName()).isNull();
+            assertThat(r.coordinatorNote()).isEqualTo("Ortho view");
+        });
+        assertThat(all.get(1)).satisfies(r -> {
+            assertThat(r.status()).isEqualTo("AWAITING_COORDINATOR");
+            assertThat(r.suggestedPractitionerId()).isEqualTo(doctorB);
+            assertThat(r.suggestedConsultantName()).isEqualTo("Dr B");
+            assertThat(r.suggestedCapability()).isEqualTo("Structural heart");
+            assertThat(r.targetConsultantName()).isNull();
+            assertThat(r.opinion()).isNull();
+        });
+
+        authenticate("doctor-a", Role.CONSULTANT);
+        assertThat(referrals.forConsultant(caseId)).extracting(ReferralView::id, ReferralView::viewerRelation)
+                .containsExactly(tuple(opinion.id(), "REFERRER"), tuple(transfer.id(), "REFERRER"));
+        authenticate("doctor-c", Role.CONSULTANT); // offered the second opinion only
+        assertThat(referrals.forConsultant(caseId)).extracting(ReferralView::id, ReferralView::viewerRelation)
+                .containsExactly(tuple(opinion.id(), "RECEIVER"));
+    }
+
     // ================= virtual clinic =================
 
     @Test void practiceManagersPrepareButOnlyTheConsultantApprovesServicesAndPrices() {

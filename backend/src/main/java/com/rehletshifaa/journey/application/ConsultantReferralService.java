@@ -10,6 +10,7 @@ import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.clinic.application.ConsultantEligibilityService;
 import com.rehletshifaa.clinic.infrastructure.CareCategoryRepository;
+import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.IdResponse;
 import com.rehletshifaa.journey.api.ReferralDtos.*;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
@@ -19,15 +20,12 @@ import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
 
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -49,15 +47,18 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  *       Submitting the opinion ends the assignment, and with it the access.</li>
  * </ul>
  * Every step is audited against the case and visible in the assignment history ({@code case_assignments}).
+ * Referral views are read by {@link ReferralQueryService}; the commands read through repositories.
  */
 @Service
 public class ConsultantReferralService {
     private final ConsultantReferralRepository referralRecords;
     private final CaseAssignmentRepository assignments;
     private final MedicalCaseRepository cases;
+    private final PractitionerProfileRepository practitioners;
+    private final ReferralQueryService queries;
     private static final String CLINICAL_WORK = "CLINICAL_REVIEW";
+    private static final List<String> OPEN = List.of("AWAITING_COORDINATOR", "AWAITING_CONSULTANT", "IN_PROGRESS");
 
-    private final JdbcClient jdbc;
     private final Authority authority;
     private final ConsultantEligibilityService eligibility;
     private final StaffWorkService work;
@@ -66,10 +67,12 @@ public class ConsultantReferralService {
     private final AuditTrail audit;
     private final Clock clock;
 
-    public ConsultantReferralService(JdbcClient jdbc, Authority authority, ConsultantEligibilityService eligibility,
+    public ConsultantReferralService(Authority authority, ConsultantEligibilityService eligibility,
                                      StaffWorkService work, CryptoService crypto, CareCategoryRepository careCategories,
-                                     AuditTrail audit, Clock clock, MedicalCaseRepository cases, CaseAssignmentRepository assignments, ConsultantReferralRepository referralRecords) { this.referralRecords = referralRecords; this.assignments = assignments; this.cases = cases;
-        this.jdbc = jdbc; this.authority = authority; this.eligibility = eligibility; this.work = work; this.crypto = crypto;
+                                     AuditTrail audit, Clock clock, MedicalCaseRepository cases, CaseAssignmentRepository assignments,
+                                     ConsultantReferralRepository referralRecords, PractitionerProfileRepository practitioners,
+                                     ReferralQueryService queries) { this.referralRecords = referralRecords; this.assignments = assignments; this.cases = cases;
+        this.practitioners = practitioners; this.queries = queries; this.authority = authority; this.eligibility = eligibility; this.work = work; this.crypto = crypto;
         this.careCategories = careCategories; this.audit = audit; this.clock = clock;
     }
 
@@ -80,14 +83,10 @@ public class ConsultantReferralService {
         var actor = authority.authorize(Permission.CLINICAL_REVIEW, Resource.ofCase(caseId));
         if (!"CONSULTANT_REVIEW".equals(caseStatus(caseId)))
             throw new ApiException(409, "CASE_STATE_CONFLICT", "A referral can be made while the case is under your clinical review");
-        UUID source = jdbc.sql("SELECT id FROM case_assignments WHERE case_id=? AND assignee_subject=? AND assignee_role='DOCTOR' AND status='ACTIVE' "
-                        + "AND assignment_type NOT IN ('TRANSFER','SECOND_OPINION')")
-                .params(caseId, actor.subject()).query(UUID.class).optional()
+        UUID source = assignments.findActiveConsultantAssignment(caseId, actor.subject())
                 .orElseThrow(() -> new ApiException(403, "ACTIVE_ASSIGNMENT_REQUIRED", "Only the case's assigned consultant can make a referral"));
-        UUID from = jdbc.sql("SELECT id FROM practitioner_profiles WHERE external_subject=?").param(actor.subject()).query(UUID.class).single();
-        long open = jdbc.sql("SELECT COUNT(*) FROM consultant_referrals WHERE case_id=? AND referral_type=? AND status IN ('AWAITING_COORDINATOR','AWAITING_CONSULTANT','IN_PROGRESS')")
-                .params(caseId, request.type()).query(Long.class).single();
-        if (open > 0) throw new ApiException(409, "REFERRAL_ALREADY_OPEN", "A referral of this kind is already in progress for this case");
+        UUID from = practitioners.findIdByExternalSubject(actor.subject()).orElseThrow();
+        if (referralRecords.existsByCaseIdAndReferralTypeAndStatusIn(caseId, request.type(), OPEN)) throw new ApiException(409, "REFERRAL_ALREADY_OPEN", "A referral of this kind is already in progress for this case");
         String suggestedArea = blankToNull(request.suggestedCareArea());
         if (suggestedArea != null && !careCategories.existsBySlug(suggestedArea))
             throw new ApiException(400, "INVALID_CARE_CATEGORY", "Select a managed care area");
@@ -100,7 +99,7 @@ public class ConsultantReferralService {
         Instant now = clock.instant();
         referralRecords.saveAndFlush(new ConsultantReferral(id, caseId, request.type(), actor.subject(), from, source, crypto.encrypt(request.clinicalReason().trim()), suggestedArea, blankToNull(request.suggestedCapability()), request.suggestedPractitionerId(), now));
         boolean transfer = "TRANSFER".equals(request.type());
-        String consultant = consultantName(from);
+        String consultant = queries.consultantName(from);
         work.openWorkItem(new NewWorkItem(caseId, confirmWork(request.type()),
                 transfer ? "Consultant transfer requested — confirm the handover" : "Second opinion requested — choose a consultant",
                 consultant + (transfer ? " asked to transfer this case to another consultant." : " asked for a second opinion.")
@@ -114,17 +113,14 @@ public class ConsultantReferralService {
     public List<com.rehletshifaa.clinic.api.ClinicDtos.EligibleConsultantView> candidates(String careArea) {
         var actor = authority.authorize(Permission.WORK_QUEUE_VIEW);
         if (!actor.has(Role.CONSULTANT)) throw new ApiException(403, "PERMISSION_NOT_HELD", "Only consultants refer cases");
-        UUID self = jdbc.sql("SELECT id FROM practitioner_profiles WHERE external_subject=?").param(actor.subject()).query(UUID.class).optional().orElse(null);
+        UUID self = practitioners.findIdByExternalSubject(actor.subject()).orElse(null);
         return eligibility.eligible(careArea).stream().filter(c -> !c.practitionerId().equals(self)).toList();
     }
 
     /** Referrals this consultant made on the case, or was offered on it. */
     public List<ReferralView> forConsultant(UUID caseId) {
         var actor = authority.authorize(Permission.CASE_READ, Resource.ofCase(caseId));
-        return jdbc.sql("SELECT r.id,CASE WHEN r.from_subject=? THEN 'REFERRER' ELSE 'RECEIVER' END relation FROM consultant_referrals r "
-                        + "LEFT JOIN case_assignments a ON a.id=r.target_assignment_id WHERE r.case_id=? AND (r.from_subject=? OR a.assignee_subject=?) ORDER BY r.created_at DESC")
-                .params(actor.subject(), caseId, actor.subject(), actor.subject())
-                .query((rs, n) -> view(rs.getObject("id", UUID.class), rs.getString("relation"))).list();
+        return queries.seenBy(caseId, actor.subject());
     }
 
     /** Submit the second opinion. The limited assignment ends with it. */
@@ -139,7 +135,7 @@ public class ConsultantReferralService {
         if (changed != 1) throw conflict();
         assignments.endIf(r.targetAssignment(), "ACTIVE", micros(now));
         work.closeWorkItems(caseId, "SECOND_OPINION", "Second opinion submitted");
-        String who = consultantName(r.targetPractitioner());
+        String who = queries.consultantName(r.targetPractitioner());
         work.notifyStaff(r.fromSubject(), caseId, null, "SECOND_OPINION_SUBMITTED", "Second opinion received",
                 who + " submitted the second opinion you asked for.", "second-opinion:" + referralId + ":referrer", true);
         work.notifyStaff(coordinator(caseId), caseId, null, "SECOND_OPINION_SUBMITTED", "Second opinion received",
@@ -152,9 +148,8 @@ public class ConsultantReferralService {
     // ================= coordinator =================
 
     public List<ReferralView> forCoordinator(UUID caseId) {
-        var actor = authority.authorize(Permission.CASE_READ, Resource.ofCase(caseId));
-        return jdbc.sql("SELECT id FROM consultant_referrals WHERE case_id=? ORDER BY created_at DESC").param(caseId)
-                .query((rs, n) -> view(rs.getObject("id", UUID.class), "COORDINATOR")).list();
+        authority.authorize(Permission.CASE_READ, Resource.ofCase(caseId));
+        return queries.onCase(caseId);
     }
 
     /** The coordinator confirms the handover to a named, eligible consultant — who must still accept. */
@@ -170,10 +165,8 @@ public class ConsultantReferralService {
         if (area == null) area = r.suggestedArea() != null ? r.suggestedArea() : caseCareArea(caseId);
         if (request.practitionerId().equals(r.fromPractitioner()) || !eligibility.isEligible(request.practitionerId(), area))
             throw new ApiException(409, "CONSULTANT_NOT_ELIGIBLE", "Select an available, verified consultant who matches the care area");
-        String subject = jdbc.sql("SELECT external_subject FROM practitioner_profiles WHERE id=?").param(request.practitionerId()).query(String.class).single();
-        long involved = jdbc.sql("SELECT COUNT(*) FROM case_assignments WHERE case_id=? AND assignee_subject=? AND status IN ('PENDING','ACTIVE')")
-                .params(caseId, subject).query(Long.class).single();
-        if (involved > 0) throw new ApiException(409, "CONSULTANT_ALREADY_ON_CASE", "This consultant already holds an assignment on the case");
+        String subject = practitioners.findExternalSubjectById(request.practitionerId()).orElseThrow();
+        if (assignments.existsByCaseIdAndAssigneeSubjectAndStatusIn(caseId, subject, List.of("PENDING", "ACTIVE"))) throw new ApiException(409, "CONSULTANT_ALREADY_ON_CASE", "This consultant already holds an assignment on the case");
         Instant now = clock.instant();
         UUID assignment = UUID.randomUUID();
         boolean transfer = "TRANSFER".equals(r.type());
@@ -210,7 +203,7 @@ public class ConsultantReferralService {
     // ================= receiving consultant =================
 
     public boolean handles(UUID assignmentId) {
-        return jdbc.sql("SELECT COUNT(*) FROM consultant_referrals WHERE target_assignment_id=?").param(assignmentId).query(Long.class).single() > 0;
+        return referralRecords.existsByTargetAssignmentId(assignmentId);
     }
 
     /** Accept or decline a referral assignment. Called by the shared assignment-decision endpoint. */
@@ -218,18 +211,17 @@ public class ConsultantReferralService {
     public IdResponse decide(UUID caseId, UUID assignmentId, boolean accept, String reason) {
         var actor = authority.authorize(Permission.ASSIGNMENT_RESPOND, Resource.ofCase(caseId));
         if (!actor.has(Role.CONSULTANT)) throw new ApiException(403, "PERMISSION_NOT_HELD", "This offer is for a consultant");
-        String current = jdbc.sql("SELECT status FROM case_assignments WHERE id=? AND case_id=? AND assignee_subject=? AND assignee_role='DOCTOR'")
-                .params(assignmentId, caseId, actor.subject()).query(String.class).optional()
+        String current = assignments.findStatusFor(assignmentId, caseId, actor.subject(), "DOCTOR")
                 .orElseThrow(() -> new ApiException(409, "ASSIGNMENT_NOT_PENDING", "The assignment is not available for this account"));
         if (accept && "ACTIVE".equals(current)) return new IdResponse(assignmentId, "ACTIVE");
         if (!accept && "DECLINED".equals(current)) return new IdResponse(assignmentId, "DECLINED");
-        UUID referralId = jdbc.sql("SELECT id FROM consultant_referrals WHERE target_assignment_id=?").param(assignmentId).query(UUID.class).single();
-        Ref r = ref(caseId, referralId);
+        Ref r = referralRecords.findRefByTargetAssignment(assignmentId, caseId).map(ConsultantReferralService::toRef).orElseThrow(ConsultantReferralService::notFound);
+        UUID referralId = r.id();
         if (!"PENDING".equals(current) || !"AWAITING_CONSULTANT".equals(r.status()))
             throw new ApiException(409, "ASSIGNMENT_NOT_PENDING", "The assignment is not available for this account");
         Instant now = clock.instant();
         boolean transfer = "TRANSFER".equals(r.type());
-        String receiver = consultantName(r.targetPractitioner());
+        String receiver = queries.consultantName(r.targetPractitioner());
         if (!accept) {
             assignments.decline(assignmentId, micros(now));
             // Back to the coordinator to choose someone else; the declined offer stays in the assignment history.
@@ -286,8 +278,7 @@ public class ConsultantReferralService {
     @Transactional
     public void withdrawOpenTransfers(UUID caseId, Actor actor) {
         Instant now = clock.instant();
-        List<Ref> open = jdbc.sql("SELECT * FROM consultant_referrals WHERE case_id=? AND referral_type='TRANSFER' AND status IN ('AWAITING_COORDINATOR','AWAITING_CONSULTANT')")
-                .param(caseId).query(this::ref).list();
+        List<Ref> open = referralRecords.findUndecidedTransfersOf(caseId).stream().map(ConsultantReferralService::toRef).toList();
         for (Ref r : open) {
             if (r.targetAssignment() != null)
                 assignments.endIf(r.targetAssignment(), "PENDING", micros(now));
@@ -302,64 +293,48 @@ public class ConsultantReferralService {
 
     // ================= reads & helpers =================
 
-    private ReferralView view(UUID id, String relation) {
-        return jdbc.sql("SELECT * FROM consultant_referrals WHERE id=?").param(id).query((rs, n) -> {
-            boolean showOpinion = rs.getString("opinion_encrypted") != null;
-            return new ReferralView(id, rs.getString("referral_type"), rs.getString("status"),
-                    consultantName(rs.getObject("from_practitioner_id", UUID.class)), crypto.decrypt(rs.getString("clinical_reason_encrypted")),
-                    rs.getString("suggested_care_category"), rs.getString("suggested_capability"), rs.getObject("suggested_practitioner_id", UUID.class),
-                    consultantName(rs.getObject("suggested_practitioner_id", UUID.class)), rs.getString("target_care_category"),
-                    consultantName(rs.getObject("target_practitioner_id", UUID.class)), rs.getString("coordinator_note"), rs.getString("receiver_reason"),
-                    showOpinion ? crypto.decrypt(rs.getString("opinion_encrypted")) : null, instant(rs, "opinion_submitted_at"),
-                    instant(rs, "created_at"), instant(rs, "updated_at"), rs.getLong("version"), relation);
-        }).single();
-    }
+    private ReferralView view(UUID id, String relation) { return queries.view(id, relation); }
 
     private record Ref(UUID id, String type, String status, String fromSubject, UUID fromPractitioner, UUID sourceAssignment,
                        String suggestedArea, String targetArea, UUID targetPractitioner, UUID targetAssignment, long version) {}
 
     private Ref ref(UUID caseId, UUID referralId) {
-        return jdbc.sql("SELECT * FROM consultant_referrals WHERE id=? AND case_id=?").params(referralId, caseId).query(this::ref).optional()
-                .orElseThrow(() -> new ApiException(404, "REFERRAL_NOT_FOUND", "The referral was not found on this case"));
+        return referralRecords.findRef(referralId, caseId).map(ConsultantReferralService::toRef).orElseThrow(ConsultantReferralService::notFound);
     }
 
-    private Ref ref(ResultSet rs, int n) throws SQLException {
-        return new Ref(rs.getObject("id", UUID.class), rs.getString("referral_type"), rs.getString("status"), rs.getString("from_subject"),
-                rs.getObject("from_practitioner_id", UUID.class), rs.getObject("source_assignment_id", UUID.class), rs.getString("suggested_care_category"),
-                rs.getString("target_care_category"), rs.getObject("target_practitioner_id", UUID.class), rs.getObject("target_assignment_id", UUID.class),
-                rs.getLong("version"));
+    private static Ref toRef(ConsultantReferralRepository.Ref r) {
+        return new Ref(r.getId(), r.getType(), r.getStatus(), r.getFromSubject(), r.getFromPractitionerId(), r.getSourceAssignmentId(),
+                r.getSuggestedCareCategory(), r.getTargetCareCategory(), r.getTargetPractitionerId(), r.getTargetAssignmentId(), r.getVersion());
+    }
+
+    private static ApiException notFound() {
+        return new ApiException(404, "REFERRAL_NOT_FOUND", "The referral was not found on this case");
     }
 
     private String coordinator(UUID caseId) {
-        return jdbc.sql("SELECT assignee_subject FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' ORDER BY assigned_at DESC LIMIT 1")
-                .param(caseId).query(String.class).optional().orElse(null);
+        return assignments.findActivePrimaryCoordinator(caseId, Limit.of(1)).stream().findFirst().orElse(null);
     }
 
     private String assignee(UUID assignmentId) {
         if (assignmentId == null) return null;
-        return jdbc.sql("SELECT assignee_subject FROM case_assignments WHERE id=?").param(assignmentId).query(String.class).optional().orElse(null);
+        return assignments.findAssigneeAndStatus(assignmentId).map(CaseAssignmentRepository.AssigneeAndStatus::getSubject).orElse(null);
     }
 
     private String assignmentStatus(UUID assignmentId) {
-        return jdbc.sql("SELECT status FROM case_assignments WHERE id=?").param(assignmentId).query(String.class).optional().orElse(null);
+        return assignments.findAssigneeAndStatus(assignmentId).map(CaseAssignmentRepository.AssigneeAndStatus::getStatus).orElse(null);
     }
 
     private String caseStatus(UUID caseId) {
-        return jdbc.sql("SELECT status FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional()
+        return cases.findStageAndVersion(caseId).map(c -> c.getStatus().name())
                 .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
     }
 
     private String caseCareArea(UUID caseId) {
-        return jdbc.sql("SELECT care_category FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
+        return cases.findCareCategory(caseId).orElse(null);
     }
 
     private String caseNumber(UUID caseId) {
-        return jdbc.sql("SELECT case_number FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse("");
-    }
-
-    private String consultantName(UUID practitionerId) {
-        if (practitionerId == null) return null;
-        return jdbc.sql("SELECT display_name FROM practitioner_profiles WHERE id=?").param(practitionerId).query(String.class).optional().orElse("The consultant");
+        return cases.findCaseNumber(caseId).orElse("");
     }
 
     private static String confirmWork(String type) { return "TRANSFER".equals(type) ? "CONFIRM_TRANSFER" : "CONFIRM_SECOND_OPINION"; }
@@ -375,9 +350,4 @@ public class ConsultantReferralService {
     }
 
     private static String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
-
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
 }

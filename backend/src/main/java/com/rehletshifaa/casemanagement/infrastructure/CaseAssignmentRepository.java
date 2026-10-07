@@ -89,6 +89,20 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
 
     boolean existsByCaseIdAndAssigneeSubjectAndAssigneeRoleAndStatus(UUID caseId, String assigneeSubject, String assigneeRole, String status);
 
+    boolean existsByCaseIdAndAssigneeSubjectAndStatusIn(UUID caseId, String assigneeSubject, java.util.Collection<String> statuses);
+
+    interface AssigneeAndStatus { String getSubject(); String getStatus(); }
+
+    @Query("select a.assigneeSubject as subject, a.status as status from CaseAssignment a where a.id = :id")
+    java.util.Optional<AssigneeAndStatus> findAssigneeAndStatus(@Param("id") UUID id);
+
+    /** The subject's active assignment as the case's consultant (a referral offer or second opinion is not one). */
+    @Query("""
+            select a.id from CaseAssignment a
+            where a.caseId = :caseId and a.assigneeSubject = :subject and a.assigneeRole = 'DOCTOR' and a.status = 'ACTIVE'
+            and a.assignmentType not in ('TRANSFER', 'SECOND_OPINION')""")
+    java.util.Optional<UUID> findActiveConsultantAssignment(@Param("caseId") UUID caseId, @Param("subject") String subject);
+
     /** Cases a consultant holds in an assignment status, excluding cases that are no longer live. */
     @Query("""
             select count(distinct a.caseId) from CaseAssignment a join MedicalCase c on c.id = a.caseId

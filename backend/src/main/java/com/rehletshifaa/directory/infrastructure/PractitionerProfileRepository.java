@@ -29,6 +29,17 @@ public interface PractitionerProfileRepository extends BaseRepository<Practition
     @Query("select p.externalSubject as subject, p.displayName as displayName from PractitionerProfile p where p.externalSubject in :subjects")
     List<SubjectName> findDisplayNames(@Param("subjects") java.util.Collection<String> subjects);
 
+    interface IdName { UUID getId(); String getDisplayName(); }
+
+    @Query("select p.id as id, p.displayName as displayName from PractitionerProfile p where p.id in :ids")
+    List<IdName> findDisplayNamesByIds(@Param("ids") java.util.Collection<UUID> ids);
+
+    @Query("select p.id from PractitionerProfile p where p.externalSubject = :subject")
+    java.util.Optional<UUID> findIdByExternalSubject(@Param("subject") String subject);
+
+    @Query("select p.externalSubject from PractitionerProfile p where p.id = :id")
+    java.util.Optional<String> findExternalSubjectById(@Param("id") UUID id);
+
     /** Verified, available consultants bound to an identity, by display name. */
     @Query("""
             select p from PractitionerProfile p where p.credentialingStatus = 'VERIFIED' and p.practitionerType = 'CONSULTANT'

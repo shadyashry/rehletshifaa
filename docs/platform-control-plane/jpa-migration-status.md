@@ -86,7 +86,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | journey | `case_messages` | W | journey |
 | journey | `clinical_review_cost_estimates` | W | journey |
 | journey | `clinical_review_versions` | W | journey |
-| journey | `consultant_referrals` | W | journey |
+| journey | `consultant_referrals` | R | journey |
 | journey | `deposit_components` | R | journey |
 | journey | `deposit_policies` | R | journey |
 | journey | `deposits` | R | journey |
@@ -367,6 +367,29 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **587 tests, 0 failures** (2 skipped; +1 deposit-ledger test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest` **PASS** on a
   freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`ConsultantReferralService` converted** (CL5 read slice 5; removed from `JDBC_NOT_YET_CONVERTED`, 13 → 12).
+  `consultant_referrals` is now **R**: no plain-SQL reader is left. The views moved to a new
+  `journey.application.ReferralQueryService` (`view`, `onCase`, `seenBy`, `consultantName`); `ConsultantReferralService` keeps
+  every command and its public contract (`create`, `candidates`, `forConsultant`, `submitOpinion`, `forCoordinator`, `confirm`,
+  `decline`, `handles`, `decide`, `withdrawOpenTransfers`), authorization (still checked before the query service is called),
+  error codes, newest-first ordering and the "The consultant" fallback for a missing profile unchanged.
+  - Queries added: `ConsultantReferralRepository.findRow`, `findRowsOf` (coordinator list), `findRowsSeenBy` (referrer or
+    currently offered receiver, left join on `CaseAssignment`; the relation is derived from `fromSubject` in Java), `findRef`,
+    `findRefByTargetAssignment` (the offer being decided — one read instead of id lookup + reload), `findUndecidedTransfersOf`,
+    `existsByCaseIdAndReferralTypeAndStatusIn`, `existsByTargetAssignmentId`; `CaseAssignmentRepository.findActiveConsultantAssignment`,
+    `findAssigneeAndStatus`, `existsByCaseIdAndAssigneeSubjectAndStatusIn`; `PractitionerProfileRepository.findDisplayNamesByIds`,
+    `findIdByExternalSubject`, `findExternalSubjectById`. Reused: `MedicalCaseRepository.findStageAndVersion`/`findCareCategory`/
+    `findCaseNumber`, `CaseAssignmentRepository.findStatusFor`/`findActivePrimaryCoordinator`.
+  - **N+1 removed:** each listed referral used to cost one row read plus up to three consultant-name reads; a list is now two
+    queries whatever its length (rows, then every referrer/suggested/target consultant in one `in :ids` read).
+  - Ownership: referral queries in `journey`, assignment queries in `casemanagement`, consultant names/subjects in `directory`.
+  - Gotcha: a JPQL text block ending in `… r """` loses its trailing space (Java strips it), so a concatenated `where` ran into
+    the alias; the shared select fragments end with a line break instead.
+  - New test `referralListsAreNewestFirstNameEveryConsultantAndShowEachPersonTheirRelation` (coordinator list order and names,
+    suggested vs target consultant, referrer vs receiver relation, unknown referral → `REFERRAL_NOT_FOUND`).
+  Verification: full suite **588 tests, 0 failures** (2 skipped; +1 referral-views test); `ArchitectureRulesTest` 22/22;
+  `PostgresJpaMappingTest` **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -379,8 +402,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 13 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService` and
-  `PaymentService` converted) — `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
+- **Reads:** 12 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
+  `PaymentService` and `ConsultantReferralService` converted) — `PatientActivationService`, `PublicCaseAccessService`,
   `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
@@ -390,8 +413,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
-`CaseActionService`, `JourneyService` and `PaymentService` are done (2026-10-07); next `ConsultantReferralService`, then the
-rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`CaseActionService`, `JourneyService`, `PaymentService` and `ConsultantReferralService` are done (2026-10-07); next
+`PatientActivationService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.
