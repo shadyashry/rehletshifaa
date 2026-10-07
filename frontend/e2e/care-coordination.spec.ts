@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { OIDC_AUTHORITY } from "./env";
+import { leadsCoordinationTeam, meFor, routeMe } from "./me-fixture";
 
 // UX-7 live sanity: synthetic HTTP fixtures render the real built UI; every write is blocked and recorded (enforcement has
 // its own integration tests). Staff Portal Team queue, transfer and assignment history; Coordination Setup sections.
@@ -63,6 +64,9 @@ async function serve(page: Page, keys: string[], roles: string[]) {
     else if (path === "/provider-workspace/me") data = { practices: [] };
     return route.fulfill({ contentType: "application/json", body: JSON.stringify(data) });
   });
+  // The staff portal persona is a Coordinator leading a care-coordination team; Coordination Setup is the manager's.
+  await routeMe(page, roles.length ? meFor("kc-lead", ["COORDINATOR"], { displayName: "Mohamed Ali", teams: leadsCoordinationTeam })
+    : meFor("kc-lead", ["CARE_COORDINATION_MANAGER"], { displayName: "Mohamed Ali" }));
   return writes;
 }
 const sane = async (page: Page) => {

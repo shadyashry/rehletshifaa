@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { OIDC_AUTHORITY } from "./env";
+import { meFor, routeMe } from "./me-fixture";
 
 // UX-8 live sanity: synthetic session + HTTP fixtures render the real built UI. Every write is blocked and recorded; the
 // Journey check/test commands are answered by fixtures (they are side-effect free on the backend too). Nothing publishes,
@@ -66,6 +67,9 @@ async function serve(page: Page, keys: string[], roles: string[], extra: Record<
     else if (path.startsWith("/provider-workspace/cases")) body = { items: [], page: 0, hasMore: false };
     return route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
+  // Commercial pages are Finance's; Care Journeys are edited and approved by the journey roles.
+  await routeMe(page, meFor("kc-checker", roles.includes("PATIENT") ? ["PATIENT"] : roles.includes("FINANCE") ? ["FINANCE", "FINANCE_MANAGER"]
+    : ["JOURNEY_MANAGER", "JOURNEY_APPROVER"], { displayName: "Mona Checker" }));
   return writes;
 }
 const sane = async (page: Page) => {

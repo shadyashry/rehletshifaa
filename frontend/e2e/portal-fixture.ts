@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
 import { OIDC_AUTHORITY } from "./env";
+import { leadsCoordinationTeam, meFor, routeMe } from "./me-fixture";
 
 // Synthetic fixtures only: browser checks exercise the real UI without touching patient records.
 const stamp="2026-09-05T12:00:00Z";
@@ -10,6 +11,9 @@ const baseCase={country:"Kenya",careCategory:"cardiology",preferredLanguage:"en"
 const actionsFor=(c:{status:string;coordinatorSubject?:string},viewer:string)=>({journeyStage:c.status,waitingOn:c.coordinatorSubject?"STAFF":"NONE",blockers:[],
   currentAction:!c.coordinatorSubject?{code:"CLAIM_CASE",kind:"CLAIM"}:c.coordinatorSubject!==viewer?{code:"VIEW_ONLY",kind:"NONE"}:{code:"ASSIGN_CONSULTANT",kind:"FOCUS"},
   availableActions:c.coordinatorSubject===viewer?["REQUEST_INFORMATION","ASSIGN_CONSULTANT","SET_TRAVEL_PACKAGE","CANCEL_CASE"]:[]});
+/** The platform roles behind each fixture persona (the portal reads them from `/me`, never from the token). */
+const PLATFORM_ROLES:Record<string,string[]>={COORDINATOR_LEAD:["COORDINATOR"],DOCTOR:["CONSULTANT"],CREDENTIALING_ADMIN:["CONSULTANT_OPERATIONS_MANAGER"],
+  AUDITOR:["COMPLIANCE_AUDITOR"],SYSTEM_ADMIN:["SYSTEM_ADMINISTRATOR"]};
 export const portalAlerts=(page:Page)=>page.locator('[role="alert"]:not(#__next-route-announcer__)');
 export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean;pendingWork?:boolean}={}){
   const roles=role==="COORDINATOR_LEAD"?["COORDINATOR",role]:[role];
@@ -60,9 +64,11 @@ export async function setupPortal(page:Page, role="COORDINATOR", options:{docume
       {subject:"ops-lead",name:"Operations Lead",role:"OPERATIONS_LEAD",staffFunction:"OPERATIONS",accountStatus:"ACTIVE"},{subject:"ops-staff",name:"Operations Staff",role:"OPERATIONS",staffFunction:"OPERATIONS",accountStatus:"ACTIVE"},
       {subject:"finance-lead",name:"Finance Lead",role:"FINANCE_LEAD",staffFunction:"FINANCE",accountStatus:"ACTIVE"},{subject:"finance-staff",name:"Finance Staff",role:"FINANCE",staffFunction:"FINANCE",accountStatus:"ACTIVE"}
     ]);
+    if(api==="/admin/platform-access/staff")return reply({people:[],invitations:[]});
     if(api==="/identity-review/queue")return reply([{id:"identity",subjectType:"PATIENT",status:"MANUAL_REVIEW",documentType:"PASSPORT",issuingCountry:"Kenya",documentReferenceMasked:"***1234",requestedAt:stamp}]);
     return reply([]);
   });
+  await routeMe(page,meFor(subject,PLATFORM_ROLES[role]??[role],{displayName:"Layla Hassan",teams:role==="COORDINATOR_LEAD"?leadsCoordinationTeam:[]}));
   return {writes};
 }
 

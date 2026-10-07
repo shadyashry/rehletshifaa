@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { OIDC_AUTHORITY } from "./env";
+import { meFor, routeMe } from "./me-fixture";
 
 /**
  * My Care — the signed-in patient's landing: straight onto the current case, the backend's current step
@@ -55,6 +56,7 @@ async function setupPatient(page: Page, scenario: Scenario) {
     if (api.endsWith("/documents")) return reply([{ documentId: "d1", fileName: "Echo_Report.pdf", contentType: "application/pdf", sizeBytes: 1024, status: "CLEAN", createdAt: "2026-09-01T09:00:00Z" }]);
     return reply({ message: `unstubbed ${api}` }, 404);
   });
+  await routeMe(page, meFor("patient-1", ["PATIENT"]));
   return { writes };
 }
 
