@@ -2,18 +2,23 @@ package com.rehletshifaa.coordination.application;
 
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
+import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
 import com.rehletshifaa.coordination.domain.Routing.*;
 import com.rehletshifaa.coordination.infrastructure.CoordinationRepository;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.shared.audit.GovernanceAuditLog;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.rehletshifaa.workforce.domain.WorkforcePerson;
+import com.rehletshifaa.workforce.infrastructure.WorkforceLeadDesignationRepository;
+import com.rehletshifaa.workforce.infrastructure.WorkforcePersonRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
+
+import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * Bounded read models for Coordination Setup (ROUTING_READ). Presentation only: names instead of account identifiers,
@@ -22,15 +27,20 @@ import java.util.*;
 @Service
 public class CoordinationReadService {
     private static final int MAX_DECISIONS = 100;
-    private final JdbcClient jdbc;
     private final CoordinationRepository repo;
+    private final WorkforcePersonRepository workforce;
+    private final WorkforceLeadDesignationRepository leads;
+    private final CaseAssignmentRepository assignments;
+    private final CaseTaskRepository tasks;
     private final Authority authority;
     private final CryptoService crypto;
     private final Clock clock;
     private final GovernanceAuditLog audit;
 
-    public CoordinationReadService(JdbcClient jdbc, CoordinationRepository repo, Authority authority, CryptoService crypto, Clock clock, GovernanceAuditLog audit) {
-        this.jdbc = jdbc; this.repo = repo; this.authority = authority; this.crypto = crypto; this.clock = clock; this.audit = audit;
+    public CoordinationReadService(CoordinationRepository repo, WorkforcePersonRepository workforce, WorkforceLeadDesignationRepository leads,
+                                   CaseAssignmentRepository assignments, CaseTaskRepository tasks, Authority authority, CryptoService crypto, Clock clock,
+                                   GovernanceAuditLog audit) {
+        this.repo = repo; this.workforce = workforce; this.leads = leads; this.assignments = assignments; this.tasks = tasks; this.authority = authority; this.crypto = crypto; this.clock = clock; this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -52,12 +62,9 @@ public class CoordinationReadService {
             teams.computeIfAbsent((String) row[0], k -> new ArrayList<>()).add(new PersonTeam((UUID) row[1], (Boolean) row[4], (Instant) row[2], (Instant) row[3]));
         Map<String, Capacity> capacity = new HashMap<>();
         repo.capacities().forEach(c -> capacity.put(c.subject(), c));
-        Map<String, String[]> staff = new HashMap<>();
-        jdbc.sql("SELECT p.subject,p.display_name_encrypted,CASE WHEN p.lifecycle_status='ACTIVE' AND s.active=TRUE THEN 'ACTIVE' ELSE 'DISABLED' END "
-                        + "FROM workforce_people p JOIN access_subjects s ON s.subject=p.subject WHERE EXISTS(SELECT 1 FROM workforce_role_assignments a "
-                        + "WHERE a.subject=p.subject AND a.role_key='COORDINATOR' AND a.status='ACTIVE' AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>?))")
-                .params(Timestamp.from(now), Timestamp.from(now))
-                .query((r, n) -> staff.put(r.getString(1), new String[]{r.getString(2), r.getString(3)})).list();
+        // Account state of everyone holding the Coordinator role now; a person outside it is NOT_A_COORDINATOR.
+        Map<String, String> staff = new HashMap<>();
+        workforce.findRoleHolderAccounts("COORDINATOR", micros(now)).forEach(a -> staff.put(a.getSubject(), a.getAccount()));
         Set<String> subjects = new TreeSet<>(teams.keySet());
         subjects.addAll(capacity.keySet());
         subjects.addAll(staff.keySet());
@@ -65,8 +72,7 @@ public class CoordinationReadService {
         Map<String, String> names = names(subjects);
         List<CoordinationPerson> people = new ArrayList<>();
         for (String subject : subjects) {
-            String[] s = staff.get(subject);
-            people.add(new CoordinationPerson(subject, names.get(subject), s == null ? "NOT_A_COORDINATOR" : s[1],
+            people.add(new CoordinationPerson(subject, names.get(subject), staff.getOrDefault(subject, "NOT_A_COORDINATOR"),
                     teams.getOrDefault(subject, List.of()), capacity.get(subject), workload.getOrDefault(subject, 0L)));
         }
         people.sort(Comparator.comparing((CoordinationPerson p) -> p.name() == null ? null : p.name().toLowerCase(Locale.ROOT), Comparator.nullsLast(Comparator.naturalOrder()))
@@ -117,20 +123,20 @@ public class CoordinationReadService {
     public List<ManagedCaseSummary> managedCaseSummaries() {
         var actor = authority.authorize(Permission.COORDINATION_CASE_SUMMARY);
         Instant now = clock.instant();
-        List<ManagedCaseSummary> rows = jdbc.sql("SELECT c.id,c.case_number,c.status,a.assignee_subject,p.display_name_encrypted,"
-                        + "COUNT(t.id),COALESCE(SUM(CASE WHEN t.due_at<? THEN 1 ELSE 0 END),0),COALESCE(SUM(CASE WHEN t.blocking=TRUE THEN 1 ELSE 0 END),0) "
-                        + "FROM case_assignments a JOIN medical_cases c ON c.id=a.case_id LEFT JOIN workforce_people p ON p.subject=a.assignee_subject "
-                        + "LEFT JOIN case_tasks t ON t.case_id=c.id AND t.status IN ('OPEN','IN_PROGRESS') AND t.visibility_scope='INTERNAL' "
-                        + "WHERE a.assignee_role='COORDINATOR' AND a.assignment_type='PRIMARY' AND a.status='ACTIVE' AND EXISTS("
-                        + "SELECT 1 FROM workforce_lead_designations l JOIN workforce_teams wt ON wt.id=l.team_id "
-                        + "JOIN workforce_team_memberships m ON m.team_id=wt.id AND m.subject=a.assignee_subject "
-                        + "WHERE l.subject=? AND l.status='ACTIVE' AND l.effective_from<=? AND (l.effective_to IS NULL OR l.effective_to>?) "
-                        + "AND wt.function_key='CARE_COORDINATION' AND wt.status='ACTIVE' AND m.status='ACTIVE' "
-                        + "AND m.effective_from<=? AND (m.effective_to IS NULL OR m.effective_to>?)) "
-                        + "GROUP BY c.id,c.case_number,c.status,a.assignee_subject,p.display_name_encrypted ORDER BY c.updated_at DESC")
-                .params(Timestamp.from(now), actor.subject(), Timestamp.from(now), Timestamp.from(now), Timestamp.from(now), Timestamp.from(now))
-                .query((rs, n) -> new ManagedCaseSummary(rs.getObject(1, UUID.class), rs.getString(2),
-                        rs.getString(3), rs.getString(4), decrypt(rs.getString(5)), rs.getLong(6), rs.getLong(7), rs.getLong(8))).list();
+        // The coordinators in active care-coordination teams the caller leads now, the cases they own, then each case's open work.
+        List<String> supervised = leads.findSupervisedMembers(actor.subject(), CoordinationRepository.FUNCTION, micros(now));
+        if (supervised.isEmpty()) return List.of();
+        var cases = assignments.findCoordinatedCases(supervised);
+        if (cases.isEmpty()) return List.of();
+        Map<UUID, CaseTaskRepository.WorkCounts> work = new HashMap<>();
+        tasks.countOpenInternalWork(cases.stream().map(CaseAssignmentRepository.CoordinatedCase::getCaseId).collect(java.util.stream.Collectors.toSet()), micros(now))
+                .forEach(w -> work.put(w.getCaseId(), w));
+        Map<String, String> names = names(cases.stream().map(CaseAssignmentRepository.CoordinatedCase::getCoordinator).collect(java.util.stream.Collectors.toSet()));
+        List<ManagedCaseSummary> rows = cases.stream().map(c -> {
+            var w = work.get(c.getCaseId());
+            return new ManagedCaseSummary(c.getCaseId(), c.getCaseNumber(), c.getStatus().name(), c.getCoordinator(), names.get(c.getCoordinator()),
+                    w == null ? 0 : w.getOpen(), w == null ? 0 : w.getOverdue(), w == null ? 0 : w.getBlocking());
+        }).toList();
         rows.forEach(row -> audit.record(actor.subject(), row.caseId().toString(), "SUPERVISORY_SUMMARY_READ", "SUCCESS", "CARE_COORDINATION"));
         return rows;
     }
@@ -138,17 +144,14 @@ public class CoordinationReadService {
     private Map<String, String> names(Set<String> subjects) {
         Map<String, String> names = new HashMap<>();
         if (subjects.isEmpty()) return names;
-        jdbc.sql("SELECT subject,display_name_encrypted FROM workforce_people WHERE subject IN (:subjects)").param("subjects", subjects)
-                .query((r, n) -> names.put(r.getString(1), decrypt(r.getString(2)))).list();
+        for (WorkforcePerson person : workforce.findAllById(subjects)) names.put(person.getSubject(), decrypt(person.getDisplayNameEncrypted()));
         return names;
     }
 
     private Map<String, Long> workload(Set<String> subjects) {
         Map<String, Long> load = new HashMap<>();
         if (subjects.isEmpty()) return load;
-        jdbc.sql("SELECT a.assignee_subject,COUNT(DISTINCT a.case_id) FROM case_assignments a JOIN medical_cases c ON c.id=a.case_id WHERE a.assignee_subject IN (:subjects) "
-                        + "AND a.assignee_role='COORDINATOR' AND a.assignment_type='PRIMARY' AND a.status='ACTIVE' AND c.status NOT IN ('CLOSED','CANCELLED') GROUP BY a.assignee_subject")
-                .param("subjects", subjects).query((r, n) -> load.put(r.getString(1), r.getLong(2))).list();
+        assignments.countCoordinatorCaseloads(subjects).forEach(c -> load.put(c.getSubject(), c.getCases()));
         return load;
     }
 

@@ -146,6 +146,16 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
 
     long countByOwnerSubjectAndStatusIn(String ownerSubject, java.util.Collection<String> statuses);
 
+    /** Open internal work per case: how much, how much is overdue at {@code now}, how much blocks. Cases without any are absent. */
+    interface WorkCounts { UUID getCaseId(); Long getOpen(); Long getOverdue(); Long getBlocking(); }
+
+    @Query("""
+            select t.caseId as caseId, count(t) as open, sum(case when t.dueAt < :now then 1 else 0 end) as overdue,
+                sum(case when t.blocking = true then 1 else 0 end) as blocking
+            from CaseTask t where t.caseId in :caseIds and t.status in ('OPEN', 'IN_PROGRESS') and t.visibilityScope = 'INTERNAL'
+            group by t.caseId""")
+    java.util.List<WorkCounts> countOpenInternalWork(@Param("caseIds") java.util.Collection<UUID> caseIds, @Param("now") Instant now);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update CaseTask t set t.status = 'IN_PROGRESS', t.startedAt = :now, t.updatedAt = :now, t.version = t.version + 1

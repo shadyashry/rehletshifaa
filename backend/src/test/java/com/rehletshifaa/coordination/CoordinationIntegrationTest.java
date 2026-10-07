@@ -331,6 +331,45 @@ class CoordinationIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM audit_events WHERE entity_id=? AND action='SUPERVISORY_SUMMARY_READ'", caseId.toString())).isOne();
     }
 
+    @Test void peopleShowAccountStateAndOpenCaseloadAndManagedSummariesListEveryLedCaseLatestFirst() {
+        jdbc.update("INSERT INTO workforce_lead_designations(id,team_id,subject,effective_from,status,created_by,reason,revision) VALUES(?,?,?,?,'ACTIVE','TEST','Managed team',0)",
+                UUID.randomUUID(), team, "routing-manager", past);
+        assignOwner(caseId, "routing-a");
+        task("COORDINATOR", "routing-a"); // open, not overdue, not blocking
+        UUID quiet = medicalCase(consultant), closed = medicalCase(consultant);
+        assignOwner(quiet, "routing-b");
+        assignOwner(closed, "routing-b");
+        jdbc.update("UPDATE medical_cases SET updated_at=? WHERE id=?", Instant.now(), quiet);
+        jdbc.update("UPDATE medical_cases SET status='CLOSED',updated_at=? WHERE id=?", past.minusSeconds(60), closed);
+        jdbc.update("UPDATE access_subjects SET active=FALSE WHERE subject='routing-b'");
+        candidate("routing-former", team, 5, true);
+        jdbc.update("UPDATE workforce_role_assignments SET status='REVOKED' WHERE subject='routing-former'");
+
+        List<CoordinationPerson> people = reads.people();
+        CoordinationPerson b = people.stream().filter(p -> p.subject().equals("routing-b")).findFirst().orElseThrow();
+        assertThat(b.name()).isEqualTo("Coordinator routing-b");
+        assertThat(b.account()).isEqualTo("DISABLED");
+        assertThat(b.workload()).as("a closed case is not caseload").isEqualTo(1);
+        CoordinationPerson former = people.stream().filter(p -> p.subject().equals("routing-former")).findFirst().orElseThrow();
+        assertThat(former.account()).isEqualTo("NOT_A_COORDINATOR");
+        assertThat(former.workload()).isZero();
+        assertThat(former.capacity().maximum()).isEqualTo(5);
+        assertThat(people.stream().filter(p -> p.subject().equals("routing-a")).findFirst().orElseThrow().workload()).isEqualTo(1);
+
+        var summaries = reads.managedCaseSummaries();
+        assertThat(summaries).extracting(CoordinationReadService.ManagedCaseSummary::caseId).containsExactly(quiet, caseId, closed);
+        assertThat(summaries.getFirst()).isEqualTo(new CoordinationReadService.ManagedCaseSummary(quiet,
+                jdbc.queryForObject("SELECT case_number FROM medical_cases WHERE id=?", String.class, quiet), "READY_FOR_CONSULTANT",
+                "routing-b", "Coordinator routing-b", 0, 0, 0));
+        assertThat(summaries.get(1)).extracting(s -> s.openWork(), s -> s.overdueWork(), s -> s.blockingWork(), s -> s.coordinatorName())
+                .containsExactly(1L, 0L, 0L, "Coordinator routing-a");
+        assertThat(summaries.get(2).stage()).isEqualTo("CLOSED");
+        // A lead of no team sees nothing.
+        TestPrincipals.grant(jdbc, crypto, "routing-unled", Role.CARE_COORDINATION_MANAGER);
+        signIn("routing-unled");
+        assertThat(reads.managedCaseSummaries()).isEmpty();
+    }
+
     Decision command(String action, long revision, String target) {
         return engine.execute(caseId, new Command(UUID.randomUUID().toString(), revision, action, target, action.equals("QUEUE") ? team : null, "Reviewed assignment", "TEST"));
     }

@@ -1138,7 +1138,7 @@ Implementation slices (kept green independently):
 | CL2 | Replace `LEGACY` Journey admission with explicit `STANDARD` versus `JOURNEY`; route every standard intake through governed team/capacity eligibility and remove unrestricted self-claim | DONE (2026-10-06, Claude) — see "CL2 delivered" below |
 | CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | DONE (2026-10-06, Claude) — see "CL3 delivered" below |
 | CL4 | Remove obsolete patient/provider/plaintext compatibility data paths and finalize clean pre-production schema | DONE (2026-10-06, Claude) — see "CL4 delivered" below |
-| CL5 | Move all SQL/JDBC out of application services module by module — **now via Spring Data JPA** (owner decision 2026-10-06, technical-decisions §29); live tracker `jpa-migration-status.md` | IN PROGRESS — all writes JPA except the local seeder; 4 classes still read with JdbcClient (ratchet in `ArchitectureRulesTest`); `StaffWorkService`, `CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService` and `JourneyCaseRelationships` converted 2026-10-07 |
+| CL5 | Move all SQL/JDBC out of application services module by module — **now via Spring Data JPA** (owner decision 2026-10-06, technical-decisions §29); live tracker `jpa-migration-status.md` | IN PROGRESS — all writes JPA except the local seeder; 3 classes still read with JdbcClient (ratchet in `ArchitectureRulesTest`); `StaffWorkService`, `CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService`, `JourneyCaseRelationships` and `CoordinationReadService` converted 2026-10-07 |
 | CL6 | Enforce the boundaries with ArchUnit, finish documentation/test cleanup, run focused and full backend gates | DONE (2026-10-06, Claude) — see "CL6 delivered" below |
 | CL7 | Add JaCoCo/Sonar configuration and run Sonar for the sole Maven backend when a Sonar server/project/token and scanner plugin are available | BLOCKED — no Sonar server/project/token; no Sonar scanner in the offline Maven cache |
 
@@ -1413,11 +1413,22 @@ entry. Verification: full suite **597 tests, 0 failures** (2 skipped; +1 relatio
 pre-conversion class); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest` **PASS** on a freshly reset PostgreSQL 17
 (V1–V73, new queries included).
 
+**CoordinationReadService converted (2026-10-07, Claude; CL5 read slice 14).** No product behaviour change. Its own plain
+SQL — the Coordination Setup roster (account state, names, caseload) and the supervisor's managed-case summary (QA-12) — became
+JPA projections in `workforce` and `casemanagement`, batched by subject or case and assembled in the service; the overview,
+consultants and decision feed still read through `CoordinationRepository` (next). Account state, the NOT_A_COORDINATOR marker,
+open caseload, the led-team scope (WF-08 `findSupervisedMembers`), latest-first order, work counts and the per-case audit are
+unchanged. It left `JDBC_NOT_YET_CONVERTED` (4 → 3); `workforce_people`, `access_subjects` and `workforce_role_assignments` are
+fully JPA outside the local seeder. Queries added and details: `jpa-migration-status.md`, 2026-10-07 `CoordinationReadService`
+entry. Verification: full suite **598 tests, 0 failures** (2 skipped; +1 roster/summary test, which also passes on the
+pre-conversion service); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest` **PASS** on a freshly reset PostgreSQL 17
+(V1–V73, new queries included).
+
 **Next exact action:** CL5 read conversions, one service per session, each rewritten as a query service and removed
 from `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`: `StaffWorkService`, `CaseActionService`, `JourneyService`,
 `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
-`PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService` and `JourneyCaseRelationships` are done; next
-`CoordinationReadService`; then move `LocalDemoDataSeeder` to a `devdata` package. CL7 is **blocked** (no Sonar server/project/token; no Sonar scanner in the offline
+`PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService`, `JourneyCaseRelationships` and
+`CoordinationReadService` are done; next the `CoordinationRepository` reads; then move `LocalDemoDataSeeder` to a `devdata` package. CL7 is **blocked** (no Sonar server/project/token; no Sonar scanner in the offline
 Maven cache). The independent Astra review of CL2+CL3 is still owed and needs a reviewer the owner chooses. Preserve
 unrelated brand/theme work and do not run concurrent builds that share `backend/target`.
 
@@ -1428,4 +1439,4 @@ unrelated brand/theme work and do not run concurrent builds that share `backend/
   Nothing was published, pushed or enabled, and no development volume was deleted. Existing historical live evidence
   remains historical rather than a fresh claim. If fresh deployment evidence is requested, use the canonical tunnel
   overlay and exercise the distinct holder/admin/manager identities without enabling Journey admission merely for
-  demonstration. The current next action is the "Next exact action" after the JourneyCaseRelationships note above.
+  demonstration. The current next action is the "Next exact action" after the CoordinationReadService note above.

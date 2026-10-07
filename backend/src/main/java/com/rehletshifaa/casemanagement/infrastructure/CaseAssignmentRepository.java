@@ -117,6 +117,27 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
                 and a.assignmentType = 'SECOND_OPINION' and a.status = 'ACTIVE'""")
     boolean isConsulted(@Param("caseId") UUID caseId, @Param("subject") String subject);
 
+    /** Open cases (not closed or cancelled) each coordinator owns as active primary coordinator. */
+    interface Caseload { String getSubject(); Long getCases(); }
+
+    @Query("""
+            select a.assigneeSubject as subject, count(distinct a.caseId) as cases from CaseAssignment a join MedicalCase c on c.id = a.caseId
+            where a.assigneeSubject in :subjects and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'
+                and c.status not in (com.rehletshifaa.casemanagement.domain.CaseStatus.CLOSED, com.rehletshifaa.casemanagement.domain.CaseStatus.CANCELLED)
+            group by a.assigneeSubject""")
+    java.util.List<Caseload> countCoordinatorCaseloads(@Param("subjects") java.util.Collection<String> subjects);
+
+    /** A case and the coordinator who owns it as active primary coordinator. */
+    interface CoordinatedCase { UUID getCaseId(); String getCaseNumber(); com.rehletshifaa.casemanagement.domain.CaseStatus getStatus(); String getCoordinator(); Instant getUpdatedAt(); }
+
+    /** The cases the given coordinators own, latest change first. */
+    @Query("""
+            select distinct c.id as caseId, c.caseNumber as caseNumber, c.status as status, a.assigneeSubject as coordinator, c.updatedAt as updatedAt
+            from CaseAssignment a join MedicalCase c on c.id = a.caseId
+            where a.assigneeSubject in :subjects and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'
+            order by c.updatedAt desc""")
+    java.util.List<CoordinatedCase> findCoordinatedCases(@Param("subjects") java.util.Collection<String> subjects);
+
     /** Everyone actively assigned to the case in the role. */
     @Query("select a.assigneeSubject from CaseAssignment a where a.caseId = :caseId and a.assigneeRole = :role and a.status = 'ACTIVE'")
     java.util.List<String> findActiveAssignees(@Param("caseId") UUID caseId, @Param("role") String role);

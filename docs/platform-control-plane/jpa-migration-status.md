@@ -135,13 +135,13 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | (none) | `platform_owner_recovery_requests` | dead |  |
 | (none) | `practice_manager_delegation_history` | dead |  |
 | (none) | `practice_manager_invitations` | dead |  |
-| workforce | `access_subjects` | W | access,authority,coordination,identity,workforce |
+| workforce | `access_subjects` | R | access,authority,coordination,identity,workforce |
 | workforce | `workforce_current_managers` | W | access,workforce |
 | workforce | `workforce_functions` | W (read-only entity) | clinic,workforce |
 | workforce | `workforce_lead_designations` | W | access,coordination,workforce |
-| workforce | `workforce_people` | W | access,authority,clinic,coordination,identity,journey,workforce |
+| workforce | `workforce_people` | R | access,authority,clinic,coordination,identity,journey,workforce |
 | workforce | `workforce_reporting_lines` | W | access,workforce |
-| workforce | `workforce_role_assignments` | W | access,authority,clinic,coordination,identity,journey,workforce |
+| workforce | `workforce_role_assignments` | R | access,authority,clinic,coordination,identity,journey,workforce |
 | workforce | `workforce_role_catalogue` | W (read-only entity) | access,workforce |
 | workforce | `workforce_team_memberships` | W | access,coordination,workforce |
 | workforce | `workforce_teams` | W | access,coordination,workforce |
@@ -592,6 +592,33 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **597 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`CoordinationReadService` converted** (CL5 read slice 14; removed from `JDBC_NOT_YET_CONVERTED`, 4 → 3).
+  `workforce_people`, `access_subjects` and `workforce_role_assignments` are now **R** (only `LocalDemoDataSeeder`, the excluded
+  local-profile exception, still touches them with JDBC — its `NOT EXISTS` guards on its own inserts); the case, task and team
+  tables stay W (`CoordinationRepository` reads them). The service's own plain SQL — the coordinator roster with account state,
+  names, caseloads and the supervisor's managed-case summary (QA-12) — became JPA projections in the owning modules, assembled in
+  the service (it already is the Coordination Setup read service; its overview, consultants and decision feed still go through
+  `CoordinationRepository`, converted next). Public contract unchanged: account ACTIVE only while the person and the access switch
+  are active, NOT_A_COORDINATOR without the role in force, caseload counts open (not closed/cancelled) primary cases, the summary
+  covers active primary coordinators who are members of active care-coordination teams the caller leads now, latest change first,
+  with open/overdue/blocking internal work and one `SUPERVISORY_SUMMARY_READ` audit per case.
+  - Queries added: `WorkforcePersonRepository.findRoleHolderAccounts` (subject + account state of a role's holders at `at`; the
+    roster's encrypted name was selected but unused — names come from the batched names read); `CaseAssignmentRepository.
+    countCoordinatorCaseloads` (`in :subjects`, grouped) and `findCoordinatedCases` (`in :subjects`, `updatedAt desc`);
+    `CaseTaskRepository.countOpenInternalWork` (`in :caseIds`, grouped; a case without open work is absent and shows zeros).
+    Reused: `WorkforceLeadDesignationRepository.findSupervisedMembers` (WF-08 — the same lead/team/membership window the SQL
+    used) and `WorkforcePersonRepository.findAllById` for names (the `JourneyCaseQueryService` pattern).
+  - The summary is four queries whatever its size (members, cases, work counts, names), where it was one grouped join; it lists
+    each (case, coordinator) once — the join could have doubled a case's counts only if one coordinator held two active primary
+    assignments on it, which the single-owner rule forbids.
+  - Locks: none.
+  - New test `CoordinationIntegrationTest.peopleShowAccountStateAndOpenCaseloadAndManagedSummariesListEveryLedCaseLatestFirst`
+    (a disabled account, a former coordinator with capacity, closed cases outside the caseload; every led case latest first with
+    stage, coordinator name and zero/real work counts; a lead of no team sees nothing). It also passes on the pre-conversion
+    service.
+  Verification: full suite **598 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -604,10 +631,10 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 4 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
+- **Reads:** 3 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
   `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
-  `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService`
-  and `JourneyCaseRelationships` converted) — `CoordinationReadService`, plus the three exceptions
+  `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService`,
+  `JourneyCaseRelationships` and `CoordinationReadService` converted) — plus the three exceptions
   (`CoordinationRepository` reads, `CaseNumberGenerator`, `LocalDemoDataSeeder`). They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
   `org.springframework.jdbc..`/`java.sql..` type (CL6), and no repository may declare a native query.
@@ -617,7 +644,7 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
 `CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`,
-`PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService` and `JourneyCaseRelationships` are done (2026-10-07); next `CoordinationReadService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService`, `JourneyCaseRelationships` and `CoordinationReadService` are done (2026-10-07); next the `CoordinationRepository` reads, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.

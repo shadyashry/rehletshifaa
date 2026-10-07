@@ -13,6 +13,17 @@ import java.util.Optional;
 public interface WorkforcePersonRepository extends BaseRepository<WorkforcePerson, String> {
     List<WorkforcePerson> findAllByOrderBySubjectAsc();
 
+    /** A person holding a role, with their account state: ACTIVE only while both the person and the access switch are active. */
+    interface RoleHolderAccount { String getSubject(); String getAccount(); }
+
+    @Query("""
+            select p.subject as subject,
+                case when p.lifecycleStatus = 'ACTIVE' and s.active = true then 'ACTIVE' else 'DISABLED' end as account
+            from WorkforcePerson p join AccessSubject s on s.subject = p.subject
+            where exists (select 1 from WorkforceRoleAssignment a where a.subject = p.subject and a.roleKey = :role
+                and a.status = 'ACTIVE' and a.effectiveFrom <= :at and (a.effectiveTo is null or a.effectiveTo > :at))""")
+    List<RoleHolderAccount> findRoleHolderAccounts(@Param("role") String role, @Param("at") Instant at);
+
     Optional<WorkforcePerson> findByEmailHash(String emailHash);
 
     /** IAM-16: ACTIVE people whose last sign-in (or activation, or creation) is before {@code cutoff}. */

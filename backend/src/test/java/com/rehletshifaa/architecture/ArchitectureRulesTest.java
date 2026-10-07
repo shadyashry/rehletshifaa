@@ -213,7 +213,6 @@ class ArchitectureRulesTest {
      */
     private static final Set<String> JDBC_NOT_YET_CONVERTED = Set.of(
             "com.rehletshifaa.casemanagement.application.CaseNumberGenerator", // nextval: JPQL has no sequence function
-            "com.rehletshifaa.coordination.application.CoordinationReadService",
             "com.rehletshifaa.coordination.infrastructure.CoordinationRepository", // reads only (writes are JPA)
             "com.rehletshifaa.shared.config.LocalDemoDataSeeder"); // @Profile("local") only
 
