@@ -539,11 +539,6 @@
       "title": "A short talk from your consultant — coming soon",
       "note": "A named consultant will introduce this care area and explain how your case is reviewed. The recorded talk will appear here."
     },
-    "stats": {
-      "areas": "Care areas",
-      "consultants": "Consultants",
-      "faculty": "University faculty"
-    },
     "explore": "Explore the care areas",
     "map": {
       "label": "Care areas arranged around your case",
@@ -688,11 +683,6 @@
     "finalBody": "Send what you have, and your coordinator will route your case to the right Consultant."
   },
   "consultantsPage": {
-    "stats": {
-      "consultants": "Consultants",
-      "faculty": "University faculty",
-      "areas": "Care areas"
-    },
     "explore": "Meet the panel",
     "matching": {
       "label": "How your case reaches a Consultant",

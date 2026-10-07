@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
-import { ArrowDown, ArrowRight, BadgeCheck, FileText, ScanSearch } from "lucide-react";
+import { ArrowDown, BadgeCheck, FileText, ScanSearch } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { CaseRouter } from "@/components/care-areas/CaseRouter";
 import { ConsultantMatching } from "@/components/consultants/ConsultantMatching";
 import { ConsultantPanel, type PanelEntry } from "@/components/consultants/ConsultantPanel";
-import { HeroStats } from "@/components/HeroStats";
 import { PageHero } from "@/components/PageHero";
-import { TrackedLink } from "@/components/TrackedLink";
 import { CARE_SYSTEMS, careAreaMeta } from "@/lib/care-area-catalog";
-import { consultantUi, getConsultants, universityFacultySlugs } from "@/lib/consultants";
+import { consultantUi, getConsultants } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -46,13 +44,6 @@ export default async function Consultants({ params }: Props) {
   });
   const systems = CARE_SYSTEMS.filter((key) => entries.some((entry) => entry.system === key)).map((key) => ({ key, title: d.careAreasPage.systems[key].title }));
 
-  const faculty = universityFacultySlugs();
-  const stats = [
-    { value: entries.length, label: page.stats.consultants },
-    { value: entries.filter((entry) => faculty.has(entry.profile.slug)).length, label: page.stats.faculty },
-    { value: new Set(entries.map((entry) => entry.profile.careAreaHref)).size, label: page.stats.areas },
-  ];
-
   return (
     <>
       <PageHero
@@ -70,13 +61,8 @@ export default async function Consultants({ params }: Props) {
           />
         }
       >
-        <HeroStats stats={stats} />
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
-          <TrackedLink event="send_case_cta_clicked" className="btn-primary w-full sm:w-auto" href={localeHref(locale, "send-my-case")}>
-            {d.common.send}
-            <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
-          </TrackedLink>
-          <a href="#consultant-panel" className="link-cta justify-center text-[0.9375rem] sm:justify-start">
+        <div className="mt-6">
+          <a href="#consultant-panel" className="link-cta text-[0.9375rem]">
             {page.explore}
             <ArrowDown size={16} aria-hidden="true" />
           </a>
