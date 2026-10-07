@@ -16,6 +16,15 @@ public interface CaseSubmissionContactRepository extends BaseRepository<CaseSubm
 
     java.util.Optional<CaseSubmissionContact> findByCaseId(UUID caseId);
 
+    /** Who submitted the case, and how to reach them. */
+    interface Submitter { String getRole(); String getName(); String getRelationship(); String getEmail(); String getWhatsapp(); }
+
+    @Query("""
+            select c.contactRole as role, c.contactName as name, c.relationshipToPatient as relationship, c.email as email,
+                c.whatsappNumber as whatsapp
+            from CaseSubmissionContact c where c.caseId = :caseId""")
+    java.util.Optional<Submitter> findSubmitter(@Param("caseId") UUID caseId);
+
     /** The submitter turned out to be a representative; a relationship already recorded is kept. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

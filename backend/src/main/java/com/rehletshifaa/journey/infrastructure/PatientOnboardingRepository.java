@@ -18,6 +18,16 @@ public interface PatientOnboardingRepository extends BaseRepository<PatientOnboa
 
     java.util.Optional<PatientOnboarding> findFirstByCaseIdOrderByCreatedAtDesc(UUID caseId);
 
+    /** The case's onboardings, newest first: the first is the current one. */
+    interface Current { UUID getId(); String getState(); }
+
+    @Query("select o.id as id, o.state as state from PatientOnboarding o where o.caseId = :caseId order by o.createdAt desc")
+    java.util.List<Current> findNewestOf(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
+    /** The subject types of the patient's onboardings, newest first (an element may be null: not chosen yet). */
+    @Query("select o.subjectType from PatientOnboarding o where o.patientId = :patientId order by o.createdAt desc")
+    java.util.List<String> findNewestSubjectTypesOf(@Param("patientId") UUID patientId, org.springframework.data.domain.Limit limit);
+
     /** An onboarding for this proposal version already exists (an absent version never matches, as before). */
     @Query("select count(o) > 0 from PatientOnboarding o where o.patientId = :patientId and o.caseId = :caseId and o.proposalVersionId = :versionId")
     boolean existsFor(@Param("patientId") UUID patientId, @Param("caseId") UUID caseId, @Param("versionId") UUID versionId);

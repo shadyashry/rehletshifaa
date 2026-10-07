@@ -36,6 +36,12 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select c.status as status, c.travelPackageRequested as travelPackageRequested from MedicalCase c where c.id = :id")
     Optional<ActionFacts> findActionFacts(@Param("id") UUID id);
 
+    /** What the patient's onboarding pages show of the case: its number, stage and who it waits on. */
+    interface OnboardingFacts { String getCaseNumber(); CaseStatus getStatus(); String getWaitingOn(); }
+
+    @Query("select c.caseNumber as caseNumber, c.status as status, c.waitingOn as waitingOn from MedicalCase c where c.id = :id")
+    Optional<OnboardingFacts> findOnboardingFacts(@Param("id") UUID id);
+
     @Query("select c.waitingReason from MedicalCase c where c.id = :id")
     Optional<String> findWaitingReason(@Param("id") UUID id);
 

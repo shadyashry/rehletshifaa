@@ -390,6 +390,30 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **588 tests, 0 failures** (2 skipped; +1 referral-views test); `ArchitectureRulesTest` 22/22;
   `PostgresJpaMappingTest` **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`PatientActivationService` converted** (CL5 read slice 6; removed from `JDBC_NOT_YET_CONVERTED`, 12 → 11).
+  The patient's onboarding views moved to a new `journey.application.PatientActivationQueryService` (`prefill`, `result`,
+  `depositSummary`; the profile, submitter and onboarding subject-type reads the validation shares); `PatientActivationService`
+  keeps `activate`, `resendAccountSetup` and `portalAccess` and its public contract — the onboarding-grant authorization,
+  validation rules and messages, error codes (`PATIENT_NOT_FOUND`, `CASE_NOT_FOUND`, `CASE_NOT_ACTIVATABLE`,
+  `ONBOARDING_NOT_STARTED`/`_NOT_ACTIVE`, `PROFILE_NOT_ACTIVE`, `ACCOUNT_SETUP_NOT_STARTED`), the deposit summary (currency,
+  display amounts and "required" rule via `DepositQueryService`), journey stage and current action are unchanged.
+  - Queries added: `PatientProfileRepository.findOnboardingProfile` (the profile as the pages show and validate it) and
+    `isVerifiedMobileOfAnotherAccount`; `MedicalCaseRepository.findOnboardingFacts` (case number, stage and waiting-on in one
+    row — the views read the case once instead of twice); `CaseSubmissionContactRepository.findSubmitter`;
+    `ConsentRecordRepository.findLiveTypesOf` (unrevoked types on any case — validation) and `findLiveTypesCovering` (the
+    pre-fill's completed consents: patient-wide or this case); `PatientOnboardingRepository.findNewestOf` (current onboarding
+    id + state, `Limit.of(1)`) and `findNewestSubjectTypesOf`. Reused: `MedicalCaseRepository.findStageAndVersion` (the
+    activatable check).
+  - Locks: activation still locks the profile row first, then the case's newest onboarding (`findNewestOf` → `lockById`,
+    which re-reads it under the lock), as the two `FOR UPDATE` selects did; the locked profile entity is reused for the
+    completion instead of a second `lockById`.
+  - Read once: validation reads the consents on file in one query, only when the request leaves a required consent out (it
+    was one count per missing type).
+  - New test `consentsAlreadyOnFileCountUnlessRevokedAndThePrefillShowsTheCaseAsStored` (a patient-wide consent on file need not
+    be repeated, a revoked one must; the pre-fill and result show the stored case number, stage, waiting-on and onboarding state).
+  Verification: full suite **589 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest` **PASS** on a
+  freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -402,8 +426,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 12 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
-  `PaymentService` and `ConsultantReferralService` converted) — `PatientActivationService`, `PublicCaseAccessService`,
+- **Reads:** 11 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
+  `PaymentService`, `ConsultantReferralService` and `PatientActivationService` converted) — `PublicCaseAccessService`,
   `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
@@ -413,8 +437,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
-`CaseActionService`, `JourneyService`, `PaymentService` and `ConsultantReferralService` are done (2026-10-07); next
-`PatientActivationService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService` and `PatientActivationService` are done
+(2026-10-07); next `PublicCaseAccessService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.

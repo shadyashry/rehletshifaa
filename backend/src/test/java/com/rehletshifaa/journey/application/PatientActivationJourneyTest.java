@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -42,6 +43,7 @@ class PatientActivationJourneyTest {
     @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort; com.rehletshifaa.identity.LocalPatientIdentitySimulator identity;
     @org.junit.jupiter.api.BeforeEach void simulator() { identity = (com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort; identity.reset(); }
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired com.rehletshifaa.casemanagement.infrastructure.ConsentRecordRepository consentRecords;
 
     /** Raw SQL behind JPA's back: flush pending entity changes first, then drop managed instances the SQL made stale. */
     private int raw(String sql, Object... args) { em.flush(); int changed = jdbc.update(sql, args); em.clear(); return changed; }
@@ -425,6 +427,44 @@ class PatientActivationJourneyTest {
                 submitted.preferredLanguage(), submitted.sex(), submitted.consents());
         activation.activate(ctx.token, g, changed); em.flush();
         assertThat(jdbc.queryForObject("SELECT email FROM patient_profiles WHERE id=?", String.class, patientId(ctx.caseId))).isEqualTo(submitted.email());
+    }
+
+    @Test void consentsAlreadyOnFileCountUnlessRevokedAndThePrefillShowsTheCaseAsStored() throws Exception {
+        var ctx = accepted(); String g = grant(ctx);
+        UUID patient = patientId(ctx.caseId);
+        // A patient-wide privacy consent covers this case; a revoked cross-border consent no longer counts.
+        consentRecords.saveAndFlush(new com.rehletshifaa.casemanagement.domain.ConsentRecord(UUID.randomUUID(), patient, null,
+                new com.rehletshifaa.casemanagement.domain.ConsentRecord.Terms("PRIVACY_DATA_PROCESSING", "v1", "en", "text", "purpose", "scope"),
+                "ONBOARDING_LINK", "SECURE_LINK", Instant.now()));
+        UUID revoked = UUID.randomUUID();
+        consentRecords.saveAndFlush(new com.rehletshifaa.casemanagement.domain.ConsentRecord(revoked, patient, ctx.caseId,
+                new com.rehletshifaa.casemanagement.domain.ConsentRecord.Terms("CROSS_BORDER_CARE", "v1", "en", "text", "purpose", "scope"),
+                "ONBOARDING_LINK", "SECURE_LINK", Instant.now()));
+        raw("UPDATE consent_records SET revoked_at=? WHERE id=?", Instant.now(), revoked);
+
+        var prefill = activation.prefill(ctx.token, g);
+        assertThat(prefill.completedConsents()).contains("PRIVACY_DATA_PROCESSING").doesNotContain("CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS");
+        assertThat(prefill.caseNumber()).isEqualTo(ctx.caseNumber);
+        assertThat(prefill.caseStatus()).isEqualTo(status(ctx.caseId));
+        assertThat(prefill.waitingOn()).isEqualTo(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId));
+        assertThat(prefill.onboardingState()).isEqualTo("IN_PROGRESS");
+
+        ProfileActivationRequest full = request("Link Patient");
+        Function<List<String>, ProfileActivationRequest> with = consents -> new ProfileActivationRequest(full.givenName(), full.familyName(),
+                full.singleLegalName(), full.preferredName(), full.email(), full.phone(), full.mobileOwner(), full.dateOfBirth(), full.nationality(),
+                full.countryOfResidence(), full.preferredLanguage(), full.sex(), consents);
+        // The revoked consent must be given again.
+        assertThatThrownBy(() -> activation.activate(ctx.token, g, with.apply(List.of("PRIVACY_DATA_PROCESSING", "DEPOSIT_CANCELLATION_TERMS"))))
+                .isInstanceOf(FieldValidationException.class)
+                .satisfies(e -> assertThat(((FieldValidationException) e).errors()).extracting("field").containsOnly("consents"));
+        assertThat(profileStatus(ctx.caseId)).isEqualTo("PENDING");
+        // The privacy consent on file need not be repeated.
+        var result = activation.activate(ctx.token, g, with.apply(List.of("CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS"))); em.flush();
+        assertThat(result.profileActive()).isTrue();
+        assertThat(result.caseNumber()).isEqualTo(ctx.caseNumber);
+        assertThat(result.onboardingState()).isEqualTo("COMPLETED");
+        assertThat(result.waitingOn()).isEqualTo(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId));
+        assertThat(count("SELECT count(*) FROM consent_records WHERE patient_id=? AND consent_type='PRIVACY_DATA_PROCESSING'", patient)).isEqualTo(1);
     }
 
     // ---------- authorization ----------
