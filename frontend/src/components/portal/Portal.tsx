@@ -5,7 +5,7 @@ import { useVirtualClinics, virtualClinicHref } from "@/components/virtual-clini
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { ReauthenticationReturnNotice } from "@/components/ReauthenticationNotices";
 import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { MessageSquare, MoreHorizontal, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
@@ -601,9 +601,13 @@ function HeaderFact({label,value}:{label:string;value:string}){
 /** Secure messages and administration as side panels: one click away, never occupying the case page. */
 function CaseDrawer({locale,title,onClose,children}:{locale:Locale;title:string;onClose:()=>void;children:React.ReactNode}){
  const dialog=useRef<HTMLDialogElement>(null);
- useEffect(()=>{dialog.current?.showModal();},[]);
- return <dialog ref={dialog} className="account-dialog !w-[min(36rem,calc(100%-2rem))]" aria-label={title} onClose={onClose}>
-  <div className="flex items-start justify-between gap-4"><h2 className="title">{title}</h2><button type="button" className="icon-button" aria-label={locale==="ar"?"إغلاق":"Close"} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
+ const titleId=useId();
+ // Return focus to whatever opened the drawer once it has really left the page. Closing it from the cleanup would fire
+ // `close` (and onClose) under StrictMode's double effects, so the cleanup only restores focus after removal.
+ const opener=useRef<HTMLElement|null>(null);
+ useEffect(()=>{const node=dialog.current;opener.current??=document.activeElement instanceof HTMLElement?document.activeElement:null;node?.showModal();return()=>{setTimeout(()=>{if(node&&!node.isConnected)opener.current?.focus();},0);};},[]);
+ return <dialog ref={dialog} className="account-dialog !w-[min(36rem,calc(100%-2rem))]" aria-labelledby={titleId} onClose={onClose}>
+  <div className="sticky -top-6 z-10 -mx-6 -mt-6 flex items-start justify-between gap-4 border-b border-line bg-white px-6 pb-3 pt-6"><h2 id={titleId} className="title">{title}</h2><button type="button" className="icon-button" aria-label={locale==="ar"?"إغلاق":"Close"} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
   <div className="mt-4">{children}</div>
  </dialog>;
 }

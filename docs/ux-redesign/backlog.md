@@ -217,15 +217,15 @@ The items below are deferred.
 | P2 | `--button-secondary-border` = line-strong (1.66:1). Point it at `--color-ink-350` (3.63:1), the same as fields. This is a token change that needs the owner. | PM | `app/globals.css` | polish |
 | P2 | `.field:focus { outline: 0 }` replaces the 3px ring with a 1px border change and a 1.26:1 halo. | PM | `app/globals.css` | polish |
 | P2 | Decline uses `window.confirm` over the modal (browser-language buttons, no consequence text). Use an in-drawer confirm step in en and ar. | WG | `PatientProposal.tsx` | harden |
-| P2 | On success the drawer unmounts without `dialog.close()`, so focus drops to `<body>`. Close it and return focus to "Review proposal". | RB, WG | `Portal.tsx` `CaseDrawer` | harden |
+| Done | Done in Phase 6 polish: the drawer returns focus to the control that opened it. | RB, WG | `Portal.tsx` `CaseDrawer` | harden |
 | P2 | `<fieldset disabled={busy}>` dims the whole document and drops focus while sending, with no "Sending…" label. This is the same root cause as the portal P1. | WG, PM, RB | `Portal.tsx:368` | harden |
 | P2 | The primary is disabled until the box is ticked, with no reason that keyboard or screen-reader users can reach. | WG, PM | `PatientProposal.tsx` | harden |
 | P2 | Optional items are priced but excluded from the total and can't be selected, and nothing says so. | WG | `PatientProposal.tsx` | clarify |
 | P2 | The Arabic blocked note asks the patient to switch to English but has no direct link to the same view in `/en`. | WG | `PatientProposal.tsx` | harden |
 | P2 | The terms id `portal-deposit-terms` is hard-coded and shared across components, and the checkbox description reads the whole English terms block. Use `useId` and a short summary target, and test the real target. | RB, WG | `PatientProposal.tsx`, `CoordinationDepositTerms.tsx`, test | harden |
 | P3 | Fixed section ids and a region landmark per section; an unnamed fieldset group around the read-only document; an inline `mutate` wrapper (use `onDecided`); formatters rebuilt per item. | RB | `PatientProposal.tsx`, `Portal.tsx` | distill |
-| P3 | The drawer header with the close button scrolls away on phones (2240px of content at 375). | PM | `Portal.tsx` `CaseDrawer` | adapt |
-| P3 | `CaseDrawer` uses `aria-label` that duplicates the visible h2. Use `aria-labelledby`. | WG | `Portal.tsx` | harden |
+| Done | Done in Phase 6 polish: the drawer header and Close stay pinned while the content scrolls. | PM | `Portal.tsx` `CaseDrawer` | adapt |
+| Done | Done in Phase 6 polish: the dialog is named by its h2 through `aria-labelledby`. | WG | `Portal.tsx` | harden |
 | P3 | A typed note is lost on Esc or close without a warning. | WG | `PatientProposal.tsx` | harden |
 | P3 | Decimals vary per amount within one document ("$4,850" beside "$120.50"). | WG | `PatientProposal.tsx` | clarify |
 | P3 | "Ready for your decision" (drawer) vs "Ready to review" (My Care card): use one phrase. Buttons mix "&" and "and". | WG | `messages/*.json`, `MyCare.tsx` | clarify |
@@ -262,12 +262,12 @@ The items below are deferred.
 | P2 | `WorkItem` has no `coordinatorSubject`, so My Work still prints your own name where the queue says "You". This needs a field in the work API. | WG | backend work API, `MyWork.tsx` | harden |
 | P2 | The work-copy context carries no locale, so callers pair a `locale` prop with context copy (a mismatch is possible). Put the locale in the context value. | RB | `portal-copy.tsx`, `portal-labels.ts` | harden |
 | P2 | Numbers rely on the engine's default numbering system for "ar". Pin one system (e.g. `-u-nu-latn`, per the Western-digits default) in `plural()`, dates and money. The page counter and filter badge are raw numbers. | I18N, RB | `portal-labels.ts`, `CaseQueue.tsx` | harden |
-| P2 | The List/Cards toggle's pressed state is shown only by a 1.26:1 fill. The toggle is 40px tall; the "Clear all" text buttons are about 21px; `!min-h-9` rows are 42.8px. | PM | `CaseQueue.tsx` | polish |
+| Done | Done in Phase 6 polish: pressed state has a petrol ring; toggle, Clear all and row/bulk/pager buttons are 44px. | PM | `CaseQueue.tsx` | polish |
 | P2 | Search and sort fields have no focus outline (`.field:focus { outline: 0 }`, halo about 1.2:1). This is global and duplicates the patient-proposal item. | PM | `app/globals.css` | polish |
 | P3 | `categoryLabel` and `statusLabel` props are now partly redundant with the context. `waiting` and `priority` mix enum keys with UI keys (nest them). Build `buildWorkCopy(locale)` once for the page and the tests. Cache `Intl` objects. Use React 19 `use()`. Add a placeholder-parity test. | RB | `CaseQueue.tsx`, `portal-labels.ts`, `page.tsx`, `test-copy.tsx` | distill |
 | P3 | JourneyPulse and FullJourneyDialog still carry inline `ar ? …` strings (Journey, phases, View full journey), and the timeline note lacks `dir="auto"`. | RB, WG, I18N | `JourneySnapshot.tsx` | clarify |
-| P3 | Copy-success isn't announced. "Remove {label}" doesn't name the chip's value. The page counter has no words ("Page {page} of {pages}"). A zero count repeats the empty state. A grid row with no name and no care area renders an empty subtitle. | WG, RB | `CaseQueue.tsx`, `MyWork.tsx` | harden |
-| P3 | The "Current action" label is 0.7rem (11.2px). This belongs to the typeset pass. | WG | `CurrentAction.tsx` | typeset |
+| Done | Done in Phase 6 polish: copy is announced, the chip remove names its value, the pager reads "Page {page} of {pages}", no zero count beside an empty state, no empty grid subtitle. | WG, RB | `CaseQueue.tsx`, `MyWork.tsx` | harden |
+| Done | Done in Phase 6 polish: the label is 13px (0.8125rem). | WG | `CurrentAction.tsx` | typeset |
 | P3 | Queue tab `tabIndex` follows a stale `focused` value after blur. Date chips show ISO dates. Country names stay in English. `FilterSelect` sorts by code, not by the localised label. | I18N | `CaseQueue.tsx` | harden |
 | P3 | Arabic wording (pending native review):<br>• "الشروط المالية" vs "الشروط التجارية";<br>• "تعيين قسم المالية";<br>• "تقديم الرأي الطبي الثاني" in `currentAction.work`;<br>• feminine priority adjectives;<br>• "تمّت تسوية الوديعة";<br>• the «إجراءات إضافية» label vs the "المزيد" button (also English "More actions" vs "More");<br>• "عملي" → "مهامي";<br>• the date-filter fragments;<br>• "حالة الطلب" → "وضع الحالة";<br>• consistent shadda on منسّق.<br>English: one term for "no coordinator yet". | I18N, WG | `messages/*.json`, `Portal.tsx` | clarify |
 | P3 | `ConsultantRouting`: "No eligible consultant is available…" is lowercase and still a dead end (see the P2 above). | WG (screenshot) | `ConsultantRouting.tsx` | clarify |

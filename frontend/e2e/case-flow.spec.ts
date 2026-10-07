@@ -13,8 +13,8 @@ async function fillContactStep(page: Page, name: string) {
   const [given, family] = name.split(" ");
   await page.getByLabel("Given name(s)").fill(given);
   await page.getByLabel(/^Family name \/ surname/).fill(family ?? "");
-  await page.getByRole("combobox", { name: /country/i }).fill("Kenya");
-  await page.getByRole("option", { name: /Kenya/ }).click();
+  await page.getByRole("combobox", { name: /country of residence/i }).fill("Kenya");
+  await page.getByRole("listbox").getByRole("option", { name: /Kenya/ }).click();
   await page.getByLabel("Phone number").fill("700000000");
   await page.getByRole("button", { name: "Continue" }).click();
 }
@@ -112,8 +112,8 @@ test("a case for someone else records the representative separately and keeps em
   await page.getByRole("radio", { name: /someone else/i }).check({ force: true });
   await page.getByLabel("Given name(s)").fill("Layla");
   await page.getByLabel(/^Family name \/ surname/).fill("Hassan");
-  await page.getByRole("combobox", { name: /country/i }).fill("Kenya");
-  await page.getByRole("option", { name: /Kenya/ }).click();
+  await page.getByRole("combobox", { name: /country of residence/i }).fill("Kenya");
+  await page.getByRole("listbox").getByRole("option", { name: /Kenya/ }).click();
   await page.getByLabel("Your name").fill("Omar Hassan");
   await page.getByLabel(/relationship to the patient/i).selectOption("PARENT");
   await page.getByLabel("Phone number").fill("700000006");

@@ -251,7 +251,7 @@ describe("CaseQueue", () => {
     const onChange = vi.fn();
     renderWithWork(<CaseQueue {...props} state={{ ...initialQueue, tab: "mine", country: "Egypt" }} onChange={onChange}/>);
     expect(screen.getByText("Egypt")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /remove country/i }));
+    fireEvent.click(screen.getByRole("button", { name: /remove filter country/i }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ country: "" }));
   });
 

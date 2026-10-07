@@ -32,7 +32,7 @@ export function MyWork({ locale, role, items, busy, onOpen }: {
           <h2 id="my-work-title" className="title">{t.title}</h2>
           <p className="mt-1 text-sm text-ink-500">{t.hint}</p>
         </div>
-        <p role="status" className="text-sm text-ink-500">{busy ? t.loading : plural(locale, items.length, work.plural.workItems)}</p>
+        <p role="status" className="text-sm text-ink-500">{busy ? t.loading : items.length ? plural(locale, items.length, work.plural.workItems) : ""}</p>
       </div>
 
       {!busy && items.length === 0 ? (

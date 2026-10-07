@@ -174,8 +174,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             <DateFilter label={text.updatedTo} value={current.updatedTo} onChange={value=>change({updatedTo:value})}/>
           </div>
           <div className="mt-4 flex justify-between gap-2 border-t border-line pt-3">
-            <button type="button" className="text-[0.85rem] font-semibold text-ink-500 hover:text-brand-700" onClick={clearAll}>{text.clearAll}</button>
-            <button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.85rem]" onClick={()=>{setFiltersOpen(false);filterButton.current?.focus();}}>{text.done}</button>
+            <button type="button" className="inline-flex min-h-11 items-center px-1 text-[0.85rem] font-semibold text-ink-500 hover:text-brand-700" onClick={clearAll}>{text.clearAll}</button>
+            <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.85rem]" onClick={()=>{setFiltersOpen(false);filterButton.current?.focus();}}>{text.done}</button>
           </div>
         </div>}
       </div>
@@ -194,7 +194,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
       <div className="flex rounded-xl border border-line-strong bg-white p-0.5" role="group" aria-label={text.display}>
         {([["list",List,text.list],["grid",LayoutGrid,text.grid]] as const).map(([mode,Icon,label])=>
           <button key={mode} type="button" aria-pressed={view===mode} title={label}
-                  className={`flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-[0.8rem] font-semibold transition ${view===mode?"bg-brand-100 text-brand-800":"text-ink-500 hover:text-ink-800"}`}
+                  className={`flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-[0.8rem] font-semibold transition ${view===mode?"bg-brand-100 ring-1 ring-brand-600 text-brand-800":"text-ink-500 hover:text-ink-800"}`}
                   onClick={()=>changeView(mode)}><Icon size={15} aria-hidden/><span className="sr-only sm:not-sr-only">{label}</span></button>)}
       </div>
     </div>
@@ -202,24 +202,27 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     {chips.length>0&&<div className="flex flex-wrap items-center gap-2">
       {chips.map(chip=><span key={String(chip.key)} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-mist px-2.5 py-1 text-[0.78rem] font-semibold text-ink-700">
         <span className="text-ink-500">{chip.label}:</span>{chip.value}
-        <button type="button" className="-my-3 -me-2.5 inline-grid h-11 w-11 place-items-center rounded-full text-ink-500 hover:text-alert-700" aria-label={fillTemplate(text.remove,{label:chip.label})} onClick={()=>clearChip(chip.key)}><X size={13}/></button>
+        <button type="button" className="-my-3 -me-2.5 inline-grid h-11 w-11 place-items-center rounded-full text-ink-500 hover:text-alert-700" aria-label={fillTemplate(text.remove,{label:chip.label,value:chip.value})} onClick={()=>clearChip(chip.key)}><X size={13}/></button>
       </span>)}
-      <button type="button" className="text-[0.78rem] font-semibold text-brand-700 underline-offset-4 hover:underline" onClick={clearAll}>{text.clearAll}</button>
+      <button type="button" className="inline-flex min-h-11 items-center px-1 text-[0.8125rem] font-semibold text-brand-700 underline-offset-4 hover:underline" onClick={clearAll}>{text.clearAll}</button>
     </div>}
 
     {/* Bulk actions exist only once something is selected. */}
     {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
       <p className="text-[0.85rem] font-bold text-brand-900">{plural(locale,selectedCases.length,work.plural.selected)}</p>
       <div className="ms-auto flex flex-wrap gap-2">
-        {canBulkClaim&&<button type="button" className="btn-primary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} onClick={async()=>{for(const item of selectedCases)await onMutate(`/coordinator/cases/${item.id}/claim`);clearSelection();}}><Check size={14}/>{text.claim}</button>}
-        {canBulkRequestInfo&&<button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>setInfoDialog(true)}>{text.requestInfo}</button>}
+        {canBulkClaim&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={async()=>{for(const item of selectedCases)await onMutate(`/coordinator/cases/${item.id}/claim`);clearSelection();}}><Check size={14}/>{text.claim}</button>}
+        {canBulkRequestInfo&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>setInfoDialog(true)}>{text.requestInfo}</button>}
         <button type="button" className="text-[0.82rem] font-semibold text-ink-600 hover:text-brand-700" onClick={clearSelection}>{text.clearSelection}</button>
       </div>
     </div>}
 
+    <p role="status" className="sr-only">{copied?text.copied:""}</p>
+
     <div id="queue-panel" role={tabs.length?"tabpanel":undefined} aria-labelledby={tabs.length?`queue-tab-${selected}`:undefined} tabIndex={tabs.length?0:undefined}>
       <div className="mb-2.5 flex items-center justify-between gap-3">
-        <p role="status" className="text-[0.82rem] text-ink-500">{busy?text.loading:plural(locale,list.length,work.plural.cases)}</p>
+        {/* The empty state already says there is nothing here; the count would only repeat it. */}
+        <p role="status" className="text-[0.82rem] text-ink-500">{busy?text.loading:list.length?plural(locale,list.length,work.plural.cases):""}</p>
         {coordinator&&pageItems.length>0&&<label className="flex items-center gap-2 text-[0.8rem] font-semibold text-ink-600">
           <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={pageSelected}
                  onChange={event=>setSelectedIds(currentIds=>{const next=new Set(currentIds);for(const item of pageItems){if(event.target.checked)next.add(item.id);else next.delete(item.id);}return next;})}/>
@@ -252,10 +255,10 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
               {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-500"><Files size={13} aria-hidden/>{plural(locale,item.documentCount??0,work.plural.documents)}</span>}
             </>;
             const actions=<>
-              {claimable&&<button type="button" className="btn-primary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
-              {pending&&<button type="button" className="btn-primary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
-              {transferable&&<button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
-              <button type="button" className={`${claimable||pending?"btn-secondary":"btn-primary"} !min-h-9 !px-3 !text-[0.82rem]`} disabled={busy} onClick={()=>onOpen(item)}>{text.open}<ArrowRight size={14} aria-hidden className="rtl:rotate-180"/></button>
+              {claimable&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
+              {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
+              {transferable&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
+              <button type="button" className={`${claimable||pending?"btn-secondary":"btn-primary"} !min-h-11 !px-3 !text-[0.82rem]`} disabled={busy} onClick={()=>onOpen(item)}>{text.open}<ArrowRight size={14} aria-hidden className="rtl:rotate-180"/></button>
             </>;
 
             if(view==="grid")return <li key={item.id} className="card flex flex-col p-4">
@@ -263,7 +266,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
                 {coordinator&&<label className="-m-3.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold text-ink-900">{title}</p>
-                  <p className="mt-0.5 text-[0.75rem] font-semibold text-brand-700">{item.patientName&&<span dir="ltr">{item.caseNumber}</span>}{item.patientName&&item.careCategory?" · ":""}{item.careCategory?categoryLabel(item.careCategory):""}</p>
+                  {(item.patientName||item.careCategory)&&<p className="mt-0.5 text-[0.75rem] font-semibold text-brand-700">{item.patientName&&<span dir="ltr">{item.caseNumber}</span>}{item.patientName&&item.careCategory?" · ":""}{item.careCategory?categoryLabel(item.careCategory):""}</p>}
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">{meta}</div>
@@ -294,9 +297,9 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
         </ul>}
 
       {pages>1&&<nav className="mt-4 flex items-center justify-between gap-3" aria-label={text.pages}>
-        <button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.82rem]" disabled={page===1} onClick={()=>change({page:page-1})}>{text.previous}</button>
-        <span className="text-[0.82rem] text-ink-500">{page} / {pages}</span>
-        <button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.82rem]" disabled={page===pages} onClick={()=>change({page:page+1})}>{text.next}</button>
+        <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={page===1} onClick={()=>change({page:page-1})}>{text.previous}</button>
+        <span className="text-[0.82rem] text-ink-500">{fillTemplate(text.pageOf,{page:new Intl.NumberFormat(locale).format(page),pages:new Intl.NumberFormat(locale).format(pages)})}</span>
+        <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={page===pages} onClick={()=>change({page:page+1})}>{text.next}</button>
       </nav>}
     </div>
   </section>;
