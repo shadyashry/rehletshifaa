@@ -271,3 +271,18 @@ The items below are deferred.
 | P3 | Queue tab `tabIndex` follows a stale `focused` value after blur. Date chips show ISO dates. Country names stay in English. `FilterSelect` sorts by code, not by the localised label. | I18N | `CaseQueue.tsx` | harden |
 | P3 | Arabic wording (pending native review):<br>• "الشروط المالية" vs "الشروط التجارية";<br>• "تعيين قسم المالية";<br>• "تقديم الرأي الطبي الثاني" in `currentAction.work`;<br>• feminine priority adjectives;<br>• "تمّت تسوية الوديعة";<br>• the «إجراءات إضافية» label vs the "المزيد" button (also English "More actions" vs "More");<br>• "عملي" → "مهامي";<br>• the date-filter fragments;<br>• "حالة الطلب" → "وضع الحالة";<br>• consistent shadda on منسّق.<br>English: one term for "no coordinator yet". | I18N, WG | `messages/*.json`, `Portal.tsx` | clarify |
 | P3 | `ConsultantRouting`: "No eligible consultant is available…" is lowercase and still a dead end (see the P2 above). | WG (screenshot) | `ConsultantRouting.tsx` | clarify |
+
+## Portal re-critique (Phase 6, 2026-10-08) — new and re-ranked items
+
+Source: `.impeccable/critique/2026-10-07T21-50-23Z__frontend-src-components-portal.md`, 25/40 (up from 24/40).
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| **P0 (owner)** | Arabic patients cannot accept a proposal but can decline it. This follows the owner's GATE 2 decision (option B). Proposed: a coordinator-mediated path ("your coordinator goes through the terms with you in Arabic and records your decision"; `RecordPatientResponse` exists), de-emphasise Decline while Accept is blocked, and treat Arabic terms approval as a launch blocker. **Owner decision needed.** | Re-critique A | `PatientProposal.tsx`, `lib/commercial-terms.ts` | clarify / harden |
+| P1 | Coordinator case: the current-action "Assign Consultant" button plus a second inline "Assign a Consultant" form with its own button. The care-area select is blank, and "No eligible consultant" has no next step. | Re-critique A | `CurrentAction.tsx`, `CoordinatorActions.tsx`, `ConsultantRouting.tsx` | clarify |
+| P1 | The staff home is still a template dashboard: off-palette KPI tiles, disabled zero tiles, an empty My work landing, the marketing footer, and no staff navigation in the header. Already planned as the P2 staff-home distill; raised to P1. | Re-critique A | `RoleDashboardSummary.tsx`, `CaseQueue.tsx`, `MyWork.tsx`, `Portal.tsx`, `Footer.tsx` | distill / layout |
+| P2 | My Care is five boxed cards and never names the patient. A representative ("Care for: [name]") is invisible, and the avatar reads "ME". | Re-critique A | `MyCare.tsx`, `PatientNav.tsx` | layout |
+| P2 | Proposal drawer: the sticky header and the embedded deposit-terms box count as nested surfaces. The open drawer has a 1px border with a wide shadow. On phones it is a centred modal, not a full-height sheet. | Re-critique B, A | `Portal.tsx` `CaseDrawer`, `CoordinationDepositTerms.tsx` | polish / adapt |
+| P2 | The drawer leads with the price, and the label says "recommended services" even when there is no recommendation. Consider the Consultant's recommendation first ("understanding before commitment"). | Re-critique A | `PatientProposal.tsx` | shape |
+| P2 | The deposit terms are badged "Pending legal review" but state concrete refund promises (F2 is open). This is a truthfulness tension for legal. | Re-critique A | `lib/commercial-terms.ts` | — (legal) |
+| P3 | AR "العرض" (My Care) vs "مقترحك" (drawer); the estimate card says "your treating doctor" where the drawer says "Consultant"; no WhatsApp route in My Care; the coordinator lead isn't labelled as a lead. | Re-critique A | `MyCare.tsx`, `messages/*.json`, `Portal.tsx` | clarify |

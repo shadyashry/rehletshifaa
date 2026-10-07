@@ -34,7 +34,16 @@ Update at the end of every phase.
 - [x] **Phase 5 — `/redesign-area` runs**
   - [x] Patient proposal dialog — GATE 3 approved; terms open by default while a decision is owed (owner)
   - [x] Staff work views — GATE 4 approved
-- [ ] **Phase 6 — Close the loop**: polish, full verification, re-critique, DESIGN.md refresh, PR draft — GATE 5
+- [ ] **Phase 6 — Close the loop**
+  - [x] polish (`6ea2a74`): drawer header pinned + focus return, 44px queue controls, announced copy, worded pager
+  - [x] full verification: typecheck ok; lint 25/13 unchanged; unit 318/11 (`ProposalSign`, pre-existing); Playwright 178 passed,
+        26 skipped, 22 failed — 18 identical on base `975f071`, 4 `case-flow` blocked by backend CORS (tunnel-only); a
+        `case-flow` locator regression from `395c002` was fixed
+  - [x] portal re-critique: 24/40 → 25/40
+  - [x] DESIGN.md refresh (`6fdc5ce`)
+  - [x] backlog updated (done items, re-critique items)
+  - [x] PR description drafted: `docs/ux-redesign/PR_DESCRIPTION.md`; branch pushed
+  - [ ] **GATE 5**: owner reviews before the PR is opened
 
 ## Decisions
 
@@ -62,6 +71,7 @@ Update at the end of every phase.
 |---|---|---|
 | Public site | `.impeccable/critique/2026-10-07T12-52-27Z__dev-rehletshifaa-com.md` | 25/40 |
 | Portal | `.impeccable/critique/2026-10-07T13-37-54Z__frontend-src-components-portal.md` | 24/40 |
+| Portal (re-critique, Phase 6) | `.impeccable/critique/2026-10-07T21-50-23Z__frontend-src-components-portal.md` | 25/40 |
 
 ## Future (out of scope for this run)
 
@@ -70,13 +80,6 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Phase 6, in a fresh session (owner request): read this file, `docs/ux-redesign/backlog.md` and the two critiques in
-`.impeccable/critique/`, then:
-1. `/impeccable:impeccable polish` the changed patient and staff views (en + ar, 390px + 1440px; synthetic fixtures via
-   `e2e/patient-fixture.ts` / `e2e/portal-fixture.ts` against `frontend-dev` on :3100);
-2. full verification: lint, typecheck, unit, Playwright (en + ar), `e2e/a11y.spec.ts` (known failures: 11 `ProposalSign`
-   unit tests, 4 `portal-ux` + 2 Control Center `care-coordination` specs, lint 25 errors/13 warnings — all pre-existing);
-3. `/impeccable:impeccable critique` the portal again; record 24/40 → new score here;
-4. `/impeccable:impeccable document` to refresh DESIGN.md (component tokens already recorded);
-5. update backlog (done items, remaining P2: staff home footer, stat tiles, toolbar → distill);
-6. push `feat/ux-redesign` and draft the PR description → **GATE 5** (stop before opening the PR).
+GATE 5: owner reviews `docs/ux-redesign/PR_DESCRIPTION.md`, then opens the PR `feat/ux-redesign` → `codex/platform-control-plane`
+(or asks Claude to). Open owner decision: the Arabic proposal path (re-critique P0). Next redesign runs: staff home distill
+(P1), duplicated Assign Consultant action (P1).
