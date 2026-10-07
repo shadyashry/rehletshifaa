@@ -101,3 +101,87 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 | P3 | Every page logs a CSP error blocking the Cloudflare Insights beacon (site config). | SC | `next.config.ts` | — |
 | A11Y | `en/care-areas` `color-contrast`: the decorative body-system numerals "01–06" are 1.92:1 (`text-brand-600/40`). | A11Y | `app/[locale]/care-areas/page.tsx` | polish |
 | Done | "Verified" claims removed (`adcf0d6`). WhatsApp prefills localised, "cardiac" dropped, Arabic eyebrow tracking fixed (`e01c663`). Representative dial code (`395c002`). Index-page CTA stacking (`6f123da`). AA placeholders (`7061d9c`). | SC | — | — |
+
+## Portal — engineering, accessibility and RTL (Phase 4 reviews, 2026-10-07)
+
+These items come from three read-only reviews of `frontend/src/components/portal`, merged with duplicates removed
+and the stricter severity kept:
+
+- **AU:** Impeccable audit, with axe and keyboard probes on synthetic fixtures.
+- **WG:** web-design-guidelines review.
+- **RB:** vercel-react-best-practices and composition-patterns review.
+
+Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items already listed above are not repeated.
+
+### Safety and data integrity
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| **P0** | `WorkspaceView` (and `ProposalSendForm`, `FinalAssessment`, `FinalQuoteActions`, `RoleActions`) has no case key. Opening another case without returning to the queue (notification bell, `openCaseById`, `otherCases`) keeps the previous case's typed drafts and dialog flags, so they can be submitted against the wrong patient's case. Fix: `key={workspace.caseSummary.id}`. (verified) | RB | `Portal.tsx:216` | harden |
+| P1 | Drafts are lost on a tab switch or "My dashboard". The clinical review, proposal notes, final assessment and operations plan live in tab-panel state that unmounts. Keep the panels mounted, or lift the drafts and warn when a form is dirty. | WG | `ClinicalReview.tsx:51`, `Portal.tsx:649/685/750` | harden |
+| P1 | Bulk "Take ownership" clears errors per case and reports success even if one claim failed. Report "N of M" and keep the failed rows selected. | WG, AU | `CaseQueue.tsx:215` | harden |
+| P1 | Bulk "Request information" stops at the first failure. Resubmitting sends a second request and email to patients who already received one. Drop the succeeded cases and show a result per case. | WG | `RequestInformationDialog.tsx:82` | harden |
+| P1 | The Arabic preliminary-estimate disclaimer is weaker than the English one. It omits non-binding, "not a price guarantee" and "may increase or decrease". | AU | `MyCare.tsx:255/272`, `CaseMessages.tsx:38` | clarify |
+| P2 | Recording a refund has no confirmation. Submitting a second opinion permanently ends access with no confirmation. "Resend link" silently revokes the current link. | WG | `Portal.tsx:731/746`, `ConsultantRouting.tsx:174`, `CoordinatorActions.tsx:478` | harden |
+| P2 | "Request changes" can be sent with an empty note. `RecordPatientResponse` lets required items be blank. | WG | `CaseMessages.tsx:38`, `RecordPatientResponse.tsx:62` | harden |
+
+### Feedback, focus and state
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P1 | `<fieldset disabled={busy}>` around the whole workspace disables the focused control on every action. Focus drops to `<body>` and is never restored, and the workspace dims to 65%. Confirmed with a keyboard probe in en and ar. | AU, WG | `Portal.tsx:418/363/365`, `app/globals.css:731` | harden |
+| P1 | Success and error notices render behind an open modal `<dialog>`, so drawer actions show no result. This affects More actions, Transfer ownership, Request info and the patient decision. Errors far down the page appear only in the top banner. | WG | `Portal.tsx:212` | harden |
+| P2 | `refresh` has no stale-result guard, and one shared `busy` flag serves concurrent loads. Reference-data effects are not cancelled or reset when the role changes. | RB | `Portal.tsx:110/134-136` | harden |
+| P2 | `refreshMe` blanks `me`, so Portal returns the loading frame and unmounts the tree (dialogs and drafts are lost). Keep the previous `me` while revalidating. | RB | `AuthProvider.tsx:41`, `Portal.tsx:191` | harden |
+| P2 | Missing empty states: an empty message thread; TeamAssignment with nobody in the role; a care-area select whose value is not among its options. | WG | `CaseMessages.tsx:20`, `CoordinatorActions.tsx:87`, `ConsultantRouting.tsx:126` | onboard |
+| P2 | `PatientIdentityStep` always receives `identity={null}`, so the PENDING and REJECTED states never render. | WG | `Portal.tsx:362` | harden |
+| P2 | `WorkforceAdoptionPanel` accept has no busy state, so a double-click sends twice. | WG | `WorkforceAdoptionPanel.tsx:38` | harden |
+| P3 | Every action shows the generic "Saved successfully"; "Retry" only reloads the queue; the copy-link failure is silent; the completion note closes before its result is known. | WG | `Portal.tsx:184/212/681`, `CurrentAction.tsx:78` | clarify |
+
+### Accessibility and semantics
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P1 | Unlabelled controls: the discharge-document select; the FinalAssessment currency select; manual service and amount inputs labelled only by placeholder; an English "remove" aria-label. | AU, WG | `CaseWorkflowActions.tsx:17`, `Portal.tsx:696/699` | harden |
+| P1 | Text-field borders are `--color-line-strong` (1.66:1 on white), below the 3:1 non-text contrast WCAG 1.4.11 requires. Token decision at GATE 2. | Tokens | `app/globals.css` `.field`, `theme-petrol.css` | polish |
+| P2 | A hard-coded English `aria-label="Confirmed arrival"` overrides the Arabic label (label-in-name). | AU, WG | `CaseWorkflowActions.tsx:16` | clarify |
+| P2 | Broken unread-badge names ("Messages1 unread"). The staff Messages badge shows the total, not the unread count. Unread notifications and overdue tasks are shown by colour only. | AU, WG | `PatientNav.tsx:30`, `MyCare.tsx:55/212`, `Portal.tsx:402/603`, `NotificationBell.tsx:101` | harden |
+| P2 | Tablist arrow keys don't flip in RTL (ArrowLeft jumps to the far tab), and Home/End are missing. | AU, WG | `Portal.tsx:260/424`, `CaseQueue.tsx:143` | adapt |
+| P2 | My Care card titles are `<p>`, not headings. `CaseMessages` puts an h3 under the h1 (axe heading-order in en and ar). | AU | `MyCare.tsx:147/187/202/219`, `CaseMessages.tsx:18` | harden |
+| P2 | Tap targets: copy button 13px, chip remove about 17px, row checkboxes 16px, `!min-h-9` (36px) buttons, tabs 40–41px, "Back to dashboard" 33px. | AU, WG | `CaseQueue.tsx:179/206/253-297`, `Portal.tsx:212/378/531` | adapt |
+| P2 | The coordinator lock is `pointer-events-none opacity-50` only, so the release buttons stay keyboard-operable. | AU | `Portal.tsx:310` | harden |
+| P2 | Zero-value dashboard tiles are `disabled` at 0.55 opacity (about 2.6:1). | AU | `RoleDashboardSummary.tsx:69` | polish |
+| P2 | Repeated "Open/View/Download" buttons with no item context. Role-switcher active state is shown by styling only. `role="dialog"` on the inline `AccountLinkRequest` card. A focusable "disabled" mailto. | WG | `MyWork.tsx:87`, `CaseQueue.tsx:256`, `Portal.tsx:208/682`, `AccountLinkRequest.tsx:84` | harden |
+| P3 | Popovers with `role="dialog"` don't move focus. The result-count live region re-announces on every keystroke. Smooth scroll ignores reduced motion. "✓/♥" glyphs are read aloud. No new-tab notice. | AU, WG | `CaseQueue.tsx:164/223`, `NotificationBell.tsx:79`, `Portal.tsx:194/336`, `PortalAccount.tsx:95` | harden |
+
+### RTL, i18n and formatting
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P2 | `tracking-[0.08–0.1em]` and `uppercase` on Arabic micro-labels (computed 1.15px letter-spacing on "الخطوة الحالية"). Add an RTL reset or use `.eyebrow`. | AU, WG | `MyCare.tsx:95/147/187/202/219`, `Portal.tsx:434-612`, `CurrentAction.tsx:45`, `JourneySnapshot.tsx:28`, `MyWork.tsx:108`, `PortalAccount.tsx:62` | typeset |
+| P2 | `dir="ltr"` on Arabic money blocks flips alignment and digit order. Wrap only the figure in `<bdi>`. | AU, WG | `MyCare.tsx:148/155/188` | adapt |
+| P2 | Care-area labels: two local maps cover 3 of 9 areas, disagree with each other, and fall back to English slugs on Arabic pages. Use one shared source. | AU, WG | `MyCare.tsx:349`, `Portal.tsx:763`, `MyWork.tsx:72` | clarify |
+| P2 | One total is formatted with 0 and 2 decimals in different places. Use one shared money formatter. | WG, AU | `Portal.tsx:517/717/760`, `MyCare.tsx`, `ClinicalReview.tsx` | clarify |
+| P2 | Date of birth is parsed as UTC midnight, so it shows the previous day west of UTC. | WG | `PortalAccount.tsx:67` | harden |
+| P3 | Dates without a year; raw FX rate and ISO date; hard-coded "KB/MB"; English "Bank" placeholder and English error fallbacks in the Arabic UI; the wrong-account case detected by an English regex; Arabic IME Enter not guarded. | WG, AU | `CaseQueue.tsx:286`, `Portal.tsx:665/727/764`, `PortalDirectories.tsx:10`, `AccountLinkRequest.tsx:68`, `RequestInformationDialog.tsx:132` | clarify |
+
+### Design-system drift (beyond items above)
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P2 | Status, priority and attention chips and the journey "blocked" state use Tailwind amber, emerald, sky and stone colours with rounded-full pills. Map them to the status tokens (GATE 2) and the 8px badge. | AU | `Portal.tsx:768`, `CaseQueue.tsx:54-62`, `MyWork.tsx:64/103`, `JourneySnapshot.tsx:36-56` | colorize / polish |
+| P2 | The deposit panel uses `sand-50/200` (not remapped by petrol), and the current step fills with `brand-50`. Both break the Two Surfaces rule. | AU | `MyCare.tsx:94/146` | polish |
+| P2 | A filled petrol "Open" on every queue row and work card (up to 12 per page) breaks the One Action rule. | AU | `CaseQueue.tsx:256`, `MyWork.tsx:87` | quieter |
+| P3 | `PortalFrame` uses a gradient with a hard-coded `#fff`; old-palette `rgba(28,51,58)` shadows; `shadow-xl`/`rounded-2xl` popovers. | AU | `Portal.tsx:236`, `CurrentAction.tsx:43`, `PortalAccount.tsx:49`, `NotificationBell.tsx:80`, `CaseQueue.tsx:165` | polish |
+
+### Performance and code structure
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P1 | `api` depends on the whole `user` object, so every silent token renewal re-runs the queue effect (clears the cases), refetches reference data, restarts polling, and wipes ConsultantRouting selections. Key on the subject and read the token from a ref. | RB | `Portal.tsx:109`, `ConsultantRouting.tsx:105` | harden |
+| P1 | Serial waterfalls: `openCaseById` makes 3 round trips including a duplicate fetch; workspace and documents load sequentially; `mutate` runs refresh then openCase (4–5 trips per click); bulk claim does this N times. | RB, AU | `Portal.tsx:145/163/182-185`, `CaseQueue.tsx:215` | optimize |
+| P1 | `Portal.tsx` is one 132 KB client module importing every role's UI. Split it into patient and staff modules by role and lazy-load dialogs and drawers. | RB, AU | `Portal.tsx:3`, `app/[locale]/portal/page.tsx` | optimize |
+| P2 | Lint `set-state-in-effect`, `refs` and `purity` errors (12 in scope), each with a concrete fix in the RB report: queue loading derived state, `?role=` lazy init, `Date.now()` in render, dialog ref read in render, a shared `usePortalSlot` hook, the view-mode lazy init, directory and adoption loaders. | RB | `Portal.tsx:108/114/168/173/666`, `PortalAccount.tsx:38/55`, `NotificationBell.tsx:34`, `CaseQueue.tsx:87`, `PortalDirectories.tsx:11`, `WorkforceAdoptionPanel.tsx:20` | harden |
+| P2 | Composition: 27 `useState` hooks in Portal, 26 props into `WorkspaceView`, 8 boolean dialog flags. Introduce a `CaseWorkspaceProvider`, split the patient and staff views, and use one dialog union state. | RB | `Portal.tsx:276/323` | — |
+| P2 | `role={currentRole!}` can crash `WorkspaceView` when `/me` fails while a case is open. | RB | `Portal.tsx:216/285` | harden |
+| P3 | The hidden queue re-renders under the workspace; formatters are rebuilt on every render; polling continues in hidden tabs; both locales' copy ships to the client; dead code (`PatientStatusCard`, `PATIENT_JOURNEY`, `ProposalShareLinks`, `TaskActions`, a no-op `Panel wide`, the MyCare timeline no-op). | RB, WG, AU | `Portal.tsx`, `NotificationBell.tsx:41`, `CaseMessages.tsx:29`, `MyCare.tsx:235` | distill |
