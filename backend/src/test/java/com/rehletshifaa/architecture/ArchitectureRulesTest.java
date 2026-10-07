@@ -213,7 +213,7 @@ class ArchitectureRulesTest {
      */
     private static final Set<String> JDBC_NOT_YET_CONVERTED = Set.of(
             "com.rehletshifaa.casemanagement.application.CaseNumberGenerator", // nextval: JPQL has no sequence function
-            "com.rehletshifaa.shared.config.LocalDemoDataSeeder"); // @Profile("local") only
+            "com.rehletshifaa.devdata.LocalDemoDataSeeder"); // @Profile("local") only; its own top-level package so shared depends on nothing
 
     /**
      * No plain-SQL API ({@code org.springframework.jdbc..}: JdbcClient, RowMapper, …; {@code java.sql..}: ResultSet,

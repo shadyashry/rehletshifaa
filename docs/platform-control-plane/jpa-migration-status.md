@@ -10,7 +10,7 @@ JdbcClient → Spring Data JPA conversion; update it at every slice boundary.
    notification · security · casemanagement · access, clinic · document · journey · coordination. (`casemanagement`
    depends only on directory, notification, security and below, so `access` and `clinic` read case tables through it;
    `ArchitectureRulesTest` keeps the graph acyclic.) `LocalDemoDataSeeder` is excluded
-   from ownership and must move to its own top-level dev-data module (it would otherwise make `shared` depend on everything).
+   from ownership and lives in its own top-level `devdata` package (in `shared` it would make `shared` depend on everything).
 2. **Write-convert a table completely, in one slice.** Every INSERT/UPDATE/DELETE on the table, in every file, goes
    through its repository with an immediate flush (`saveAndFlush`/`saveAllAndFlush`, or `@Modifying(flushAutomatically
    = true, clearAutomatically = true)` for bulk JPQL). Only then is the table "W". Reads may stay JDBC until their
@@ -651,12 +651,21 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **599 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`LocalDemoDataSeeder` moved to `com.rehletshifaa.devdata`** (CL5 slice 16; closes CL5). The local-profile
+  seeder left `shared.config` for its own top-level package, so `shared` no longer hosts a class that writes every module's
+  tables (rule 1). It is unchanged otherwise: `@Profile("local")`, idempotent JDBC seeding with `NOT EXISTS` guards, and it
+  stays on `JDBC_NOT_YET_CONVERTED` under its new name (a documented exception, with `CaseNumberGenerator`). It depends only on
+  `shared`; nothing depends on it, so `businessModulesAreFreeOfCycles` holds. The application root package
+  (`com.rehletshifaa`) still scans it.
+  Verification: full suite **599 tests, 0 failures** (2 skipped); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
   counter table would add a hot row lock to every intake.
-- `LocalDemoDataSeeder` (`@Profile("local")`, runs once at startup) still writes with JDBC until it moves to its own
-  dev-data package.
+- `devdata.LocalDemoDataSeeder` (`@Profile("local")`, runs once at startup) seeds the local QA data with JDBC (idempotent
+  `INSERT … WHERE NOT EXISTS`). It is excluded from ownership and is never active outside the local profile.
 
 ## Where it stands (2026-10-07)
 
@@ -673,6 +682,6 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 
 ## Next slice
 
-Move `LocalDemoDataSeeder` out of `shared.config` into its own top-level `devdata` package (rule 1: it must not make `shared`
-depend on everything), keeping it `@Profile("local")` and on the exception list under its new name. After that the JPA
-migration has no open slice; CL7 (Sonar) stays blocked on a Sonar server/project/token and scanner.
+None: CL5 is complete (2026-10-07). Every table is read and written through Spring Data JPA; the ratchet holds only the two
+documented exceptions. New persistence code follows the rules above. CL7 (Sonar) stays blocked on a Sonar
+server/project/token and scanner.

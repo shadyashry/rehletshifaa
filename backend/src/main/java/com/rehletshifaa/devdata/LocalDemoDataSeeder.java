@@ -1,4 +1,4 @@
-package com.rehletshifaa.shared.config;
+package com.rehletshifaa.devdata;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
