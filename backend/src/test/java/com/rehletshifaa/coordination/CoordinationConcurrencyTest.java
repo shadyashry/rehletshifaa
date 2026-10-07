@@ -36,6 +36,31 @@ class CoordinationConcurrencyTest {
         assertThat(capacity).allMatch(x->x instanceof Decision);assertThat(capacity.stream().map(x->(Decision)x).filter(d->d.selectedOwner()!=null)).hasSize(1);
         assertThat(repo.workload("routing-a",UUID.randomUUID())).isEqualTo(current+1);
     }
+    /** CL2+CL3 review R4: authority is checked before the case and routing locks are taken, and again under them. */
+    @Test void callersWithoutAuthorityAreRefusedWithoutWaitingForTheCaseOrRoutingLock()throws Exception{
+        CoordinationIntegrationTest fixture=new CoordinationIntegrationTest();fixture.jdbc=jdbc;fixture.crypto=crypto;
+        TransactionTemplate tx=new TransactionTemplate(transactions);
+        UUID caseId=tx.execute(s->fixture.medicalCase(fixture.consultant()));
+        com.rehletshifaa.authority.TestPrincipals.grant(jdbc,crypto,"r4-coordinator",com.rehletshifaa.authority.domain.Role.COORDINATOR);
+        CountDownLatch held=new CountDownLatch(1),release=new CountDownLatch(1);
+        try(var pool=Executors.newFixedThreadPool(2)){
+            Future<?> holder=pool.submit(()->tx.executeWithoutResult(s->{repo.lockCase(caseId);repo.lock();held.countDown();
+                try{release.await(30,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}}));
+            try{
+                assertThat(held.await(10,TimeUnit.SECONDS)).isTrue();
+                // While another transaction holds both locks, an outsider is refused at once instead of queueing behind them.
+                assertThat(pool.submit(()->as("r4-outsider",()->engine.claimCoordinatorCase(caseId))).get(5,TimeUnit.SECONDS)).isEqualTo("PERMISSION_NOT_HELD");
+                assertThat(pool.submit(()->as("r4-outsider",()->engine.reassignCoordinator(caseId,"r4-coordinator","Take over"))).get(5,TimeUnit.SECONDS)).isEqualTo("PERMISSION_NOT_HELD");
+            }finally{release.countDown();holder.get(30,TimeUnit.SECONDS);}
+            // An unknown case is refused like any other case outside the caller's scope, not reported as missing.
+            assertThat(pool.submit(()->as("r4-coordinator",()->engine.claimCoordinatorCase(UUID.randomUUID()))).get(10,TimeUnit.SECONDS)).isEqualTo("OUT_OF_SCOPE");
+        }
+    }
+    private static String as(String subject,Callable<UUID> action){
+        CoordinationIntegrationTest.signIn(subject);
+        try{action.call();return "ALLOWED";}catch(ApiException e){return e.code();}catch(Exception e){throw new IllegalStateException(e);}
+        finally{org.springframework.security.core.context.SecurityContextHolder.clearContext();}
+    }
     private void oneWinner(List<Object> results){assertThat(results.stream().filter(x->x instanceof Decision)).hasSize(1);assertThat(results.stream().filter(x->x instanceof ApiException)).hasSize(1);assertThat(results.stream().filter(x->x instanceof ApiException).findFirst().orElseThrow()).isInstanceOf(ApiException.class);}
     private List<Object> race(Callable<Decision> first,Callable<Decision> second)throws Exception{CountDownLatch ready=new CountDownLatch(2),start=new CountDownLatch(1);try(var pool=Executors.newFixedThreadPool(2)){List<Future<Object>> futures=new ArrayList<>();for(Callable<Decision> action:List.of(first,second))futures.add(pool.submit(()->{CoordinationIntegrationTest.signIn("routing-manager");ready.countDown();if(!start.await(10,TimeUnit.SECONDS))throw new IllegalStateException("Race start timeout");try{return action.call();}catch(ApiException e){return e;}finally{org.springframework.security.core.context.SecurityContextHolder.clearContext();}}));assertThat(ready.await(10,TimeUnit.SECONDS)).isTrue();start.countDown();return List.of(futures.get(0).get(20,TimeUnit.SECONDS),futures.get(1).get(20,TimeUnit.SECONDS));}}
 }

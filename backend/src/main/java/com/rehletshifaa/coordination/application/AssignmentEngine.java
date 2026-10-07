@@ -128,6 +128,9 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
     @Override
     @Transactional
     public UUID claimCoordinatorCase(UUID caseId) {
+        // Authorize before locking, so a caller without intake authority never holds the case or the routing lock (and an
+        // unknown case is refused like any other); the scope depends on case state, so it is checked again under the locks.
+        authority.require(Permission.CASE_INTAKE, Resource.ofCase(caseId));
         repo.lockCase(caseId);
         repo.lock();
         var actor = authority.require(Permission.CASE_INTAKE, Resource.ofCase(caseId));
@@ -150,15 +153,11 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
     @Transactional
     public UUID reassignCoordinator(UUID caseId, String target, String reason) {
         text(target, 255); text(reason, 500);
+        // As for a claim: authorized before locking, and again under the locks (supervision depends on the current owner).
+        authorizeReassignment(caseId, target);
         repo.lockCase(caseId);
         repo.lock();
-        String actor;
-        if (authority.allowed(Permission.ROUTING_ASSIGN, Resource.platform())) {
-            actor = authority.require(Permission.ROUTING_ASSIGN).subject();
-        } else {
-            actor = authority.require(Permission.CASE_REASSIGN_COORDINATOR, Resource.ofCase(caseId)).subject();
-            if (!target.equals(actor)) authority.require(Permission.CASE_REASSIGN_COORDINATOR, Resource.ofCase(caseId, target));
-        }
+        String actor = authorizeReassignment(caseId, target);
         CaseFacts c = repo.facts(caseId);
         if (CLOSED.contains(c.status())) bad("This case is not accepting coordination work");
         Instant now = clock.instant();
@@ -170,6 +169,14 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
         Command command = new Command(UUID.randomUUID().toString(), c.revision(), "REASSIGN", target, selection.team(), reason, "COORDINATOR_REASSIGNMENT");
         persist(c, p, config.effectivePreference(c.consultantId(), now), candidates, selection, command, actor, repo.encode(command), now);
         return repo.ownerAssignmentId(caseId);
+    }
+
+    /** A manager may reassign any case; a lead only a case whose owner, and whose new owner, they supervise. */
+    private String authorizeReassignment(UUID caseId, String target) {
+        if (authority.allowed(Permission.ROUTING_ASSIGN, Resource.platform())) return authority.require(Permission.ROUTING_ASSIGN).subject();
+        String actor = authority.require(Permission.CASE_REASSIGN_COORDINATOR, Resource.ofCase(caseId)).subject();
+        if (!target.equals(actor)) authority.require(Permission.CASE_REASSIGN_COORDINATOR, Resource.ofCase(caseId, target));
+        return actor;
     }
 
     /** Durable retry of an automatically queued case; a manager's explicit QUEUE stays parked. */
