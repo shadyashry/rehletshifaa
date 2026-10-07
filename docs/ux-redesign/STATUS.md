@@ -34,7 +34,7 @@ Update at the end of every phase.
 - [x] **Phase 5 — `/redesign-area` runs**
   - [x] Patient proposal dialog — GATE 3 approved; terms open by default while a decision is owed (owner)
   - [x] Staff work views — GATE 4 approved
-- [ ] **Phase 6 — Close the loop**
+- [x] **Phase 6 — Close the loop**
   - [x] polish (`6ea2a74`): drawer header pinned + focus return, 44px queue controls, announced copy, worded pager
   - [x] full verification: typecheck ok; lint 25/13 unchanged; unit 318/11 (`ProposalSign`, pre-existing); Playwright 178 passed,
         26 skipped, 22 failed — 18 identical on base `975f071`, 4 `case-flow` blocked by backend CORS (tunnel-only); a
@@ -43,7 +43,8 @@ Update at the end of every phase.
   - [x] DESIGN.md refresh (`6fdc5ce`)
   - [x] backlog updated (done items, re-critique items)
   - [x] PR description drafted: `docs/ux-redesign/PR_DESCRIPTION.md`; branch pushed
-  - [ ] **GATE 5**: owner reviews before the PR is opened
+  - [x] **GATE 5**: owner chose to merge directly (no PR) — `feat/ux-redesign` merged into `codex/platform-control-plane`
+        as `06daa8e` and pushed (2026-10-08); `PR_DESCRIPTION.md` stays as the change summary
 
 ## Decisions
 
@@ -81,6 +82,7 @@ Update at the end of every phase.
 
 ## Next exact action
 
-GATE 5: owner opens the PR `feat/ux-redesign` → `codex/platform-control-plane` with `docs/ux-redesign/PR_DESCRIPTION.md`
-(revised: short summary, before/after screenshots, decisions log, test plan). Then: shape the coordinator-mediated Arabic
-proposal path, and run `/redesign-area` for the staff home distill.
+Pass 2: (1) `/impeccable:impeccable shape` the coordinator-mediated Arabic proposal decision path (re-critique P0);
+(2) `/redesign-area` staff home distill (stat tiles, toolbar, slim portal footer, staff nav, duplicated Assign Consultant).
+Branch from `codex/platform-control-plane` (now includes pass 1). Reviewer checklist in `PR_DESCRIPTION.md` (tunnel rebuild,
+`case-flow`, live specs, native Arabic review) is still open.
