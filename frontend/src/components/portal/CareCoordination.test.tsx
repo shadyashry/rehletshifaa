@@ -4,6 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { TransferOwnership } from "./TransferOwnership";
 import { AssignmentHistory, type AssignmentHistoryEntry } from "./AssignmentHistory";
 import { CaseQueue, initialQueue, type QueueCase } from "./CaseQueue";
+import { renderWithWork } from "./test-copy";
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
@@ -115,7 +116,7 @@ describe("Team queue", () => {
 
   it("separates unowned work from team-owned cases and offers Transfer only on a teammate's case", () => {
     const onTransfer = vi.fn();
-    const { rerender } = render(<CaseQueue {...props} lead scope="team" state={{ ...initialQueue, tab: "unowned" }} onTransfer={onTransfer} />);
+    const { rerender } = renderWithWork(<CaseQueue {...props} lead scope="team" state={{ ...initialQueue, tab: "unowned" }} onTransfer={onTransfer} />);
     expect(screen.getByRole("tab", { name: "Needs an owner" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText(/New requests nobody owns yet/)).toBeVisible();
     expect(screen.getByText("Layla Hassan")).toBeVisible();
@@ -125,7 +126,7 @@ describe("Team queue", () => {
     expect(screen.queryByRole("button", { name: "Transfer ownership" })).not.toBeInTheDocument();
 
     rerender(<CaseQueue {...props} lead scope="team" state={{ ...initialQueue, tab: "team" }} onTransfer={onTransfer} />);
-    expect(screen.getByRole("tab", { name: "Owned by my team" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Owned by your team" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Karim Adel")).toBeVisible();
     expect(screen.queryByText("Mine")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Transfer ownership" }));
@@ -140,7 +141,7 @@ describe("Team queue", () => {
   });
 
   it("gives a coordinator who is not a lead no team-owned view", () => {
-    render(<CaseQueue {...props} lead={false} scope="team" state={{ ...initialQueue, tab: "unowned" }} />);
-    expect(screen.queryByRole("tab", { name: "Owned by my team" })).not.toBeInTheDocument();
+    renderWithWork(<CaseQueue {...props} lead={false} scope="team" state={{ ...initialQueue, tab: "unowned" }} />);
+    expect(screen.queryByRole("tab", { name: "Owned by your team" })).not.toBeInTheDocument();
   });
 });

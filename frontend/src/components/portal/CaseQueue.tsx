@@ -7,9 +7,10 @@ import {
 } from "lucide-react";
 
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
-import { waitingLabel } from "@/components/portal/MyWork";
+import { useWorkCopy } from "@/components/portal/portal-copy";
 import { matchesKpi, type KpiFilter } from "@/components/portal/RoleDashboardSummary";
 import type { Locale } from "@/lib/i18n";
+import { coordinatorLabel, fillTemplate, plural, tabKeyTarget, waitingLabel, type WorkCopy } from "@/lib/portal-labels";
 
 export type QueueCase = { id:string; caseNumber:string; patientName?:string|null; status:string; waitingOn?:string|null; waitingReason?:string|null; country:string; preferredLanguage?:string; careCategory?:string; coordinatorSubject?:string; coordinatorName?:string; doctorName?:string; travelPackageRequested?:boolean; createdAt:string; updatedAt:string; assignmentId?:string; assignmentStatus?:string; openTaskCount?:number; overdueTaskCount?:number; documentCount?:number; blockingOverdueCount?:number; highPriorityCount?:number; nextDueAt?:string|null; patientResponsePending?:boolean };
 export type QueueState = { view:string; tab:string; kpi:KpiFilter; search:string; status:string; country:string;careArea:string;consultant:string;coordinator:string;createdFrom:string;createdTo:string;updatedFrom:string;updatedTo:string;sort:string;page:number };
@@ -48,14 +49,14 @@ export function attentionRank(item: QueueCase, now = Date.now()) {
 }
 
 /** The one-word reason a case is near the top, so the ordering is never a mystery. */
-function attentionChip(item: QueueCase, ar: boolean, now = Date.now()) {
+function attentionChip(item: QueueCase, copy: WorkCopy["attention"], now = Date.now()) {
   const rank = attentionRank(item, now);
-  if (rank === 0) return { label: ar ? "متأخر ويوقف التقدم" : "Overdue · blocking", tone: "bg-alert-50 text-alert-800" };
-  if (rank === 1) return { label: ar ? "أولوية عالية" : "High priority", tone: "bg-amber-50 text-amber-900" };
+  if (rank === 0) return { label: copy.overdueBlocking, tone: "bg-alert-50 text-alert-800" };
+  if (rank === 1) return { label: copy.high, tone: "bg-amber-50 text-amber-900" };
   if (rank === 2) return (item.overdueTaskCount ?? 0) > 0
-    ? { label: ar ? "متأخر" : "Overdue", tone: "bg-alert-50 text-alert-800" }
-    : { label: ar ? "مستحق قريبًا" : "Due soon", tone: "bg-amber-50 text-amber-900" };
-  if (rank === 3) return { label: ar ? "رد المريض بانتظار المراجعة" : "Patient responded", tone: "bg-sky-50 text-sky-900" };
+    ? { label: copy.overdue, tone: "bg-alert-50 text-alert-800" }
+    : { label: copy.dueSoon, tone: "bg-amber-50 text-amber-900" };
+  if (rank === 3) return { label: copy.patientResponded, tone: "bg-sky-50 text-sky-900" };
   return null;
 }
 
@@ -74,7 +75,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   onTransfer?:(item:T)=>void;
   onChange:(value:QueueState)=>void; onOpen:(item:T)=>void; onMutate:(path:string,body?:unknown,method?:string)=>Promise<unknown>; statusLabel:(value:string)=>string; categoryLabel:(value:string)=>string;
 }) {
-  const ar=locale==="ar", coordinator=role==="coordinator";
+  const rtl=locale==="ar", coordinator=role==="coordinator";
+  const work=useWorkCopy(), text=work.queue;
   const [focused,setFocused]=useState<string|null>(null);
   const [view,setView]=useState<"grid"|"list">("list");
   const [copied,setCopied]=useState<string|null>(null);
@@ -95,9 +97,6 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     return()=>{document.removeEventListener("pointerdown",away);document.removeEventListener("keydown",escape);};
   },[filtersOpen]);
 
-  const text=ar
-    ?{title:"قائمة الحالات",unowned:"تحتاج إلى مالك",team:"حالات فريقي",unownedHint:"طلبات جديدة لا يملكها أحد بعد. عند استلامها تصبح مالك الحالة.",teamHint:"حالات يملكها منسقون في فريقك. انقل الملكية لإعادة توزيع العمل.",mineHint:"الحالات التي تملكها بصفتك المنسق المسؤول.",assignedHint:"الحالات المسندة إليك.",transfer:"نقل الملكية",received:"وصلت",search:"ابحث برقم الحالة أو الاسم أو مجال الرعاية",status:"حالة الطلب",active:"الحالات النشطة",all:"جميع الحالات",empty:"لا توجد حالات هنا",emptyHint:"ستظهر الحالات هنا عندما تصبح متاحة لك.",noMatch:"لا توجد نتائج مطابقة",loading:"جارٍ التحميل…",results:"حالة",filters:"الفلاتر",clearAll:"مسح الكل",sort:"الترتيب",display:"طريقة العرض",list:"قائمة",grid:"بطاقات",open:"فتح",claim:"استلام الحالة",requestInfo:"طلب معلومات",selected:"محددة",clearSelection:"إلغاء التحديد",previous:"السابق",next:"التالي",waiting:"بانتظار",owner:"المنسق",consultant:"الاستشاري",unassigned:"غير مسند",updated:"آخر تحديث",overdue:"متأخر",openWork:"مهام مفتوحة",docs:"مستندات",copy:"نسخ رقم الحالة",copied:"تم النسخ",country:"الدولة",careArea:"مجال الرعاية",createdFrom:"أُنشئت من",createdTo:"أُنشئت إلى",updatedFrom:"حُدّثت من",updatedTo:"حُدّثت إلى",accept:"قبول التعيين"}
-    :{title:"Case list",unowned:"Needs an owner",team:"Owned by my team",unownedHint:"New requests nobody owns yet. Taking ownership makes you the case owner.",teamHint:"Cases owned by coordinators on your team. Transfer ownership to rebalance work.",mineHint:"Cases you own as the responsible coordinator.",assignedHint:"Cases you are assigned to.",transfer:"Transfer ownership",received:"Received",search:"Search case number, name or care area",status:"Case status",active:"Active cases",all:"All cases",empty:"No cases here",emptyHint:"Cases appear here when they become available to you.",noMatch:"No cases match these filters",loading:"Loading…",results:"cases",filters:"Filters",clearAll:"Clear all",sort:"Sort",display:"View",list:"List",grid:"Cards",open:"Open",claim:"Take ownership",requestInfo:"Request info",selected:"selected",clearSelection:"Clear selection",previous:"Previous",next:"Next",waiting:"Waiting",owner:"Coordinator",consultant:"Consultant",unassigned:"Unassigned",updated:"Updated",overdue:"Overdue",openWork:"open",docs:"files",copy:"Copy case number",copied:"Copied",country:"Country",careArea:"Care area",createdFrom:"Created from",createdTo:"Created to",updatedFrom:"Updated from",updatedTo:"Updated to",accept:"Accept assignment"};
 
   // "My cases" is a single accountable list; the team queue keeps the ownership sub-tabs.
   const selected=scope==="mine"?"mine":(state.tab&&state.tab!=="mine"?state.tab:"unowned");
@@ -138,9 +137,9 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     {tabs.length>0&&<div role="tablist" aria-label={text.title} className="flex flex-wrap gap-1 border-b border-line-strong">
       {tabs.map((tab,index)=><button key={tab.id} id={`queue-tab-${tab.id}`} role="tab" aria-controls="queue-panel" aria-selected={selected===tab.id}
         tabIndex={(focused??selected)===tab.id?0:-1} type="button"
-        className={`-mb-px border-b-2 px-3.5 py-2 text-[0.85rem] font-bold transition ${selected===tab.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
+        className={`-mb-px min-h-11 border-b-2 px-3.5 py-2 text-[0.85rem] font-bold transition ${selected===tab.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
         onFocus={()=>setFocused(tab.id)}
-        onKeyDown={event=>{const step=event.key==="ArrowRight"?1:event.key==="ArrowLeft"?-1:0;if(!step)return;event.preventDefault();const next=tabs[(index+step+tabs.length)%tabs.length];setFocused(next.id);document.getElementById(`queue-tab-${next.id}`)?.focus();}}
+        onKeyDown={event=>{const target=tabKeyTarget(event.key,index,tabs.length,rtl);if(target<0)return;event.preventDefault();const next=tabs[target];setFocused(next.id);document.getElementById(`queue-tab-${next.id}`)?.focus();}}
         onClick={()=>change({tab:tab.id})}>{tab.label}</button>)}
     </div>}
 
@@ -165,10 +164,10 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
              className="absolute end-0 top-12 z-40 w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-line bg-white p-4 shadow-xl">
           <div className="grid gap-3 sm:grid-cols-2">
             <FilterSelect label={text.status} value={current.status} options={[...new Set(scoped.map(item=>item.status))]} render={statusLabel} allLabel={text.all} onChange={value=>change({status:value||"active"})} baseLabel={text.active} baseValue="active"/>
-            <FilterSelect label={text.country} value={current.country} options={countries} allLabel={ar?"الكل":"All"} onChange={value=>change({country:value})}/>
-            <FilterSelect label={text.careArea} value={current.careArea} options={careAreas} render={categoryLabel} allLabel={ar?"الكل":"All"} onChange={value=>change({careArea:value})}/>
-            <FilterSelect label={text.consultant} value={current.consultant} options={consultants} allLabel={ar?"الكل":"All"} onChange={value=>change({consultant:value})}/>
-            {coordinator&&<FilterSelect label={text.owner} value={current.coordinator} options={coordinators} allLabel={ar?"الكل":"All"} onChange={value=>change({coordinator:value})}/>}
+            <FilterSelect label={text.country} value={current.country} options={countries} allLabel={text.allOption} onChange={value=>change({country:value})}/>
+            <FilterSelect label={text.careArea} value={current.careArea} options={careAreas} render={categoryLabel} allLabel={text.allOption} onChange={value=>change({careArea:value})}/>
+            <FilterSelect label={text.consultant} value={current.consultant} options={consultants} allLabel={text.allOption} onChange={value=>change({consultant:value})}/>
+            {coordinator&&<FilterSelect label={text.owner} value={current.coordinator} options={coordinators} allLabel={text.allOption} onChange={value=>change({coordinator:value})}/>}
             <DateFilter label={text.createdFrom} value={current.createdFrom} onChange={value=>change({createdFrom:value})}/>
             <DateFilter label={text.createdTo} value={current.createdTo} onChange={value=>change({createdTo:value})}/>
             <DateFilter label={text.updatedFrom} value={current.updatedFrom} onChange={value=>change({updatedFrom:value})}/>
@@ -176,7 +175,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
           </div>
           <div className="mt-4 flex justify-between gap-2 border-t border-line pt-3">
             <button type="button" className="text-[0.85rem] font-semibold text-ink-500 hover:text-brand-700" onClick={clearAll}>{text.clearAll}</button>
-            <button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.85rem]" onClick={()=>{setFiltersOpen(false);filterButton.current?.focus();}}>{ar?"تم":"Done"}</button>
+            <button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.85rem]" onClick={()=>{setFiltersOpen(false);filterButton.current?.focus();}}>{text.done}</button>
           </div>
         </div>}
       </div>
@@ -184,11 +183,11 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
       <label className="min-w-0">
         <span className="sr-only">{text.sort}</span>
         <select className="field !min-h-11 !w-auto !py-0 !text-[0.85rem]" value={current.sort} onChange={event=>change({sort:event.target.value})}>
-          <option value="attention">{ar?"الأكثر إلحاحًا":"Needs attention"}</option>
-          <option value="updated-desc">{ar?"آخر تحديث":"Last updated"}</option>
-          <option value="updated-asc">{ar?"الأقدم تحديثًا":"Least recently updated"}</option>
-          <option value="created-desc">{ar?"الأحدث إنشاءً":"Newest first"}</option>
-          <option value="created-asc">{ar?"الأقدم إنشاءً":"Oldest first"}</option>
+          <option value="attention">{text.sortAttention}</option>
+          <option value="updated-desc">{text.sortUpdatedDesc}</option>
+          <option value="updated-asc">{text.sortUpdatedAsc}</option>
+          <option value="created-desc">{text.sortCreatedDesc}</option>
+          <option value="created-asc">{text.sortCreatedAsc}</option>
         </select>
       </label>
 
@@ -203,14 +202,14 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     {chips.length>0&&<div className="flex flex-wrap items-center gap-2">
       {chips.map(chip=><span key={String(chip.key)} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-mist px-2.5 py-1 text-[0.78rem] font-semibold text-ink-700">
         <span className="text-ink-500">{chip.label}:</span>{chip.value}
-        <button type="button" className="rounded-full p-0.5 text-ink-500 hover:bg-white hover:text-alert-700" aria-label={`${ar?"إزالة":"Remove"} ${chip.label}`} onClick={()=>clearChip(chip.key)}><X size={13}/></button>
+        <button type="button" className="-my-3 -me-2.5 inline-grid h-11 w-11 place-items-center rounded-full text-ink-500 hover:text-alert-700" aria-label={fillTemplate(text.remove,{label:chip.label})} onClick={()=>clearChip(chip.key)}><X size={13}/></button>
       </span>)}
       <button type="button" className="text-[0.78rem] font-semibold text-brand-700 underline-offset-4 hover:underline" onClick={clearAll}>{text.clearAll}</button>
     </div>}
 
     {/* Bulk actions exist only once something is selected. */}
     {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
-      <p className="text-[0.85rem] font-bold text-brand-900">{selectedCases.length} {text.selected}</p>
+      <p className="text-[0.85rem] font-bold text-brand-900">{plural(locale,selectedCases.length,work.plural.selected)}</p>
       <div className="ms-auto flex flex-wrap gap-2">
         {canBulkClaim&&<button type="button" className="btn-primary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} onClick={async()=>{for(const item of selectedCases)await onMutate(`/coordinator/cases/${item.id}/claim`);clearSelection();}}><Check size={14}/>{text.claim}</button>}
         {canBulkRequestInfo&&<button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>setInfoDialog(true)}>{text.requestInfo}</button>}
@@ -220,11 +219,11 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
 
     <div id="queue-panel" role={tabs.length?"tabpanel":undefined} aria-labelledby={tabs.length?`queue-tab-${selected}`:undefined} tabIndex={tabs.length?0:undefined}>
       <div className="mb-2.5 flex items-center justify-between gap-3">
-        <p role="status" className="text-[0.82rem] text-ink-500">{busy?text.loading:`${list.length} ${text.results}`}</p>
+        <p role="status" className="text-[0.82rem] text-ink-500">{busy?text.loading:plural(locale,list.length,work.plural.cases)}</p>
         {coordinator&&pageItems.length>0&&<label className="flex items-center gap-2 text-[0.8rem] font-semibold text-ink-600">
           <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={pageSelected}
                  onChange={event=>setSelectedIds(currentIds=>{const next=new Set(currentIds);for(const item of pageItems){if(event.target.checked)next.add(item.id);else next.delete(item.id);}return next;})}/>
-          {ar?"تحديد الصفحة":"Select page"}
+          {text.selectPage}
         </label>}
       </div>
 
@@ -236,18 +235,21 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             const claimable=coordinator&&!item.coordinatorSubject&&item.status==="RECEIVED";
             const transferable=!!onTransfer&&coordinator&&scope==="team"&&selected==="team"&&!!item.coordinatorSubject&&!terminal.has(item.status);
             const overdue=(item.overdueTaskCount??0)>0;
-            const attention=attentionChip(item,ar);
+            const attention=attentionChip(item,work.attention);
             const quick=async(path:string,body?:unknown)=>{await onMutate(path,body);};
+            // Only the number is isolated left-to-right, so "الحالة RS-…" still reads right-to-left in Arabic.
+            const [titleBefore,titleAfter=""]=text.caseTitle.split("{number}");
+            const title=item.patientName?<bdi>{item.patientName}</bdi>:<>{titleBefore}<bdi dir="ltr">{item.caseNumber}</bdi>{titleAfter}</>;
             const meta=<>
               <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.72rem] font-bold ${statusTone(item.status)}`}>{statusLabel(item.status)}</span>
-              {item.waitingOn&&item.waitingOn!=="NONE"&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-600"><Hourglass size={12} className="text-brand-600" aria-hidden/>{text.waiting}: <strong className="font-semibold text-ink-800">{waitingLabel(item.waitingOn,locale)}</strong></span>}
+              {item.waitingOn&&item.waitingOn!=="NONE"&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-600"><Hourglass size={12} className="text-brand-600" aria-hidden/>{text.waiting}: <strong className="font-semibold text-ink-800">{waitingLabel(item.waitingOn,work.waiting,{role,ownsCase:!!subject&&item.coordinatorSubject===subject})}</strong></span>}
               {attention&&<span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.72rem] font-bold ${attention.tone}`}>{overdue&&<CircleAlert size={12} aria-hidden/>}{attention.label}</span>}
             </>;
             const people=<>
-              <span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-600"><UserRound size={13} className="text-ink-400" aria-hidden/>{item.coordinatorName?<bdi>{item.coordinatorName}</bdi>:text.unassigned}</span>
+              <span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-600"><UserRound size={13} className="text-ink-400" aria-hidden/><bdi>{coordinatorLabel(item,subject,text)}</bdi></span>
               {item.doctorName&&<span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-600"><Stethoscope size={13} className="text-ink-400" aria-hidden/><bdi>{item.doctorName}</bdi></span>}
-              {(item.openTaskCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-500"><ListTodo size={13} aria-hidden/>{item.openTaskCount} {text.openWork}</span>}
-              {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-500"><Files size={13} aria-hidden/>{item.documentCount} {text.docs}</span>}
+              {(item.openTaskCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-500"><ListTodo size={13} aria-hidden/>{plural(locale,item.openTaskCount??0,work.plural.openTasks)}</span>}
+              {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-500"><Files size={13} aria-hidden/>{plural(locale,item.documentCount??0,work.plural.documents)}</span>}
             </>;
             const actions=<>
               {claimable&&<button type="button" className="btn-primary !min-h-9 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
@@ -258,10 +260,10 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
 
             if(view==="grid")return <li key={item.id} className="card flex flex-col p-4">
               <div className="flex items-start gap-2">
-                {coordinator&&<input type="checkbox" className="mt-1 h-4 w-4 flex-none accent-brand-600" checked={selectedIds.has(item.id)} onChange={()=>toggle(item.id)} aria-label={`${text.selected} ${item.caseNumber}`}/>}
+                {coordinator&&<label className="-m-3.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-ink-900">{item.patientName||item.caseNumber}</p>
-                  <p className="mt-0.5 text-[0.75rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}{item.careCategory?` · ${categoryLabel(item.careCategory)}`:""}</p>
+                  <p className="truncate font-bold text-ink-900">{title}</p>
+                  <p className="mt-0.5 text-[0.75rem] font-semibold text-brand-700">{item.patientName&&<span dir="ltr">{item.caseNumber}</span>}{item.patientName&&item.careCategory?" · ":""}{item.careCategory?categoryLabel(item.careCategory):""}</p>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">{meta}</div>
@@ -270,13 +272,13 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             </li>;
 
             return <li key={item.id} className="flex flex-col gap-3 p-3.5 transition hover:bg-brand-50/40 sm:flex-row sm:items-center sm:gap-4">
-              {coordinator&&<input type="checkbox" className="h-4 w-4 flex-none accent-brand-600" checked={selectedIds.has(item.id)} onChange={()=>toggle(item.id)} aria-label={`${text.selected} ${item.caseNumber}`}/>}
+              {coordinator&&<label className="-m-3.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                  <p className="truncate font-bold text-ink-900">{item.patientName||item.caseNumber}</p>
-                  <span className="text-[0.75rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>
+                  <p className="truncate font-bold text-ink-900">{title}</p>
+                  {item.patientName&&<span className="text-[0.75rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>}
                   {item.careCategory&&<span className="text-[0.75rem] text-ink-500">{categoryLabel(item.careCategory)}</span>}
-                  <button type="button" className="text-ink-400 transition hover:text-brand-700" title={copied===item.id?text.copied:text.copy} aria-label={text.copy}
+                  <button type="button" className="-my-3.5 inline-grid h-11 w-11 place-items-center text-ink-400 transition hover:text-brand-700" title={copied===item.id?text.copied:fillTemplate(text.copy,{number:item.caseNumber})} aria-label={fillTemplate(text.copy,{number:item.caseNumber})}
                           onClick={()=>{void navigator.clipboard?.writeText(item.caseNumber).then(()=>{setCopied(item.id);setTimeout(()=>setCopied(null),1500);}).catch(()=>{});}}>
                     {copied===item.id?<Check size={13}/>:<Copy size={13}/>}
                   </button>
@@ -291,7 +293,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
           })}
         </ul>}
 
-      {pages>1&&<nav className="mt-4 flex items-center justify-between gap-3" aria-label={ar?"صفحات الحالات":"Case pages"}>
+      {pages>1&&<nav className="mt-4 flex items-center justify-between gap-3" aria-label={text.pages}>
         <button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.82rem]" disabled={page===1} onClick={()=>change({page:page-1})}>{text.previous}</button>
         <span className="text-[0.82rem] text-ink-500">{page} / {pages}</span>
         <button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.82rem]" disabled={page===pages} onClick={()=>change({page:page+1})}>{text.next}</button>

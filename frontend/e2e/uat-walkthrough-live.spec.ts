@@ -125,7 +125,7 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   await coordinator.page.screenshot({ path: shots("team-queue-1440"), fullPage: true });
   await coordinator.page.goto(`/en/portal?case=${caseId}`);
   await expect(coordinator.page.getByRole("heading", { name: "Intake brief" })).toBeVisible();
-  await expect(coordinator.page.getByText("Unowned — in the team queue")).toBeVisible();
+  await expect(coordinator.page.getByText("No coordinator yet — in the team queue")).toBeVisible();
   await expect(coordinator.page.getByText(/High priority/)).toHaveCount(0);
   await idle(coordinator.page);
   await coordinator.page.screenshot({ path: shots("overview-unowned-1440"), fullPage: true });
@@ -159,7 +159,7 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   expect(cancel.status).toBe(409);
   await coordinator.page.goto(`/en/portal?case=${caseId}`);
   await expect(coordinator.page.getByText(/Actions are locked until the clinical recommendation is ready/)).toBeVisible();
-  await expect(coordinator.page.getByText("Waiting on: the consultant")).toBeVisible();
+  await expect(coordinator.page.getByText("Waiting on: the Consultant")).toBeVisible();
   await idle(coordinator.page);
   await coordinator.page.screenshot({ path: shots("overview-consultant-phase-1440"), fullPage: true });
   await coordinator.page.getByRole("button", { name: /^More$/ }).click();

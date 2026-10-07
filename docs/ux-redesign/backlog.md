@@ -232,3 +232,42 @@ The items below are deferred.
 | P3 | The quote's `paymentTitle` is a bold `<p>`, not a heading. The three decision buttons wrap unevenly. | WG | `PatientProposal.tsx` | layout |
 | P3 | `CoordinationDepositTerms`: a 12px-radius card with `bg-white` inside the disclosure, one-off type sizes (0.82–0.95rem), and a small, low-contrast Arabic notice (0.82rem, ink-600). | WG, I18N | `components/CoordinationDepositTerms.tsx` | polish |
 | P3 | Arabic: masculine address throughout (use neutral phrasing where cheap); "عرض" alone is ambiguous (offer vs display); `{count}` is not formatted with Intl. All pending native review. | I18N | `messages/ar.json`, `PatientProposal.tsx` | clarify |
+
+## Staff work views — deferred review findings (`/redesign-area` run 2, 2026-10-07)
+
+Four reviewers (RB, WG, I18N, PM) found 7 HIGH issues. All were fixed in the run:
+
+- "you" decided by role instead of ownership;
+- the workspace and the queue disagreeing about the coordinator;
+- English work-item titles in Arabic (×2);
+- 13–17px copy, chip-remove and checkbox hit areas (×3).
+
+These in-area MEDIUM items were fixed too:
+
+- the RTL "Case RS-…" order;
+- "Assign a verified consultant" (moved to messages);
+- the patient's own "Waiting on";
+- the due-date format;
+- Arabic letter-spacing in the journey strip;
+- Arabic ownership wording (ملكية → مسؤولية) and one Arabic "take ownership";
+- RTL arrow keys plus Home/End on every portal tablist;
+- 44px tabs;
+- one care-area label source (`prettyCategory` removed).
+
+The items below are deferred.
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P2 | **Backend follow-up.** Work-item titles and context are English text from the backend. Arabic now shows a per-type title, but the context stays English. Emit a title code plus parameters instead of prose. | I18N | backend `CaseActionService`, `JourneyService`, `PatientActionService`; `MyWork.tsx`, `CurrentAction.tsx` | harden |
+| P2 | `WorkItem` has no `coordinatorSubject`, so My Work still prints your own name where the queue says "You". This needs a field in the work API. | WG | backend work API, `MyWork.tsx` | harden |
+| P2 | The work-copy context carries no locale, so callers pair a `locale` prop with context copy (a mismatch is possible). Put the locale in the context value. | RB | `portal-copy.tsx`, `portal-labels.ts` | harden |
+| P2 | Numbers rely on the engine's default numbering system for "ar". Pin one system (e.g. `-u-nu-latn`, per the Western-digits default) in `plural()`, dates and money. The page counter and filter badge are raw numbers. | I18N, RB | `portal-labels.ts`, `CaseQueue.tsx` | harden |
+| P2 | The List/Cards toggle's pressed state is shown only by a 1.26:1 fill. The toggle is 40px tall; the "Clear all" text buttons are about 21px; `!min-h-9` rows are 42.8px. | PM | `CaseQueue.tsx` | polish |
+| P2 | Search and sort fields have no focus outline (`.field:focus { outline: 0 }`, halo about 1.2:1). This is global and duplicates the patient-proposal item. | PM | `app/globals.css` | polish |
+| P3 | `categoryLabel` and `statusLabel` props are now partly redundant with the context. `waiting` and `priority` mix enum keys with UI keys (nest them). Build `buildWorkCopy(locale)` once for the page and the tests. Cache `Intl` objects. Use React 19 `use()`. Add a placeholder-parity test. | RB | `CaseQueue.tsx`, `portal-labels.ts`, `page.tsx`, `test-copy.tsx` | distill |
+| P3 | JourneyPulse and FullJourneyDialog still carry inline `ar ? …` strings (Journey, phases, View full journey), and the timeline note lacks `dir="auto"`. | RB, WG, I18N | `JourneySnapshot.tsx` | clarify |
+| P3 | Copy-success isn't announced. "Remove {label}" doesn't name the chip's value. The page counter has no words ("Page {page} of {pages}"). A zero count repeats the empty state. A grid row with no name and no care area renders an empty subtitle. | WG, RB | `CaseQueue.tsx`, `MyWork.tsx` | harden |
+| P3 | The "Current action" label is 0.7rem (11.2px). This belongs to the typeset pass. | WG | `CurrentAction.tsx` | typeset |
+| P3 | Queue tab `tabIndex` follows a stale `focused` value after blur. Date chips show ISO dates. Country names stay in English. `FilterSelect` sorts by code, not by the localised label. | I18N | `CaseQueue.tsx` | harden |
+| P3 | Arabic wording (pending native review):<br>• "الشروط المالية" vs "الشروط التجارية";<br>• "تعيين قسم المالية";<br>• "تقديم الرأي الطبي الثاني" in `currentAction.work`;<br>• feminine priority adjectives;<br>• "تمّت تسوية الوديعة";<br>• the «إجراءات إضافية» label vs the "المزيد" button (also English "More actions" vs "More");<br>• "عملي" → "مهامي";<br>• the date-filter fragments;<br>• "حالة الطلب" → "وضع الحالة";<br>• consistent shadda on منسّق.<br>English: one term for "no coordinator yet". | I18N, WG | `messages/*.json`, `Portal.tsx` | clarify |
+| P3 | `ConsultantRouting`: "No eligible consultant is available…" is lowercase and still a dead end (see the P2 above). | WG (screenshot) | `ConsultantRouting.tsx` | clarify |

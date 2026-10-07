@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+
+import en from "@/messages/en.json";
+import ar from "@/messages/ar.json";
+
+import { careAreaLabel, coordinatorLabel, plural, priorityLabel, tabKeyTarget, waitingLabel } from "./portal-labels";
+
+const keys = (value: unknown, prefix = ""): string[] =>
+  value && typeof value === "object"
+    ? Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => keys(child, `${prefix}${key}.`))
+    : [prefix.slice(0, -1)];
+
+describe("portal copy parity", () => {
+  it("has the same keys in English and Arabic (Arabic may add plural categories)", () => {
+    for (const namespace of ["portalWork", "portalProposal"] as const) {
+      const english = keys(en[namespace]).filter((key) => !key.startsWith("plural."));
+      const arabic = keys(ar[namespace]).filter((key) => !key.startsWith("plural."));
+      expect(arabic.sort()).toEqual(english.sort());
+    }
+    for (const form of Object.keys(en.portalWork.plural)) expect(Object.keys(ar.portalWork.plural[form as keyof typeof ar.portalWork.plural])).toContain("other");
+  });
+});
+
+describe("portal labels", () => {
+  it("counts in the locale's own plural forms", () => {
+    expect(plural("en", 1, en.portalWork.plural.cases)).toBe("1 case");
+    expect(plural("en", 3, en.portalWork.plural.cases)).toBe("3 cases");
+    expect(plural("ar", 1, ar.portalWork.plural.cases)).toBe("حالة واحدة");
+    expect(plural("ar", 2, ar.portalWork.plural.cases)).toBe("حالتان");
+    expect(plural("ar", 5, ar.portalWork.plural.cases)).toBe("5 حالات");
+    expect(plural("ar", 11, ar.portalWork.plural.cases)).toBe("11 حالة");
+  });
+
+  it("says \"you\" only to the person really being waited on, and never shows the raw value", () => {
+    const w = en.portalWork.waiting;
+    expect(waitingLabel("CONSULTANT", w, { role: "doctor" })).toBe("you");
+    expect(waitingLabel("CONSULTANT", w, { role: "coordinator" })).toBe("the Consultant");
+    expect(waitingLabel("STAFF", w, { role: "coordinator", ownsCase: true })).toBe("you");
+    expect(waitingLabel("STAFF", w, { role: "coordinator", ownsCase: false })).toBe("our team");
+    expect(waitingLabel("STAFF", w, { role: "finance" })).toBe("our team");
+    expect(waitingLabel("PATIENT", w, { role: "patient" })).toBe("you");
+    expect(waitingLabel("SOMETHING_NEW", w)).toBe("another party");
+    expect(waitingLabel("label", w)).toBe("another party");
+  });
+
+  it("moves tab focus with the reading direction", () => {
+    expect(tabKeyTarget("ArrowRight", 0, 3, false)).toBe(1);
+    expect(tabKeyTarget("ArrowLeft", 0, 3, true)).toBe(1);
+    expect(tabKeyTarget("ArrowRight", 0, 3, true)).toBe(2);
+    expect(tabKeyTarget("End", 0, 3, true)).toBe(2);
+    expect(tabKeyTarget("Home", 2, 3, false)).toBe(0);
+    expect(tabKeyTarget("Enter", 1, 3, false)).toBe(-1);
+  });
+
+  it("puts priorities and care areas into words", () => {
+    expect(priorityLabel("NORMAL", en.portalWork.priority)).toBe("Normal");
+    expect(priorityLabel("SOMETHING_NEW", en.portalWork.priority)).toBe("Priority not set");
+    expect(careAreaLabel("cardiology", { cardiology: "Cardiology" })).toBe("Cardiology");
+    expect(careAreaLabel("sleep-medicine", {})).toBe("Sleep medicine");
+  });
+
+  it("reads the coordinator from the viewer's side", () => {
+    const copy = en.portalWork.queue;
+    expect(coordinatorLabel({ coordinatorSubject: "me", coordinatorName: null }, "me", copy)).toBe("You");
+    expect(coordinatorLabel({ coordinatorSubject: "other", coordinatorName: "Sara Ahmed" }, "me", copy)).toBe("Sara Ahmed");
+    expect(coordinatorLabel({ coordinatorSubject: "other", coordinatorName: null }, "me", copy)).toBe("Coordinator (name not set)");
+    expect(coordinatorLabel({ coordinatorSubject: null, coordinatorName: null }, "me", copy)).toBe("Unassigned");
+  });
+});

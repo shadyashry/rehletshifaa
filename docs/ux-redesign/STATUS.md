@@ -31,9 +31,9 @@ Update at the end of every phase.
   - [x] GATE 2 decided (see Decisions); approved component tokens + `ink-350` applied to `globals.css` /
         `theme-petrol.css` / `DESIGN.md`; lint unchanged, typecheck ok, a11y 20/20
   - [x] P0 cross-case drafts fixed on `fix/workspace-case-key` (`6f561e6`), merged into `feat/ux-redesign` (`9e77677`)
-- [ ] **Phase 5 — `/redesign-area` runs**
+- [x] **Phase 5 — `/redesign-area` runs**
   - [x] Patient proposal dialog — GATE 3 approved; terms open by default while a decision is owed (owner)
-  - [ ] Staff work views — GATE 4
+  - [x] Staff work views — GATE 4 approved
 - [ ] **Phase 6 — Close the loop**: polish, full verification, re-critique, DESIGN.md refresh, PR draft — GATE 5
 
 ## Decisions
@@ -70,5 +70,13 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Phase 5.2: `/redesign-area` Staff work views (CurrentAction.tsx, MyWork.tsx, CaseQueue.tsx) per
-`plans/staff-work-views.md`; stop at GATE 4.
+Phase 6, in a fresh session (owner request): read this file, `docs/ux-redesign/backlog.md` and the two critiques in
+`.impeccable/critique/`, then:
+1. `/impeccable:impeccable polish` the changed patient and staff views (en + ar, 390px + 1440px; synthetic fixtures via
+   `e2e/patient-fixture.ts` / `e2e/portal-fixture.ts` against `frontend-dev` on :3100);
+2. full verification: lint, typecheck, unit, Playwright (en + ar), `e2e/a11y.spec.ts` (known failures: 11 `ProposalSign`
+   unit tests, 4 `portal-ux` + 2 Control Center `care-coordination` specs, lint 25 errors/13 warnings — all pre-existing);
+3. `/impeccable:impeccable critique` the portal again; record 24/40 → new score here;
+4. `/impeccable:impeccable document` to refresh DESIGN.md (component tokens already recorded);
+5. update backlog (done items, remaining P2: staff home footer, stat tiles, toolbar → distill);
+6. push `feat/ux-redesign` and draft the PR description → **GATE 5** (stop before opening the PR).
