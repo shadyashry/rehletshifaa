@@ -16,7 +16,8 @@ import { CaseMessages } from "@/components/portal/CaseMessages";
 import { PatientProposal, PatientProposalDecision, type ProposalCopy } from "@/components/portal/PatientProposal";
 import { PortalAccount, type Preferences } from "@/components/portal/PortalAccount";
 import { RoleDashboardSummary, matchesKpi } from "@/components/portal/RoleDashboardSummary";
-import { CaseQueue, initialQueue, type QueueState } from "@/components/portal/CaseQueue";
+import { CaseQueue, initialQueue, ownershipTab, type QueueState } from "@/components/portal/CaseQueue";
+import { StaffNav, StaffViewLinks, type StaffViewId, type StaffViewItem } from "@/components/portal/StaffNav";
 import { JourneyPulse, FullJourneyDialog } from "@/components/portal/JourneySnapshot";
 import { CurrentActionPanel, type CaseActions } from "@/components/portal/CurrentAction";
 import { ClinicalReviewPanel } from "@/components/portal/ClinicalReview";
@@ -88,7 +89,7 @@ export function Portal({workCopy,...props}:{locale:Locale;proposalCopy:ProposalC
 }
 
 function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCopy}){
-  const t=copy[locale];const{user,me,loading,signIn,signOut,refreshMe}=useAuth();
+  const t=copy[locale];const work=useWorkCopy();const{user,me,loading,signIn,signOut,refreshMe}=useAuth();
   // Case workspaces come from /api/v1/me. Control Center work lives in the Control Center: an account with only that
   // lands there directly; everyone else reaches it from the account menu. A signed-in account with no workforce
   // workspace is a patient-side account: it opens My Care, where the account is bound to its patient record.
@@ -111,7 +112,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const [preferences,setPreferences]=useState<Preferences>({displayName:null,locale:null});
   const [queueState,setQueueState]=useState<QueueState>(initialQueue);
   const queuePosition=useRef(0);const opening=useRef(0);const mutationPending=useRef(false);
-  const [documentError,setDocumentError]=useState(false);const [queueLoading,setQueueLoading]=useState(true);
+  const [documentError,setDocumentError]=useState(false);const [queueLoading,setQueueLoading]=useState(true);const [queueFor,setQueueFor]=useState<string|null>(null);const [landedRole,setLandedRole]=useState<string|null>(null);
   const currentRole=active&&available.includes(active)?active:available[0];
   useEffect(()=>{const selected=new URLSearchParams(window.location.search).get("role") as RoleKey;if(available.includes(selected))setActive(selected);},[available]);
   const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{if(!user)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(user.access_token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){await requestReauthentication(signIn);throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[user,t.error,signIn]);
@@ -122,7 +123,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     if(!currentRole||["admin","identity"].includes(currentRole)||deferPatient){setQueueLoading(false);return;}
     let cancelled=false;setQueueLoading(true);setCases([]);setMyTasks([]);setError("");
     void Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),["coordinator","doctor","operations","finance","patient"].includes(currentRole)?api<Task[]>("/work/mine"):Promise.resolve([])])
-      .then(([nextCases,nextTasks])=>{if(!cancelled){setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}}).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:t.error);}).finally(()=>{if(!cancelled)setQueueLoading(false);});
+      .then(([nextCases,nextTasks])=>{if(!cancelled){setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}}).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:t.error);}).finally(()=>{if(!cancelled){setQueueLoading(false);setQueueFor(currentRole);}});
     return()=>{cancelled=true;};
   },[currentRole,api,t.error,deferPatient]);
   // One-shot entry flags. ?signin=1 (header "Sign in", "use your saved details") and ?continue=1 (returning
@@ -173,7 +174,9 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   }
   function backToQueue(){opening.current++;setWorkspace(null);setError("");setNotice("");const url=new URL(window.location.href);url.searchParams.delete("case");window.history.replaceState({},"",url);requestAnimationFrame(()=>window.scrollTo({top:queuePosition.current,behavior:"instant"}));}
   // Keep only navigation preferences in this browser session, scoped to the signed-in account.
-  useEffect(()=>{if(!user||!currentRole)return;try{const saved=sessionStorage.getItem(`portal-queue:${user.profile.sub}:${currentRole}`);setQueueState(saved?{...initialQueue,...JSON.parse(saved)}:initialQueue);}catch{setQueueState(initialQueue);}},[user,currentRole]);
+  // Keyed by the subject, not the User object: a silent token renew hands over a new User and must not reset the view.
+  const userSubject=user?.profile.sub;
+  useEffect(()=>{if(!userSubject||!currentRole)return;try{const saved=sessionStorage.getItem(`portal-queue:${userSubject}:${currentRole}`);setQueueState(saved?{...initialQueue,...JSON.parse(saved)}:initialQueue);}catch{setQueueState(initialQueue);}},[userSubject,currentRole]);
   function changeQueue(next:QueueState){setQueueState(next);if(user&&currentRole)try{sessionStorage.setItem(`portal-queue:${user.profile.sub}:${currentRole}`,JSON.stringify(next));}catch{}}
   const restored=useRef(false);
   // For patients, wait for the session answer: it may have just pointed ?case= at their current case.
@@ -196,6 +199,20 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);await refreshAfterRejectedAction(path,workspace,refresh,openCase);setError(message);return undefined;}
     finally{mutationPending.current=false;setBusy(false);}
   }
+  // Staff views (My work, My cases, Team queue) in one place: the header navigation, the inline phone navigation and
+  // the landing rule all read the same items and counts.
+  const staffViews=currentRole&&STAFF_ROLES.includes(currentRole)?staffViewItems(currentRole,cases,myTasks,user?.profile?.sub,work.nav):null;
+  const staffView=staffViews?resolveStaffView(queueState.view,staffViews.items):null;
+  // Land on the first view that has work (owner decision, GATE P2-2), once per role and only on that role's loaded
+  // data. A view the person picked wins, and the landing itself is not saved as a choice.
+  if(staffViews&&currentRole&&queueFor===currentRole&&!queueLoading&&landedRole!==currentRole){
+    setLandedRole(currentRole);
+    const next=staffViews.items.find(item=>staffViews.counts[item.id]>0)?.id??"work";
+    if(!queueState.viewChosen&&next!==queueState.view)setQueueState({...queueState,view:next,tab:next==="team"?"unowned":next==="mine"?"mine":queueState.tab,page:1});
+  }
+  function selectStaffView(id:StaffViewId){if(workspace)backToQueue();changeQueue({...queueState,view:id,viewChosen:true,tab:id==="team"?"unowned":id==="mine"?"mine":queueState.tab,page:1});}
+  function switchRole(role:RoleKey){setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}
+  const clinicLink=hasClinic?{href:virtualClinicHref(locale),label:work.nav.clinic}:null;
   if(loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
   if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح مركز التحكم…":"Opening the Control Center…"}/>;
   if(user&&!workforce&&!careEntry&&clinicAccess.loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
@@ -211,9 +228,12 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const isPatientRole=currentRole==="patient";
   return <PortalFrame title={isPatientRole?(locale==="ar"?"رعايتي":"My Care"):currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>void openCaseById(caseId)}/>}
+    {staffViews&&<StaffNav locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView}/>}
     {isPatientRole&&workspace&&<PatientNav locale={locale} view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
-    <PortalAccount locale={locale} name={displayName} email={profile.email} role={currentRole?roleLabel(currentRole,locale):""} api={api} signOut={signOut} preferences={preferences} onSaved={value=>{setPreferences(value);setNotice(t.success);}} patient={isPatientRole} controlCenter={controlCenter}/>
-    {(available.length>1||hasClinic)&&<div className="mb-8 flex flex-wrap gap-2">{hasClinic&&<a className="btn-secondary" href={virtualClinicHref(locale)}>{locale==="ar"?"العيادة الافتراضية":"Virtual Clinic"}</a>}{available.length>1&&available.map(role=><button key={role} className={currentRole===role?"btn-primary":"btn-secondary"} onClick={()=>{setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}}>{roleLabel(role,locale)}</button>)}</div>}
+    <PortalAccount locale={locale} name={displayName} email={profile.email} role={currentRole?roleLabel(currentRole,locale):""} api={api} signOut={signOut} preferences={preferences} onSaved={value=>{setPreferences(value);setNotice(t.success);}} patient={isPatientRole} controlCenter={controlCenter}
+      roles={available.length>1?{label:work.nav.workingAs,current:currentRole,options:available.map(role=>({key:role,label:roleLabel(role,locale)})),onSelect:key=>switchRole(key as RoleKey)}:null}/>
+    {/* A patient-side account that also manages a clinic keeps its one way in; staff reach it from the navigation. */}
+    {isPatientRole&&clinicLink&&<p className="mb-6"><a className="btn-secondary" href={clinicLink.href}>{clinicLink.label}</a></p>}
     <ReauthenticationReturnNotice locale={locale} className="mb-4 rounded-xl bg-brand-50 p-4 text-brand-800"/>
     {!available.length&&<NoPortalWorkspace locale={locale}/>}
     {linkToken&&currentRole==="patient"&&<AccountLinkRequest locale={locale} token={linkToken} api={api} onResolved={()=>{setLinkToken(null);restored.current=false;void refresh();}}/>}
@@ -223,12 +243,12 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     {workspace
         // Keyed by case: opening another case straight from a notification or My Work must not carry this case's
         // drafts, tab or open dialogs into it (or let them be submitted against the wrong patient's case).
-        ? <WorkspaceView key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={openCaseById}/>
+        ? <WorkspaceView key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={openCaseById} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null}/>
         : isPatientRole ? (queueLoading||(!landed&&patientView)||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)
         : null}
-    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div hidden={!!workspace}><Queue queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff} openCase={openCase} mutate={mutate}/></div>}
+    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div hidden={!!workspace}><Queue views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} clinic={clinicLink} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff} openCase={openCase} mutate={mutate}/></div>}
 
     {currentRole==="finance"&&!workspace&&holds(me,"COMMERCIAL_POLICY_READ")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
   </PortalFrame>;
@@ -244,47 +264,43 @@ function PatientNoCase({locale}:{locale:Locale}){
  </section>;
 }
 function PortalFrame({title,subtitle,children}:{title:string;subtitle:string;children?:React.ReactNode}){return <section className="portal-shell bg-[linear-gradient(180deg,var(--color-mist)_0%,#fff_32rem)]"><div className="container-site"><h1 className="headline">{title}</h1>{subtitle&&<p className="mt-2 max-w-3xl text-sm text-ink-600">{subtitle}</p>}<div className="mt-6">{children}</div></div></section>}
+const STAFF_ROLES:string[]=["coordinator","doctor","operations","finance"];
+const terminalStatuses=new Set(["CLOSED","CANCELLED","DECLINED","CLINICALLY_NOT_SUITABLE"]);
+/** The staff views in order with the counts that decide where the home lands. My cases shows no count: it is accountability, not a to-do. */
+function staffViewItems(role:string,cases:CaseView[],tasks:Task[],subject:string|undefined,nav:WorkCopy["nav"]){
+  const coordinator=role==="coordinator";
+  const counts:Record<StaffViewId,number>={work:tasks.length,mine:cases.filter(item=>!terminalStatuses.has(item.status)&&(!coordinator||ownershipTab(item,subject)==="mine")).length,team:coordinator?cases.filter(item=>matchesKpi(item,"unowned","coordinator")).length:0};
+  const items:StaffViewItem[]=[{id:"work",label:nav.work,count:counts.work},{id:"mine",label:nav.mine},...(coordinator?[{id:"team" as const,label:nav.team,count:counts.team}]:[])];
+  return {items,counts};
+}
+const resolveStaffView=(view:string,items:StaffViewItem[]):StaffViewId=>items.find(item=>item.id===view)?.id??"work";
 function roleLabel(role:RoleKey,locale:Locale){const labels={en:{patient:"Patient",coordinator:"Coordinator",doctor:"Consultant workspace",operations:"Operations",finance:"Finance",admin:"Control Center",identity:"Identity checks"},ar:{patient:"المريض",coordinator:"منسق الحالة",doctor:"مساحة عمل الاستشاري",operations:"العمليات",finance:"المالية",admin:"مركز التحكم",identity:"التحقق من الهوية"}};return labels[locale][role];}
 
 /**
  * The operational dashboard: work first, then the cases I own, then what the team has available.
  * Ownership ("Take ownership") belongs to the team queue; My Cases is accountability, not a task list.
  */
-function Queue({locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],openCase,openCaseById,mutate,queueState,changeQueue}:{locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;staff?:StaffMember[];openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
+function Queue({views,view:current,onSelectView,clinic,loading,locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],openCase,openCaseById,mutate,queueState,changeQueue}:{views:StaffViewItem[];view:StaffViewId;onSelectView:(id:StaffViewId)=>void;clinic:{href:string;label:string}|null;loading:boolean;locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;staff?:StaffMember[];openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
  const work=useWorkCopy();
   const ar=locale==="ar";
   const staffView=role!=="patient";
   const[transferCase,setTransferCase]=useState<CaseView|null>(null);
-  // New, unowned requests are shared work: the team-queue tab carries their count so nobody has to open it to know.
-  const unownedCount=role==="coordinator"?cases.filter(item=>matchesKpi(item,"unowned","coordinator")).length:0;
-  const tabs=[{id:"work",label:ar?"عملي":"My work",count:tasks.length},{id:"mine",label:ar?"حالاتي":"My cases",count:undefined},...(role==="coordinator"?[{id:"team",label:ar?"قائمة الفريق":"Team queue",count:unownedCount}]:[])];
-  const view=staffView?(tabs.some(tab=>tab.id===queueState.view)?queueState.view:"work"):"cases";
-  // Selecting a view also resets the sub-tab and the page, so the click handler and the arrow keys
-  // share one function instead of repeating the reset rules.
-  const selectQueueView=(id:typeof tabs[number]["id"])=>changeQueue({...queueState,view:id,tab:id==="team"?"unowned":id==="mine"?"mine":queueState.tab,page:1});
-  return <>{staffView&&<RoleDashboardSummary locale={locale} role={role??""} cases={cases} tasks={tasks} selected={queueState.kpi} onSelect={value=>changeQueue({...queueState,kpi:value,...(value?{view:value==="unowned"?(role==="coordinator"?"team":"work"):view==="work"?"mine":view,tab:value==="unowned"&&role==="coordinator"?"unowned":queueState.tab}:{}),page:1})}/>}
-    {staffView&&<div role="tablist" aria-label={ar?"لوحة العمل":"Operational views"} className="mb-4 flex flex-wrap gap-1 border-b border-line-strong">
-      {tabs.map(tab=><button key={tab.id} type="button" role="tab" aria-selected={view===tab.id} id={`work-tab-${tab.id}`} aria-controls="work-panel"
-        className={`-mb-px min-h-11 border-b-2 px-3.5 py-2 text-[0.88rem] font-bold transition ${view===tab.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
-        // Arrow keys and a roving tabindex, matching the case workspace tablist. Without them the
-        // portal's primary navigation was the one tablist in the app a keyboard user had to Tab through.
-        onKeyDown={event=>{const target=tabKeyTarget(event.key,tabs.findIndex(x=>x.id===tab.id),tabs.length,locale==="ar");if(target<0)return;event.preventDefault();const next=tabs[target];selectQueueView(next.id);requestAnimationFrame(()=>document.getElementById(`work-tab-${next.id}`)?.focus());}}
-        tabIndex={view===tab.id?0:-1}
-        onClick={()=>selectQueueView(tab.id)}>
-        {tab.label}{tab.count!==undefined&&tab.count>0&&<span className="ms-2 rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-800">{tab.count}</span>}
-      </button>)}
-    </div>}
-    <div id="work-panel" role={staffView?"tabpanel":undefined} aria-labelledby={staffView?`work-tab-${view}`:undefined} tabIndex={staffView?0:undefined}>
+  const view=staffView?current:"cases";
+  const teamWaiting=views.find(item=>item.id==="team")?.count??0;
+  const title=views.find(item=>item.id===view)?.label;
+  return <>{staffView&&<StaffViewLinks locale={locale} label={work.nav.label} items={views} current={view as StaffViewId} clinic={clinic} onSelect={onSelectView} variant="inline"/>}
+    {staffView&&<RoleDashboardSummary locale={locale} role={role??""} cases={cases} tasks={tasks} loading={loading} selected={queueState.kpi} onSelect={value=>changeQueue({...queueState,kpi:value,...(value?{view:value==="unowned"?(role==="coordinator"?"team":"work"):view==="work"?"mine":view,viewChosen:true,tab:value==="unowned"&&role==="coordinator"?"unowned":queueState.tab}:{}),page:1})}/>}
+    <div id="work-panel">
       {!staffView&&tasks.length>0&&<MyWork locale={locale} role={role} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>}
       {view==="work"
-        ? <MyWork locale={locale} role={role} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>
-        : <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} scope={staffView?(view==="team"?"team":"mine"):"all"} onChange={changeQueue} onOpen={openCase} onMutate={mutate} onTransfer={role==="coordinator"&&coordinatorLead?item=>setTransferCase(item):undefined} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>careAreaLabel(value,work.careAreas)}/>}
+        ? <MyWork locale={locale} role={role} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById} teamWaiting={teamWaiting} onTeamQueue={()=>onSelectView("team")}/>
+        : <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} scope={staffView?(view==="team"?"team":"mine"):"all"} title={staffView?title:undefined} onChange={changeQueue} onOpen={openCase} onMutate={mutate} onTransfer={role==="coordinator"&&coordinatorLead?item=>setTransferCase(item):undefined} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>careAreaLabel(value,work.careAreas)}/>}
     </div>
     {transferCase&&<CaseDrawer locale={locale} title={ar?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>setTransferCase(null)}><TransferOwnership locale={locale} caseId={transferCase.id} caseNumber={transferCase.caseNumber} currentOwner={transferCase.coordinatorSubject} currentOwnerName={transferCase.coordinatorName} mySubject={mySubject} staff={staff} busy={busy} mutate={mutate} onClose={()=>setTransferCase(null)}/></CaseDrawer>}
   </>;
 }
 
-function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,careView="care",onCareView,otherCases=[],openCaseById}:{locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void}){
+function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,careView="care",onCareView,otherCases=[],openCaseById,consultantsHref}:{locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null}){
  const work=useWorkCopy();
  const c=value.caseSummary;const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
@@ -425,7 +441,8 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
    response={current.workType==="REVIEW_PATIENT_RESPONSE"?{message:latestPatientMessage?.body,documentName:newestDocument?.fileName}:null}
    busy={busy} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    onAcceptAssignment={()=>{if(!myPending)return;void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:true}).then(result=>{if(result&&isDoctor)setTab("clinical");});}}
-   onDeclineAssignment={()=>setDeclineOpen(true)}/>
+   onDeclineAssignment={()=>setDeclineOpen(true)}
+   form={formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref}/>:undefined}/>
 
   {isCoordinator&&<CaseBlockers locale={locale} blockers={actions.blockers} deposit={value.deposit}/>}
 
@@ -460,8 +477,6 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
         </div>
        </section>}
        {banners}
-       {/* The form behind the current action, and only that form. */}
-       {formAction&&<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load}/>}
        {workflowBlock}
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>

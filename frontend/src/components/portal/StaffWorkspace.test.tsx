@@ -39,7 +39,15 @@ describe("MyWork", () => {
 
   it("has a calm empty state rather than a blank panel", () => {
     renderWithWork(<MyWork locale="en" items={[]} busy={false} onOpen={vi.fn()}/>);
-    expect(screen.getByText(/no open work/i)).toBeTruthy();
+    expect(screen.getByText("Nothing is assigned to you.")).toBeTruthy();
+    expect(screen.getByText(/anything assigned to you/i)).toBeTruthy();
+  });
+
+  it("points an empty My work at new cases waiting in the Team queue", () => {
+    const onTeamQueue = vi.fn();
+    renderWithWork(<MyWork locale="en" items={[]} busy={false} onOpen={vi.fn()} teamWaiting={2} onTeamQueue={onTeamQueue}/>);
+    fireEvent.click(screen.getByRole("button", { name: /2 new cases are waiting/i }));
+    expect(onTeamQueue).toHaveBeenCalled();
   });
 });
 

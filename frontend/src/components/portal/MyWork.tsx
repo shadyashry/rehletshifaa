@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Clock3, FileText } from "lucide-react";
+import { ArrowRight, CalendarClock, CircleAlert, Clock3, FileText } from "lucide-react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import type { Locale } from "@/lib/i18n";
@@ -18,9 +18,14 @@ export type WorkItem = {
  *
  * <p>Each row is a real work item, independent of case status: it stays open until the work is done, and
  * reading the matching notification does not clear it.
+ *
+ * <p>Rows are a hairline list with one quiet action each. Only an overdue or urgent first item earns the filled
+ * button, so the page never shows a column of identical primaries. An empty list points to the next useful place.
  */
-export function MyWork({ locale, role, items, busy, onOpen }: {
+export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onTeamQueue }: {
   locale: Locale; role?: string; items: WorkItem[]; busy: boolean; onOpen: (caseId: string) => void;
+  /** New cases nobody owns yet (coordinators), offered as the next place to look when nothing is assigned. */
+  teamWaiting?: number; onTeamQueue?: () => void;
 }) {
   const work = useWorkCopy();
   const t = work.myWork;
@@ -36,32 +41,36 @@ export function MyWork({ locale, role, items, busy, onOpen }: {
       </div>
 
       {!busy && items.length === 0 ? (
-        <div className="card mt-4 px-6 py-12 text-center">
-          <CheckCircle2 className="mx-auto mb-3 text-brand-600" size={28} aria-hidden/>
-          <h3 className="font-bold text-ink-900">{t.empty}</h3>
-          <p className="mt-2 text-sm text-ink-500">{t.emptyHint}</p>
+        <div className="mt-4 border-t border-line pt-4 text-[0.9375rem]">
+          <p className="font-semibold text-ink-900">{t.empty}</p>
+          {teamWaiting > 0 && onTeamQueue
+            ? <button type="button" className="mt-1 inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current" onClick={onTeamQueue}>
+                {plural(locale, teamWaiting, work.plural.teamWaiting)}<ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
+              </button>
+            : <p className="mt-1 text-ink-600">{t.emptyHint}</p>}
         </div>
       ) : (
-        <ul className="mt-4 space-y-3">
-          {items.map(item => (
+        <ul className="mt-4 divide-y divide-line border-y border-line">
+          {items.map((item, index) => {
+            const lead = index === 0 && (item.overdue || item.priority === "URGENT");
+            const titleId = `work-item-${item.id}`;
+            return (
             <li key={item.id}>
-              <article className="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+              <article aria-labelledby={titleId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:gap-6">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <PriorityChip priority={item.priority} label={priorityLabel(item.priority, work.priority)}/>
                     {item.overdue && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-alert-50 px-2.5 py-1 text-xs font-bold text-alert-800">
+                      <span className="status-badge items-center gap-1 !border-alert-200 !bg-alert-50 !text-alert-800">
                         <CircleAlert size={13} aria-hidden/>{t.overdue}
                       </span>
                     )}
-                    {item.blocking && (
-                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-900">{t.blocking}</span>
-                    )}
+                    {item.blocking && <span className="status-badge">{t.blocking}</span>}
                     <span className="text-xs font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>
                     {item.patientName && <bdi className="truncate text-xs font-semibold text-ink-700">{item.patientName}</bdi>}
                   </div>
                   {/* The backend titles work in English; Arabic shows the work type in Arabic, English keeps the specific title. */}
-                  <p dir="auto" className="mt-2 font-bold leading-6 text-ink-900">{workTitle(item, locale, work.workTitles)}</p>
+                  <h3 id={titleId} dir="auto" className="mt-2 font-bold leading-6 text-ink-900">{workTitle(item, locale, work.workTitles)}</h3>
                   {/* Enough case identity to act without opening it first. */}
                   <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] text-ink-600">
                     {item.careCategory && <span>{t.care}: <strong className="font-semibold text-ink-800">{careAreaLabel(item.careCategory, work.careAreas)}</strong></span>}
@@ -79,29 +88,31 @@ export function MyWork({ locale, role, items, busy, onOpen }: {
                     {item.waitingOn && item.waitingOn !== "NONE" && <span>{work.waiting.label}: {waitingLabel(item.waitingOn, work.waiting, { role })}</span>}
                   </p>
                 </div>
-                <button type="button" className="btn-primary w-full justify-center sm:w-auto" onClick={() => onOpen(item.caseId)}>
-                  {item.type==="CONSULTANT_ASSIGNMENT"?t.reviewAssignment:t.open}<ArrowRight size={16} className="ms-1 rtl:rotate-180" aria-hidden/>
+                <button type="button" aria-describedby={titleId}
+                        className={lead ? "btn-primary w-full justify-center sm:w-auto" : "inline-flex min-h-11 items-center gap-1.5 self-start font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current sm:self-center"}
+                        onClick={() => onOpen(item.caseId)}>
+                  {item.type==="CONSULTANT_ASSIGNMENT"?t.reviewAssignment:t.open}<ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
                 </button>
               </article>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </section>
   );
 }
 
-const PRIORITY_TONES: Record<string, string> = {
-  URGENT: "bg-alert-50 text-alert-800",
-  HIGH: "bg-amber-50 text-amber-900",
-  NORMAL: "bg-brand-50 text-brand-800",
-  LOW: "bg-stone-100 text-ink-600",
-};
-
-/** Words, not the enum: no uppercase styling, so "Normal" never reads as the raw value "NORMAL". */
+/**
+ * Words, not the enum: no uppercase styling, so "Normal" never reads as the raw value "NORMAL". Only a priority that
+ * changes the order is marked — urgent in alert, high as the petrol badge, low as plain text — and Normal, the
+ * default for most rows, carries no chip at all.
+ */
 function PriorityChip({ priority, label }: { priority: string; label: string }) {
-  const tone = Object.hasOwn(PRIORITY_TONES, priority) ? PRIORITY_TONES[priority] : "bg-stone-100 text-ink-600";
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${tone}`}>{label}</span>;
+  if (priority === "URGENT") return <span className="status-badge !border-alert-200 !bg-alert-50 !text-alert-800">{label}</span>;
+  if (priority === "HIGH") return <span className="status-badge">{label}</span>;
+  if (priority === "NORMAL") return null;
+  return <span className="text-xs font-semibold text-ink-600">{label}</span>;
 }
 
 function workTitle(item: WorkItem, locale: Locale, titles: Record<string, string>) {

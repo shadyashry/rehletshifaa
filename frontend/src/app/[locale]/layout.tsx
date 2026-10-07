@@ -4,6 +4,8 @@ import { AnalyticsScripts } from "@/components/AnalyticsScripts";
 import { AuthProvider } from "@/components/AuthProvider";
 import { BRAND_THEME_BOOT, BrandTheme } from "@/components/brand/BrandTheme";
 import { Footer } from "@/components/Footer";
+import { PortalFooter } from "@/components/PortalFooter";
+import { FooterSwitch } from "@/components/nav/FooterSwitch";
 import { Header } from "@/components/Header";
 import { HideInControlCenter, SiteMain } from "@/components/nav/HideInControlCenter";
 import { MobileCaseBar } from "@/components/nav/MobileCaseBar";
@@ -47,7 +49,9 @@ export default async function LocaleLayout({
         </HideInControlCenter>
         <AuthProvider><SiteMain>{children}</SiteMain></AuthProvider>
         <HideInControlCenter>
-          <Footer locale={locale} d={d} />
+          <FooterSwitch portal={<PortalFooter locale={locale} d={d} />}>
+            <Footer locale={locale} d={d} />
+          </FooterSwitch>
           <MobileCaseBar
             locale={locale}
             label={d.home.primaryAction}

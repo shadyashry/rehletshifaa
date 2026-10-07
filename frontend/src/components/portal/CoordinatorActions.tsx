@@ -1,40 +1,44 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { ClipboardList, Link2, MessageSquareText, Plane, Send, UserRoundPlus, Users, XCircle } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 import { EligibleConsultantPicker, ReferralConfirmation, type Load } from "@/components/portal/ConsultantRouting";
 import { useWorkCopy } from "@/components/portal/portal-copy";
+import { careAreaLabel, fillTemplate } from "@/lib/portal-labels";
 
 type CareCategory = { slug: string; nameEn: string; nameAr: string };
 type StaffMember = { subject: string; name: string; role: string };
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
 
 /**
- * The form that does the work behind the current action, and nothing else. It appears only when the
- * backend's current action is a FOCUS step with a form on this page (assigning a consultant, confirming a
- * consultant referral, Operations or Finance). Every other step either lives in its own panel (the proposal)
- * or is somebody else's move.
+ * The form that does the work behind the current action, and nothing else. It renders inside the current-action panel
+ * when the backend's current action is a FOCUS step with a form (assigning a consultant, confirming a consultant
+ * referral, Operations or Finance), so the panel's title is the step and this form is its one control — never a
+ * second card further down the page. Every other step either lives in its own panel (the proposal) or is somebody
+ * else's move.
  */
-export function CoordinatorActionForm({ locale, code, caseId, version, careCategory, categories, staff, busy, mutate, load }: {
+export function CoordinatorActionForm({ locale, code, caseId, version, careCategory, categories, staff, busy, mutate, load, consultantsHref }: {
   locale: Locale; code: string; caseId: string; version: number; careCategory?: string;
   categories: CareCategory[]; staff: StaffMember[]; busy: boolean; mutate: Mutate; load: Load;
+  /** The Control Center's Consultants page, for people who can open it; the next step when nobody is eligible. */
+  consultantsHref?: string | null;
 }) {
   const ar = locale === "ar";
   const work = useWorkCopy();
   if (code === "ASSIGN_CONSULTANT")
-    return <ActionFormShell id="case-actions" title={work.assignConsultant.title} hint={work.assignConsultant.hint}>
-      <ConsultantAssignment locale={locale} caseId={caseId} version={version} careCategory={careCategory} categories={categories} busy={busy} mutate={mutate} load={load}/>
+    return <ActionFormShell id="case-actions" busy={busy} title={work.assignConsultant.title} hint={work.assignConsultant.hint}>
+      <ConsultantAssignment locale={locale} caseId={caseId} version={version} careCategory={careCategory} categories={categories} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref}/>
     </ActionFormShell>;
   if (code === "CONFIRM_REFERRAL")
-    return <ActionFormShell id="case-actions" title={ar ? "تأكيد إحالة الاستشاري" : "Confirm the consultant referral"}
+    return <ActionFormShell id="case-actions" busy={busy} title={ar ? "تأكيد إحالة الاستشاري" : "Confirm the consultant referral"}
                             hint={ar ? "لا يحصل أي استشاري على الحالة حتى تؤكد أنت ويقبل هو." : "No consultant gains the case until you confirm and they accept."}>
       <ReferralConfirmation locale={locale} caseId={caseId} careCategory={careCategory} categories={categories} busy={busy} load={load} mutate={mutate}/>
     </ActionFormShell>;
   if (code === "ASSIGN_OPERATIONS" || code === "ASSIGN_FINANCE") {
     const role = code === "ASSIGN_OPERATIONS" ? "OPERATIONS" : "FINANCE";
-    return <ActionFormShell id="case-actions" title={role === "OPERATIONS" ? (ar ? "تعيين فريق العمليات" : "Assign Operations") : (ar ? "تعيين المالية" : "Assign Finance")}
+    return <ActionFormShell id="case-actions" busy={busy} title={role === "OPERATIONS" ? (ar ? "تعيين فريق العمليات" : "Assign Operations") : (ar ? "تعيين المالية" : "Assign Finance")}
                             hint={role === "OPERATIONS" ? (ar ? "لترتيب السفر والوصول." : "To arrange travel and arrival.") : (ar ? "لاعتماد الخدمات المسعّرة يدويًا قبل الإصدار." : "To approve the manually priced services before release.")}>
       <TeamAssignment locale={locale} caseId={caseId} role={role} staff={staff} busy={busy} mutate={mutate}/>
     </ActionFormShell>;
@@ -42,18 +46,23 @@ export function CoordinatorActionForm({ locale, code, caseId, version, careCateg
   return null;
 }
 
-function ActionFormShell({ id, title, hint, children }: { id: string; title: string; hint?: string; children: React.ReactNode }) {
-  return <section id={id} className="card p-4 sm:p-5" aria-label={title}>
-    <h3 className="font-bold text-brand-900">{title}</h3>
-    {hint && <p className="mt-0.5 text-[0.85rem] leading-6 text-ink-600">{hint}</p>}
-    <div className="mt-3">{children}</div>
-  </section>;
+/** Sits inside the current-action panel under its title, so it names itself for assistive tech only and adds no card. */
+function ActionFormShell({ id, title, hint, busy = false, children }: { id: string; title: string; hint?: string; busy?: boolean; children: React.ReactNode }) {
+  return <div id={id} role="group" aria-label={title} className="mt-4 border-t border-line pt-4">
+    {hint && <p className="max-w-2xl text-[0.85rem] leading-6 text-ink-600">{hint}</p>}
+    {/* Outside the workspace fieldset, so it follows the in-flight state itself. */}
+    <fieldset disabled={busy} className="mt-3 min-w-0">{children}</fieldset>
+  </div>;
 }
 
-function ConsultantAssignment({ locale, caseId, version, careCategory, categories, busy, mutate, load }: {
+function ConsultantAssignment({ locale, caseId, version, careCategory, categories, busy, mutate, load, consultantsHref }: {
   locale: Locale; caseId: string; version: number; careCategory?: string; categories: CareCategory[]; busy: boolean; mutate: Mutate; load: Load;
+  consultantsHref?: string | null;
 }) {
   const ar = locale === "ar";
+  const work = useWorkCopy();
+  const t = work.assignConsultant;
+  const select = useRef<HTMLSelectElement>(null);
   const [category, setCategory] = useState(careCategory ?? "");
   const [consultant, setConsultant] = useState("");
   // Reset the editable selections when the case or its stored care area changes underneath the form.
@@ -68,15 +77,31 @@ function ConsultantAssignment({ locale, caseId, version, careCategory, categorie
     }
     await mutate(`/coordinator/cases/${caseId}/consultant-assignment`, { practitionerId: consultant, reason: "Assigned to consultant" }).then(r => { if (r) setConsultant(""); });
   };
+  // The case's own care area stays selected even when the category list lacks it (not loaded, renamed or retired):
+  // a blank select would silently ask the coordinator to re-classify a case that is already classified.
+  const options = careCategory && !categories.some(cat => cat.slug === careCategory)
+    ? [...categories, { slug: careCategory, nameEn: careAreaLabel(careCategory, work.careAreas), nameAr: careAreaLabel(careCategory, work.careAreas) }]
+    : categories;
+  const areaName = category ? (options.find(cat => cat.slug === category)?.[ar ? "nameAr" : "nameEn"] ?? careAreaLabel(category, work.careAreas)) : "";
+  const unsetHintId = `care-area-unset-${caseId}`;
+  // Nobody eligible is a routing problem, not the end of the task: offer the next move the coordinator can make.
+  const nextSteps = <ul className="mt-2 space-y-1 text-[0.875rem]">
+    <li><button type="button" className="inline-flex min-h-11 items-center font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current" onClick={() => select.current?.focus()}>{t.otherArea}</button></li>
+    {consultantsHref
+      ? <li><a className="inline-flex min-h-11 items-center font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current" href={consultantsHref}>{fillTemplate(t.seeConsultants, { area: areaName })}</a></li>
+      : <li className="text-ink-600">{fillTemplate(t.askLead, { area: areaName })}</li>}
+  </ul>;
   return <div className="grid gap-3">
-    <label className="block max-w-sm text-sm font-bold">{ar ? "مجال رعاية الحالة" : "Case care area"}
-      <select className="field mt-1.5" value={category} onChange={e => { setCategory(e.target.value); setConsultant(""); }} required>
-        <option value="" disabled>{ar ? "اختر مجال الرعاية" : "Select a care area"}</option>
-        {categories.map(cat => <option key={cat.slug} value={cat.slug}>{ar ? cat.nameAr : cat.nameEn}</option>)}
+    <label className="block max-w-sm text-sm font-bold">{t.careArea}
+      <select ref={select} className="field mt-1.5" value={category} onChange={e => { setCategory(e.target.value); setConsultant(""); }} required
+              aria-describedby={careCategory ? undefined : unsetHintId}>
+        <option value="" disabled>{t.choose}</option>
+        {options.map(cat => <option key={cat.slug} value={cat.slug}>{ar ? cat.nameAr : cat.nameEn}</option>)}
       </select>
     </label>
-    {category && <EligibleConsultantPicker locale={locale} caseId={caseId} careArea={category} value={consultant} onChange={setConsultant} load={load}/>}
-    <div><button type="button" className="btn-primary" disabled={!consultant || busy} onClick={() => void assign()}>{ar ? "تأكيد التعيين" : "Confirm assignment"}</button></div>
+    {!careCategory && <p id={unsetHintId} className="-mt-1 max-w-prose text-[0.85rem] leading-6 text-ink-600">{t.unset}</p>}
+    {category && <EligibleConsultantPicker locale={locale} caseId={caseId} careArea={category} value={consultant} onChange={setConsultant} load={load} empty={nextSteps}
+      footer={<div className="mt-3"><button type="button" className="btn-primary" disabled={!consultant || busy} onClick={() => void assign()}>{t.submit}</button></div>}/>}
   </div>;
 }
 

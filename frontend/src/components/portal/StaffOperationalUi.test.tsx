@@ -189,18 +189,46 @@ describe("RoleDashboardSummary", () => {
     { status: "CLOSED", coordinatorSubject: "me" },
   ];
 
-  it("renders KPIs as real toggle buttons, not decoration", () => {
+  it("reads as one line of counts, each a real toggle that filters", () => {
     const onSelect = vi.fn();
-    render(<RoleDashboardSummary locale="en" role="coordinator" cases={cases} tasks={[]} selected="" onSelect={onSelect}/>);
-    const overdue = screen.getByRole("button", { name: /overdue/i });
+    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={cases} tasks={[]} selected="" onSelect={onSelect}/>);
+    expect(screen.getByRole("button", { name: "1 case needs action" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1 case without a coordinator" })).toBeTruthy();
+    const overdue = screen.getByRole("button", { name: "1 case overdue" });
     expect(overdue.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(overdue);
     expect(onSelect).toHaveBeenCalledWith("overdue");
   });
 
+  it("leaves zero counts out and says so in words when nothing is owed", () => {
+    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={[{ status: "CLOSED", coordinatorSubject: "me" }]} tasks={[]}/>);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByText("No cases need action right now.")).toBeTruthy();
+  });
+
+  it("keeps a pressed count visible at zero so its filter can be switched off", () => {
+    const onSelect = vi.fn();
+    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={[]} tasks={[]} selected="overdue" onSelect={onSelect}/>);
+    const overdue = screen.getByRole("button", { name: "0 cases overdue" });
+    expect(overdue.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(overdue);
+    expect(onSelect).toHaveBeenCalledWith("");
+  });
+
+  it("shows no numbers while the queue loads", () => {
+    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={[]} tasks={[]} loading/>);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByText(/nothing needs action/i)).toBeNull();
+  });
+
+  it("counts in Arabic plural forms", () => {
+    renderWithWork(<RoleDashboardSummary locale="ar" role="coordinator" cases={cases} tasks={[]}/>, "ar");
+    expect(screen.getByRole("button", { name: "حالة واحدة متأخرة" })).toBeTruthy();
+  });
+
   it("clicking the active KPI clears it", () => {
     const onSelect = vi.fn();
-    render(<RoleDashboardSummary locale="en" role="coordinator" cases={cases} tasks={[]} selected="overdue" onSelect={onSelect}/>);
+    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={cases} tasks={[]} selected="overdue" onSelect={onSelect}/>);
     const overdue = screen.getByRole("button", { name: /overdue/i });
     expect(overdue.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(overdue);
@@ -227,14 +255,23 @@ describe("CaseQueue", () => {
     categoryLabel: (v: string) => v,
   };
 
-  it("defaults to a scannable list carrying stage, waiting-on, people and one primary action per row", () => {
+  it("is one scannable list carrying stage, waiting-on, people and a quiet open action per row", () => {
     renderWithWork(<CaseQueue {...props}/>);
-    expect(screen.getByRole("button", { name: /list/i }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByRole("button", { name: /^(list|cards)$/i })).toBeNull();
     expect(screen.getByText("Yassmine Lashine")).toBeTruthy();
     expect(screen.getByText("RS-2026-000029")).toBeTruthy();
     expect(screen.getAllByText(/Waiting on:/).length).toBe(2);
     expect(screen.getByText("Overdue")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /^open$/i })).toHaveLength(2);
+  });
+
+  it("offers row selection only where a bulk action exists", () => {
+    const teamCase = { ...cases[0], id: "3", caseNumber: "RS-2026-000031", coordinatorSubject: "other", coordinatorName: "Mona" };
+    renderWithWork(<CaseQueue {...props} lead scope="team" cases={[teamCase]} state={{ ...initialQueue, tab: "team" }}/>);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    cleanup();
+    renderWithWork(<CaseQueue {...props}/>);
+    expect(screen.getAllByRole("checkbox").length).toBeGreaterThan(0);
   });
 
   it("keeps advanced filters out of the page until they are asked for", () => {
@@ -346,12 +383,11 @@ describe("consultant workspace", () => {
   });
 
   it("counts a consultant's new assignments from work items, not from cases", () => {
-    render(<RoleDashboardSummary locale="en" role="doctor" cases={[]} tasks={[
+    renderWithWork(<RoleDashboardSummary locale="en" role="doctor" cases={[]} tasks={[
       { overdue: false, status: "OPEN", type: "CONSULTANT_ASSIGNMENT" },
       { overdue: false, status: "OPEN", type: "CLINICAL_REVIEW" },
     ]} selected="" onSelect={vi.fn()}/>);
-    const card = screen.getByRole("button", { name: /new assignments/i });
-    expect(card.textContent).toContain("1");
+    expect(screen.getByRole("button", { name: "1 new assignment" })).toBeTruthy();
   });
 });
 

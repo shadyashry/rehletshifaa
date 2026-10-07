@@ -1,17 +1,18 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Clock3, FolderKanban, Stethoscope, UsersRound } from "lucide-react";
+import { useId } from "react";
 
+import { useWorkCopy } from "@/components/portal/portal-copy";
 import type { Locale } from "@/lib/i18n";
+import { plural } from "@/lib/portal-labels";
 
 type SummaryCase = { status: string; coordinatorSubject?: string; assignmentStatus?: string; overdueTaskCount?: number };
 type SummaryTask = { overdue: boolean; status: string; type?: string };
 
-const completed = new Set(["CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE"]);
 const doctorAction = new Set(["CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW", "ARRIVAL_CONFIRMED"]);
 const coordinatorAction = new Set(["RECEIVED", "INFORMATION_REQUIRED", "CLINICAL_RECOMMENDATION_READY", "PROPOSAL_PREPARATION", "REVISION_REQUESTED"]);
 
-/** The KPI a card filters by. "" is the unfiltered baseline (all active cases). */
+/** The count a summary item filters by. "" is the unfiltered baseline (every case in the view). */
 export type KpiFilter = "" | "action" | "unowned" | "overdue";
 
 /** Does this case belong to the given quick filter? Shared with the queue so counts and results agree. */
@@ -27,65 +28,60 @@ export function matchesKpi(item: SummaryCase, kpi: KpiFilter, role: string) {
 }
 
 /**
- * Compact operational summary whose cards are genuine quick filters, not decoration: each one is a
- * real toggle button with pressed state, and selecting it narrows the list below. Nothing here looks
- * interactive without being interactive.
+ * The staff home's numbers as one line of text, not a tile grid: only the counts that are not zero, each one a toggle
+ * that narrows the list below to those cases. When nothing is owed the line says so in words. While the queue loads it
+ * shows no numbers at all, so a zero never flashes before the real count.
  */
-export function RoleDashboardSummary({ locale, role, cases, tasks, selected = "", onSelect }: {
-  locale: Locale; role: string; cases: SummaryCase[]; tasks: SummaryTask[];
+export function RoleDashboardSummary({ locale, role, cases, tasks, loading = false, selected = "", onSelect }: {
+  locale: Locale; role: string; cases: SummaryCase[]; tasks: SummaryTask[]; loading?: boolean;
   selected?: KpiFilter; onSelect?: (value: KpiFilter) => void;
 }) {
-  const ar = locale === "ar";
-  const active = cases.filter(item => !completed.has(item.status)).length; // accepted, still running
+  const work = useWorkCopy();
+  const t = work.summary;
+  const hintId = useId();
   const overdue = Math.max(
     tasks.filter(task => task.overdue && task.status !== "COMPLETED").length,
     cases.filter(item => matchesKpi(item, "overdue", role)).length,
   );
   const needsAction = cases.filter(item => matchesKpi(item, "action", role)).length;
-  // A consultant's "new assignments" are work items awaiting accept/decline — pending assignments are
-  // deliberately not cases yet, so they are counted from My Work rather than from the case list.
+  // A consultant's new assignments are work items awaiting accept/decline — pending assignments are deliberately not
+  // cases yet, so they are counted from My work. Operations and finance read "pending" as their "needs action" already.
   const unowned = role === "doctor"
     ? tasks.filter(task => task.type === "CONSULTANT_ASSIGNMENT" && task.status !== "COMPLETED").length
-    : cases.filter(item => matchesKpi(item, "unowned", role)).length;
+    : role === "coordinator" ? cases.filter(item => matchesKpi(item, "unowned", role)).length : 0;
 
-  const cards: { id: KpiFilter; label: string; value: number; Icon: typeof FolderKanban; tone: string }[] = [
-    { id: "", label: ar ? "حالات نشطة" : "Active", value: active, Icon: FolderKanban, tone: "bg-brand-50 text-brand-800" },
-    { id: "action", label: ar ? "تحتاج إجراء" : "Need action", value: needsAction, Icon: role === "doctor" ? Stethoscope : CheckCircle2, tone: "bg-sky-50 text-sky-900" },
-    { id: "unowned", label: role === "coordinator" ? (ar ? "بدون منسق" : "Unowned") : role === "doctor" ? (ar ? "تعيينات جديدة" : "New assignments") : (ar ? "تعيينات معلّقة" : "Pending"), value: unowned, Icon: UsersRound, tone: "bg-violet-50 text-violet-900" },
-    { id: "overdue", label: ar ? "متأخرة" : "Overdue", value: overdue, Icon: overdue ? AlertTriangle : Clock3, tone: overdue ? "bg-alert-50 text-alert-800" : "bg-stone-100 text-ink-700" },
-  ];
+  // Zero counts are left out — except the one that is filtering the list, so it can always be switched off again.
+  const shown = (id: KpiFilter, count: number) => count > 0 || selected === id;
+  const items: { id: KpiFilter; text: string; alert?: boolean }[] = [];
+  if (shown("action", needsAction)) items.push({ id: "action", text: plural(locale, needsAction, work.plural.needAction) });
+  if (shown("unowned", unowned)) items.push({ id: "unowned", text: plural(locale, unowned, role === "doctor" ? work.plural.newAssignments : work.plural.unownedCases) });
+  if (shown("overdue", overdue)) items.push({ id: "overdue", text: plural(locale, overdue, work.plural.overdueCases), alert: overdue > 0 });
 
   return (
-    <section aria-labelledby="dashboard-summary-title" className="mb-5">
-      <h2 id="dashboard-summary-title" className="sr-only">{ar ? "نظرة سريعة" : "At a glance"}</h2>
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        {cards.map(({ id, label, value, Icon, tone }) => {
-          const pressed = selected === id;
-          // A zero tile is worth showing — "nothing is overdue" is the reassurance — but filtering by it
-          // can only produce an empty list, so it stays a read-out rather than an action.
-          const filterable = value > 0;
-          return (
-            <button
-              key={label} type="button" aria-pressed={filterable ? pressed : undefined} disabled={!filterable}
-              onClick={() => onSelect?.(pressed ? "" : id)}
-              className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-start transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
-                pressed
-                  ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600"
-                  : filterable
-                    ? "border-line bg-white hover:border-brand-300 hover:bg-brand-50/60"
-                    : "border-line bg-white"}`}
-            >
-              <span className={`grid h-9 w-9 flex-none place-items-center rounded-lg ${tone}`}>
-                <Icon size={17} aria-hidden/>
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[1.15rem] font-bold leading-6 text-ink-900">{value}</span>
-                <span className="block truncate text-[0.78rem] font-semibold text-ink-500">{label}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+    <section aria-labelledby="dashboard-summary-title" className="mb-6 min-h-11">
+      <h2 id="dashboard-summary-title" className="sr-only">{t.title}</h2>
+      {loading ? null : items.length === 0 ? (
+        <p className="flex min-h-11 items-center text-[0.9375rem] text-ink-600">{t.nothing}</p>
+      ) : (
+        <>
+          <p id={hintId} className="sr-only">{t.hint}</p>
+          <ul className="flex flex-wrap items-center gap-x-5 text-[0.9375rem]">
+            {items.map(item => {
+              const pressed = selected === item.id;
+              return (
+                <li key={item.id}>
+                  <button type="button" aria-pressed={pressed} aria-describedby={hintId}
+                          onClick={() => onSelect?.(pressed ? "" : item.id)}
+                          className={`min-h-11 rounded-md font-semibold underline decoration-2 underline-offset-[6px] transition ${
+                            item.alert ? "text-alert-700" : "text-brand-800"} ${pressed ? "decoration-current" : "decoration-line-strong hover:decoration-current"}`}>
+                    {item.text}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </section>
   );
 }

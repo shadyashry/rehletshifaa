@@ -57,7 +57,20 @@ Update at the end of every phase.
         one entry point for focus-step actions (Assign Consultant inline in the current-action panel, care area
         preselected, no-eligible next steps). Owner decisions S1–S3.
   - [x] **GATE P2-2** approved (S1 remove List/Cards, S2 slim footer on all `/portal` routes, S3 مهامي)
-  - [ ] Step 2 build: `/redesign-area` staff home
+  - [x] Step 2 build: `/redesign-area` staff home
+    - [x] count line instead of KPI tiles (zero counts omitted; a pressed count stays at zero); land on the first view with
+          work (an explicit choice wins); `StaffNav` in the header from md, inline below; role switch in the account menu;
+          slim `PortalFooter` on all `/portal` routes (`FooterSwitch`); List/Cards removed; selection only where a bulk
+          action exists; My work as a hairline list with one quiet action; Assign Consultant inside the current-action
+          panel, care area kept when the category list lacks it, unset hint, no-eligible next steps and no dead submit
+    - [x] four reviewers: HIGH ×2 fixed (restore on silent renew; stuck zero filter); cheap MEDIUM/LOW fixed;
+          the rest in backlog.md "Staff home — deferred review findings"
+    - [x] verify: typecheck ok; lint 24/13 (baseline 25/13); unit 330 pass, 11 `ProposalSign` (pre-existing);
+          Playwright staff-home 13/13 (en/ar × 375/390/768/1024/1440, assign en/ar, view choice), portal/portal-ux/
+          workspace-case-switch/my-care/a11y 70 pass, 1 fail = pre-existing Control Center "Staff & teams"; a11y 20/20 at
+          baseline (no entries to shrink); 3 previously failing `portal-ux` tests now pass (stale sub-tab labels fixed)
+    - [x] screenshots: `docs/ux-redesign/screenshots/pass-2/`
+  - [x] **GATE P2-3** approved (2026-10-08) → committed
 
 ## Decisions
 
@@ -97,5 +110,6 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Run `/redesign-area` staff home per `plans/staff-home.md`; stop with the report and screenshots; commit only after
-"approved". The Arabic proposal decision build is a separate run; legal L1–L5 go to legal.
+Build the coordinator-mediated Arabic proposal decision (`plans/arabic-proposal-decision.md`) in its own run, backend
+contract first (recorded-decision endpoint, patient request endpoint, `ProposalDecision` provenance columns), then the
+portal drawer and the secure link (O1). Legal L1–L5 go to legal. Staff-home deferred items are in backlog.md.

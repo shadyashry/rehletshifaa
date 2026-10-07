@@ -14,6 +14,8 @@ const actionsFor=(c:{status:string;coordinatorSubject?:string},viewer:string)=>(
 /** The platform roles behind each fixture persona (the portal reads them from `/me`, never from the token). */
 const PLATFORM_ROLES:Record<string,string[]>={COORDINATOR_LEAD:["COORDINATOR"],DOCTOR:["CONSULTANT"],CREDENTIALING_ADMIN:["CONSULTANT_OPERATIONS_MANAGER"],
   AUDITOR:["COMPLIANCE_AUDITOR"],SYSTEM_ADMIN:["SYSTEM_ADMINISTRATOR"]};
+/** The staff views (My work, My cases, Team queue) are navigation — in the header from md, inline below — not tabs. */
+export const staffView=(page:Page,name:RegExp)=>page.getByRole("navigation",{name:/^(Your work|أقسام العمل)$/}).getByRole("button",{name});
 export const portalAlerts=(page:Page)=>page.locator('[role="alert"]:not(#__next-route-announcer__)');
 export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean;pendingWork?:boolean}={}){
   const roles=role==="COORDINATOR_LEAD"?["COORDINATOR",role]:[role];

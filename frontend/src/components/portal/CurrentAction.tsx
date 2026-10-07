@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowRight, CalendarClock, CircleAlert, FileText, MessageSquareText } from "lucide-react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
@@ -25,9 +25,12 @@ export type SecondaryAction = { label: string; onClick: () => void };
  * <p>Everything here comes from the backend's action contract. Future workflow steps are absent until
  * they become the current action, and nothing is offered that the backend would refuse.
  */
-export function CurrentActionPanel({ locale, role, action, response, busy, secondary = [], onComplete, onFocusAction, onClaim, onAcceptAssignment, onDeclineAssignment }: {
+export function CurrentActionPanel({ locale, role, action, response, busy, secondary = [], form, onComplete, onFocusAction, onClaim, onAcceptAssignment, onDeclineAssignment }: {
   locale: Locale; role: string; action: CurrentActionView; response?: ResponseContext | null; busy?: boolean;
-  secondary?: SecondaryAction[]; onComplete?: (evidence: string) => void; onFocusAction?: () => void; onClaim?: () => void;
+  secondary?: SecondaryAction[];
+  /** The form that does a FOCUS step, shown here instead of a button that scrolls to it: one entry point per action. */
+  form?: ReactNode;
+  onComplete?: (evidence: string) => void; onFocusAction?: () => void; onClaim?: () => void;
   onAcceptAssignment?: () => void; onDeclineAssignment?: () => void;
 }) {
   const work = useWorkCopy();
@@ -37,7 +40,9 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
   if (role === "patient") return null;
 
   const copy = describe(action, role, t, locale === "ar" ? work.workTitles : null);
-  const primary = primaryFor(action, t);
+  const found = primaryFor(action, t);
+  // With the step's form inline, its submit is the primary; a second button for the same job would only repeat it.
+  const primary: Primary = form && found.kind === "focus" ? { label: "", kind: "none" } : found;
   const showResponse = !!response && (!!response.message || !!response.documentName);
   const waiting = action.kind === "WAIT" || action.kind === "NONE";
 
@@ -103,6 +108,7 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
           ))}
         </div>
       )}
+      {form}
     </section>
   );
 }

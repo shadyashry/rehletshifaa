@@ -60,8 +60,12 @@ function areaName(slug: string | null | undefined, categories: CareCategory[], l
 }
 
 /** Eligible consultants for a care area, as choosable cards. Loads from the case-scoped coordinator endpoint. */
-export function EligibleConsultantPicker({ locale, caseId, careArea, value, onChange, load }: {
+export function EligibleConsultantPicker({ locale, caseId, careArea, value, onChange, load, empty, footer }: {
   locale: Locale; caseId: string; careArea: string; value: string; onChange: (practitionerId: string) => void; load: Load;
+  /** What the caller can do next when nobody is eligible; without it the message stands alone. */
+  empty?: React.ReactNode;
+  /** Shown under the list only when someone is eligible (the caller's submit): nothing to submit, no button. */
+  footer?: React.ReactNode;
 }) {
   const t = L[locale];
   // The answer belongs to one case + care area: until THAT read answers, the list is loading.
@@ -76,8 +80,8 @@ export function EligibleConsultantPicker({ locale, caseId, careArea, value, onCh
   }, [key, caseId, careArea, load]);
   const rows = !key ? [] : result?.key === key ? result.rows : null;
   if (rows === null) return <p role="status" className="text-sm text-ink-500">{t.loading}</p>;
-  if (!rows.length) return <p className="text-sm text-ink-500">{t.noneEligible}</p>;
-  return <fieldset>
+  if (!rows.length) return <div><p role="status" className="text-[0.9rem] font-semibold text-ink-800">{t.noneEligible}</p>{empty}</div>;
+  return <><fieldset>
     <legend className="text-sm font-bold">{t.choose}</legend>
     <p className="text-[0.8rem] text-ink-500">{t.chooseHint}</p>
     <div className="mt-2 grid gap-2 md:grid-cols-2">{rows.map(c => <label key={c.practitionerId} className={`flex cursor-pointer gap-3 rounded-xl border p-3 text-sm ${value === c.practitionerId ? "border-brand-500 bg-brand-50" : "border-line"}`}>
@@ -90,7 +94,7 @@ export function EligibleConsultantPicker({ locale, caseId, careArea, value, onCh
         {c.matchedBy === "APPROVED_CAPABILITY" && <span className="mt-1 block text-[0.78rem] font-semibold text-brand-700">{t.viaCapability}</span>}
       </span>
     </label>)}</div>
-  </fieldset>;
+  </fieldset>{footer}</>;
 }
 
 /** The coordinator's half of a consultant referral: confirm the handover to an eligible consultant, or decline it. */

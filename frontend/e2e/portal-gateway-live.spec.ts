@@ -169,7 +169,7 @@ test("consultant: dashboard and case open through the gateway without a single r
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, "doctor");
   await expect(page.getByRole("heading", { name: /Consultant workspace/ })).toBeVisible({ timeout: 20000 });
-  await page.getByRole("tab", { name: /My cases/ }).click();
+  await page.getByRole("navigation", { name: "Your work" }).getByRole("button", { name: /My cases/ }).click();
   const open = page.getByRole("button", { name: "Open", exact: true }).first();
   if (await open.count()) {
     await open.click();

@@ -117,10 +117,10 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
 
   // The coordinator's dashboard shows the request as shared work, and the intake brief before ownership.
   await coordinator.page.goto("/en/portal");
-  const teamTab = coordinator.page.getByRole("tab", { name: /Team queue/ });
+  const teamTab = coordinator.page.getByRole("navigation", { name: "Your work" }).getByRole("button", { name: /Team queue/ });
   await expect(teamTab).toContainText(/\d/);
   await teamTab.click();
-  await coordinator.page.getByRole("tab", { name: /Needs ownership/ }).click();
+  await coordinator.page.getByRole("tab", { name: /Needs an owner/ }).click();
   await idle(coordinator.page);
   await coordinator.page.screenshot({ path: shots("team-queue-1440"), fullPage: true });
   await coordinator.page.goto(`/en/portal?case=${caseId}`);

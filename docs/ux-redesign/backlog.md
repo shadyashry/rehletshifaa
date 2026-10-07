@@ -37,17 +37,17 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 | P1 | Raw enum values reach the screen ("NORMAL", "cardiology"). Map them to words in both locales. | PC | `CaseQueue.tsx`, `MyWork.tsx`, `CurrentAction.tsx` | clarify |
 | P1 | "Assign a verified consultant" breaks the never-say-"Verified" rule and the capital C in "Consultant". | PC | `Portal.tsx` / `ConsultantRouting.tsx` | clarify |
 | P2 | The case number is repeated as the title when there is no patient name. | PC | `CaseQueue.tsx` | clarify |
-| P2 | "Assign consultant" only scrolls to a second "Confirm assignment" panel, so there are two controls for one job. | PC | `CoordinatorActions.tsx`, `ConsultantRouting.tsx` | distill |
+| Done (pass 2) | "Assign consultant" only scrolls to a second "Confirm assignment" panel, so there are two controls for one job. | PC | `CoordinatorActions.tsx`, `ConsultantRouting.tsx` | distill |
 | P2 | "No eligible Consultant" is a dead end. Add a next step (escalate or request staffing). | PC | `ConsultantRouting.tsx` | onboard / harden |
 
 ## Staff home and shell (portal)
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P2 | Multi-hue stat tiles (violet, sky, stone) repeat the tab counts, and the colours are outside the petrol family. | PC | `components/portal/RoleDashboardSummary.tsx` | distill |
-| P2 | The toolbar shows 6+ controls before the first case. List/Cards and "Select page" have no bulk action to support them. | PC | `CaseQueue.tsx` | distill |
-| P2 | The home lands on an empty "My work" tab while the cases sit one tab away. Land on the first tab that has work. | PC | `Portal.tsx`, `CaseQueue.tsx` | distill |
-| P2 | The public marketing footer appears on staff screens. Replace it with a slim app footer (owner decision). | PC | `components/Footer.tsx`, portal layout | distill |
+| Done (pass 2) | Multi-hue stat tiles (violet, sky, stone) repeat the tab counts, and the colours are outside the petrol family. | PC | `components/portal/RoleDashboardSummary.tsx` | distill |
+| Done (pass 2) | The toolbar shows 6+ controls before the first case. List/Cards and "Select page" have no bulk action to support them. | PC | `CaseQueue.tsx` | distill |
+| Done (pass 2) | The home lands on an empty "My work" tab while the cases sit one tab away. Land on the first tab that has work. | PC | `Portal.tsx`, `CaseQueue.tsx` | distill |
+| Done (pass 2) | The public marketing footer appears on staff screens. Replace it with a slim app footer (owner decision). | PC | `components/Footer.tsx`, portal layout | distill |
 | P3 | No keyboard shortcuts or saved views for coordinators. | PC | `CaseQueue.tsx` | shape |
 | P3 | The finance home is only an empty state plus one link. | PC | `Portal.tsx` | onboard |
 | P3 | On phones, coordinator rows put a lone checkbox above the case name. | PC | `CaseQueue.tsx` | adapt |
@@ -279,10 +279,52 @@ Source: `.impeccable/critique/2026-10-07T21-50-23Z__frontend-src-components-port
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
 | **P0 (owner)** | Arabic patients cannot accept a proposal but can decline it. This follows the owner's GATE 2 decision (option B). Proposed: a coordinator-mediated path ("your coordinator goes through the terms with you in Arabic and records your decision"; `RecordPatientResponse` exists), de-emphasise Decline while Accept is blocked, and treat Arabic terms approval as a launch blocker. **Owner decision needed.** | Re-critique A | `PatientProposal.tsx`, `lib/commercial-terms.ts` | clarify / harden |
-| P1 | Coordinator case: the current-action "Assign Consultant" button plus a second inline "Assign a Consultant" form with its own button. The care-area select is blank, and "No eligible consultant" has no next step. | Re-critique A | `CurrentAction.tsx`, `CoordinatorActions.tsx`, `ConsultantRouting.tsx` | clarify |
-| P1 | The staff home is still a template dashboard: off-palette KPI tiles, disabled zero tiles, an empty My work landing, the marketing footer, and no staff navigation in the header. Already planned as the P2 staff-home distill; raised to P1. | Re-critique A | `RoleDashboardSummary.tsx`, `CaseQueue.tsx`, `MyWork.tsx`, `Portal.tsx`, `Footer.tsx` | distill / layout |
+| Done (pass 2) | Coordinator case: the current-action "Assign Consultant" button plus a second inline "Assign a Consultant" form with its own button. The care-area select is blank, and "No eligible consultant" has no next step. | Re-critique A | `CurrentAction.tsx`, `CoordinatorActions.tsx`, `ConsultantRouting.tsx` | clarify |
+| Done (pass 2) | The staff home is still a template dashboard: off-palette KPI tiles, disabled zero tiles, an empty My work landing, the marketing footer, and no staff navigation in the header. Already planned as the P2 staff-home distill; raised to P1. | Re-critique A | `RoleDashboardSummary.tsx`, `CaseQueue.tsx`, `MyWork.tsx`, `Portal.tsx`, `Footer.tsx` | distill / layout |
 | P2 | My Care is five boxed cards and never names the patient. A representative ("Care for: [name]") is invisible, and the avatar reads "ME". | Re-critique A | `MyCare.tsx`, `PatientNav.tsx` | layout |
 | P2 | Proposal drawer: the sticky header and the embedded deposit-terms box count as nested surfaces. The open drawer has a 1px border with a wide shadow. On phones it is a centred modal, not a full-height sheet. | Re-critique B, A | `Portal.tsx` `CaseDrawer`, `CoordinationDepositTerms.tsx` | polish / adapt |
 | P2 | The drawer leads with the price, and the label says "recommended services" even when there is no recommendation. Consider the Consultant's recommendation first ("understanding before commitment"). | Re-critique A | `PatientProposal.tsx` | shape |
 | P2 | The deposit terms are badged "Pending legal review" but state concrete refund promises (F2 is open). This is a truthfulness tension for legal. | Re-critique A | `lib/commercial-terms.ts` | — (legal) |
 | P3 | AR "العرض" (My Care) vs "مقترحك" (drawer); the estimate card says "your treating doctor" where the drawer says "Consultant"; no WhatsApp route in My Care; the coordinator lead isn't labelled as a lead. | Re-critique A | `MyCare.tsx`, `messages/*.json`, `Portal.tsx` | clarify |
+
+## Staff home — deferred review findings (`/redesign-area` run 3, pass 2, 2026-10-08)
+
+Four reviewers ran on the staff home (plan `plans/staff-home.md`):
+- **RB:** react-best-practices and composition-patterns;
+- **WG:** web-design-guidelines;
+- **I18N:** RTL and i18n;
+- **PM:** the Pro Max pre-delivery checklist.
+
+These were fixed in the run:
+- **HIGH (RB):** a silent token renew re-ran the queue-state restore and sent a landed view back to My work. The restore is now keyed by the subject.
+- **Raised to HIGH (RB, WG):** a pressed count that dropped to zero disappeared and left the list filtered with no way out. It now stays visible, pressed, at zero.
+- A failed queue load left the count line blank forever.
+- Resting underlines on the count toggles and quiet actions.
+- The live region now holds only the no-eligible message.
+- Spoken separator for nav counts.
+- Role switch: `aria-pressed`, and focus returns to the menu button.
+- The inline form follows the busy state.
+- The dot separator wrapped at the start of a phone line.
+- Footer gutter.
+- "No cases need action right now."
+- "{count} cases overdue".
+- Curly apostrophe.
+- Neutral Arabic for "الدور الحالي", the unset hint, the Control Center link and the lead line.
+- Nav label "أقسام العمل".
+- Header nav one-line check at 768/1024.
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P2 | The staff view lives only in sessionStorage. Back/Forward, deep links and "open in new tab" don't reach a view. Write `?view=` as `changeCareView` does, or render views as links. | WG | `Portal.tsx`, `StaffNav.tsx` | harden |
+| P2 | Pin Western digits (`-u-nu-latn`) in `plural()` and the nav count. This is the existing numbering-system item, and this run adds more call sites. Add an Arabic test for a few/many count. | I18N | `lib/portal-labels.ts`, `StaffNav.tsx` | harden |
+| P2 | The count line has no live region, so screen-reader users miss updates when counts arrive or change. | WG | `RoleDashboardSummary.tsx` | harden |
+| P2 | Picking a view from inside a case keeps focus on the header nav. Move it to the view's `<h2>`. | WG | `Portal.tsx` | harden |
+| P3 | A failed eligible-consultants load reads as "nobody eligible" with routing advice. Give it its own error state. | RB | `ConsultantRouting.tsx` | harden |
+| P3 | "Assign Consultant" is disabled with no reason until a Consultant is picked. Use an inline "Choose a Consultant" error, or a described-by hint. | WG | `CoordinatorActions.tsx` | harden |
+| P3 | Row actions in My work are all named "Open"/"Review assignment" (the title is only a description). Add the title as an sr-only part of the name. | WG | `MyWork.tsx` | clarify |
+| P3 | `{area}` is interpolated as plain text, so a Latin fallback name can't be wrapped in `<bdi>` on Arabic pages. | I18N | `CoordinatorActions.tsx` | adapt |
+| P3 | Memoise `staffViewItems` and pass the counts down instead of re-filtering in `RoleDashboardSummary`. | RB | `Portal.tsx`, `RoleDashboardSummary.tsx` | optimize |
+| P3 | `FooterSwitch` serialises both footers into every RSC payload. A portal route-group layout would avoid it. Acceptable for now. | RB | `app/[locale]/layout.tsx` | optimize |
+| P3 | The Arabic footer shows the Latin brand, and the "© {year} {brand}" order is fixed in code. Add an Arabic brand string and a copyright template. | I18N | `PortalFooter.tsx`, `messages/*.json` | clarify |
+| P3 | Arabic (pending native review): the spelling of "منسّق" vs "منسق" is mixed across portalWork. | I18N | `messages/ar.json` | clarify |
+| P3 | The "Current action" kicker above the panel heading (an Impeccable ban, pre-existing). | Impeccable | `CurrentAction.tsx` | typeset |

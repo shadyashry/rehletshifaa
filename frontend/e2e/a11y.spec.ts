@@ -44,8 +44,8 @@ const PUBLIC: Target[] = [
   { name: "cardiology", path: "/cardiology" },
 ];
 const PORTAL: Target[] = [
-  { name: "portal-coordinator", path: "/portal", prepare: page => setupPortal(page, "COORDINATOR"), ready: page => expect(page.getByRole("tab").first()).toBeVisible() },
-  { name: "portal-doctor", path: "/portal", prepare: page => setupPortal(page, "DOCTOR"), ready: page => expect(page.getByRole("tab").first()).toBeVisible() },
+  { name: "portal-coordinator", path: "/portal", prepare: page => setupPortal(page, "COORDINATOR"), ready: page => expect(page.locator("#work-panel")).toBeVisible() },
+  { name: "portal-doctor", path: "/portal", prepare: page => setupPortal(page, "DOCTOR"), ready: page => expect(page.locator("#work-panel")).toBeVisible() },
   { name: "my-care", path: "/portal", prepare: page => setupPatient(page, "deposit-arranging"), ready: page => expect(page.locator("#current-step-title")).toBeVisible() },
 ];
 

@@ -889,7 +889,12 @@
       "selected": {
         "one": "{count} selected",
         "other": "{count} selected"
-      }
+      },
+      "needAction": { "one": "{count} case needs action", "other": "{count} cases need action" },
+      "unownedCases": { "one": "{count} case without a coordinator", "other": "{count} cases without a coordinator" },
+      "newAssignments": { "one": "{count} new assignment", "other": "{count} new assignments" },
+      "overdueCases": { "one": "{count} case overdue", "other": "{count} cases overdue" },
+      "teamWaiting": { "one": "{count} new case is waiting for an owner in the Team queue", "other": "{count} new cases are waiting for an owner in the Team queue" }
     },
     "currentAction": {
       "label": "Current action",
@@ -1036,7 +1041,7 @@
     "myWork": {
       "title": "My work",
       "hint": "Work assigned to you personally, most urgent first.",
-      "empty": "You have no open work.",
+      "empty": "Nothing is assigned to you.",
       "emptyHint": "Anything assigned to you shows up here.",
       "open": "Open",
       "due": "Due",
@@ -1075,9 +1080,6 @@
       "sortUpdatedAsc": "Least recently updated",
       "sortCreatedDesc": "Newest first",
       "sortCreatedAsc": "Oldest first",
-      "display": "View",
-      "list": "List",
-      "grid": "Cards",
       "open": "Open",
       "claim": "Take ownership",
       "requestInfo": "Request info",
@@ -1108,6 +1110,19 @@
       "accept": "Accept assignment",
       "unownedInQueue": "No coordinator yet — in the team queue"
     },
+    "summary": {
+      "title": "At a glance",
+      "hint": "Select a count to show only those cases. Select it again to show every case.",
+      "nothing": "No cases need action right now."
+    },
+    "nav": {
+      "label": "Your work",
+      "work": "My work",
+      "mine": "My cases",
+      "team": "Team queue",
+      "clinic": "Virtual Clinic",
+      "workingAs": "Working as"
+    },
     "workTitles": {
       "REVIEW_PATIENT_RESPONSE": "Review the patient's response",
       "CONSULTANT_ASSIGNMENT": "New case assignment",
@@ -1128,7 +1143,14 @@
     },
     "assignConsultant": {
       "title": "Assign a Consultant",
-      "hint": "Confirm or correct the care area, then choose a named Consultant. Only available Consultants with current credentials who match the area are listed."
+      "hint": "Confirm or correct the care area, then choose a named Consultant. Only available Consultants with current credentials who match the area are listed.",
+      "careArea": "Case care area",
+      "choose": "Choose a care area",
+      "unset": "The patient didn’t choose a care area. Pick one from their description.",
+      "submit": "Assign Consultant",
+      "otherArea": "Choose another care area",
+      "seeConsultants": "See Consultants for {area} in the Control Center",
+      "askLead": "Ask your coordinator lead to add or approve a Consultant for {area}."
     }
   }
 }

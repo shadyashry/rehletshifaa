@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { setupPortal } from "./portal-fixture";
+import { setupPortal, staffView } from "./portal-fixture";
 
 /**
  * Opening a different case straight from a notification (without going back to the queue) must start that case's
@@ -17,7 +17,7 @@ test("opening another case from a notification starts a fresh workspace", async 
         context: null, createdAt: "2026-09-05T12:00:00Z", read: false }] }) }));
   await page.goto("/en/portal");
 
-  await page.getByRole("tab", { name: /My cases/ }).click();
+  await staffView(page, /My cases/).click();
   await page.getByRole("button", { name: "Open", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Maya Example" })).toBeVisible();
 
