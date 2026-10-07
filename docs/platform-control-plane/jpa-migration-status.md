@@ -59,7 +59,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | casemanagement | `case_submission_contacts` | R | casemanagement,journey |
 | casemanagement | `consent_records` | W | casemanagement,journey |
 | document | `medical_documents` | W | casemanagement,document,journey |
-| clinic | `audit_events` | W | clinic,journey |
+| clinic | `audit_events` | R | clinic,journey |
 | clinic | `care_categories` | R | clinic,journey |
 | clinic | `clinic_service_changes` | R | clinic |
 | clinic | `consultant_capabilities` | W | clinic |
@@ -147,8 +147,8 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | workforce | `workforce_teams` | W | access,coordination,workforce |
 
 `care_categories` is read only through `CareCategoryRepository` since `JourneyService` was converted (2026-10-07).
-`audit_events` reads remaining:
-`CaseHandoffService`, `JourneyCaseAdmissionRepository`, `JourneyDefinitionRepository`.
+`audit_events` is read only through JPA (`AuditEventRepository`, `JourneyVersionRepository`) since `CaseHandoffService` was
+converted (2026-10-07).
 
 ## Dead schema (owner decision needed)
 
@@ -519,6 +519,31 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **593 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`CaseHandoffService` converted** (CL5 read slice 11; removed from `JDBC_NOT_YET_CONVERTED`, 7 → 6).
+  `audit_events` is now **R** (this was its last plain-SQL reader); `medical_cases`, `case_assignments` and `patient_profiles`
+  stay W (`OnboardingService`, `JourneyCaseRelationships` and the coordination reads still use them). Every read is a command
+  lookup inside an event handler (deposit required, deposit settled, patient readiness changed), so — as for
+  `PublicCaseAccessService` — they are repository reads used by the service directly; no query service was needed. Public
+  contract unchanged: only an ACCEPTED case gets deposit work; the handoff (close deposit work, restore the original
+  coordinator, TRAVEL work item, shared-queue alert when unowned, the patient's WhatsApp-else-email message in `ar`/`en`) runs
+  once, keyed on the `CASE_DEPOSIT_HANDOFF` audit row; the move to TRAVEL_COORDINATION is retried under `CaseTransitionPolicy`
+  on every event; unknown cases are ignored.
+  - Queries added: `CaseAssignmentRepository.findNewestPrimaryCoordinators` (`CoordinatorAssignment` projection, ended ones
+    included, `assignedAt desc` — NOT NULL, `Limit.of(1)`) and `MedicalCaseRepository.findPatientContact` (the patient's own
+    number, email and language). Reused: `MedicalCaseRepository.findStageAndVersion` and `findCaseNumber`,
+    `CaseAssignmentRepository.findActivePrimaryCoordinator` (the active-owner read, now shared by `currentCoordinator` and
+    `restoreCoordinator`) and `AuditEventRepository.countByCaseIdAndEventType` (the one-shot marker).
+  - Locks: the two `SELECT status … FOR UPDATE` reads (deposit settled, readiness changed) are now
+    `MedicalCaseRepository.lockById` (lock + refresh), still the first statement of each handler, so the lock order is unchanged.
+  - New tests in `UatDefectCorrectionsTest`: `aSettledDepositRevivesTheEndedCoordinatorOnceAndTellsThePatientByEmailInTheirLanguage`
+    (ended coordinator reinstated once with its audit, TRAVEL work owned by them, deposit work closed, no shared-queue alert,
+    patient told by email in Arabic when no number is on file, a replay changes nothing, unknown cases ignored by all three
+    handlers) and `aSettledDepositOnACaseNoCoordinatorEverOwnedAlertsTheSharedQueueWithTheCaseNumber` (no coordinator picked,
+    unowned TRAVEL work, the deposit-settled team alert carries the case number, patient told on WhatsApp). Both also pass on
+    the pre-conversion service.
+  Verification: full suite **595 tests, 0 failures** (2 skipped; +2 tests); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -531,9 +556,9 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 7 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
+- **Reads:** 6 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
   `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
-  `PatientAccountService`, `PatientActionService` and `IdentityVerificationService` converted) — `CaseHandoffService`,
+  `PatientAccountService`, `PatientActionService`, `IdentityVerificationService` and `CaseHandoffService` converted) —
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions
   (`CoordinationRepository` reads, `CaseNumberGenerator`, `LocalDemoDataSeeder`). They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
@@ -544,7 +569,7 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
 `CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`,
-`PublicCaseAccessService`, `PatientAccountService`, `PatientActionService` and `IdentityVerificationService` are done (2026-10-07); next `CaseHandoffService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`, `IdentityVerificationService` and `CaseHandoffService` are done (2026-10-07); next `OnboardingService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.

@@ -87,6 +87,16 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
             order by a.assignedAt desc""")
     java.util.List<String> findActivePrimaryCoordinator(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
 
+    /** A primary coordinator assignment of the case, whatever its status. */
+    interface CoordinatorAssignment { UUID getId(); String getAssigneeSubject(); }
+
+    /** The case's primary coordinator assignments, latest first, ended ones included (use with {@code Limit.of(1)}). */
+    @Query("""
+            select a.id as id, a.assigneeSubject as assigneeSubject from CaseAssignment a
+            where a.caseId = :caseId and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY'
+            order by a.assignedAt desc""")
+    java.util.List<CoordinatorAssignment> findNewestPrimaryCoordinators(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
     boolean existsByCaseIdAndAssigneeSubjectAndAssigneeRoleAndStatus(UUID caseId, String assigneeSubject, String assigneeRole, String status);
 
     boolean existsByCaseIdAndAssigneeSubjectAndStatusIn(UUID caseId, String assigneeSubject, java.util.Collection<String> statuses);

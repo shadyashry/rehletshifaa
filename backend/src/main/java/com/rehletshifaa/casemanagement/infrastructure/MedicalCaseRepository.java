@@ -74,6 +74,14 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
     Optional<String> findPatientName(@Param("id") UUID id);
 
+    /** The case's patient's own number, email and language. */
+    interface PatientContact { String getWhatsappNumber(); String getEmail(); String getPreferredLanguage(); }
+
+    @Query("""
+            select p.whatsappNumber as whatsappNumber, p.email as email, p.preferredLanguage as preferredLanguage
+            from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id""")
+    Optional<PatientContact> findPatientContact(@Param("id") UUID id);
+
     /** A submitted case found by its number, with the patient's own number and language (status-link recovery). */
     interface RecoveryContact { UUID getCaseId(); UUID getPatientId(); String getWhatsappNumber(); String getPreferredLanguage(); }
 

@@ -375,6 +375,67 @@ class UatDefectCorrectionsTest {
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT' AND owner_subject IS NULL AND status='OPEN'", caseId)).isEqualTo(1); // the work waits in the shared queue
     }
 
+    @Test void aSettledDepositRevivesTheEndedCoordinatorOnceAndTellsThePatientByEmailInTheirLanguage() throws Exception {
+        UUID caseId = acknowledgedCase("+254700000519", "uat-h1@local.test");
+        // The coordinator was released meanwhile; the patient has no number on file and reads Arabic.
+        raw("UPDATE case_assignments SET status='ENDED', ended_at=CURRENT_TIMESTAMP WHERE case_id=? AND assignee_role='COORDINATOR'", caseId);
+        raw("UPDATE patient_profiles SET whatsapp_number=NULL, preferred_language='ar' WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", caseId);
+        String patientEmail = jdbc.queryForObject("SELECT email FROM patient_profiles WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", String.class, caseId);
+        assertThat(patientEmail).isNotBlank();
+
+        assertThat(handoff.onDepositSettled(caseId)).isTrue(); em.flush();
+        assertThat(count("SELECT count(*) FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' AND assignee_subject='coordinator-subject' AND ended_at IS NULL", caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_COORDINATOR_RESTORED'", caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='TRAVEL' AND status='OPEN' AND owner_subject='coordinator-subject'", caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT' AND status='OPEN'", caseId)).isZero();
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key=?", "deposit-settled-team:" + caseId)).isZero(); // owned again: no shared-queue alert
+        var patientMessage = outboxRow("deposit-settled-patient:" + caseId);
+        assertThat(patientMessage.destination()).isEqualTo(patientEmail);
+        assertThat(patientMessage.templateKey()).isEqualTo("deposit-settled-patient");
+        assertThat(patientMessage.data().get("lang")).isEqualTo("ar");
+        assertThat(jdbc.queryForObject("SELECT channel FROM notification_outbox WHERE idempotency_key=?", String.class, "deposit-settled-patient:" + caseId)).isEqualTo("EMAIL");
+
+        // A replayed confirmation performs no second handoff; unknown cases are ignored by every entry point.
+        assertThat(handoff.onDepositSettled(caseId)).isFalse(); em.flush();
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type IN ('CASE_COORDINATOR_RESTORED','CASE_DEPOSIT_HANDOFF')", caseId)).isEqualTo(2);
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key=?", "deposit-settled-patient:" + caseId)).isEqualTo(1);
+        UUID unknown = UUID.randomUUID();
+        assertThat(handoff.onDepositRequired(unknown)).isFalse();
+        assertThat(handoff.onDepositSettled(unknown)).isFalse();
+        assertThat(handoff.onPatientReadinessChanged(unknown)).isFalse();
+    }
+
+    @Test void aSettledDepositOnACaseNoCoordinatorEverOwnedAlertsTheSharedQueueWithTheCaseNumber() throws Exception {
+        UUID caseId = acknowledgedCase("+254700000520", "uat-h2@local.test");
+        raw("DELETE FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR'", caseId);
+
+        assertThat(handoff.onDepositSettled(caseId)).isTrue(); em.flush();
+        var mail = outboxRow("deposit-settled-team:" + caseId);
+        assertThat(mail.destination()).isEqualTo("coordinator@test.invalid");
+        assertThat(mail.templateKey()).isEqualTo("deposit-settled-coordinator");
+        assertThat(mail.data().get("case")).isEqualTo(caseNumber(caseId));
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='TRAVEL' AND status='OPEN' AND owner_subject IS NULL", caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_COORDINATOR_RESTORED'", caseId)).isZero();
+        assertThat(count("SELECT count(*) FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR'", caseId)).isZero(); // nobody was picked
+        // The patient keeps their number: the message goes to WhatsApp.
+        assertThat(jdbc.queryForObject("SELECT channel FROM notification_outbox WHERE idempotency_key=?", String.class, "deposit-settled-patient:" + caseId)).isEqualTo("WHATSAPP");
+    }
+
+    /** An owned case whose patient acknowledged a released proposal under a deposit policy: ACCEPTED, deposit due. */
+    private UUID acknowledgedCase(String whatsapp, String email) throws Exception {
+        UUID caseId = ownedCase(whatsapp, email);
+        releasedUsdProposal(caseId);
+        seedDepositPolicy(new BigDecimal("5000.00"));
+        var ctx = openViaStatusLink(caseId, whatsapp);
+        journey.decideProposalPublic(ctx.token(), ctx.grant(), new PublicProposalDecisionRequest(ctx.grant(), "ACKNOWLEDGED", null, true));
+        em.flush();
+        assertThat(status(caseId)).isEqualTo("ACCEPTED");
+        return caseId;
+    }
+
+    /** Raw SQL behind JPA's back: flush pending entity changes first, then drop managed instances the SQL made stale. */
+    private int raw(String sql, Object... args) { em.flush(); int changed = jdbc.update(sql, args); em.clear(); return changed; }
+
     @Test void replayingAWorkItemNeverDuplicatesTheNotificationOrTheEmail() throws Exception {
         UUID caseId = ownedCase("+254700000518", "uat-p@local.test");
         setStaffEmail("coordinator-subject", "coordinator.p@local.test");
