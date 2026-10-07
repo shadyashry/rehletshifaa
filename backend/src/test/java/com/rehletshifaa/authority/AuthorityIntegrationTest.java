@@ -1,6 +1,7 @@
 package com.rehletshifaa.authority;
 
 import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.CaseRelationships;
 import com.rehletshifaa.authority.application.Principal;
 import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 @Transactional
 class AuthorityIntegrationTest {
     @Autowired Authority authority;
+    @Autowired CaseRelationships relationships;
     @Autowired JdbcTemplate jdbc;
     @Autowired CryptoService crypto;
     @Autowired Clock clock;
@@ -113,6 +115,59 @@ class AuthorityIntegrationTest {
         authenticate("a-other");
         ApiException error = catchThrowableOfType(ApiException.class, () -> authority.require(Permission.CASE_READ, Resource.ofCase(caseId)));
         assertThat(error.code()).isEqualTo(decide("a-other", Permission.CASE_READ, Resource.ofCase(caseId)).code());
+    }
+
+    @Test
+    void caseRelationshipFactsSeparateTheTeamOffersSecondOpinionsIntakeAndRepresentation() {
+        Instant now = clock.instant();
+        assign("r-doctor", "DOCTOR", "PRIMARY", "ACTIVE", now);
+        assign("r-offered", "DOCTOR", "PRIMARY", "PENDING", now);
+        assign("r-second", "DOCTOR", "SECOND_OPINION", "ACTIVE", now);
+        assign("r-ended", "DOCTOR", "PRIMARY", "ENDED", now);
+        // The team: active and not a second opinion; an offer counts only when offers are asked for; the role must match.
+        assertThat(relationships.assigned(caseId, "r-doctor", "DOCTOR", false)).isTrue();
+        assertThat(relationships.assigned(caseId, "r-offered", "DOCTOR", false)).isFalse();
+        assertThat(relationships.assigned(caseId, "r-offered", "DOCTOR", true)).isTrue();
+        assertThat(relationships.assigned(caseId, "r-second", "DOCTOR", false)).isFalse();
+        assertThat(relationships.assigned(caseId, "r-second", "DOCTOR", true)).isTrue();
+        assertThat(relationships.assigned(caseId, "r-ended", "DOCTOR", true)).isFalse();
+        assertThat(relationships.assigned(caseId, "r-doctor", "COORDINATOR", true)).isFalse();
+        assertThat(relationships.consulted(caseId, "r-second")).isTrue();
+        assertThat(relationships.consulted(caseId, "r-doctor")).isFalse();
+        assertThat(relationships.activeAssignees(caseId, "DOCTOR")).containsExactlyInAnyOrder("r-doctor", "r-second");
+        assertThat(relationships.activeAssignees(caseId, "COORDINATOR")).containsExactly("a-owner");
+
+        // Ownership and intake: a RECEIVED case is unclaimed only while no primary coordinator is active.
+        assertThat(relationships.primaryCoordinator(caseId)).contains("a-owner");
+        jdbc.update("UPDATE medical_cases SET status='RECEIVED' WHERE id=?", caseId);
+        assertThat(relationships.unclaimedIntake(caseId)).isFalse();
+        jdbc.update("UPDATE case_assignments SET status='ENDED' WHERE case_id=? AND assignee_subject='a-owner'", caseId);
+        assertThat(relationships.primaryCoordinator(caseId)).isEmpty();
+        assertThat(relationships.unclaimedIntake(caseId)).isTrue();
+        assertThat(relationships.unclaimedIntake(UUID.randomUUID())).isFalse();
+
+        // The patient and a representative in force reach the case; one not yet in force, expired or revoked does not.
+        UUID patient = jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?", UUID.class, caseId);
+        assertThat(relationships.ownPatientCase(caseId, "a-patient")).isTrue();
+        represent(patient, "r-rep", now.minusSeconds(60), null, null);
+        represent(patient, "r-future", now.plusSeconds(3600), null, null);
+        represent(patient, "r-expired", now.minusSeconds(7200), now.minusSeconds(60), null);
+        represent(patient, "r-revoked", now.minusSeconds(60), null, now.minusSeconds(30));
+        assertThat(relationships.ownPatientCase(caseId, "r-rep")).isTrue();
+        assertThat(relationships.ownPatientCase(caseId, "r-future")).isFalse();
+        assertThat(relationships.ownPatientCase(caseId, "r-expired")).isFalse();
+        assertThat(relationships.ownPatientCase(caseId, "r-revoked")).isFalse();
+        assertThat(relationships.ownPatientCase(caseId, "a-stranger")).isFalse();
+    }
+
+    private void assign(String subject, String role, String type, String status, Instant at) {
+        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) "
+                + "VALUES(?,?,?,?,?,?,'Relationship check','test',?,0)", UUID.randomUUID(), caseId, subject, role, type, status, at);
+    }
+
+    private void represent(UUID patient, String subject, Instant from, Instant expires, Instant revoked) {
+        jdbc.update("INSERT INTO patient_representatives(id,patient_id,representative_subject,relationship,permissions,effective_from,expires_at,revoked_at,created_at) "
+                + "VALUES(?,?,?,'Parent','VIEW',?,?,?,?)", UUID.randomUUID(), patient, subject, from, expires, revoked, from);
     }
 
     private Authority.Decision decide(String subject, Permission permission, Resource resource) {

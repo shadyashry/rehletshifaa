@@ -74,6 +74,21 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
     Optional<String> findPatientName(@Param("id") UUID id);
 
+    /** A submitted case nobody has claimed yet: RECEIVED with no active primary coordinator. */
+    @Query("""
+            select count(c) > 0 from MedicalCase c where c.id = :id and c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.RECEIVED
+                and not exists (select 1 from CaseAssignment a where a.caseId = c.id and a.assigneeRole = 'COORDINATOR'
+                    and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE')""")
+    boolean isUnclaimedIntake(@Param("id") UUID id);
+
+    /** The identity is the case's patient, or represents them under a relationship in force at {@code now}. */
+    @Query("""
+            select count(c) > 0 from MedicalCase c join PatientProfile p on p.id = c.patientId
+            where c.id = :id and (p.externalSubject = :subject or exists (select 1 from PatientRepresentative r where r.patientId = p.id
+                and r.representativeSubject = :subject and r.revokedAt is null and r.effectiveFrom <= :now
+                and (r.expiresAt is null or r.expiresAt > :now)))""")
+    boolean isOwnPatientCase(@Param("id") UUID id, @Param("subject") String subject, @Param("now") Instant now);
+
     /** The case and its patient as the onboarding page heads them (display name: the {@code CASE_ROW} rule). */
     interface OnboardingHeader {
         String getCaseNumber(); UUID getPatientId(); String getFullName(); String getCountry(); String getWhatsappNumber(); String getEmail();

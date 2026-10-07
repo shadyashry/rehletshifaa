@@ -84,7 +84,7 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
     @Query("""
             select a.assigneeSubject from CaseAssignment a
             where a.caseId = :caseId and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'
-            order by a.assignedAt desc""")
+            order by a.assignedAt desc, a.id""")
     java.util.List<String> findActivePrimaryCoordinator(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
 
     /** A primary coordinator assignment of the case, whatever its status. */
@@ -100,6 +100,26 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
     boolean existsByCaseIdAndAssigneeSubjectAndAssigneeRoleAndStatus(UUID caseId, String assigneeSubject, String assigneeRole, String status);
 
     boolean existsByCaseIdAndAssigneeSubjectAndStatusIn(UUID caseId, String assigneeSubject, java.util.Collection<String> statuses);
+
+    /** The subject holds an offered (PENDING) or active assignment of the role on the case. */
+    boolean existsByCaseIdAndAssigneeSubjectAndAssigneeRoleAndStatusIn(UUID caseId, String assigneeSubject, String assigneeRole,
+                                                                       java.util.Collection<String> statuses);
+
+    /** The subject actively works the case in the role (a second opinion is a consultation, not the case's work). */
+    @Query("""
+            select count(a) > 0 from CaseAssignment a where a.caseId = :caseId and a.assigneeSubject = :subject and a.assigneeRole = :role
+                and a.status = 'ACTIVE' and a.assignmentType <> 'SECOND_OPINION'""")
+    boolean isActivelyAssigned(@Param("caseId") UUID caseId, @Param("subject") String subject, @Param("role") String role);
+
+    /** The subject gives an active second opinion on the case. */
+    @Query("""
+            select count(a) > 0 from CaseAssignment a where a.caseId = :caseId and a.assigneeSubject = :subject
+                and a.assignmentType = 'SECOND_OPINION' and a.status = 'ACTIVE'""")
+    boolean isConsulted(@Param("caseId") UUID caseId, @Param("subject") String subject);
+
+    /** Everyone actively assigned to the case in the role. */
+    @Query("select a.assigneeSubject from CaseAssignment a where a.caseId = :caseId and a.assigneeRole = :role and a.status = 'ACTIVE'")
+    java.util.List<String> findActiveAssignees(@Param("caseId") UUID caseId, @Param("role") String role);
 
     interface AssigneeAndStatus { String getSubject(); String getStatus(); }
 
