@@ -185,6 +185,14 @@
     border-radius: 3px;
   }
 
+  /* Placeholders are examples patients read, so they get Muted Ink (AA) instead of preflight's 50% currentColor
+     (~3:1). Same selector as preflight so this later rule wins. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-ink-400);
+    opacity: 1;
+  }
+
   /* Focus ring lightened on saturated teal surfaces so it stays visible. */
   .on-dark :focus-visible,
   .on-dark:focus-visible {

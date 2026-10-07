@@ -53,7 +53,7 @@ export function CaseRouter({ locale, copy, button }: {
                   <Icon size={19} strokeWidth={1.7} />
                 </span>
                 <div>
-                  <p className="text-[0.75rem] font-semibold tabular-nums tracking-[0.08em] text-brand-600 rtl:tracking-normal">0{index + 1}</p>
+                  <p className="text-[0.8125rem] font-semibold tabular-nums tracking-[0.08em] text-brand-600 rtl:tracking-normal">0{index + 1}</p>
                   <h3 className="mt-0.5 text-[1.0625rem] font-semibold leading-snug text-brand-900">{step.title}</h3>
                   <p className="mt-1 text-[0.9375rem] leading-6 text-ink-600 md:max-w-[22ch] md:mx-auto">{step.body}</p>
                 </div>
