@@ -46,6 +46,14 @@ Update at the end of every phase.
   - [x] **GATE 5**: owner chose to merge directly (no PR) — `feat/ux-redesign` merged into `codex/platform-control-plane`
         as `06daa8e` and pushed (2026-10-08); `PR_DESCRIPTION.md` stays as the change summary
 
+- [ ] **Pass 2** (branch `feat/ux-redesign-pass-2` from `codex/platform-control-plane` @ `5f0b887`)
+  - [x] Step 1 shape: `plans/arabic-proposal-decision.md`. Findings: no backend path for a coordinator to record
+        a proposal decision (`RecordPatientResponse` covers information requests only); the Arabic block applies to the
+        portal drawer only — the secure link (`ProposalSign`) and activation deposit consent are not gated. Needs a
+        backend contract change, legal questions L1–L5, owner decisions O1–O3.
+  - [x] **GATE P2-1** approved (O1 all surfaces, O2 keep quiet English link, O3 owning coordinator only)
+  - [ ] Step 2: `/redesign-area` staff home (needs `plans/staff-home.md` approved first)
+
 ## Decisions
 
 | Date | Decision | By |
@@ -59,6 +67,7 @@ Update at the end of every phase.
 | 2026-10-07 | GATE 2 legal: **option B** — the proposal decision stays disabled on `/ar` until legally approved Arabic deposit/refund/cancellation terms exist; explain why and offer "Message your coordinator". | Owner |
 | 2026-10-07 | New P0 (cross-case drafts, `WorkspaceView` has no case key) gets its own fix branch from `codex/platform-control-plane`, like the reload loop. | Owner |
 | 2026-10-08 | GATE 5 follow-ups: the Arabic proposal path becomes **coordinator-mediated** (Arabic page offers a coordinator who goes through the terms in Arabic and records the decision; Decline de-emphasised while Accept is blocked) — needs its own shape plan. **Next `/redesign-area` run: staff home distill** (stat tiles, toolbar, slim footer, staff nav; fold in the duplicated Assign Consultant action). PR description to be revised before opening. | Owner |
+| 2026-10-08 | GATE P2-1: `plans/arabic-proposal-decision.md` **approved**. O1: the coordinator-mediated rule covers every Arabic surface relying on the deposit/refund/cancellation terms (portal drawer and secure link; activation per legal L2). O2: keep a quiet "decide on the English page" link. O3: only the owning coordinator records a decision on the patient's behalf. Legal L1–L5 open; Arabic terms approval stays a launch blocker. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -82,7 +91,5 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Pass 2: (1) `/impeccable:impeccable shape` the coordinator-mediated Arabic proposal decision path (re-critique P0);
-(2) `/redesign-area` staff home distill (stat tiles, toolbar, slim portal footer, staff nav, duplicated Assign Consultant).
-Branch from `codex/platform-control-plane` (now includes pass 1). Reviewer checklist in `PR_DESCRIPTION.md` (tunnel rebuild,
-`case-flow`, live specs, native Arabic review) is still open.
+Shape `plans/staff-home.md` and stop for approval before `/redesign-area` staff home. The Arabic proposal decision
+build (backend contract + portal + secure link) is a separate run; legal L1–L5 go to legal.
