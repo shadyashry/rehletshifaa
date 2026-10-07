@@ -53,7 +53,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | directory | `practice_managers` | W | access,authority,clinic |
 | directory | `practitioner_profiles` | W | access,authority,clinic,coordination,identity,journey |
 | authority | `workforce_role_conflicts` | W | access,authority |
-| casemanagement | `case_access_links` | W | casemanagement,journey |
+| casemanagement | `case_access_links` | R | casemanagement,journey |
 | casemanagement | `case_intake_grants` | R | casemanagement |
 | casemanagement | `case_status_history` | W | casemanagement,journey |
 | casemanagement | `case_submission_contacts` | W | casemanagement,journey |
@@ -81,7 +81,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | identity | `platform_governance_lock` | W | access,identity |
 | workforce | `workforce_invitation_roles` | W | access,identity |
 | workforce | `workforce_invitations` | W | access,identity |
-| journey | `case_access_challenges` | W | journey |
+| journey | `case_access_challenges` | R | journey |
 | journey | `case_message_reads` | W | journey |
 | journey | `case_messages` | W | journey |
 | journey | `clinical_review_cost_estimates` | W | journey |
@@ -414,6 +414,30 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **589 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest` **PASS** on a
   freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`PublicCaseAccessService` converted** (CL5 read slice 7; removed from `JDBC_NOT_YET_CONVERTED`, 11 → 10).
+  `case_access_links` and `case_access_challenges` are now **R**: no plain-SQL reader is left. Every read here is a command
+  lookup or an authorization check (no list view), so they became repository reads used by the service directly; no query
+  service was needed. Public contract unchanged: token → link resolution (revoked/expired → `CASE_LINK_INVALID` 404), the
+  grant check (`VERIFICATION_REQUIRED` 401), code verification (`VERIFICATION_INVALID`, attempt counting, open code first),
+  the hourly limits (5 codes per link → `TOO_MANY_REQUESTS` 429; 3 silent recovery links per case), purpose checks, masks,
+  status labels/phases and the "already invited" onboarding rule.
+  - Queries added: `CaseAccessLinkRepository.findByTokenHash` (the link as its token resolves it; liveness stays in Java) and
+    `existsLive` (unrevoked, unexpired link of a purpose); `CaseAccessChallengeRepository.countByLinkIdAndCreatedAtAfter`,
+    `findCurrentOf` (open code first, then newest — `Limit.of(1)`; no NULL sort involved), `findLastVerifiedDelivery` (channel and
+    masked destination of the last consumed code in one row — it was two identical reads) and `hasLiveGrant`;
+    `MedicalCaseRepository.findRecoveryContact` (non-draft case by number with the patient's own number and language). Reused:
+    `MedicalCaseRepository.findOnboardingFacts` (case number + stage for the status view).
+  - Read once: `CaseContactResolver.CaseContact` now carries the case's patient id (the resolver already loads it), so issuing an
+    information/status link and stamping a verified channel no longer re-read `medical_cases.patient_id`; requesting a code
+    resolves the contact once (it was resolved for the code and again for the summary). The onboarding link keeps its "case
+    missing → no link" rule with `findById`, which leaves the case in the persistence context for the resolver.
+  - Locks: unchanged — stamping a verified channel still locks the patient profile (`lockById`); no `FOR UPDATE` select existed.
+  - New test `caseAccessChecksTheOpenCodeLimitsSendsAndExpiresGrantsAndLinks` (draft never recovered, recovery limit, summary
+    mask, resend revokes the earlier code, status view labels, a grant opens only its own link, the 5-codes limit leaves an issued
+    grant valid, grant expiry at 30 minutes, link expiry at 30 days).
+  Verification: full suite **590 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -426,8 +450,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 11 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
-  `PaymentService`, `ConsultantReferralService` and `PatientActivationService` converted) — `PublicCaseAccessService`,
+- **Reads:** 10 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
+  `PaymentService`, `ConsultantReferralService`, `PatientActivationService` and `PublicCaseAccessService` converted) —
   `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
@@ -437,8 +461,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
-`CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService` and `PatientActivationService` are done
-(2026-10-07); next `PublicCaseAccessService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService` and
+`PublicCaseAccessService` are done (2026-10-07); next `PatientAccountService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.

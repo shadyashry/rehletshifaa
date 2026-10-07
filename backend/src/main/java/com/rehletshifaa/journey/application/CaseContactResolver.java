@@ -30,7 +30,7 @@ public class CaseContactResolver {
         this.cases = cases; this.patients = patients; this.submissions = submissions;
     }
 
-    public record CaseContact(String caseNumber, String whatsapp, String email, boolean patientOwnsWhatsapp, boolean patientOwnsEmail, String preferredLanguage) {
+    public record CaseContact(String caseNumber, UUID patientId, String whatsapp, String email, boolean patientOwnsWhatsapp, boolean patientOwnsEmail, String preferredLanguage) {
         public boolean patientOwns(String channel) { return "WHATSAPP".equals(channel) ? patientOwnsWhatsapp : "EMAIL".equals(channel) && patientOwnsEmail; }
     }
 
@@ -41,7 +41,7 @@ public class CaseContactResolver {
         Optional<CaseSubmissionContact> submitter = submissions.findByCaseId(caseId);
         String pw = blankToNull(p.getWhatsappNumber()), pe = blankToNull(p.getEmail());
         String sw = submitter.map(s -> blankToNull(s.getWhatsappNumber())).orElse(null), se = submitter.map(s -> blankToNull(s.getEmail())).orElse(null);
-        return new CaseContact(c.getCaseNumber(), pw != null ? pw : sw, pe != null ? pe : se, pw != null, pe != null, c.getPreferredLanguage());
+        return new CaseContact(c.getCaseNumber(), p.getId(), pw != null ? pw : sw, pe != null ? pe : se, pw != null, pe != null, c.getPreferredLanguage());
     }
 
     private static String blankToNull(String v) { return v == null || v.isBlank() ? null : v; }

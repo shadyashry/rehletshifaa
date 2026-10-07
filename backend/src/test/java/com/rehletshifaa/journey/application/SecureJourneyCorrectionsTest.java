@@ -82,6 +82,50 @@ class SecureJourneyCorrectionsTest {
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='CASE_STATUS_RECOVERY' AND destination=?","+20 101 044 7898")).isEqualTo(1);
     }
 
+    @Test void caseAccessChecksTheOpenCodeLimitsSendsAndExpiresGrantsAndLinks() throws Exception {
+        var created=cases.create(new CreateCaseRequest("Access", "Patient","Kenya","+254700000091","Reports","en",true,null,null,null));
+        String token=cases.submit(created.caseId()).statusToken();
+        var other=cases.create(new CreateCaseRequest("Other", "Patient","Kenya","+254700000092","Reports","en",true,null,null,null));
+        String otherToken=cases.submit(other.caseId()).statusToken();
+        var draft=cases.create(new CreateCaseRequest("Draft", "Patient","Kenya","+254700000093","Reports","en",true,null,null,null));
+        em.flush(); em.clear();
+        // Recovery: a draft is never matched; a submitted case is sent at most three recovery links an hour.
+        publicCases.recoverStatusLink(new CaseLinkRecoveryRequest(draft.caseNumber(),"+254700000093","en")); em.flush();
+        assertThat(count("SELECT count(*) FROM case_access_links WHERE case_id=?",draft.caseId())).isZero();
+        for(int i=0;i<4;i++){publicCases.recoverStatusLink(new CaseLinkRecoveryRequest(other.caseNumber(),"+254700000092","en")); em.flush(); tick();}
+        assertThat(count("SELECT count(*) FROM case_access_links WHERE case_id=? AND purpose='STATUS'",other.caseId())).isEqualTo(1+3);
+        // Codes: a resend revokes the earlier code; a wrong code counts one attempt; the open code still verifies.
+        var summary=publicCases.requestAccess(token); em.flush();
+        assertThat(summary).isEqualTo(new CaseAccessSummary(created.caseNumber(),"STATUS","WHATSAPP","***0091"));
+        String first=caseAccessCode(token,"+254700000091");
+        tick(); publicCases.requestAccess(token,"WHATSAPP"); em.flush();
+        String second=caseAccessCode(token,"+254700000091");
+        assertThat(second).isNotEqualTo(first);
+        fails("VERIFICATION_INVALID",()->publicCases.verify(token,first));
+        String grant=publicCases.verify(token,second).grant();
+        PublicCaseStatus status=publicCases.view(token,grant);
+        assertThat(status.caseNumber()).isEqualTo(created.caseNumber());
+        assertThat(status.statusEn()).isEqualTo("Case received");
+        assertThat(status.phase()).isEqualTo("received");
+        assertThat(status.actionRequired()).isFalse();
+        // A grant opens only its own link.
+        fails("VERIFICATION_REQUIRED",()->publicCases.view(otherToken,grant));
+        // At most five codes an hour; new codes do not revoke a grant already issued.
+        for(int i=0;i<3;i++){tick(); publicCases.requestAccess(token); em.flush();}
+        fails("TOO_MANY_REQUESTS",()->publicCases.requestAccess(token));
+        assertThat(publicCases.view(token,grant).caseNumber()).isEqualTo(created.caseNumber());
+        // The grant lasts 30 minutes, the status link 30 days.
+        ((AdvanceableClock)clock).advance(Duration.ofMinutes(31));
+        fails("VERIFICATION_REQUIRED",()->publicCases.view(token,grant));
+        assertThat(publicCases.summary(token).caseNumber()).isEqualTo(created.caseNumber());
+        ((AdvanceableClock)clock).advance(Duration.ofDays(30));
+        fails("CASE_LINK_INVALID",()->publicCases.summary(token));
+    }
+
+    private static void fails(String code,org.assertj.core.api.ThrowableAssert.ThrowingCallable call){
+        assertThatThrownBy(call).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code()).isEqualTo(code));
+    }
+
     @Test void informationResponseIsPurposeScopedCompletesPatientActionAndReturnsToIntake() throws Exception {
         var created=cases.create(new CreateCaseRequest("Action", "Patient","Kenya","+254700000012","Reports","en",true,null,null,null));
         cases.submit(created.caseId()); em.flush(); em.clear();

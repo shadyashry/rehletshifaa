@@ -63,6 +63,15 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select p.preferredLanguage from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
     Optional<String> findPatientPreferredLanguage(@Param("id") UUID id);
 
+    /** A submitted case found by its number, with the patient's own number and language (status-link recovery). */
+    interface RecoveryContact { UUID getCaseId(); UUID getPatientId(); String getWhatsappNumber(); String getPreferredLanguage(); }
+
+    @Query("""
+            select c.id as caseId, c.patientId as patientId, p.whatsappNumber as whatsappNumber, p.preferredLanguage as preferredLanguage
+            from MedicalCase c join PatientProfile p on p.id = c.patientId
+            where c.caseNumber = :caseNumber and c.status <> com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT""")
+    Optional<RecoveryContact> findRecoveryContact(@Param("caseNumber") String caseNumber);
+
     /** The identity is the case's own patient. */
     @Query("select count(c) > 0 from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id and p.externalSubject = :subject")
     boolean isPatientOf(@Param("id") UUID id, @Param("subject") String subject);
