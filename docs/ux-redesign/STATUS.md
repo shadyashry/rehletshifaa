@@ -57,6 +57,7 @@ Update at the end of every phase.
 | 2026-10-07 | GATE 2 plans: `plans/patient-proposal.md` and `plans/staff-work-views.md` **approved**. | Owner |
 | 2026-10-07 | GATE 2 legal: **option B** — the proposal decision stays disabled on `/ar` until legally approved Arabic deposit/refund/cancellation terms exist; explain why and offer "Message your coordinator". | Owner |
 | 2026-10-07 | New P0 (cross-case drafts, `WorkspaceView` has no case key) gets its own fix branch from `codex/platform-control-plane`, like the reload loop. | Owner |
+| 2026-10-08 | GATE 5 follow-ups: the Arabic proposal path becomes **coordinator-mediated** (Arabic page offers a coordinator who goes through the terms in Arabic and records the decision; Decline de-emphasised while Accept is blocked) — needs its own shape plan. **Next `/redesign-area` run: staff home distill** (stat tiles, toolbar, slim footer, staff nav; fold in the duplicated Assign Consultant action). PR description to be revised before opening. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -80,6 +81,6 @@ Update at the end of every phase.
 
 ## Next exact action
 
-GATE 5: owner reviews `docs/ux-redesign/PR_DESCRIPTION.md`, then opens the PR `feat/ux-redesign` → `codex/platform-control-plane`
-(or asks Claude to). Open owner decision: the Arabic proposal path (re-critique P0). Next redesign runs: staff home distill
-(P1), duplicated Assign Consultant action (P1).
+GATE 5: owner opens the PR `feat/ux-redesign` → `codex/platform-control-plane` with `docs/ux-redesign/PR_DESCRIPTION.md`
+(revised: short summary, before/after screenshots, decisions log, test plan). Then: shape the coordinator-mediated Arabic
+proposal path, and run `/redesign-area` for the staff home distill.
