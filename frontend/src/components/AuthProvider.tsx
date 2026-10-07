@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "oidc-client-ts";
 import { authManager } from "@/lib/auth-client";
 import { apiFetchAs } from "@/lib/api";
@@ -40,8 +40,13 @@ export function AuthProvider({children}:{children:React.ReactNode}){
   const current=!!key&&result.key===key;
   const me=current?result.me:null;const meFailed=current&&result.failed;const activationIssue=current?result.activationIssue:null;const meLoading=!!key&&!current;
   const refreshMe=useCallback(()=>setAttempt(n=>n+1),[]);
+  // signIn reads `me` through a ref so its identity never changes: consumers put it in effect and callback dependencies
+  // (the portal's `api`), and a new signIn on every /me reload re-ran those effects — including the patient session
+  // registration, which itself refreshes /me — in an endless loop.
+  const meRef=useRef(me);
+  useEffect(()=>{meRef.current=me;},[me]);
   // returnTo defaults to the current page; callers that arrive via a one-shot flag (?signin=1, ?continue=1) strip it first so a cancelled sign-in cannot loop.
-  const signIn=useCallback(async(reauthenticate=false,returnTo?:string)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,...(reauthenticate?{acr_values:reauthenticationAcr(me)}:{})},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[me]);
+  const signIn=useCallback(async(reauthenticate=false,returnTo?:string)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,...(reauthenticate?{acr_values:reauthenticationAcr(meRef.current)}:{})},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[]);
   const signOut=useCallback(async()=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";await authManager().signoutRedirect({post_logout_redirect_uri:`${window.location.origin}/${locale}/portal`});},[]);
   const value=useMemo(()=>({user,me,roles:me?.roles??[],loading:loading||meLoading,meFailed,activationIssue,refreshMe,signIn,signOut}),[user,me,loading,meLoading,meFailed,activationIssue,refreshMe,signIn,signOut]);
   return <Context.Provider value={value}>{children}</Context.Provider>;

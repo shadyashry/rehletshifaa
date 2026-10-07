@@ -41,6 +41,15 @@ async function setupPatient(page: Page, scenario: Scenario) {
       : { state: "ACCEPTED", action: "VIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: stamp },
   };
   const writes: { path: string; body: unknown }[] = [];
+  // Counted from the browser side so a request storm shows up even when every call is answered: a linked patient's
+  // session registration refreshes /me once; repeating it is the reload loop this suite must catch.
+  const calls = { session: 0, me: 0, roleless: 0 };
+  page.on("request", request => {
+    const path = new URL(request.url()).pathname;
+    if (request.method() === "POST" && path.endsWith("/api/v1/patient/account/session")) calls.session++;
+    if (request.method() === "GET" && path.endsWith("/api/v1/me")) calls.me++;
+    if (path.includes("/api/v1/undefined/")) calls.roleless++;
+  });
   await page.route("**/api/v1/**", async route => {
     const request = route.request(), api = new URL(request.url()).pathname.replace("/api/v1", "");
     const reply = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
@@ -50,6 +59,7 @@ async function setupPatient(page: Page, scenario: Scenario) {
     if (api === "/patient/account/session") return reply({ linked: true, currentCaseId: scenario === "no-case" ? null : "case-1", accountStatus: "ACTIVE", pendingLinkRequests: 0 });
     if (api === "/patient/account/profile") return reply({ givenName: "Maya", familyName: "Example", displayName: "Maya Example", preferredName: null, dateOfBirth: "1990-04-02", country: "Kenya", nationality: "KE", preferredLanguage: "en", email: "maya@example.test", emailVerified: true, whatsappNumber: "+254700000081", phoneVerified: true, accountStatus: "ACTIVE" });
     if (api === "/work/mine") return reply([]);
+    if (api === "/clinics/mine") return reply([]);
     if (api === "/patient/cases") return reply(scenario === "no-case" ? [] : [caseSummary]);
     if (api === "/patient/cases/case-1") return reply(workspace);
     if (api === "/patient/cases/case-1/proposals/v1/decision") return reply({ ...proposal, status: "ACCEPTED" });
@@ -57,7 +67,7 @@ async function setupPatient(page: Page, scenario: Scenario) {
     return reply({ message: `unstubbed ${api}` }, 404);
   });
   await routeMe(page, meFor("patient-1", ["PATIENT"]));
-  return { writes };
+  return { writes, calls };
 }
 
 const noOverflow = async (page: Page) => expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1), "no horizontal overflow").toBe(false);
@@ -92,6 +102,21 @@ test("lands on the current case with the deposit being arranged: one step, no fa
     await noOverflow(page);
     await page.screenshot({ path: `e2e/screenshots/my-care-deposit-${width}.png`, fullPage: true });
   }
+});
+
+test("a linked patient registers the session once and the page settles instead of reloading", async ({ page }) => {
+  const { calls } = await setupPatient(page, "deposit-arranging");
+  await page.goto("/en/portal");
+  await expect(page.getByRole("heading", { name: "Deposit arrangements" })).toBeVisible();
+  await page.waitForTimeout(1500);
+  const settled = { ...calls };
+  // One registration per signed-in subject; /me is read on sign-in and refreshed once because the session is linked.
+  expect(settled.session).toBe(1);
+  expect(settled.me).toBeLessThanOrEqual(2);
+  expect(settled.roleless, "no role-scoped URL is built while /me reloads").toBe(0);
+  await page.waitForTimeout(1000);
+  expect(calls, "nothing is re-requested once the page has settled").toEqual(settled);
+  await expect(page.getByRole("heading", { name: "Deposit arrangements" })).toBeVisible();
 });
 
 test("on a phone the current step comes before everything else, and nothing overflows", async ({ page }) => {
