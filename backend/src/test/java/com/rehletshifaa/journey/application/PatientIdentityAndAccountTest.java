@@ -305,6 +305,46 @@ class PatientIdentityAndAccountTest {
         assertThat(result.account().emailHint()).isEqualTo("ta***@local.test");
     }
 
+    @Test void aPendingContinuationLinkShowsUntilItExpiresCanBeResentAndIsNeverReopenedOnceAnswered() throws Exception {
+        String subject = identity.seedActiveAccount("hana25@local.test");
+        var created = cases.create(new CreateCaseRequest("Hana", "Adel", "Egypt", "+201000000025", "Reports", "en", true, null, "hana25@local.test", null));
+        cases.submit(created.caseId()); em.flush();
+        UUID patientId = patientId(created.caseId());
+        // A live request: the account state asks the patient to check the request's (masked) address.
+        var state = account.state(patientId);
+        assertThat(state.status()).isEqualTo(AccountStatus.NOT_PROVISIONED);
+        assertThat(state.awaitingEmail()).isTrue();
+        assertThat(state.emailHint()).isEqualTo("ha***@local.test");
+        // The address's owner sees it as pending on sign-in; nobody else does.
+        authenticateWithEmail("someone-else", "other25@local.test", Role.PATIENT);
+        assertThat(account.session().pendingLinkRequests()).isZero();
+        authenticateWithEmail(subject, "hana25@local.test", Role.PATIENT);
+        assertThat(account.session().pendingLinkRequests()).isEqualTo(1);
+
+        // Expired: no longer pending, neither in the account state nor on sign-in.
+        em.flush();
+        jdbc.update("UPDATE patient_account_link_requests SET expires_at=? WHERE patient_id=?", Instant.now().minusSeconds(60), patientId);
+        em.clear();
+        assertThat(account.state(patientId).awaitingEmail()).isFalse();
+        assertThat(account.session().pendingLinkRequests()).isZero();
+        // "Send me a new link" re-sends the newest unanswered request (expired included): rotated, never a second one.
+        var resent = account.resendSetup(patientId, created.caseId(), "en"); em.flush();
+        assertThat(resent.emailHint()).isEqualTo("ha***@local.test");
+        assertThat(account.state(patientId).awaitingEmail()).isTrue();
+        assertThat(account.session().pendingLinkRequests()).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM patient_account_link_requests WHERE patient_id=?", patientId)).isEqualTo(1);
+
+        // Answered: the request is not re-opened by a later existing-account signal, and nothing is resent.
+        account.resolveLinkRequest(linkToken(patientId), new AccountLinkResolution("DECLINED", null)); em.flush();
+        int mails = count("SELECT count(*) FROM notification_outbox WHERE notification_type='ACCOUNT_LINK' AND destination=?", "hana25@local.test");
+        account.ensureAccount(patientId, created.caseId(), "hana25@local.test", "en"); em.flush();
+        assertThat(count("SELECT count(*) FROM patient_account_link_requests WHERE patient_id=? AND consumed_at IS NULL", patientId)).isZero();
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='ACCOUNT_LINK' AND destination=?", "hana25@local.test")).isEqualTo(mails);
+        assertThat(account.session().pendingLinkRequests()).isZero();
+        assertThatThrownBy(() -> account.resendSetup(patientId, created.caseId(), "en"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("ACCOUNT_SETUP_NOT_STARTED"));
+    }
+
     // ---------- returning patients and idempotency ----------
 
     @Test void anExistingActivePatientStartsANewCaseUnderTheSamePatient() throws Exception {

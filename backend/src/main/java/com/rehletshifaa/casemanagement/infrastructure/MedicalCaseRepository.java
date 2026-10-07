@@ -72,6 +72,36 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
             where c.caseNumber = :caseNumber and c.status <> com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT""")
     Optional<RecoveryContact> findRecoveryContact(@Param("caseNumber") String caseNumber);
 
+    /**
+     * The patient's open cases, the current one first: those waiting on the patient, then the most recently
+     * active (no NULL sort: {@code updatedAt} is required).
+     */
+    @Query("""
+            select c.id from MedicalCase c
+            where c.patientId = :patientId and c.status not in (com.rehletshifaa.casemanagement.domain.CaseStatus.CLOSED,
+                com.rehletshifaa.casemanagement.domain.CaseStatus.CANCELLED, com.rehletshifaa.casemanagement.domain.CaseStatus.DECLINED,
+                com.rehletshifaa.casemanagement.domain.CaseStatus.EXPIRED)
+            order by case when c.waitingOn = 'PATIENT' then 0 else 1 end, c.updatedAt desc""")
+    java.util.List<UUID> findCurrentCasesOf(@Param("patientId") UUID patientId, org.springframework.data.domain.Limit limit);
+
+    /** Where an intake submission was sent from: the case's patient, the submitter's email and the case language. */
+    interface SubmissionAddress { UUID getPatientId(); String getEmail(); String getLanguage(); }
+
+    @Query("""
+            select c.patientId as patientId, sc.email as email, c.preferredLanguage as language
+            from MedicalCase c join CaseSubmissionContact sc on sc.caseId = c.id where c.id = :id""")
+    Optional<SubmissionAddress> findSubmissionAddress(@Param("id") UUID id);
+
+    /** What an account owner is asked about a case: its number, the patient's name and who submitted it for whom. */
+    interface LinkedCase { String getCaseNumber(); String getGivenName(); String getFamilyName(); String getContactRole(); String getRelationship(); }
+
+    @Query("""
+            select c.caseNumber as caseNumber, p.givenName as givenName, p.familyName as familyName, sc.contactRole as contactRole,
+                sc.relationshipToPatient as relationship
+            from MedicalCase c join PatientProfile p on p.id = c.patientId join CaseSubmissionContact sc on sc.caseId = c.id
+            where c.id = :id""")
+    Optional<LinkedCase> findLinkedCase(@Param("id") UUID id);
+
     /** The identity is the case's own patient. */
     @Query("select count(c) > 0 from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id and p.externalSubject = :subject")
     boolean isPatientOf(@Param("id") UUID id, @Param("subject") String subject);

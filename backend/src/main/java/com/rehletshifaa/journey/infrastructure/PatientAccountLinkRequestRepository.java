@@ -6,7 +6,11 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.domain.Limit;
+
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface PatientAccountLinkRequestRepository extends BaseRepository<PatientAccountLinkRequest, UUID> {
@@ -34,4 +38,33 @@ public interface PatientAccountLinkRequestRepository extends BaseRepository<Pati
             update PatientAccountLinkRequest r set r.patientId = :into
             where r.patientId = :from and r.email not in (select x.email from PatientAccountLinkRequest x where x.patientId = :into)""")
     int moveToSurvivor(@Param("from") UUID from, @Param("into") UUID into);
+
+    /** A request as its continuation link resolves it; expiry and ownership are checked by the caller. */
+    interface LinkRequest {
+        UUID getId(); UUID getPatientId(); UUID getCaseId(); String getEmail(); String getOrigin(); Instant getExpiresAt();
+        String getResolution(); String getResolvedSubject();
+    }
+
+    @Query("""
+            select r.id as id, r.patientId as patientId, r.caseId as caseId, r.email as email, r.origin as origin,
+                r.expiresAt as expiresAt, r.resolution as resolution, r.resolvedSubject as resolvedSubject
+            from PatientAccountLinkRequest r where r.tokenHash = :tokenHash""")
+    Optional<LinkRequest> findByToken(@Param("tokenHash") String tokenHash);
+
+    /** The addresses of the patient's unanswered requests, newest first (expired ones included). */
+    @Query("select r.email from PatientAccountLinkRequest r where r.patientId = :patientId and r.consumedAt is null order by r.createdAt desc")
+    List<String> findNewestPendingEmails(@Param("patientId") UUID patientId, Limit limit);
+
+    /** The patient has an unanswered request that has not expired. */
+    @Query("""
+            select count(r) > 0 from PatientAccountLinkRequest r
+            where r.patientId = :patientId and r.consumedAt is null and r.expiresAt > :now""")
+    boolean hasLivePendingFor(@Param("patientId") UUID patientId, @Param("now") Instant now);
+
+    /** Unanswered, unexpired requests sent to an address. */
+    @Query("select count(r) from PatientAccountLinkRequest r where r.email = :email and r.consumedAt is null and r.expiresAt > :now")
+    long countLivePendingTo(@Param("email") String email, @Param("now") Instant now);
+
+    /** Any request, answered or not, for this patient and address. */
+    boolean existsByPatientIdAndEmail(UUID patientId, String email);
 }

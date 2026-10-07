@@ -56,7 +56,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | casemanagement | `case_access_links` | R | casemanagement,journey |
 | casemanagement | `case_intake_grants` | R | casemanagement |
 | casemanagement | `case_status_history` | W | casemanagement,journey |
-| casemanagement | `case_submission_contacts` | W | casemanagement,journey |
+| casemanagement | `case_submission_contacts` | R | casemanagement,journey |
 | casemanagement | `consent_records` | W | casemanagement,journey |
 | document | `medical_documents` | W | casemanagement,document,journey |
 | clinic | `audit_events` | W | clinic,journey |
@@ -105,7 +105,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | journey | `journey_stage_projections` | R | journey |
 | journey | `journey_version_editors` | R | journey |
 | journey | `journey_versions` | R | journey |
-| journey | `patient_account_link_requests` | W | journey |
+| journey | `patient_account_link_requests` | R | journey |
 | journey | `patient_action_items` | W | journey |
 | journey | `patient_identity_verifications` | W | journey |
 | journey | `patient_onboardings` | W | journey |
@@ -438,6 +438,33 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **590 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`PatientAccountService` converted** (CL5 read slice 8; removed from `JDBC_NOT_YET_CONVERTED`, 10 → 9).
+  `patient_account_link_requests` and `case_submission_contacts` are now **R**: no plain-SQL reader is left. Every read is a
+  command lookup or a single-row view (account state, the sign-in session, the "is this case for you?" question, "Profile &
+  Security"), so — as for `PublicCaseAccessService` — they are repository projection reads used by the service directly; no
+  query service was needed. Public contract unchanged: account setup/resume/resend rules and the 10-minute resend guard, the
+  7-day continuation link, token → request resolution (`ACCOUNT_LINK_INVALID` 404, `ACCOUNT_LINK_EXPIRED` 410,
+  `ACCOUNT_LINK_WRONG_ACCOUNT` 403, replay of a resolved request only for its resolver), `ACCOUNT_SETUP_NOT_STARTED`,
+  `PATIENT_NOT_FOUND`, `PATIENT_PROFILE_NOT_FOUND`, `PATIENT_NOT_LINKED`, masks, and the current-case rule.
+  - Queries added: `PatientProfileRepository.findAccount` and `findAccountBySubject` (one shared `ACCOUNT` select; a patient
+    folded into another by a merge owns no account) and `findOwnProfile`; `PatientAccountLinkRequestRepository.findByToken`
+    (`LinkRequest` projection; expiry and ownership stay in Java), `findNewestPendingEmails` (unanswered, newest first, expired
+    included as before — `Limit.of(1)`), `hasLivePendingFor` (patient), `countLivePendingTo` (address; the session's pending
+    count) and `existsByPatientIdAndEmail` (an answered request is never re-opened); `MedicalCaseRepository.findCurrentCasesOf`
+    (open cases, waiting-on-patient first, then `updatedAt desc` — `Limit.of(1)`; no NULL sort involved),
+    `findSubmissionAddress` (intake existing-account check: patient, submitter email, case language) and `findLinkedCase`
+    (case number, patient name, submitter role and relationship). Reused: `CaseSubmissionContactRepository.findSubmitter` for
+    the submitter's number (one contact per case, `uq_case_submission_contact`).
+  - Locks: unchanged — every profile change still goes through `PatientProfileRepository.lockById` (lock + refresh); no
+    `FOR UPDATE` select existed. A link request without a submission contact still fails as an internal error (it was
+    `EmptyResultDataAccessException`, now `IllegalStateException`; both map to `INTERNAL_ERROR`).
+  - New test `aPendingContinuationLinkShowsUntilItExpiresCanBeResentAndIsNeverReopenedOnceAnswered` (account state and the
+    session's pending count for the address's owner only, expiry, resend of the newest unanswered request by rotation, an
+    answered request is not re-opened or re-sent, `ACCOUNT_SETUP_NOT_STARTED` once nothing is pending). It also passes on the
+    pre-conversion service.
+  Verification: full suite **591 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -450,9 +477,9 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 10 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
-  `PaymentService`, `ConsultantReferralService`, `PatientActivationService` and `PublicCaseAccessService` converted) —
-  `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
+- **Reads:** 9 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
+  `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService` and
+  `PatientAccountService` converted) — `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
   `org.springframework.jdbc..`/`java.sql..` type (CL6), and no repository may declare a native query.
@@ -461,8 +488,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
-`CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService` and
-`PublicCaseAccessService` are done (2026-10-07); next `PatientAccountService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`,
+`PublicCaseAccessService` and `PatientAccountService` are done (2026-10-07); next `PatientActionService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.
