@@ -63,6 +63,10 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select p.preferredLanguage from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
     Optional<String> findPatientPreferredLanguage(@Param("id") UUID id);
 
+    /** The patient's display name for the case (given name + family name). */
+    @Query("select trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
+    Optional<String> findPatientName(@Param("id") UUID id);
+
     /** A submitted case found by its number, with the patient's own number and language (status-link recovery). */
     interface RecoveryContact { UUID getCaseId(); UUID getPatientId(); String getWhatsappNumber(); String getPreferredLanguage(); }
 

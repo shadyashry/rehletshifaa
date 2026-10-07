@@ -72,7 +72,7 @@ public class CaseWorkspaceQueryService {
     private final ClinicalReviewVersionRepository reviews;
     private final ClinicalReviewCostEstimateRepository estimates;
     private final DepositQueryService deposits;
-    private final PatientActionService patientActions;
+    private final PatientActionQueryService patientActions;
     private final ProposalAccessService proposalAccess;
     private final CurrencyService currency;
     private final CryptoService crypto;
@@ -82,7 +82,7 @@ public class CaseWorkspaceQueryService {
                                      ProposalQueryService proposals, MedicalCaseRepository cases, CaseStatusChangeRepository statusHistory,
                                      CaseTaskRepository tasks, CaseMessageRepository messages, CaseAssignmentRepository assignments,
                                      ClinicalReviewVersionRepository reviews, ClinicalReviewCostEstimateRepository estimates,
-                                     DepositQueryService deposits, PatientActionService patientActions, ProposalAccessService proposalAccess,
+                                     DepositQueryService deposits, PatientActionQueryService patientActions, ProposalAccessService proposalAccess,
                                      CurrencyService currency, CryptoService crypto, Clock clock) {
         this.authority = authority; this.caseActions = caseActions; this.caseQueries = caseQueries; this.proposals = proposals;
         this.cases = cases; this.statusHistory = statusHistory; this.tasks = tasks; this.messages = messages; this.assignments = assignments;

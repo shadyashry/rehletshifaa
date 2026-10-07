@@ -59,12 +59,12 @@ public class CaseActionService {
     private final CustomerReadinessService readiness;
     private final PaymentService payment;
     private final StaffWorkService work;
-    private final PatientActionService patientActions;
+    private final PatientActionQueryService patientActions;
     private final ProposalAccessService proposals;
     private final Clock clock;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
-                             StaffWorkService work, PatientActionService patientActions, ProposalAccessService proposals, Clock clock) {
+                             StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Clock clock) {
         this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
         this.patientActions = patientActions; this.proposals = proposals; this.clock = clock;
     }

@@ -10,6 +10,22 @@ import java.time.Instant;
 import java.util.UUID;
 
 public interface PatientActionItemRepository extends BaseRepository<PatientActionItem, UUID> {
+    long countByTaskId(UUID taskId);
+
+    /** One requested line (label and response stay encrypted). */
+    interface ItemRow {
+        UUID getId(); String getItemKind(); String getItemCode(); String getLabel(); Boolean getRequired(); Instant getCompletedAt();
+        String getResponseText();
+    }
+
+    /** The lines of one patient action in the order they were requested. */
+    @Query("""
+            select i.id as id, i.itemKind as itemKind, i.itemCode as itemCode, i.label as label, i.required as required,
+                i.completedAt as completedAt, i.responseText as responseText
+            from PatientActionItem i where i.taskId = :taskId
+            order by i.sortOrder, i.createdAt""")
+    java.util.List<ItemRow> findRowsOf(@Param("taskId") UUID taskId);
+
     @Query("select count(i) > 0 from PatientActionItem i where i.taskId = :taskId and i.itemCode = :code and i.completedAt is null")
     boolean hasOpen(@Param("taskId") UUID taskId, @Param("code") String code);
 

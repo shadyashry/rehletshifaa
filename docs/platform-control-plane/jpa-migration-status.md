@@ -106,7 +106,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | journey | `journey_version_editors` | R | journey |
 | journey | `journey_versions` | R | journey |
 | journey | `patient_account_link_requests` | R | journey |
-| journey | `patient_action_items` | W | journey |
+| journey | `patient_action_items` | R | journey |
 | journey | `patient_identity_verifications` | W | journey |
 | journey | `patient_onboardings` | W | journey |
 | journey | `payment_events` | R | journey |
@@ -465,6 +465,35 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **591 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`PatientActionService` converted** (CL5 read slice 9; removed from `JDBC_NOT_YET_CONVERTED`, 9 → 8).
+  `patient_action_items` is now **R**: no plain-SQL reader is left. The one view — the case's open information request
+  (`openAction`, shown on the secure link, the case page and to the action resolver) — moved to a new
+  `journey.application.PatientActionQueryService`: two queries (the request, then its lines), where it was three (id, row,
+  lines). `CaseWorkspaceQueryService` and `CaseActionService` call the query service directly; `PublicCaseAccessService` keeps
+  calling the unchanged `PatientActionService.openAction`, which delegates. The commands (`request`, `openJourneyAction`,
+  `completeJourneyAction`, `completeByPatient`, `recordOnBehalf`) read through repositories. Public contract unchanged: one
+  open request per case (a repeat extends it and never duplicates a line), the terminal-case refusal (`CASE_NOT_FOUND` 404,
+  `CASE_NOT_ACTIONABLE` 409), `INVALID_CHANNEL`, `NO_OPEN_PATIENT_ACTION`, required-answer enforcement, foreign item ids
+  ignored, the replay rule (no second review or notification), the review summary and the stage restore.
+  - Queries added: `CaseTaskRepository.findOpenPatientActionOfType` (newest open PATIENT_ACTION task of a type — the
+    information request or a Journey action; `Limit.of(1)`) and `findOpenPatientActionRowsOfType` (the same, with title,
+    message, blocking and due date for the view); `PatientActionItemRepository.findRowsOf` (lines in `sortOrder, createdAt`
+    order — both NOT NULL, no NULL sort involved) and `countByTaskId` (next sort position); `MedicalCaseRepository.findPatientName`
+    (display name, the `trim(concat(given, ' ', coalesce(family, '')))` rule of the case rows). Reused:
+    `MedicalCaseRepository.findStageAndVersion` (case status for the terminal check) and
+    `CaseAssignmentRepository.findActivePrimaryCoordinator` (owner of the review work item).
+  - Answers (`applyResponses`) now match against the undecrypted line rows instead of the decrypted view: the patient's
+    labels and earlier answers are no longer decrypted on the write path.
+  - Locks: none — the service never took a row lock; its guarded updates (`renewPatientAction`, `complete`, `moveStatus`,
+    `recordAnswer`/`recordDocument`) were already JPQL.
+  - New test `anExtendedRequestShowsItsLatestTermsAndEveryLineOnceInOrderAndTheReviewNamesThePatient` (no request → null view;
+    an extended request keeps its first title, takes the latest message, blocking flag and due date, lists each line once in
+    request order with kind/label/required; a Journey action on the same case is never the information request and is opened
+    once; answering closes the view, stores the answer and opens the coordinator's review naming the patient and their note).
+    It also passes on the pre-conversion service.
+  Verification: full suite **592 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -477,10 +506,11 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 9 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
-  `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService` and
-  `PatientAccountService` converted) — `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
-  `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
+- **Reads:** 8 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
+  `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
+  `PatientAccountService` and `PatientActionService` converted) — `IdentityVerificationService`, `CaseHandoffService`,
+  `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions
+  (`CoordinationRepository` reads, `CaseNumberGenerator`, `LocalDemoDataSeeder`). They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
   `org.springframework.jdbc..`/`java.sql..` type (CL6), and no repository may declare a native query.
 
@@ -489,7 +519,7 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
 `CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`,
-`PublicCaseAccessService` and `PatientAccountService` are done (2026-10-07); next `PatientActionService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`PublicCaseAccessService`, `PatientAccountService` and `PatientActionService` are done (2026-10-07); next `IdentityVerificationService`, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.

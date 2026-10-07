@@ -32,6 +32,26 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
     java.util.List<UUID> findOpenInternalOfType(@Param("caseId") UUID caseId, @Param("type") String type,
                                                 org.springframework.data.domain.Limit limit);
 
+    /** The newest open patient action of a type on the case (pass {@code Limit.of(1)}). */
+    @Query("""
+            select t.id from CaseTask t
+            where t.caseId = :caseId and t.taskType = :type and t.visibilityScope = 'PATIENT_ACTION' and t.status in ('OPEN', 'IN_PROGRESS')
+            order by t.createdAt desc""")
+    java.util.List<UUID> findOpenPatientActionOfType(@Param("caseId") UUID caseId, @Param("type") String type,
+                                                     org.springframework.data.domain.Limit limit);
+
+    /** A patient action as the patient sees it (title and message stay encrypted). */
+    interface PatientActionRow { UUID getId(); String getTitle(); String getDescription(); Boolean getBlocking(); Instant getDueAt(); }
+
+    /** The newest open patient action of a type on the case, as shown to the patient (pass {@code Limit.of(1)}). */
+    @Query("""
+            select t.id as id, t.title as title, t.description as description, t.blocking as blocking, t.dueAt as dueAt
+            from CaseTask t
+            where t.caseId = :caseId and t.taskType = :type and t.visibilityScope = 'PATIENT_ACTION' and t.status in ('OPEN', 'IN_PROGRESS')
+            order by t.createdAt desc""")
+    java.util.List<PatientActionRow> findOpenPatientActionRowsOfType(@Param("caseId") UUID caseId, @Param("type") String type,
+                                                                     org.springframework.data.domain.Limit limit);
+
     interface CaseWorkRow { UUID getId(); String getTaskType(); String getTitle(); String getDescription(); Instant getDueAt(); Long getVersion(); }
 
     /** The subject's open internal work on one case: blocking first, then most urgent, then oldest (pass {@code Limit.of(1)}). */

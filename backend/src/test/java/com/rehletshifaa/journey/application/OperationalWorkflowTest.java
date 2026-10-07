@@ -94,6 +94,48 @@ class OperationalWorkflowTest {
         assertThat(count("SELECT count(*) FROM patient_action_items WHERE task_id=(SELECT id FROM case_tasks WHERE case_id=? AND visibility_scope='PATIENT_ACTION')", caseId)).isEqualTo(1);
     }
 
+    @Test void anExtendedRequestShowsItsLatestTermsAndEveryLineOnceInOrderAndTheReviewNamesThePatient() throws Exception {
+        UUID caseId = ownedCase();
+        assertThat(patientActions.openAction(caseId)).isNull();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        journey.requestInformation(caseId, new InformationRequestCommand("Please confirm your current medication.",
+                List.of(new RequestedItem("INFORMATION", "CURRENT_MEDICATION", "Current medication", true),
+                        new RequestedItem("DOCUMENT", "ECHO_REPORT", "Latest Echo report", false)), true, null, "ar"));
+        em.flush();
+        Instant due = Instant.now().plusSeconds(3 * 86400).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        journey.requestInformation(caseId, new InformationRequestCommand("Also your allergies, please.",
+                List.of(new RequestedItem("INFORMATION", "ALLERGIES", "Allergies", true),
+                        new RequestedItem("INFORMATION", "CURRENT_MEDICATION", "Current medication", true)), false, due, "en"));
+        em.flush();
+        // A Journey patient action on the same case is a different action, never the information request.
+        UUID journeyAction = patientActions.openJourneyAction(caseId, "complete-profile", "Complete your profile", false, "SYSTEM");
+        assertThat(patientActions.openJourneyAction(caseId, "complete-profile", "Complete your profile", false, "SYSTEM")).isEqualTo(journeyAction);
+        em.flush(); SecurityContextHolder.clearContext();
+
+        PatientActionView action = patientActions.openAction(caseId);
+        assertThat(action.taskId()).isNotEqualTo(journeyAction);
+        assertThat(action.title()).isEqualTo("معلومات مطلوبة لحالتك"); // the first request's title stays
+        assertThat(action.message()).isEqualTo("Also your allergies, please.");
+        assertThat(action.blocking()).isFalse();
+        assertThat(action.dueAt()).isEqualTo(due);
+        assertThat(action.items()).extracting(PatientActionItemView::code).containsExactly("CURRENT_MEDICATION", "ECHO_REPORT", "ALLERGIES");
+        assertThat(action.items()).extracting(PatientActionItemView::label).containsExactly("Current medication", "Latest Echo report", "Allergies");
+        assertThat(action.items()).extracting(PatientActionItemView::kind).containsExactly("INFORMATION", "DOCUMENT", "INFORMATION");
+        assertThat(action.items()).extracting(PatientActionItemView::required).containsExactly(true, false, true);
+        assertThat(action.items()).noneMatch(PatientActionItemView::completed);
+
+        var answers = action.items().stream().filter(PatientActionItemView::required)
+                .map(i -> new ItemResponse(i.id(), "Answer for " + i.code(), null)).toList();
+        patientActions.completeByPatient(caseId, answers, "Sent by my daughter");
+        em.flush();
+
+        assertThat(patientActions.openAction(caseId)).isNull();
+        assertThat(decrypt(jdbc.queryForObject("SELECT response_text FROM patient_action_items WHERE item_code='ALLERGIES'", String.class))).isEqualTo("Answer for ALLERGIES");
+        assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE case_id=? AND task_type='REVIEW_PATIENT_RESPONSE'", String.class, caseId)).isEqualTo("coordinator-subject");
+        assertThat(decrypt(jdbc.queryForObject("SELECT description FROM case_tasks WHERE case_id=? AND task_type='REVIEW_PATIENT_RESPONSE'", String.class, caseId)))
+                .isEqualTo("Workflow Patient answered your information request: Sent by my daughter");
+    }
+
     // ---------------- the patient answers without signing in ----------------
 
     @Test void thePatientSeesOnlyWhatWasRequestedAndAnsweringReturnsTheCaseToTheCoordinator() throws Exception {

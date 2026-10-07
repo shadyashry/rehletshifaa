@@ -3,6 +3,7 @@ package com.rehletshifaa.journey.application;
 import com.rehletshifaa.casemanagement.application.CaseStatusLog;
 import com.rehletshifaa.casemanagement.domain.CaseStatus;
 import com.rehletshifaa.casemanagement.domain.CaseTask;
+import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.WorkDtos.*;
@@ -13,12 +14,10 @@ import com.rehletshifaa.shared.api.FieldValidationException;
 import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
 
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
@@ -43,21 +42,22 @@ public class PatientActionService {
     private final CaseTaskRepository tasks;
     private final MedicalCaseRepository cases;
     private final AuditTrail auditTrail;
-    private static final String TASK_TYPE = "INFORMATION_REQUEST";
+    static final String TASK_TYPE = "INFORMATION_REQUEST";
     private static final String REVIEW_TYPE = "REVIEW_PATIENT_RESPONSE";
     private static final Set<String> KINDS = Set.of("INFORMATION", "DOCUMENT");
     private static final Set<String> CHANNELS = Set.of("WHATSAPP", "PHONE", "ASSISTED");
     private static final Set<String> TERMINAL = Set.of("DRAFT", "CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE", "EXPIRED");
     private static final int MAX_ITEMS = 12;
 
-    private final JdbcClient jdbc;
+    private final PatientActionQueryService queries;
+    private final CaseAssignmentRepository assignments;
     private final StaffWorkService work;
     private final CryptoService crypto;
     private final Clock clock;
 
-    public PatientActionService(JdbcClient jdbc, StaffWorkService work,
-                                CryptoService crypto, Clock clock, AuditTrail auditTrail, MedicalCaseRepository cases, CaseTaskRepository tasks, CaseStatusLog statusLog, PatientActionItemRepository actionItems) { this.actionItems = actionItems; this.statusLog = statusLog; this.tasks = tasks; this.cases = cases; this.auditTrail = auditTrail;
-        this.jdbc = jdbc; this.work = work; this.crypto = crypto; this.clock = clock;
+    public PatientActionService(PatientActionQueryService queries, StaffWorkService work,
+                                CryptoService crypto, Clock clock, AuditTrail auditTrail, MedicalCaseRepository cases, CaseTaskRepository tasks, CaseStatusLog statusLog, PatientActionItemRepository actionItems, CaseAssignmentRepository assignments) { this.actionItems = actionItems; this.statusLog = statusLog; this.tasks = tasks; this.cases = cases; this.auditTrail = auditTrail;
+        this.queries = queries; this.assignments = assignments; this.work = work; this.crypto = crypto; this.clock = clock;
     }
 
     // ---------------- coordinator: request information ----------------
@@ -70,8 +70,7 @@ public class PatientActionService {
      */
     @Transactional
     public UUID request(UUID caseId, InformationRequestCommand command, String actorSubject, String actorRole) {
-        String status = jdbc.sql("SELECT status FROM medical_cases WHERE id=?").param(caseId).query(String.class)
-                .optional().orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
+        String status = caseStatus(caseId);
         if (TERMINAL.contains(status))
             throw new ApiException(409, "CASE_NOT_ACTIONABLE", "Information cannot be requested for a closed case");
 
@@ -89,7 +88,7 @@ public class PatientActionService {
         } else {
             tasks.renewPatientAction(taskId, encryptNullable(message), command.blocking(), micros(command.dueAt()), micros(now));
         }
-        int order = count("SELECT count(*) FROM patient_action_items WHERE task_id=?", taskId);
+        int order = (int) actionItems.countByTaskId(taskId);
         for (RequestedItem item : items) {
             // Re-requesting the same thing must not duplicate the line the patient sees.
             int sortOrder = order++; if (!actionItems.hasOpen(taskId, item.code())) actionItems.saveAndFlush(new PatientActionItem(taskId, item.kind(), item.code(), encrypt(item.label().trim()), item.required(), sortOrder, now));
@@ -135,11 +134,9 @@ public class PatientActionService {
     @Transactional
     public UUID openJourneyAction(UUID caseId, String nodeKey, String label, boolean blocking, String actorSubject) {
         String type = "JOURNEY:" + nodeKey;
-        UUID existing = jdbc.sql("SELECT id FROM case_tasks WHERE case_id=? AND task_type=? AND visibility_scope='PATIENT_ACTION' AND status IN ('OPEN','IN_PROGRESS') ORDER BY created_at DESC LIMIT 1")
-                .params(caseId, type).query(UUID.class).optional().orElse(null);
+        UUID existing = openActionId(caseId, type);
         if (existing != null) return existing;
-        String status = jdbc.sql("SELECT status FROM medical_cases WHERE id=?").param(caseId).query(String.class)
-                .optional().orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
+        String status = caseStatus(caseId);
         if (TERMINAL.contains(status)) throw new ApiException(409, "CASE_NOT_ACTIONABLE", "This patient action is no longer available");
         Instant now = clock.instant();
         UUID id = UUID.randomUUID();
@@ -160,24 +157,7 @@ public class PatientActionService {
     /** The open request for this case, or null. Labels only — internal notes are never exposed. */
     @Transactional(readOnly = true)
     public PatientActionView openAction(UUID caseId) {
-        UUID taskId = openRequestId(caseId);
-        if (taskId == null) return null;
-        record T(String title, String message, boolean blocking, Instant dueAt) {}
-        T task = jdbc.sql("SELECT title,description,blocking,due_at FROM case_tasks WHERE id=?").param(taskId)
-                .query((rs, n) -> new T(decrypt(rs.getString("title")), decrypt(rs.getString("description")),
-                        rs.getBoolean("blocking"), instant(rs, "due_at"))).single();
-        return new PatientActionView(taskId, task.title(), task.message(), task.blocking(), task.dueAt(), items(taskId));
-    }
-
-    private List<PatientActionItemView> items(UUID taskId) {
-        return jdbc.sql("SELECT id,item_kind,item_code,label,required,completed_at,response_text FROM patient_action_items WHERE task_id=? ORDER BY sort_order,created_at")
-                .param(taskId).query(this::mapItem).list();
-    }
-
-    private PatientActionItemView mapItem(ResultSet rs, int n) throws SQLException {
-        return new PatientActionItemView(rs.getObject("id", UUID.class), rs.getString("item_kind"), rs.getString("item_code"),
-                decrypt(rs.getString("label")), rs.getBoolean("required"), rs.getObject("completed_at") != null,
-                decrypt(rs.getString("response_text")));
+        return queries.openAction(caseId);
     }
 
     /**
@@ -223,24 +203,23 @@ public class PatientActionService {
         Map<UUID, ItemResponse> supplied = new LinkedHashMap<>();
         if (responses != null) for (ItemResponse r : responses) if (r != null && r.itemId() != null) supplied.put(r.itemId(), r);
 
-        List<PatientActionItemView> outstanding = items(taskId);
         var errors = new FieldValidationException.Collector();
-        for (PatientActionItemView item : outstanding) {
-            ItemResponse response = supplied.remove(item.id());
-            boolean answered = item.completed();
+        for (PatientActionItemRepository.ItemRow item : actionItems.findRowsOf(taskId)) {
+            ItemResponse response = supplied.remove(item.getId());
+            boolean answered = item.getCompletedAt() != null;
             if (response != null) {
-                boolean document = "DOCUMENT".equals(item.kind());
+                boolean document = "DOCUMENT".equals(item.getItemKind());
                 String value = response.value() == null ? null : response.value().trim();
                 if (document && response.documentId() != null) {
-                    actionItems.recordDocument(item.id(), taskId, response.documentId(), encryptNullable(value), source, channel, recordedBy, micros(now));
+                    actionItems.recordDocument(item.getId(), taskId, response.documentId(), encryptNullable(value), source, channel, recordedBy, micros(now));
                     answered = true;
                 } else if (value != null && !value.isBlank()) {
-                    actionItems.recordAnswer(item.id(), taskId, encrypt(value), source, channel, recordedBy, micros(now));
+                    actionItems.recordAnswer(item.getId(), taskId, encrypt(value), source, channel, recordedBy, micros(now));
                     answered = true;
                 }
             }
-            if (enforceRequired && item.required() && !answered)
-                errors.reject("item:" + item.id(), "DOCUMENT".equals(item.kind())
+            if (enforceRequired && Boolean.TRUE.equals(item.getRequired()) && !answered)
+                errors.reject("item:" + item.getId(), "DOCUMENT".equals(item.getItemKind())
                         ? "Please upload the requested document." : "Please provide this information.");
         }
         errors.throwIfInvalid();
@@ -253,10 +232,8 @@ public class PatientActionService {
         work.refreshWaitingOn(caseId, "STAFF", "Patient responded — awaiting coordinator review");
         if (closed != 1) return; // already completed: never open a second review or send a second notification
         restoreStage(caseId);
-        String coordinator = jdbc.sql("SELECT assignee_subject FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' AND assignment_type='PRIMARY' AND status='ACTIVE' ORDER BY assigned_at DESC LIMIT 1")
-                .param(caseId).query(String.class).optional().orElse(null);
-        String patient = jdbc.sql("SELECT " + com.rehletshifaa.shared.util.PatientNames.DISPLAY_SQL + " FROM medical_cases c JOIN patient_profiles p ON p.id=c.patient_id WHERE c.id=?")
-                .param(caseId).query(String.class).optional().orElse(null);
+        String coordinator = assignments.findActivePrimaryCoordinator(caseId, Limit.of(1)).stream().findFirst().orElse(null);
+        String patient = cases.findPatientName(caseId).orElse(null);
         work.openWorkItem(new NewWorkItem(caseId, REVIEW_TYPE, "Review information provided by the patient",
                 summary(patient, note), coordinator, "COORDINATOR", false, null, "SYSTEM",
                 "PATIENT_RESPONDED", "patient-response:" + taskId, true));
@@ -274,9 +251,16 @@ public class PatientActionService {
     // ---------------- helpers ----------------
 
     /** The single open patient action for a case, if any. */
-    private UUID openRequestId(UUID caseId) {
-        return jdbc.sql("SELECT id FROM case_tasks WHERE case_id=? AND task_type=? AND visibility_scope='PATIENT_ACTION' AND status IN ('OPEN','IN_PROGRESS') ORDER BY created_at DESC LIMIT 1")
-                .params(caseId, TASK_TYPE).query(UUID.class).optional().orElse(null);
+    private UUID openRequestId(UUID caseId) { return openActionId(caseId, TASK_TYPE); }
+
+    /** The newest open patient action of a type on the case, or null. */
+    private UUID openActionId(UUID caseId, String type) {
+        return tasks.findOpenPatientActionOfType(caseId, type, Limit.of(1)).stream().findFirst().orElse(null);
+    }
+
+    private String caseStatus(UUID caseId) {
+        return cases.findStageAndVersion(caseId).map(c -> c.getStatus().name())
+                .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
     }
 
     private static String title(String language) {
@@ -287,17 +271,8 @@ public class PatientActionService {
         return note == null || note.isBlank() ? who + " answered your information request."
                 : who + " answered your information request: " + note.substring(0, Math.min(note.length(), 240));
     }
-    private int count(String sql, Object arg) {
-        Integer value = jdbc.sql(sql).param(arg).query(Integer.class).single();
-        return value == null ? 0 : value;
-    }
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        var value = rs.getObject(column, java.time.OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
     private String encrypt(String value) { return "enc:" + crypto.encrypt(value); }
     private String encryptNullable(String value) { return value == null || value.isBlank() ? null : "enc:" + crypto.encrypt(value.trim()); }
-    private String decrypt(String value) { return com.rehletshifaa.shared.crypto.EncryptedText.decodeNullable(crypto, value); }
 
     private void audit(UUID caseId, String type, String subject, String role, UUID entityId, String reason) {
         auditTrail.event(type).actor(subject == null ? "SYSTEM" : subject, role == null ? "SYSTEM" : role).caseId(caseId).entity("CaseTask", entityId).action("REQUEST").reason(reason).record();
