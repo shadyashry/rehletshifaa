@@ -84,3 +84,5 @@ Rules for all work on `feat/ux-redesign`:
 - **Copy:** every copy change goes to both `frontend/src/messages/en.json` and `frontend/src/messages/ar.json`.
 - **Privacy:** never use real patient data in prompts, screenshots or live mode.
 - **Patch scope:** for this epic, the "smallest patch" rule applies per component, not per epic.
+- **Pipeline:** Redesign work per area runs through /redesign-area; status lives in docs/ux-redesign/STATUS.md. Pro Max
+  reviews and fills gaps; it never decides the look.

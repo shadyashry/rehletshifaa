@@ -21,7 +21,8 @@ Update at the end of every phase.
   - [x] `e2e/a11y.spec.ts`: 10 targets × en/ar = 20 pages; serious/critical only; baseline ratchet; update mode
   - [x] baseline recorded, normal run green (20/20). CI (`.github/workflows/ci.yml`) already runs `pnpm test:e2e`,
         which includes the spec; note CI is red earlier on lint (25 errors) and unit tests (11 `ProposalSign`).
-- [ ] **Phase 3 — `/redesign-area` skill, backlog, CLAUDE.md note**
+- [x] **Phase 3 — `/redesign-area` skill, backlog, CLAUDE.md note** (`.claude/skills/redesign-area/SKILL.md`,
+      `docs/ux-redesign/backlog.md` seeded from both critiques + the a11y baseline)
 - [ ] **Phase 4 — Architect work**: portal audits → backlog; token proposals; shape plans
   - [ ] GATE 2: token, plan and legal (Arabic terms) decisions
 - [ ] **Phase 5 — `/redesign-area` runs**
@@ -59,5 +60,5 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Phase 3: create `.claude/skills/redesign-area/SKILL.md`, append the pipeline note to CLAUDE.md, seed
-`docs/ux-redesign/backlog.md` from both critiques.
+Phase 4: three parallel read-only portal reviews (Impeccable audit, web-design-guidelines, vercel-react-best-practices)
+merged into backlog.md; then Pro Max token proposals; then the two shape plans; then GATE 2.
