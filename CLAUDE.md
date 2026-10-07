@@ -67,3 +67,22 @@ Keep responses concise:
 - any unresolved blocker.
 
 Do not restate the project architecture, permanent URLs, or Docker rules unless directly relevant to the result.
+
+## UX redesign epic
+
+Rules for all work on `feat/ux-redesign`:
+
+- **Tokens:** the token source of truth is the `@theme` block in `frontend/src/app/globals.css` as re-pointed by
+  `frontend/src/app/theme-petrol.css` ("Petrol & Paper"); `DESIGN.md` states the resulting values. Never invent
+  colors; propose any new token explicitly before using it. The Control Center still renders the base values; that
+  is legacy, so converge it to Petrol & Paper when touched.
+- **UX, layout and copy decisions:** follow Impeccable, respecting `PRODUCT.md` and `DESIGN.md`.
+- **React/Next code:** `vercel-react-best-practices` and `vercel-composition-patterns` win on code concerns.
+- **Accessibility:** WCAG 2.2 AA. When skills disagree, apply the stricter rule.
+- **i18n/RTL:** every UI change must work in `en` and `ar` (RTL). Use CSS logical properties only (no left/right
+  physical properties).
+- **Copy:** every copy change goes to both `frontend/src/messages/en.json` and `frontend/src/messages/ar.json`.
+- **Privacy:** never use real patient data in prompts, screenshots or live mode.
+- **Patch scope:** for this epic, the "smallest patch" rule applies per component, not per epic.
+- **Pipeline:** Redesign work per area runs through /redesign-area; status lives in docs/ux-redesign/STATUS.md. Pro Max
+  reviews and fills gaps; it never decides the look.

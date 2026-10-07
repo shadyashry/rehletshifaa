@@ -1,25 +1,102 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-import { PatientProposalDecision } from "./CaseMessages";
+import { estimateTerms, finalQuoteTerms } from "@/lib/commercial-terms";
+import { getDictionary } from "@/lib/dictionary";
 
-/** The signed-in decision path must show the same deposit terms before an estimate is acknowledged (F1). */
+import { PatientProposal, PatientProposalDecision, patientProposalStatus } from "./PatientProposal";
+
+const en = getDictionary("en").portalProposal;
+const ar = getDictionary("ar").portalProposal;
+const estimate = { versionId: "v1", status: "RELEASED", currency: "USD", validUntil: "2026-12-31T00:00:00Z", documentType: "PRELIMINARY_ESTIMATE",
+  items: [{ id: "i1", description: "Dual chamber pacemaker implant", quantity: 1, unitPrice: 4850, optional: false }] };
+
 describe("PatientProposalDecision", () => {
   afterEach(cleanup);
 
-  it("shows the deposit, refund and cancellation terms before a signed-in patient acknowledges an estimate", () => {
-    render(<PatientProposalDecision locale="en" caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={vi.fn()} />);
-    const terms = screen.getByRole("region", { name: "Coordination deposit, refunds and cancellation" });
-    const ack = screen.getByRole("checkbox");
-    expect(terms.compareDocumentPosition(ack) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(ack.getAttribute("aria-describedby")).toBe("portal-deposit-terms");
-    expect(screen.getByText(/This is a preliminary, non-binding estimate, not a final price or a price guarantee/)).toBeTruthy();
+  it("keeps the deposit terms referenced by the acknowledgement on an estimate (F1)", () => {
+    render(<><span id="portal-deposit-terms" /><PatientProposalDecision locale="en" copy={en} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={vi.fn()} /></>);
+    expect(screen.getByRole("checkbox").getAttribute("aria-describedby")).toBe("portal-deposit-terms");
+    expect(screen.getByRole("button", { name: "Acknowledge estimate & continue" })).toHaveProperty("disabled", true);
   });
 
-  it("asks a final-quote decision to accept, says it is not medical consent, and shows no deposit terms", () => {
-    render(<PatientProposalDecision locale="en" caseId="c1" proposal={{ versionId: "v2", documentType: "FINAL_TREATMENT_QUOTE" }} mutate={vi.fn()} />);
+  it("asks a final-quote decision to accept", () => {
+    render(<PatientProposalDecision locale="en" copy={en} caseId="c1" proposal={{ versionId: "v2", documentType: "FINAL_TREATMENT_QUOTE" }} mutate={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Accept final treatment plan and quote" })).toBeTruthy();
-    expect(screen.getByText(/Accepting this quote is not medical consent/)).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "Coordination deposit, refunds and cancellation" })).toBeNull();
+  });
+
+  it("does not let Arabic pages complete the decision while the Arabic terms await legal approval (GATE 2, option B)", () => {
+    const mutate = vi.fn();
+    render(<PatientProposalDecision locale="ar" copy={ar} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={mutate} />);
+    const primary = screen.getByRole("button", { name: ar.primaryEstimate });
+    expect(primary).toHaveProperty("disabled", true);
+    expect(screen.getByRole("checkbox")).toHaveProperty("disabled", true);
+    expect(screen.getByRole("note").textContent).toBe(ar.arabicTermsPending);
+    expect(screen.getByRole("button", { name: ar.requestChanges })).toHaveProperty("disabled", false);
+    expect(screen.getByRole("button", { name: ar.decline })).toHaveProperty("disabled", false);
+  });
+
+  it("asks for a note before sending a change request", () => {
+    const mutate = vi.fn().mockResolvedValue(true);
+    render(<PatientProposalDecision locale="en" copy={en} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={mutate} />);
+    fireEvent.click(screen.getByRole("button", { name: "Request changes" }));
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe(en.noteRequired);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Can the stay be shorter?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Request changes" }));
+    expect(mutate).toHaveBeenCalledWith("/patient/cases/c1/proposals/v1/decision", { decision: "REVISION_REQUESTED", selectedOptionalItemIds: [], comment: "Can the stay be shorter?" });
+  });
+});
+
+describe("PatientProposalDecision failures and variants", () => {
+  afterEach(cleanup);
+
+  it("reports a failed decision inside the drawer, where the patient can see it", async () => {
+    const mutate = vi.fn().mockResolvedValue(undefined);
+    render(<PatientProposalDecision locale="en" copy={en} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={mutate} />);
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Acknowledge estimate & continue" }));
+    expect(await screen.findByText(en.decisionFailed)).toBeTruthy();
+  });
+
+  it("names the payment terms, not the deposit terms, when an Arabic final quote is blocked", () => {
+    render(<PatientProposalDecision locale="ar" copy={ar} caseId="c1" proposal={{ versionId: "v2", documentType: "FINAL_TREATMENT_QUOTE" }} mutate={vi.fn()} />);
+    expect(screen.getByRole("note").textContent).toBe(ar.arabicTermsPendingQuote);
+  });
+});
+
+describe("PatientProposal", () => {
+  afterEach(cleanup);
+
+  it("reads price first, then how firm it is, with the terms open while a decision is owed and pending legal review", () => {
+    render(<PatientProposal locale="en" copy={en} proposal={estimate} decision={<p>decision</p>} />);
+    expect(screen.getByText(en.totalLabel).nextElementSibling?.textContent).toBe("$4,850");
+    expect(screen.getByText(/Ready for your decision/)).toBeTruthy();
+    expect(screen.getByText(/Valid until December 31, 2026/)).toBeTruthy();
+    expect(screen.queryByText(/RELEASED|v1/)).toBeNull();
+    const terms = screen.getByText(en.termsEstimate).closest("details")!;
+    expect(terms.open).toBe(true);
+    expect(terms.textContent).toContain(en.pendingReview);
+    expect(terms.textContent).toContain("Coordination deposit, refunds and cancellation");
+    const honesty = screen.getByText(en.honestyEstimate);
+    expect(honesty.compareDocumentPosition(terms) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("keeps the terms closed when no decision is owed", () => {
+    render(<PatientProposal locale="en" copy={en} proposal={{ ...estimate, status: "ACCEPTED" }} />);
+    expect(screen.getByText(en.termsEstimate).closest("details")!.open).toBe(false);
+  });
+
+  it("keeps the English honesty lines identical to the approved commercial wording", () => {
+    expect(en.honestyEstimate).toBe(`${estimateTerms.nonBinding} ${estimateTerms.mayChange}`);
+    expect(en.honestyQuote).toBe(`${finalQuoteTerms.basis} ${finalQuoteTerms.notMedicalConsent}`);
+  });
+
+  it("names every patient-visible status in plain words and never shows an internal value", () => {
+    for (const status of ["RELEASED", "VIEWED", "ACCEPTED", "DECLINED", "REVISION_REQUESTED", "EXPIRED", "SUPERSEDED", "SOMETHING_NEW"]) {
+      for (const copy of [en, ar]) expect(patientProposalStatus(copy, status, false)).not.toMatch(/[A-Z]{2,}_|^[A-Z_]+$/);
+    }
+    expect(patientProposalStatus(en, "ACCEPTED", true)).toBe("You accepted this quote");
+    expect(patientProposalStatus(en, "SOMETHING_NEW", false)).toBe("Proposal");
   });
 });

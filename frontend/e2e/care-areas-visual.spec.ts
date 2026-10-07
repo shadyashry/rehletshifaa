@@ -83,8 +83,8 @@ test("small teams are named in the hero; larger teams are counted", async ({ pag
   await page.goto("/en/cardiology");
   const hero = page.locator("main > section").first();
   await expect(hero.getByRole("link", { name: /Dr Ahmed AlAshry/ })).toHaveAttribute("href", /\/en\/consultants\/ahmed-alashry$/);
-  await expect(hero.getByText("Verified Consultants")).toHaveCount(0);
+  await expect(hero.getByText("Consultants", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Send us your case if…")).toBeVisible();
   await page.goto("/en/orthopedics");
-  await expect(page.locator("main > section").first().getByText("Verified Consultants")).toBeVisible();
+  await expect(page.locator("main > section").first().getByText("Consultants", { exact: true })).toBeVisible();
 });

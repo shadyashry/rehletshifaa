@@ -5,14 +5,15 @@ import { useVirtualClinics, virtualClinicHref } from "@/components/virtual-clini
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { ReauthenticationReturnNotice } from "@/components/ReauthenticationNotices";
 import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { MessageSquare, MoreHorizontal, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CoordinatorActionForm, MoreActions } from "@/components/portal/CoordinatorActions";
 import { RecordPatientResponse } from "@/components/portal/RecordPatientResponse";
-import { CaseMessages, PatientProposalDecision } from "@/components/portal/CaseMessages";
+import { CaseMessages } from "@/components/portal/CaseMessages";
+import { PatientProposal, PatientProposalDecision, type ProposalCopy } from "@/components/portal/PatientProposal";
 import { PortalAccount, type Preferences } from "@/components/portal/PortalAccount";
 import { RoleDashboardSummary, matchesKpi } from "@/components/portal/RoleDashboardSummary";
 import { CaseQueue, initialQueue, type QueueState } from "@/components/portal/CaseQueue";
@@ -24,7 +25,9 @@ import { MyCare, type CareView, type PatientProposalState } from "@/components/p
 import { PatientIdentityStep } from "@/components/portal/PatientIdentityStep";
 import { PatientNav } from "@/components/portal/PatientNav";
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
-import { MyWork, waitingLabel, type WorkItem } from "@/components/portal/MyWork";
+import { MyWork, type WorkItem } from "@/components/portal/MyWork";
+import { WorkCopyProvider, useWorkCopy } from "@/components/portal/portal-copy";
+import { careAreaLabel, coordinatorLabel, tabKeyTarget, waitingLabel, type WorkCopy } from "@/lib/portal-labels";
 import { TransferOwnership } from "@/components/portal/TransferOwnership";
 import { AssignmentHistory, type AssignmentHistoryEntry } from "@/components/portal/AssignmentHistory";
 import { NotificationBell } from "@/components/portal/NotificationBell";
@@ -79,7 +82,12 @@ const copy={
   ar:{title:"بوابة رحلة الشفاء الآمنة",subtitle:"مساحة عمل مسؤولة واحدة من استقبال الحالة حتى العلاج والمتابعة.",signIn:"تسجيل الدخول الآمن",signOut:"تسجيل الخروج",loading:"جارٍ تحميل مساحة العمل…",noCases:"لا توجد حالات في قائمة العمل.",grpAction:"إجراء مطلوب",grpTracking:"المتابعة — آخر حالة",grpMoreInfo:"طلب معلومات إضافية",grpNotSuitable:"غير مناسبة سريريًا",claimTitle:"ربط طلب سابق",caseId:"معرّف الحالة",code:"رمز التحقق المكوّن من 6 أرقام",claim:"ربط الحالة",open:"فتح مساحة العمل",back:"العودة إلى القائمة",timeline:"رحلة الحالة",tasks:"المهام",messages:"الرسائل الآمنة",send:"إرسال الرسالة",message:"اكتب رسالة",assignments:"فريق الرعاية",documents:"مستندات المريض",download:"تنزيل",docScanning:"جارٍ الفحص الأمني",docUnavailable:"غير متاح",noDocuments:"لم يتم رفع أي مستندات بعد.",reviews:"مراجعات الطبيب",coordinatorLabel:"المنسق",consultantLabel:"الاستشاري",you:"أنت",signedInAs:"مسجّل الدخول باسم",myDashboard:"لوحة التحكم",caseWorkspaceLabel:"مساحة عمل الحالة",patientLabel:"المريض",careArea:"مجال الرعاية",languageLabel:"اللغة",updatedLabel:"آخر تحديث",countryLabel:"الدولة",estimatedByConsultant:"تقدير التكلفة من الاستشاري",prefilledFromReview:"معبأ مسبقًا من تقدير الاستشاري — عدّل قبل الإرسال.",servicesFromConsultant:"الخدمات والتكاليف",additionalCostTitle:"تكلفة إضافية (اختياري)",additionalCostHint:"بند اختياري إضافي، يُعرض بشكل منفصل ولا يُضاف إلى الإجمالي الأساسي.",additionalCostDesc:"ما الغرض منه؟",commentsTitle:"ملاحظات للمريض (اختياري)",commentsHint:"تظهر في العرض بجانب التوصية والخدمات.",proposalNotesLabel:"ملاحظة المنسق",assignedToYou:"تم تعيينك لهذه الحالة — اقبل لبدء مراجعتك.",doctorAccepted:"تم قبول الحالة وإعادتها إلى المنسق.",doctorInfoSent:"تم طلب معلومات إضافية — أُعيدت الحالة إلى المنسق.",doctorNotSuitable:"تم اعتبارها غير مناسبة سريريًا وأُعيدت إلى المنسق.",doctorReturned:"تمت إعادة هذه الحالة إلى المنسق.",proposal:"المقترح المقدم للمريض",genSend:"إنشاء وإرسال العرض",addService:"إضافة خدمة",sendWhatsapp:"إرسال عبر واتساب",sendEmail:"إرسال بالبريد",copyLink:"نسخ الرابط",copied:"تم النسخ!",linkReady:"رابط العرض جاهز — أرسله إلى المريض:",noPatientEmail:"لا يوجد بريد مسجّل",coordinatorClaim:"استلام مسؤولية الحالة",ownershipHint:"لديك صلاحية العرض فقط. استلم الحالة لتعيين استشاري أو تغيير الحالة أو إنشاء مقترح.",ownedByOther:"تملك هذه الحالة منسقة أخرى — لديك صلاحية العرض فقط.",handoff:"هذه الحالة قيد مراجعة الاستشاري {name}. الإجراءات مقفلة حتى تجهيز التوصية الطبية.",status:"الحالة",transition:"نقل الحالة",reason:"سبب التغيير",doctorSubject:"معرّف حساب الطبيب",assignDoctor:"تعيين طبيب معتمد",reviewTreatment:"العلاج الموصى به",reviewRisks:"المخاطر والقيود",saveReview:"حفظ المراجعة الطبية",approveReview:"اعتماد المراجعة",createProposal:"إنشاء المقترح",item:"وصف الخدمة",price:"سعر الوحدة",release:"إرسال المقترح للمريض",operationsComplete:"استكمال الخطة التشغيلية",financeApprove:"اعتماد الشروط المالية",accept:"موافقة",decline:"رفض",revise:"طلب تعديل",adminTitle:"إضافة طبيب للنظام",coordinatorTitle:"إضافة منسق",coordinatorRole:"دور المنسق",name:"الاسم القانوني",subject:"معرّف حساب الهوية",specialty:"التخصص",create:"إنشاء الملف",profileId:"معرّف ملف الطبيب",credentialTitle:"تسجيل مستند اعتماد",credentialType:"نوع الاعتماد",reference:"رقم التسجيل أو الترخيص",source:"جهة الإصدار",expires:"تاريخ الانتهاء",addCredential:"إضافة الاعتماد",decisionTitle:"قرار اعتماد الطبيب",approvePractitioner:"اعتماد الطبيب",rejectPractitioner:"رفض الطبيب",rejectionReason:"سبب الرفض",success:"تم الحفظ بنجاح.",activated:"تم ربط حسابك بحالتك الآن — مرحبًا بك في رحلتك.",error:"تعذر إكمال الطلب."}
 };
 
-export function Portal({locale}:{locale:Locale}){
+/** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
+export function Portal({workCopy,...props}:{locale:Locale;proposalCopy:ProposalCopy;workCopy:WorkCopy}){
+  return <WorkCopyProvider copy={workCopy}><PortalView {...props}/></WorkCopyProvider>;
+}
+
+function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCopy}){
   const t=copy[locale];const{user,me,loading,signIn,signOut,refreshMe}=useAuth();
   // Case workspaces come from /api/v1/me. Control Center work lives in the Control Center: an account with only that
   // lands there directly; everyone else reaches it from the account menu. A signed-in account with no workforce
@@ -215,7 +223,7 @@ export function Portal({locale}:{locale:Locale}){
     {workspace
         // Keyed by case: opening another case straight from a notification or My Work must not carry this case's
         // drafts, tab or open dialogs into it (or let them be submitted against the wrong patient's case).
-        ? <WorkspaceView key={workspace.caseSummary.id} locale={locale} t={t} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={openCaseById}/>
+        ? <WorkspaceView key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={backToQueue} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={openCaseById}/>
         : isPatientRole ? (queueLoading||(!landed&&patientView)||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)
@@ -243,6 +251,7 @@ function roleLabel(role:RoleKey,locale:Locale){const labels={en:{patient:"Patien
  * Ownership ("Take ownership") belongs to the team queue; My Cases is accountability, not a task list.
  */
 function Queue({locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],openCase,openCaseById,mutate,queueState,changeQueue}:{locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;staff?:StaffMember[];openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
+ const work=useWorkCopy();
   const ar=locale==="ar";
   const staffView=role!=="patient";
   const[transferCase,setTransferCase]=useState<CaseView|null>(null);
@@ -256,26 +265,27 @@ function Queue({locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],
   return <>{staffView&&<RoleDashboardSummary locale={locale} role={role??""} cases={cases} tasks={tasks} selected={queueState.kpi} onSelect={value=>changeQueue({...queueState,kpi:value,...(value?{view:value==="unowned"?(role==="coordinator"?"team":"work"):view==="work"?"mine":view,tab:value==="unowned"&&role==="coordinator"?"unowned":queueState.tab}:{}),page:1})}/>}
     {staffView&&<div role="tablist" aria-label={ar?"لوحة العمل":"Operational views"} className="mb-4 flex flex-wrap gap-1 border-b border-line-strong">
       {tabs.map(tab=><button key={tab.id} type="button" role="tab" aria-selected={view===tab.id} id={`work-tab-${tab.id}`} aria-controls="work-panel"
-        className={`-mb-px border-b-2 px-3.5 py-2 text-[0.88rem] font-bold transition ${view===tab.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
+        className={`-mb-px min-h-11 border-b-2 px-3.5 py-2 text-[0.88rem] font-bold transition ${view===tab.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
         // Arrow keys and a roving tabindex, matching the case workspace tablist. Without them the
         // portal's primary navigation was the one tablist in the app a keyboard user had to Tab through.
-        onKeyDown={event=>{const step=event.key==="ArrowRight"?1:event.key==="ArrowLeft"?-1:0;if(!step)return;event.preventDefault();const next=tabs[(tabs.findIndex(x=>x.id===tab.id)+step+tabs.length)%tabs.length];selectQueueView(next.id);requestAnimationFrame(()=>document.getElementById(`work-tab-${next.id}`)?.focus());}}
+        onKeyDown={event=>{const target=tabKeyTarget(event.key,tabs.findIndex(x=>x.id===tab.id),tabs.length,locale==="ar");if(target<0)return;event.preventDefault();const next=tabs[target];selectQueueView(next.id);requestAnimationFrame(()=>document.getElementById(`work-tab-${next.id}`)?.focus());}}
         tabIndex={view===tab.id?0:-1}
         onClick={()=>selectQueueView(tab.id)}>
         {tab.label}{tab.count!==undefined&&tab.count>0&&<span className="ms-2 rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-800">{tab.count}</span>}
       </button>)}
     </div>}
     <div id="work-panel" role={staffView?"tabpanel":undefined} aria-labelledby={staffView?`work-tab-${view}`:undefined} tabIndex={staffView?0:undefined}>
-      {!staffView&&tasks.length>0&&<MyWork locale={locale} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>}
+      {!staffView&&tasks.length>0&&<MyWork locale={locale} role={role} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>}
       {view==="work"
-        ? <MyWork locale={locale} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>
-        : <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} scope={staffView?(view==="team"?"team":"mine"):"all"} onChange={changeQueue} onOpen={openCase} onMutate={mutate} onTransfer={role==="coordinator"&&coordinatorLead?item=>setTransferCase(item):undefined} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>prettyCategory(value,locale)}/>}
+        ? <MyWork locale={locale} role={role} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>
+        : <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} scope={staffView?(view==="team"?"team":"mine"):"all"} onChange={changeQueue} onOpen={openCase} onMutate={mutate} onTransfer={role==="coordinator"&&coordinatorLead?item=>setTransferCase(item):undefined} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>careAreaLabel(value,work.careAreas)}/>}
     </div>
     {transferCase&&<CaseDrawer locale={locale} title={ar?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>setTransferCase(null)}><TransferOwnership locale={locale} caseId={transferCase.id} caseNumber={transferCase.caseNumber} currentOwner={transferCase.coordinatorSubject} currentOwnerName={transferCase.coordinatorName} mySubject={mySubject} staff={staff} busy={busy} mutate={mutate} onClose={()=>setTransferCase(null)}/></CaseDrawer>}
   </>;
 }
 
-function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,careView="care",onCareView,otherCases=[],openCaseById}:{locale:Locale;t:typeof copy.en;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void}){
+function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,careView="care",onCareView,otherCases=[],openCaseById}:{locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void}){
+ const work=useWorkCopy();
  const c=value.caseSummary;const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
  const doctorPhase=["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
@@ -363,15 +373,17 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
      onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)}
      identityStep={actions.currentAction.code==="VERIFY_IDENTITY"?<PatientIdentityStep locale={locale} caseId={c.id} identity={null} busy={busy} mutate={mutate}/>:undefined}
      messagesPanel={<fieldset disabled={busy} className="min-w-0"><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={true} busy={busy} mutate={mutate}/></fieldset>}/>
-    {proposalOpen&&value.proposal&&<CaseDrawer locale={locale} title={t.proposal} onClose={()=>setProposalOpen(false)}>
-     <fieldset disabled={busy} className="min-w-0 space-y-4">{recommendationBlock}<ProposalCard locale={locale} t={t} proposal={value.proposal}/>{proposalReady&&<PatientProposalDecision key={value.proposal.versionId} locale={locale} caseId={c.id} proposal={value.proposal} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setProposalOpen(false);return result;}}/>}</fieldset>
+    {proposalOpen&&value.proposal&&<CaseDrawer locale={locale} title={proposalCopy.title} onClose={()=>setProposalOpen(false)}>
+     <fieldset disabled={busy} className="min-w-0"><PatientProposal locale={locale} copy={proposalCopy} proposal={value.proposal}
+      recommendation={approved?{treatment:approved.recommendedTreatment,risks:approved.risksAndLimitations}:null}
+      decision={proposalReady?<PatientProposalDecision key={value.proposal.versionId} locale={locale} copy={proposalCopy} caseId={c.id} proposal={value.proposal} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setProposalOpen(false);return result;}}/>:null}/></fieldset>
     </CaseDrawer>}
    </div>;
   }
 
   // Who is on the case: the owner first, then the clinical and operational people actually assigned.
   const team=[
-   {label:t.coordinatorLabel,name:c.coordinatorName??(locale==="ar"?"غير مسند":"Unassigned"),pending:false},
+   {label:t.coordinatorLabel,name:coordinatorLabel(c,mySubject,work.queue),pending:false},
    ...value.assignments.filter(a=>a.assigneeRole!=="COORDINATOR").map(a=>({label:a.assigneeRole==="DOCTOR"?(locale==="ar"?"الاستشاري":"Consultant"):a.assigneeRole==="OPERATIONS"?(locale==="ar"?"العمليات":"Operations"):a.assigneeRole==="FINANCE"?(locale==="ar"?"المالية":"Finance"):a.assigneeRole,name:a.assigneeName??(locale==="ar"?"عضو الفريق":"Team member"),pending:a.status==="PENDING"})),
   ];
 
@@ -387,15 +399,15 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
     <div className="min-w-0">
      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
       <span className="text-[0.78rem] font-bold text-brand-700" dir="ltr">{c.caseNumber}</span>
-      {c.careCategory&&<span className="text-[0.78rem] text-ink-500">{prettyCategory(c.careCategory,locale)}</span>}
+      {c.careCategory&&<span className="text-[0.78rem] text-ink-500">{careAreaLabel(c.careCategory,work.careAreas)}</span>}
       <span className="text-[0.78rem] text-ink-500">{c.country}</span>
       <span className="text-[0.78rem] text-ink-500">{c.preferredLanguage==="ar"?(locale==="ar"?"العربية":"Arabic"):(locale==="ar"?"الإنجليزية":"English")}</span>
      </div>
      <h2 id="case-heading" tabIndex={-1} className="mt-0.5 text-[1.35rem] font-bold leading-7 text-brand-900 outline-none">{c.patientName||(locale==="ar"?"مراجعة طلب الرعاية":"Review care request")}</h2>
      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.8rem]">
       <Status value={c.status} locale={locale}/>
-      {actions.waitingOn&&actions.waitingOn!=="NONE"&&<HeaderFact label={locale==="ar"?"بانتظار":"Waiting on"} value={waitingLabel(actions.waitingOn,locale,role)}/>}
-      <HeaderFact label={t.coordinatorLabel} value={c.coordinatorName??(locale==="ar"?"غير مسند":"Unassigned")}/>
+      {actions.waitingOn&&actions.waitingOn!=="NONE"&&<HeaderFact label={work.waiting.label} value={waitingLabel(actions.waitingOn,work.waiting,{role,ownsCase:!!mySubject&&c.coordinatorSubject===mySubject})}/>}
+      <HeaderFact label={t.coordinatorLabel} value={coordinatorLabel(c,mySubject,work.queue)}/>
       {consultantOnCase&&<HeaderFact label={locale==="ar"?"الاستشاري":"Consultant"} value={consultantOnCase}/>}
      </div>
     </div>
@@ -422,8 +434,8 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
     <div className="min-w-0">
      {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex flex-wrap gap-1 border-b border-line-strong">
       {caseTabs.map(item=><button key={item.id} type="button" role="tab" id={`case-tab-${item.id}`} aria-controls="case-tab-panel" aria-selected={tab===item.id}
-        className={`-mb-px border-b-2 px-3 py-2 text-[0.85rem] font-bold transition ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
-        onKeyDown={event=>{const step=event.key==="ArrowRight"?1:event.key==="ArrowLeft"?-1:0;if(!step)return;event.preventDefault();const next=caseTabs[(caseTabs.findIndex(x=>x.id===tab)+step+caseTabs.length)%caseTabs.length];setTab(next.id);requestAnimationFrame(()=>document.getElementById(`case-tab-${next.id}`)?.focus());}}
+        className={`-mb-px min-h-11 border-b-2 px-3 py-2 text-[0.85rem] font-bold transition ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
+        onKeyDown={event=>{const target=tabKeyTarget(event.key,caseTabs.findIndex(x=>x.id===tab),caseTabs.length,locale==="ar");if(target<0)return;event.preventDefault();const next=caseTabs[target];setTab(next.id);requestAnimationFrame(()=>document.getElementById(`case-tab-${next.id}`)?.focus());}}
         tabIndex={tab===item.id?0:-1}
         onClick={()=>setTab(item.id)}>{item.label}{item.count?<span className="ms-1.5 text-[0.75rem] font-semibold text-ink-400">{item.count}</span>:null}</button>)}
      </div>}
@@ -436,7 +448,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
         <h3 id="assignment-preview" className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-ink-500">{locale==="ar"?"ملف التعيين":"Assignment brief"}</h3>
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-2 lg:grid-cols-4">
          <div><dt className="text-[0.7rem] font-bold uppercase tracking-[0.08em] text-ink-500">{t.patientLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.patientName||"—"}</dd></div>
-         {c.careCategory&&<div><dt className="text-[0.7rem] font-bold uppercase tracking-[0.08em] text-ink-500">{t.careArea}</dt><dd className="mt-0.5 font-semibold text-ink-800">{prettyCategory(c.careCategory,locale)}</dd></div>}
+         {c.careCategory&&<div><dt className="text-[0.7rem] font-bold uppercase tracking-[0.08em] text-ink-500">{t.careArea}</dt><dd className="mt-0.5 font-semibold text-ink-800">{careAreaLabel(c.careCategory,work.careAreas)}</dd></div>}
          <div><dt className="text-[0.7rem] font-bold uppercase tracking-[0.08em] text-ink-500">{t.coordinatorLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.coordinatorName??"—"}</dd></div>
          <div><dt className="text-[0.7rem] font-bold uppercase tracking-[0.08em] text-ink-500">{t.countryLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.country}</dd></div>
         </dl>
@@ -456,7 +468,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
          :(value.proposal||value.deposit)?<ProposalSummary locale={locale} proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} caseId={c.id} available={available} busy={busy} mutate={mutate} onView={()=>setProposalOpen(true)}/>:null)}
        {!isCoordinator&&!isDoctor&&(value.proposal||value.deposit)&&proposalPanel}
        {/* The case brief: the facts a coordinator decides ownership on, and the operational context once they own it. */}
-       {isCoordinator&&<CoordinatorBrief locale={locale} t={t} c={c} actions={actions} documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} consultantName={consultantOnCase} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
+       {isCoordinator&&<CoordinatorBrief locale={locale} t={t} mySubject={mySubject} c={c} actions={actions} documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} consultantName={consultantOnCase} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
       </>}
 
       {tab==="clinical"&&<>
@@ -476,7 +488,7 @@ function WorkspaceView({locale,t,role,value,documents,doctors,categories,staff,c
     </div>
 
     <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
-     <JourneyPulse locale={locale} stage={c.status} waitingOn={actions.waitingOn} viewerRole={role} onViewJourney={()=>setJourneyOpen(true)}/>
+     <JourneyPulse locale={locale} stage={c.status} waitingOn={actions.waitingOn} viewerRole={role} ownsCase={!!mySubject&&c.coordinatorSubject===mySubject} onViewJourney={()=>setJourneyOpen(true)}/>
      {!value.preview&&<section aria-labelledby="case-team-title" className="card p-4">
       <h2 id="case-team-title" className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-ink-500">{locale==="ar"?"فريق الحالة":"Case team"}</h2>
       <dl className="mt-2 space-y-1.5 text-[0.82rem]">{team.map((member,i)=><div key={`${member.label}-${i}`} className="flex items-baseline justify-between gap-3"><dt className="text-ink-500">{member.label}</dt><dd className="text-end font-semibold text-ink-800">{member.name}{member.pending&&<span className="ms-1 text-[0.72rem] font-semibold text-amber-800">{locale==="ar"?"· بانتظار القبول":"· pending"}</span>}</dd></div>)}</dl>
@@ -549,17 +561,18 @@ function ProposalSummary({locale,proposal,deposit,delivery,caseId,available,busy
  * never the files or messages themselves); after ownership it is the compact operational summary the current
  * action sits above. It renders only real data: a fact with nothing behind it is left out, not filled in.
  */
-function CoordinatorBrief({locale,t,c,actions,documents,preview,intakeSummary,consultantName,onClinical,onDocuments}:{locale:Locale;t:typeof copy.en;c:CaseView;actions:CaseActions;documents:CaseDocument[];preview:boolean;intakeSummary?:string;consultantName?:string|null;onClinical:()=>void;onDocuments:()=>void}){
+function CoordinatorBrief({locale,t,mySubject,c,actions,documents,preview,intakeSummary,consultantName,onClinical,onDocuments}:{locale:Locale;t:typeof copy.en;mySubject?:string;c:CaseView;actions:CaseActions;documents:CaseDocument[];preview:boolean;intakeSummary?:string;consultantName?:string|null;onClinical:()=>void;onDocuments:()=>void}){
+ const work=useWorkCopy();
  const ar=locale==="ar";
  const when=(iso:string)=>new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(iso));
  const facts:{label:string;value:string}[]=[
   {label:ar?"تاريخ الاستلام":"Received",value:when(c.createdAt)},
-  ...(c.careCategory?[{label:t.careArea,value:prettyCategory(c.careCategory,locale)}]:[{label:t.careArea,value:ar?"لم يُحدَّد بعد":"Not classified yet"}]),
+  ...(c.careCategory?[{label:t.careArea,value:careAreaLabel(c.careCategory,work.careAreas)}]:[{label:t.careArea,value:ar?"لم يُحدَّد بعد":"Not classified yet"}]),
   {label:t.countryLabel,value:c.country},
   {label:t.languageLabel,value:c.preferredLanguage==="ar"?(ar?"العربية":"Arabic"):(ar?"الإنجليزية":"English")},
   {label:t.documents,value:documents.length===0?(ar?"لا توجد":"None"):String(documents.length)},
   // Stage and "waiting on" are stated once, in the case header above — not repeated here.
-  {label:t.coordinatorLabel,value:c.coordinatorName??(ar?"غير مسندة — في قائمة الفريق":"Unowned — in the team queue")},
+  {label:t.coordinatorLabel,value:c.coordinatorSubject?coordinatorLabel(c,mySubject,work.queue):work.queue.unownedInQueue},
   ...(consultantName?[{label:t.consultantLabel,value:consultantName}]:[]),
   ...(c.travelPackageRequested?[{label:ar?"باقة السفر":"Travel package",value:ar?"مطلوبة":"Requested"}]:[]),
   {label:t.updatedLabel,value:when(c.updatedAt)},
@@ -588,9 +601,13 @@ function HeaderFact({label,value}:{label:string;value:string}){
 /** Secure messages and administration as side panels: one click away, never occupying the case page. */
 function CaseDrawer({locale,title,onClose,children}:{locale:Locale;title:string;onClose:()=>void;children:React.ReactNode}){
  const dialog=useRef<HTMLDialogElement>(null);
- useEffect(()=>{dialog.current?.showModal();},[]);
- return <dialog ref={dialog} className="account-dialog !w-[min(36rem,calc(100%-2rem))]" aria-label={title} onClose={onClose}>
-  <div className="flex items-start justify-between gap-4"><h2 className="title">{title}</h2><button type="button" className="icon-button" aria-label={locale==="ar"?"إغلاق":"Close"} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
+ const titleId=useId();
+ // Return focus to whatever opened the drawer once it has really left the page. Closing it from the cleanup would fire
+ // `close` (and onClose) under StrictMode's double effects, so the cleanup only restores focus after removal.
+ const opener=useRef<HTMLElement|null>(null);
+ useEffect(()=>{const node=dialog.current;opener.current??=document.activeElement instanceof HTMLElement?document.activeElement:null;node?.showModal();return()=>{setTimeout(()=>{if(node&&!node.isConnected)opener.current?.focus();},0);};},[]);
+ return <dialog ref={dialog} className="account-dialog !w-[min(36rem,calc(100%-2rem))]" aria-labelledby={titleId} onClose={onClose}>
+  <div className="sticky -top-6 z-10 -mx-6 -mt-6 flex items-start justify-between gap-4 border-b border-line bg-white px-6 pb-3 pt-6"><h2 id={titleId} className="title">{title}</h2><button type="button" className="icon-button" aria-label={locale==="ar"?"إغلاق":"Close"} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
   <div className="mt-4">{children}</div>
  </dialog>;
 }
@@ -756,13 +773,11 @@ export function RoleActions({role,t,c,proposal,gates,availableActions,locale,mut
  if(role==="operations")return <>{checklist}{availableActions.includes("UPDATE_TRAVEL_PLAN")&&proposal?.status==="CLINICALLY_APPROVED"?<div className="mt-4 space-y-3"><textarea className="field min-h-28" aria-label={t.operationsComplete} maxLength={30000} required value={operationsPlan} onChange={event=>setOperationsPlan(event.target.value)}/><button className="btn-primary" disabled={!operationsPlan.trim()} onClick={()=>void mutate(`/operations/cases/${c.id}/proposals/${proposal.versionId}/complete`,{plan:operationsPlan.trim()})}>{t.operationsComplete}</button></div>:null}</>;
  if(role==="finance")return <>{checklist}{availableActions.includes("APPROVE_COMMERCIAL_TERMS")&&proposal?<button className="btn-primary mt-4" onClick={()=>void mutate(`/finance/cases/${c.id}/proposals/${proposal.versionId}/approve`)}>{t.financeApprove}</button>:null}</>;
  if(role==="coordinator")return <>{checklist}{gates?.readyForRelease&&proposal?<div className="mt-4"><button className="btn-primary" onClick={()=>void mutate(`/coordinator/cases/${c.id}/proposals/${proposal.versionId}/release`)}>{t.release}</button><p className="mt-2 text-xs text-ink-500">{gl.releaseHint}</p></div>:(gates&&!gates.readyForRelease?<p className="mt-3 text-xs text-ink-500">{gl.releaseHint}</p>:null)}</>;
- if(role==="patient"&&proposal&&["RELEASED","VIEWED"].includes(proposal.status))return <PatientProposalDecision key={proposal.versionId} locale={locale} caseId={c.id} proposal={proposal} mutate={mutate}/>;
  return null;
 }
 function ProposalCard({locale,t,proposal}:{locale:Locale;t:typeof copy.en;proposal:Proposal}){const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-xl bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>v{proposal.versionNumber} · {statusLabel(proposal.status,locale)}</strong><strong>{new Intl.NumberFormat(locale,{style:"currency",currency:proposal.currency}).format(total)}</strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?(locale==="ar"?" (اختياري)":" (optional)"):""}</span><strong className="whitespace-nowrap">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{locale==="ar"?"صالح حتى":"Valid until"} {new Intl.DateTimeFormat(locale).format(new Date(proposal.validUntil))}</p>}</div>}
 function Panel({title,children,wide=false}:{title:string;children:React.ReactNode;wide?:boolean}){return <section className={`card mt-6 p-5 ${wide?"":""}`}><h3 className="title mb-4">{title}</h3><div className="space-y-3">{children}</div></section>}
 function Empty(){return <p className="text-ink-500">—</p>}
-function prettyCategory(slug:string,locale:Locale){const map:Record<string,{en:string;ar:string}>={cardiology:{en:"Cardiology",ar:"أمراض القلب"},"rheumatology-rehabilitation":{en:"Rehabilitation & Dysphagia",ar:"إعادة التأهيل والبلع"},orthopedics:{en:"Orthopedics",ar:"العظام"}};return map[slug]?.[locale]??slug.replace(/-/g," ").replace(/\b\w/g,ch=>ch.toUpperCase());}
 function formatBytes(bytes:number){if(!bytes)return "0 B";const units=["B","KB","MB","GB"];const i=Math.min(units.length-1,Math.floor(Math.log(bytes)/Math.log(1024)));return `${(bytes/Math.pow(1024,i)).toFixed(i?1:0)} ${units[i]}`;}
 const STATUS_LABELS:Record<string,{en:string;ar:string}>={RECEIVED:{en:"Received",ar:"تم الاستلام"},INTAKE_REVIEW:{en:"Intake review",ar:"مراجعة الاستقبال"},INFORMATION_REQUIRED:{en:"Information required",ar:"مطلوب معلومات"},READY_FOR_CONSULTANT:{en:"Ready for consultant",ar:"جاهزة للاستشاري"},CONSULTANT_ASSIGNMENT_PENDING:{en:"Assigned to consultant",ar:"تم التعيين للاستشاري"},CONSULTANT_REVIEW:{en:"Under consultant review",ar:"قيد مراجعة الاستشاري"},CLINICAL_RECOMMENDATION_READY:{en:"Treatment recommendation ready",ar:"توصية العلاج جاهزة"},PROPOSAL_PREPARATION:{en:"Preparing your proposal",ar:"جارٍ تحضير المقترح"},PROPOSAL_INTERNAL_APPROVAL:{en:"Internal approval",ar:"الموافقة الداخلية"},PATIENT_DECISION:{en:"Waiting for your decision",ar:"بانتظار قرارك"},REVISION_REQUESTED:{en:"Revision requested",ar:"مطلوب تعديل"},ACCEPTED:{en:"Preliminary estimate acknowledged",ar:"تم الإقرار بالتقدير المبدئي"},DECLINED:{en:"Proposal declined",ar:"تم رفض العرض"},CLINICALLY_NOT_SUITABLE:{en:"Not clinically suitable",ar:"غير مناسبة سريريًا"},EXPIRED:{en:"Proposal expired",ar:"انتهت صلاحية العرض"},TRAVEL_COORDINATION:{en:"Travel coordination",ar:"تنسيق السفر"},ARRIVAL_CONFIRMED:{en:"Arrival confirmed",ar:"تم تأكيد الوصول"},TREATMENT_IN_PROGRESS:{en:"Treatment in progress",ar:"العلاج جارٍ"},DISCHARGED:{en:"Discharged",ar:"تم الخروج"},FOLLOW_UP:{en:"Follow-up",ar:"المتابعة"},CLOSED:{en:"Closed",ar:"مغلقة"},CANCELLED:{en:"Cancelled",ar:"ملغاة"}};
 function statusLabel(value:string,locale:Locale){return STATUS_LABELS[value]?.[locale]??value.replaceAll("_"," ");}

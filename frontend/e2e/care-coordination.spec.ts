@@ -81,13 +81,13 @@ for (const locale of ["en", "ar"] as const) test(`Staff Portal team queue, trans
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/${locale}/portal`);
   await page.getByRole("tab", { name: en ? /Team queue/ : /قائمة الفريق/ }).click();
-  await expect(page.getByRole("tab", { name: en ? "Needs an owner" : "تحتاج إلى مالك" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: en ? "Needs an owner" : "بلا منسق مسؤول" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("Layla Hassan")).toBeVisible();
   await sane(page); await shot("team-queue-unowned-desktop");
-  await page.getByRole("tab", { name: en ? "Owned by my team" : "حالات فريقي" }).click();
+  await page.getByRole("tab", { name: en ? "Owned by your team" : "يتولاها فريقي" }).click();
   await expect(page.getByText("Karim Adel")).toBeVisible();
   await sane(page); await shot("team-queue-team-desktop");
-  await page.getByRole("button", { name: en ? "Transfer ownership" : "نقل الملكية" }).click();
+  await page.getByRole("button", { name: en ? "Transfer ownership" : "نقل المسؤولية" }).click();
   const drawer = page.getByRole("dialog");
   await drawer.getByRole("radio", { name: /Sara Ahmed/ }).check();
   await drawer.getByRole("textbox").fill(en ? "Leave coverage" : "تغطية إجازة");
@@ -103,7 +103,7 @@ for (const locale of ["en", "ar"] as const) test(`Staff Portal team queue, trans
   await sane(page); await shot("my-work-mobile");
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole("tab", { name: en ? /Team queue/ : /قائمة الفريق/ }).click();
-  await page.getByRole("tab", { name: en ? "Owned by my team" : "حالات فريقي" }).click();
+  await page.getByRole("tab", { name: en ? "Owned by your team" : "يتولاها فريقي" }).click();
   await page.getByRole("button", { name: en ? /^Open/ : /^فتح/ }).first().click();
   await page.getByRole("tab", { name: en ? "Activity" : "السجل" }).click();
   await expect(page.getByRole("heading", { name: en ? "Assignment history" : "سجل التعيينات" })).toBeVisible();

@@ -32,6 +32,7 @@
     "tagline": "A clearer path to specialist care",
     "send": "Start my case",
     "whatsapp": "Talk to a Patient Coordinator",
+    "whatsappIntro": "Hello RehletShifaa, I would like help with a medical case.",
     "explore": "View all care areas",
     "profile": "View Consultant Profile",
     "emergency": "Emergency symptoms? RehletShifaa is not an emergency service. Call your local emergency number or seek urgent care now.",
@@ -152,7 +153,7 @@
     "finalBody": "Send what you already have. We'll guide you through the next step.",
     "finalNote": "Starting a case does not commit you to treatment or travel.",
     "slogan": "You see the full picture first. The decision stays yours.",
-    "areasIntro": "Organised by body system, each led by named, verified Consultants — or send your case and we will route it for you.",
+    "areasIntro": "Organised by body system, each led by named Consultants — or send your case and we will route it for you.",
     "areasAction": "View care area",
     "cardiologyFacets": ["Coronary", "Structural heart", "Heart rhythm"],
     "consultantsPromise": {
@@ -190,8 +191,8 @@
     "areasConsultantsMany": "{n} Consultants",
     "panel": {
       "title": "The Consultants behind your care",
-      "body": "Senior specialists, verified before any case is matched to them.",
-      "consultants": "Verified Consultants",
+      "body": "Senior specialists whose credentials are reviewed before any case is matched to them.",
+      "consultants": "Consultants",
       "faculty": "University faculty",
       "areas": "Care areas",
       "link": "Meet the Consultants"
@@ -472,6 +473,9 @@
     "familyName": "Family name / surname",
     "country": "Country",
     "phone": "WhatsApp / mobile number",
+    "phoneHint": "We will contact you on WhatsApp using this number. A number shared with family is fine. If the number is from another country, change the code.",
+    "dialCode": "Country code",
+    "dialCodeChoose": "Choose the country code",
     "email": "Contact email",
     "description": "Tell Us Briefly About Your Condition",
     "optional": "optional",
@@ -483,6 +487,7 @@
     "choose": "Choose files",
     "selected": "files selected",
     "successTitle": "Your Case Has Been Received",
+    "whatsappCaseMessage": "Hello RehletShifaa, I have just sent my medical case. My case number is {caseNumber}.",
     "successBody": "Thank you. A Patient Coordinator will help organize your case and guide you through the next steps.",
     "caseNumber": "Case Number",
     "continue": "Continue on WhatsApp",
@@ -522,7 +527,7 @@
   "careAreasPage": {
     "eyebrow": "Care areas",
     "title": "Choose the care area closest to your need",
-    "intro": "Consultant-led review across {count} care areas, each led by named, verified senior Consultants. Explore by body system — or send your case and we will route it for you.",
+    "intro": "Consultant-led review across {count} care areas, each led by named senior Consultants. Explore by body system — or send your case and we will route it for you.",
     "tabsLabel": "Care areas",
     "tabs": {
       "cardiology": "Cardiology",
@@ -534,11 +539,6 @@
       "title": "A short talk from your consultant — coming soon",
       "note": "A named consultant will introduce this care area and explain how your case is reviewed. The recorded talk will appear here."
     },
-    "stats": {
-      "areas": "Care areas",
-      "consultants": "Verified Consultants",
-      "faculty": "University faculty"
-    },
     "explore": "Explore the care areas",
     "map": {
       "label": "Care areas arranged around your case",
@@ -548,7 +548,7 @@
     "atlas": {
       "eyebrow": "The care atlas",
       "title": "{count} care areas, organised by body system",
-      "intro": "Each care area is led by verified Consultants who own the clinical decision. Choose the one closest to your need — or let your coordinator choose for you.",
+      "intro": "Each care area is led by named Consultants who own the clinical decision. Choose the one closest to your need — or let your coordinator choose for you.",
       "index": "Jump to a body system",
       "areasOne": "1 care area",
       "areasMany": "{n} care areas",
@@ -598,7 +598,7 @@
         },
         {
           "title": "Matched Consultant",
-          "body": "A verified senior Consultant reviews your case and owns the clinical decision."
+          "body": "A senior Consultant in the right specialty reviews your case and owns the clinical decision."
         }
       ]
     }
@@ -683,11 +683,6 @@
     "finalBody": "Send what you have, and your coordinator will route your case to the right Consultant."
   },
   "consultantsPage": {
-    "stats": {
-      "consultants": "Verified Consultants",
-      "faculty": "University faculty",
-      "areas": "Care areas"
-    },
     "explore": "Meet the panel",
     "matching": {
       "label": "How your case reaches a Consultant",
@@ -725,8 +720,8 @@
           "body": "Degrees, board fellowships and appointments are checked with institutional sources."
         },
         {
-          "title": "Verified before matching",
-          "body": "Only verified Consultants are matched to a patient's case."
+          "title": "Reviewed before matching",
+          "body": "A Consultant is matched to a patient's case only after this credential review."
         }
       ],
       "disclaimer": "Profiles draw on supplied CVs and the sources identified on each profile. The order of profiles is not a ranking, and no credential is an outcome guarantee."
@@ -747,7 +742,7 @@
         },
         {
           "title": "Your Consultant reviews",
-          "body": "A verified senior Consultant reviews your case and owns the clinical decision."
+          "body": "A senior Consultant in the right specialty reviews your case and owns the clinical decision."
         }
       ]
     }
@@ -756,10 +751,10 @@
     "careAreas": "Care areas",
     "meet": "Meet the Consultants",
     "stats": {
-      "consultants": "Verified Consultants",
+      "consultants": "Consultants",
       "faculty": "University faculty",
       "focus": "Clinical focus areas",
-      "consultantsOne": "Verified Consultant",
+      "consultantsOne": "Consultant",
       "facultyOne": "University faculty member"
     },
     "snapshotLed": "Led by",
@@ -770,7 +765,7 @@
     "signsFallback": "Send us your case if…",
     "consultantsEyebrow": "The Consultants",
     "consultantsTitle": "Who leads {area}",
-    "consultantsIntro": "Verified senior specialists. Your coordinator matches your case to the most appropriate one.",
+    "consultantsIntro": "Senior specialists in this area. Your coordinator matches your case to the most appropriate one.",
     "relatedEyebrow": "Keep exploring",
     "relatedTitle": "Other care areas",
     "sameSystem": "Also in {system}",
@@ -797,5 +792,343 @@
     "statYears": "years since graduation",
     "statQualifications": "qualifications",
     "statFocus": "focus areas"
+  },
+  "portalProposal": {
+    "title": "Your proposal",
+    "documentType": {
+      "estimate": "Preliminary care estimate",
+      "quote": "Final treatment quote"
+    },
+    "status": {
+      "RELEASED": "Ready for your decision",
+      "VIEWED": "Ready for your decision",
+      "ACCEPTED_estimate": "You acknowledged this estimate",
+      "ACCEPTED_quote": "You accepted this quote",
+      "DECLINED": "You declined this proposal",
+      "REVISION_REQUESTED": "You asked for changes",
+      "EXPIRED": "This proposal has expired",
+      "SUPERSEDED": "Replaced by a newer version",
+      "other": "Proposal"
+    },
+    "validUntil": "Valid until {date}",
+    "totalLabel": "Total for the recommended services",
+    "itemsLabel": "What the price covers",
+    "optional": "optional",
+    "quantity": "× {count}",
+    "honestyEstimate": "This is a preliminary, non-binding estimate, not a final price or a price guarantee. Your treatment and its price may increase or decrease after your treating doctor examines you in person.",
+    "honestyQuote": "Prepared after your in-person assessment. It covers the confirmed services listed, at the price shown. Accepting this quote is not medical consent. Your treating doctor will ask for separate informed consent before treatment.",
+    "recommendationTitle": "Your Consultant's recommendation",
+    "treatment": "Recommended treatment",
+    "risks": "Risks and limitations",
+    "notesTitle": "A note from your coordinator",
+    "termsEstimate": "Deposit, refunds and cancellation",
+    "termsQuote": "Payment and changes",
+    "pendingReview": "Pending legal review",
+    "decisionTitle": "Your decision",
+    "introEstimate": "Continuing does not accept a final treatment plan or confirm a booking.",
+    "introQuote": "Review your final treatment plan and quote before deciding.",
+    "acknowledgeEstimate": "I have reviewed this estimate, including the deposit, refund and cancellation terms, and understand the next step.",
+    "acknowledgeQuote": "I have reviewed this quote, including its payment terms, and understand the next step.",
+    "note": "Note for your coordinator",
+    "noteHint": "Optional when you continue; needed when you request changes.",
+    "noteRequired": "Tell your coordinator what you would like changed before you send the request.",
+    "primaryEstimate": "Acknowledge estimate & continue",
+    "primaryQuote": "Accept final treatment plan and quote",
+    "requestChanges": "Request changes",
+    "decline": "Decline",
+    "declineConfirm": "Decline this proposal?",
+    "arabicTermsPending": "The deposit, refund and cancellation terms above are shown in English because their Arabic wording is not yet approved, so this decision cannot be completed in Arabic yet. You can request changes, decline, or message your coordinator; to decide now, switch the page to English.",
+    "arabicTermsPendingQuote": "The payment terms above are shown in English because their Arabic wording is not yet approved, so this decision cannot be completed in Arabic yet. You can request changes, decline, or message your coordinator; to decide now, switch the page to English.",
+    "decisionFailed": "Your decision was not sent. Check your connection and try again; nothing has changed yet."
+  },
+  "portalWork": {
+    "waiting": {
+      "label": "Waiting on",
+      "you": "you",
+      "STAFF": "our team",
+      "PATIENT": "the patient",
+      "CONSULTANT": "the Consultant",
+      "HOSPITAL": "the hospital",
+      "TRAVEL_TEAM": "the travel team",
+      "PAYMENT": "payment",
+      "EXTERNAL": "an external party",
+      "NONE": "nobody",
+      "other": "another party"
+    },
+    "priority": {
+      "URGENT": "Urgent",
+      "HIGH": "High",
+      "NORMAL": "Normal",
+      "LOW": "Low",
+      "other": "Priority not set"
+    },
+    "attention": {
+      "overdueBlocking": "Overdue · blocking",
+      "high": "High priority",
+      "overdue": "Overdue",
+      "dueSoon": "Due soon",
+      "patientResponded": "Patient responded"
+    },
+    "plural": {
+      "cases": {
+        "one": "{count} case",
+        "other": "{count} cases"
+      },
+      "workItems": {
+        "one": "{count} work item",
+        "other": "{count} work items"
+      },
+      "documents": {
+        "one": "{count} document",
+        "other": "{count} documents"
+      },
+      "openTasks": {
+        "one": "{count} open task",
+        "other": "{count} open tasks"
+      },
+      "selected": {
+        "one": "{count} selected",
+        "other": "{count} selected"
+      }
+    },
+    "currentAction": {
+      "label": "Current action",
+      "overdue": "Overdue",
+      "due": "Due",
+      "note": "Note for the record (optional)",
+      "notePlaceholder": "What did you do?",
+      "cancel": "Cancel",
+      "decline": "Decline",
+      "claim": "Take ownership",
+      "accept": "Accept assignment",
+      "done": "Mark done",
+      "work": {
+        "REVIEW_PATIENT_RESPONSE": "Accept & continue",
+        "CLINICAL_REVIEW": "Start clinical review",
+        "PREPARE_PROPOSAL": "Prepare proposal",
+        "PROPOSAL_REVISION": "Revise proposal",
+        "PROPOSAL_DECLINED_REVIEW": "Acknowledge outcome",
+        "CLINICAL_OUTCOME_REVIEW": "Acknowledge outcome",
+        "DEPOSIT_ARRANGEMENT": "Payment instructions sent",
+        "TRAVEL": "Assign Operations",
+        "REASSIGN_CONSULTANT": "Reassign Consultant",
+        "CONFIRM_TRANSFER": "Confirm the transfer",
+        "CONFIRM_SECOND_OPINION": "Choose a Consultant",
+        "SECOND_OPINION": "Give your second opinion",
+        "REVIEW": "Mark reviewed",
+        "INFORMATION_REQUEST": "Mark handled"
+      },
+      "actions": {
+        "ASSIGN_CONSULTANT": "Assign Consultant",
+        "PREPARE_PROPOSAL": "Prepare proposal",
+        "RELEASE_PROPOSAL": "Review & release",
+        "ASSIGN_OPERATIONS": "Assign Operations",
+        "ASSIGN_FINANCE": "Assign Finance",
+        "RECORD_CLINICAL_DECISION": "Record clinical decision",
+        "UPDATE_TRAVEL_PLAN": "Complete arrangements",
+        "APPROVE_COMMERCIAL_TERMS": "Approve commercial terms"
+      },
+      "states": {
+        "CLAIM_CASE": {
+          "title": "This case has no coordinator",
+          "body": "Review the intake details, then take ownership to start work."
+        },
+        "VIEW_ONLY": {
+          "title": "Owned by another coordinator",
+          "body": "You have view-only access to this case."
+        },
+        "VIEW_ONLY_STAFF": {
+          "title": "The case coordinator owns this case",
+          "body": "You can review it; the coordinator handles its workflow."
+        },
+        "ACCEPT_ASSIGNMENT": {
+          "title": "New assignment",
+          "body": "Review the case, then accept the assignment or decline so the coordinator can reassign it."
+        },
+        "ACCEPT_ASSIGNMENT_DOCTOR": {
+          "title": "New clinical assignment",
+          "body": "Review the case summary and documents, then accept to begin your clinical review — or decline so the coordinator can reassign it."
+        },
+        "WAIT_PATIENT_INFORMATION": {
+          "title": "Waiting for the patient's information",
+          "body": "Nothing is needed from you right now. If their reply arrives by WhatsApp or phone, record it from More actions."
+        },
+        "WAIT_CONSULTANT": {
+          "title": "Waiting for the Consultant",
+          "body": "The case returns to you as soon as the clinical recommendation is recorded."
+        },
+        "WAIT_PATIENT_DECISION": {
+          "title": "With the patient",
+          "body": "The proposal was delivered. The case returns to you when they decide."
+        },
+        "WAIT_PAYMENT": {
+          "title": "Waiting for the coordination deposit",
+          "body": "Finance records the receipt; the journey continues automatically once it is confirmed."
+        },
+        "WAIT_OPERATIONS": {
+          "title": "Operations is arranging travel and arrival",
+          "body": "The case continues once the arrangements are confirmed."
+        },
+        "ASSIGN_CONSULTANT": {
+          "title": "Prepare the case for a Consultant",
+          "body": "Complete anything missing, then assign a Consultant for this care area."
+        },
+        "PREPARE_PROPOSAL": {
+          "title": "Prepare the patient proposal",
+          "body": "Review the approved recommendation and internal requirements before releasing it."
+        },
+        "RELEASE_PROPOSAL": {
+          "title": "Release the proposal to the patient",
+          "body": "Check the release requirements, then release the secure link."
+        },
+        "ASSIGN_OPERATIONS": {
+          "title": "Start treatment coordination",
+          "body": "The deposit is settled. Assign Operations to arrange travel and arrival."
+        },
+        "ASSIGN_FINANCE": {
+          "title": "Finance must approve the commercial terms",
+          "body": "A manually priced service needs Finance sign-off before release. Assign who should approve it."
+        },
+        "WAIT_INTERNAL_APPROVAL": {
+          "title": "Waiting for internal sign-off",
+          "body": "The assigned team completes their part; release unlocks once every requirement is met."
+        },
+        "RECORD_CLINICAL_DECISION": {
+          "title": "Record your clinical decision",
+          "body": "Review the intake summary and documents, then record your recommendation."
+        },
+        "UPDATE_TRAVEL_PLAN": {
+          "title": "Arrange travel and arrival",
+          "body": "Keep the travel plan current; confirm it once every requirement is met."
+        },
+        "APPROVE_COMMERCIAL_TERMS": {
+          "title": "Approve the commercial terms",
+          "body": "Review the manually priced services before the proposal can be released."
+        },
+        "default": {
+          "title": "Nothing needs you right now",
+          "body": "The next step appears here as soon as it is due."
+        }
+      },
+      "readiness": {
+        "CONTACT_NOT_VERIFIED": {
+          "title": "Waiting for contact verification",
+          "body": "The patient verifies their contact channel through the secure link. The coordination deposit is arranged once that is done."
+        },
+        "CONSENTS_INCOMPLETE": {
+          "title": "Waiting for the patient's consents",
+          "body": "Required consents are captured through the secure profile link."
+        },
+        "ONBOARDING_INCOMPLETE": {
+          "title": "Waiting for the patient to submit onboarding",
+          "body": "The patient reviews and submits their onboarding through the secure link."
+        },
+        "REPRESENTATIVE_AUTH_MISSING": {
+          "title": "Waiting for representative authorization",
+          "body": "A valid representative authorization is required before coordination continues."
+        },
+        "default": {
+          "title": "Waiting for the patient to activate their profile",
+          "body": "The secure profile link was sent to the patient. The coordination deposit is arranged once the profile is active."
+        }
+      }
+    },
+    "myWork": {
+      "title": "My work",
+      "hint": "Work assigned to you personally, most urgent first.",
+      "empty": "You have no open work.",
+      "emptyHint": "Anything assigned to you shows up here.",
+      "open": "Open",
+      "due": "Due",
+      "overdue": "Overdue",
+      "blocking": "Blocking",
+      "loading": "Loading…",
+      "reviewAssignment": "Review assignment",
+      "care": "Care area",
+      "coordinator": "Coordinator"
+    },
+    "queue": {
+      "title": "Case list",
+      "unowned": "Needs an owner",
+      "team": "Owned by your team",
+      "unownedHint": "New requests nobody owns yet. Taking ownership makes you the case owner.",
+      "teamHint": "Cases owned by coordinators on your team. Transfer ownership to rebalance work.",
+      "mineHint": "Cases you own as the responsible coordinator.",
+      "assignedHint": "Cases you are assigned to.",
+      "transfer": "Transfer ownership",
+      "received": "Received",
+      "search": "Search case number, name or care area",
+      "status": "Case status",
+      "active": "Active cases",
+      "all": "All cases",
+      "allOption": "All",
+      "empty": "No cases here",
+      "emptyHint": "Cases appear here when they become available to you.",
+      "noMatch": "No cases match these filters",
+      "loading": "Loading…",
+      "filters": "Filters",
+      "clearAll": "Clear all",
+      "done": "Done",
+      "sort": "Sort",
+      "sortAttention": "Needs attention",
+      "sortUpdatedDesc": "Last updated",
+      "sortUpdatedAsc": "Least recently updated",
+      "sortCreatedDesc": "Newest first",
+      "sortCreatedAsc": "Oldest first",
+      "display": "View",
+      "list": "List",
+      "grid": "Cards",
+      "open": "Open",
+      "claim": "Take ownership",
+      "requestInfo": "Request info",
+      "clearSelection": "Clear selection",
+      "selectPage": "Select page",
+      "selectCase": "Select case {number}",
+      "remove": "Remove filter {label}: {value}",
+    "pageOf": "Page {page} of {pages}",
+      "previous": "Previous",
+      "next": "Next",
+      "pages": "Case pages",
+      "waiting": "Waiting on",
+      "owner": "Coordinator",
+      "ownerYou": "You",
+      "ownerUnnamed": "Coordinator (name not set)",
+      "consultant": "Consultant",
+      "unassigned": "Unassigned",
+      "caseTitle": "Case {number}",
+      "updated": "Updated",
+      "copy": "Copy case number {number}",
+      "copied": "Copied",
+      "country": "Country",
+      "careArea": "Care area",
+      "createdFrom": "Created from",
+      "createdTo": "Created to",
+      "updatedFrom": "Updated from",
+      "updatedTo": "Updated to",
+      "accept": "Accept assignment",
+      "unownedInQueue": "No coordinator yet — in the team queue"
+    },
+    "workTitles": {
+      "REVIEW_PATIENT_RESPONSE": "Review the patient's response",
+      "CONSULTANT_ASSIGNMENT": "New case assignment",
+      "CLINICAL_REVIEW": "Clinical review",
+      "PREPARE_PROPOSAL": "Prepare the proposal",
+      "PROPOSAL_REVISION": "Revise the proposal",
+      "PROPOSAL_DECLINED_REVIEW": "Review the declined proposal",
+      "CLINICAL_OUTCOME_REVIEW": "Review the clinical outcome",
+      "DEPOSIT_ARRANGEMENT": "Arrange the coordination deposit",
+      "TRAVEL": "Coordinate treatment and travel",
+      "REASSIGN_CONSULTANT": "Reassign the case to a Consultant",
+      "CONFIRM_TRANSFER": "Confirm the case transfer",
+      "CONFIRM_SECOND_OPINION": "Choose a Consultant for the second opinion",
+      "SECOND_OPINION": "Give your second opinion",
+      "REVIEW": "Review",
+      "INFORMATION_REQUEST": "Follow up the information request",
+      "DOCUMENT_REVIEW": "Review the documents"
+    },
+    "assignConsultant": {
+      "title": "Assign a Consultant",
+      "hint": "Confirm or correct the care area, then choose a named Consultant. Only available Consultants with current credentials who match the area are listed."
+    }
   }
 }

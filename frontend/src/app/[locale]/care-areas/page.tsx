@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
-import { ArrowDown, ArrowRight } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { CareAreaCard } from "@/components/care-areas/CareAreaCard";
 import { SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import { CareNetwork } from "@/components/care-areas/CareNetwork";
 import { CaseRouter } from "@/components/care-areas/CaseRouter";
-import { HeroStats } from "@/components/HeroStats";
 import { PageHero } from "@/components/PageHero";
-import { TrackedLink } from "@/components/TrackedLink";
 import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
-import { universityFacultySlugs } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -47,14 +44,6 @@ export default async function CareAreas({ params }: Props) {
     fill(n === 1 ? page.atlas.consultantsOne : n === 2 ? page.atlas.consultantsTwo : page.atlas.consultantsMany, { n });
   const areasLabel = (n: number) => (n === 1 ? page.atlas.areasOne : fill(page.atlas.areasMany, { n }));
 
-  const consultantSlugs = new Set(areas.flatMap((area) => area.consultants.map((profile) => profile.slug)));
-  const faculty = universityFacultySlugs();
-  const stats = [
-    { value: areas.length, label: page.stats.areas },
-    { value: consultantSlugs.size, label: page.stats.consultants },
-    { value: [...consultantSlugs].filter((slug) => faculty.has(slug)).length, label: page.stats.faculty },
-  ];
-
   return (
     <>
       <PageHero
@@ -64,13 +53,8 @@ export default async function CareAreas({ params }: Props) {
         intro={fill(page.intro, { count: areas.length })}
         aside={<CareNetwork areas={areas} rtl={locale === "ar"} label={page.map.label} center={page.map.center} jump={page.map.jump} />}
       >
-        <HeroStats stats={stats} />
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
-          <TrackedLink event="send_case_cta_clicked" className="btn-primary w-full sm:w-auto" href={localeHref(locale, "send-my-case")}>
-            {d.common.send}
-            <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
-          </TrackedLink>
-          <a href="#atlas" className="link-cta justify-center text-[0.9375rem] sm:justify-start">
+        <div className="mt-6">
+          <a href="#atlas" className="link-cta text-[0.9375rem]">
             {page.explore}
             <ArrowDown size={16} aria-hidden="true" />
           </a>

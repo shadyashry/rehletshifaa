@@ -16,6 +16,7 @@ import { CaseQueue, attentionRank, filterQueue, initialQueue, type QueueCase } f
 import { MyWork, type WorkItem } from "./MyWork";
 import { NotificationBell } from "./NotificationBell";
 import { DeclineAssignmentDialog } from "./DeclineAssignmentDialog";
+import { renderWithWork, workCopyFor } from "./test-copy";
 
 
 const item: WorkItem = {
@@ -38,7 +39,7 @@ describe("JourneyPulse", () => {
   afterEach(cleanup);
 
   it("gives orientation only: phases, current position and who has the ball", () => {
-    render(<JourneyPulse locale="en" stage="PROPOSAL_PREPARATION" waitingOn="STAFF" onViewJourney={vi.fn()}/>);
+    renderWithWork(<JourneyPulse locale="en" stage="PROPOSAL_PREPARATION" waitingOn="STAFF" onViewJourney={vi.fn()}/>);
     ["Intake", "Consultant", "Proposal", "Patient decision", "Coordination deposit", "Treatment", "Follow-up"]
       .forEach(phase => expect(screen.getByText(phase)).toBeTruthy());
     expect(screen.getByText(/Waiting on: our team/i)).toBeTruthy();
@@ -50,7 +51,7 @@ describe("JourneyPulse", () => {
 
   it("marks the current phase and opens the full journey on demand", () => {
     const onViewJourney = vi.fn();
-    render(<JourneyPulse locale="en" stage="CONSULTANT_REVIEW" waitingOn="CONSULTANT" onViewJourney={onViewJourney}/>);
+    renderWithWork(<JourneyPulse locale="en" stage="CONSULTANT_REVIEW" waitingOn="CONSULTANT" onViewJourney={onViewJourney}/>);
     expect(screen.getByText("Consultant").className).toContain("font-bold");
     expect(screen.getByText("Proposal").className).not.toContain("font-bold");
     fireEvent.click(screen.getByRole("button", { name: /view full journey/i }));
@@ -73,7 +74,7 @@ describe("CurrentActionPanel", () => {
 
   it("names the business outcome and never the task mechanics", () => {
     const onComplete = vi.fn();
-    render(<CurrentActionPanel locale="en" role="coordinator"
+    renderWithWork(<CurrentActionPanel locale="en" role="coordinator"
                                action={{ code: "WORK_ITEM", kind: "COMPLETE", workItemId: "w1", workItemVersion: 0, workType: "REVIEW_PATIENT_RESPONSE", title: "Review information provided by the patient" }}
                                response={{ message: "Kindly find attached document", documentName: "Echo_Report.pdf" }}
                                secondary={[{ label: "Request information", onClick: vi.fn() }]} onComplete={onComplete}/>);
@@ -91,7 +92,7 @@ describe("CurrentActionPanel", () => {
   });
 
   it("offers one primary and at most two secondary actions", () => {
-    render(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "ASSIGN_CONSULTANT", kind: "FOCUS" }}
+    renderWithWork(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "ASSIGN_CONSULTANT", kind: "FOCUS" }}
                                onFocusAction={vi.fn()} secondary={[
                                  { label: "Request information", onClick: vi.fn() },
                                  { label: "Message patient", onClick: vi.fn() },
@@ -102,7 +103,7 @@ describe("CurrentActionPanel", () => {
   });
 
   it("shows no primary action while the ball is with the patient", () => {
-    render(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "WAIT_PATIENT_INFORMATION", kind: "WAIT" }}
+    renderWithWork(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "WAIT_PATIENT_INFORMATION", kind: "WAIT" }}
                                onFocusAction={vi.fn()} secondary={[{ label: "Record patient response", onClick: vi.fn() }]}/>);
     expect(screen.getByRole("heading", { name: /waiting for the patient/i })).toBeTruthy();
     expect(screen.getAllByRole("button")).toHaveLength(1); // the secondary only
@@ -111,7 +112,7 @@ describe("CurrentActionPanel", () => {
   // The acknowledged-proposal regression: at the deposit stage the patient's profile step is the current
   // action, and neither "Prepare proposal" nor "Assign Operations" exists anywhere on the panel.
   it("explains a patient readiness wait instead of offering future steps", () => {
-    render(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "CONTACT_NOT_VERIFIED" }}/>);
+    renderWithWork(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "CONTACT_NOT_VERIFIED" }}/>);
     expect(screen.getByRole("heading", { name: /waiting for contact verification/i })).toBeTruthy();
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.queryByText(/prepare the proposal/i)).toBeNull();
@@ -119,20 +120,20 @@ describe("CurrentActionPanel", () => {
   });
 
   it("renders the deposit arrangement as staff work with its own outcome label", () => {
-    render(<CurrentActionPanel locale="en" role="coordinator" onComplete={vi.fn()}
+    renderWithWork(<CurrentActionPanel locale="en" role="coordinator" onComplete={vi.fn()}
                                action={{ code: "WORK_ITEM", kind: "COMPLETE", workItemId: "w2", workItemVersion: 0, workType: "DEPOSIT_ARRANGEMENT", title: "Arrange the coordination deposit" }}/>);
     expect(screen.getByRole("heading", { name: /arrange the coordination deposit/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /payment instructions sent/i })).toBeTruthy();
   });
 
   it("reads right-to-left with Arabic copy for the same contract", () => {
-    render(<CurrentActionPanel locale="ar" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "PROFILE_NOT_ACTIVATED" }}/>);
+    renderWithWork(<CurrentActionPanel locale="ar" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "PROFILE_NOT_ACTIVATED" }}/>, "ar");
     expect(screen.getByText("الإجراء الحالي")).toBeTruthy();
     expect(screen.getByRole("heading", { name: /بانتظار تفعيل المريض لملفه/ })).toBeTruthy();
   });
 
   it("shows nothing to patients", () => {
-    const { container } = render(<CurrentActionPanel locale="en" role="patient" action={{ code: "NONE", kind: "NONE" }}/>);
+    const { container } = renderWithWork(<CurrentActionPanel locale="en" role="patient" action={{ code: "NONE", kind: "NONE" }}/>);
     expect(container.firstChild).toBeNull();
   });
 });
@@ -227,17 +228,17 @@ describe("CaseQueue", () => {
   };
 
   it("defaults to a scannable list carrying stage, waiting-on, people and one primary action per row", () => {
-    render(<CaseQueue {...props}/>);
+    renderWithWork(<CaseQueue {...props}/>);
     expect(screen.getByRole("button", { name: /list/i }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("Yassmine Lashine")).toBeTruthy();
     expect(screen.getByText("RS-2026-000029")).toBeTruthy();
-    expect(screen.getAllByText(/Waiting:/).length).toBe(2);
+    expect(screen.getAllByText(/Waiting on:/).length).toBe(2);
     expect(screen.getByText("Overdue")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /^open$/i })).toHaveLength(2);
   });
 
   it("keeps advanced filters out of the page until they are asked for", () => {
-    render(<CaseQueue {...props}/>);
+    renderWithWork(<CaseQueue {...props}/>);
     expect(screen.queryByRole("dialog", { name: /filters/i })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /filters/i }));
     expect(screen.getByRole("dialog", { name: /filters/i })).toBeTruthy();
@@ -248,14 +249,14 @@ describe("CaseQueue", () => {
 
   it("shows active refinements as removable chips", () => {
     const onChange = vi.fn();
-    render(<CaseQueue {...props} state={{ ...initialQueue, tab: "mine", country: "Egypt" }} onChange={onChange}/>);
+    renderWithWork(<CaseQueue {...props} state={{ ...initialQueue, tab: "mine", country: "Egypt" }} onChange={onChange}/>);
     expect(screen.getByText("Egypt")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /remove country/i }));
+    fireEvent.click(screen.getByRole("button", { name: /remove filter country/i }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ country: "" }));
   });
 
   it("reveals bulk actions only after a case is selected", () => {
-    render(<CaseQueue {...props}/>);
+    renderWithWork(<CaseQueue {...props}/>);
     expect(screen.queryByText(/1 selected/)).toBeNull();
     fireEvent.click(screen.getAllByRole("checkbox")[1]);
     expect(screen.getByText(/1 selected/)).toBeTruthy();
@@ -294,7 +295,7 @@ describe("attention ordering", () => {
   });
 
   it("labels why a case is near the top", () => {
-    render(<CaseQueue locale="en" role="coordinator" subject="me" lead={false} busy={false} state={{ ...initialQueue, tab: "mine" }} scope="mine" onChange={vi.fn()} onOpen={vi.fn()} onMutate={vi.fn(() => Promise.resolve({}))} statusLabel={(v: string) => v} categoryLabel={(v: string) => v}
+    renderWithWork(<CaseQueue locale="en" role="coordinator" subject="me" lead={false} busy={false} state={{ ...initialQueue, tab: "mine" }} scope="mine" onChange={vi.fn()} onOpen={vi.fn()} onMutate={vi.fn(() => Promise.resolve({}))} statusLabel={(v: string) => v} categoryLabel={(v: string) => v}
       cases={[{ ...base, id: "1", patientName: "Omar Nabil", coordinatorSubject: "me", openTaskCount: 1, patientResponsePending: true }]}/>);
     expect(screen.getByText("Patient responded")).toBeTruthy();
   });
@@ -305,7 +306,7 @@ describe("consultant workspace", () => {
 
   it("treats a pending assignment as one accept/decline decision, not clinical work", () => {
     const onAccept = vi.fn(), onDecline = vi.fn();
-    render(<CurrentActionPanel locale="en" role="doctor" action={{ code: "ACCEPT_ASSIGNMENT", kind: "ACCEPT" }}
+    renderWithWork(<CurrentActionPanel locale="en" role="doctor" action={{ code: "ACCEPT_ASSIGNMENT", kind: "ACCEPT" }}
                                secondary={[{ label: "Messages", onClick: vi.fn() }]}
                                onAcceptAssignment={onAccept} onDeclineAssignment={onDecline}/>);
 
@@ -324,7 +325,7 @@ describe("consultant workspace", () => {
   });
 
   it("turns the accepted assignment into the clinical work and drops the acceptance controls", () => {
-    render(<CurrentActionPanel locale="en" role="doctor"
+    renderWithWork(<CurrentActionPanel locale="en" role="doctor"
                                action={{ code: "WORK_ITEM", kind: "FOCUS", workItemId: "w1", workItemVersion: 0, workType: "CLINICAL_REVIEW", title: "Review case and provide clinical recommendation" }}
                                onFocusAction={vi.fn()}/>);
     // Who has the ball is stated once, in the case header — never repeated inside the action panel.
@@ -336,7 +337,7 @@ describe("consultant workspace", () => {
 
   it("labels the consultant's new assignments in My Work with the review CTA", () => {
     const onOpen = vi.fn();
-    render(<MyWork locale="en" busy={false} onOpen={onOpen} items={[{
+    renderWithWork(<MyWork locale="en" busy={false} onOpen={onOpen} items={[{
       ...item, id: "a1", type: "CONSULTANT_ASSIGNMENT", title: "New clinical assignment",
       context: "You have been assigned case RS-10281 for clinical review.", waitingOn: "CONSULTANT",
     }]}/>);
@@ -459,16 +460,49 @@ describe("consultant work rows", () => {
   afterEach(cleanup);
 
   it("carry the case identity a consultant needs before opening anything", () => {
-    render(<MyWork locale="en" busy={false} onOpen={vi.fn()} items={[{
+    renderWithWork(<MyWork locale="en" busy={false} onOpen={vi.fn()} items={[{
       ...item, id: "a1", type: "CONSULTANT_ASSIGNMENT", title: "New clinical assignment",
       caseNumber: "RS-2026-000030", patientName: "Ahmed Ali", careCategory: "cardiology",
       coordinatorName: "Layla Hassan", documentCount: 3, context: null,
     }]}/>);
     expect(screen.getByText("RS-2026-000030")).toBeTruthy();
     expect(screen.getByText("Ahmed Ali")).toBeTruthy();
-    expect(screen.getByText("cardiology")).toBeTruthy();
+    expect(screen.getByText(workCopyFor("en").careAreas.cardiology)).toBeTruthy();
     expect(screen.getByText("Layla Hassan")).toBeTruthy();
     expect(screen.getByText(/3 documents/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /review assignment/i })).toBeTruthy();
+  });
+});
+
+describe("role-aware staff copy", () => {
+  afterEach(cleanup);
+
+  it("tells a Consultant who owns a coordinator's case without calling them a coordinator", () => {
+    renderWithWork(<CurrentActionPanel locale="en" role="doctor" action={{ code: "VIEW_ONLY", kind: "NONE" }}/>);
+    expect(screen.getByRole("heading", { name: "The case coordinator owns this case" })).toBeTruthy();
+    expect(screen.queryByText(/another coordinator/)).toBeNull();
+  });
+
+  it("asks for a Consultant for the care area, never a \"verified\" one", () => {
+    renderWithWork(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "ASSIGN_CONSULTANT", kind: "FOCUS" }} onFocusAction={vi.fn()}/>);
+    expect(screen.getByText("Complete anything missing, then assign a Consultant for this care area.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Assign Consultant/ })).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/verified/i);
+  });
+});
+
+describe("queue identity and counts", () => {
+  afterEach(cleanup);
+  const queueBase = { country: "Egypt", careCategory: "cardiology", status: "INTAKE_REVIEW", createdAt: "2026-09-01T09:00:00Z", updatedAt: "2026-09-02T09:00:00Z" };
+
+  it("titles a case without a patient name \"Case RS-…\" once, shows you as its coordinator and counts naturally", () => {
+    renderWithWork(<CaseQueue locale="en" role="coordinator" subject="me" lead={false} busy={false} state={{ ...initialQueue, tab: "mine" }} scope="mine" onChange={vi.fn()} onOpen={vi.fn()} onMutate={vi.fn(() => Promise.resolve({}))} statusLabel={(v: string) => v} categoryLabel={(v: string) => v}
+      cases={[{ ...queueBase, id: "1", caseNumber: "RS-2026-000001", patientName: null, coordinatorSubject: "me", coordinatorName: undefined, openTaskCount: 1, documentCount: 1 }]}/>);
+    expect(screen.getAllByText(/RS-2026-000001/)).toHaveLength(1);
+    expect(screen.getByText((_, element) => element?.tagName === "P" && element.textContent === "Case RS-2026-000001")).toBeTruthy();
+    expect(screen.getByText("You")).toBeTruthy();
+    expect(screen.getByText("1 case")).toBeTruthy();
+    expect(screen.getByText("1 open task")).toBeTruthy();
+    expect(screen.getByText("1 document")).toBeTruthy();
   });
 });

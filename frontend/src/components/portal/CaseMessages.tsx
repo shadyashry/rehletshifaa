@@ -1,8 +1,6 @@
 "use client";
 import { useState } from "react";
 import type { Locale } from "@/lib/i18n";
-import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
-import { estimateTerms, finalQuoteTerms } from "@/lib/commercial-terms";
 
 type Message={id:string;threadType?:string;senderRole:string;senderName?:string;direction:string;body:string;createdAt:string;read:boolean};
 type Mutate=(path:string,body?:unknown,method?:string)=>Promise<unknown>;
@@ -30,10 +28,4 @@ export function TaskActions({locale,caseId,task,mutate}:{locale:Locale;caseId:st
   const [evidence,setEvidence]=useState("");const ar=locale==="ar";
   if(!["OPEN","IN_PROGRESS"].includes(task.status))return null;
   return <div className="mt-3 space-y-2">{task.status==="OPEN"&&<button className="btn-secondary" onClick={()=>void mutate(`/tasks/${task.id}/cases/${caseId}/start`,{expectedVersion:task.version})}>{ar?"بدء المهمة":"Start task"}</button>}<details><summary className="cursor-pointer py-2 text-sm font-semibold text-brand-700">{ar?"إكمال المهمة":"Complete task"}</summary><form className="mt-2 space-y-2" onSubmit={async e=>{e.preventDefault();const result=await mutate(`/tasks/${task.id}/cases/${caseId}/complete`,{expectedVersion:task.version,evidence:evidence.trim()});if(result)setEvidence("");}}><label className="block text-sm">{ar?"ما الذي تم إنجازه؟":"What was completed?"}<textarea className="field mt-2" required maxLength={10000} value={evidence} onChange={e=>setEvidence(e.target.value)}/></label><button className="btn-primary" disabled={!evidence.trim()}>{ar?"تسجيل الإكمال":"Record completion"}</button></form></details></div>;
-}
-
-export function PatientProposalDecision({locale,caseId,proposal,mutate}:{locale:Locale;caseId:string;proposal:{versionId:string;documentType?:string};mutate:Mutate}){
-  const [acknowledged,setAcknowledged]=useState(false),[comment,setComment]=useState("");const ar=locale==="ar",final=proposal.documentType==="FINAL_TREATMENT_QUOTE";
-  const decide=(decision:string)=>void mutate(`/patient/cases/${caseId}/proposals/${proposal.versionId}/decision`,{decision,selectedOptionalItemIds:[],comment:comment.trim()||undefined});
-  return <div className="mt-5 space-y-4 border-t border-line pt-5"><p className="text-sm text-ink-600">{final?(ar?"راجع العرض النهائي قبل اتخاذ قرارك. قبول العرض لا يحل محل الموافقة الطبية على الإجراء.":`Review your final treatment plan and quote before deciding. ${finalQuoteTerms.notMedicalConsent}`):(ar?"هذا تقدير مبدئي. المتابعة لا تعني قبول خطة العلاج النهائية أو تأكيد حجز.":`${estimateTerms.nonBinding} Continuing does not accept a final treatment plan or confirm a booking.`)}</p>{!final&&<CoordinationDepositTerms id="portal-deposit-terms" locale={locale} level={3}/>}<label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1 h-5 w-5" checked={acknowledged} aria-describedby={final?undefined:"portal-deposit-terms"} onChange={e=>setAcknowledged(e.target.checked)}/>{ar?"راجعت العرض وأفهم الخطوة التالية.":"I have reviewed this document and understand the next step."}</label><label className="block text-sm font-semibold">{ar?"ملاحظة أو تغييرات مطلوبة (اختياري)":"Note or requested changes (optional)"}<textarea className="field mt-2" value={comment} onChange={e=>setComment(e.target.value)} maxLength={10000}/></label><div className="flex flex-wrap gap-3"><button className="btn-primary" disabled={!acknowledged} onClick={()=>decide(final?"ACCEPTED":"ACKNOWLEDGED")}>{final?(ar?"قبول العرض النهائي":"Accept final treatment plan and quote"):(ar?"الإقرار بالتقدير والمتابعة":"Acknowledge estimate & continue")}</button><button className="btn-secondary" onClick={()=>decide("REVISION_REQUESTED")}>{ar?"طلب تعديل":"Request changes"}</button><button className="btn-secondary" onClick={()=>{if(window.confirm(ar?"هل تريد رفض هذا العرض؟":"Decline this proposal?"))decide("DECLINED");}}>{ar?"رفض":"Decline"}</button></div></div>;
 }

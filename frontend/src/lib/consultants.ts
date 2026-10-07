@@ -16,9 +16,9 @@ export type ConsultantProfile = {
   summary: string;
   /** The listing card's evidence line (≈20–30 words); the full summary lives on the profile page. */
   cardSummary: string;
-  /** One clinical anchor and its verified related areas (from focusAreas / summary); short labels are shown as tags above the profile's focus list. Qualitative only. */
+  /** One clinical anchor and its CV-sourced related areas (from focusAreas / summary); short labels are shown as tags above the profile's focus list. Qualitative only. */
   expertise: { anchor: string; areas: readonly string[] };
-  /** A verified professional distinction (appointment or role) from appointments/qualifications — shown only when it adds value. */
+  /** A CV-sourced professional distinction (appointment or role) from appointments/qualifications — shown only when it adds value. */
   distinction?: string;
   /** The two or three strongest credibility signals for the card: qualification / certification. */
   signals: readonly string[];
@@ -42,9 +42,9 @@ export const consultantUi = {
     pageTitle: "Meet the Consultants behind your care",
     pageIntro: "Every case is matched to the appropriate Consultant according to clinical need. You do not need to choose a Consultant before you start.",
     matching: ["Your case", "Clinical matching", "Appropriate Consultant"],
-    rail: ["Credentials verified before matching", "Consultant-owned clinical decision", "Arabic & English coordination"],
-    verificationEyebrow: "Profile verification",
-    verificationTitle: "Credentials are verified before a patient is matched.",
+    rail: ["Credentials reviewed before matching", "Consultant-owned clinical decision", "Arabic & English coordination"],
+    verificationEyebrow: "Profile review",
+    verificationTitle: "Credentials are reviewed before a patient is matched.",
     notice: "Profile information is based on consultant-provided CVs and official institutional sources.",
     viewProfile: "View full profile",
     viewProfileOf: (name: string) => `View ${name}'s full profile`,
@@ -64,9 +64,9 @@ export const consultantUi = {
     pageTitle: "تعرّف على الاستشاريين القائمين على رعايتك",
     pageIntro: "تُوجَّه كل حالة إلى الاستشاري المناسب وفق الحاجة السريرية. لا تحتاج إلى اختيار استشاري قبل أن تبدأ.",
     matching: ["حالتك", "توجيه سريري", "الاستشاري المناسب"],
-    rail: ["مؤهلات موثّقة قبل التوجيه", "قرار سريري يملكه الاستشاري", "تنسيق بالعربية والإنجليزية"],
-    verificationEyebrow: "التحقق من الملفات",
-    verificationTitle: "يجري التحقق من المؤهلات قبل توجيه أي مريض.",
+    rail: ["مراجعة المؤهلات قبل التوجيه", "قرار سريري يملكه الاستشاري", "تنسيق بالعربية والإنجليزية"],
+    verificationEyebrow: "مراجعة الملفات",
+    verificationTitle: "تُراجَع المؤهلات قبل توجيه أي مريض.",
     notice: "تستند معلومات الملفات إلى السير الذاتية المقدمة من الاستشاريين والمصادر المؤسسية الرسمية.",
     viewProfile: "عرض الملف الكامل",
     viewProfileOf: (name: string) => `عرض الملف الكامل: ${name}`,

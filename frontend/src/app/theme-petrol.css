@@ -120,7 +120,18 @@
 
   --radius-card: 0.5rem;
   --shadow-card: 0 1px 2px rgba(20, 38, 43, 0.05);
-  --petrol-shadow-raised: 0 1px 2px rgba(20, 38, 43, 0.06), 0 12px 28px -20px rgba(20, 38, 43, 0.28);
+  --shadow-raised: 0 1px 2px rgba(20, 38, 43, 0.06), 0 12px 28px -20px rgba(20, 38, 43, 0.28);
+
+  /* Component tokens where petrol differs in structure, not colour (approved 2026-10-07). The colour aliases follow
+     the re-pointed ramps by themselves. */
+  --button-radius: 0.5rem;
+  --button-radius-compact: 0.5rem;
+  --button-primary-shadow-hover: none;
+  --button-secondary-bg-hover: var(--color-surface-default);
+  --button-secondary-fg-hover: var(--color-brand-900);
+  --button-secondary-border-hover: var(--color-brand-900);
+  --field-radius: 0.5rem;
+  --dialog-radius: var(--radius-card);
 }
 
 @layer components {
@@ -148,14 +159,12 @@
     color: var(--color-brand-600);
     letter-spacing: 0.12em;
   }
+  /* Tracking breaks Arabic letter joining; this must out-specify the Latin rule above. */
+  :root[data-brand-theme="petrol"][dir="rtl"] .eyebrow {
+    letter-spacing: 0;
+  }
 
   /* ---- Controls: flat, firm ---- */
-  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-inverse) {
-    border-radius: 0.5rem;
-  }
-  :root[data-brand-theme="petrol"] .btn-outline {
-    border-radius: 0.5rem;
-  }
   :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-primary:hover, .btn-secondary, .btn-secondary:hover) {
     box-shadow: none;
     background-image: none;
@@ -163,25 +172,8 @@
   :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary):hover {
     transform: none;
   }
-  :root[data-brand-theme="petrol"] .btn-secondary {
-    color: var(--color-brand-900);
-    border-color: var(--color-line-strong);
-  }
-  :root[data-brand-theme="petrol"] .btn-secondary:hover {
-    color: var(--color-brand-900);
-    border-color: var(--color-brand-900);
-    background: #ffffff;
-  }
   :root[data-brand-theme="petrol"] :focus-visible {
     outline-color: var(--color-brand-600);
-  }
-  :root[data-brand-theme="petrol"] .field {
-    border-color: var(--color-line-strong);
-    border-radius: 0.5rem;
-  }
-  :root[data-brand-theme="petrol"] .field:focus {
-    border-color: var(--color-brand-600);
-    box-shadow: 0 0 0 3px var(--color-brand-100);
   }
   :root[data-brand-theme="petrol"] .link-cta {
     text-underline-offset: 5px;
@@ -196,7 +188,7 @@
   }
   :root[data-brand-theme="petrol"] .home-hero .home-hero-card {
     border-color: var(--color-line);
-    box-shadow: var(--petrol-shadow-raised);
+    box-shadow: var(--shadow-raised);
   }
   :root[data-brand-theme="petrol"] .page-hero-aside {
     border: 1px solid var(--color-line);
@@ -633,8 +625,8 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
 }
 :root[data-brand-theme="petrol"] form.card [role="radiogroup"] > label:has(input:checked) {
-  border-color: var(--color-brand-600);
-  background: var(--color-brand-50);
+  border-color: var(--choice-checked-border);
+  background: var(--choice-checked-bg);
   box-shadow: 0 0 0 3px var(--color-brand-100);
 }
 :root[data-brand-theme="petrol"] form.card [role="radiogroup"] > label:has(input:focus-visible) {

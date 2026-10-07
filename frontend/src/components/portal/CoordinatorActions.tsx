@@ -5,6 +5,7 @@ import { ClipboardList, Link2, MessageSquareText, Plane, Send, UserRoundPlus, Us
 
 import type { Locale } from "@/lib/i18n";
 import { EligibleConsultantPicker, ReferralConfirmation, type Load } from "@/components/portal/ConsultantRouting";
+import { useWorkCopy } from "@/components/portal/portal-copy";
 
 type CareCategory = { slug: string; nameEn: string; nameAr: string };
 type StaffMember = { subject: string; name: string; role: string };
@@ -21,9 +22,9 @@ export function CoordinatorActionForm({ locale, code, caseId, version, careCateg
   categories: CareCategory[]; staff: StaffMember[]; busy: boolean; mutate: Mutate; load: Load;
 }) {
   const ar = locale === "ar";
+  const work = useWorkCopy();
   if (code === "ASSIGN_CONSULTANT")
-    return <ActionFormShell id="case-actions" title={ar ? "تعيين استشاري معتمد" : "Assign a verified consultant"}
-                            hint={ar ? "أكّد مجال رعاية الحالة أو صححه، ثم اختر استشاريًا بالاسم. يظهر فقط الاستشاريون المعتمدون والمتاحون ذوو الاعتمادات السارية المطابقون للمجال." : "Confirm or correct the care area, then choose a named consultant. Only available, verified consultants with current credentials who match the area are listed."}>
+    return <ActionFormShell id="case-actions" title={work.assignConsultant.title} hint={work.assignConsultant.hint}>
       <ConsultantAssignment locale={locale} caseId={caseId} version={version} careCategory={careCategory} categories={categories} busy={busy} mutate={mutate} load={load}/>
     </ActionFormShell>;
   if (code === "CONFIRM_REFERRAL")

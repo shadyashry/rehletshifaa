@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MyWork, type WorkItem } from "./MyWork";
 import { NotificationBell } from "./NotificationBell";
 import { RequestInformationDialog } from "./RequestInformationDialog";
+import { renderWithWork } from "./test-copy";
 
 /**
  * The staff side of the operational loop: work items are what you must do, notifications are what you
@@ -22,7 +23,7 @@ describe("MyWork", () => {
 
   it("shows the priority, case, patient and a single primary action", () => {
     const onOpen = vi.fn();
-    render(<MyWork locale="en" items={[item]} busy={false} onOpen={onOpen}/>);
+    renderWithWork(<MyWork locale="en" items={[item]} busy={false} onOpen={onOpen}/>);
     expect(screen.getByText("Review information provided by the patient")).toBeTruthy();
     expect(screen.getByText("RS-10281")).toBeTruthy();
     expect(screen.getAllByText(/Mohamed Ahmed/).length).toBeGreaterThan(0);
@@ -32,12 +33,12 @@ describe("MyWork", () => {
   });
 
   it("flags overdue work so it cannot be missed", () => {
-    render(<MyWork locale="en" items={[{ ...item, overdue: true, dueAt: new Date(Date.now() - 86400000).toISOString() }]} busy={false} onOpen={vi.fn()}/>);
+    renderWithWork(<MyWork locale="en" items={[{ ...item, overdue: true, dueAt: new Date(Date.now() - 86400000).toISOString() }]} busy={false} onOpen={vi.fn()}/>);
     expect(screen.getByText("Overdue")).toBeTruthy();
   });
 
   it("has a calm empty state rather than a blank panel", () => {
-    render(<MyWork locale="en" items={[]} busy={false} onOpen={vi.fn()}/>);
+    renderWithWork(<MyWork locale="en" items={[]} busy={false} onOpen={vi.fn()}/>);
     expect(screen.getByText(/no open work/i)).toBeTruthy();
   });
 });
