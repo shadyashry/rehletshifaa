@@ -33,6 +33,15 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const { user, roles, loading: authLoading } = useAuth();
   const [values, setValues] = useState<FormValues>({ caseFor: "MYSELF", givenName: "", familyName: "", singleLegalName: false, representativeName: "", representativeRelationship: "", country: "", whatsappNumber: "", email: "", conditionDescription: "", consent: false });
   const [country, setCountry] = useState<Country | null>(null);
+  // The WhatsApp number may belong to a representative in another country, so its dialling code follows the
+  // patient's country only until someone chooses a different one.
+  const [dialOverride, setDialOverride] = useState<Country | null>(null);
+  const dialCountry = dialOverride ?? country;
+  const dialOptions = useMemo(() => {
+    let regionName = (c: Country) => c.name;
+    try { const names = new Intl.DisplayNames([locale], { type: "region" }); regionName = c => names.of(c.iso2) ?? c.name; } catch { /* keep the English names */ }
+    return COUNTRIES.map(c => ({ country: c, label: `${regionName(c)} (${c.dial})` })).sort((a, b) => a.label.localeCompare(b.label, locale));
+  }, [locale]);
   // Survives a failed attempt so pressing send again continues the same case instead of starting a
   // new one. Refs, not state: retry correctness must not depend on a re-render happening first.
   const draftCase = useRef<CreateCaseResponse | null>(null);
@@ -61,7 +70,6 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     countryPlaceholder: ar ? "ابحث عن دولتك…" : "Search your country…",
     countryEmpty: ar ? "لا توجد نتائج مطابقة" : "No matching country",
     selectCountryFirst: ar ? "اختر الدولة أولًا" : "Select the country first",
-    phoneHint: ar ? "نتواصل معك عبر واتساب على هذا الرقم. يمكن مشاركة الرقم مع أفراد العائلة." : "We'll contact you on WhatsApp using this number. A number shared with family is fine.",
     emailHint: ar ? "للتواصل فقط في هذه المرحلة — لن يصبح بريد الدخول قبل التحقق منه لاحقًا." : "For contact only at this stage — it won't become your sign-in email until you verify it later.",
     localNumber: ar ? "رقم الهاتف" : "Phone number",
     requiredMark: ar ? "مطلوب" : "Required",
@@ -126,7 +134,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   function onFiles(next: File[]) { begin(); setFiles(current => {const keys=new Set(current.map(file=>`${file.name}:${file.size}:${file.lastModified}`));return [...current,...next.filter(file=>!keys.has(`${file.name}:${file.size}:${file.lastModified}`))];}); }
 
   const digits = phoneLocal.replace(/\D/g, "");
-  const fullPhone = country ? `${country.dial} ${phoneLocal.trim()}`.trim() : phoneLocal.trim();
+  const fullPhone = dialCountry ? `${dialCountry.dial} ${phoneLocal.trim()}`.trim() : phoneLocal.trim();
   const emailTrimmed = values.email.trim();
   // Live per-field validity — drives inline messages and the submit button's disabled state.
   const valid = useMemo(() => ({
@@ -135,11 +143,11 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     representativeName: !someoneElse || values.representativeName.trim().length >= 1,
     representativeRelationship: !someoneElse || values.representativeRelationship !== "",
     country: !!country,
-    whatsappNumber: !!country && digits.length >= 6 && digits.length <= 15,
+    whatsappNumber: !!dialCountry && digits.length >= 6 && digits.length <= 15,
     email: emailTrimmed === "" || EMAIL_RE.test(emailTrimmed),
     consent: values.consent === true,
     files: filesAreValid(files),
-  }), [values.givenName, values.familyName, values.singleLegalName, values.representativeName, values.representativeRelationship, someoneElse, country, digits.length, emailTrimmed, values.consent, files]);
+  }), [values.givenName, values.familyName, values.singleLegalName, values.representativeName, values.representativeRelationship, someoneElse, country, dialCountry, digits.length, emailTrimmed, values.consent, files]);
   const contactValid = valid.givenName && valid.familyName && valid.representativeName && valid.representativeRelationship && valid.country && valid.whatsappNumber && valid.email;
 
   function nextStep() {
@@ -164,7 +172,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     if (key === "familyName" && !valid.familyName) return d.form.errors.familyName;
     if ((key === "representativeName" && !valid.representativeName) || (key === "representativeRelationship" && !valid.representativeRelationship)) return d.form.errors.representative;
     if (key === "country" && !valid.country) return t.selectCountryFirst;
-    if (key === "whatsappNumber" && !valid.whatsappNumber) return valid.country ? d.form.errors.phone : t.selectCountryFirst;
+    if (key === "whatsappNumber" && !valid.whatsappNumber) return dialCountry ? d.form.errors.phone : d.form.dialCodeChoose;
     if (key === "email" && !valid.email) return d.form.errors.email;
     if (key === "consent" && !valid.consent) return d.form.errors.consent;
     if (key === "files" && !valid.files) return d.form.errors.file;
@@ -381,12 +389,23 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
           <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.contactSectionRep : t.contactSection}</legend>
           {someoneElse && <p className="mt-1 text-sm text-ink-500">{t.contactRepHint}</p>}
           <div className="mt-4 grid gap-6 sm:grid-cols-2">
-            <Field label={d.form.phone} required requiredMark={t.requiredMark} valid={valid.whatsappNumber} error={fieldError("whatsappNumber")} hint={t.phoneHint}>
+            <Field label={d.form.phone} required requiredMark={t.requiredMark} valid={valid.whatsappNumber} error={fieldError("whatsappNumber")} hint={d.form.phoneHint}>
               <div className={`flex items-stretch overflow-hidden rounded-[0.55rem] border ${fieldError("whatsappNumber") ? "border-alert-700" : "border-line-strong focus-within:border-brand-600 focus-within:shadow-[0_0_0_3px_var(--color-brand-100)]"}`} dir="ltr">
-                <span className="flex flex-none items-center gap-1.5 border-e border-line bg-brand-50 px-3 text-sm font-bold text-ink-800" aria-hidden>
-                  {country ? <><span className="text-base leading-none">{flagEmoji(country.iso2)}</span><span>{country.dial}</span></> : <span className="text-ink-400">+—</span>}
+                <input className="min-w-0 flex-1 bg-white px-3 py-2.5 text-ink-900 outline-none" inputMode="tel" autoComplete="tel-national" placeholder={dialCountry ? "100 000 0000" : d.form.dialCodeChoose} aria-label={t.localNumber} value={phoneLocal} onChange={e => { begin(); setPhoneLocal(e.target.value.replace(/[^\d\s()-]/g, "")); }} onBlur={() => touch("whatsappNumber")} />
+                {/* The visible prefix is drawn; a transparent native select over it does the choosing, so keyboards,
+                    screen readers and phone pickers all get the platform control. It comes after the number in the DOM
+                    (shown first with `order-first`) so the field label still targets the number input. */}
+                <span className="relative order-first flex flex-none items-center gap-1.5 border-e border-line bg-brand-50 ps-3 pe-2 text-sm font-bold text-ink-800 hover:bg-brand-100">
+                  <span aria-hidden className="flex items-center gap-1.5">
+                    {dialCountry ? <><span className="text-base leading-none">{flagEmoji(dialCountry.iso2)}</span><span>{dialCountry.dial}</span></> : <span className="text-ink-500">+—</span>}
+                    <ChevronDown size={14} className="text-ink-500" />
+                  </span>
+                  <select className="absolute inset-0 cursor-pointer opacity-0" aria-label={d.form.dialCode} value={dialCountry?.iso2 ?? ""}
+                    onChange={e => { begin(); setDialOverride(COUNTRIES.find(c => c.iso2 === e.target.value) ?? null); }} onBlur={() => phoneLocal && touch("whatsappNumber")}>
+                    <option value="" disabled>{d.form.dialCodeChoose}</option>
+                    {dialOptions.map(o => <option key={o.country.iso2} value={o.country.iso2} suppressHydrationWarning>{o.label}</option>)}
+                  </select>
                 </span>
-                <input className="min-w-0 flex-1 bg-white px-3 py-2.5 text-ink-900 outline-none" inputMode="tel" autoComplete="tel-national" placeholder={country ? "100 000 0000" : t.selectCountryFirst} aria-label={t.localNumber} value={phoneLocal} onChange={e => { begin(); setPhoneLocal(e.target.value.replace(/[^\d\s()-]/g, "")); }} onBlur={() => touch("whatsappNumber")} />
               </div>
             </Field>
             <Field label={`${d.form.email} (${d.form.optional})`} valid={valid.email && emailTrimmed !== ""} error={fieldError("email")} hint={t.emailHint}>
