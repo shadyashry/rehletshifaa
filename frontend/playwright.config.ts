@@ -4,6 +4,9 @@ const oidcAuthority = process.env.PLAYWRIGHT_OIDC_AUTHORITY ?? "http://localhost
 const externalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === "true";
 export default defineConfig({
   testDir: "./e2e",
+  // The release-candidate QA pack runs only under playwright.qa.config.ts (it imports other specs, which this run
+  // would refuse to load).
+  testIgnore: "qa/**",
   // Next.js dev blocks cross-origin asset requests, so the browser must use the
   // same host the dev server reports (localhost) or the page never hydrates.
   use: { baseURL, trace: "retain-on-failure" },
