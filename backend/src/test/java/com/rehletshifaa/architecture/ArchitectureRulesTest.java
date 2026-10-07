@@ -219,7 +219,6 @@ class ArchitectureRulesTest {
             "com.rehletshifaa.journey.application.ConsultantReferralService",
             "com.rehletshifaa.journey.application.IdentityVerificationService",
             "com.rehletshifaa.journey.application.JourneyCaseRelationships",
-            "com.rehletshifaa.journey.application.JourneyService",
             "com.rehletshifaa.journey.application.OnboardingService",
             "com.rehletshifaa.journey.application.PatientAccountService",
             "com.rehletshifaa.journey.application.PatientActionService",

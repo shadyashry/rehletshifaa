@@ -146,8 +146,8 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | workforce | `workforce_team_memberships` | W | access,coordination,workforce |
 | workforce | `workforce_teams` | W | access,coordination,workforce |
 
-`care_categories` still has a JDBC *read* inside a multi-table join in `JourneyService`;
-they convert with `practitioner_profiles`. `audit_events` reads remaining:
+`care_categories` is read only through `CareCategoryRepository` since `JourneyService` was converted (2026-10-07).
+`audit_events` reads remaining:
 `CaseHandoffService`, `JourneyCaseAdmissionRepository`, `JourneyDefinitionRepository`.
 
 ## Dead schema (owner decision needed)
@@ -305,6 +305,40 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **585 tests, 0 failures** (2 skipped); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`JourneyService` converted, every view** (CL5 read slice 3; removed from `JDBC_NOT_YET_CONVERTED`, 15 → 14).
+  All ~85 JdbcClient statements are gone; public contract (every method the controllers and action handlers call), ordering,
+  filtering, authorization and error codes unchanged. The views moved to three query services in `journey.application`:
+  - `JourneyCaseQueryService` — patient cases, the coordination queue, assigned cases, a case view, queue cards and the
+    assignment history. One `MedicalCaseRepository` row query (`findCaseRow`, `findPatientCaseRows` — representatives
+    included —, `findCoordinatorQueueRows`, `findAssignedCaseRows`; patient display name in JPQL) plus one batched
+    `CaseAssignmentRepository.findCaseHolders` and one names read; cards add `CaseTaskRepository.findWorkSignals` (one
+    grouped aggregate), `CaseAssignmentRepository.findHeldBy` and `MedicalDocumentRepository.countByCaseExcluding`.
+    `Names` resolves staff (`WorkforcePersonRepository.findAllById`, decrypted on use) and consultant names
+    (`PractitionerProfileRepository.findDisplayNames`) for a whole set of subjects in two queries.
+  - `CaseWorkspaceQueryService` — the case page and `myTasks`. Timeline (`CaseStatusChangeRepository.findTimelineOf`), tasks
+    (`CaseTaskRepository.findRowsOf`, patient-scoped overload), messages with the reader's read flag
+    (`CaseMessageRepository.findRowsOf`, left join on `CaseMessageRead`), open assignments (`findOpenRowsOn`), reviews and
+    their estimate lines (`ClinicalReviewVersionRepository.findRowsOf`, `ClinicalReviewCostEstimateRepository.findRowsForCase`).
+    **N+1 removed:** every timeline actor, message sender and assignee used to cost one or two name queries per row
+    (and invisible threads were named before being filtered out); the page now reads all names once, and today's FX
+    rates at most once instead of once per foreign-currency review. The role → thread rule moved here (`allowedThreads`).
+  - `ProposalQueryService` — a proposal document (`ProposalVersionRepository.findDocument` + `ProposalItemRepository.findRowsOf`),
+    the latest version (`findLatestIdOf`, patient-visible statuses overload), the patient's secure view
+    (`findPatientDocument`: case, patient, recommendation, totals, rate snapshot, consultant), the approval gates (one
+    `findApprovalGatesOf` read instead of four single-column reads) and delivery status.
+  - Command lookups in `JourneyService` now read through repositories: `findStageAndVersion`, `findCareCategory`,
+    `findPatientId`, `findConditionDescription`, `findPatientPreferredLanguage`, `isPatientOf`, `lockById` (intake preview
+    and the proposal version counter — `Proposal.getCurrentVersion` added), `findActivePrimaryCoordinator`, `findStatusFor`,
+    `existsBy…` checks (active assignment, open task owner, clean document, treatment episode, live consent, optional
+    item, accepted decision, approved review), `nextVersionNumber`, `findProposalCurrency`/`findLatestProposalCurrency`,
+    `findPricedLinesOf`, `findLockedMargin`, `findLatestLiveFinalQuote`, `findIdByCaseId`, `findLive` (share link),
+    `findLatest`/`hasLiveGrant`/`countByShareTokenIdAndCreatedAtAfter` (OTP codes), `CatalogEntryRepository.findActivePrice`,
+    `PractitionerProfileRepository.findAvailableVerifiedConsultants`, and `CareCategoryCatalog.exists` (uncached).
+  Ownership: case-table queries in `casemanagement`, proposal/review/message queries in `journey`, names in `directory` and
+  `workforce`, catalogue price in `clinic`, documents in `document`. New test
+  `theCasePageNamesEveryPersonOnItAndNeverShowsARawSubject`.
+  Verification: full suite **586 tests, 0 failures** (2 skipped; +1 case-page names test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest` **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -317,8 +351,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 15 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService` and `CaseActionService` converted) — `JourneyService`
-  (~85 statements), `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
+- **Reads:** 14 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService` and `JourneyService`
+  converted) — `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
   `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
@@ -328,8 +362,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
-`CaseActionService` are done (2026-10-07); next `JourneyService` split by view, then the rest of the list, one service
-per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`CaseActionService` and `JourneyService` are done (2026-10-07); next `PaymentService`, then the rest of the list, one
+service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.

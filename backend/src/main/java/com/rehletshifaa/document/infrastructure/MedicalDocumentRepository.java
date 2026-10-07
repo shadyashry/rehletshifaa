@@ -6,6 +6,7 @@ public interface MedicalDocumentRepository extends JpaRepository<MedicalDocument
     Optional<MedicalDocument> findByIdAndMedicalCaseId(UUID id, UUID caseId);
     long countByMedicalCaseId(UUID caseId);
     java.util.List<MedicalDocument> findByMedicalCaseIdOrderByCreatedAtDesc(UUID caseId);
+    boolean existsByIdAndMedicalCaseIdAndStatus(UUID id, UUID caseId, com.rehletshifaa.document.domain.DocumentStatus status);
     long countByMedicalCaseIdAndStatusNot(UUID caseId, com.rehletshifaa.document.domain.DocumentStatus status);
     long countByMedicalCaseIdAndStatusIn(UUID caseId, java.util.Collection<com.rehletshifaa.document.domain.DocumentStatus> statuses);
     @org.springframework.data.jpa.repository.Query("select coalesce(sum(d.sizeBytes),0) from MedicalDocument d where d.medicalCase.id=:caseId and d.status <> :status")

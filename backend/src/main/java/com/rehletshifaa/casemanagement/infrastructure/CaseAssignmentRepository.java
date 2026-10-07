@@ -31,6 +31,64 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
             order by a.assignedAt desc""")
     java.util.List<OpenAssignment> findOpenOnCase(@Param("caseId") UUID caseId);
 
+    interface CaseHolder { UUID getCaseId(); String getRole(); String getSubject(); String getStatus(); }
+
+    /**
+     * The open coordinator and consultant assignments of the given cases, oldest first (the last row per case and role is
+     * the current one). Referral offers and second opinions never stand in for the case's consultant.
+     */
+    @Query("""
+            select a.caseId as caseId, a.assigneeRole as role, a.assigneeSubject as subject, a.status as status from CaseAssignment a
+            where a.caseId in :caseIds and a.assigneeRole in ('COORDINATOR', 'DOCTOR') and a.status in ('PENDING', 'ACTIVE')
+            and a.assignmentType not in ('TRANSFER', 'SECOND_OPINION')
+            order by a.assignedAt""")
+    java.util.List<CaseHolder> findCaseHolders(@Param("caseIds") java.util.Collection<UUID> caseIds);
+
+    interface HeldAssignment { UUID getCaseId(); UUID getId(); String getStatus(); }
+
+    /** The subject's open assignments in a role on the given cases: active ones first, then oldest first (the last row per case wins). */
+    @Query("""
+            select a.caseId as caseId, a.id as id, a.status as status from CaseAssignment a
+            where a.caseId in :caseIds and a.assigneeSubject = :subject and a.assigneeRole = :role and a.status in ('PENDING', 'ACTIVE')
+            order by case a.status when 'PENDING' then 1 else 0 end, a.assignedAt""")
+    java.util.List<HeldAssignment> findHeldBy(@Param("caseIds") java.util.Collection<UUID> caseIds, @Param("subject") String subject,
+                                              @Param("role") String role);
+
+    interface OpenAssignmentRow { UUID getId(); String getSubject(); String getRole(); String getType(); String getStatus(); Instant getAssignedAt(); Long getVersion(); }
+
+    /** The case's pending and active assignments, oldest first. */
+    @Query("""
+            select a.id as id, a.assigneeSubject as subject, a.assigneeRole as role, a.assignmentType as type, a.status as status,
+                a.assignedAt as assignedAt, a.version as version from CaseAssignment a
+            where a.caseId = :caseId and a.status in ('PENDING', 'ACTIVE')
+            order by a.assignedAt""")
+    java.util.List<OpenAssignmentRow> findOpenRowsOn(@Param("caseId") UUID caseId);
+
+    interface HistoryRow { String getSubject(); String getRole(); String getStatus(); String getReason(); String getAssignedBy(); Instant getAssignedAt(); Instant getEndedAt(); }
+
+    /** Every assignment of the case, newest first; on a shared assignment time the still-open one precedes the one it replaced. */
+    @Query("""
+            select a.assigneeSubject as subject, a.assigneeRole as role, a.status as status, a.reason as reason, a.assignedBy as assignedBy,
+                a.assignedAt as assignedAt, a.endedAt as endedAt from CaseAssignment a
+            where a.caseId = :caseId
+            order by a.assignedAt desc, case when a.endedAt is null then 0 else 1 end, a.endedAt desc, a.id""")
+    java.util.List<HistoryRow> findHistoryOf(@Param("caseId") UUID caseId);
+
+    @Query("""
+            select a.status from CaseAssignment a
+            where a.id = :id and a.caseId = :caseId and a.assigneeSubject = :subject and a.assigneeRole = :role""")
+    java.util.Optional<String> findStatusFor(@Param("id") UUID id, @Param("caseId") UUID caseId, @Param("subject") String subject,
+                                             @Param("role") String role);
+
+    /** The case's active primary coordinator, newest assignment first (pass {@code Limit.of(1)}). */
+    @Query("""
+            select a.assigneeSubject from CaseAssignment a
+            where a.caseId = :caseId and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'
+            order by a.assignedAt desc""")
+    java.util.List<String> findActivePrimaryCoordinator(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
+    boolean existsByCaseIdAndAssigneeSubjectAndAssigneeRoleAndStatus(UUID caseId, String assigneeSubject, String assigneeRole, String status);
+
     /** Cases a consultant holds in an assignment status, excluding cases that are no longer live. */
     @Query("""
             select count(distinct a.caseId) from CaseAssignment a join MedicalCase c on c.id = a.caseId

@@ -64,6 +64,54 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
                 t.dueAt nulls last, t.createdAt""")
     java.util.List<OpenWorkRow> findOpenWorkOf(@Param("owner") String owner);
 
+    /** A task as the case page and task lists show it (title and description still encrypted). */
+    interface TaskRow {
+        UUID getId(); UUID getCaseId(); String getTaskType(); String getTitle(); String getDescription(); String getOwnerSubject();
+        String getOwnerRole(); String getVisibilityScope(); String getPriority(); String getStatus(); Boolean getBlocking(); Instant getDueAt();
+        Long getVersion();
+    }
+
+    String TASK_ROW = """
+            select t.id as id, t.caseId as caseId, t.taskType as taskType, t.title as title, t.description as description,
+                t.ownerSubject as ownerSubject, t.ownerRole as ownerRole, t.visibilityScope as visibilityScope, t.priority as priority,
+                t.status as status, t.blocking as blocking, t.dueAt as dueAt, t.version as version
+            from CaseTask t
+            """;
+
+    @Query(TASK_ROW + "where t.caseId = :caseId order by t.createdAt")
+    java.util.List<TaskRow> findRowsOf(@Param("caseId") UUID caseId);
+
+    @Query(TASK_ROW + "where t.caseId = :caseId and t.visibilityScope = :scope order by t.createdAt")
+    java.util.List<TaskRow> findRowsOf(@Param("caseId") UUID caseId, @Param("scope") String scope);
+
+    /** Open tasks owned by the subject: most urgent first, then soonest due (undated last), then oldest. */
+    @Query(TASK_ROW + """
+            where t.ownerSubject = :owner and t.status in ('OPEN', 'IN_PROGRESS')
+            order by case t.priority when 'URGENT' then 0 when 'HIGH' then 1 when 'NORMAL' then 2 else 3 end,
+                t.dueAt nulls last, t.createdAt""")
+    java.util.List<TaskRow> findOpenRowsOwnedBy(@Param("owner") String owner);
+
+    @Query("select t.ownerSubject from CaseTask t where t.id = :id and t.caseId = :caseId")
+    java.util.Optional<String> findOwnerSubject(@Param("id") UUID id, @Param("caseId") UUID caseId);
+
+    /** The queue signals of a case's open internal work; cases without any are absent. */
+    interface WorkSignals {
+        UUID getCaseId(); Long getOpenCount(); Long getOverdueCount(); Long getBlockingOverdueCount(); Long getHighPriorityCount();
+        Long getPatientResponseCount(); Instant getNextDue();
+    }
+
+    @Query("""
+            select t.caseId as caseId, count(t) as openCount,
+                sum(case when t.dueAt is not null and t.dueAt < :now then 1 else 0 end) as overdueCount,
+                sum(case when t.blocking = true and t.dueAt is not null and t.dueAt < :now then 1 else 0 end) as blockingOverdueCount,
+                sum(case when t.priority in ('URGENT', 'HIGH') then 1 else 0 end) as highPriorityCount,
+                sum(case when t.taskType = 'REVIEW_PATIENT_RESPONSE' then 1 else 0 end) as patientResponseCount,
+                min(case when t.dueAt is not null and t.dueAt >= :now then t.dueAt end) as nextDue
+            from CaseTask t
+            where t.caseId in :caseIds and t.status in ('OPEN', 'IN_PROGRESS') and t.visibilityScope = 'INTERNAL'
+            group by t.caseId""")
+    java.util.List<WorkSignals> findWorkSignals(@Param("caseIds") java.util.Collection<UUID> caseIds, @Param("now") Instant now);
+
     /** The signed-in patient owns this patient action of their own (unmerged) case. */
     @Query("""
             select count(t) > 0 from CaseTask t join MedicalCase c on c.id = t.caseId join PatientProfile p on p.id = c.patientId

@@ -39,6 +39,74 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select c.waitingReason from MedicalCase c where c.id = :id")
     Optional<String> findWaitingReason(@Param("id") UUID id);
 
+    /** The case stage and revision a guarded transition starts from. */
+    interface StageAndVersion { CaseStatus getStatus(); Long getVersion(); }
+
+    @Query("select c.status as status, c.version as version from MedicalCase c where c.id = :id")
+    Optional<StageAndVersion> findStageAndVersion(@Param("id") UUID id);
+
+    @Query("select c.conditionDescription from MedicalCase c where c.id = :id")
+    Optional<String> findConditionDescription(@Param("id") UUID id);
+
+    @Query("select c.careCategory from MedicalCase c where c.id = :id")
+    Optional<String> findCareCategory(@Param("id") UUID id);
+
+    @Query("select c.patientId from MedicalCase c where c.id = :id")
+    Optional<UUID> findPatientId(@Param("id") UUID id);
+
+    @Query("select p.preferredLanguage from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
+    Optional<String> findPatientPreferredLanguage(@Param("id") UUID id);
+
+    /** The identity is the case's own patient. */
+    @Query("select count(c) > 0 from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id and p.externalSubject = :subject")
+    boolean isPatientOf(@Param("id") UUID id, @Param("subject") String subject);
+
+    /** One case as the case lists show it: the case facts and the patient's display name. */
+    interface CaseRow {
+        UUID getId(); String getCaseNumber(); CaseStatus getStatus(); String getPatientName(); String getCountry();
+        String getPreferredLanguage(); String getCareCategory(); Instant getCreatedAt(); Instant getUpdatedAt(); Long getVersion();
+        Boolean getTravelPackageRequested(); String getWaitingOn(); String getWaitingReason();
+    }
+
+    String CASE_ROW = """
+            select c.id as id, c.caseNumber as caseNumber, c.status as status,
+                trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as patientName, c.country as country,
+                c.preferredLanguage as preferredLanguage, c.careCategory as careCategory, c.createdAt as createdAt,
+                c.updatedAt as updatedAt, c.version as version, c.travelPackageRequested as travelPackageRequested,
+                c.waitingOn as waitingOn, c.waitingReason as waitingReason
+            from MedicalCase c join PatientProfile p on p.id = c.patientId
+            """;
+
+    @Query(CASE_ROW + "where c.id = :id")
+    Optional<CaseRow> findCaseRow(@Param("id") UUID id);
+
+    /** The cases of the patient the identity is, or represents under an unrevoked, unexpired representation; latest change first. */
+    @Query(CASE_ROW + """
+            where p.externalSubject = :subject or exists (select 1 from PatientRepresentative r where r.patientId = p.id
+                and r.representativeSubject = :subject and r.revokedAt is null and (r.expiresAt is null or r.expiresAt > :now))
+            order by c.updatedAt desc""")
+    java.util.List<CaseRow> findPatientCaseRows(@Param("subject") String subject, @Param("now") Instant now);
+
+    /**
+     * The coordination queue: submitted cases still waiting for a primary coordinator, plus cases whose active primary
+     * coordinator is one of the given subjects; latest change first.
+     */
+    @Query(CASE_ROW + """
+            where c.status <> com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT
+            and ((c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.RECEIVED and not exists (select 1 from CaseAssignment a
+                    where a.caseId = c.id and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'))
+                or exists (select 1 from CaseAssignment a where a.caseId = c.id and a.assigneeRole = 'COORDINATOR'
+                    and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE' and a.assigneeSubject in :subjects))
+            order by c.updatedAt desc""")
+    java.util.List<CaseRow> findCoordinatorQueueRows(@Param("subjects") java.util.Collection<String> subjects);
+
+    /** Cases one of the subjects actively holds in an assignment role; least recently changed first. */
+    @Query(CASE_ROW + """
+            where exists (select 1 from CaseAssignment a where a.caseId = c.id and a.assigneeSubject in :subjects
+                and a.assigneeRole = :role and a.status = 'ACTIVE')
+            order by c.updatedAt asc""")
+    java.util.List<CaseRow> findAssignedCaseRows(@Param("subjects") java.util.Collection<String> subjects, @Param("role") String role);
+
     /** A status transition guarded by the status the caller saw. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update MedicalCase c set c.status = :to, c.updatedAt = :now, c.version = c.version + 1 where c.id = :id and c.status = :from")

@@ -26,4 +26,7 @@ public class CareCategoryCatalog {
         return categories.findAllByOrderBySortOrderAscNameEnAsc().stream()
                 .map(c -> new CareCategoryView(c.getSlug(), c.getNameEn(), c.getNameAr())).toList();
     }
+
+    /** A managed care area. Not cached: a value about to be stored is checked against the table itself. */
+    public boolean exists(String slug) { return categories.existsBySlug(slug); }
 }

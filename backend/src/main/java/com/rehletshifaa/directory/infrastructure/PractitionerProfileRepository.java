@@ -24,6 +24,17 @@ public interface PractitionerProfileRepository extends BaseRepository<Practition
 
     java.util.Optional<PractitionerProfile> findFirstByExternalSubjectAndCredentialingStatus(String externalSubject, String credentialingStatus);
 
+    interface SubjectName { String getSubject(); String getDisplayName(); }
+
+    @Query("select p.externalSubject as subject, p.displayName as displayName from PractitionerProfile p where p.externalSubject in :subjects")
+    List<SubjectName> findDisplayNames(@Param("subjects") java.util.Collection<String> subjects);
+
+    /** Verified, available consultants bound to an identity, by display name. */
+    @Query("""
+            select p from PractitionerProfile p where p.credentialingStatus = 'VERIFIED' and p.practitionerType = 'CONSULTANT'
+            and p.availabilityStatus = 'AVAILABLE' and p.externalSubject is not null order by p.displayName""")
+    List<PractitionerProfile> findAvailableVerifiedConsultants();
+
     /** An enabled consultant account bound to this identity (authority: CONSULTANT role). */
     @Query("select count(p) > 0 from PractitionerProfile p where p.externalSubject = :subject and p.accountStatus <> 'DISABLED' and p.disabledAt is null")
     boolean isEnabledConsultant(@Param("subject") String subject);

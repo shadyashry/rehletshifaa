@@ -10,6 +10,31 @@ import java.time.Instant;
 import java.util.UUID;
 
 public interface ClinicalReviewVersionRepository extends BaseRepository<ClinicalReviewVersion, UUID> {
+    /** A review as the case page lists it. */
+    interface ReviewRow {
+        UUID getId(); Integer getVersionNumber(); String getStatus(); String getSuitability(); String getRecommendedTreatment();
+        String getRisksAndLimitations(); String getProposalCurrency(); Instant getCreatedAt();
+    }
+
+    @Query("""
+            select r.id as id, r.versionNumber as versionNumber, r.status as status, r.suitability as suitability,
+                r.recommendedTreatment as recommendedTreatment, r.risksAndLimitations as risksAndLimitations,
+                r.proposalCurrency as proposalCurrency, r.createdAt as createdAt
+            from ClinicalReviewVersion r where r.caseId = :caseId order by r.versionNumber desc""")
+    java.util.List<ReviewRow> findRowsOf(@Param("caseId") UUID caseId);
+
+    @Query("select coalesce(max(r.versionNumber), 0) + 1 from ClinicalReviewVersion r where r.caseId = :caseId")
+    int nextVersionNumber(@Param("caseId") UUID caseId);
+
+    boolean existsByIdAndCaseIdAndStatus(UUID id, UUID caseId, String status);
+
+    @Query("select r.proposalCurrency from ClinicalReviewVersion r where r.id = :id")
+    java.util.Optional<String> findProposalCurrency(@Param("id") UUID id);
+
+    /** The currency the case's latest review with one was prepared in (pass {@code Limit.of(1)}). */
+    @Query("select r.proposalCurrency from ClinicalReviewVersion r where r.caseId = :caseId and r.proposalCurrency is not null order by r.versionNumber desc")
+    java.util.List<String> findLatestProposalCurrency(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
     /** A new decision supersedes the case reviews still in force (drafts and the approved one). */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update ClinicalReviewVersion r set r.status = 'SUPERSEDED' where r.caseId = :caseId and r.status in ('DRAFT', 'APPROVED')")

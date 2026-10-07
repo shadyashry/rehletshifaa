@@ -19,4 +19,6 @@ public interface ConsentRecordRepository extends BaseRepository<ConsentRecord, U
             select count(c) > 0 from ConsentRecord c where c.patientId = :patientId and c.consentType = :type and c.revokedAt is null
             and (c.caseId is null or c.caseId = :caseId)""")
     boolean isGiven(@Param("patientId") UUID patientId, @Param("type") String type, @Param("caseId") UUID caseId);
+
+    boolean existsByCaseIdAndConsentTypeInAndRevokedAtIsNull(UUID caseId, java.util.Collection<String> consentTypes);
 }

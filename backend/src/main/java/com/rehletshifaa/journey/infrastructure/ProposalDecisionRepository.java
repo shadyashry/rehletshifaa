@@ -6,4 +6,5 @@ import com.rehletshifaa.shared.persistence.BaseRepository;
 import java.util.UUID;
 
 public interface ProposalDecisionRepository extends BaseRepository<ProposalDecision, UUID> {
+    boolean existsByProposalVersionIdAndDecision(UUID proposalVersionId, String decision);
 }

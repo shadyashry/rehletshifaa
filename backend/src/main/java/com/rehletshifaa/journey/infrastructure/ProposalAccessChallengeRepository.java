@@ -10,6 +10,26 @@ import java.time.Instant;
 import java.util.UUID;
 
 public interface ProposalAccessChallengeRepository extends BaseRepository<ProposalAccessChallenge, UUID> {
+    long countByShareTokenIdAndCreatedAtAfter(UUID shareTokenId, Instant since);
+
+    interface CodeRow {
+        UUID getId(); String getCodeHash(); Instant getExpiresAt(); Integer getAttempts(); Integer getMaxAttempts(); Instant getConsumedAt();
+        Instant getRevokedAt(); String getDeliveryChannel();
+    }
+
+    /** The link's codes, newest first (pass {@code Limit.of(1)} for the current one). */
+    @Query("""
+            select c.id as id, c.codeHash as codeHash, c.expiresAt as expiresAt, c.attempts as attempts, c.maxAttempts as maxAttempts,
+                c.consumedAt as consumedAt, c.revokedAt as revokedAt, c.deliveryChannel as deliveryChannel
+            from ProposalAccessChallenge c where c.shareTokenId = :shareTokenId order by c.createdAt desc""")
+    java.util.List<CodeRow> findLatest(@Param("shareTokenId") UUID shareTokenId, org.springframework.data.domain.Limit limit);
+
+    /** A consumed code of the link exchanged for this grant, unexpired and not revoked. */
+    @Query("""
+            select count(c) > 0 from ProposalAccessChallenge c where c.shareTokenId = :shareTokenId and c.grantHash = :grantHash
+            and c.grantExpiresAt > :now and c.consumedAt is not null and c.revokedAt is null""")
+    boolean hasLiveGrant(@Param("shareTokenId") UUID shareTokenId, @Param("grantHash") String grantHash, @Param("now") Instant now);
+
     /** A new code supersedes the open codes of the link. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

@@ -26,4 +26,6 @@ public class Proposal extends AssignedIdEntity {
         super(id);
         this.caseId = caseId; this.createdAt = micros(now); this.updatedAt = micros(now);
     }
+
+    public int getCurrentVersion() { return currentVersion; }
 }

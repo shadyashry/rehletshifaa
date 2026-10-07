@@ -354,6 +354,30 @@ class OperationalWorkflowTest {
         assertThat(card.patientResponsePending()).isFalse();
     }
 
+    @Test void theCasePageNamesEveryPersonOnItAndNeverShowsARawSubject() throws Exception {
+        seedCoordinatorProfile();
+        UUID caseId = ownedCase();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        journey.message(caseId, new MessageRequest("COORDINATOR_DOCTOR", "Note for the consultant", "en", true));
+        work.openWorkItem(new NewWorkItem(caseId, "REVIEW", "Internal review", null, "coordinator-subject",
+                "COORDINATOR", false, null, "SYSTEM", "WORK_ASSIGNED", "page-1:" + caseId, false));
+        em.flush();
+
+        CaseWorkspace page = journey.workspace(caseId);
+        assertThat(page.caseSummary().coordinatorName()).isEqualTo("Coordinator One");
+        assertThat(page.assignments()).filteredOn(a -> "COORDINATOR".equals(a.assigneeRole()))
+                .extracting(AssignmentView::assigneeName).containsOnly("Coordinator One");
+        assertThat(page.messages()).singleElement().satisfies(m -> {
+            assertThat(m.senderName()).isEqualTo("Coordinator One");
+            assertThat(m.direction()).isEqualTo("OUTBOUND");
+            assertThat(m.read()).isTrue();
+            assertThat(m.body()).isEqualTo("Note for the consultant");
+        });
+        assertThat(page.tasks()).extracting(TaskView::title).contains("Internal review");
+        assertThat(page.timeline()).isNotEmpty().extracting(TimelineEvent::actorName).doesNotContain("coordinator-subject");
+        assertThat(journey.assignmentHistory(caseId)).extracting(AssignmentHistoryEntry::assigneeName).contains("Coordinator One");
+    }
+
 
     // ---------------- consultant assignment lifecycle ----------------
 

@@ -21,6 +21,13 @@ public interface CatalogEntryRepository extends BaseRepository<CatalogEntry, UUI
 
     boolean existsByPractitionerIdAndServiceCode(UUID practitionerId, String serviceCode);
 
+    /** The EGP price of an active entry of the consultant's list that is already in effect. */
+    @Query("""
+            select e.priceEgp from CatalogEntry e where e.id = :id and e.practitionerId = :practitionerId and e.active = true
+            and (e.effectiveFrom is null or e.effectiveFrom <= :today)""")
+    Optional<java.math.BigDecimal> findActivePrice(@Param("id") UUID id, @Param("practitionerId") UUID practitionerId,
+                                                   @Param("today") LocalDate today);
+
     /** The services a consultant currently offers: active and inside their effective window. */
     @Query("""
             select e from CatalogEntry e where e.practitionerId = :practitionerId and e.active = true
