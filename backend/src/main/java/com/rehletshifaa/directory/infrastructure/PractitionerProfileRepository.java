@@ -106,4 +106,13 @@ public interface PractitionerProfileRepository extends BaseRepository<Practition
             where p.id = :id and p.version = :version""")
     int setAvailabilityAndReviewHours(@Param("id") UUID id, @Param("version") long version, @Param("status") String status,
                                       @Param("hours") Integer hours, @Param("now") Instant now);
+
+    boolean existsByIdAndPractitionerType(UUID id, String practitionerType);
+
+    /** A practitioner's id and display name. */
+    interface IdAndName { UUID getId(); String getDisplayName(); }
+
+    /** Consultants by display name, then id. */
+    @Query("select p.id as id, p.displayName as displayName from PractitionerProfile p where p.practitionerType = 'CONSULTANT' order by p.displayName, p.id")
+    java.util.List<IdAndName> findConsultantNames();
 }

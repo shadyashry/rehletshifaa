@@ -28,69 +28,69 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 
 | Owner | Table | Status | Users (modules) |
 |---|---|---|---|
-| access | `access_recertification_campaigns` | W | access |
-| access | `access_recertification_items` | W | access |
-| casemanagement | `case_assignments` | W | access,clinic,coordination,journey |
-| casemanagement | `case_tasks` | W | access,coordination,journey |
-| access | `consultant_current_operations_owners` | W | access,clinic |
-| access | `mfa_reset_requests` | W | access |
-| access | `platform_account_owner_current` | W | access |
-| access | `platform_account_owner_relationships` | W | access |
-| access | `platform_governance_bootstrap` | W | access |
-| access | `platform_owner_transfer_acceptances` | W | access |
-| access | `platform_owner_transfer_requests` | W | access |
-| access | `platform_owner_transfer_verifications` | W | access |
-| access | `privileged_access_change_decisions` | W | access |
-| access | `privileged_access_change_requests` | W | access |
-| access | `service_accounts` | W | access |
-| access | `support_identity_checks` | W | access |
-| workforce | `workforce_identity_review_history` | W | access |
-| workforce | `workforce_identity_reviews` | W | access |
-| workforce | `workforce_staffing_requests` | W | access |
+| access | `access_recertification_campaigns` | R | access |
+| access | `access_recertification_items` | R | access |
+| casemanagement | `case_assignments` | R | access,clinic,coordination,journey |
+| casemanagement | `case_tasks` | R | access,coordination,journey |
+| access | `consultant_current_operations_owners` | R | access,clinic |
+| access | `mfa_reset_requests` | R | access |
+| access | `platform_account_owner_current` | R | access |
+| access | `platform_account_owner_relationships` | R | access |
+| access | `platform_governance_bootstrap` | R | access |
+| access | `platform_owner_transfer_acceptances` | R | access |
+| access | `platform_owner_transfer_requests` | R | access |
+| access | `platform_owner_transfer_verifications` | R | access |
+| access | `privileged_access_change_decisions` | R | access |
+| access | `privileged_access_change_requests` | R | access |
+| access | `service_accounts` | R | access |
+| access | `support_identity_checks` | R | access |
+| workforce | `workforce_identity_review_history` | R | access |
+| workforce | `workforce_identity_reviews` | R | access |
+| workforce | `workforce_staffing_requests` | R | access |
 | directory | `patient_profiles` | R | access,authority,casemanagement,journey |
 | directory | `patient_representatives` | R | authority,journey |
-| authority | `platform_role_assignments` | W | access,authority,identity |
-| directory | `practice_managers` | W | access,authority,clinic |
-| directory | `practitioner_profiles` | W | access,authority,clinic,coordination,identity,journey |
-| authority | `workforce_role_conflicts` | W | access,authority |
+| authority | `platform_role_assignments` | R | access,authority,identity |
+| directory | `practice_managers` | R | access,authority,clinic |
+| directory | `practitioner_profiles` | R | access,authority,clinic,coordination,identity,journey |
+| authority | `workforce_role_conflicts` | R | access,authority |
 | casemanagement | `case_access_links` | R | casemanagement,journey |
 | casemanagement | `case_intake_grants` | R | casemanagement |
-| casemanagement | `case_status_history` | W | casemanagement,journey |
+| casemanagement | `case_status_history` | R | casemanagement,journey |
 | casemanagement | `case_submission_contacts` | R | casemanagement,journey |
 | casemanagement | `consent_records` | R | casemanagement,journey |
-| document | `medical_documents` | W | casemanagement,document,journey |
+| document | `medical_documents` | R | casemanagement,document,journey |
 | clinic | `audit_events` | R | clinic,journey |
 | clinic | `care_categories` | R | clinic,journey |
 | clinic | `clinic_service_changes` | R | clinic |
-| clinic | `consultant_capabilities` | W | clinic |
-| clinic | `consultant_operations_ownerships` | W | clinic |
-| clinic | `consultant_review_conflicts` | W | clinic |
-| clinic | `consultant_service_catalog` | W | clinic,journey |
+| clinic | `consultant_capabilities` | R | clinic |
+| clinic | `consultant_operations_ownerships` | R | clinic |
+| clinic | `consultant_review_conflicts` | R | clinic |
+| clinic | `consultant_service_catalog` | R | clinic,journey |
 | clinic | `consultation_slots` | R | clinic |
-| casemanagement | `medical_cases` | W | casemanagement,clinic,coordination,journey |
-| directory | `practitioner_credentials` | W | clinic,journey |
+| casemanagement | `medical_cases` | R | casemanagement,clinic,coordination,journey |
+| directory | `practitioner_credentials` | R | clinic,journey |
 | clinic | `virtual_clinics` | R | clinic |
-| coordination | `coordination_routing_lock` | W | coordination |
-| coordination | `coordination_decisions` | W | coordination |
-| coordination | `coordination_policy_versions` | W | coordination |
-| coordination | `coordination_team_profiles` | W | coordination |
-| identity | `identity_operations` | W | access,identity |
-| identity | `identity_reconciliation_discrepancies` | W | identity |
-| identity | `identity_reconciliation_runs` | W | identity |
-| identity | `identity_restore_gate` | W | identity |
-| identity | `platform_governance_lock` | W | access,identity |
-| workforce | `workforce_invitation_roles` | W | access,identity |
-| workforce | `workforce_invitations` | W | access,identity |
+| coordination | `coordination_routing_lock` | R | coordination |
+| coordination | `coordination_decisions` | R | coordination |
+| coordination | `coordination_policy_versions` | R | coordination |
+| coordination | `coordination_team_profiles` | R | coordination |
+| identity | `identity_operations` | R | access,identity |
+| identity | `identity_reconciliation_discrepancies` | R | identity |
+| identity | `identity_reconciliation_runs` | R | identity |
+| identity | `identity_restore_gate` | R | identity |
+| identity | `platform_governance_lock` | R | access,identity |
+| workforce | `workforce_invitation_roles` | R | access,identity |
+| workforce | `workforce_invitations` | R | access,identity |
 | journey | `case_access_challenges` | R | journey |
-| journey | `case_message_reads` | W | journey |
-| journey | `case_messages` | W | journey |
-| journey | `clinical_review_cost_estimates` | W | journey |
-| journey | `clinical_review_versions` | W | journey |
+| journey | `case_message_reads` | R | journey |
+| journey | `case_messages` | R | journey |
+| journey | `clinical_review_cost_estimates` | R | journey |
+| journey | `clinical_review_versions` | R | journey |
 | journey | `consultant_referrals` | R | journey |
 | journey | `deposit_components` | R | journey |
 | journey | `deposit_policies` | R | journey |
 | journey | `deposits` | R | journey |
-| journey | `follow_up_plans` | W | journey |
+| journey | `follow_up_plans` | R | journey |
 | journey | `journey_admission_policy_current` | R | journey |
 | journey | `journey_admission_policy_revisions` | R | journey |
 | journey | `journey_case_admissions` | R | journey |
@@ -110,20 +110,20 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | journey | `patient_identity_verifications` | R | journey |
 | journey | `patient_onboardings` | R | journey |
 | journey | `payment_events` | R | journey |
-| journey | `portal_preferences` | W | journey |
-| journey | `proposal_access_challenges` | W | journey |
-| journey | `proposal_decisions` | W | journey |
-| journey | `proposal_items` | W | journey |
-| journey | `proposal_share_tokens` | W | journey |
-| journey | `proposal_versions` | W | journey |
-| journey | `proposals` | W | journey |
+| journey | `portal_preferences` | R | journey |
+| journey | `proposal_access_challenges` | R | journey |
+| journey | `proposal_decisions` | R | journey |
+| journey | `proposal_items` | R | journey |
+| journey | `proposal_share_tokens` | R | journey |
+| journey | `proposal_versions` | R | journey |
+| journey | `proposals` | R | journey |
 | journey | `service_template_items` | R | journey |
 | journey | `service_templates` | R | journey |
-| journey | `staff_notifications` | W | journey |
-| journey | `travel_plans` | W | journey |
-| journey | `treatment_episodes` | W | journey |
-| notification | `notification_outbox` | W | casemanagement,journey,notification |
-| notification | `whatsapp_delivery_events` | W | notification |
+| journey | `staff_notifications` | R | journey |
+| journey | `travel_plans` | R | journey |
+| journey | `treatment_episodes` | R | journey |
+| notification | `notification_outbox` | R | casemanagement,journey,notification |
+| notification | `whatsapp_delivery_events` | R | notification |
 | journey | `commercial_policies` | R |  |
 | shared | `fx_rates` | R |  |
 | (none) | `idempotency_records` | dead |  |
@@ -136,15 +136,15 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | (none) | `practice_manager_delegation_history` | dead |  |
 | (none) | `practice_manager_invitations` | dead |  |
 | workforce | `access_subjects` | R | access,authority,coordination,identity,workforce |
-| workforce | `workforce_current_managers` | W | access,workforce |
-| workforce | `workforce_functions` | W (read-only entity) | clinic,workforce |
-| workforce | `workforce_lead_designations` | W | access,coordination,workforce |
+| workforce | `workforce_current_managers` | R | access,workforce |
+| workforce | `workforce_functions` | R (read-only entity) | clinic,workforce |
+| workforce | `workforce_lead_designations` | R | access,coordination,workforce |
 | workforce | `workforce_people` | R | access,authority,clinic,coordination,identity,journey,workforce |
-| workforce | `workforce_reporting_lines` | W | access,workforce |
+| workforce | `workforce_reporting_lines` | R | access,workforce |
 | workforce | `workforce_role_assignments` | R | access,authority,clinic,coordination,identity,journey,workforce |
-| workforce | `workforce_role_catalogue` | W (read-only entity) | access,workforce |
-| workforce | `workforce_team_memberships` | W | access,coordination,workforce |
-| workforce | `workforce_teams` | W | access,coordination,workforce |
+| workforce | `workforce_role_catalogue` | R (read-only entity) | access,workforce |
+| workforce | `workforce_team_memberships` | R | access,coordination,workforce |
+| workforce | `workforce_teams` | R | access,coordination,workforce |
 
 `care_categories` is read only through `CareCategoryRepository` since `JourneyService` was converted (2026-10-07).
 `audit_events` is read only through JPA (`AuditEventRepository`, `JourneyVersionRepository`) since `CaseHandoffService` was
@@ -619,6 +619,38 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   Verification: full suite **598 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
   **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`CoordinationRepository` reads converted** (CL5 read slice 15; removed from `JDBC_NOT_YET_CONVERTED`, 3 → 2).
+  The coordination facade's writes were already JPA; its reads (teams with routing profiles, care-coordination memberships and
+  person teams with the lead flag, capacity, policy and preference versions, consultants, case routing facts, owner, workload,
+  last automatic assignment, the routing queue, decision replay, history and the decision feed) are now JPQL projections in the
+  owning modules (`coordination` for its own tables and the team profile join, `workforce` for memberships, `directory` for
+  consultants, `casemanagement` for cases, assignments and tasks). Its public API is unchanged. **Every table is now R**: the
+  status table above was swept W → R, since no plain-SQL reader is left outside the two documented exceptions —
+  `CaseNumberGenerator` reads only the `case_number_seq` sequence, and `LocalDemoDataSeeder` (local profile, excluded from
+  ownership) still seeds with JDBC, guarding its inserts with `NOT EXISTS`.
+  - Behaviour unchanged: team and membership windows, the lead flag, capacity/policy/preference orders, the CONSULTANT filter,
+    `CASE_NOT_FOUND`, owner and consultant tie-breaks (`assignedAt desc, id`), open caseload excluding the case being routed,
+    the MANUAL_QUEUE exclusion and 100-case retry batch, queue order `dueAt, id` (no explicit NULL placement, as before),
+    `IDEMPOTENCY_CONFLICT`, newest-first history and feed (`createdAt desc, id desc`).
+  - The routing queue no longer counts decisions once per item: one batched `countByCaseIds`. `ownerAssignmentId` on a case
+    without an active primary coordinator still fails as an internal error (was `EmptyResultDataAccessException`, now
+    `IllegalStateException`).
+  - Queries added: `CoordinationTeamProfileRepository.findTeams`; `CoordinatorCapacityRepository.findRows`;
+    `CoordinationPolicyVersionRepository.findRowsNewestFirst`; `ConsultantRoutingPreferenceRepository.findRowsOf`/`findAllRows`;
+    `CoordinationDecisionRepository.countByCaseId`, `countByCaseIds`, `countRoutedCases`, `findRecorded`, `findResultsOf`,
+    `findFeed`; `WorkforceTeamMembershipRepository.findActiveMembers` and `findMemberTeams`; `PractitionerProfileRepository.
+    existsByIdAndPractitionerType` and `findConsultantNames`; `MedicalCaseRepository.findRoutingFacts`;
+    `CaseAssignmentRepository.findActivePrimaryCoordinatorAssignmentIds`, `findPrimaryConsultantIds`,
+    `countOpenPrimaryCasesExcept`, `findAutomaticAssignmentTimes`; `CaseTaskRepository.isQueuedForRouting`,
+    `findRetryableRoutingCases`, `findRoutingQueue`. Reused: `CaseAssignmentRepository.findActivePrimaryCoordinator` (owner).
+  - Locks: unchanged — `lock()` (routing lock) and `lockCase` (`lockById`) were already JPA.
+  - New test `CoordinationIntegrationTest.routingReadsCarryQueueRevisionsTeamsLeadsPreferencesConsultantsAndNewestDecisionsFirst`
+    (last automatic assignment, the queue item's number/reason/team/revision and the overview count, newest-first history and
+    feed, case facts and the latest offered consultant, `CASE_NOT_FOUND`, a team without a profile at revision -1, lead flags,
+    current vs latest preference). It also passes on the pre-conversion repository.
+  Verification: full suite **599 tests, 0 failures** (2 skipped; +1 test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest`
+  **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -626,25 +658,21 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - `LocalDemoDataSeeder` (`@Profile("local")`, runs once at startup) still writes with JDBC until it moves to its own
   dev-data package.
 
-## Where it stands (2026-10-06)
+## Where it stands (2026-10-07)
 
-- **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
-  2026-10-06). The patient merge (`mergePatient`) was the
+- **Writes:** every table is JPA-written except by the two exceptions above. The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 3 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService`,
-  `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
-  `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService`,
-  `JourneyCaseRelationships` and `CoordinationReadService` converted) — plus the three exceptions
-  (`CoordinationRepository` reads, `CaseNumberGenerator`, `LocalDemoDataSeeder`). They are
-  listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
-  `org.springframework.jdbc..`/`java.sql..` type (CL6), and no repository may declare a native query.
+- **Reads:** every table is read through Spring Data JPA (all rows above are R). CL5 converted, on 2026-10-07,
+  `StaffWorkService`, `CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`,
+  `PatientActivationService`, `PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`,
+  `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService`, `JourneyCaseRelationships`,
+  `CoordinationReadService` and the `CoordinationRepository` reads.
+- `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED` holds only the two documented exceptions (`CaseNumberGenerator`,
+  `LocalDemoDataSeeder`); nothing else may use `JdbcClient` or any other `org.springframework.jdbc..`/`java.sql..` type (CL6),
+  and no repository may declare a native query.
 
 ## Next slice
 
-Convert the read models, one service per slice, as query services rather than line-by-line translations: most
-remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
-`CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`,
-`PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService`, `JourneyCaseRelationships` and `CoordinationReadService` are done (2026-10-07); next the `CoordinationRepository` reads, then the rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
-batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
-class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
-`LocalDemoDataSeeder` to a `devdata` package.
+Move `LocalDemoDataSeeder` out of `shared.config` into its own top-level `devdata` package (rule 1: it must not make `shared`
+depend on everything), keeping it `@Profile("local")` and on the exception list under its new name. After that the JPA
+migration has no open slice; CL7 (Sonar) stays blocked on a Sonar server/project/token and scanner.

@@ -138,6 +138,35 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
             order by c.updatedAt desc""")
     java.util.List<CoordinatedCase> findCoordinatedCases(@Param("subjects") java.util.Collection<String> subjects);
 
+    /** The case's active primary coordinator assignments, latest first (use with {@code Limit.of(1)}). */
+    @Query("""
+            select a.id from CaseAssignment a
+            where a.caseId = :caseId and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'
+            order by a.assignedAt desc, a.id""")
+    java.util.List<UUID> findActivePrimaryCoordinatorAssignmentIds(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
+    /** Practitioner ids of the case's primary consultant, active or offered, latest first (use with {@code Limit.of(1)}). */
+    @Query("""
+            select p.id from CaseAssignment a join PractitionerProfile p on p.externalSubject = a.assigneeSubject
+            where a.caseId = :caseId and a.assigneeRole = 'DOCTOR' and a.assignmentType = 'PRIMARY' and a.status in ('ACTIVE', 'PENDING')
+            order by a.assignedAt desc, a.id""")
+    java.util.List<UUID> findPrimaryConsultantIds(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
+    /** Open (not closed or cancelled) cases the coordinator owns as active primary coordinator, other than {@code excluded}. */
+    @Query("""
+            select count(distinct a.caseId) from CaseAssignment a join MedicalCase c on c.id = a.caseId
+            where a.assigneeSubject = :subject and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'
+                and c.status not in (com.rehletshifaa.casemanagement.domain.CaseStatus.CLOSED, com.rehletshifaa.casemanagement.domain.CaseStatus.CANCELLED)
+                and a.caseId <> :excluded""")
+    long countOpenPrimaryCasesExcept(@Param("subject") String subject, @Param("excluded") UUID excluded);
+
+    /** When the routing engine last made the subject a case's coordinator, latest first (use with {@code Limit.of(1)}). */
+    @Query("""
+            select a.assignedAt from CaseAssignment a
+            where a.assigneeSubject = :subject and a.assigneeRole = 'COORDINATOR' and a.assignedBy = 'ROUTING_ENGINE'
+            order by a.assignedAt desc""")
+    java.util.List<Instant> findAutomaticAssignmentTimes(@Param("subject") String subject, org.springframework.data.domain.Limit limit);
+
     /** Everyone actively assigned to the case in the role. */
     @Query("select a.assigneeSubject from CaseAssignment a where a.caseId = :caseId and a.assigneeRole = :role and a.status = 'ACTIVE'")
     java.util.List<String> findActiveAssignees(@Param("caseId") UUID caseId, @Param("role") String role);

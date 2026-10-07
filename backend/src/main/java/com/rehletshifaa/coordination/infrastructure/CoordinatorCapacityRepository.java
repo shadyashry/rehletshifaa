@@ -17,4 +17,12 @@ public interface CoordinatorCapacityRepository extends BaseRepository<Coordinato
             where c.subject = :subject and c.revision = :revision""")
     int change(@Param("subject") String subject, @Param("revision") long revision, @Param("maximum") int maximum, @Param("onDuty") boolean onDuty,
                @Param("languages") String languages, @Param("careAreas") String careAreas, @Param("by") String by, @Param("now") Instant now);
+
+    interface Row { String getSubject(); Integer getMaximum(); Boolean getOnDuty(); String getLanguages(); String getCareAreas(); Long getRevision(); }
+
+    @Query("""
+            select c.subject as subject, c.maximum as maximum, c.onDuty as onDuty, c.languages as languages, c.careAreas as careAreas,
+                c.revision as revision
+            from CoordinatorCapacity c order by c.subject""")
+    java.util.List<Row> findRows();
 }

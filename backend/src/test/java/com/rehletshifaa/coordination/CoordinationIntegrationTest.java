@@ -370,6 +370,64 @@ class CoordinationIntegrationTest {
         assertThat(reads.managedCaseSummaries()).isEmpty();
     }
 
+    @Test void routingReadsCarryQueueRevisionsTeamsLeadsPreferencesConsultantsAndNewestDecisionsFirst() {
+        // An automatic route, then a manager's QUEUE: the case waits in the queue carrying both decisions as its revision.
+        assertThat(repo.lastAutomatic("routing-a")).isNull();
+        command("AUTO", 0, null);
+        assertThat(repo.lastAutomatic("routing-a")).isEqualTo(jdbc.queryForObject(
+                "SELECT MAX(assigned_at) FROM case_assignments WHERE assignee_subject='routing-a' AND assigned_by='ROUTING_ENGINE'", Instant.class)).isNotNull();
+        assertThat(repo.lastAutomatic("routing-b")).isNull();
+        command("QUEUE", 1, null);
+        QueueItem item = repo.queue().stream().filter(q -> q.caseId().equals(caseId)).findFirst().orElseThrow();
+        assertThat(item.caseNumber()).isEqualTo(jdbc.queryForObject("SELECT case_number FROM medical_cases WHERE id=?", String.class, caseId));
+        assertThat(item.reason()).isEqualTo("MANUAL_QUEUE");
+        assertThat(item.team()).isEqualTo(team);
+        assertThat(item.queuedAt()).isNotNull();
+        assertThat(item.revision()).isEqualTo(2).isEqualTo(repo.facts(caseId).revision());
+        assertThat(reads.overview().queue()).isEqualTo(repo.queue().size());
+        assertThat(repo.history(caseId)).extracting(Decision::id).containsExactlyElementsOf(
+                jdbc.queryForList("SELECT id FROM coordination_decisions WHERE case_id=? ORDER BY created_at DESC,id DESC", UUID.class, caseId));
+        assertThat(reads.decisions(10)).extracting(DecisionEntry::id).containsExactlyElementsOf(
+                jdbc.queryForList("SELECT id FROM coordination_decisions ORDER BY created_at DESC,id DESC", UUID.class));
+
+        // The case's primary consultant: the latest active or offered one.
+        CaseFacts facts = repo.facts(caseId);
+        assertThat(facts).extracting(CaseFacts::consultantId, CaseFacts::careArea, CaseFacts::language, CaseFacts::status, CaseFacts::owner)
+                .containsExactly(consultant, "cardiology", "en", "READY_FOR_CONSULTANT", null);
+        UUID offered = consultant();
+        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,version) VALUES(?,?,?,'DOCTOR','PRIMARY','PENDING','Offer','TEST',?,0)",
+                UUID.randomUUID(), caseId, offered.toString(), Instant.now());
+        assertThat(repo.facts(caseId).consultantId()).isEqualTo(offered);
+        assertThat(catchThrowableOfType(ApiException.class, () -> repo.facts(UUID.randomUUID())).code()).isEqualTo("CASE_NOT_FOUND");
+
+        // A team without a routing profile has none, at revision -1; leads are flagged on their teams.
+        UUID bare = team("Bare");
+        assertThat(repo.team(bare)).hasValueSatisfying(t -> {
+            assertThat(t.revision()).isEqualTo(-1);
+            assertThat(t.careAreas()).isEmpty();
+            assertThat(t.languages()).isEmpty();
+            assertThat(t.active()).isTrue();
+        });
+        jdbc.update("INSERT INTO workforce_lead_designations(id,team_id,subject,effective_from,status,created_by,reason,revision) VALUES(?,?,?,?,'ACTIVE','TEST','Lead',0)",
+                UUID.randomUUID(), team, "routing-a", past);
+        List<CoordinationPerson> people = reads.people();
+        assertThat(people.stream().filter(p -> p.subject().equals("routing-a")).findFirst().orElseThrow().teams()).singleElement().satisfies(t -> {
+            assertThat(t.lead()).isTrue();
+            assertThat(t.effectiveFrom()).isNotNull();
+        });
+        assertThat(people.stream().filter(p -> p.subject().equals("routing-b")).findFirst().orElseThrow().teams()).singleElement()
+                .satisfies(t -> assertThat(t.lead()).isFalse());
+
+        // A consultant's current preference is the one in force; the latest is the newest version.
+        config.savePreference(consultant, 0, past, future, "routing-b", team, null, "Current preference");
+        config.savePreference(consultant, 1, future, future.plusSeconds(1000), "routing-a", team, null, "Next preference");
+        ConsultantRouting routing = reads.consultants().stream().filter(c -> c.consultantId().equals(consultant)).findFirst().orElseThrow();
+        assertThat(routing.current().version()).isEqualTo(1);
+        assertThat(routing.current().coordinator()).isEqualTo("routing-b");
+        assertThat(routing.latest().version()).isEqualTo(2);
+        assertThat(reads.consultants()).extracting(ConsultantRouting::consultantId).contains(offered);
+    }
+
     Decision command(String action, long revision, String target) {
         return engine.execute(caseId, new Command(UUID.randomUUID().toString(), revision, action, target, action.equals("QUEUE") ? team : null, "Reviewed assignment", "TEST"));
     }

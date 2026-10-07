@@ -74,6 +74,12 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
     Optional<String> findPatientName(@Param("id") UUID id);
 
+    /** What routing needs from the case itself. */
+    interface RoutingFacts { String getCareCategory(); String getPreferredLanguage(); CaseStatus getStatus(); }
+
+    @Query("select c.careCategory as careCategory, c.preferredLanguage as preferredLanguage, c.status as status from MedicalCase c where c.id = :id")
+    Optional<RoutingFacts> findRoutingFacts(@Param("id") UUID id);
+
     /** A submitted case nobody has claimed yet: RECEIVED with no active primary coordinator. */
     @Query("""
             select count(c) > 0 from MedicalCase c where c.id = :id and c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.RECEIVED

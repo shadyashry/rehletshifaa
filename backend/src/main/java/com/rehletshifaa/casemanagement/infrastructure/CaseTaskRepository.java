@@ -146,6 +146,33 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
 
     long countByOwnerSubjectAndStatusIn(String ownerSubject, java.util.Collection<String> statuses);
 
+    /** The case waits, unowned, in the coordination routing queue. */
+    @Query("""
+            select count(t) > 0 from CaseTask t where t.caseId = :caseId and t.taskType = 'COORDINATION_ROUTING'
+                and t.status in ('OPEN', 'IN_PROGRESS') and t.ownerSubject is null""")
+    boolean isQueuedForRouting(@Param("caseId") UUID caseId);
+
+    /** Cases queued automatically (not a manager's explicit QUEUE), by case id (use with {@code Limit.of(100)}). */
+    @Query("""
+            select distinct t.caseId from CaseTask t where t.taskType = 'COORDINATION_ROUTING' and t.status in ('OPEN', 'IN_PROGRESS')
+                and t.ownerSubject is null and t.coordinationQueueReason <> 'MANUAL_QUEUE'
+            order by t.caseId""")
+    java.util.List<UUID> findRetryableRoutingCases(org.springframework.data.domain.Limit limit);
+
+    /** An unowned coordination routing queue item with its case number. */
+    interface RoutingQueueRow {
+        UUID getCaseId(); String getCaseNumber(); UUID getTaskId(); UUID getTeam(); String getReason(); Instant getQueuedAt(); Instant getDueAt();
+    }
+
+    /** The routing queue, earliest due first. */
+    @Query("""
+            select t.caseId as caseId, c.caseNumber as caseNumber, t.id as taskId, t.coordinationTeamId as team,
+                t.coordinationQueueReason as reason, t.coordinationQueuedAt as queuedAt, t.dueAt as dueAt
+            from CaseTask t join MedicalCase c on c.id = t.caseId
+            where t.taskType = 'COORDINATION_ROUTING' and t.status in ('OPEN', 'IN_PROGRESS') and t.ownerSubject is null
+            order by t.dueAt, t.id""")
+    java.util.List<RoutingQueueRow> findRoutingQueue();
+
     /** Open internal work per case: how much, how much is overdue at {@code now}, how much blocks. Cases without any are absent. */
     interface WorkCounts { UUID getCaseId(); Long getOpen(); Long getOverdue(); Long getBlocking(); }
 

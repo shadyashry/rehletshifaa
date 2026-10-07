@@ -50,4 +50,29 @@ public interface WorkforceTeamMembershipRepository extends BaseRepository<Workfo
                 m.effectiveTo = case when m.effectiveFrom < :now then cast(:now as Instant) else null end, m.revision = m.revision + 1
             where m.subject = :subject and m.status = 'ACTIVE'""")
     int endAllActive(@Param("subject") String subject, @Param("now") Instant now);
+
+    /** A subject's membership of a team. */
+    interface Member { String getSubject(); UUID getTeamId(); }
+
+    /** Active members of active teams of the function at {@code at}, by subject then team. */
+    @Query("""
+            select m.subject as subject, m.teamId as teamId from WorkforceTeamMembership m join WorkforceTeam t on t.id = m.teamId
+            where t.functionKey = :function and t.status = 'ACTIVE'
+                and m.status = 'ACTIVE' and m.effectiveFrom <= :at and (m.effectiveTo is null or m.effectiveTo > :at)
+            order by m.subject, m.teamId""")
+    List<Member> findActiveMembers(@Param("function") String function, @Param("at") Instant at);
+
+    /** A membership in force with its window and whether the member also leads the team at {@code at}. */
+    interface MemberTeam { String getSubject(); UUID getTeamId(); Instant getEffectiveFrom(); Instant getEffectiveTo(); Boolean getLead(); }
+
+    /** Memberships in force of the function's teams (whatever the team's status), by subject then team. */
+    @Query("""
+            select m.subject as subject, m.teamId as teamId, m.effectiveFrom as effectiveFrom, m.effectiveTo as effectiveTo,
+                case when exists (select 1 from WorkforceLeadDesignation l where l.teamId = m.teamId and l.subject = m.subject
+                    and l.status = 'ACTIVE' and l.effectiveFrom <= :at and (l.effectiveTo is null or l.effectiveTo > :at)) then true else false end as lead
+            from WorkforceTeamMembership m join WorkforceTeam t on t.id = m.teamId
+            where t.functionKey = :function
+                and m.status = 'ACTIVE' and m.effectiveFrom <= :at and (m.effectiveTo is null or m.effectiveTo > :at)
+            order by m.subject, m.teamId""")
+    List<MemberTeam> findMemberTeams(@Param("function") String function, @Param("at") Instant at);
 }
