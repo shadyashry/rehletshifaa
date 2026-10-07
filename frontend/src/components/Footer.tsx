@@ -3,7 +3,7 @@ import { ChevronDown, MessageCircle } from "lucide-react";
 
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
-import { legalNav, primaryNav, whatsappHref, WHATSAPP_INTRO } from "@/lib/links";
+import { legalNav, primaryNav, whatsappHref } from "@/lib/links";
 import { Logo } from "./Logo";
 import { TrackedLink } from "./TrackedLink";
 
@@ -38,7 +38,7 @@ export function Footer({ locale, d }: { locale: Locale; d: Dictionary }) {
       title: d.footer.contact,
       items: (
         <li>
-          <TrackedLink event="whatsapp_clicked" target="_blank" href={whatsappHref(WHATSAPP_INTRO)} className="footer-link inline-flex items-center gap-2">
+          <TrackedLink event="whatsapp_clicked" target="_blank" href={whatsappHref(d.common.whatsappIntro)} className="footer-link inline-flex items-center gap-2">
             <MessageCircle size={16} aria-hidden="true" />
             {d.common.whatsapp}
           </TrackedLink>

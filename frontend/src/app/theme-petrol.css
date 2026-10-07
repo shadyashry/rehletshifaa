@@ -148,6 +148,10 @@
     color: var(--color-brand-600);
     letter-spacing: 0.12em;
   }
+  /* Tracking breaks Arabic letter joining; this must out-specify the Latin rule above. */
+  :root[data-brand-theme="petrol"][dir="rtl"] .eyebrow {
+    letter-spacing: 0;
+  }
 
   /* ---- Controls: flat, firm ---- */
   :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-inverse) {

@@ -1,7 +1,7 @@
 import { ArrowRight, FileText, UserCheck } from "lucide-react";
 
 import type { Dictionary } from "@/lib/dictionary";
-import { whatsappHref, WHATSAPP_INTRO } from "@/lib/links";
+import { whatsappHref } from "@/lib/links";
 import { TrackedLink } from "@/components/TrackedLink";
 
 /**
@@ -22,7 +22,7 @@ export function SupportBand({ d }: { d: Dictionary }) {
             event="whatsapp_clicked"
             className="link-cta mt-6"
             target="_blank"
-            href={whatsappHref(WHATSAPP_INTRO)}
+            href={whatsappHref(d.common.whatsappIntro)}
           >
             {d.common.whatsapp}
             <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />

@@ -44,4 +44,3 @@ export function whatsappHref(message?: string): string {
   return message ? `https://wa.me/${number}?text=${encodeURIComponent(message)}` : `https://wa.me/${number}`;
 }
 
-export const WHATSAPP_INTRO = "Hello RehletShifaa, I would like help reviewing a medical case.";
