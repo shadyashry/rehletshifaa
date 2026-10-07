@@ -5,9 +5,8 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
-import { SpecialtyMotif } from "@/components/care-areas/SpecialtyMotif";
 import { ConsultantPortrait } from "@/components/ConsultantProfileCard";
-import { FiguresCard, FocusMap } from "@/components/consultants/ProfileVisuals";
+import { HeroStats } from "@/components/HeroStats";
 import { careAreaMeta } from "@/lib/care-area-catalog";
 import { CONSULTANT_SLUGS, consultantUi, getConsultant, getConsultants } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
@@ -47,22 +46,27 @@ function splitLine(text: string) {
   return comma > 0 ? { head: body.slice(0, comma), rest: body.slice(comma + 1).trim() } : { head: body, rest: "" };
 }
 
-/** One CV section: a plain typographic heading over its content, separated from the next by a hairline. */
+/** A flat icon tile — white, one hairline, 8px corners — the theme's single icon treatment. */
+function Tile({ children }: { children: ReactNode }) {
+  return <span aria-hidden className="grid h-9 w-9 flex-none place-items-center rounded-lg border border-line bg-surface-default text-brand-700">{children}</span>;
+}
+
+/** One CV section: a brand-type heading over its content, separated from the next by a hairline. */
 function CvSection({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-title`} className="border-t border-border-subtle py-9 first:border-t-0 first:pt-0 md:py-10">
-      <h2 id={`${id}-title`} className="text-[1.25rem] font-semibold leading-snug tracking-[-0.01em] text-brand-900 rtl:tracking-normal">{title}</h2>
-      <div className="mt-5">{children}</div>
+    <section aria-labelledby={`${id}-title`} className="border-t border-line py-10 first:border-t-0 first:pt-0 md:py-12">
+      <h2 id={`${id}-title`} className="headline text-[1.375rem] sm:text-[1.5rem]">{title}</h2>
+      <div className="mt-6">{children}</div>
     </section>
   );
 }
 
-/** A CV entry: a small icon tile, the title set firm, its institution and dates quieter beneath. */
+/** A CV entry: an icon tile, the title set firm, its institution and dates quieter beneath, between hairlines. */
 function Entry({ text, icon }: { text: string; icon: ReactNode }) {
   const { head, rest } = splitLine(text);
   return (
-    <li className="flex gap-3.5 py-3 first:pt-0 last:pb-0">
-      <span aria-hidden className="mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-[10px] bg-surface-clinical text-brand-700 ring-1 ring-border-clinical">{icon}</span>
+    <li className="flex gap-4 border-t border-line py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <Tile>{icon}</Tile>
       <p className="min-w-0">
         <span className="block text-[1rem] font-medium leading-7 text-brand-900">{head}</span>
         {rest ? <span className="block text-[0.9375rem] leading-6 text-ink-500">{rest}</span> : null}
@@ -72,12 +76,12 @@ function Entry({ text, icon }: { text: string; icon: ReactNode }) {
 }
 
 /**
- * A Consultant's profile, set as a clinical dossier — no sales furniture. On desktop a fixed identity column (portrait
- * mark with the specialty icon, name, role, three figures from the CV, the facts a patient checks first) sits beside
- * the CV itself: overview, clinical focus drawn as a map around the specialty, highlights marked by kind, qualifications
- * as a dated timeline, appointments, standing and sources, separated by hairlines. The specialty's tint and line
- * drawing wash the top of the page. The page carries no buttons of its own: one quiet line at the end says the patient
- * never has to choose, and the header keeps the single "Start my case". Other Consultants follow as a list of names.
+ * A Consultant's profile, built from the site's own page system so the theme carries it like every other page: a flat
+ * paper hero with one hairline (breadcrumb; portrait mark with the specialty badge; the care area as the coral-ruled
+ * label; the name in the brand display face; the role; three figures between hairlines). Below, on white, the dossier:
+ * a fixed facts column beside the CV — overview, clinical focus as a hairline grid, highlights, a dated qualifications
+ * timeline with coral-ringed markers, appointments, standing and sources. No buttons of its own: one quiet line at the
+ * end says the patient never has to choose; the header keeps the single "Start my case".
  */
 export default async function ConsultantProfilePage({ params }: Props) {
   const { locale, slug } = await params;
@@ -98,7 +102,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
   const latest = timeline[0] ? { ...splitLine(timeline[0].text), year: timeline[0].year } : undefined;
 
   const facts = [
-    same(profile.specialty, profile.expertise.anchor) ? null : { label: t.specialty, value: profile.specialty },
+    same(profile.specialty, profile.careAreaLabel) ? null : { label: t.specialty, value: profile.specialty },
     profile.distinction ? { label: ui.verifiedRole, value: profile.distinction } : null,
     latest ? { label: t.latestQualification, value: [latest.head, latest.year].filter(Boolean).join(locale === "ar" ? "، " : ", ") } : null,
     { label: t.basedIn, value: profile.location },
@@ -106,9 +110,9 @@ export default async function ConsultantProfilePage({ params }: Props) {
 
   const firstYear = profile.qualifications.map(yearOf).filter((y) => y !== undefined).sort()[0];
   const stats = [
-    firstYear ? { value: String(new Date().getFullYear() - Number(firstYear)), label: t.statYears } : null,
-    { value: String(profile.qualifications.length), label: t.statQualifications },
-    { value: String(profile.focusAreas.length), label: t.statFocus },
+    firstYear ? { value: new Date().getFullYear() - Number(firstYear), label: t.statYears } : null,
+    { value: profile.qualifications.length, label: t.statQualifications },
+    { value: profile.focusAreas.length, label: t.statFocus },
   ].filter((stat) => stat !== null);
 
   const all = getConsultants(locale).filter((p) => p.slug !== profile.slug);
@@ -116,51 +120,57 @@ export default async function ConsultantProfilePage({ params }: Props) {
   const related = (sameSystem.length ? sameSystem : all).slice(0, 3);
 
   return (
-    <div className="relative isolate overflow-x-clip bg-surface-default">
-      {/* The specialty's tint and line drawing wash the top of the page, then fade into the white reading surface. */}
-      <div aria-hidden className={`absolute inset-x-0 top-0 -z-10 h-[24rem] ${style.soft} [mask-image:linear-gradient(to_bottom,black_45%,transparent)]`} />
-      <SpecialtyMotif system={meta.system} className="absolute -end-24 -top-28 -z-10 h-[20rem] w-[44rem] opacity-40 [mask-image:linear-gradient(to_left,black_30%,transparent_75%)] rtl:-scale-x-100" />
-      <div className="container-site pb-16 pt-8 md:pb-20 md:pt-10">
-        <nav aria-label={ui.back} className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-ink-500">
-          <Link href={localeHref(locale, "consultants")} className="rounded px-0.5 hover:text-brand-700">{ui.back}</Link>
-          <ChevronRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />
-          <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden className={`h-2 w-2 rounded-full ${style.dot}`} />
-            {systemTitle}
-          </span>
-        </nav>
+    <>
+      <section className="page-hero border-b border-line bg-surface-pearl">
+        <div className="container-site pb-10 pt-8 md:pb-12 md:pt-10">
+          <nav aria-label={ui.back} className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-ink-500">
+            <Link href={localeHref(locale, "consultants")} className="rounded px-0.5 hover:text-brand-700">{ui.back}</Link>
+            <ChevronRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className={`h-2 w-2 rounded-full ${style.dot}`} />
+              {systemTitle}
+            </span>
+          </nav>
 
-        <div className="mt-8 grid gap-10 md:mt-10 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-16 xl:grid-cols-[19rem_minmax(0,1fr)] xl:gap-24">
-          <header className="lg:top-28 lg:self-start lg:[@media(min-height:50rem)]:sticky">
-            <span className="relative inline-block rounded-full bg-surface-default/80 p-1.5 shadow-[0_20px_40px_-28px_rgba(36,64,74,0.6)] ring-1 ring-border-card">
+          <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
+            <span className="relative inline-block w-fit flex-none rounded-full border border-line bg-surface-default p-1.5">
               <ConsultantPortrait profile={profile} size="lg" />
-              <span aria-hidden className="absolute -bottom-0.5 -end-0.5 grid h-9 w-9 place-items-center rounded-full bg-brand-700 text-white ring-4 ring-surface-default">
+              <span aria-hidden className="absolute -bottom-0.5 -end-0.5 grid h-9 w-9 place-items-center rounded-full bg-brand-700 text-white ring-4 ring-surface-pearl">
                 <CareAreaIcon name={meta.icon} size={17} strokeWidth={2} />
               </span>
             </span>
-            <h1 className="mt-6 text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal">{profile.name}</h1>
-            <p className="mt-2 text-[1rem] leading-7 text-ink-600">{profile.role}</p>
+            <div className="min-w-0">
+              <p className="eyebrow">{profile.careAreaLabel}</p>
+              <h1 className="display mt-3 max-w-[24ch] rtl:max-w-[30ch]">{profile.name}</h1>
+              <p className="lead mt-3 max-w-[60ch]">{profile.role}</p>
+            </div>
+          </div>
 
-            <FiguresCard stats={stats} className="mt-6" />
+          <div className="mt-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <HeroStats stats={stats} />
+            <p className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.875rem] leading-6 text-ink-600">
+              <span title={t.reviewNote} className="inline-flex items-center gap-1.5"><FileText size={15} aria-hidden="true" className="text-brand-600" />{t.verified}</span>
+              <Link href={localeHref(locale, profile.careAreaHref)} className="link-cta inline-flex items-center gap-1.5">
+                {ui.careArea}
+                <ArrowRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />
+              </Link>
+            </p>
+          </div>
+        </div>
+      </section>
 
-            <dl className="mt-6 border-t border-border-subtle">
+      <div className="bg-surface-default">
+        <div className="container-site grid gap-10 py-14 md:py-16 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-16 xl:grid-cols-[19rem_minmax(0,1fr)] xl:gap-24">
+          <aside aria-label={t.atAGlance} className="lg:sticky lg:top-28 lg:self-start">
+            <dl className="border-t border-line">
               {facts.map(({ label, value }) => (
-                <div key={label} className="border-b border-border-subtle py-3.5">
+                <div key={label} className="border-b border-line py-4">
                   <dt className="text-[0.8125rem] leading-5 text-ink-500">{label}</dt>
-                  <dd className="mt-0.5 text-[0.9375rem] font-medium leading-6 text-brand-900">{value}</dd>
+                  <dd className="mt-1 text-[0.9375rem] font-medium leading-6 text-brand-900">{value}</dd>
                 </div>
               ))}
             </dl>
-
-            <p title={t.reviewNote} className="mt-4 flex items-center gap-2 text-[0.8125rem] leading-5 text-ink-500">
-              <FileText size={14} aria-hidden="true" className="flex-none" />
-              {t.verified}
-            </p>
-            <Link href={localeHref(locale, profile.careAreaHref)} className="mt-3 inline-flex items-center gap-2 text-[0.875rem] font-semibold text-brand-700 hover:text-brand-800">
-              <CareAreaIcon name={meta.icon} size={15} strokeWidth={1.9} />
-              {ui.careArea}
-            </Link>
-          </header>
+          </aside>
 
           <div className="min-w-0 max-w-[46rem]">
             <CvSection id="overview" title={t.overview}>
@@ -168,18 +178,26 @@ export default async function ConsultantProfilePage({ params }: Props) {
             </CvSection>
 
             <CvSection id="focus" title={ui.focus}>
-              <FocusMap anchor={profile.expertise.anchor} areas={profile.focusAreas} icon={meta.icon} system={meta.system} />
+              {/* A hairline grid: one white sheet divided into cells, each with the specialty tile. */}
+              <ul className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2">
+                {profile.focusAreas.map((item) => (
+                  <li key={item} className="flex gap-4 bg-surface-default p-5">
+                    <Tile><CareAreaIcon name={meta.icon} size={17} strokeWidth={1.8} /></Tile>
+                    <p className="pt-1 text-[1rem] font-medium leading-7 text-brand-900">{item}</p>
+                  </li>
+                ))}
+              </ul>
             </CvSection>
 
             {profile.achievements?.length ? (
               <CvSection id="highlights" title={t.highlights}>
-                <ul className="grid gap-4">
+                <ul className="grid">
                   {profile.achievements.map((achievement) => {
                     const Icon = highlightIcon(achievement);
                     return (
-                      <li key={achievement} className="flex gap-4">
-                        <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand-700 text-white shadow-[0_10px_20px_-12px_rgba(31,107,115,0.9)]"><Icon size={18} strokeWidth={1.8} /></span>
-                        <p className="pt-1.5 text-[1rem] leading-7 text-ink-700">{achievement}</p>
+                      <li key={achievement} className="flex gap-4 border-t border-line py-4 first:border-t-0 first:pt-0 last:pb-0">
+                        <Tile><Icon size={17} strokeWidth={1.8} /></Tile>
+                        <p className="pt-1 text-[1rem] leading-7 text-ink-700">{achievement}</p>
                       </li>
                     );
                   })}
@@ -194,10 +212,11 @@ export default async function ConsultantProfilePage({ params }: Props) {
                   const last = index === timeline.length - 1;
                   return (
                     <li key={item.text} className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-4 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                      <span className={`text-[0.9375rem] font-semibold tabular-nums leading-7 ${item.year ? "text-brand-700" : "text-ink-500"}`}>{item.year ?? "—"}</span>
-                      <p className={`relative min-w-0 ps-7 ${last ? "" : "pb-6"}`}>
-                        <span aria-hidden className={`absolute start-0 top-[0.5625rem] h-2.5 w-2.5 rounded-full ring-4 ring-surface-default ${index === 0 ? "bg-brand-700" : "bg-brand-300"}`} />
-                        {last ? null : <span aria-hidden className="absolute bottom-0 start-[0.28125rem] top-6 w-px bg-border-clinical" />}
+                      <span className="text-[0.9375rem] font-semibold tabular-nums leading-7 text-brand-700">{item.year ?? "—"}</span>
+                      <p className={`relative min-w-0 ps-8 ${last ? "" : "pb-7"}`}>
+                        {/* The theme's journey marker in miniature: white, ringed in coral. */}
+                        <span aria-hidden className="absolute start-0 top-[0.4375rem] h-3.5 w-3.5 rounded-full border-2 border-coral bg-surface-default" />
+                        {last ? null : <span aria-hidden className="absolute bottom-0 start-[0.40625rem] top-6 w-px bg-line" />}
                         <span className="block text-[1rem] font-medium leading-7 text-brand-900">{head}</span>
                         {rest ? <span className="block text-[0.9375rem] leading-6 text-ink-500">{rest}</span> : null}
                       </p>
@@ -208,18 +227,18 @@ export default async function ConsultantProfilePage({ params }: Props) {
             </CvSection>
 
             <CvSection id="appointments" title={ui.appointments}>
-              <ul className="grid">{profile.appointments.map((item) => <Entry key={item} text={item} icon={<Building2 size={16} strokeWidth={1.8} />} />)}</ul>
+              <ul className="grid">{profile.appointments.map((item) => <Entry key={item} text={item} icon={<Building2 size={17} strokeWidth={1.8} />} />)}</ul>
             </CvSection>
 
             {profile.professionalStanding.length ? (
               <CvSection id="standing" title={ui.standing}>
-                <ul className="grid">{profile.professionalStanding.map((item) => <Entry key={item} text={item} icon={<ShieldCheck size={16} strokeWidth={1.8} />} />)}</ul>
+                <ul className="grid">{profile.professionalStanding.map((item) => <Entry key={item} text={item} icon={<ShieldCheck size={17} strokeWidth={1.8} />} />)}</ul>
               </CvSection>
             ) : null}
 
-            <section aria-labelledby="sources-title" className="border-t border-border-subtle pt-9 md:pt-10">
-              <h2 id="sources-title" className="text-[0.8125rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">{t.sourcesTitle}</h2>
-              <p className="mt-2 text-[0.875rem] leading-6 text-ink-500">{profile.verification}</p>
+            <section aria-labelledby="sources-title" className="border-t border-line pt-10 md:pt-12">
+              <h2 id="sources-title" className="eyebrow">{t.sourcesTitle}</h2>
+              <p className="mt-3 text-[0.875rem] leading-6 text-ink-500">{profile.verification}</p>
               {profile.externalLinks?.length ? (
                 <div className="mt-3 flex flex-wrap gap-4">
                   {profile.externalLinks.map((link) => (
@@ -232,7 +251,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
               ) : null}
             </section>
 
-            <p className="mt-10 border-t border-border-subtle pt-6 text-[0.9375rem] leading-7 text-ink-600">
+            <p className="mt-10 border-t border-line pt-6 text-[0.9375rem] leading-7 text-ink-600">
               {t.matchNote}{" "}
               <Link href={localeHref(locale, "send-my-case")} className="font-semibold text-brand-700 underline decoration-brand-300 underline-offset-4 hover:decoration-brand-700">{t.matchLink}</Link>
             </p>
@@ -241,22 +260,25 @@ export default async function ConsultantProfilePage({ params }: Props) {
       </div>
 
       {related.length ? (
-        <section aria-labelledby="related-consultants-title" className="border-t border-border-subtle py-12 md:py-14">
+        <section aria-labelledby="related-consultants-title" className="border-t border-line bg-surface-pearl py-12 md:py-16">
           <div className="container-site">
-            <div className="flex flex-wrap items-baseline justify-between gap-4">
-              <h2 id="related-consultants-title" className="text-[1.25rem] font-semibold leading-snug text-brand-900">
-                {sameSystem.length ? t.relatedTitle.replace("{system}", systemTitle) : t.relatedFallback}
-              </h2>
-              <Link href={localeHref(locale, "consultants")} className="inline-flex items-center gap-1.5 text-[0.875rem] font-semibold text-brand-700 hover:text-brand-800">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="eyebrow">{t.relatedEyebrow}</p>
+                <h2 id="related-consultants-title" className="headline mt-3 text-[1.5rem] sm:text-[1.75rem]">
+                  {sameSystem.length ? t.relatedTitle.replace("{system}", systemTitle) : t.relatedFallback}
+                </h2>
+              </div>
+              <Link href={localeHref(locale, "consultants")} className="link-cta inline-flex items-center gap-1.5 text-[0.9375rem]">
                 {t.allConsultants}
                 <ArrowRight size={15} aria-hidden="true" className="rtl:-scale-x-100" />
               </Link>
             </div>
-            <ul className="mt-6 grid border-t border-border-subtle md:grid-cols-3 md:gap-x-10">
+            <ul className="mt-7 grid gap-4 md:grid-cols-3">
               {related.map((p) => (
-                <li key={p.slug} className="border-b border-border-subtle md:border-b-0">
-                  <Link href={localeHref(locale, `consultants/${p.slug}`)} className="group flex items-center gap-4 py-5">
-                    <span className={`rounded-full p-1 ${SYSTEM_STYLES[careAreaMeta(p.careAreaHref)?.system ?? meta.system].well}`}><ConsultantPortrait profile={p} size="sm" /></span>
+                <li key={p.slug}>
+                  <Link href={localeHref(locale, `consultants/${p.slug}`)} className="group flex h-full items-center gap-4 rounded-lg border border-line bg-surface-default p-4 transition-colors hover:border-brand-300">
+                    <ConsultantPortrait profile={p} size="sm" />
                     <span className="min-w-0">
                       <span className="block font-semibold leading-6 text-brand-900 group-hover:text-brand-700">{p.name}</span>
                       <span className="line-clamp-1 text-[0.875rem] leading-6 text-ink-500">{p.specialty}</span>
@@ -268,6 +290,6 @@ export default async function ConsultantProfilePage({ params }: Props) {
           </div>
         </section>
       ) : null}
-    </div>
+    </>
   );
 }
