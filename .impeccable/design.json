@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-07T00:00:00Z",
+  "title": "Design System: RehletShifaa",
+  "extensions": {
+    "colorMeta": {
+      "petrol-600": { "role": "primary", "displayName": "Petrol", "canonical": "#0e5f66", "tonalRamp": ["#0b1d21", "#13292e", "#0c4247", "#0e4f55", "#0e5f66", "#1d6b6b", "#8cbab4", "#eef4f3"] },
+      "petrol-700": { "role": "primary", "displayName": "Deep Petrol", "canonical": "#0e4f55" },
+      "petrol-900": { "role": "primary", "displayName": "Petrol Ink", "canonical": "#13292e" },
+      "petrol-50": { "role": "primary", "displayName": "Petrol Wash", "canonical": "#eef4f3" },
+      "petrol-100": { "role": "primary", "displayName": "Petrol Halo", "canonical": "#d9e8e6" },
+      "petrol-400": { "role": "primary", "displayName": "Support Teal", "canonical": "#5fb3ac" },
+      "logo-coral": { "role": "tertiary", "displayName": "Logo Coral", "canonical": "#e07a5f", "tonalRamp": ["#5c2618", "#7d3523", "#a14a33", "#c2604a", "#e07a5f", "#ea9c86", "#f3c3b5", "#fbe9e3"] },
+      "ink-600": { "role": "neutral", "displayName": "Body Ink", "canonical": "#33474c", "tonalRamp": ["#14262b", "#1b2f34", "#24383d", "#33474c", "#41555a", "#5d6e72", "#a3afb1", "#e3e8e9"] },
+      "ink-400": { "role": "neutral", "displayName": "Muted Ink", "canonical": "#5d6e72" },
+      "ink-900": { "role": "neutral", "displayName": "Deep Ink", "canonical": "#14262b" },
+      "ink-300": { "role": "neutral", "displayName": "Quiet Ink", "canonical": "#a3afb1" },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#f7f4ee", "tonalRamp": ["#3a352b", "#5c5546", "#857c69", "#b3aa96", "#cfc8ba", "#e3ded4", "#efeae0", "#f7f4ee"] },
+      "paper-deep": { "role": "neutral", "displayName": "Deep Paper", "canonical": "#efeae0" },
+      "surface-white": { "role": "neutral", "displayName": "White", "canonical": "#ffffff" },
+      "line": { "role": "neutral", "displayName": "Hairline", "canonical": "#e3ded4" },
+      "line-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "#cfc8ba" },
+      "alert-600": { "role": "semantic", "displayName": "Alert", "canonical": "#b3352f", "tonalRamp": ["#74201e", "#8c2b28", "#b3352f", "#d0675f", "#e49a93", "#f0d4d1", "#f8e7e5", "#fdf5f4"] },
+      "system-heart-deep": { "role": "categorical", "displayName": "Heart (sea green)", "canonical": "#1b5f3d" },
+      "system-neuro-deep": { "role": "categorical", "displayName": "Neuro (teal)", "canonical": "#186256" },
+      "system-movement-deep": { "role": "categorical", "displayName": "Movement (cyan)", "canonical": "#175c63" },
+      "system-digestive-deep": { "role": "categorical", "displayName": "Digestive (steel)", "canonical": "#184c62" },
+      "system-surgery-deep": { "role": "categorical", "displayName": "Surgery (blue)", "canonical": "#1c3b5e" },
+      "system-women-deep": { "role": "categorical", "displayName": "Women's health (slate)", "canonical": "#202e5b" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The one hero headline per page." },
+      "display-ar": { "displayName": "Display (Arabic)", "purpose": "Arabic hero headline: smaller, open leading, no tracking." },
+      "headline": { "displayName": "Headline", "purpose": "Section headings." },
+      "headline-ar": { "displayName": "Headline (Arabic)", "purpose": "Arabic section headings." },
+      "statement": { "displayName": "Statement", "purpose": "Editorial supporting statements." },
+      "title": { "displayName": "Title", "purpose": "Card and step titles." },
+      "body": { "displayName": "Body", "purpose": "Running text." },
+      "body-ar": { "displayName": "Body (Arabic)", "purpose": "Arabic running text in Cairo." },
+      "lead": { "displayName": "Lead", "purpose": "Intro paragraphs under headings." },
+      "label": { "displayName": "Label", "purpose": "Eyebrows, opened by the coral rule." },
+      "label-ar": { "displayName": "Label (Arabic)", "purpose": "Arabic eyebrows: no uppercase, no tracking." }
+    },
+    "shadows": [
+      { "name": "rest", "value": "0 1px 2px rgba(20, 38, 43, 0.05)", "purpose": "Cards at rest; barely there." },
+      { "name": "raised", "value": "0 1px 2px rgba(20, 38, 43, 0.06), 0 12px 28px -20px rgba(20, 38, 43, 0.28)", "purpose": "The hero intake card and hovered care cards, the only floating objects." },
+      { "name": "header-firm", "value": "0 22px 44px -26px rgba(14, 79, 85, 0.45)", "purpose": "Applied by scroll to the floating header." },
+      { "name": "focus-halo", "value": "0 0 0 3px #d9e8e6", "purpose": "Focused fields and checked choice cards." }
+    ],
+    "motion": [
+      { "name": "ease-brand", "value": "cubic-bezier(0.2, 0.7, 0.2, 1)", "purpose": "Arrivals, underline draws, arrow leans, progress fills." },
+      { "name": "duration-state", "value": "0.18s", "purpose": "Colour and border state changes." },
+      { "name": "duration-arrive", "value": "0.6s–0.7s", "purpose": "Hero composition and content arrival (opacity + 14–18px rise)." },
+      { "name": "reduced-motion", "value": "static", "purpose": "Every animation collapses to its final state under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "phone-max", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "nav", "value": "1100px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single filled action: Petrol, flat, with a soft light passing across on hover.",
+      "html": "<button class=\"ds-btn-primary\">Start my case <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m13 6 6 6-6 6\"/></svg></button>",
+      "css": ".ds-btn-primary { position: relative; overflow: hidden; isolation: isolate; display: inline-flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0.7rem 1.35rem; border: 1px solid var(--color-brand-600, #0e5f66); border-radius: 0.5rem; background: var(--color-brand-600, #0e5f66); color: #fff; font: 600 1rem/1.2 'Plus Jakarta Sans', 'Segoe UI', sans-serif; cursor: pointer; transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease; } .ds-btn-primary::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.2) 50%, transparent 65%); transform: translateX(-120%); } .ds-btn-primary svg { transition: translate 0.22s cubic-bezier(0.2,0.7,0.2,1); } .ds-btn-primary:hover { background: var(--color-brand-700, #0e4f55); border-color: var(--color-brand-700, #0e4f55); } .ds-btn-primary:hover::after { transform: translateX(120%); transition: transform 0.75s cubic-bezier(0.2,0.7,0.2,1); } .ds-btn-primary:hover svg { translate: 3px 0; } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: 3px solid #0e5f66; outline-offset: 3px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "White with a strong hairline; the edge turns Petrol Ink on hover.",
+      "html": "<button class=\"ds-btn-secondary\">See how it works</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0.7rem 1.35rem; border: 1px solid var(--color-line-strong, #cfc8ba); border-radius: 0.5rem; background: #fff; color: var(--color-brand-900, #13292e); font: 600 1rem/1.2 'Plus Jakarta Sans', 'Segoe UI', sans-serif; cursor: pointer; transition: border-color 0.18s ease, transform 0.18s ease; } .ds-btn-secondary:hover { border-color: var(--color-brand-900, #13292e); } .ds-btn-secondary:active { transform: scale(0.98); } .ds-btn-secondary:focus-visible { outline: 3px solid #0e5f66; outline-offset: 3px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The header's Sign in: transparent, never a second filled action.",
+      "html": "<button class=\"ds-btn-outline\">Sign in</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0.55rem 1.15rem; border: 1px solid var(--color-line-strong, #cfc8ba); border-radius: 0.5rem; background: transparent; color: var(--color-brand-700, #0e4f55); font: 600 0.9375rem/1.2 'Plus Jakarta Sans', 'Segoe UI', sans-serif; white-space: nowrap; cursor: pointer; transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease; } .ds-btn-outline:hover { background: var(--color-brand-50, #eef4f3); border-color: var(--color-brand-300, #8cbab4); color: var(--color-brand-800, #0c4247); } .ds-btn-outline:focus-visible { outline: 3px solid #0e5f66; outline-offset: 3px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "White field on a strong hairline; Petrol edge and halo on focus, label turns Deep Petrol.",
+      "html": "<label class=\"ds-field-wrap\"><span>WhatsApp number</span><input class=\"ds-field\" type=\"tel\" placeholder=\"+218 91 000 0000\"></label>",
+      "css": ".ds-field-wrap { display: grid; gap: 0.4rem; font: 600 0.9375rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; color: var(--color-ink-700, #24383d); max-width: 22rem; } .ds-field-wrap:focus-within > span { color: var(--color-brand-700, #0e4f55); } .ds-field { width: 100%; min-height: 3.35rem; padding: 0.8rem 0.9rem; border: 1px solid var(--color-line-strong, #cfc8ba); border-radius: 0.5rem; background: #fff; color: var(--color-ink-900, #14262b); font: 400 1rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; transition: border-color 0.18s ease, box-shadow 0.18s ease; } .ds-field:hover:not(:focus) { border-color: var(--color-brand-300, #8cbab4); } .ds-field:focus { outline: 0; border-color: var(--color-brand-600, #0e5f66); box-shadow: 0 0 0 3px var(--color-brand-100, #d9e8e6); }"
+    },
+    {
+      "name": "Primary Navigation",
+      "kind": "nav",
+      "refersTo": "nav-pill",
+      "description": "A soft track of pill links; the current page rises as a white pill.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Primary\"><a class=\"ds-nav-pill\" href=\"#\">Care areas</a><a class=\"ds-nav-pill\" href=\"#\" aria-current=\"page\">Consultants</a><a class=\"ds-nav-pill\" href=\"#\">How it works</a><a class=\"ds-nav-pill\" href=\"#\">Track case</a></nav>",
+      "css": ".ds-nav { display: inline-flex; gap: 0.125rem; padding: 0.25rem; border-radius: 9999px; background: rgba(247,244,238,0.8); box-shadow: 0 0 0 1px var(--color-border-subtle, #e3ded4); } .ds-nav-pill { padding: 0.5rem 1rem; border-radius: 9999px; color: var(--color-ink-600, #33474c); font: 500 0.9375rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; text-decoration: none; white-space: nowrap; transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; } .ds-nav-pill:hover { background: rgba(255,255,255,0.7); color: var(--color-brand-800, #0c4247); } .ds-nav-pill[aria-current='page'] { background: #fff; color: var(--color-brand-900, #13292e); box-shadow: 0 2px 8px -3px rgba(20,38,43,0.3), 0 0 0 1px var(--color-border-subtle, #e3ded4); } .ds-nav-pill:focus-visible { outline: 3px solid #0e5f66; outline-offset: 3px; }"
+    },
+    {
+      "name": "Dossier Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White card on paper with a hairline edge; the intake variant carries a petrol file-tab top edge.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-kicker\">Start with what you have</p><p class=\"ds-card-title\">Medical report or discharge summary</p><p class=\"ds-card-body\">If anything else is needed, your coordinator will tell you before the review.</p></div>",
+      "css": ".ds-card { max-width: 24rem; padding: 1.5rem; border: 1px solid var(--color-line, #e3ded4); border-top: 2px solid var(--color-brand-600, #0e5f66); border-radius: 0.5rem; background: #fff; box-shadow: 0 1px 2px rgba(20,38,43,0.06), 0 12px 28px -20px rgba(20,38,43,0.28); font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif; } .ds-card-kicker { margin: 0 0 0.75rem; color: var(--color-brand-600, #0e5f66); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; } .ds-card-title { margin: 0 0 0.5rem; color: var(--color-brand-900, #13292e); font-size: 1.125rem; font-weight: 600; } .ds-card-body { margin: 0; color: var(--color-ink-600, #33474c); font-size: 0.9375rem; line-height: 1.65; }"
+    },
+    {
+      "name": "Eyebrow",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "Section label opened by the short coral rule: the most repeated brand signal.",
+      "html": "<p class=\"ds-eyebrow\">What we care for</p>",
+      "css": ".ds-eyebrow { margin: 0; color: var(--color-brand-600, #0e5f66); font: 700 0.8125rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; } .ds-eyebrow::before { content: ''; display: inline-block; width: 1rem; height: 2px; margin-inline-end: 0.625rem; vertical-align: 0.28em; background: #e07a5f; }"
+    },
+    {
+      "name": "Journey Markers",
+      "kind": "custom",
+      "refersTo": "journey-marker",
+      "description": "Numbered steps on a thin petrol line: reached steps fill Deep Petrol, the rest wait in coral rings.",
+      "html": "<ol class=\"ds-journey\"><li><span class=\"ds-marker ds-marker-reached\">1</span>Share what you have</li><li><span class=\"ds-marker\">2</span>Your coordinator reviews it</li><li><span class=\"ds-marker\">3</span>A Consultant assesses your case</li></ol>",
+      "css": ".ds-journey { position: relative; display: grid; gap: 1.25rem; margin: 0; padding: 0; list-style: none; font: 600 1rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; color: var(--color-brand-900, #13292e); } .ds-journey::before { content: ''; position: absolute; inset-block: 1rem; inset-inline-start: 1rem; width: 1.25px; background: var(--color-brand-300, #8cbab4); } .ds-journey li { position: relative; display: flex; align-items: center; gap: 0.875rem; } .ds-marker { display: grid; place-items: center; width: 2rem; height: 2rem; flex: none; border-radius: 9999px; background: #fff; color: var(--color-brand-700, #0e4f55); font-size: 0.8125rem; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: inset 0 0 0 1.5px #e07a5f; transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease; } .ds-marker-reached { background: var(--color-brand-700, #0e4f55); color: #fff; box-shadow: 0 0 0 4px var(--color-brand-100, #d9e8e6); }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "status-badge",
+      "description": "Case and workflow state in the portal.",
+      "html": "<span class=\"ds-status\">Under Consultant review</span>",
+      "css": ".ds-status { display: inline-flex; padding: 0.25rem 0.65rem; border: 1px solid var(--color-brand-200, #b6d3cf); border-radius: 0.5rem; background: var(--color-brand-50, #eef4f3); color: var(--color-brand-800, #0c4247); font: 600 0.8rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Clinical Dossier",
+    "overview": "Every screen should read like a well-kept patient file: warm paper, near-black ink with a green cast, fine warm hairlines, and one deep petrol that marks what matters and what to do next. The interface is evidence first. A patient deciding on treatment abroad should meet facts set in confident type, arranged by space and rules, not persuaded by panels, glows or repeated buttons. Decoration is edited down until only signals remain: a short coral rule opening a section, a petrol edge on the top of a card like the tab of a file, and a numbered journey that fills as you move through it.\n\nDensity is calm but not sparse. The public site breathes generously, while the patient portal and staff tools tighten the same tokens for working use. English and Arabic are equal: Arabic gets its own sizes, leading and zero tracking, never a mirrored copy of the Latin settings. Motion explains (arrival, progress, cause and effect) and switches off completely for reduced motion.",
+    "keyCharacteristics": [
+      "Two surfaces only (white and paper), separated by warm hairlines, not shadows.",
+      "One action colour (petrol) and one warm note (logo coral, used as a mark and never as text).",
+      "Alexandria headings shared with the wordmark; Plus Jakarta Sans body; Cairo for Arabic.",
+      "One radius family (8px), flat at rest.",
+      "Bilingual by construction: logical properties, direction-aware motion, Arabic type steps."
+    ],
+    "rules": [
+      { "name": "The One Action Rule", "body": "Petrol is the only colour that means \"do this\". Nothing else is filled with it except the single closing panel.", "section": "colors" },
+      { "name": "The Coral Is a Mark Rule", "body": "Logo Coral appears only as a short rule, ring or hairline. It never carries text, fills a surface or stands alone for meaning.", "section": "colors" },
+      { "name": "The Two Surfaces Rule", "body": "A page uses white and paper, alternating by section and edged by hairlines. Deep Paper is for small wells and tracks only; there are no washes, gradients or tinted section bands.", "section": "colors" },
+      { "name": "The Ladder Rule", "body": "Fixed sizes come from one ladder: 12 (badges and initials only), 13 (smallest label), 14, 15, 16, 17, 18 and 20px, with the fluid roles above. Map any new size onto it.", "section": "typography" },
+      { "name": "The Arabic Is Not Latin Rule", "body": "Arabic never inherits negative tracking or uppercase. Display, headline, title and label reset letter-spacing to 0, and Arabic sizes step down with leading opened up.", "section": "typography" },
+      { "name": "The Hairline First Rule", "body": "Separate with type, space and a 1px hairline before you reach for a surface or a shadow. Never nest a card inside a card.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do take every colour from the tokens above; propose any new token explicitly before using it.",
+      "Do alternate white and paper sections with a 1px hairline where they meet.",
+      "Do keep Petrol for actions and links, and Logo Coral for short rules and rings.",
+      "Do keep at most one in-content route to the case form on an informational page, preferably a text link; the header's primary action covers the rest.",
+      "Do use logical properties and mirror arrows, slides and transform origins in RTL.",
+      "Do keep text at or above Muted Ink (4.9:1) contrast, and target WCAG 2.2 AA throughout.",
+      "Do animate only opacity and transform, and never hide the hero headline or photo (LCP) behind motion; give every animation a static reduced-motion state.",
+      "Do keep care-area colours inside the petrol family and let the icon carry identity."
+    ],
+    "donts": [
+      "Don't set text in Logo Coral or use it as a fill.",
+      "Don't add gradients, glows, mint washes, frosted glass or tinted section bands.",
+      "Don't nest cards, or wrap editorial lists in feature cards.",
+      "Don't stack calls to action: no hero buttons plus sticky cards plus closing panels on the same informational page.",
+      "Don't use radii outside 6px, 8px and full circles, or the 14–18px \"bubble\" cards of the old look.",
+      "Don't apply Latin tracking or uppercase to Arabic.",
+      "Don't use `left`/`right` physical properties for layout.",
+      "Don't redesign the hand-and-heart logo mark; wordmark changes need explicit confirmation.",
+      "Don't introduce a multi-hue categorical palette outside the petrol family."
+    ]
+  }
+}

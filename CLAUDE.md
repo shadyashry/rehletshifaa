@@ -72,8 +72,10 @@ Do not restate the project architecture, permanent URLs, or Docker rules unless 
 
 Rules for all work on `feat/ux-redesign`:
 
-- **Tokens:** the `@theme` block ("Light Healing") in `frontend/src/app/globals.css` is the single source of truth for
-  colors and design tokens. Never invent colors; propose any new token explicitly before using it.
+- **Tokens:** the token source of truth is the `@theme` block in `frontend/src/app/globals.css` as re-pointed by
+  `frontend/src/app/theme-petrol.css` ("Petrol & Paper"); `DESIGN.md` states the resulting values. Never invent
+  colors; propose any new token explicitly before using it. The Control Center still renders the base values; that
+  is legacy, so converge it to Petrol & Paper when touched.
 - **UX, layout and copy decisions:** follow Impeccable, respecting `PRODUCT.md` and `DESIGN.md`.
 - **React/Next code:** `vercel-react-best-practices` and `vercel-composition-patterns` win on code concerns.
 - **Accessibility:** WCAG 2.2 AA. When skills disagree, apply the stricter rule.
