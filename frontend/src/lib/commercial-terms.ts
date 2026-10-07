@@ -16,6 +16,13 @@ export const DEPOSIT_TERMS_VERSION = "deposit-terms-2026-09-25";
 
 export const ARABIC_PENDING_NOTICE = "تُعرض هذه الشروط بالإنجليزية إلى حين اعتماد صياغتها العربية.";
 
+/**
+ * Owner decision 2026-10-07 (GATE 2, option B): until legally approved Arabic deposit, refund and cancellation terms
+ * exist, an Arabic page cannot complete a proposal decision that relies on them (request changes and decline stay
+ * available). Flip only together with shipping the approved Arabic wording.
+ */
+export const ARABIC_TERMS_APPROVED = false;
+
 export const depositTerms = {
   title: "Coordination deposit, refunds and cancellation",
   amountLabel: "Coordination deposit",

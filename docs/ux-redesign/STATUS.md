@@ -30,9 +30,9 @@ Update at the end of every phase.
   - [x] shape plans → `plans/patient-proposal.md`, `plans/staff-work-views.md` (drafts)
   - [x] GATE 2 decided (see Decisions); approved component tokens + `ink-350` applied to `globals.css` /
         `theme-petrol.css` / `DESIGN.md`; lint unchanged, typecheck ok, a11y 20/20
-  - [ ] P0 cross-case drafts: branch `fix/workspace-case-key` from `codex/platform-control-plane` (in progress)
+  - [x] P0 cross-case drafts fixed on `fix/workspace-case-key` (`6f561e6`), merged into `feat/ux-redesign` (`9e77677`)
 - [ ] **Phase 5 — `/redesign-area` runs**
-  - [ ] Patient proposal dialog — GATE 3
+  - [x] Patient proposal dialog — GATE 3 approved; terms open by default while a decision is owed (owner)
   - [ ] Staff work views — GATE 4
 - [ ] **Phase 6 — Close the loop**: polish, full verification, re-critique, DESIGN.md refresh, PR draft — GATE 5
 
@@ -70,5 +70,5 @@ Update at the end of every phase.
 
 ## Next exact action
 
-P0 cross-case drafts: `git switch -c fix/workspace-case-key codex/platform-control-plane`, key `WorkspaceView` by case id,
-add a Playwright test that switches cases and checks drafts are cleared; stop for approval (Gate-1 style). Then Phase 5.
+Phase 5.2: `/redesign-area` Staff work views (CurrentAction.tsx, MyWork.tsx, CaseQueue.tsx) per
+`plans/staff-work-views.md`; stop at GATE 4.

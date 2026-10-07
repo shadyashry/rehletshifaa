@@ -792,5 +792,53 @@
     "statYears": "years since graduation",
     "statQualifications": "qualifications",
     "statFocus": "focus areas"
+  },
+  "portalProposal": {
+    "title": "Your proposal",
+    "documentType": {
+      "estimate": "Preliminary care estimate",
+      "quote": "Final treatment quote"
+    },
+    "status": {
+      "RELEASED": "Ready for your decision",
+      "VIEWED": "Ready for your decision",
+      "ACCEPTED_estimate": "You acknowledged this estimate",
+      "ACCEPTED_quote": "You accepted this quote",
+      "DECLINED": "You declined this proposal",
+      "REVISION_REQUESTED": "You asked for changes",
+      "EXPIRED": "This proposal has expired",
+      "SUPERSEDED": "Replaced by a newer version",
+      "other": "Proposal"
+    },
+    "validUntil": "Valid until {date}",
+    "totalLabel": "Total for the recommended services",
+    "itemsLabel": "What the price covers",
+    "optional": "optional",
+    "quantity": "× {count}",
+    "honestyEstimate": "This is a preliminary, non-binding estimate, not a final price or a price guarantee. Your treatment and its price may increase or decrease after your treating doctor examines you in person.",
+    "honestyQuote": "Prepared after your in-person assessment. It covers the confirmed services listed, at the price shown. Accepting this quote is not medical consent. Your treating doctor will ask for separate informed consent before treatment.",
+    "recommendationTitle": "Your Consultant's recommendation",
+    "treatment": "Recommended treatment",
+    "risks": "Risks and limitations",
+    "notesTitle": "A note from your coordinator",
+    "termsEstimate": "Deposit, refunds and cancellation",
+    "termsQuote": "Payment and changes",
+    "pendingReview": "Pending legal review",
+    "decisionTitle": "Your decision",
+    "introEstimate": "Continuing does not accept a final treatment plan or confirm a booking.",
+    "introQuote": "Review your final treatment plan and quote before deciding.",
+    "acknowledgeEstimate": "I have reviewed this estimate, including the deposit, refund and cancellation terms, and understand the next step.",
+    "acknowledgeQuote": "I have reviewed this quote, including its payment terms, and understand the next step.",
+    "note": "Note for your coordinator",
+    "noteHint": "Optional when you continue; needed when you request changes.",
+    "noteRequired": "Tell your coordinator what you would like changed before you send the request.",
+    "primaryEstimate": "Acknowledge estimate & continue",
+    "primaryQuote": "Accept final treatment plan and quote",
+    "requestChanges": "Request changes",
+    "decline": "Decline",
+    "declineConfirm": "Decline this proposal?",
+    "arabicTermsPending": "The deposit, refund and cancellation terms above are shown in English because their Arabic wording is not yet approved, so this decision cannot be completed in Arabic yet. You can request changes, decline, or message your coordinator; to decide now, switch the page to English.",
+    "arabicTermsPendingQuote": "The payment terms above are shown in English because their Arabic wording is not yet approved, so this decision cannot be completed in Arabic yet. You can request changes, decline, or message your coordinator; to decide now, switch the page to English.",
+    "decisionFailed": "Your decision was not sent. Check your connection and try again; nothing has changed yet."
   }
 }

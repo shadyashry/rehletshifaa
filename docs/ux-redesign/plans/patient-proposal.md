@@ -42,7 +42,7 @@ Keep the existing **side drawer** (`CaseDrawer`) opened from My Care. This is an
 6. **The decision:** one primary action (Acknowledge estimate / Accept quote) behind the existing acknowledgement
    checkbox. "Request changes" is secondary. "Decline" stays behind its existing disclosure and dialog.
 7. **Terms behind a disclosure**, between the honesty line and the decision: "Deposit, refunds and cancellation"
-   as a `<details>`/disclosure, closed by default. The wording is unchanged and carries a "Pending legal review"
+   as a `<details>`/disclosure, **open by default while a decision is owed** (owner, GATE 3) and closed otherwise. The wording is unchanged and carries a "Pending legal review"
    note. The acknowledgement checkbox text points to it ("I have read the deposit, refund and cancellation terms"),
    so the decision still requires the terms to be available.
 

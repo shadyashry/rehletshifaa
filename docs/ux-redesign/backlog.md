@@ -185,3 +185,50 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | P2 | Composition: 27 `useState` hooks in Portal, 26 props into `WorkspaceView`, 8 boolean dialog flags. Introduce a `CaseWorkspaceProvider`, split the patient and staff views, and use one dialog union state. | RB | `Portal.tsx:276/323` | — |
 | P2 | `role={currentRole!}` can crash `WorkspaceView` when `/me` fails while a case is open. | RB | `Portal.tsx:216/285` | harden |
 | P3 | The hidden queue re-renders under the workspace; formatters are rebuilt on every render; polling continues in hidden tabs; both locales' copy ships to the client; dead code (`PatientStatusCard`, `PATIENT_JOURNEY`, `ProposalShareLinks`, `TaskActions`, a no-op `Panel wide`, the MyCare timeline no-op). | RB, WG, AU | `Portal.tsx`, `NotificationBell.tsx:41`, `CaseMessages.tsx:29`, `MyCare.tsx:235` | distill |
+
+## Patient proposal — deferred review findings (`/redesign-area` run 1, 2026-10-07)
+
+Four reviewers ran on the redesigned patient proposal:
+
+- **RB:** react-best-practices and composition-patterns.
+- **WG:** web-design-guidelines.
+- **I18N:** RTL and i18n.
+- **PM:** the Pro Max pre-delivery checklist.
+
+The two HIGH findings, a failed decision hidden behind the modal and Arabic amounts reading "$US", were fixed in
+the run. So were these in-area MEDIUM items:
+
+- the note label and validation contradicted each other;
+- the Arabic disclaimer and acknowledge wording;
+- bidi isolation and `dir="auto"` for free text;
+- the blocked-note variant for quotes;
+- a summary chevron;
+- the expiry date shown in the viewer's time zone;
+- per-currency decimals;
+- `Object.hasOwn`;
+- the dead old decision component.
+
+The items below are deferred.
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| Done | The terms disclosure now opens by default while a decision is owed (owner decision at GATE 3). | RB, WG, PM | `components/portal/PatientProposal.tsx` | — |
+| P2 | The disabled primary button relies on `opacity .55` (white on #7aa7ab, 2.64:1). Add `--button-disabled-bg/fg/border` tokens; on `/ar` it stays disabled for good. | PM | `app/globals.css` (`button:disabled`) | polish |
+| P2 | `--button-secondary-border` = line-strong (1.66:1). Point it at `--color-ink-350` (3.63:1), the same as fields. This is a token change that needs the owner. | PM | `app/globals.css` | polish |
+| P2 | `.field:focus { outline: 0 }` replaces the 3px ring with a 1px border change and a 1.26:1 halo. | PM | `app/globals.css` | polish |
+| P2 | Decline uses `window.confirm` over the modal (browser-language buttons, no consequence text). Use an in-drawer confirm step in en and ar. | WG | `PatientProposal.tsx` | harden |
+| P2 | On success the drawer unmounts without `dialog.close()`, so focus drops to `<body>`. Close it and return focus to "Review proposal". | RB, WG | `Portal.tsx` `CaseDrawer` | harden |
+| P2 | `<fieldset disabled={busy}>` dims the whole document and drops focus while sending, with no "Sending…" label. This is the same root cause as the portal P1. | WG, PM, RB | `Portal.tsx:368` | harden |
+| P2 | The primary is disabled until the box is ticked, with no reason that keyboard or screen-reader users can reach. | WG, PM | `PatientProposal.tsx` | harden |
+| P2 | Optional items are priced but excluded from the total and can't be selected, and nothing says so. | WG | `PatientProposal.tsx` | clarify |
+| P2 | The Arabic blocked note asks the patient to switch to English but has no direct link to the same view in `/en`. | WG | `PatientProposal.tsx` | harden |
+| P2 | The terms id `portal-deposit-terms` is hard-coded and shared across components, and the checkbox description reads the whole English terms block. Use `useId` and a short summary target, and test the real target. | RB, WG | `PatientProposal.tsx`, `CoordinationDepositTerms.tsx`, test | harden |
+| P3 | Fixed section ids and a region landmark per section; an unnamed fieldset group around the read-only document; an inline `mutate` wrapper (use `onDecided`); formatters rebuilt per item. | RB | `PatientProposal.tsx`, `Portal.tsx` | distill |
+| P3 | The drawer header with the close button scrolls away on phones (2240px of content at 375). | PM | `Portal.tsx` `CaseDrawer` | adapt |
+| P3 | `CaseDrawer` uses `aria-label` that duplicates the visible h2. Use `aria-labelledby`. | WG | `Portal.tsx` | harden |
+| P3 | A typed note is lost on Esc or close without a warning. | WG | `PatientProposal.tsx` | harden |
+| P3 | Decimals vary per amount within one document ("$4,850" beside "$120.50"). | WG | `PatientProposal.tsx` | clarify |
+| P3 | "Ready for your decision" (drawer) vs "Ready to review" (My Care card): use one phrase. Buttons mix "&" and "and". | WG | `messages/*.json`, `MyCare.tsx` | clarify |
+| P3 | The quote's `paymentTitle` is a bold `<p>`, not a heading. The three decision buttons wrap unevenly. | WG | `PatientProposal.tsx` | layout |
+| P3 | `CoordinationDepositTerms`: a 12px-radius card with `bg-white` inside the disclosure, one-off type sizes (0.82–0.95rem), and a small, low-contrast Arabic notice (0.82rem, ink-600). | WG, I18N | `components/CoordinationDepositTerms.tsx` | polish |
+| P3 | Arabic: masculine address throughout (use neutral phrasing where cheap); "عرض" alone is ambiguous (offer vs display); `{count}` is not formatted with Intl. All pending native review. | I18N | `messages/ar.json`, `PatientProposal.tsx` | clarify |
