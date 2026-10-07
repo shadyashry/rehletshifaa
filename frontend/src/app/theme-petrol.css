@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
-   Brand preview — "Petrol & Paper" (أزرق بترولي)
+   Brand — "Petrol & Paper" (أزرق بترولي)
    ---------------------------------------------------------------------------
    The teal identity, edited down rather than decorated. Fewer, firmer choices:
      · one deep petrol (#0e4f55 family) carries headings' weight, actions and
@@ -15,7 +15,7 @@
 
    The base tokens in globals.css stay the source of truth (and the Control
    Center keeps them untouched); this file re-points them on the public site and
-   patient portal (`BrandThemeSwitch` sets data-brand-theme="petrol").
+   patient portal (`BrandTheme` sets data-brand-theme="petrol").
    Every text pairing is WCAG 2.2 AA (white on petrol-600 7.4:1, body ink on
    paper 8.9:1, muted ink on paper 4.9:1).
 --------------------------------------------------------------------------- */

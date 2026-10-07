@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AnalyticsScripts } from "@/components/AnalyticsScripts";
 import { AuthProvider } from "@/components/AuthProvider";
-import { BRAND_THEME_BOOT, BrandThemeSwitch } from "@/components/brand/BrandThemeSwitch";
+import { BRAND_THEME_BOOT, BrandTheme } from "@/components/brand/BrandTheme";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { HideInControlCenter, SiteMain } from "@/components/nav/HideInControlCenter";
@@ -32,7 +32,7 @@ export default async function LocaleLayout({
       dir={locale === "ar" ? "rtl" : "ltr"}
       className={fontVariables}
       data-scroll-behavior="smooth"
-      // The brand-preview boot script may set data-brand-theme before hydration.
+      // The brand boot script sets data-brand-theme before hydration.
       suppressHydrationWarning
     >
       <head>
@@ -53,7 +53,7 @@ export default async function LocaleLayout({
             label={d.home.primaryAction}
             note={locale === "ar" ? "لا التزام عند البدء — نرشدك خطوة بخطوة." : "No commitment to start — we guide every step."}
           />
-          <BrandThemeSwitch locale={locale} />
+          <BrandTheme />
         </HideInControlCenter>
         <AnalyticsScripts />
       </body>

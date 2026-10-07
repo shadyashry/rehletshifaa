@@ -24,10 +24,6 @@ type LogoProps = {
  * asset, and the "reversed" (white, for dark surfaces) and "mono" (single
  * ink) variants are produced from it with CSS filters rather than shipping
  * separate exports.
- *
- * A brand theme may instead colour the three parts of the mark separately (heart, hand, head): the colour variant
- * also renders `.logo-mark-parts`, three vector masks traced from the same mark (`/brand/mark-*.svg`; full-colour master: `mark-lapis.svg`), hidden
- * unless a theme switches them on and sets `--logo-part-body/-hand/-head`.
  */
 export function GuidedArc({
   variant = "color",
@@ -44,9 +40,9 @@ export function GuidedArc({
       ? "brightness(0) invert(1)"
       : variant === "mono"
         ? "brightness(0) saturate(0)"
-        : "var(--logo-icon-filter, none)"; // a brand theme may re-tint the colour mark
+        : undefined;
 
-  const image = (
+  return (
     <Image
       src="/brand/icon.png"
       alt={title ?? ""}
@@ -56,18 +52,6 @@ export function GuidedArc({
       style={{ width: size, height: size, filter }}
       priority
     />
-  );
-  if (variant !== "color") return image;
-
-  return (
-    <span className="logo-mark" style={{ width: size, height: size }}>
-      {image}
-      <span aria-hidden className="logo-mark-parts">
-        <span className="logo-mark-body" />
-        <span className="logo-mark-hand" />
-        <span className="logo-mark-head" />
-      </span>
-    </span>
   );
 }
 

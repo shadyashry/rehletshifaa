@@ -1,7 +1,5 @@
 @import "tailwindcss";
 @import "./theme-petrol.css";
-@import "./theme-lapis.css";
-@import "./theme-lapis-night.css";
 
 /* ---------------------------------------------------------------------------
    Design tokens — "Light Healing" system
@@ -223,30 +221,6 @@
     font-weight: 800;
     letter-spacing: -0.035em;
   }
-
-  /* The logo mark. A theme may colour its three parts separately (see GuidedArc); hidden by default. */
-  .logo-mark {
-    position: relative;
-    display: inline-block;
-    flex: none;
-  }
-
-  .logo-mark-parts {
-    display: none;
-    position: absolute;
-    inset: 0;
-  }
-
-  .logo-mark-parts > span {
-    position: absolute;
-    inset: 0;
-    -webkit-mask: var(--part) center / contain no-repeat;
-    mask: var(--part) center / contain no-repeat;
-  }
-
-  .logo-mark-body { --part: url("/brand/mark-body.svg"); background: var(--logo-part-body, #247c86); }
-  .logo-mark-hand { --part: url("/brand/mark-hand.svg"); background: var(--logo-part-hand, #65bdb5); }
-  .logo-mark-head { --part: url("/brand/mark-head.svg"); background: var(--logo-part-head, #247c86); }
 
   /* The wordmark beside the logo mark: Alexandria for both scripts, medium lead + bold accent. */
   .logo-wordmark {
