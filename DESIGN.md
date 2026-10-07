@@ -391,6 +391,19 @@ fills as it crosses the middle of the screen; step one is always filled ("you ar
 ### Eyebrow (signature)
 Petrol label text, opened by a 1rem × 2px coral rule. It is the most repeated brand signal on every page.
 
+### Drawer (portal)
+A native modal `<dialog>` sized to 36rem (full width minus 2rem on phones), 8px radius, Raised shadow. Its header — the
+title as `<h2>` naming the dialog, and a 44px Close icon button — stays pinned while the content scrolls, edged by a
+hairline. Escape closes it, and focus returns to the control that opened it. A result or error from an action inside
+the drawer is reported inside the drawer: the page behind a modal is inert.
+
+### Patient proposal (signature)
+One reading column inside the drawer, in the patient's voice: document type, then a plain-word status and a long
+localised "Valid until" date (never a version number or internal status); the total in Display weight; the line items
+as a hairline list; the honesty line (estimate or final quote); the Consultant's recommendation and the coordinator's
+note as plain text; the terms in a disclosure marked "Pending legal review", open while a decision is owed; then one
+decision with Request changes and Decline as secondary actions.
+
 ### Status badge
 8px, petrol-50 fill, petrol-200 edge, petrol-800 text at 12px/600, for case and workflow states in the portal.
 
@@ -405,6 +418,12 @@ The status, chart and dense-table tokens in `docs/ux-redesign/token-proposals.md
 ## Do's and Don'ts
 
 ### Do:
+- **Do** give every control at least a 44×44px hit area — tabs, row checkboxes, icon buttons, chip removes — by
+  expanding the hit area (padding with a negative margin) rather than the visual.
+- **Do** isolate left-to-right runs inside Arabic: amounts and case numbers in `<bdi dir="ltr">`, names and staff
+  free text in `<bdi>` or `dir="auto"`.
+- **Do** read labels from the viewer's side: "you" only for the person actually waited on or responsible, counts
+  through `Intl.PluralRules`, and enum values always as words.
 - **Do** take every colour from the tokens above; propose any new token explicitly before using it.
 - **Do** alternate white and paper sections with a 1px hairline where they meet.
 - **Do** keep Petrol for actions and links, and Logo Coral for short rules and rings.

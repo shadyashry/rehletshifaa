@@ -1,64 +1,291 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-07T00:00:00Z",
+  "generatedAt": "2026-10-07T21:23:56.218Z",
   "title": "Design System: RehletShifaa",
   "extensions": {
     "colorMeta": {
-      "petrol-600": { "role": "primary", "displayName": "Petrol", "canonical": "#0e5f66", "tonalRamp": ["#0b1d21", "#13292e", "#0c4247", "#0e4f55", "#0e5f66", "#1d6b6b", "#8cbab4", "#eef4f3"] },
-      "petrol-700": { "role": "primary", "displayName": "Deep Petrol", "canonical": "#0e4f55" },
-      "petrol-900": { "role": "primary", "displayName": "Petrol Ink", "canonical": "#13292e" },
-      "petrol-50": { "role": "primary", "displayName": "Petrol Wash", "canonical": "#eef4f3" },
-      "petrol-100": { "role": "primary", "displayName": "Petrol Halo", "canonical": "#d9e8e6" },
-      "petrol-400": { "role": "primary", "displayName": "Support Teal", "canonical": "#5fb3ac" },
-      "logo-coral": { "role": "tertiary", "displayName": "Logo Coral", "canonical": "#e07a5f", "tonalRamp": ["#5c2618", "#7d3523", "#a14a33", "#c2604a", "#e07a5f", "#ea9c86", "#f3c3b5", "#fbe9e3"] },
-      "ink-600": { "role": "neutral", "displayName": "Body Ink", "canonical": "#33474c", "tonalRamp": ["#14262b", "#1b2f34", "#24383d", "#33474c", "#41555a", "#5d6e72", "#a3afb1", "#e3e8e9"] },
-      "ink-400": { "role": "neutral", "displayName": "Muted Ink", "canonical": "#5d6e72" },
-      "ink-900": { "role": "neutral", "displayName": "Deep Ink", "canonical": "#14262b" },
-      "ink-300": { "role": "neutral", "displayName": "Quiet Ink", "canonical": "#a3afb1" },
-      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#f7f4ee", "tonalRamp": ["#3a352b", "#5c5546", "#857c69", "#b3aa96", "#cfc8ba", "#e3ded4", "#efeae0", "#f7f4ee"] },
-      "paper-deep": { "role": "neutral", "displayName": "Deep Paper", "canonical": "#efeae0" },
-      "surface-white": { "role": "neutral", "displayName": "White", "canonical": "#ffffff" },
-      "line": { "role": "neutral", "displayName": "Hairline", "canonical": "#e3ded4" },
-      "line-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "#cfc8ba" },
-      "alert-600": { "role": "semantic", "displayName": "Alert", "canonical": "#b3352f", "tonalRamp": ["#74201e", "#8c2b28", "#b3352f", "#d0675f", "#e49a93", "#f0d4d1", "#f8e7e5", "#fdf5f4"] },
-      "system-heart-deep": { "role": "categorical", "displayName": "Heart (sea green)", "canonical": "#1b5f3d" },
-      "system-neuro-deep": { "role": "categorical", "displayName": "Neuro (teal)", "canonical": "#186256" },
-      "system-movement-deep": { "role": "categorical", "displayName": "Movement (cyan)", "canonical": "#175c63" },
-      "system-digestive-deep": { "role": "categorical", "displayName": "Digestive (steel)", "canonical": "#184c62" },
-      "system-surgery-deep": { "role": "categorical", "displayName": "Surgery (blue)", "canonical": "#1c3b5e" },
-      "system-women-deep": { "role": "categorical", "displayName": "Women's health (slate)", "canonical": "#202e5b" }
+      "petrol-600": {
+        "role": "primary",
+        "displayName": "Petrol",
+        "canonical": "#0e5f66",
+        "tonalRamp": [
+          "#0b1d21",
+          "#13292e",
+          "#0c4247",
+          "#0e4f55",
+          "#0e5f66",
+          "#1d6b6b",
+          "#8cbab4",
+          "#eef4f3"
+        ]
+      },
+      "petrol-700": {
+        "role": "primary",
+        "displayName": "Deep Petrol",
+        "canonical": "#0e4f55"
+      },
+      "petrol-900": {
+        "role": "primary",
+        "displayName": "Petrol Ink",
+        "canonical": "#13292e"
+      },
+      "petrol-50": {
+        "role": "primary",
+        "displayName": "Petrol Wash",
+        "canonical": "#eef4f3"
+      },
+      "petrol-100": {
+        "role": "primary",
+        "displayName": "Petrol Halo",
+        "canonical": "#d9e8e6"
+      },
+      "petrol-400": {
+        "role": "primary",
+        "displayName": "Support Teal",
+        "canonical": "#5fb3ac"
+      },
+      "logo-coral": {
+        "role": "tertiary",
+        "displayName": "Logo Coral",
+        "canonical": "#e07a5f",
+        "tonalRamp": [
+          "#5c2618",
+          "#7d3523",
+          "#a14a33",
+          "#c2604a",
+          "#e07a5f",
+          "#ea9c86",
+          "#f3c3b5",
+          "#fbe9e3"
+        ]
+      },
+      "ink-600": {
+        "role": "neutral",
+        "displayName": "Body Ink",
+        "canonical": "#33474c",
+        "tonalRamp": [
+          "#14262b",
+          "#1b2f34",
+          "#24383d",
+          "#33474c",
+          "#41555a",
+          "#5d6e72",
+          "#a3afb1",
+          "#e3e8e9"
+        ]
+      },
+      "ink-400": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#5d6e72"
+      },
+      "ink-900": {
+        "role": "neutral",
+        "displayName": "Deep Ink",
+        "canonical": "#14262b"
+      },
+      "ink-300": {
+        "role": "neutral",
+        "displayName": "Quiet Ink",
+        "canonical": "#a3afb1"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#f7f4ee",
+        "tonalRamp": [
+          "#3a352b",
+          "#5c5546",
+          "#857c69",
+          "#b3aa96",
+          "#cfc8ba",
+          "#e3ded4",
+          "#efeae0",
+          "#f7f4ee"
+        ]
+      },
+      "paper-deep": {
+        "role": "neutral",
+        "displayName": "Deep Paper",
+        "canonical": "#efeae0"
+      },
+      "surface-white": {
+        "role": "neutral",
+        "displayName": "White",
+        "canonical": "#ffffff"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e3ded4"
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "#cfc8ba"
+      },
+      "alert-600": {
+        "role": "semantic",
+        "displayName": "Alert",
+        "canonical": "#b3352f",
+        "tonalRamp": [
+          "#74201e",
+          "#8c2b28",
+          "#b3352f",
+          "#d0675f",
+          "#e49a93",
+          "#f0d4d1",
+          "#f8e7e5",
+          "#fdf5f4"
+        ]
+      },
+      "system-heart-deep": {
+        "role": "categorical",
+        "displayName": "Heart (sea green)",
+        "canonical": "#1b5f3d"
+      },
+      "system-neuro-deep": {
+        "role": "categorical",
+        "displayName": "Neuro (teal)",
+        "canonical": "#186256"
+      },
+      "system-movement-deep": {
+        "role": "categorical",
+        "displayName": "Movement (cyan)",
+        "canonical": "#175c63"
+      },
+      "system-digestive-deep": {
+        "role": "categorical",
+        "displayName": "Digestive (steel)",
+        "canonical": "#184c62"
+      },
+      "system-surgery-deep": {
+        "role": "categorical",
+        "displayName": "Surgery (blue)",
+        "canonical": "#1c3b5e"
+      },
+      "system-women-deep": {
+        "role": "categorical",
+        "displayName": "Women's health (slate)",
+        "canonical": "#202e5b"
+      },
+      "ink-350": {
+        "role": "neutral",
+        "displayName": "Field Edge",
+        "canonical": "#7a898c"
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "The one hero headline per page." },
-      "display-ar": { "displayName": "Display (Arabic)", "purpose": "Arabic hero headline: smaller, open leading, no tracking." },
-      "headline": { "displayName": "Headline", "purpose": "Section headings." },
-      "headline-ar": { "displayName": "Headline (Arabic)", "purpose": "Arabic section headings." },
-      "statement": { "displayName": "Statement", "purpose": "Editorial supporting statements." },
-      "title": { "displayName": "Title", "purpose": "Card and step titles." },
-      "body": { "displayName": "Body", "purpose": "Running text." },
-      "body-ar": { "displayName": "Body (Arabic)", "purpose": "Arabic running text in Cairo." },
-      "lead": { "displayName": "Lead", "purpose": "Intro paragraphs under headings." },
-      "label": { "displayName": "Label", "purpose": "Eyebrows, opened by the coral rule." },
-      "label-ar": { "displayName": "Label (Arabic)", "purpose": "Arabic eyebrows: no uppercase, no tracking." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "The one hero headline per page."
+      },
+      "display-ar": {
+        "displayName": "Display (Arabic)",
+        "purpose": "Arabic hero headline: smaller, open leading, no tracking."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section headings."
+      },
+      "headline-ar": {
+        "displayName": "Headline (Arabic)",
+        "purpose": "Arabic section headings."
+      },
+      "statement": {
+        "displayName": "Statement",
+        "purpose": "Editorial supporting statements."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card and step titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text."
+      },
+      "body-ar": {
+        "displayName": "Body (Arabic)",
+        "purpose": "Arabic running text in Cairo."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Intro paragraphs under headings."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Eyebrows, opened by the coral rule."
+      },
+      "label-ar": {
+        "displayName": "Label (Arabic)",
+        "purpose": "Arabic eyebrows: no uppercase, no tracking."
+      }
     },
     "shadows": [
-      { "name": "rest", "value": "0 1px 2px rgba(20, 38, 43, 0.05)", "purpose": "Cards at rest; barely there." },
-      { "name": "raised", "value": "0 1px 2px rgba(20, 38, 43, 0.06), 0 12px 28px -20px rgba(20, 38, 43, 0.28)", "purpose": "The hero intake card and hovered care cards, the only floating objects." },
-      { "name": "header-firm", "value": "0 22px 44px -26px rgba(14, 79, 85, 0.45)", "purpose": "Applied by scroll to the floating header." },
-      { "name": "focus-halo", "value": "0 0 0 3px #d9e8e6", "purpose": "Focused fields and checked choice cards." }
+      {
+        "name": "rest",
+        "value": "0 1px 2px rgba(20, 38, 43, 0.05)",
+        "purpose": "Cards at rest; barely there."
+      },
+      {
+        "name": "raised",
+        "value": "0 1px 2px rgba(20, 38, 43, 0.06), 0 12px 28px -20px rgba(20, 38, 43, 0.28)",
+        "purpose": "The hero intake card and hovered care cards, the only floating objects."
+      },
+      {
+        "name": "header-firm",
+        "value": "0 22px 44px -26px rgba(14, 79, 85, 0.45)",
+        "purpose": "Applied by scroll to the floating header."
+      },
+      {
+        "name": "focus-halo",
+        "value": "0 0 0 3px #d9e8e6",
+        "purpose": "Focused fields and checked choice cards."
+      }
     ],
     "motion": [
-      { "name": "ease-brand", "value": "cubic-bezier(0.2, 0.7, 0.2, 1)", "purpose": "Arrivals, underline draws, arrow leans, progress fills." },
-      { "name": "duration-state", "value": "0.18s", "purpose": "Colour and border state changes." },
-      { "name": "duration-arrive", "value": "0.6s–0.7s", "purpose": "Hero composition and content arrival (opacity + 14–18px rise)." },
-      { "name": "reduced-motion", "value": "static", "purpose": "Every animation collapses to its final state under prefers-reduced-motion." }
+      {
+        "name": "ease-brand",
+        "value": "cubic-bezier(0.2, 0.7, 0.2, 1)",
+        "purpose": "Arrivals, underline draws, arrow leans, progress fills."
+      },
+      {
+        "name": "duration-state",
+        "value": "0.18s",
+        "purpose": "Colour and border state changes."
+      },
+      {
+        "name": "duration-arrive",
+        "value": "0.6s–0.7s",
+        "purpose": "Hero composition and content arrival (opacity + 14–18px rise)."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "static",
+        "purpose": "Every animation collapses to its final state under prefers-reduced-motion."
+      }
     ],
     "breakpoints": [
-      { "name": "phone-max", "value": "640px" },
-      { "name": "md", "value": "768px" },
-      { "name": "lg", "value": "1024px" },
-      { "name": "nav", "value": "1100px" },
-      { "name": "xl", "value": "1280px" }
+      {
+        "name": "phone-max",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "nav",
+        "value": "1100px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
     ]
   },
   "components": [
@@ -92,7 +319,7 @@
       "refersTo": "field",
       "description": "White field on a strong hairline; Petrol edge and halo on focus, label turns Deep Petrol.",
       "html": "<label class=\"ds-field-wrap\"><span>WhatsApp number</span><input class=\"ds-field\" type=\"tel\" placeholder=\"+218 91 000 0000\"></label>",
-      "css": ".ds-field-wrap { display: grid; gap: 0.4rem; font: 600 0.9375rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; color: var(--color-ink-700, #24383d); max-width: 22rem; } .ds-field-wrap:focus-within > span { color: var(--color-brand-700, #0e4f55); } .ds-field { width: 100%; min-height: 3.35rem; padding: 0.8rem 0.9rem; border: 1px solid var(--color-line-strong, #cfc8ba); border-radius: 0.5rem; background: #fff; color: var(--color-ink-900, #14262b); font: 400 1rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; transition: border-color 0.18s ease, box-shadow 0.18s ease; } .ds-field:hover:not(:focus) { border-color: var(--color-brand-300, #8cbab4); } .ds-field:focus { outline: 0; border-color: var(--color-brand-600, #0e5f66); box-shadow: 0 0 0 3px var(--color-brand-100, #d9e8e6); }"
+      "css": ".ds-field-wrap { display: grid; gap: 0.4rem; font: 600 0.9375rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; color: var(--color-ink-700, #24383d); max-width: 22rem; } .ds-field-wrap:focus-within > span { color: var(--color-brand-700, #0e4f55); } .ds-field { width: 100%; min-height: 3.35rem; padding: 0.8rem 0.9rem; border: 1px solid var(--field-border, #7a898c); border-radius: 0.5rem; background: #fff; color: var(--color-ink-900, #14262b); font: 400 1rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; transition: border-color 0.18s ease, box-shadow 0.18s ease; } .ds-field:hover:not(:focus) { border-color: var(--color-brand-300, #8cbab4); } .ds-field:focus { outline: 0; border-color: var(--color-brand-600, #0e5f66); box-shadow: 0 0 0 3px var(--color-brand-100, #d9e8e6); }"
     },
     {
       "name": "Primary Navigation",
@@ -132,7 +359,7 @@
       "refersTo": "status-badge",
       "description": "Case and workflow state in the portal.",
       "html": "<span class=\"ds-status\">Under Consultant review</span>",
-      "css": ".ds-status { display: inline-flex; padding: 0.25rem 0.65rem; border: 1px solid var(--color-brand-200, #b6d3cf); border-radius: 0.5rem; background: var(--color-brand-50, #eef4f3); color: var(--color-brand-800, #0c4247); font: 600 0.8rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; }"
+      "css": ".ds-status { display: inline-flex; padding: 0.25rem 0.65rem; border: 1px solid var(--color-brand-200, #b6d3cf); border-radius: 0.5rem; background: var(--color-brand-50, #eef4f3); color: var(--color-brand-800, #0c4247); font: 600 0.75rem/1.4 'Plus Jakarta Sans', 'Segoe UI', sans-serif; }"
     }
   ],
   "narrative": {
@@ -146,14 +373,41 @@
       "Bilingual by construction: logical properties, direction-aware motion, Arabic type steps."
     ],
     "rules": [
-      { "name": "The One Action Rule", "body": "Petrol is the only colour that means \"do this\". Nothing else is filled with it except the single closing panel.", "section": "colors" },
-      { "name": "The Coral Is a Mark Rule", "body": "Logo Coral appears only as a short rule, ring or hairline. It never carries text, fills a surface or stands alone for meaning.", "section": "colors" },
-      { "name": "The Two Surfaces Rule", "body": "A page uses white and paper, alternating by section and edged by hairlines. Deep Paper is for small wells and tracks only; there are no washes, gradients or tinted section bands.", "section": "colors" },
-      { "name": "The Ladder Rule", "body": "Fixed sizes come from one ladder: 12 (badges and initials only), 13 (smallest label), 14, 15, 16, 17, 18 and 20px, with the fluid roles above. Map any new size onto it.", "section": "typography" },
-      { "name": "The Arabic Is Not Latin Rule", "body": "Arabic never inherits negative tracking or uppercase. Display, headline, title and label reset letter-spacing to 0, and Arabic sizes step down with leading opened up.", "section": "typography" },
-      { "name": "The Hairline First Rule", "body": "Separate with type, space and a 1px hairline before you reach for a surface or a shadow. Never nest a card inside a card.", "section": "elevation" }
+      {
+        "name": "The One Action Rule",
+        "body": "Petrol is the only colour that means \"do this\". Nothing else is filled with it except the single closing panel.",
+        "section": "colors"
+      },
+      {
+        "name": "The Coral Is a Mark Rule",
+        "body": "Logo Coral appears only as a short rule, ring or hairline. It never carries text, fills a surface or stands alone for meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Surfaces Rule",
+        "body": "A page uses white and paper, alternating by section and edged by hairlines. Deep Paper is for small wells and tracks only; there are no washes, gradients or tinted section bands.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ladder Rule",
+        "body": "Fixed sizes come from one ladder: 12 (badges and initials only), 13 (smallest label), 14, 15, 16, 17, 18 and 20px, with the fluid roles above. Map any new size onto it.",
+        "section": "typography"
+      },
+      {
+        "name": "The Arabic Is Not Latin Rule",
+        "body": "Arabic never inherits negative tracking or uppercase. Display, headline, title and label reset letter-spacing to 0, and Arabic sizes step down with leading opened up.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline First Rule",
+        "body": "Separate with type, space and a 1px hairline before you reach for a surface or a shadow. Never nest a card inside a card.",
+        "section": "elevation"
+      }
     ],
     "dos": [
+      "Do give every control at least a 44×44px hit area — tabs, row checkboxes, icon buttons, chip removes — by expanding the hit area (padding with a negative margin) rather than the visual.",
+      "Do isolate left-to-right runs inside Arabic: amounts and case numbers in <bdi dir=\"ltr\">, names and staff free text in <bdi> or dir=\"auto\".",
+      "Do read labels from the viewer's side: \"you\" only for the person actually waited on or responsible, counts through Intl.PluralRules, and enum values always as words.",
       "Do take every colour from the tokens above; propose any new token explicitly before using it.",
       "Do alternate white and paper sections with a 1px hairline where they meet.",
       "Do keep Petrol for actions and links, and Logo Coral for short rules and rings.",
