@@ -23,8 +23,12 @@ Update at the end of every phase.
         which includes the spec; note CI is red earlier on lint (25 errors) and unit tests (11 `ProposalSign`).
 - [x] **Phase 3 — `/redesign-area` skill, backlog, CLAUDE.md note** (`.claude/skills/redesign-area/SKILL.md`,
       `docs/ux-redesign/backlog.md` seeded from both critiques + the a11y baseline)
-- [ ] **Phase 4 — Architect work**: portal audits → backlog; token proposals; shape plans
-  - [ ] GATE 2: token, plan and legal (Arabic terms) decisions
+- [ ] **Phase 4 — Architect work** (`fe8b8a4`)
+  - [x] three read-only portal reviews (Impeccable audit, web-design-guidelines, react-best-practices) merged into
+        backlog.md — new **P0**: `WorkspaceView` has no case key, so typed drafts can carry into another patient's case
+  - [x] Pro Max token proposals → `docs/ux-redesign/token-proposals.md` (proposals only)
+  - [x] shape plans → `plans/patient-proposal.md`, `plans/staff-work-views.md` (drafts)
+  - [ ] GATE 2: token, plan and legal (Arabic terms) decisions; apply approved tokens; commit `feat(tokens)`
 - [ ] **Phase 5 — `/redesign-area` runs**
   - [ ] Patient proposal dialog — GATE 3
   - [ ] Staff work views — GATE 4
@@ -60,5 +64,4 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Phase 4: three parallel read-only portal reviews (Impeccable audit, web-design-guidelines, vercel-react-best-practices)
-merged into backlog.md; then Pro Max token proposals; then the two shape plans; then GATE 2.
+GATE 2 — waiting for owner decisions on tokens, plans, legal option and the new P0 (cross-case drafts).
