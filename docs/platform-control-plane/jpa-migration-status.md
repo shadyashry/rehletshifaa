@@ -87,9 +87,9 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | journey | `clinical_review_cost_estimates` | W | journey |
 | journey | `clinical_review_versions` | W | journey |
 | journey | `consultant_referrals` | W | journey |
-| journey | `deposit_components` | W | journey |
-| journey | `deposit_policies` | W | journey |
-| journey | `deposits` | W | journey |
+| journey | `deposit_components` | R | journey |
+| journey | `deposit_policies` | R | journey |
+| journey | `deposits` | R | journey |
 | journey | `follow_up_plans` | W | journey |
 | journey | `journey_admission_policy_current` | R | journey |
 | journey | `journey_admission_policy_revisions` | R | journey |
@@ -109,7 +109,7 @@ Legend: **—** not started · **W** all writes via JPA · **R** all reads via J
 | journey | `patient_action_items` | W | journey |
 | journey | `patient_identity_verifications` | W | journey |
 | journey | `patient_onboardings` | W | journey |
-| journey | `payment_events` | W | journey |
+| journey | `payment_events` | R | journey |
 | journey | `portal_preferences` | W | journey |
 | journey | `proposal_access_challenges` | W | journey |
 | journey | `proposal_decisions` | W | journey |
@@ -339,6 +339,34 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
   `theCasePageNamesEveryPersonOnItAndNeverShowsARawSubject`.
   Verification: full suite **586 tests, 0 failures** (2 skipped; +1 case-page names test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest` **PASS** on a freshly reset PostgreSQL 17 (V1–V73, new queries included).
 
+- 2026-10-07 — **`PaymentService` converted** (CL5 read slice 4; removed from `JDBC_NOT_YET_CONVERTED`, 14 → 13). The four
+  deposit tables (`deposits`, `deposit_components`, `deposit_policies`, `payment_events`) are now **R**. The reads moved to a
+  new `journey.application.DepositQueryService`; `PaymentService` keeps the commands (deposit creation, receipts, refunds,
+  waiver, policy configuration) and its public contract — every method callers use, the authorization (`PAYMENT_RECORD`,
+  `COMMERCIAL_POLICY_READ`), error codes, ordering, the display rounding (EGP × the deposit's snapshot rate, 2 dp half-up)
+  and the currency rules are unchanged. The unused `depositPaid` (no caller) was removed.
+  - Queries added: `DepositRepository.findLatestOf` (latest deposit, cancelled included — the deposit view) and
+    `findLatestLiveOf` (latest not-cancelled — readiness, net paid), `findOnCase` (404 guard that also returns the quote, so a
+    receipt/refund reads the deposit once instead of four times), `existsByCaseIdAndStatusNot`;
+    `DepositComponentRepository.findLinesOf`; `PaymentEventRepository.findLedgerOf` and `findTotalsOf` (paid and refunded in one
+    aggregate instead of two `SUM`s); `CoordinationDepositPolicyRepository.findAllRows`, `findRow`, `findActiveFor`,
+    `findActiveDefault`, `findLatestVersionFor`/`findLatestDefaultVersion`; `ProposalVersionRepository.findFxSnapshot`. The care
+    area comes from the existing `MedicalCaseRepository.findCareCategory`.
+  - Read once per request: readiness used to call four deposit methods that each re-read the active deposit (and the case
+    and policy when there was none); `DepositQueryService.standing` answers status, waiver, satisfied and the amount due from
+    one deposit read (plus case + policy only when no deposit exists). `CustomerReadinessService`, `PatientActivationService`
+    (activation hand-off and the deposit summary) and `CaseWorkspaceQueryService` read through the query service;
+    `CaseActionService`, `CaseTransitionPolicy` and `JourneyService` keep calling the unchanged `PaymentService` methods.
+  - H2 finding: Hibernate's H2 dialect omits `nulls first` (it assumes NULLs sort low) while the test database orders them
+    high (`DEFAULT_NULL_ORDERING=HIGH`, like PostgreSQL), so the policy list now orders default-first with an explicit
+    `case when careCategory is null`. `CommercialPolicyRepository` (`asc nulls first`) and `ClinicServiceChangeRepository`
+    (`desc nulls last`) have the same H2-only divergence (PostgreSQL renders both correctly); not changed in this slice.
+  - New test `depositLedgerTracksPartialPaymentsAndRefundsAtTheQuotedRateAndPoliciesListDefaultFirst` (policy revisions and
+    list order, anticipated amount before a deposit, partial receipt → PARTIALLY_PAID with half-up display amounts in USD,
+    PAID, partial refund, full refund → REFUNDED, ledger order, foreign deposit id → 404).
+  Verification: full suite **587 tests, 0 failures** (2 skipped; +1 deposit-ledger test); `ArchitectureRulesTest` 22/22; `PostgresJpaMappingTest` **PASS** on a
+  freshly reset PostgreSQL 17 (V1–V73, new queries included).
+
 ## Known exceptions to the rules
 
 - `CaseNumberGenerator` reads `nextval('case_number_seq')` through `JdbcClient`: JPQL has no sequence function, and a
@@ -351,8 +379,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 - **Writes:** every table is JPA-written except the two exceptions above (the coordination tables followed CL2 on
   2026-10-06). The patient merge (`mergePatient`) was the
   last dynamic-SQL writer (`"UPDATE " + table`); it is now six `moveToPatient` JPQL updates.
-- **Reads:** 14 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService` and `JourneyService`
-  converted) — `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
+- **Reads:** 13 classes still read with `JdbcClient` (2026-10-07: `StaffWorkService`, `CaseActionService`, `JourneyService` and
+  `PaymentService` converted) — `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`,
   `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`,
   `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService`, plus the three exceptions. They are
   listed in `ArchitectureRulesTest.JDBC_NOT_YET_CONVERTED`; nothing else may use `JdbcClient` or any other
@@ -362,8 +390,8 @@ dropped by V73 (claim codes were superseded by secure status links and account-l
 
 Convert the read models, one service per slice, as query services rather than line-by-line translations: most
 remaining reads assemble a view across 3–6 tables (case cards, work queues, proposal documents). `StaffWorkService` and
-`CaseActionService` and `JourneyService` are done (2026-10-07); next `PaymentService`, then the rest of the list, one
-service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
+`CaseActionService`, `JourneyService` and `PaymentService` are done (2026-10-07); next `ConsultantReferralService`, then the
+rest of the list, one service per session. Follow the `StaffWorkService` pattern: one projection query for the rows in the owning module, then one
 batched (`in :ids`) query per extra fact, assembled in a `…QueryService` in the caller's `application`. Each slice removes its
 class from `JDBC_NOT_YET_CONVERTED`; the full suite is green (0 failures), so any failure is a regression. Move
 `LocalDemoDataSeeder` to a `devdata` package.

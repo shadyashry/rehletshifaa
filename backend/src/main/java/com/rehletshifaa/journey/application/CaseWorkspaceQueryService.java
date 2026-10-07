@@ -71,7 +71,7 @@ public class CaseWorkspaceQueryService {
     private final CaseAssignmentRepository assignments;
     private final ClinicalReviewVersionRepository reviews;
     private final ClinicalReviewCostEstimateRepository estimates;
-    private final PaymentService payment;
+    private final DepositQueryService deposits;
     private final PatientActionService patientActions;
     private final ProposalAccessService proposalAccess;
     private final CurrencyService currency;
@@ -82,11 +82,11 @@ public class CaseWorkspaceQueryService {
                                      ProposalQueryService proposals, MedicalCaseRepository cases, CaseStatusChangeRepository statusHistory,
                                      CaseTaskRepository tasks, CaseMessageRepository messages, CaseAssignmentRepository assignments,
                                      ClinicalReviewVersionRepository reviews, ClinicalReviewCostEstimateRepository estimates,
-                                     PaymentService payment, PatientActionService patientActions, ProposalAccessService proposalAccess,
+                                     DepositQueryService deposits, PatientActionService patientActions, ProposalAccessService proposalAccess,
                                      CurrencyService currency, CryptoService crypto, Clock clock) {
         this.authority = authority; this.caseActions = caseActions; this.caseQueries = caseQueries; this.proposals = proposals;
         this.cases = cases; this.statusHistory = statusHistory; this.tasks = tasks; this.messages = messages; this.assignments = assignments;
-        this.reviews = reviews; this.estimates = estimates; this.payment = payment; this.patientActions = patientActions;
+        this.reviews = reviews; this.estimates = estimates; this.deposits = deposits; this.patientActions = patientActions;
         this.proposalAccess = proposalAccess; this.currency = currency; this.crypto = crypto; this.clock = clock;
     }
 
@@ -129,7 +129,7 @@ public class CaseWorkspaceQueryService {
         ProposalView latest = proposals.latest(caseId, patientActor);
         DeliveryStatus delivery = latest != null && DELIVERED_STATUSES.contains(latest.status()) ? proposals.deliveryStatus(latest.versionId()) : null;
         return new CaseWorkspace(summary, timeline, taskViews, messageViews, assignmentViews, reviewViews, latest, proposals.gates(caseId, latest),
-                delivery, payment.depositForCase(caseId), cases.findConditionDescription(caseId).orElse(null), patientActions.openAction(caseId),
+                delivery, deposits.depositForCase(caseId), cases.findConditionDescription(caseId).orElse(null), patientActions.openAction(caseId),
                 actions, proposalAccess.state(caseId));
     }
 

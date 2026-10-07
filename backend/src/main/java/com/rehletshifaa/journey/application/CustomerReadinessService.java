@@ -33,7 +33,7 @@ public class CustomerReadinessService {
     private final PatientOnboardingRepository onboardings;
     private final PatientProfileRepository patients;
     private final MedicalCaseRepository cases;
-    private final Clock clock; private final PaymentService payment;
+    private final Clock clock; private final DepositQueryService deposits;
     // Onboarding-stage consents that live in the existing consent_records table (never a new table).
     static final List<String> BASE_CONSENTS = List.of("PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS");
     static final String REP_CONSENT = "REPRESENTATIVE_AUTHORIZATION";
@@ -41,7 +41,7 @@ public class CustomerReadinessService {
     // and the deposit plus any operational identity step deliberately come after the profile is active.
     private static final Set<String> SUBMIT_DEFERRED = Set.of("ONBOARDING_INCOMPLETE", "DEPOSIT_UNPAID", "ACCOUNT_NOT_ACTIVATED", "IDENTITY_NOT_VERIFIED");
 
-    public CustomerReadinessService(Clock clock, PaymentService payment, MedicalCaseRepository cases, PatientProfileRepository patients, PatientOnboardingRepository onboardings, PatientIdentityVerificationRepository verifications, ConsentRecordRepository consents, PatientRepresentativeRepository representatives) { this.representatives = representatives; this.consents = consents; this.verifications = verifications; this.onboardings = onboardings; this.patients = patients; this.cases = cases; this.clock = clock; this.payment = payment; }
+    public CustomerReadinessService(Clock clock, DepositQueryService deposits, MedicalCaseRepository cases, PatientProfileRepository patients, PatientOnboardingRepository onboardings, PatientIdentityVerificationRepository verifications, ConsentRecordRepository consents, PatientRepresentativeRepository representatives) { this.representatives = representatives; this.consents = consents; this.verifications = verifications; this.onboardings = onboardings; this.patients = patients; this.cases = cases; this.clock = clock; this.deposits = deposits; }
 
     public List<String> requiredConsentTypes(String subjectType) {
         List<String> required = new ArrayList<>(BASE_CONSENTS);
@@ -75,10 +75,11 @@ public class CustomerReadinessService {
         boolean consentsDone = required.stream().allMatch(t -> consentPresent(p.patientId(), caseId, t));
         boolean repValid = repAuthValid(p.patientId(), subjectType);
 
-        boolean depositWaived = payment.depositWaived(caseId);
-        boolean depositSatisfied = payment.depositSatisfied(caseId);
-        boolean depositRequired = payment.anticipatedCoordinationDepositEgp(caseId).signum() > 0 && !depositWaived;
-        String depositStatus = payment.depositStatusFor(caseId);
+        DepositQueryService.Standing deposit = deposits.standing(caseId);
+        boolean depositWaived = deposit.waived();
+        boolean depositSatisfied = deposit.satisfied();
+        boolean depositRequired = deposit.anticipatedEgp().signum() > 0 && !depositWaived;
+        String depositStatus = deposit.status();
 
         boolean onboardingCompleted = ob != null && "COMPLETED".equals(ob.state());
 

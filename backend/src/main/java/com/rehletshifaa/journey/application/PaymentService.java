@@ -3,6 +3,7 @@ package com.rehletshifaa.journey.application;
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.journey.domain.CoordinationDepositPolicy;
 import com.rehletshifaa.journey.domain.Deposit;
@@ -11,16 +12,15 @@ import com.rehletshifaa.journey.infrastructure.CoordinationDepositPolicyReposito
 import com.rehletshifaa.journey.infrastructure.DepositComponentRepository;
 import com.rehletshifaa.journey.infrastructure.DepositRepository;
 import com.rehletshifaa.journey.infrastructure.PaymentEventRepository;
+import com.rehletshifaa.journey.infrastructure.ProposalVersionRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.AuditTrail;
 
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
@@ -40,28 +40,24 @@ public class PaymentService {
     private final CoordinationDepositPolicyRepository depositPolicies;
     private final DepositComponentRepository depositComponents;
     private final DepositRepository deposits;
+    private final DepositQueryService queries;
+    private final MedicalCaseRepository cases;
+    private final ProposalVersionRepository proposalVersions;
     private final AuditTrail auditTrail;
     /** Version of the patient-facing deposit terms (frontend lib/commercial-terms.ts), recorded with each new component. */
     public static final String DEPOSIT_TERMS_VERSION = "deposit-terms-2026-09-25";
     static final String DEPOSIT_TERMS_REFERENCE = "Deducted from the final treatment plan and quote price. Refund and cancellation terms: as shown to the patient ("
             + DEPOSIT_TERMS_VERSION + "). Refund classification awaits a legal decision.";
-    private final JdbcClient jdbc;
     private final Authority authority;
     private final Clock clock;
     private final ApplicationEventPublisher events;
 
-    public PaymentService(JdbcClient jdbc, Authority authority, Clock clock, ApplicationEventPublisher events, AuditTrail auditTrail, DepositRepository deposits, DepositComponentRepository depositComponents, CoordinationDepositPolicyRepository depositPolicies, PaymentEventRepository paymentEvents) { this.paymentEvents = paymentEvents; this.depositPolicies = depositPolicies; this.depositComponents = depositComponents; this.deposits = deposits; this.auditTrail = auditTrail;
-        this.jdbc = jdbc; this.authority = authority; this.clock = clock; this.events = events;
-    }
-
-    record DepositPolicy(UUID id, BigDecimal coordinationEgp, int version) {}
-
-    private DepositPolicy activeDepositPolicyFor(String careCategory) {
-        DepositPolicy p = careCategory == null ? null : jdbc.sql("SELECT id,coordination_deposit_egp,version FROM deposit_policies WHERE active AND care_category=? ORDER BY version DESC LIMIT 1")
-                .param(careCategory).query((rs, n) -> new DepositPolicy(rs.getObject("id", UUID.class), rs.getBigDecimal("coordination_deposit_egp"), rs.getInt("version"))).optional().orElse(null);
-        if (p != null) return p;
-        return jdbc.sql("SELECT id,coordination_deposit_egp,version FROM deposit_policies WHERE active AND care_category IS NULL ORDER BY version DESC LIMIT 1")
-                .query((rs, n) -> new DepositPolicy(rs.getObject("id", UUID.class), rs.getBigDecimal("coordination_deposit_egp"), rs.getInt("version"))).optional().orElse(null);
+    public PaymentService(DepositQueryService queries, Authority authority, Clock clock, ApplicationEventPublisher events, AuditTrail auditTrail,
+                          DepositRepository deposits, DepositComponentRepository depositComponents, CoordinationDepositPolicyRepository depositPolicies,
+                          PaymentEventRepository paymentEvents, MedicalCaseRepository cases, ProposalVersionRepository proposalVersions) {
+        this.queries = queries; this.paymentEvents = paymentEvents; this.depositPolicies = depositPolicies; this.depositComponents = depositComponents;
+        this.deposits = deposits; this.auditTrail = auditTrail; this.cases = cases; this.proposalVersions = proposalVersions;
+        this.authority = authority; this.clock = clock; this.events = events;
     }
 
     /**
@@ -71,24 +67,21 @@ public class PaymentService {
      */
     @Transactional
     public void createDepositForAcknowledgement(UUID caseId, UUID versionId) {
-        Integer existing = jdbc.sql("SELECT count(*) FROM deposits WHERE case_id=? AND status<>'CANCELLED'").param(caseId).query(Integer.class).single();
-        if (existing != null && existing > 0) return;
-        String careArea = jdbc.sql("SELECT care_category FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
-        DepositPolicy policy = activeDepositPolicyFor(careArea);
+        if (deposits.existsByCaseIdAndStatusNot(caseId, "CANCELLED")) return;
+        DepositQueryService.ActivePolicy policy = queries.activePolicyFor(cases.findCareCategory(caseId).orElse(null));
         if (policy == null || policy.coordinationEgp() == null || policy.coordinationEgp().signum() <= 0) return;
-        record Fx(String currency, BigDecimal rate, LocalDate date, String source) {}
-        Fx fx = jdbc.sql("SELECT currency,fx_rate,fx_rate_date,fx_source FROM proposal_versions WHERE id=?").param(versionId)
-                .query((rs, n) -> new Fx(rs.getString("currency"), rs.getBigDecimal("fx_rate"), rs.getObject("fx_rate_date", LocalDate.class), rs.getString("fx_source"))).optional().orElseThrow(() -> new ApiException(409, "PROPOSAL_NOT_FOUND", "The acknowledged proposal version was not found"));
-        if (fx.currency() == null) throw new ApiException(409, "PROPOSAL_CURRENCY_MISSING", "The acknowledged proposal has no currency");
+        ProposalVersionRepository.FxSnapshot fx = proposalVersions.findFxSnapshot(versionId)
+                .orElseThrow(() -> new ApiException(409, "PROPOSAL_NOT_FOUND", "The acknowledged proposal version was not found"));
+        if (fx.getCurrency() == null) throw new ApiException(409, "PROPOSAL_CURRENCY_MISSING", "The acknowledged proposal has no currency");
         // The deposit is quoted in the proposal's currency at the proposal's own snapshot rate. A released
         // foreign-currency proposal always carries one; the base currency is the only legitimate "rate 1".
-        if (fx.rate() == null && !"EGP".equals(fx.currency()))
+        if (fx.getFxRate() == null && !"EGP".equals(fx.getCurrency()))
             throw new ApiException(409, "PROPOSAL_FX_SNAPSHOT_MISSING", "The accepted proposal has no exchange-rate snapshot");
-        BigDecimal rate = fx.rate() == null ? BigDecimal.ONE : fx.rate();
+        BigDecimal rate = fx.getFxRate() == null ? BigDecimal.ONE : fx.getFxRate();
         BigDecimal totalEgp = policy.coordinationEgp();
-        BigDecimal totalDisplay = totalEgp.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalDisplay = DepositQueryService.display(totalEgp, rate);
         UUID depositId = UUID.randomUUID(); java.time.Instant now = clock.instant();
-        deposits.saveAndFlush(new Deposit(depositId, caseId, versionId, new Deposit.Quote(fx.currency(), rate, fx.date(), fx.source(), totalEgp, totalDisplay), policy.id(), policy.version(), "SYSTEM", now));
+        deposits.saveAndFlush(new Deposit(depositId, caseId, versionId, new Deposit.Quote(fx.getCurrency(), rate, fx.getFxRateDate(), fx.getFxSource(), totalEgp, totalDisplay), policy.id(), policy.version(), "SYSTEM", now));
         // Raising the deposit is not the end of the story: with an offline process a person has to arrange
         // it, so the case gains real staff work rather than sitting silently waiting for money to appear.
         events.publishEvent(new CaseEvents.DepositRequired(caseId));
@@ -97,27 +90,12 @@ public class PaymentService {
         // points to the terms the patient is shown; it no longer claims a refund window tied to coordination starting,
         // which payment of this deposit itself triggers. Existing rows keep the text they were created with.
         depositComponents.saveAndFlush(new DepositComponent(depositId, "PLATFORM", "Case coordination initiation", totalEgp, "NON_REFUNDABLE", DEPOSIT_TERMS_REFERENCE, true));
-        appendEvent(caseId, depositId, "DEPOSIT_REQUESTED", totalEgp, totalDisplay, fx.currency(), null, "OFFLINE", null, "REQUESTED", "SYSTEM", null, "deposit-req:" + depositId);
+        appendEvent(caseId, depositId, "DEPOSIT_REQUESTED", totalEgp, totalDisplay, fx.getCurrency(), null, "OFFLINE", null, "REQUESTED", "SYSTEM", null, "deposit-req:" + depositId);
     }
 
+    /** The case's latest deposit with its components, ledger and paid/balance amounts; null when the case has none. */
     @Transactional(readOnly = true)
-    public DepositView depositForCase(UUID caseId) {
-        record D(UUID id, String status, String currency, BigDecimal totalEgp, BigDecimal totalDisplay, BigDecimal rate) {}
-        D d = jdbc.sql("SELECT id,status,currency,total_egp,total_display,fx_rate FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1").param(caseId)
-                .query((rs, n) -> new D(rs.getObject("id", UUID.class), rs.getString("status"), rs.getString("currency"), rs.getBigDecimal("total_egp"), rs.getBigDecimal("total_display"), rs.getBigDecimal("fx_rate"))).optional().orElse(null);
-        if (d == null) return null;
-        BigDecimal rate = d.rate() == null ? BigDecimal.ONE : d.rate();
-        List<DepositComponentView> components = jdbc.sql("SELECT beneficiary,purpose,amount_egp,refundability,cancellation_terms,credited_to_final FROM deposit_components WHERE deposit_id=? ORDER BY sort_order").param(d.id())
-                .query((rs, n) -> new DepositComponentView(rs.getString("beneficiary"), rs.getString("purpose"), rs.getBigDecimal("amount_egp"), rs.getBigDecimal("amount_egp").multiply(rate).setScale(2, RoundingMode.HALF_UP), rs.getString("refundability"), rs.getString("cancellation_terms"), rs.getBoolean("credited_to_final"))).list();
-        List<PaymentEventView> events = jdbc.sql("SELECT event_type,amount_display,currency,method,provider,provider_reference,status,reason,occurred_at FROM payment_events WHERE deposit_id=? ORDER BY occurred_at").param(d.id())
-                .query((rs, n) -> new PaymentEventView(rs.getString("event_type"), rs.getBigDecimal("amount_display"), rs.getString("currency"), rs.getString("method"), rs.getString("provider"), rs.getString("provider_reference"), rs.getString("status"), rs.getString("reason"), rs.getObject("occurred_at", java.time.OffsetDateTime.class) == null ? null : rs.getObject("occurred_at", java.time.OffsetDateTime.class).toInstant())).list();
-        BigDecimal paidEgp = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'").param(d.id()).query(BigDecimal.class).single());
-        BigDecimal refundedEgp = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='REFUND_RECORDED'").param(d.id()).query(BigDecimal.class).single());
-        BigDecimal netPaidEgp = paidEgp.subtract(refundedEgp);
-        BigDecimal paidDisplay = netPaidEgp.multiply(rate).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal balanceDisplay = d.totalEgp().subtract(netPaidEgp).max(BigDecimal.ZERO).multiply(rate).setScale(2, RoundingMode.HALF_UP);
-        return new DepositView(d.id(), d.status(), d.currency(), d.totalEgp(), d.totalDisplay(), paidDisplay, balanceDisplay, components, events);
-    }
+    public DepositView depositForCase(UUID caseId) { return queries.depositForCase(caseId); }
 
     /**
      * Provider-agnostic authoritative settlement — the one domain operation every confirmation path goes
@@ -132,12 +110,12 @@ public class PaymentService {
      */
     @Transactional
     public DepositView confirmPayment(ConfirmedPayment confirmed) {
-        requireDeposit(confirmed.caseId(), confirmed.depositId());
+        DepositRepository.Quoted deposit = requireDeposit(confirmed.caseId(), confirmed.depositId());
         appendEvent(confirmed.caseId(), confirmed.depositId(), "PAYMENT_RECORDED", confirmed.amountEgp(),
-                displayFor(confirmed.depositId(), confirmed.amountEgp()), currencyOf(confirmed.depositId()),
+                displayFor(deposit, confirmed.amountEgp()), deposit.getCurrency(),
                 confirmed.method(), confirmed.provider(), confirmed.providerReference(), "RECORDED",
                 confirmed.confirmedBy(), null, confirmed.idempotencyKey());
-        recomputeStatus(confirmed.caseId(), confirmed.depositId());
+        recomputeStatus(confirmed.caseId(), deposit);
         return depositForCase(confirmed.caseId());
     }
 
@@ -158,9 +136,9 @@ public class PaymentService {
     @Transactional
     public DepositView recordRefund(UUID caseId, UUID depositId, RefundRequest request) {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
-        requireDeposit(caseId, depositId);
-        appendEvent(caseId, depositId, "REFUND_RECORDED", request.amountEgp(), displayFor(depositId, request.amountEgp()), currencyOf(depositId), null, "OFFLINE", null, "RECORDED", actor.subject(), request.reason(), request.idempotencyKey());
-        recomputeStatus(caseId, depositId);
+        DepositRepository.Quoted deposit = requireDeposit(caseId, depositId);
+        appendEvent(caseId, depositId, "REFUND_RECORDED", request.amountEgp(), displayFor(deposit, request.amountEgp()), deposit.getCurrency(), null, "OFFLINE", null, "RECORDED", actor.subject(), request.reason(), request.idempotencyKey());
+        recomputeStatus(caseId, deposit);
         audit(actor, caseId, "DEPOSIT_REFUND_RECORDED", depositId, request.reason());
         return depositForCase(caseId);
     }
@@ -168,8 +146,7 @@ public class PaymentService {
     // ---- deposit policy administration ----
     public List<DepositPolicyView> listPolicies() {
         authority.authorize(Permission.COMMERCIAL_POLICY_READ);
-        return jdbc.sql("SELECT id,name,care_category,coordination_deposit_egp,active,version,created_by,valid_from FROM deposit_policies ORDER BY care_category NULLS FIRST,version DESC")
-                .query((rs, n) -> new DepositPolicyView(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("care_category"), rs.getBigDecimal("coordination_deposit_egp"), rs.getBoolean("active"), rs.getInt("version"), rs.getString("created_by"), rs.getObject("valid_from", LocalDate.class))).list();
+        return queries.policies();
     }
 
     @Transactional
@@ -177,61 +154,26 @@ public class PaymentService {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
         if (request.coordinationDepositEgp() == null || request.coordinationDepositEgp().signum() < 0) throw new ApiException(400, "DEPOSIT_AMOUNT_INVALID", "The coordination deposit must be zero or more");
         String careCategory = request.careCategory() == null || request.careCategory().isBlank() ? null : request.careCategory().trim();
-        Integer prev = (careCategory == null
-                ? jdbc.sql("SELECT COALESCE(MAX(version),0) FROM deposit_policies WHERE care_category IS NULL")
-                : jdbc.sql("SELECT COALESCE(MAX(version),0) FROM deposit_policies WHERE care_category=?").param(careCategory)).query(Integer.class).single();
+        int prev = (careCategory == null ? depositPolicies.findLatestDefaultVersion() : depositPolicies.findLatestVersionFor(careCategory)).orElse(0);
         if (careCategory == null) depositPolicies.retireDefault(); else depositPolicies.retireFor(careCategory);
         UUID id = UUID.randomUUID();
         depositPolicies.saveAndFlush(new CoordinationDepositPolicy(id, request.name() == null || request.name().isBlank() ? "Coordination-initiation deposit" : request.name().trim(), careCategory, request.coordinationDepositEgp(), prev + 1, actor.subject(), LocalDate.now(clock), clock.instant()));
         audit(actor, null, "DEPOSIT_POLICY_CONFIGURED", id, "amount=" + request.coordinationDepositEgp());
-        return jdbc.sql("SELECT id,name,care_category,coordination_deposit_egp,active,version,created_by,valid_from FROM deposit_policies WHERE id=?").param(id)
-                .query((rs, n) -> new DepositPolicyView(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("care_category"), rs.getBigDecimal("coordination_deposit_egp"), rs.getBoolean("active"), rs.getInt("version"), rs.getString("created_by"), rs.getObject("valid_from", LocalDate.class))).single();
+        return queries.policy(id);
     }
 
     /** The coordination deposit that will be due on acknowledgement (existing deposit total, else the active policy amount). */
-    public BigDecimal anticipatedCoordinationDepositEgp(UUID caseId) {
-        BigDecimal existing = jdbc.sql("SELECT total_egp FROM deposits WHERE case_id=? AND status<>'CANCELLED' ORDER BY created_at DESC LIMIT 1").param(caseId).query(BigDecimal.class).optional().orElse(null);
-        if (existing != null) return existing;
-        String careArea = jdbc.sql("SELECT care_category FROM medical_cases WHERE id=?").param(caseId).query(String.class).optional().orElse(null);
-        DepositPolicy p = activeDepositPolicyFor(careArea);
-        return p == null || p.coordinationEgp() == null ? BigDecimal.ZERO : p.coordinationEgp();
-    }
+    public BigDecimal anticipatedCoordinationDepositEgp(UUID caseId) { return queries.standing(caseId).anticipatedEgp(); }
 
     /** Net amount recorded as paid on the case's latest deposit, in EGP (paid minus refunded). */
-    public BigDecimal netPaidEgp(UUID caseId) {
-        UUID depositId = jdbc.sql("SELECT id FROM deposits WHERE case_id=? AND status<>'CANCELLED' ORDER BY created_at DESC LIMIT 1").param(caseId).query(UUID.class).optional().orElse(null);
-        if (depositId == null) return BigDecimal.ZERO;
-        BigDecimal paid = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'").param(depositId).query(BigDecimal.class).single());
-        BigDecimal refunded = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='REFUND_RECORDED'").param(depositId).query(BigDecimal.class).single());
-        return paid.subtract(refunded);
-    }
+    public BigDecimal netPaidEgp(UUID caseId) { return queries.netPaidEgp(caseId); }
 
-    /** True when the case's deposit is fully PAID — used to gate non-cancellable bookings. */
-    public boolean depositPaid(UUID caseId) {
-        String s = jdbc.sql("SELECT status FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1").param(caseId).query(String.class).optional().orElse(null);
-        return s == null || "PAID".equals(s); // no deposit required => not blocking
-    }
-
-    private record DepositState(UUID id, String status, java.time.Instant waivedAt) {}
-    private DepositState latestDeposit(UUID caseId) {
-        return jdbc.sql("SELECT id,status,waived_at FROM deposits WHERE case_id=? AND status<>'CANCELLED' ORDER BY created_at DESC LIMIT 1").param(caseId)
-                .query((rs, n) -> new DepositState(rs.getObject("id", UUID.class), rs.getString("status"), rs.getObject("waived_at", java.time.OffsetDateTime.class) == null ? null : rs.getObject("waived_at", java.time.OffsetDateTime.class).toInstant())).optional().orElse(null);
-    }
     /** True when an authorized Finance/System-Admin waiver has been recorded on the active deposit. */
-    public boolean depositWaived(UUID caseId) { DepositState d = latestDeposit(caseId); return d != null && d.waivedAt() != null; }
+    public boolean depositWaived(UUID caseId) { return queries.standing(caseId).waived(); }
     /** Deposit readiness: no deposit required, or PAID, or WAIVED by an authorized actor. */
-    public boolean depositSatisfied(UUID caseId) {
-        DepositState d = latestDeposit(caseId);
-        if (d == null) return anticipatedCoordinationDepositEgp(caseId).signum() <= 0;
-        return d.waivedAt() != null || "PAID".equals(d.status());
-    }
+    public boolean depositSatisfied(UUID caseId) { return queries.standing(caseId).satisfied(); }
     /** Patient-safe deposit status string for readiness: NONE / REQUIRED / REQUESTED / PARTIALLY_PAID / PAID / WAIVED. */
-    public String depositStatusFor(UUID caseId) {
-        DepositState d = latestDeposit(caseId);
-        if (d != null && d.waivedAt() != null) return "WAIVED";
-        if (d != null) return d.status();
-        return anticipatedCoordinationDepositEgp(caseId).signum() > 0 ? "REQUIRED" : "NONE";
-    }
+    public String depositStatusFor(UUID caseId) { return queries.standing(caseId).status(); }
 
     /**
      * Record an authorized deposit waiver. Requires recent authentication, an explicit Finance/System-Admin
@@ -251,32 +193,30 @@ public class PaymentService {
     }
 
     // ---- helpers ----
-    private void requireDeposit(UUID caseId, UUID depositId) {
-        Integer c = jdbc.sql("SELECT count(*) FROM deposits WHERE id=? AND case_id=?").params(depositId, caseId).query(Integer.class).single();
-        if (c == null || c == 0) throw new ApiException(404, "DEPOSIT_NOT_FOUND", "The deposit was not found for this case");
+    private DepositRepository.Quoted requireDeposit(UUID caseId, UUID depositId) {
+        return deposits.findOnCase(depositId, caseId)
+                .orElseThrow(() -> new ApiException(404, "DEPOSIT_NOT_FOUND", "The deposit was not found for this case"));
     }
     private void appendEvent(UUID caseId, UUID depositId, String type, BigDecimal amountEgp, BigDecimal amountDisplay, String currency, String method, String provider, String providerRef, String status, String actor, String reason, String idempotencyKey) {
         // Idempotent by idempotency_key: a duplicate submission inserts nothing.
         paymentEvents.append(UUID.randomUUID(), caseId, depositId, type, amountEgp, amountDisplay, currency, method, provider, providerRef, status, actor, reason, idempotencyKey, micros(clock.instant()));
     }
-    /** Recompute from the append-only ledger and, on the first authoritative settlement, continue the journey. */
-    private void recomputeStatus(UUID caseId, UUID depositId) {
-        String previous = jdbc.sql("SELECT status FROM deposits WHERE id=?").param(depositId).query(String.class).optional().orElse(null);
-        BigDecimal total = jdbc.sql("SELECT total_egp FROM deposits WHERE id=?").param(depositId).query(BigDecimal.class).single();
-        BigDecimal paid = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'").param(depositId).query(BigDecimal.class).single());
-        BigDecimal refunded = firstNonNull(jdbc.sql("SELECT COALESCE(SUM(amount_egp),0) FROM payment_events WHERE deposit_id=? AND event_type='REFUND_RECORDED'").param(depositId).query(BigDecimal.class).single());
-        BigDecimal net = paid.subtract(refunded);
-        String status = net.signum() <= 0 ? (paid.signum() > 0 ? "REFUNDED" : "REQUESTED") : net.compareTo(total) >= 0 ? "PAID" : "PARTIALLY_PAID";
-        deposits.settleAs(depositId, status);
+    /**
+     * Recompute from the append-only ledger and, on the first authoritative settlement, continue the journey.
+     * {@code deposit} is the row as read before this command appended to the ledger, so its status is the previous one.
+     */
+    private void recomputeStatus(UUID caseId, DepositRepository.Quoted deposit) {
+        DepositQueryService.Totals totals = queries.totalsOf(deposit.getId());
+        BigDecimal paid = totals.paidEgp();
+        BigDecimal net = totals.netEgp();
+        String status = net.signum() <= 0 ? (paid.signum() > 0 ? "REFUNDED" : "REQUESTED") : net.compareTo(deposit.getTotalEgp()) >= 0 ? "PAID" : "PARTIALLY_PAID";
+        deposits.settleAs(deposit.getId(), status);
         // Authoritative settlement is the ONLY trigger for continuing the journey; a browser never reaches here.
-        if ("PAID".equals(status) && !"PAID".equals(previous)) events.publishEvent(new CaseEvents.DepositSettled(caseId));
+        if ("PAID".equals(status) && !"PAID".equals(deposit.getStatus())) events.publishEvent(new CaseEvents.DepositSettled(caseId));
     }
-    private BigDecimal displayFor(UUID depositId, BigDecimal egp) {
-        BigDecimal rate = jdbc.sql("SELECT fx_rate FROM deposits WHERE id=?").param(depositId).query(BigDecimal.class).optional().orElse(BigDecimal.ONE);
-        return egp.multiply(rate == null ? BigDecimal.ONE : rate).setScale(2, RoundingMode.HALF_UP);
+    private static BigDecimal displayFor(DepositRepository.Quoted deposit, BigDecimal egp) {
+        return DepositQueryService.display(egp, deposit.getFxRate() == null ? BigDecimal.ONE : deposit.getFxRate());
     }
-    private String currencyOf(UUID depositId) { return jdbc.sql("SELECT currency FROM deposits WHERE id=?").param(depositId).query(String.class).optional().orElse("EGP"); }
-    private static BigDecimal firstNonNull(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
     private void audit(Actor actor, UUID caseId, String type, UUID entityId, String reason) {
         auditTrail.event(type).actor(actor.subject(), actor.label()).caseId(caseId).entity("Deposit", entityId).action("PAYMENT").reason(reason).record();
     }

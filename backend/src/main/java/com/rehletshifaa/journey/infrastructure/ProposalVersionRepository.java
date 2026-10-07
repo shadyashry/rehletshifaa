@@ -29,6 +29,12 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
             from ProposalVersion v join Proposal p on p.id = v.proposalId where p.caseId = :caseId order by v.versionNumber desc""")
     List<PatientFacing> latestForCase(@Param("caseId") UUID caseId, org.springframework.data.domain.Pageable page);
 
+    /** The currency and exchange-rate snapshot a version was released at. */
+    interface FxSnapshot { String getCurrency(); BigDecimal getFxRate(); LocalDate getFxRateDate(); String getFxSource(); }
+
+    @Query("select v.currency as currency, v.fxRate as fxRate, v.fxRateDate as fxRateDate, v.fxSource as fxSource from ProposalVersion v where v.id = :id")
+    java.util.Optional<FxSnapshot> findFxSnapshot(@Param("id") UUID id);
+
     /** Where a version stands in internal approval before release. */
     interface ApprovalGates {
         String getStatus(); Boolean getRequiresFinanceApproval(); Instant getOperationsCompletedAt(); Instant getFinanceApprovedAt();

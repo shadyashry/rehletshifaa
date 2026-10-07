@@ -55,18 +55,18 @@ public class PatientActivationService {
 
     private final JdbcClient jdbc;
     private final PublicCaseAccessService access;
-    private final PaymentService payment;
+    private final DepositQueryService deposits;
     private final CustomerReadinessService readiness;
     private final CaseHandoffService handoff;
     private final PatientAccountService account;
     private final CaseActionService caseActions;
     private final Clock clock;
 
-    public PatientActivationService(JdbcClient jdbc, PublicCaseAccessService access, PaymentService payment,
+    public PatientActivationService(JdbcClient jdbc, PublicCaseAccessService access, DepositQueryService deposits,
                                     CustomerReadinessService readiness, CaseHandoffService handoff,
                                     PatientAccountService account,
                                     CaseActionService caseActions, Clock clock, AuditTrail auditTrail, PatientProfileRepository patients, CaseSubmissionContactRepository contacts, ConsentRecordRepository consentRecords, PatientOnboardingRepository onboardings) { this.onboardings = onboardings; this.consentRecords = consentRecords; this.contacts = contacts; this.patients = patients; this.auditTrail = auditTrail;
-        this.jdbc = jdbc; this.access = access; this.payment = payment; this.readiness = readiness;
+        this.jdbc = jdbc; this.access = access; this.deposits = deposits; this.readiness = readiness;
         this.handoff = handoff; this.account = account; this.caseActions = caseActions; this.clock = clock;
     }
 
@@ -154,7 +154,7 @@ public class PatientActivationService {
         completeOnboarding(onboarding, now);
         audit(caseId, "PATIENT_PROFILE_ACTIVATED", patientId, "Profile completed from secure onboarding link");
         // When no deposit is due (policy amount zero, already paid, or waived) the journey continues now.
-        if (payment.depositSatisfied(caseId)) handoff.onDepositSettled(caseId);
+        if (deposits.standing(caseId).satisfied()) handoff.onDepositSettled(caseId);
         // Otherwise the patient has done their part and the offline deposit is now our team's move.
         else { handoff.onDepositRequired(caseId); caseActions.reconcileWaitingOn(caseId); }
 
@@ -335,11 +335,12 @@ public class PatientActivationService {
     }
 
     private DepositSummary depositSummary(UUID caseId) {
-        var view = payment.depositForCase(caseId);
-        boolean satisfied = payment.depositSatisfied(caseId);
-        String status = payment.depositStatusFor(caseId);
+        var view = deposits.depositForCase(caseId);
+        DepositQueryService.Standing standing = deposits.standing(caseId);
+        boolean satisfied = standing.satisfied();
+        String status = standing.status();
         if (view == null) {
-            BigDecimal anticipated = payment.anticipatedCoordinationDepositEgp(caseId);
+            BigDecimal anticipated = standing.anticipatedEgp();
             boolean required = anticipated.signum() > 0;
             return new DepositSummary(required, status, "EGP", required ? anticipated : BigDecimal.ZERO, BigDecimal.ZERO,
                     required ? anticipated : BigDecimal.ZERO, satisfied);

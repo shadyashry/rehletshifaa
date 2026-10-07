@@ -174,6 +174,57 @@ class JourneyServiceIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'",Integer.class,deposit.id())).isEqualTo(1);
     }
 
+    @Test void depositLedgerTracksPartialPaymentsAndRefundsAtTheQuotedRateAndPoliciesListDefaultFirst(){
+        var created=cases.create(new CreateCaseRequest("Ledger", "Patient","Kenya","+254700000093","Cardiac reports","en",true,null,"ledger@local.test","Africa/Nairobi","cardiology"));
+        UUID caseId=created.caseId();
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-subject", "FINANCE", crypto.encrypt("Finance One"));
+        authenticate("finance-subject",Role.FINANCE);
+        payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("1000.00")));
+        payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("2000.00")));
+        var current=payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("2500.00")));
+        var listed=payment.listPolicies();
+        int firstCareArea=(int)listed.stream().takeWhile(p->p.careCategory()==null).count();
+        assertThat(listed.subList(firstCareArea,listed.size())).allSatisfy(p->assertThat(p.careCategory()).isNotNull());
+        assertThat(listed.stream().filter(p->"cardiology".equals(p.careCategory())).toList())
+                .extracting(DepositPolicyView::version,DepositPolicyView::active).startsWith(tuple(current.version(),true),tuple(current.version()-1,false));
+        // No deposit yet: the active care-area policy is what will be due.
+        assertThat(payment.depositForCase(caseId)).isNull();
+        assertThat(payment.anticipatedCoordinationDepositEgp(caseId)).isEqualByComparingTo("2500.00");
+        assertThat(payment.depositStatusFor(caseId)).isEqualTo("REQUIRED");
+        assertThat(payment.depositSatisfied(caseId)).isFalse();
+
+        UUID depositId=UUID.randomUUID();
+        entityManager.flush();
+        jdbc.update("INSERT INTO deposits(id,case_id,currency,fx_rate,total_egp,total_display,status,created_at,version) VALUES(?,?,?,?,?,?,?,?,0)",
+                depositId,caseId,"USD",new BigDecimal("0.02035"),new BigDecimal("3000.00"),new BigDecimal("61.05"),"REQUESTED",Instant.now());
+        jdbc.update("INSERT INTO deposit_components(id,deposit_id,beneficiary,purpose,amount_egp,refundability,credited_to_final,sort_order) VALUES(?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(),depositId,"PLATFORM","Case coordination initiation",new BigDecimal("3000.00"),"NON_REFUNDABLE",true,0);
+        entityManager.clear();
+
+        var partial=payment.recordReceipt(caseId,depositId,new RecordReceiptRequest(new BigDecimal("1234.56"),"BANK","ref-a","ledger-a-"+caseId));
+        assertThat(partial.status()).isEqualTo("PARTIALLY_PAID");
+        assertThat(partial.currency()).isEqualTo("USD");
+        assertThat(partial.paidDisplay()).isEqualByComparingTo("25.12");     // 1234.56 × 0.02035, half-up
+        assertThat(partial.balanceDisplay()).isEqualByComparingTo("35.93");  // 1765.44 × 0.02035, half-up
+        assertThat(partial.components()).singleElement().satisfies(c->assertThat(c.amountDisplay()).isEqualByComparingTo("61.05"));
+        assertThat(partial.events()).singleElement().satisfies(e->{assertThat(e.amountDisplay()).isEqualByComparingTo("25.12");assertThat(e.currency()).isEqualTo("USD");});
+        assertThat(payment.netPaidEgp(caseId)).isEqualByComparingTo("1234.56");
+        assertThat(payment.anticipatedCoordinationDepositEgp(caseId)).isEqualByComparingTo("3000.00");
+        assertThat(payment.depositStatusFor(caseId)).isEqualTo("PARTIALLY_PAID");
+
+        assertThat(payment.recordReceipt(caseId,depositId,new RecordReceiptRequest(new BigDecimal("1765.44"),"BANK","ref-b","ledger-b-"+caseId)).status()).isEqualTo("PAID");
+        assertThat(payment.depositSatisfied(caseId)).isTrue();
+        assertThat(payment.recordRefund(caseId,depositId,new RefundRequest(new BigDecimal("500.00"),"Partial refund","ledger-c-"+caseId)).status()).isEqualTo("PARTIALLY_PAID");
+        var refunded=payment.recordRefund(caseId,depositId,new RefundRequest(new BigDecimal("2500.00"),"Full refund","ledger-d-"+caseId));
+        assertThat(refunded.status()).isEqualTo("REFUNDED");
+        assertThat(refunded.paidDisplay()).isEqualByComparingTo("0.00");
+        assertThat(refunded.balanceDisplay()).isEqualByComparingTo("61.05");
+        assertThat(refunded.events()).extracting(PaymentEventView::eventType).containsExactly("PAYMENT_RECORDED","PAYMENT_RECORDED","REFUND_RECORDED","REFUND_RECORDED");
+        assertThat(payment.netPaidEgp(caseId)).isEqualByComparingTo("0");
+        assertThatThrownBy(()->payment.recordReceipt(caseId,UUID.randomUUID(),new RecordReceiptRequest(BigDecimal.ONE,"BANK","ref-x","ledger-x-"+caseId)))
+                .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("not found for this case");
+    }
+
     @Test void resendRefreshesLinkWithoutNewVersionOrTransition()throws Exception{
         var created=cases.create(new CreateCaseRequest("Resend", "Patient","Kenya","+254700000091","Cardiac reports","en",true,null,"rs@local.test","Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
