@@ -1135,8 +1135,8 @@ Implementation slices (kept green independently):
 | Slice | Scope | State |
 |---|---|---|
 | CL1 | Remove Keycloak business-role compatibility provisioning and its patient-role mutation | DONE |
-| CL2 | Replace `LEGACY` Journey admission with explicit `STANDARD` versus `JOURNEY`; route every standard intake through governed team/capacity eligibility and remove unrestricted self-claim | DONE (2026-10-06, Claude) — see "CL2 delivered" below |
-| CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | DONE (2026-10-06, Claude) — see "CL3 delivered" below |
+| CL2 | Replace `LEGACY` Journey admission with explicit `STANDARD` versus `JOURNEY`; route every standard intake through governed team/capacity eligibility and remove unrestricted self-claim | DONE (2026-10-06, Claude) — see "CL2 delivered" below; reviewed 2026-10-07 by Claude (not Astra), R2 fixed |
+| CL3 | Remove onboarding/readiness/commercial legacy exemptions and require the current evidence model for every case | DONE (2026-10-06, Claude) — see "CL3 delivered" below; reviewed 2026-10-07 by Claude (not Astra), R1/R3 fixed |
 | CL4 | Remove obsolete patient/provider/plaintext compatibility data paths and finalize clean pre-production schema | DONE (2026-10-06, Claude) — see "CL4 delivered" below |
 | CL5 | Move all SQL/JDBC out of application services module by module — **now via Spring Data JPA** (owner decision 2026-10-06, technical-decisions §29); live tracker `jpa-migration-status.md` | DONE (2026-10-07, Claude) — every table read and written through JPA; only the two documented exceptions (`CaseNumberGenerator`, `devdata.LocalDemoDataSeeder`) still use JdbcClient (ratchet in `ArchitectureRulesTest`); `StaffWorkService`, `CaseActionService`, `JourneyService`, `PaymentService`, `ConsultantReferralService`, `PatientActivationService`, `PublicCaseAccessService`, `PatientAccountService`, `PatientActionService`, `IdentityVerificationService`, `CaseHandoffService`, `OnboardingService`, `JourneyCaseRelationships`, `CoordinationReadService` and the `CoordinationRepository` reads converted and the seeder moved to `devdata` 2026-10-07 |
 | CL6 | Enforce the boundaries with ArchUnit, finish documentation/test cleanup, run focused and full backend gates | DONE (2026-10-06, Claude) — see "CL6 delivered" below |
@@ -1441,10 +1441,37 @@ through Spring Data JPA; the ratchet holds only `CaseNumberGenerator` (sequence)
 seeding), both documented exceptions. Verification: full suite **599 tests, 0 failures** (2 skipped); `ArchitectureRulesTest`
 22/22; `PostgresJpaMappingTest` **PASS** on a freshly reset PostgreSQL 17 (V1–V73).
 
-**Next exact action:** no implementation slice is open in the clean-code continuation (CL1–CL6 done). Two items remain and need
-the owner: CL7 is **blocked** (no Sonar server/project/token; no Sonar scanner in the offline Maven cache), and the
-independent Astra review of CL2+CL3 is still owed and needs a reviewer the owner chooses. Preserve unrelated brand/theme work
-and do not run concurrent builds that share `backend/target`.
+**CL2+CL3 review (2026-10-07, Claude — substitute for the owed Astra review).** The owner asked Claude to run the review
+because Astra was not available in this session. It is therefore **not an Astra review and not model-independent**: CL2 and
+CL3 were also delivered by Claude sessions. Scope: the CL2/CL3 commits (`17770bf`, `1b3f4bd`) and the Codex groundwork they
+completed (V72, governed claim), as the code stands after CL5 — `AssignmentEngine`, `CoordinatorEligibilityService`,
+`JourneyProductionIntakeService`/V72, `CustomerReadinessService`, `CaseActionService`, `CaseTransitionPolicy`, the account-setup
+readiness event and the deposit currency refusal. Focus: authority, stage invariants, lock order, replay safety. Each suspected
+defect was proved with a throwaway test before it was reported.
+
+| # | Severity | Finding | Outcome |
+|---|---|---|---|
+| R1 | Medium | CL3 said a missing onboarding keeps a case out of TRAVEL_COORDINATION and blocks Operations, but both gates (`CaseTransitionPolicy.entryBlockers`, `CaseActionService.assertOperationsAssignable`) only counted PATIENT-owned blockers, and `ONBOARDING_NOT_STARTED` is STAFF-owned. Proved: an active, consented patient with a settled deposit and no onboarding record entered TRAVEL_COORDINATION with `readyForCoordination=false`, and Operations was assignable. CL3's own test did not isolate the gate (its patient never activated). Chargeable commitments were still refused. | **Fixed**: one `CaseActionService.coordinationGate` (every gating readiness step except the deposit, which the stage gate checks itself) used by both gates; the staff step reads "onboarding not started — staff must resolve it". Only `ONBOARDING_NOT_STARTED` newly gates (every other gating step is patient-owned). Test `aMissingOnboardingHoldsAReadyPaidCaseOutOfTreatmentCoordinationAndOperations`; it fails on the pre-fix code. |
+| R2 | Medium | `AssignmentEngine.route` used one replay key per case (`journey:<case>`, `intake:<case>`) while the recorded payload carries the case revision: routing journey work again after a manager QUEUE (or after a NO_ROUTING_POLICY decision) was refused with `IDEMPOTENCY_CONFLICT`, failing the Journey action. Predates CL2 (Phase 3 engine) but CL2 made governed routing the only path. | **Fixed**: the key is the caller's prefix plus the revision read under the locks; a redelivery at the same revision still replays, later routing is a new command. The queue-retry key keeps its `queue-retry:<revision>` form (now read under the lock). Test `journeyWorkRoutesAgainAfterAManualQueueOrAMissingPolicyAndReplaysWithinARevision`; it fails on the pre-fix code. |
+| R3 | Low | `CaseTransitionPolicy.entryBlockers` Javadoc still described the deposit-only gate CL3 removed. | **Fixed** with R1. |
+| R4 | Low | `claimCoordinatorCase` and `reassignCoordinator` take the case lock and the global routing lock before authorizing (`execute` authorizes first): an unauthorized caller briefly serializes routing, and an unknown case answers 404 before 403. | **Open** — not in the requested fix scope. |
+
+Held: only routing assigns a Coordinator (the generic assignment endpoint refuses that role); a claim needs `CASE_INTAKE` on
+the case plus eligibility under the effective policy; admission is decided once per case (V72 constrains COORDINATION/JOURNEY
+and its binding columns); lock order case → governance → routing; a routed intake moves RECEIVED → INTAKE_REVIEW once (actor
+`ROUTING_ENGINE`); transfer notifications are transactional and never sent to the actor; a missing proposal or currency
+refuses the deposit; finishing account setup re-checks each of the patient's cases once.
+
+Verification: the two regression tests fail on the pre-fix code and pass after; focused run 252 tests, 0 failures
+(coordination, conversion, case actions, activation, UAT, secure-journey, operational, production intake, architecture);
+full suite **601 tests, 0 failures** (2 skipped; +2 tests); `PostgresJpaMappingTest` **PASS** on a freshly reset
+PostgreSQL 17 (V1–V73).
+
+**Next exact action:** no implementation slice is open in the clean-code continuation (CL1–CL6 done, CL2+CL3 reviewed and
+R1–R3 fixed). Open: R4 (lock before authorization in claim/reassign, low); CL7 is **blocked** (no Sonar server/project/token;
+no Sonar scanner in the offline Maven cache); a model-independent Astra review of CL2+CL3 remains the owner's call — the
+2026-10-07 review above was Claude's. Preserve unrelated brand/theme work and do not run concurrent builds that share
+`backend/target`.
 
 ### Open evidence (P1–P6, 2026-10-05)
 
@@ -1453,4 +1480,4 @@ and do not run concurrent builds that share `backend/target`.
   Nothing was published, pushed or enabled, and no development volume was deleted. Existing historical live evidence
   remains historical rather than a fresh claim. If fresh deployment evidence is requested, use the canonical tunnel
   overlay and exercise the distinct holder/admin/manager identities without enabling Journey admission merely for
-  demonstration. The current next action is the "Next exact action" after the LocalDemoDataSeeder note above.
+  demonstration. The current next action is the "Next exact action" after the CL2+CL3 review note above.

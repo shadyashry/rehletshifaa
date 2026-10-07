@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.*;
 class PatientConversionLayerTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired OnboardingService onboarding; @Autowired IdentityVerificationService identity; @Autowired PaymentService payment;
-    @Autowired PatientAccountService accounts; @Autowired CustomerReadinessService readiness; @Autowired com.rehletshifaa.authority.application.Authority authority;
+    @Autowired PatientAccountService accounts; @Autowired CustomerReadinessService readiness; @Autowired com.rehletshifaa.authority.application.Authority authority; @Autowired CaseActionService caseActions; @Autowired CaseTransitionPolicy transitions;
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
 
     /** Raw SQL behind JPA's back: flush pending entity changes first, then drop managed instances the SQL made stale. */
@@ -375,6 +375,28 @@ class PatientConversionLayerTest {
                 .isInstanceOf(ApiException.class).hasMessageContaining("start onboarding");
         // CL3: no deposit-only gate — without onboarding evidence the case does not even enter treatment coordination.
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
+    }
+
+    @Test void aMissingOnboardingHoldsAReadyPaidCaseOutOfTreatmentCoordinationAndOperations() throws Exception {
+        // CL2+CL3 review: a missing onboarding is owed by staff, yet it must still gate — not only the patient's own steps.
+        var ctx = onboardedCase();
+        raw("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
+        UUID patient = patientOf(ctx.caseId);
+        for (String type : List.of("PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS"))
+            consent(patient, null, type, null);
+        authenticate("finance-subject", Role.FINANCE);
+        payment.recordReceipt(ctx.caseId, depositId(ctx.caseId), new RecordReceiptRequest(new BigDecimal("3000.00"), "BANK", "no-onboarding", "no-onboarding-" + ctx.caseId));
+        em.flush();
+        assertThat(caseActions.readinessBlockers(ctx.caseId)).as("nothing is left for the patient").noneMatch(CaseActionService::patientGate);
+        assertThat(readiness.compute(ctx.caseId).readyForCoordination()).isFalse();
+        assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
+        assertThat(transitions.entryBlockers(ctx.caseId, "TRAVEL_COORDINATION")).singleElement().asString().contains("onboarding not started");
+        assertThat(transitions.mayEnter(ctx.caseId, "ACCEPTED", "TRAVEL_COORDINATION")).isFalse();
+        raw("UPDATE medical_cases SET status='TRAVEL_COORDINATION' WHERE id=?", ctx.caseId);
+        assertThat(caseActions.operationsAssignable(ctx.caseId)).isFalse();
+        assertThatThrownBy(() -> caseActions.assertOperationsAssignable(ctx.caseId))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("COORDINATION_NOT_READY"))
+                .hasMessageContaining("Onboarding not started");
     }
 
     @Test void completedProfileWithPendingAccountDoesNotSatisfyAccountReadiness() throws Exception {

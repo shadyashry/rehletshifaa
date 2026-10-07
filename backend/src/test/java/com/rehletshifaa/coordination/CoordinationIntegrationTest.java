@@ -428,6 +428,28 @@ class CoordinationIntegrationTest {
         assertThat(reads.consultants()).extracting(ConsultantRouting::consultantId).contains(offered);
     }
 
+    @Test void journeyWorkRoutesAgainAfterAManualQueueOrAMissingPolicyAndReplaysWithinARevision() {
+        // CL2+CL3 review: the replay key is per revision, so routing the case again later is a new command, not a conflict.
+        assertThat(engine.routeCoordinatorWork(caseId)).contains("routing-a");
+        command("QUEUE", 1, null);
+        assertThat(repo.owner(caseId)).isNull();
+        String owner = engine.routeCoordinatorWork(caseId).orElseThrow(); // the engine's choice (workload/last-assignment tie-breaks)
+        assertThat(repo.history(caseId)).extracting(Decision::path).containsExactly("DEFAULT_TEAM", "MANUAL_QUEUE", "DEFAULT_TEAM");
+        assertThat(engine.routeCoordinatorWork(caseId)).contains(owner);
+        assertThat(repo.history(caseId)).as("an owned case is not routed again").hasSize(3);
+
+        // No policy: one durable queue decision however often journey work asks; once a policy applies, the case routes.
+        UUID other = medicalCase(consultant);
+        jdbc.update("UPDATE coordination_policy_versions SET effective_from=?,effective_to=?", java.sql.Timestamp.from(future), java.sql.Timestamp.from(future.plusSeconds(3600)));
+        assertThat(engine.routeCoordinatorWork(other)).isEmpty();
+        assertThat(engine.routeCoordinatorWork(other)).isEmpty();
+        assertThat(repo.history(other)).singleElement().satisfies(d -> assertThat(d.path()).isEqualTo("NO_ROUTING_POLICY"));
+        jdbc.update("UPDATE coordination_policy_versions SET effective_from=?,effective_to=?", java.sql.Timestamp.from(past), java.sql.Timestamp.from(future));
+        assertThat(engine.routeCoordinatorWork(other)).isPresent();
+        assertThat(repo.queued(other)).isFalse();
+        assertThat(count("SELECT COUNT(DISTINCT command_key) FROM coordination_decisions WHERE case_id=?", other)).isEqualTo(2);
+    }
+
     Decision command(String action, long revision, String target) {
         return engine.execute(caseId, new Command(UUID.randomUUID().toString(), revision, action, target, action.equals("QUEUE") ? team : null, "Reviewed assignment", "TEST"));
     }

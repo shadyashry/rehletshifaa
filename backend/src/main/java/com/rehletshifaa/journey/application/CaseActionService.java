@@ -260,9 +260,13 @@ public class CaseActionService {
         }
         if (!"TRAVEL_COORDINATION".equals(status))
             throw new ApiException(409, "CASE_NOT_READY_FOR_ASSIGNMENT", "Operations is assigned once the coordination deposit is settled and treatment coordination starts");
-        List<String> outstanding = blockers.get().stream().filter(CaseActionService::patientGate).map(BlockerView::labelEn).toList();
-        if (!outstanding.isEmpty())
-            throw new ApiException(409, "COORDINATION_NOT_READY", "The patient has not completed the steps needed before coordination starts: " + String.join("; ", outstanding));
+        List<BlockerView> outstanding = blockers.get().stream().filter(CaseActionService::coordinationGate).toList();
+        if (outstanding.isEmpty()) return;
+        List<String> patient = outstanding.stream().filter(CaseActionService::patientGate).map(BlockerView::labelEn).toList();
+        if (!patient.isEmpty())
+            throw new ApiException(409, "COORDINATION_NOT_READY", "The patient has not completed the steps needed before coordination starts: " + String.join("; ", patient));
+        throw new ApiException(409, "COORDINATION_NOT_READY", "Steps needed before coordination starts are outstanding: "
+                + String.join("; ", outstanding.stream().map(BlockerView::labelEn).toList()));
     }
 
     private static boolean operationsAssignable(Facts f, List<BlockerView> blockers) {
@@ -348,6 +352,12 @@ public class CaseActionService {
 
     /** A step only the patient can complete and that holds the current stage (identity is a later commitment gate). */
     static boolean patientGate(BlockerView b) { return "PATIENT".equals(b.owner()) && b.gating(); }
+
+    /**
+     * A step that must be done before treatment coordination starts, whoever owes it: every gating readiness step except
+     * the deposit, which the stage gate checks itself. A missing onboarding is owed by staff but still gates (CL3).
+     */
+    static boolean coordinationGate(BlockerView b) { return b.gating() && !"DEPOSIT_UNPAID".equals(b.code()); }
     private static CurrentActionView simple(String code, String kind) { return new CurrentActionView(code, kind, null, null, null, null, null, null, false, null); }
     private static CurrentActionView none() { return simple("NONE", "NONE"); }
 }

@@ -177,15 +177,21 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
     public void retryQueued(UUID caseId) {
         CaseFacts c = repo.facts(caseId);
         if (!repo.queued(caseId) || CLOSED.contains(c.status())) return;
-        route(caseId, "queue-retry:" + c.revision(), "QUEUE_RETRY");
+        route(caseId, "queue-retry", "QUEUE_RETRY");
     }
 
-    private void route(UUID caseId, String key, String source) {
+    /**
+     * The command key is the caller's prefix plus the case revision read under the locks: a redelivery at the same
+     * revision replays its decision, while routing the case again later (after a manager's queue, an owner leaving, or a
+     * no-policy decision) is a new command rather than a conflicting replay of the first one.
+     */
+    private void route(UUID caseId, String keyPrefix, String source) {
         Instant now = clock.instant();
         repo.lockCase(caseId);
         repo.lock();
         CaseFacts c = repo.facts(caseId);
         if (CLOSED.contains(c.status()) || c.owner() != null) return;
+        String key = keyPrefix + ":" + c.revision();
         Optional<Policy> policy = config.effectivePolicy(now);
         if (policy.isEmpty()) {
             if (!repo.queued(caseId)) {

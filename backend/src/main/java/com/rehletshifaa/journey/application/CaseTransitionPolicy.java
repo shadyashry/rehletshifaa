@@ -81,16 +81,19 @@ public class CaseTransitionPolicy {
     /**
      * What still stands between the case and the target stage; empty when it may enter. Only
      * TRAVEL_COORDINATION carries entry invariants today: an accepted proposal, a settled deposit where one
-     * is due, and no profile step still owed by the patient. Cases from before the onboarding layer keep
-     * the deposit-only gate, as {@link CustomerReadinessService#assertReadyForCommitment} does.
+     * is due, and no gating readiness step outstanding — a profile step owed by the patient, or an onboarding staff
+     * have not started. Every case needs current onboarding evidence; there is no deposit-only gate (CL3).
      */
     public List<String> entryBlockers(UUID caseId, String target) {
         if (!"TRAVEL_COORDINATION".equals(target)) return List.of();
         List<String> out = new ArrayList<>();
         if (!proposalVersions.hasAcceptedForCase(caseId)) out.add("no accepted proposal is on record");
         if (!payment.depositSatisfied(caseId)) out.add("the coordination deposit is not settled");
-        for (BlockerView step : caseActions.readinessBlockers(caseId))
-            if (CaseActionService.patientGate(step)) out.add(step.labelEn().toLowerCase(Locale.ROOT) + " is still pending with the patient");
+        for (BlockerView step : caseActions.readinessBlockers(caseId)) {
+            if (!CaseActionService.coordinationGate(step)) continue;
+            String label = step.labelEn().toLowerCase(Locale.ROOT);
+            out.add(CaseActionService.patientGate(step) ? label + " is still pending with the patient" : label + " — staff must resolve it");
+        }
         return out;
     }
 
