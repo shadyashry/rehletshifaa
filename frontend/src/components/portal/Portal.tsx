@@ -12,6 +12,7 @@ import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CoordinatorActionForm, MoreActions } from "@/components/portal/CoordinatorActions";
 import { RecordPatientResponse } from "@/components/portal/RecordPatientResponse";
+import { RecordProposalDecision } from "@/components/portal/RecordProposalDecision";
 import { CaseMessages } from "@/components/portal/CaseMessages";
 import { PatientProposal, PatientProposalDecision, type ProposalCopy } from "@/components/portal/PatientProposal";
 import { PortalAccount, type Preferences } from "@/components/portal/PortalAccount";
@@ -332,8 +333,8 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
  // The proposal is the coordinator's work while it is being prepared or released (or, at arrival, finalised);
  // once decided it becomes reference history.
  // An assignment step has its own inline form; every other focus step lives in the proposal panel.
- const formCode=current.workType==="TRAVEL"?"ASSIGN_OPERATIONS":REFERRAL_CONFIRM_WORK.includes(current.workType??"")?"CONFIRM_REFERRAL":current.code;
- const formAction=isCoordinator&&owned&&current.kind==="FOCUS"&&["ASSIGN_CONSULTANT","CONFIRM_REFERRAL","ASSIGN_OPERATIONS","ASSIGN_FINANCE"].includes(formCode);
+ const formCode=current.workType==="TRAVEL"?"ASSIGN_OPERATIONS":current.workType==="PROPOSAL_TERMS_CALL"?"RECORD_PROPOSAL_DECISION":REFERRAL_CONFIRM_WORK.includes(current.workType??"")?"CONFIRM_REFERRAL":current.code;
+ const formAction=isCoordinator&&owned&&current.kind==="FOCUS"&&["ASSIGN_CONSULTANT","CONFIRM_REFERRAL","ASSIGN_OPERATIONS","ASSIGN_FINANCE"].includes(formCode)||(formCode==="RECORD_PROPOSAL_DECISION"&&isCoordinator&&owned&&!!value.proposal&&available.includes("RECORD_PROPOSAL_DECISION"));
  const proposalIsWork=isCoordinator&&owned&&(["PREPARE_PROPOSAL","RELEASE_PROPOSAL","WAIT_INTERNAL_APPROVAL","ASSIGN_FINANCE"].includes(current.code)||["PREPARE_PROPOSAL","PROPOSAL_REVISION"].includes(current.workType??"")||(!!approved&&!value.proposal)||c.status==="ARRIVAL_CONFIRMED");
  const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard locale={locale} t={t} proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm caseId={c.id} reviewId={approved.id} language={c.preferredLanguage} estimate={approved} fxRates={fxRates} locale={locale} t={t} busy={busy} onSend={sendProposal}/>}{isCoordinator&&share&&<ProposalShareLinks share={share} locale={locale} t={t}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} caseId={c.id} versionId={value.proposal.versionId} locale={locale} busy={busy} mutate={mutate} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions caseId={c.id} reviewId={approved?.id} proposal={value.proposal} gates={value.gates} fxRates={fxRates} locale={locale} busy={busy} mutate={mutate}/>}{value.deposit&&<DepositCard deposit={value.deposit} caseId={c.id} role={role} locale={locale} busy={busy} mutate={mutate}/>}{showActions&&<div className={dim?"pointer-events-none opacity-50":""}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} locale={locale} mutate={mutate}/></div>}</Panel>;
  const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={t.reviews}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="rounded-lg border border-line p-4"><strong>v{r.versionNumber} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 rounded-lg bg-brand-50 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-xs text-ink-600">{locale==="ar"?"عملة العرض":"Proposal currency"}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span>{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.72rem] text-ink-500">{locale==="ar"?"الأساس":"Base"} {money(e.estimatedCost,e.currency,locale)}</span>}</span></li>)}</ul></div>}</div>):<Empty/>}{isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&<FinalAssessment caseId={c.id} busy={busy} locale={locale} catalog={catalog} fxRates={fxRates} mutate={mutate}/>}</Panel>:null;
@@ -355,7 +356,7 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
   const [infoOpen,setInfoOpen]=useState(false);
   const [proposalOpen,setProposalOpen]=useState(false);
   const [declineOpen,setDeclineOpen]=useState(false);
-  const [recordOpen,setRecordOpen]=useState(false);
+  const [recordOpen,setRecordOpen]=useState(false);const [recordDecisionOpen,setRecordDecisionOpen]=useState(false);
   const unreadMessages=value.messages.filter(m=>m.senderRole==="PATIENT"&&!m.read).length;
   const latestPatientMessage=[...value.messages].reverse().find(m=>m.senderRole==="PATIENT");
   const newestDocument=documents.length?documents[documents.length-1]:undefined;
@@ -367,7 +368,7 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
   const caseTabs=[{id:"overview" as const,label:locale==="ar"?"نظرة عامة":"Overview",count:0},{id:"clinical" as const,label:locale==="ar"?"الملف السريري":"Clinical",count:0},{id:"documents" as const,label:locale==="ar"?"المستندات":"Documents",count:documents.length},{id:"activity" as const,label:locale==="ar"?"السجل":"Activity",count:0}];
   // Utilities live in one place each: the secure-link row owns "resend", the header owns messages, and the
   // "More" drawer owns everything else the backend listed for this state.
-  const moreAvailable=available.filter(code=>!code.startsWith("RESEND_"));
+  const moreAvailable=available.filter(code=>!code.startsWith("RESEND_")&&!(code==="RECORD_PROPOSAL_DECISION"&&formCode==="RECORD_PROPOSAL_DECISION"));
   const showMore=isCoordinator&&owned&&!value.preview&&(moreAvailable.length>0||canRebalance);
 
   const banners=<>
@@ -392,7 +393,9 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
     {proposalOpen&&value.proposal&&<CaseDrawer locale={locale} title={proposalCopy.title} onClose={()=>setProposalOpen(false)}>
      <fieldset disabled={busy} className="min-w-0"><PatientProposal locale={locale} copy={proposalCopy} proposal={value.proposal}
       recommendation={approved?{treatment:approved.recommendedTreatment,risks:approved.risksAndLimitations}:null}
-      decision={proposalReady?<PatientProposalDecision key={value.proposal.versionId} locale={locale} copy={proposalCopy} caseId={c.id} proposal={value.proposal} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setProposalOpen(false);return result;}}/>:null}/></fieldset>
+      decision={proposalReady?<PatientProposalDecision key={value.proposal.versionId} locale={locale} copy={proposalCopy} caseId={c.id} proposal={value.proposal}
+       coordinatorName={c.coordinatorName} englishHref={locale==="ar"?`/en/portal?case=${c.id}`:undefined} onRequestAssistance={path=>mutate(path)}
+       onMessage={onCareView?()=>{setProposalOpen(false);onCareView("messages");}:undefined} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setProposalOpen(false);return result;}}/>:null}/></fieldset>
     </CaseDrawer>}
    </div>;
   }
@@ -442,7 +445,7 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
    busy={busy} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    onAcceptAssignment={()=>{if(!myPending)return;void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:true}).then(result=>{if(result&&isDoctor)setTab("clinical");});}}
    onDeclineAssignment={()=>setDeclineOpen(true)}
-   form={formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref}/>:undefined}/>
+   form={formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref} proposal={value.proposal}/>:undefined}/>
 
   {isCoordinator&&<CaseBlockers locale={locale} blockers={actions.blockers} deposit={value.deposit}/>}
 
@@ -520,10 +523,14 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
   {moreOpen&&<CaseDrawer locale={locale} title={locale==="ar"?"إجراءات إضافية":"More actions"} onClose={()=>setMoreOpen(false)}>
    <MoreActions locale={locale} caseId={c.id} available={moreAvailable} travelPackage={!!c.travelPackageRequested} version={c.version} busy={busy} mutate={mutate}
     onRequestInformation={()=>{setMoreOpen(false);setInfoOpen(true);}} onRecordResponse={()=>{setMoreOpen(false);setRecordOpen(true);}}
+    onRecordDecision={value.proposal?()=>{setMoreOpen(false);setRecordDecisionOpen(true);}:undefined}
     onAdministration={canRebalance?()=>{setMoreOpen(false);setAdminOpen(true);}:undefined}/>
   </CaseDrawer>}
   {/* Recording a WhatsApp/phone answer opens its own dialog; the trigger is hidden and driven from More actions so the page carries one control per business action. */}
   {isCoordinator&&owned&&available.includes("RECORD_PATIENT_RESPONSE")&&<RecordPatientResponse locale={locale} caseId={c.id} action={value.patientAction} mutate={mutate} open={recordOpen} onOpenChange={setRecordOpen} hideTrigger/>}
+  {recordDecisionOpen&&value.proposal&&<CaseDrawer locale={locale} title={work.recordDecision.title} onClose={()=>setRecordDecisionOpen(false)}>
+   <RecordProposalDecision key={value.proposal.versionId} locale={locale} caseId={c.id} proposal={value.proposal} busy={busy} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setRecordDecisionOpen(false);return result;}}/>
+  </CaseDrawer>}
   {proposalOpen&&<CaseDrawer locale={locale} title={t.proposal} onClose={()=>setProposalOpen(false)}>
    <div className="space-y-4">{recommendationBlock}{value.proposal&&<ProposalCard locale={locale} t={t} proposal={value.proposal}/>}{value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} caseId={c.id} versionId={value.proposal.versionId} locale={locale} busy={busy} mutate={mutate} canResend={false}/>}{value.deposit&&<DepositCard deposit={value.deposit} caseId={c.id} role={role} locale={locale} busy={busy} mutate={mutate}/>}</div>
   </CaseDrawer>}

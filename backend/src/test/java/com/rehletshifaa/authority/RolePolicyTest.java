@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RolePolicyTest {
     private static final Set<Permission> CASE_AND_CLINICAL = EnumSet.of(Permission.CASE_INTAKE, Permission.CASE_READ,
             Permission.CASE_COORDINATE, Permission.CASE_REASSIGN_COORDINATOR, Permission.CASE_MESSAGE, Permission.TASK_CREATE,
-            Permission.TASK_SUPERVISE, Permission.REFERRAL_DECIDE, Permission.CLINICAL_REVIEW, Permission.CLINICAL_APPROVE,
+            Permission.TASK_SUPERVISE, Permission.REFERRAL_DECIDE, Permission.PROPOSAL_DECISION_RECORD, Permission.CLINICAL_REVIEW, Permission.CLINICAL_APPROVE,
             Permission.OPERATIONS_FULFIL, Permission.FINANCE_SETTLE, Permission.CREDENTIAL_DECIDE, Permission.PATIENT_IDENTITY_REVIEW);
 
     @Test

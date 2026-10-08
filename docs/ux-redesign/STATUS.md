@@ -71,6 +71,25 @@ Update at the end of every phase.
           baseline (no entries to shrink); 3 previously failing `portal-ux` tests now pass (stale sub-tab labels fixed)
     - [x] screenshots: `docs/ux-redesign/screenshots/pass-2/`
   - [x] **GATE P2-3** approved (2026-10-08) → committed
+  - [x] Step 3 build: coordinator-mediated Arabic proposal decision
+    - [x] backend: `V74__assisted_proposal_decisions` (provenance columns + `proposal_assistance_requests`), permission
+          `PROPOSAL_DECISION_RECORD` (step-up, coordinator at `CASE_OWNER`), `ProposalAssistanceService` (patient request
+          from portal/secure link → one `PROPOSAL_TERMS_CALL` work item; owner records with attestation, channel, time,
+          confirmer), `JourneyService.applyRecordedDecision` (same state change as the patient's own), assistance facts
+          on `ProposalView`/`PublicProposalView`, `RECORD_PROPOSAL_DECISION` available action
+    - [x] frontend: `/ar` drawer and secure link ask the coordinator (no dead checkbox/primary), "requested" state,
+          quiet English route; in-drawer Decline confirm (en + ar); "Recorded by … after a …" provenance + dispute line;
+          staff `RecordProposalDecision` inline in the current action or from More actions
+    - [x] five reviewers (incl. a backend authorization review): HIGH fixed (datetime, focus, Arabic gendered verbs,
+          English route as instruction); journey-runtime HIGH deferred as a cross-path decision (pre-existing for
+          self-service); rest in backlog.md "Arabic proposal decision — deferred review findings"
+    - [x] verify: backend full suite 611/0 (2 skipped), `PostgresJpaMappingTest` green on V74; typecheck ok; lint 24/13;
+          unit 340 pass, 11 `ProposalSign` (pre-existing); Playwright `arabic-proposal-decision` 8/8, my-care,
+          proposal-responsive, staff-home, a11y (20/20 at baseline), status-proposal, proposal-otp, pre8c, portal-ux all
+          pass except the pre-existing Control Center "Staff & teams"
+    - [x] screenshots: `docs/ux-redesign/screenshots/pass-2/` (secure-link-assisted-ar-*, my-care-assisted-ar-390,
+          my-care-recorded-{en,ar}-1440, record-decision-{en,ar}-1440)
+  - [x] **GATE P2-4** approved (2026-10-08) → committed
 
 ## Decisions
 
@@ -110,6 +129,6 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Build the coordinator-mediated Arabic proposal decision (`plans/arabic-proposal-decision.md`) in its own run, backend
-contract first (recorded-decision endpoint, patient request endpoint, `ProposalDecision` provenance columns), then the
-portal drawer and the secure link (O1). Legal L1–L5 go to legal. Staff-home deferred items are in backlog.md.
+Owner: decide the journey-runtime follow-up (backlog "Arabic proposal decision" P1 decision: UI on the journey-action
+endpoints, or direct endpoints sync the runtime). Then the next pass-2 item from the backlog (patient notification of a
+recorded decision, P2). Legal L1–L5 open; Arabic terms approval remains a launch blocker; native Arabic review pending.

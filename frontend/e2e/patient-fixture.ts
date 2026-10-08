@@ -15,7 +15,8 @@ const proposal = { proposalId: "p1", versionId: "v1", versionNumber: 1, status: 
   items: [{ id: "i1", category: "MEDICAL", description: "Dual chamber pacemaker implant", quantity: 1, unitPrice: 4850, optional: false }], coordinatorNotes: null };
 const deposit = { id: "dep-1", status: "REQUESTED", currency: "USD", totalEgp: 25000, totalDisplay: 500, paidDisplay: 0, balanceDisplay: 500, components: [], events: [] };
 
-export type Scenario = "deposit-arranging" | "deposit-paid" | "proposal-ready" | "no-case";
+/** `proposal-recorded`: the coordinator recorded the patient's acknowledgement after an Arabic call (assisted path). */
+export type Scenario = "deposit-arranging" | "deposit-paid" | "proposal-ready" | "proposal-recorded" | "no-case";
 
 export async function setupPatient(page: Page, scenario: Scenario) {
   await page.addInitScript(({ authority }) => {
@@ -33,7 +34,9 @@ export async function setupPatient(page: Page, scenario: Scenario) {
     caseSummary, timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: "2026-09-01T09:00:00Z" }, { type: "STATUS", label: caseSummary.status, status: caseSummary.status, occurredAt: stamp }],
     tasks: [], messages: [{ id: "m1", threadType: "PATIENT_COORDINATOR", senderRole: "COORDINATOR", senderName: "Sara Ahmed", direction: "INBOUND", body: "Welcome — I will send the deposit details shortly.", createdAt: stamp, internalOnly: false, read: false }],
     assignments: [], clinicalReviews: [], gates: null, delivery: null,
-    proposal: { ...proposal, status: ready ? "RELEASED" : "ACCEPTED" },
+    proposal: { ...proposal, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
+      ? { requestedAt: "2026-09-10T09:00:00Z", decisionSource: "RECORDED_ON_BEHALF", recordedByName: "Sara Ahmed", channel: "WHATSAPP_CALL", confirmedBy: "PATIENT", conversationAt: "2026-09-11T09:00:00Z", decidedAt: "2026-09-11T09:05:00Z" }
+      : null as null | Record<string, string> },
     deposit: ready ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0 } : deposit,
     actions,
     patientProposal: ready ? { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: null }
@@ -62,6 +65,8 @@ export async function setupPatient(page: Page, scenario: Scenario) {
     if (api === "/patient/cases") return reply(scenario === "no-case" ? [] : [caseSummary]);
     if (api === "/patient/cases/case-1") return reply(workspace);
     if (api === "/patient/cases/case-1/proposals/v1/decision") return reply({ ...proposal, status: "ACCEPTED" });
+    // The Arabic assisted path: asking once opens the coordinator's work; the page then says it was asked.
+    if (api === "/patient/cases/case-1/proposals/v1/assistance") { workspace.proposal.assistance = { requestedAt: "2026-10-08T09:00:00Z" }; return reply(workspace.proposal.assistance); }
     if (api.endsWith("/documents")) return reply([{ documentId: "d1", fileName: "Echo_Report.pdf", contentType: "application/pdf", sizeBytes: 1024, status: "CLEAN", createdAt: "2026-09-01T09:00:00Z" }]);
     return reply({ message: `unstubbed ${api}` }, 404);
   });

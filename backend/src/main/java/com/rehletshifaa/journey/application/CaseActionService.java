@@ -78,7 +78,8 @@ public class CaseActionService {
     @Transactional
     public CaseActionsView resolve(UUID caseId, Actor actor) {
         Facts f = queries.facts(caseId);
-        closeObsoleteWork(caseId, f.status());
+        Proposal proposal = queries.latestProposal(caseId);
+        closeObsoleteWork(caseId, f.status(), proposal);
         PatientActionView patientAction = patientActions.openAction(caseId);
         List<BlockerView> blockers = READINESS_STAGES.contains(f.status()) ? readinessBlockers(caseId) : List.of();
         boolean patientBlocked = blockers.stream().anyMatch(CaseActionService::patientGate);
@@ -91,7 +92,6 @@ public class CaseActionService {
 
         boolean coordinator = actor.role() == Role.COORDINATOR;
         boolean owned = coordinator && actor.subject().equals(f.coordinatorSubject());
-        Proposal proposal = queries.latestProposal(caseId);
         CurrentActionView current = currentAction(caseId, f, proposal, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
         List<String> available = coordinator && owned ? availableActions(f, proposal, patientAction, blockers)
                 : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of();
@@ -223,7 +223,11 @@ public class CaseActionService {
         if (patientAction != null) {
             if (patientAction.items().stream().anyMatch(i -> !i.completed())) actions.add("RECORD_PATIENT_RESPONSE");
         } else if (!TERMINAL.contains(s) && !CONSULTANT_OWNED.contains(s)) actions.add("REQUEST_INFORMATION");
-        if (p != null && Set.of("RELEASED", "VIEWED").contains(p.status())) actions.add("RESEND_PROPOSAL_LINK");
+        if (p != null && Set.of("RELEASED", "VIEWED").contains(p.status())) {
+            actions.add("RESEND_PROPOSAL_LINK");
+            // A patient who decided on a call (the Arabic assisted path) has their decision recorded by the owner.
+            actions.add("RECORD_PROPOSAL_DECISION");
+        }
         if (blockers.stream().anyMatch(b -> "PROFILE_NOT_ACTIVATED".equals(b.code()))) actions.add("RESEND_ONBOARDING_LINK");
         if (CONSULTANT_ASSIGNABLE.contains(s)) actions.add("ASSIGN_CONSULTANT");
         if (operationsAssignable(f, blockers)) actions.add("ASSIGN_OPERATIONS");
@@ -328,7 +332,10 @@ public class CaseActionService {
     }
 
     /** Work made obsolete by a stage the case has already left. Idempotent; a no-op on a healthy case. */
-    private void closeObsoleteWork(UUID caseId, String status) {
+    private void closeObsoleteWork(UUID caseId, String status, Proposal proposal) {
+        // An assisted-decision call is owed only while the latest version can still be decided (expired, replaced or decided: done).
+        if (proposal == null || !Set.of("RELEASED", "VIEWED").contains(proposal.status()))
+            work.closeWorkItems(caseId, ProposalAssistanceService.WORK_TYPE, "Superseded — no proposal decision is owed");
         if (!PROPOSAL_WORK_STAGES.contains(status)) {
             work.closeWorkItems(caseId, "PREPARE_PROPOSAL", "Superseded — the proposal has already been prepared");
             work.closeWorkItems(caseId, "PROPOSAL_REVISION", "Superseded — the proposal has already been revised");

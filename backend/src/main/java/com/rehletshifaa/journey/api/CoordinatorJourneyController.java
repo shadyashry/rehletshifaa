@@ -1,8 +1,8 @@
 package com.rehletshifaa.journey.api;
-import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.PricingCatalogService;import jakarta.validation.Valid;import org.springframework.format.annotation.DateTimeFormat;import org.springframework.web.bind.annotation.*;import java.time.LocalDate;import java.util.*;
+import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.PricingCatalogService;import com.rehletshifaa.journey.application.ProposalAssistanceService;import jakarta.validation.Valid;import org.springframework.format.annotation.DateTimeFormat;import org.springframework.web.bind.annotation.*;import java.time.LocalDate;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/coordinator") public class CoordinatorJourneyController{
- private final JourneyService service;private final PricingCatalogService pricing;public CoordinatorJourneyController(JourneyService service,PricingCatalogService pricing){this.service=service;this.pricing=pricing;}
+ private final JourneyService service;private final PricingCatalogService pricing;private final ProposalAssistanceService assistance;public CoordinatorJourneyController(JourneyService service,PricingCatalogService pricing,ProposalAssistanceService assistance){this.service=service;this.pricing=pricing;this.assistance=assistance;}
  @GetMapping("/me")public StaffProfileView me(){return service.myCoordinatorProfile();}
  @GetMapping("/fx-rates")public List<FxRateView>fxRates(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return pricing.fxRates(date);}
  @GetMapping("/cases/{caseId}/deposit")public DepositView deposit(@PathVariable UUID caseId){return service.depositView(caseId);}
@@ -31,6 +31,8 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/tasks/{taskId}/complete")public IdResponse complete(@PathVariable UUID caseId,@PathVariable UUID taskId,@Valid @RequestBody CompleteTaskRequest request){return service.completeTask(caseId,taskId,request);}
  @PostMapping("/cases/{caseId}/proposals")public ProposalView proposal(@PathVariable UUID caseId,@Valid @RequestBody ProposalDraftRequest request){return service.createProposal(caseId,request);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/release")public ProposalView release(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.releaseProposal(caseId,versionId);}
+ /** The owning coordinator records the patient's decision after going through the terms with them in Arabic. */
+ @PostMapping("/cases/{caseId}/proposals/{versionId}/decision/on-behalf")public ProposalView recordDecision(@PathVariable UUID caseId,@PathVariable UUID versionId,@Valid @RequestBody RecordedDecisionRequest request){return assistance.recordDecision(caseId,versionId,request);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/resend")public IdResponse resend(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.resendProposalLink(caseId,versionId);}
  /** Resend the secure profile-activation link; valid only while the profile is unactivated. */
  @PostMapping("/cases/{caseId}/onboarding-link/resend")public IdResponse resendOnboardingLink(@PathVariable UUID caseId){return service.resendOnboardingLink(caseId);}

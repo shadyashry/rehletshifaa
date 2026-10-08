@@ -2,9 +2,13 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.DeliveryStatus;
+import com.rehletshifaa.journey.api.JourneyDtos.ProposalAssistanceView;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalGates;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalItemView;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalView;
+import com.rehletshifaa.journey.domain.ProposalDecision;
+import com.rehletshifaa.journey.infrastructure.ProposalAssistanceRequestRepository;
+import com.rehletshifaa.journey.infrastructure.ProposalDecisionRepository;
 import com.rehletshifaa.journey.infrastructure.ProposalItemRepository;
 import com.rehletshifaa.journey.infrastructure.ProposalVersionRepository;
 import com.rehletshifaa.journey.infrastructure.ProposalVersionRepository.ApprovalGates;
@@ -34,10 +38,15 @@ public class ProposalQueryService {
     private final ProposalItemRepository items;
     private final MedicalCaseRepository cases;
     private final QueuedNotificationRepository outbox;
+    private final ProposalDecisionRepository decisions;
+    private final ProposalAssistanceRequestRepository assistance;
+    private final JourneyCaseQueryService people;
 
     public ProposalQueryService(ProposalVersionRepository versions, ProposalItemRepository items, MedicalCaseRepository cases,
-                                QueuedNotificationRepository outbox) {
+                                QueuedNotificationRepository outbox, ProposalDecisionRepository decisions,
+                                ProposalAssistanceRequestRepository assistance, JourneyCaseQueryService people) {
         this.versions = versions; this.items = items; this.cases = cases; this.outbox = outbox;
+        this.decisions = decisions; this.assistance = assistance; this.people = people;
     }
 
     ProposalView proposal(UUID versionId) {
@@ -48,7 +57,22 @@ public class ProposalQueryService {
                 .toList();
         return new ProposalView(v.getProposalId(), v.getId(), v.getVersionNumber(), v.getStatus(), v.getLanguage(), v.getCurrency(),
                 v.getValidUntil(), v.getOperationalPlan(), v.getIncludedServices(), v.getExcludedServices(), v.getPaymentTerms(),
-                v.getRefundTerms(), v.getDisclaimers(), lines, v.getCoordinatorNotes(), v.getDocumentType(), v.getScopeChangeReason());
+                v.getRefundTerms(), v.getDisclaimers(), lines, v.getCoordinatorNotes(), v.getDocumentType(), v.getScopeChangeReason(), assistance(versionId));
+    }
+
+    /**
+     * The assisted-decision facts of a version, or null when there are none: no request was made and the decision (if any)
+     * was the patient's own. A recorded decision names the staff member who recorded it, never their identity subject.
+     */
+    ProposalAssistanceView assistance(UUID versionId) {
+        var request = assistance.findByProposalVersionId(versionId).orElse(null);
+        ProposalDecision decision = decisions.findByProposalVersionId(versionId).orElse(null);
+        boolean recorded = decision != null && ProposalDecision.SOURCE_RECORDED.equals(decision.getDecisionSource());
+        if (request == null && !recorded) return null;
+        String recordedBy = recorded ? people.names(List.of(decision.getRecordedBy())).staff(decision.getRecordedBy()) : null;
+        return new ProposalAssistanceView(request == null ? null : request.getRequestedAt(), decision == null ? null : decision.getDecisionSource(),
+                recordedBy, recorded ? decision.getDecisionChannel() : null, recorded ? decision.getConfirmedBy() : null,
+                recorded ? decision.getConversationAt() : null, decision == null ? null : decision.getCreatedAt());
     }
 
     /** The case's latest version, or for a patient its latest version released to them; null when there is none. */

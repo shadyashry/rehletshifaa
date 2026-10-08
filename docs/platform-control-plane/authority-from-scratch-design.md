@@ -71,7 +71,8 @@ recorded.
 `Permission` is a code enum naming business actions, for example:
 
 - **Cases and work:** `CASE_INTAKE_PREVIEW`, `CASE_CLAIM`, `CASE_READ`, `CASE_COORDINATE`, `CASE_ASSIGN_STAFF`,
-  `CASE_ASSIGN_CONSULTANT`, `CASE_MESSAGE`, `TASK_WORK`, `TASK_SUPERVISE`, `REFERRAL_DECIDE`.
+  `CASE_ASSIGN_CONSULTANT`, `CASE_MESSAGE`, `TASK_WORK`, `TASK_SUPERVISE`, `REFERRAL_DECIDE`, `PROPOSAL_DECISION_RECORD` (the owning coordinator's
+  recording of a patient's proposal decision after an assisted Arabic conversation; step-up, `CASE_OWNER` scope).
 - **Clinical:** `CLINICAL_REVIEW_SUBMIT`.
 - **Fulfilment:** `OPERATIONS_FULFIL`, `FINANCE_SETTLE`, `PRICING_POLICY_MANAGE`.
 - **Credentials and identity:** `CREDENTIAL_DECIDE`, `CAPABILITY_DECIDE`, `PATIENT_IDENTITY_REVIEW`.

@@ -17,7 +17,7 @@ const PLATFORM_ROLES:Record<string,string[]>={COORDINATOR_LEAD:["COORDINATOR"],D
 /** The staff views (My work, My cases, Team queue) are navigation — in the header from md, inline below — not tabs. */
 export const staffView=(page:Page,name:RegExp)=>page.getByRole("navigation",{name:/^(Your work|أقسام العمل)$/}).getByRole("button",{name});
 export const portalAlerts=(page:Page)=>page.locator('[role="alert"]:not(#__next-route-announcer__)');
-export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean;pendingWork?:boolean}={}){
+export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean;pendingWork?:boolean;assistedDecision?:boolean}={}){
   const roles=role==="COORDINATOR_LEAD"?["COORDINATOR",role]:[role];
   await page.addInitScript(({roles,subject,authority})=>{
     const value=JSON.stringify({access_token:"synthetic-test-token",token_type:"Bearer",scope:"openid profile email",profile:{sub:subject,name:"Layla Hassan",email:"layla@example.test",roles},expires_at:Math.floor(Date.now()/1000)+3600});
@@ -30,6 +30,14 @@ export async function setupPortal(page:Page, role="COORDINATOR", options:{docume
     {...baseCase,id:"owned",caseNumber:"RS-2026-000002",patientName:"Maya Example",status:"INTAKE_REVIEW",coordinatorSubject:subject},
     ...(role==="COORDINATOR_LEAD"?[{...baseCase,id:"team",caseNumber:"RS-2026-000003",patientName:"Omar Example",status:"INTAKE_REVIEW",coordinatorSubject:"report",coordinatorName:"Team Coordinator"}]:[])
   ]:[{...baseCase,id:"owned",caseNumber:"RS-2026-000002",patientName:"Maya Example",status,coordinatorSubject:"owner"}];
+  // The Arabic assisted path: the patient asked for a call, so recording their decision is the owned case's current action.
+  let recorded=false;
+  const assisted=(c:{id:string;coordinatorSubject?:string})=>!!options.assistedDecision&&c.id==="owned"&&c.coordinatorSubject===subject;
+  const releasedProposal={proposalId:"p1",versionId:"v1",versionNumber:1,status:"RELEASED",language:"ar",currency:"USD",validUntil:"2026-12-31T00:00:00Z",documentType:"PRELIMINARY_ESTIMATE",
+    items:[{id:"i1",category:"MEDICAL",description:"Dual chamber pacemaker implant",quantity:1,unitPrice:4850,optional:false}],assistance:{requestedAt:stamp}};
+  const assistedActions=()=>recorded?{journeyStage:"ACCEPTED",waitingOn:"STAFF",blockers:[],currentAction:{code:"WAIT_DEPOSIT_ARRANGEMENT",kind:"WAIT"},availableActions:["REQUEST_INFORMATION"]}
+    :{journeyStage:"PATIENT_DECISION",waitingOn:"STAFF",blockers:[],currentAction:{code:"WORK_ITEM",kind:"FOCUS",title:"Go through the proposal terms with the patient in Arabic",context:"The patient asked you to go through the deposit, refund and cancellation terms with them in Arabic and record their decision.",workItemId:"w-terms",workItemVersion:0,workType:"PROPOSAL_TERMS_CALL",overdue:false},
+      availableActions:["REQUEST_INFORMATION","RESEND_PROPOSAL_LINK","RECORD_PROPOSAL_DECISION"]};
   let preferences={displayName:null as string|null,locale:"en"};
   const writes:{path:string;body:Record<string,unknown>}[]=[];
   await page.route("**/api/v1/**",async route=>{
@@ -56,7 +64,8 @@ export async function setupPortal(page:Page, role="COORDINATOR", options:{docume
     if(api.endsWith("/cases/pending"))return reply({caseSummary:{...baseCase,id:"pending",caseNumber:"RS-2026-000009",patientName:"Nour Example",status:"CONSULTANT_ASSIGNMENT_PENDING",coordinatorSubject:"owner",coordinatorName:"Layla Hassan",waitingOn:"CONSULTANT"},actions:{journeyStage:"CONSULTANT_ASSIGNMENT_PENDING",waitingOn:"CONSULTANT",blockers:[],currentAction:{code:"ACCEPT_ASSIGNMENT",kind:"ACCEPT"},availableActions:[]},intakeSummary:"Cardiac reports submitted for review.",timeline:[{type:"STATUS",label:"Received",status:"RECEIVED",occurredAt:stamp}],tasks:[],messages:[],assignments:[{id:"a-pending",assigneeSubject:subject,assigneeName:"Dr Layla Hassan",assigneeRole:"DOCTOR",assignmentType:"PRIMARY",status:"PENDING",assignedAt:stamp,version:0}],clinicalReviews:[]});
     if(api.endsWith("/cases"))return reply(cases);
     if(api.endsWith("/documents"))return options.documentsFail?reply({message:"Documents temporarily unavailable"},503):reply(options.reviews||options.pendingWork?[{documentId:"doc",fileName:"Clinical report.pdf",contentType:"application/pdf",sizeBytes:1024,status:"CLEAN",createdAt:stamp}]:[]);
-    if(/\/cases\/(owned|unowned|team)$/.test(api)){const c=cases.find(c=>api.endsWith(c.id))!;return reply({caseSummary:c,actions:actionsFor(c,subject),intakeSummary:"Cardiac reports submitted for review.",timeline:[{type:"STATUS",label:"Received",status:"RECEIVED",occurredAt:stamp}],tasks:[],messages:[],assignments:[],clinicalReviews:options.reviews?[{id:"review",versionNumber:1,status:"APPROVED",recommendedTreatment:"Review finding visible to the care team",createdAt:stamp}]:[]});}
+    if(api.endsWith("/proposals/v1/decision/on-behalf")){recorded=true;return reply({...releasedProposal,status:"ACCEPTED"});}
+    if(/\/cases\/(owned|unowned|team)$/.test(api)){const c=cases.find(c=>api.endsWith(c.id))!;return reply({caseSummary:assisted(c)?{...c,status:recorded?"ACCEPTED":"PATIENT_DECISION"}:c,actions:assisted(c)?assistedActions():actionsFor(c,subject),...(assisted(c)?{proposal:{...releasedProposal,...(recorded?{status:"ACCEPTED"}:{})}}:{}),intakeSummary:"Cardiac reports submitted for review.",timeline:[{type:"STATUS",label:"Received",status:"RECEIVED",occurredAt:stamp}],tasks:[],messages:[],assignments:[],clinicalReviews:options.reviews?[{id:"review",versionNumber:1,status:"APPROVED",recommendedTreatment:"Review finding visible to the care team",createdAt:stamp}]:[]});}
     if(api.endsWith("/messages"))return options.saveFail?reply({message:"Unable to save changes"},500):reply({id:"message",status:"SENT"});
     if(api.endsWith("/me"))return reply({displayName:"Layla Hassan",specialty:"Cardiology"});
     if(api.endsWith("/readiness"))return reply({readyForCoordination:false,depositStatus:"REQUESTED",blockingItems:[{code:"DEPOSIT",labelEn:"Deposit outstanding",labelAr:"الوديعة مستحقة"}],updatedAt:stamp});

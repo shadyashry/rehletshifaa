@@ -131,6 +131,8 @@ function primaryFor(action: CurrentActionView, t: ActionCopy): Primary {
 }
 
 type Described = { title: string; body?: string | null };
+/** Work items whose inline form carries its own localized explanation, so the English context is not repeated in Arabic. */
+const LOCALIZED_FORM_HINT = new Set(["PROPOSAL_TERMS_CALL"]);
 const state = (table: Record<string, Described>, key: string) => (Object.hasOwn(table, key) ? table[key] : undefined);
 
 /**
@@ -139,7 +141,8 @@ const state = (table: Record<string, Described>, key: string) => (Object.hasOwn(
  */
 function describe(action: CurrentActionView, role: string, t: ActionCopy, localizedWork: Record<string, string> | null): Described {
   // Work items are titled by the backend in English; Arabic shows the work type in Arabic and keeps the context.
-  if (action.code === "WORK_ITEM") return { title: pick(localizedWork ?? {}, action.workType) ?? action.title ?? "", body: action.context };
+  if (action.code === "WORK_ITEM") return { title: pick(localizedWork ?? {}, action.workType) ?? action.title ?? "",
+    body: localizedWork && LOCALIZED_FORM_HINT.has(action.workType ?? "") ? null : action.context };
   if (action.code === "VIEW_ONLY") return role === "coordinator" ? t.states.VIEW_ONLY : t.states.VIEW_ONLY_STAFF;
   if (action.code === "ACCEPT_ASSIGNMENT") return role === "doctor" ? t.states.ACCEPT_ASSIGNMENT_DOCTOR : t.states.ACCEPT_ASSIGNMENT;
   if (action.code === "WAIT_PATIENT_READINESS") return state(t.readiness, action.blockerCode ?? "") ?? t.readiness.default;

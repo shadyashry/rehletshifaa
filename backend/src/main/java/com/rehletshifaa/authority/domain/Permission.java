@@ -8,6 +8,8 @@ public enum Permission {
     // cases and work
     WORK_QUEUE_VIEW(false), COORDINATION_QUEUE(false), COORDINATION_CASE_SUMMARY(false), ROUTING_READ(false), ROUTING_CONFIGURE(true), ROUTING_ASSIGN(false), ASSIGNMENT_RESPOND(false), CASE_INTAKE(false), CASE_READ(false), CASE_COORDINATE(false), CASE_REASSIGN_COORDINATOR(false),
     CASE_MESSAGE(false), TASK_CREATE(false), TASK_WORK(false), TASK_SUPERVISE(false), REFERRAL_DECIDE(false),
+    // a patient's proposal decision, recorded by the owning coordinator after an assisted conversation (Arabic terms path)
+    PROPOSAL_DECISION_RECORD(true),
     // clinical and fulfilment
     CLINICAL_REVIEW(false), SECOND_OPINION_SUBMIT(false), CLINICAL_APPROVE(true), OPERATIONS_FULFIL(false), FINANCE_SETTLE(true),
     CONSULTANT_CATALOG_MANAGE(false), COMMERCIAL_POLICY_MANAGE(true), COMMERCIAL_POLICY_READ(false), PAYMENT_RECORD(true),

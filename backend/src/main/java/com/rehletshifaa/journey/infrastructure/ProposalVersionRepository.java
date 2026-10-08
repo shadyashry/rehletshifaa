@@ -107,6 +107,10 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
     @Query("select count(v) > 0 from ProposalVersion v join Proposal p on p.id = v.proposalId where v.id = :id and p.caseId = :caseId")
     boolean belongsToCase(@Param("id") UUID id, @Param("caseId") UUID caseId);
 
+    /** When the version was sent to the patient; empty before release. */
+    @Query("select v.releasedAt from ProposalVersion v where v.id = :id")
+    java.util.Optional<Instant> findReleasedAt(@Param("id") UUID id);
+
     /** The commercial policy rate locked on the case's latest preliminary estimate. */
     interface LockedMargin { BigDecimal getMarginRate(); UUID getCommercialPolicyId(); Integer getCommercialPolicyVersion(); }
 

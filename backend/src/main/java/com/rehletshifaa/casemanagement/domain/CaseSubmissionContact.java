@@ -38,6 +38,7 @@ public class CaseSubmissionContact extends AssignedIdEntity {
     }
 
     public UUID getPatientId() { return patientId; }
+    public String getContactRole() { return contactRole; }
     public String getWhatsappNumber() { return whatsappNumber; }
     public String getEmail() { return email; }
 }

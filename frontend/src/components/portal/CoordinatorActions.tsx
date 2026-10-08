@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
-import { ClipboardList, Link2, MessageSquareText, Plane, Send, UserRoundPlus, Users, XCircle } from "lucide-react";
+import { ClipboardList, Handshake, Link2, MessageSquareText, Plane, Send, UserRoundPlus, Users, XCircle } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 import { EligibleConsultantPicker, ReferralConfirmation, type Load } from "@/components/portal/ConsultantRouting";
 import { useWorkCopy } from "@/components/portal/portal-copy";
+import { RecordProposalDecision, type RecordableProposal } from "@/components/portal/RecordProposalDecision";
 import { careAreaLabel, fillTemplate } from "@/lib/portal-labels";
 
 type CareCategory = { slug: string; nameEn: string; nameAr: string };
@@ -19,14 +20,20 @@ type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown
  * second card further down the page. Every other step either lives in its own panel (the proposal) or is somebody
  * else's move.
  */
-export function CoordinatorActionForm({ locale, code, caseId, version, careCategory, categories, staff, busy, mutate, load, consultantsHref }: {
+export function CoordinatorActionForm({ locale, code, caseId, version, careCategory, categories, staff, busy, mutate, load, consultantsHref, proposal }: {
   locale: Locale; code: string; caseId: string; version: number; careCategory?: string;
   categories: CareCategory[]; staff: StaffMember[]; busy: boolean; mutate: Mutate; load: Load;
   /** The Control Center's Consultants page, for people who can open it; the next step when nobody is eligible. */
   consultantsHref?: string | null;
+  /** The released proposal whose decision is recorded (RECORD_PROPOSAL_DECISION). */
+  proposal?: RecordableProposal | null;
 }) {
   const ar = locale === "ar";
   const work = useWorkCopy();
+  if (code === "RECORD_PROPOSAL_DECISION" && proposal)
+    return <ActionFormShell id="case-actions" busy={busy} title={work.recordDecision.title} hint={work.recordDecision.hint}>
+      <RecordProposalDecision key={proposal.versionId} locale={locale} caseId={caseId} proposal={proposal} busy={busy} mutate={mutate}/>
+    </ActionFormShell>;
   if (code === "ASSIGN_CONSULTANT")
     return <ActionFormShell id="case-actions" busy={busy} title={work.assignConsultant.title} hint={work.assignConsultant.hint}>
       <ConsultantAssignment locale={locale} caseId={caseId} version={version} careCategory={careCategory} categories={categories} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref}/>
@@ -123,15 +130,19 @@ function TeamAssignment({ locale, caseId, role, staff, busy, mutate }: { locale:
  * "More actions": the state-valid utilities and exceptions the backend listed, one line each, in a drawer.
  * Nothing here is a workflow step, and nothing appears that the backend did not offer for this state.
  */
-export function MoreActions({ locale, caseId, available, travelPackage, version, busy, mutate, onRequestInformation, onRecordResponse, onAdministration, proposalVersionId }: {
+export function MoreActions({ locale, caseId, available, travelPackage, version, busy, mutate, onRequestInformation, onRecordResponse, onRecordDecision, onAdministration, proposalVersionId }: {
   locale: Locale; caseId: string; available: string[]; travelPackage: boolean; version: number; busy: boolean; mutate: Mutate;
   onRequestInformation: () => void; onRecordResponse: () => void; onAdministration?: () => void; proposalVersionId?: string;
+  /** The patient decided on a call (Arabic assisted path) and nobody asked through the page first. */
+  onRecordDecision?: () => void;
 }) {
   const ar = locale === "ar";
+  const work = useWorkCopy();
   const items: { code: string; label: string; hint: string; icon: React.ReactNode; onClick: () => void; tone?: "danger" }[] = [];
   const has = (code: string) => available.includes(code);
   if (has("REQUEST_INFORMATION")) items.push({ code: "REQUEST_INFORMATION", icon: <ClipboardList size={16} aria-hidden/>, label: ar ? "طلب معلومات إضافية" : "Request more information", hint: ar ? "يُرسل طلبًا آمنًا للمريض وينقل المسؤولية إليه حتى يرد." : "Sends a secure request to the patient; the case waits on them until they respond.", onClick: onRequestInformation });
   if (has("RECORD_PATIENT_RESPONSE")) items.push({ code: "RECORD_PATIENT_RESPONSE", icon: <MessageSquareText size={16} aria-hidden/>, label: ar ? "تسجيل رد المريض" : "Record patient response", hint: ar ? "ما أرسله المريض عبر واتساب أو الهاتف، مع حفظ المصدر." : "What the patient sent by WhatsApp or phone, with provenance kept.", onClick: onRecordResponse });
+  if (has("RECORD_PROPOSAL_DECISION") && onRecordDecision) items.push({ code: "RECORD_PROPOSAL_DECISION", icon: <Handshake size={16} aria-hidden/>, label: work.recordDecision.title, hint: work.recordDecision.moreHint, onClick: onRecordDecision });
   if (has("RESEND_PROPOSAL_LINK") && proposalVersionId) items.push({ code: "RESEND_PROPOSAL_LINK", icon: <Send size={16} aria-hidden/>, label: ar ? "إعادة إرسال رابط العرض" : "Resend proposal link", hint: ar ? "يُلغي الرابط السابق ويُرسل رابطًا آمنًا جديدًا. لا يُنشئ عرضًا جديدًا." : "Revokes the previous link and sends a fresh secure one. Does not create a new proposal.", onClick: () => void mutate(`/coordinator/cases/${caseId}/proposals/${proposalVersionId}/resend`) });
   if (has("RESEND_ONBOARDING_LINK")) items.push({ code: "RESEND_ONBOARDING_LINK", icon: <Link2 size={16} aria-hidden/>, label: ar ? "إعادة إرسال رابط تفعيل الملف" : "Resend profile link", hint: ar ? "يُلغي الرابط السابق ويُرسل رابطًا آمنًا جديدًا إلى وسيلة تواصل المريض المسجّلة." : "Revokes the previous link and sends a fresh secure one to the patient's on-file contact.", onClick: () => void mutate(`/coordinator/cases/${caseId}/onboarding-link/resend`) });
   if (has("MOVE_TO_INTAKE_REVIEW")) items.push({ code: "MOVE_TO_INTAKE_REVIEW", icon: <UserRoundPlus size={16} aria-hidden/>, label: ar ? "العودة إلى مراجعة الاستقبال" : "Move back to intake review", hint: ar ? "دون انتظار رد المريض." : "Without waiting for the patient's reply.", onClick: () => void mutate(`/coordinator/cases/${caseId}/transition`, { targetStatus: "INTAKE_REVIEW", expectedVersion: version }) });

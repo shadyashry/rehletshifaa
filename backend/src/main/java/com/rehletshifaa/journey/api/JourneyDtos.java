@@ -29,6 +29,18 @@ public final class JourneyDtos {
     }
     public record ProposalItemRequest(@NotBlank String category,@NotBlank @Size(max=500)String description,@NotNull @DecimalMin("0.01")BigDecimal quantity,@NotNull @DecimalMin("0.00")BigDecimal unitPrice,boolean optional,Integer sortOrder) {}
     public record ProposalDraftRequest(@NotNull UUID clinicalReviewId,@Pattern(regexp="en|ar")String language,@Size(max=30000)String operationalPlan,@Pattern(regexp="[A-Z]{3}")String currency,@Size(max=20000)String includedServices,@Size(max=20000)String excludedServices,@Size(max=20000)String paymentTerms,@Size(max=20000)String refundTerms,@Size(max=20000)String disclaimers,@NotNull @Future Instant validUntil,@NotEmpty List<@Valid ProposalItemRequest> items,@Size(max=20000)String coordinatorNotes) {}
+    /**
+     * A decision a coordinator records for the patient after going through the terms with them (the Arabic assisted path).
+     * {@code attested} confirms the deposit, refund and cancellation terms were explained in Arabic and understood.
+     */
+    public record RecordedDecisionRequest(@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,@Size(max=10000)String comment,
+        @NotBlank @Pattern(regexp="PHONE|WHATSAPP_CALL|VIDEO|IN_PERSON")String channel,@NotBlank @Pattern(regexp="PATIENT|REPRESENTATIVE")String confirmedBy,
+        @NotNull Instant conversationAt,boolean attested) {}
+    /**
+     * The assisted-decision facts of one proposal version, for the patient and the coordinator: when the patient asked for
+     * the conversation, and, once decided, whether the decision was the patient's own or recorded by their coordinator.
+     */
+    public record ProposalAssistanceView(Instant requestedAt,String decisionSource,String recordedByName,String channel,String confirmedBy,Instant conversationAt,Instant decidedAt) {}
     public record OperationsPlanRequest(@NotBlank @Size(max=30000)String plan) {}
     public record ProposalDecisionRequest(@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,List<UUID>selectedOptionalItemIds,@Size(max=10000)String comment) {}
     public record TravelPlanRequest(Instant plannedArrival,Instant confirmedArrival,@Size(max=80)String visaStatus,@Size(max=5000)String flightDetails,@Size(max=5000)String airportReception,@Size(max=5000)String accommodation,@Size(max=5000)String localTransport,@Size(max=5000)String companionDetails,@Size(max=300)String facility,@Size(max=5000)String exceptions,@NotBlank @Pattern(regexp="PLANNING|CONFIRMED|ARRIVED")String status) {}
@@ -64,7 +76,7 @@ public final class JourneyDtos {
     }
     // Patient-facing proposal view. Never exposes provider net cost, margin rate, or profit. fxRateDate is the day of the
     // exchange rate frozen on the version at release (null until the version is released), so the patient can be told which rate applies.
-    public record PublicProposalView(String caseNumber,String patientName,String documentType,int versionNumber,String currency,List<ProposalItemView>items,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax,String assumptions,String includedServices,String excludedServices,String scopeChangeReason,String paymentTerms,String refundTerms,String disclaimers,Instant validUntil,boolean decided,String decisionState,String recommendedTreatment,String risksAndLimitations,String notes,BigDecimal depositDueDisplay,BigDecimal depositPaidDisplay,String consultantName,java.time.LocalDate fxRateDate) {}
+    public record PublicProposalView(String caseNumber,String patientName,String documentType,int versionNumber,String currency,List<ProposalItemView>items,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax,String assumptions,String includedServices,String excludedServices,String scopeChangeReason,String paymentTerms,String refundTerms,String disclaimers,Instant validUntil,boolean decided,String decisionState,String recommendedTreatment,String risksAndLimitations,String notes,BigDecimal depositDueDisplay,BigDecimal depositPaidDisplay,String consultantName,java.time.LocalDate fxRateDate,ProposalAssistanceView assistance) {}
     // channel is the currently-selected/default OTP channel; whatsappHint/emailHint are non-null only when
     // that channel is on file for the patient, so the UI can offer a switch without leaking real contacts.
     public record PublicProposalSummary(String caseNumber,String channel,String destinationHint,String whatsappHint,String emailHint) {}
@@ -92,7 +104,7 @@ public final class JourneyDtos {
     public record StaffDirectoryView(String subject,String name,String role) {}
     /** One responsibility record on a case (UX-7 Assignment history). assignedByKind: PERSON, ROUTING or SYSTEM; names only, never account identifiers. */
     public record AssignmentHistoryEntry(String role,String assigneeName,String status,Instant assignedAt,Instant endedAt,String assignedByKind,String assignedByName,String reason) {}
-    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason) {}
+    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason,ProposalAssistanceView assistance) {}
     public record ProposalItemView(UUID id,String category,String description,BigDecimal quantity,BigDecimal unitPrice,boolean optional) {}
     /** {@code assigneeName} is resolved server-side so no interface ever renders an identity subject. */
     public record AssignmentView(UUID id,String assigneeSubject,String assigneeName,String assigneeRole,String assignmentType,String status,Instant assignedAt,long version) {}

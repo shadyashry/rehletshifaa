@@ -6,7 +6,9 @@ import type { Locale } from "@/lib/i18n";
 import { ProposalDecisionDialog } from "@/components/ProposalDecisionDialog";
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
 import { apiUrl } from "@/lib/api";
-import { estimateTerms, exchangeRateStatement, finalQuoteTerms, generalDisclaimers, isForeignCurrency, LEGACY_PLACEHOLDER_TERMS } from "@/lib/commercial-terms";
+import { ARABIC_TERMS_APPROVED, estimateTerms, exchangeRateStatement, finalQuoteTerms, generalDisclaimers, isForeignCurrency, LEGACY_PLACEHOLDER_TERMS } from "@/lib/commercial-terms";
+import { getDictionary } from "@/lib/dictionary";
+import { fillTemplate } from "@/lib/portal-labels";
 import { scrollIntoView } from "@/lib/scroll";
 
 type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean };
@@ -21,6 +23,8 @@ type Proposal = {
   depositDueDisplay?: number; depositPaidDisplay?: number; consultantName?: string | null;
   /** Day of the exchange rate frozen on this version at release; absent on legacy versions. */
   fxRateDate?: string | null;
+  /** When the patient asked their coordinator to go through the terms in Arabic (assisted path); absent until then. */
+  assistance?: { requestedAt?: string | null } | null;
 };
 type Decision = "ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED";
 /** Terminal states the patient cannot act out of; each gets its own honest explanation, never a raw error. */
@@ -192,6 +196,33 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const [busy, setBusy] = useState(false);
   const decisionRef = useRef<HTMLDivElement>(null);
   const [decisionVisible, setDecisionVisible] = useState(true);
+  const [requestFailed, setRequestFailed] = useState(false);
+  const requestedRef = useRef<HTMLParagraphElement>(null);
+  // Until the terms have approved Arabic wording, an Arabic page asks the coordinator to go through them with the
+  // patient in Arabic and record the decision (owner decision, GATE P2-1) instead of asking for an acknowledgement.
+  const assisted = locale === "ar" && !ARABIC_TERMS_APPROVED;
+  const assistedCopy = getDictionary(locale).portalProposal.assisted;
+
+  /** Asks the coordinator for the Arabic conversation; the page then says it was asked, also after a reload. */
+  async function requestAssistance() {
+    setBusy(true); setRequestFailed(false);
+    try {
+      const r = await fetch(apiUrl(`/public/proposals/${token}/assistance`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grant }) });
+      // An expired or replaced version is explained like any decision on it, never offered again.
+      if (r.status === 410) { setBlocked("EXPIRED"); return; }
+      if (r.status === 409) { setBlocked("SUPERSEDED"); return; }
+      if (!r.ok) { setRequestFailed(true); scrollIntoView(decisionRef.current, { behavior: "smooth", block: "center" }); return; }
+      const assistance = (await r.json()) as Proposal["assistance"];
+      setProposal(current => current ? { ...current, assistance } : current);
+      // The button (inline or in the sticky bar) is replaced by the confirmation: bring it into view and give it focus.
+      requestAnimationFrame(() => { scrollIntoView(requestedRef.current, { behavior: "smooth", block: "center" }); requestedRef.current?.focus(); });
+    } catch { setRequestFailed(true); } finally { setBusy(false); }
+  }
+
+  /** The verified grant travels to the English page, so switching language does not ask for a second code. */
+  function keepGrantForEnglish() {
+    try { sessionStorage.setItem(`rs-proposal-grant:${token}`, JSON.stringify({ grant })); } catch { /* private mode: the English page asks for a code */ }
+  }
 
   /** Loads the full proposal with a grant already proven elsewhere; false when the grant is no longer good. */
   async function openWithGrant(g: string) {
@@ -517,6 +548,27 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                 {!blocked && (
                   <div ref={decisionRef} className="mt-8 border-t border-line pt-6">
                     <h2 className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.beforeTitle}</h2>
+                    {assisted ? (
+                      <div className="mt-3 space-y-3">
+                        <p className="max-w-[60ch] text-[0.95rem] leading-7 text-ink-800">{isFinal ? assistedCopy.explainQuote : assistedCopy.explain}</p>
+                        {proposal.assistance?.requestedAt ? (
+                          <p ref={requestedRef} tabIndex={-1} role="status" className="text-[0.95rem] font-semibold leading-6 text-brand-900 outline-none">
+                            {fillTemplate(assistedCopy.requested, { date: new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(new Date(proposal.assistance.requestedAt)), name: assistedCopy.nameFallback })}
+                          </p>
+                        ) : (
+                          <div>
+                            <button type="button" className="btn-primary min-h-11 px-6" disabled={busy} onClick={() => void requestAssistance()}>
+                              {busy ? assistedCopy.sending : fillTemplate(assistedCopy.ask, { name: assistedCopy.askFallback })}
+                            </button>
+                            {requestFailed && <p role="alert" className="mt-2 text-[0.85rem] font-semibold text-alert-700">{assistedCopy.requestFailed}</p>}
+                          </div>
+                        )}
+                        <p className="flex flex-wrap items-center gap-x-1.5 text-[0.88rem] leading-6 text-ink-600">
+                          {assistedCopy.englishPrompt}
+                          <a href={`/en/proposal/${token}`} hrefLang="en" onClick={keepGrantForEnglish} className="inline-flex min-h-11 items-center font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current">{assistedCopy.englishLink}</a>
+                        </p>
+                      </div>
+                    ) : (<>
                     <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white p-4 has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
                       <input type="checkbox" className="mt-0.5 h-5 w-5 flex-none accent-brand-600" checked={acknowledged}
                              aria-describedby={depositDue ? "ack-detail deposit-terms" : "ack-detail"} aria-invalid={ackError || undefined}
@@ -527,10 +579,11 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                       </span>
                     </label>
                     {ackError && <p role="alert" className="mt-2 text-[0.85rem] font-semibold text-alert-700">{t.ackRequired}</p>}
+                    </>)}
                     {error && <p role="alert" className="mt-3 rounded-xl bg-alert-50 p-3 text-[0.9rem] text-alert-800">{error}</p>}
 
                     <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
-                      <button className="btn-primary min-h-11 px-6" disabled={busy} onClick={submitPrimary}>{busy ? t.deciding : primaryLabel}</button>
+                      {!assisted && <button className="btn-primary min-h-11 px-6" disabled={busy} onClick={submitPrimary}>{busy ? t.deciding : primaryLabel}</button>}
                       <button type="button" className="min-h-11 text-[0.92rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
                               disabled={busy} onClick={() => setDialog("REVISION_REQUESTED")}>{t.requestRevision}</button>
                     </div>
@@ -591,7 +644,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
             </div>
 
             {/* Carries the same two operations while the decision block is out of view; never a third choice. */}
-            {!blocked && !decisionVisible && (
+            {!blocked && !decisionVisible && !(assisted && proposal.assistance?.requestedAt) && (
               <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-2px_12px_rgba(28,51,58,0.08)] backdrop-blur">
                 <div className="container-site flex max-w-[1120px] flex-wrap items-center justify-between gap-3 px-0">
                   <div className="min-w-0">
@@ -604,12 +657,14 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                   <div className="flex flex-1 flex-wrap items-center justify-end gap-3 sm:flex-none">
                     <button type="button" className="min-h-11 text-[0.9rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
                             disabled={busy} onClick={() => setDialog("REVISION_REQUESTED")}>{t.requestRevision}</button>
-                    <button className="btn-primary min-h-11 flex-1 justify-center px-5 sm:flex-none" disabled={busy} onClick={submitPrimary}>{busy ? t.deciding : primaryLabel}</button>
+                    <button className="btn-primary min-h-11 flex-1 justify-center px-5 sm:flex-none" disabled={busy} onClick={assisted ? () => void requestAssistance() : submitPrimary}>
+                      {busy ? (assisted ? assistedCopy.sending : t.deciding) : assisted ? fillTemplate(assistedCopy.ask, { name: assistedCopy.askFallback }) : primaryLabel}
+                    </button>
                   </div>
                 </div>
               </div>
             )}
-            {!blocked && !decisionVisible && <div aria-hidden className="h-20" />}
+            {!blocked && !decisionVisible && !(assisted && proposal.assistance?.requestedAt) && <div aria-hidden className="h-20" />}
 
             {dialog && (
               <ProposalDecisionDialog locale={locale} kind={dialog} busy={busy}

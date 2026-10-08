@@ -165,7 +165,7 @@ describe("MoreActions", () => {
 
   it("lists only what the backend offered, one control per business action", () => {
     const mutate = vi.fn().mockResolvedValue({});
-    render(<MoreActions locale="en" caseId="c1" version={1} travelPackage={false} busy={false} mutate={mutate}
+    renderWithWork(<MoreActions locale="en" caseId="c1" version={1} travelPackage={false} busy={false} mutate={mutate}
                         available={["REQUEST_INFORMATION"]} onRequestInformation={vi.fn()} onRecordResponse={vi.fn()}/>);
     const labels = screen.getAllByRole("button").map(b => b.textContent ?? "");
     expect(labels.some(l => /request more information/i.test(l))).toBe(true);
@@ -175,7 +175,7 @@ describe("MoreActions", () => {
   });
 
   it("is honest when the state allows nothing extra", () => {
-    render(<MoreActions locale="en" caseId="c1" version={1} travelPackage={false} busy={false} mutate={vi.fn()}
+    renderWithWork(<MoreActions locale="en" caseId="c1" version={1} travelPackage={false} busy={false} mutate={vi.fn()}
                         available={[]} onRequestInformation={vi.fn()} onRecordResponse={vi.fn()}/>);
     expect(screen.getByText(/no additional actions/i)).toBeTruthy();
   });

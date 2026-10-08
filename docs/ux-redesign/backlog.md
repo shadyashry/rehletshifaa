@@ -216,12 +216,12 @@ The items below are deferred.
 | P2 | The disabled primary button relies on `opacity .55` (white on #7aa7ab, 2.64:1). Add `--button-disabled-bg/fg/border` tokens; on `/ar` it stays disabled for good. | PM | `app/globals.css` (`button:disabled`) | polish |
 | P2 | `--button-secondary-border` = line-strong (1.66:1). Point it at `--color-ink-350` (3.63:1), the same as fields. This is a token change that needs the owner. | PM | `app/globals.css` | polish |
 | P2 | `.field:focus { outline: 0 }` replaces the 3px ring with a 1px border change and a 1.26:1 halo. | PM | `app/globals.css` | polish |
-| P2 | Decline uses `window.confirm` over the modal (browser-language buttons, no consequence text). Use an in-drawer confirm step in en and ar. | WG | `PatientProposal.tsx` | harden |
+| Done (pass 2) | Decline uses `window.confirm` over the modal (browser-language buttons, no consequence text). Use an in-drawer confirm step in en and ar. | WG | `PatientProposal.tsx` | harden |
 | Done | Done in Phase 6 polish: the drawer returns focus to the control that opened it. | RB, WG | `Portal.tsx` `CaseDrawer` | harden |
 | P2 | `<fieldset disabled={busy}>` dims the whole document and drops focus while sending, with no "Sending…" label. This is the same root cause as the portal P1. | WG, PM, RB | `Portal.tsx:368` | harden |
 | P2 | The primary is disabled until the box is ticked, with no reason that keyboard or screen-reader users can reach. | WG, PM | `PatientProposal.tsx` | harden |
 | P2 | Optional items are priced but excluded from the total and can't be selected, and nothing says so. | WG | `PatientProposal.tsx` | clarify |
-| P2 | The Arabic blocked note asks the patient to switch to English but has no direct link to the same view in `/en`. | WG | `PatientProposal.tsx` | harden |
+| Done (pass 2) | The Arabic blocked note asks the patient to switch to English but has no direct link to the same view in `/en`. | WG | `PatientProposal.tsx` | harden |
 | P2 | The terms id `portal-deposit-terms` is hard-coded and shared across components, and the checkbox description reads the whole English terms block. Use `useId` and a short summary target, and test the real target. | RB, WG | `PatientProposal.tsx`, `CoordinationDepositTerms.tsx`, test | harden |
 | P3 | Fixed section ids and a region landmark per section; an unnamed fieldset group around the read-only document; an inline `mutate` wrapper (use `onDecided`); formatters rebuilt per item. | RB | `PatientProposal.tsx`, `Portal.tsx` | distill |
 | Done | Done in Phase 6 polish: the drawer header and Close stay pinned while the content scrolls. | PM | `Portal.tsx` `CaseDrawer` | adapt |
@@ -278,7 +278,7 @@ Source: `.impeccable/critique/2026-10-07T21-50-23Z__frontend-src-components-port
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| **P0 (owner)** | Arabic patients cannot accept a proposal but can decline it. This follows the owner's GATE 2 decision (option B). Proposed: a coordinator-mediated path ("your coordinator goes through the terms with you in Arabic and records your decision"; `RecordPatientResponse` exists), de-emphasise Decline while Accept is blocked, and treat Arabic terms approval as a launch blocker. **Owner decision needed.** | Re-critique A | `PatientProposal.tsx`, `lib/commercial-terms.ts` | clarify / harden |
+| Done (pass 2) | Arabic patients cannot accept a proposal but can decline it. This follows the owner's GATE 2 decision (option B). Proposed: a coordinator-mediated path ("your coordinator goes through the terms with you in Arabic and records your decision"; `RecordPatientResponse` exists), de-emphasise Decline while Accept is blocked, and treat Arabic terms approval as a launch blocker. **Owner decision needed.** | Re-critique A | `PatientProposal.tsx`, `lib/commercial-terms.ts` | clarify / harden |
 | Done (pass 2) | Coordinator case: the current-action "Assign Consultant" button plus a second inline "Assign a Consultant" form with its own button. The care-area select is blank, and "No eligible consultant" has no next step. | Re-critique A | `CurrentAction.tsx`, `CoordinatorActions.tsx`, `ConsultantRouting.tsx` | clarify |
 | Done (pass 2) | The staff home is still a template dashboard: off-palette KPI tiles, disabled zero tiles, an empty My work landing, the marketing footer, and no staff navigation in the header. Already planned as the P2 staff-home distill; raised to P1. | Re-critique A | `RoleDashboardSummary.tsx`, `CaseQueue.tsx`, `MyWork.tsx`, `Portal.tsx`, `Footer.tsx` | distill / layout |
 | P2 | My Care is five boxed cards and never names the patient. A representative ("Care for: [name]") is invisible, and the avatar reads "ME". | Re-critique A | `MyCare.tsx`, `PatientNav.tsx` | layout |
@@ -328,3 +328,34 @@ These were fixed in the run:
 | P3 | The Arabic footer shows the Latin brand, and the "© {year} {brand}" order is fixed in code. Add an Arabic brand string and a copyright template. | I18N | `PortalFooter.tsx`, `messages/*.json` | clarify |
 | P3 | Arabic (pending native review): the spelling of "منسّق" vs "منسق" is mixed across portalWork. | I18N | `messages/ar.json` | clarify |
 | P3 | The "Current action" kicker above the panel heading (an Impeccable ban, pre-existing). | Impeccable | `CurrentAction.tsx` | typeset |
+
+## Arabic proposal decision — deferred review findings (pass 2 build, 2026-10-08)
+
+Five reviewers ran on the coordinator-mediated decision (plan `plans/arabic-proposal-decision.md`):
+- **AUTH:** a backend authorization and correctness review;
+- **RB:** react-best-practices and composition-patterns;
+- **WG:** web-design-guidelines;
+- **I18N:** RTL and i18n;
+- **PM:** the Pro Max pre-delivery checklist.
+
+These were fixed in the build:
+- an unchecked conversation time that could throw, and focus loss when the "ask" button is replaced;
+- masculine Arabic verbs beside a coordinator's name, and the English route worded as an instruction;
+- a call before the release, and work left open after expiry or a new version;
+- requests on a lapsed version, the acknowledgement-version stamp, and the request race (row lock);
+- exact denial codes, plus IDOR, expiry and deposit tests;
+- 409/410 on the secure link, busy labels, `hrefLang`, the note-error id, the neutral provenance fallback, bidi isolation of names, and the Arabic context of the work item.
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| **P1 (decision)** | Journey-bound cases: neither the patient's own decisions (portal and secure link post to the direct `/decision` endpoints) nor the recorded decision complete the journey runtime `REVIEW_PROPOSAL` action. This is pre-existing for self-service, and the recorded path keeps parity. Decide whether the UI moves to the `/actions/{id}/proposal-decision` endpoints or the direct paths sync the runtime. Then add a `RecordedDecision` handler variant. | AUTH | `JourneyService`, `ReviewProposalActionHandler`, `PatientProposal.tsx`, `ProposalSign.tsx` | harden |
+| P2 | The patient is not notified when a decision is recorded (the plan says "notified with the provenance line"). A recorded decline also notifies the recording coordinator about their own action. Needs an outbox template in en and ar, plus legal L4 (dispute window). | AUTH | `JourneyService.applyRecordedDecision`, notification templates | harden |
+| P2 | "Representative" means the submitting contact (`case_submission_contacts.contact_role`), not an authorised `PATIENT_REPRESENTATIVE` link, and no representative id is stored. Align with the representative model (legal L3). | AUTH | `ProposalAssistanceService` | harden |
+| P2 | Arabic secure link: the numbered "what happens next" list still starts with "acknowledge this estimate". | Build review | `ProposalSign.tsx` | clarify |
+| P2 | Activation's deposit-terms consent on `/ar` is unchanged, pending legal L2. | Plan O1 | `ProfileActivation.tsx` | — |
+| P3 | `englishHref` opens the English case without the proposal drawer. Add a deep link that opens it. | WG | `Portal.tsx` | harden |
+| P3 | Portal `mutate` returns `undefined` both for a failure and for a skipped overlapping call, so "failed" can show while the first request succeeds. | RB | `Portal.tsx` | harden |
+| P3 | Every `proposal(versionId)` read now also loads the assistance facts and a staff name. Compute them only where they are returned. | AUTH | `ProposalQueryService` | optimize |
+| P3 | The staff form's Note label doesn't say it becomes required for Request changes. The time field has no `min` (release time) on the client, though the server enforces it. | WG, RB | `RecordProposalDecision.tsx` | clarify |
+| P3 | The quiet links' resting underline uses `line-strong` (1.66:1). It is the cue beside near-identical text colours. Consider `decoration-current`. | PM | `PatientProposal.tsx`, `ProposalSign.tsx` | polish |
+| P3 | The "requested" line names no channel ("You will hear from …"). Interpolate the patient's actual contact channel once the backend exposes it. | I18N | `messages/*.json` | clarify |

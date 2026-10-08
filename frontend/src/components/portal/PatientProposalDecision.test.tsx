@@ -25,15 +25,41 @@ describe("PatientProposalDecision", () => {
     expect(screen.getByRole("button", { name: "Accept final treatment plan and quote" })).toBeTruthy();
   });
 
-  it("does not let Arabic pages complete the decision while the Arabic terms await legal approval (GATE 2, option B)", () => {
-    const mutate = vi.fn();
-    render(<PatientProposalDecision locale="ar" copy={ar} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={mutate} />);
-    const primary = screen.getByRole("button", { name: ar.primaryEstimate });
-    expect(primary).toHaveProperty("disabled", true);
-    expect(screen.getByRole("checkbox")).toHaveProperty("disabled", true);
-    expect(screen.getByRole("note").textContent).toBe(ar.arabicTermsPending);
-    expect(screen.getByRole("button", { name: ar.requestChanges })).toHaveProperty("disabled", false);
-    expect(screen.getByRole("button", { name: ar.decline })).toHaveProperty("disabled", false);
+  it("offers the coordinator in Arabic instead of a dead acknowledgement while the Arabic terms await legal approval", async () => {
+    const request = vi.fn().mockResolvedValue({ requestedAt: "2026-10-08T10:00:00Z" });
+    render(<PatientProposalDecision locale="ar" copy={ar} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={vi.fn()}
+      coordinatorName="Layla Hassan" englishHref="/en/portal?case=c1" onRequestAssistance={request} />);
+    // No checkbox and no primary that can never be used.
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: ar.primaryEstimate })).toBeNull();
+    expect(screen.getByText(ar.assisted.explain)).toBeTruthy();
+    expect(screen.queryByText(/الإنجليزية/, { selector: "p.max-w-[60ch]" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Layla Hassan/ }));
+    expect(request).toHaveBeenCalledWith("/patient/cases/c1/proposals/v1/assistance");
+    expect(screen.getByRole("link", { name: ar.assisted.englishLink }).getAttribute("href")).toBe("/en/portal?case=c1");
+    expect(screen.getByRole("button", { name: ar.requestChanges })).toBeTruthy();
+  });
+
+  it("says the request was made, after a reload", () => {
+    render(<PatientProposalDecision locale="ar" copy={ar} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE", assistance: { requestedAt: "2026-10-08T10:00:00Z" } }} mutate={vi.fn()} onMessage={vi.fn()} />);
+    expect(screen.getByRole("status").textContent).toContain(ar.assisted.nameFallback);
+    expect(screen.queryByRole("button", { name: /مراجعة الشروط/ })).toBeNull();
+    expect(screen.getByRole("button", { name: ar.assisted.message })).toBeTruthy();
+  });
+
+  it("keeps Decline quiet and confirms it inside the drawer, not in a browser dialog", () => {
+    const mutate = vi.fn().mockResolvedValue(true);
+    const confirm = vi.spyOn(window, "confirm");
+    render(<PatientProposalDecision locale="en" copy={en} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={mutate} />);
+    fireEvent.click(screen.getByRole("button", { name: en.declineQuiet }));
+    expect(screen.getByText(en.declineConsequence)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: en.declineKeep }));
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: en.declineQuiet }));
+    fireEvent.click(screen.getByRole("button", { name: en.decline }));
+    expect(mutate).toHaveBeenCalledWith("/patient/cases/c1/proposals/v1/decision", { decision: "DECLINED", selectedOptionalItemIds: [], comment: undefined });
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
   });
 
   it("asks for a note before sending a change request", () => {
@@ -59,9 +85,21 @@ describe("PatientProposalDecision failures and variants", () => {
     expect(await screen.findByText(en.decisionFailed)).toBeTruthy();
   });
 
-  it("names the payment terms, not the deposit terms, when an Arabic final quote is blocked", () => {
+  it("states only that it was recorded when the channel or confirmer is unknown", () => {
+    render(<PatientProposal locale="en" copy={en} proposal={{ ...estimate, status: "ACCEPTED", assistance: { decisionSource: "RECORDED_ON_BEHALF", recordedByName: "Layla Hassan", channel: "CARRIER_PIGEON", confirmedBy: "PATIENT", conversationAt: "2026-10-08T10:00:00Z" } }} />);
+    const line = screen.getByText(/Recorded by .*Layla Hassan/);
+    expect(line.textContent).not.toMatch(/phone call|with you/);
+  });
+
+  it("names the payment terms, not the deposit terms, on an Arabic final quote", () => {
     render(<PatientProposalDecision locale="ar" copy={ar} caseId="c1" proposal={{ versionId: "v2", documentType: "FINAL_TREATMENT_QUOTE" }} mutate={vi.fn()} />);
-    expect(screen.getByRole("note").textContent).toBe(ar.arabicTermsPendingQuote);
+    expect(screen.getByText(ar.assisted.explainQuote)).toBeTruthy();
+  });
+
+  it("shows who recorded a decision and how, with a way to dispute it", () => {
+    render(<PatientProposal locale="en" copy={en} proposal={{ ...estimate, status: "ACCEPTED", assistance: { decisionSource: "RECORDED_ON_BEHALF", recordedByName: "Layla Hassan", channel: "WHATSAPP_CALL", confirmedBy: "REPRESENTATIVE", conversationAt: "2026-10-08T10:00:00Z" } }} />);
+    expect(screen.getByText(/Recorded by ⁨Layla Hassan⁩ on October 8, 2026, after a WhatsApp call with your representative./)).toBeTruthy();
+    expect(screen.getByText(new RegExp(en.assisted.dispute))).toBeTruthy();
   });
 });
 
