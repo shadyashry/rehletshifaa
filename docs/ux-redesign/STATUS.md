@@ -140,6 +140,15 @@ Update at the end of every phase.
           `care-coordination` "Coordination Setup" ×2 and Control Center "Staff & teams"; e2e staff-view selectors moved from
           button to link (fixture + portal-live, portal-gateway-live, uat-walkthrough-live)
     - [x] screenshots: `docs/ux-redesign/screenshots/pass-3/leave-case-{en,ar}-{390,1440}.png`
+  - [x] Tunnel stack rebuilt from `codex/platform-control-plane` @ `9e3b336` (main checkout switched from `feat/ux-redesign`,
+        which it contains): backend applied V74–V76, health UP, localhost 3000/8081/8180 all 200, cloudflared 4 connections.
+        From this machine's network every `*.rehletshifaa.com` TLS handshake is reset (other Cloudflare sites work); the owner
+        confirmed the site loads on mobile data, so the block is local, not the stack.
+  - [x] Follow-up (owner: "carry on"): step-4 deferred P2s — Arabic services count through `portalWork.plural.services`
+        (2 → خدمتان, 11 → 11 خدمة); the Consultant name in the handoff line and the timeline actor are bidi-isolated; the
+        proposal version label (`portalWork.proposalVersion`, Arabic «الإصدار») and file sizes (Intl unit) are localised
+    - [x] verify: typecheck ok; lint 24/12; unit 345 pass, 11 `ProposalSign`; Playwright 11 portal/patient specs incl. a11y
+          105 pass, 1 fail = pre-existing Control Center "Staff & teams"
 
 ## Decisions
 
@@ -181,9 +190,9 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08). Before any live check, rebuild the tunnel stack
-from this branch (it runs a 2026-10-07 backend at V73; pass 3 adds V75/V76). Next engineering candidates: the step-4
-deferred P2s (Arabic services plural, name isolation), wording the remaining work types (backlog P3), a representative
-picker for recorded decisions, full Portal module split. Owner decisions
+Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08); the follow-up
+commit on `feat/ux-redesign-pass-3` is not merged or pushed yet. The tunnel stack runs `9e3b336` (V76); live checks must run from a network that
+reaches `*.rehletshifaa.com`. Next engineering candidates: wording the remaining work types (backlog P3), a
+representative picker for recorded decisions, full Portal module split. Owner decisions
 still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
 amber tones; proposal drawer order (price first approved, recommendation-first suggestion kept in the backlog).

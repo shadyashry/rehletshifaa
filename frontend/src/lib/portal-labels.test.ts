@@ -29,6 +29,9 @@ describe("portal labels", () => {
     expect(plural("ar", 1, ar.portalWork.plural.cases)).toBe("حالة واحدة");
     // Western digits on Arabic pages (owner default until native review), for the few and many forms alike.
     expect(plural("ar", 3, ar.portalWork.plural.cases)).toBe("3 حالات");
+    expect(plural("ar", 2, ar.portalWork.plural.services)).toBe("خدمتان");
+    expect(plural("ar", 11, ar.portalWork.plural.services)).toBe("11 خدمة");
+    expect(plural("en", 1, en.portalWork.plural.services)).toBe("1 service");
     expect(plural("ar", 11, ar.portalWork.plural.cases)).toBe("11 حالة");
     expect(plural("ar", 1250, ar.portalWork.plural.cases)).toMatch(/^1[,٬]250 حالة$/);
     expect(new Intl.DateTimeFormat(intlLocale("ar"), { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date("2026-10-08T00:00:00Z"))).toMatch(/^8 .+ 2026$/);

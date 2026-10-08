@@ -107,7 +107,7 @@ export function FullJourneyDialog({ locale, timeline, caseNumber, onClose }: {
                   </p>
                   <p className="mt-0.5 text-[0.8125rem] leading-5 text-ink-500">
                     {new Date(event.occurredAt).toLocaleString(intlLocale(locale), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-                    {event.actorName ? ` · ${event.actorName}` : ""}
+                    {event.actorName ? <> · <bdi>{event.actorName}</bdi></> : ""}
                     {event.actorRole && event.actorName && event.actorRole !== "SYSTEM" ? ` · ${roleLabel(event.actorRole, locale)}` : ""}
                   </p>
                   {event.note && <p className="mt-1 text-[0.8125rem] leading-5 text-ink-600">{event.note}</p>}

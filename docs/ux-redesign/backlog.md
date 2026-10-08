@@ -387,10 +387,10 @@ a text-arrow glyph; 36px View proposal and 32px View full journey; feminine Arab
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P2 | The services count is a raw template (`${services} خدمات`): wrong Arabic for 2 and 11+. Add `portalWork.plural.services`. | I18N | `Portal.tsx` | clarify |
-| P2 | `t.handoff.replace("{name}", …)` puts a Latin Consultant name into Arabic without isolation; the timeline's `· {actorName}` likewise. | I18N | `Portal.tsx`, `JourneySnapshot.tsx` | adapt |
+| Done (pass 3 follow-up: `portalWork.plural.services`) | The services count is a raw template (`${services} خدمات`): wrong Arabic for 2 and 11+. Add `portalWork.plural.services`. | I18N | `Portal.tsx` | clarify |
+| Done (pass 3 follow-up: isolated name; timeline actor in `<bdi>`) | `t.handoff.replace("{name}", …)` puts a Latin Consultant name into Arabic without isolation; the timeline's `· {actorName}` likewise. | I18N | `Portal.tsx`, `JourneySnapshot.tsx` | adapt |
 | P3 | An action in the same panel rebaselines the whole panel (outermost form/section/dialog), so text typed beside a different successful action in that panel stops counting as unsent. Messages typed in the staff Messages drawer are still lost when the drawer closes (pre-existing). | Build | `LeaveCaseGuard.tsx`, `Portal.tsx` | harden |
 | P3 | Opening case B from inside case A (bell, My work, other cases) replaces the entry, so Back from B returns to the view, not to A. Intended for now. | RB | `Portal.tsx` | — |
 | P3 | `LeaveCaseDialog` opens on mount only; any future path that swaps the pending exit without an unmount would leave it closed. Key it per request if such a path appears. | RB | `LeaveCaseGuard.tsx` | harden |
 | P3 | Arabic: منسّق vs منسق mixed across portalWork; `PROPOSAL_TERMS_CALL` says «المقترح» where siblings say «العرض» and its context is masculine. Pending native review. | I18N | `messages/ar.json` | clarify |
-| P3 | A Latin "v{versionNumber}" in the Arabic proposal summary; `formatBytes` uses `toFixed` and English KB/MB. | I18N | `Portal.tsx` | clarify |
+| Done (pass 3 follow-up: `portalWork.proposalVersion`, Intl unit file sizes) | A Latin "v{versionNumber}" in the Arabic proposal summary; `formatBytes` uses `toFixed` and English KB/MB. | I18N | `Portal.tsx` | clarify |

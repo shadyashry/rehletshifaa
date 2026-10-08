@@ -908,6 +908,14 @@
         "many": "{count} عنصر عمل",
         "other": "{count} عنصر عمل"
       },
+      "services": {
+        "zero": "لا خدمات",
+        "one": "خدمة واحدة",
+        "two": "خدمتان",
+        "few": "{count} خدمات",
+        "many": "{count} خدمة",
+        "other": "{count} خدمة"
+      },
       "documents": {
         "zero": "لا مستندات",
         "one": "مستند واحد",
@@ -1219,6 +1227,7 @@
       "INFORMATION_REQUEST": "متابعة طلب المعلومات",
       "DOCUMENT_REVIEW": "مراجعة المستندات"
     },
+    "proposalVersion": "الإصدار {number}",
     "leaveCase": {
       "title": "مغادرة هذه الحالة؟",
       "body": "لم يُرسَل النص الذي كتبته في هذه الحالة بعد. إذا غادرت الآن فسيضيع.",

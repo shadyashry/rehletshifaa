@@ -900,6 +900,10 @@
         "one": "{count} work item",
         "other": "{count} work items"
       },
+      "services": {
+        "one": "{count} service",
+        "other": "{count} services"
+      },
       "documents": {
         "one": "{count} document",
         "other": "{count} documents"
@@ -1199,6 +1203,7 @@
       "INFORMATION_REQUEST": "Follow up the information request",
       "DOCUMENT_REVIEW": "Review the documents"
     },
+    "proposalVersion": "v{number}",
     "leaveCase": {
       "title": "Leave this case?",
       "body": "Text you typed in this case hasn’t been sent. If you leave now, it will be lost.",

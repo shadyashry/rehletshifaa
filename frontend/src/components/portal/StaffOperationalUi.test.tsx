@@ -63,7 +63,10 @@ describe("JourneyPulse", () => {
     expect(screen.getByText("Intake")).toBeTruthy();
     expect(screen.getByText("Consultant")).toBeTruthy();
     expect(screen.getByText("Under consultant review")).toBeTruthy();
-    expect(screen.getByText(/Dr\. Yasmine · Consultant/)).toBeTruthy();
+    // The actor name is isolated, so a Latin name keeps its order beside an Arabic role label.
+    const actor = screen.getByText("Dr. Yasmine");
+    expect(actor.tagName).toBe("BDI");
+    expect(actor.parentElement?.textContent).toMatch(/Dr\. Yasmine · Consultant/);
     expect(screen.getByText("Awaiting imaging")).toBeTruthy();
     expect(screen.queryByText("CONSULTANT_REVIEW")).toBeNull();
   });
