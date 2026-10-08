@@ -8,6 +8,8 @@ import { intlLocale } from "@/lib/i18n";
 
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
 export type RecordableProposal = { versionId: string; versionNumber?: number; documentType?: string };
+/** Someone authorised to act for the patient right now (an in-force PATIENT_REPRESENTATIVE link). */
+export type RepresentativeOption = { id: string; name?: string | null; relationship?: string | null; since?: string | null };
 
 const CHANNELS = ["PHONE", "WHATSAPP_CALL", "VIDEO", "IN_PERSON"] as const;
 
@@ -24,8 +26,8 @@ function localNow() {
  * decided, who confirmed it, how and when the conversation happened, and the coordinator's attestation that the terms
  * were explained and understood. The patient later sees that it was recorded, by whom and how.
  */
-export function RecordProposalDecision({ locale, caseId, proposal, busy, mutate }: {
-  locale: string; caseId: string; proposal: RecordableProposal; busy: boolean; mutate: Mutate;
+export function RecordProposalDecision({ locale, caseId, proposal, representatives = [], busy, mutate }: {
+  locale: string; caseId: string; proposal: RecordableProposal; representatives?: RepresentativeOption[]; busy: boolean; mutate: Mutate;
 }) {
   const work = useWorkCopy();
   const t = work.recordDecision;
@@ -36,12 +38,22 @@ export function RecordProposalDecision({ locale, caseId, proposal, busy, mutate 
   const [when, setWhen] = useState(localNow);
   const [note, setNote] = useState("");
   const [attested, setAttested] = useState(false);
-  const [errors, setErrors] = useState<{ decision?: boolean; note?: boolean; attested?: boolean; when?: boolean }>({});
+  const [representativeId, setRepresentativeId] = useState("");
+  const [errors, setErrors] = useState<{ decision?: boolean; note?: boolean; attested?: boolean; when?: boolean; representative?: boolean }>({});
   const [failed, setFailed] = useState(false);
   const [latest] = useState(localNow);
-  const ids = { decision: useId(), note: useId(), attest: useId(), when: useId() };
+  const ids = { decision: useId(), note: useId(), attest: useId(), when: useId(), representative: useId() };
   const firstDecision = useRef<HTMLInputElement>(null), noteRef = useRef<HTMLTextAreaElement>(null);
-  const whenRef = useRef<HTMLInputElement>(null), attestRef = useRef<HTMLInputElement>(null);
+  const whenRef = useRef<HTMLInputElement>(null), attestRef = useRef<HTMLInputElement>(null), representativeRef = useRef<HTMLSelectElement>(null);
+  // One representative is named in the choice itself; several need a pick, because the record says which one confirmed.
+  const relationships = t.relationships as Record<string, string>;
+  const describe = (r: RepresentativeOption) => [`\u2068${r.name || t.unnamedRepresentative}\u2069`,
+    r.relationship && Object.hasOwn(relationships, r.relationship) ? relationships[r.relationship] : null,
+    r.since ? fillTemplate(t.since, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(r.since)) }) : null].filter(Boolean).join(" · ");
+  const single = representatives.length === 1 ? representatives[0] : null;
+  const confirmers: [string, string][] = representatives.length
+    ? [["PATIENT", t.patient], ["REPRESENTATIVE", single ? fillTemplate(t.representativeNamed, { name: describe(single) }) : t.representative]]
+    : [["PATIENT", t.patient]];
   const channels = t.channels as Record<string, string>;
   const decisions = [
     { value: quote ? "ACCEPTED" : "ACKNOWLEDGED", label: quote ? t.accept : t.acknowledge },
@@ -55,15 +67,17 @@ export function RecordProposalDecision({ locale, caseId, proposal, busy, mutate 
     // empty, unreadable or in the future is never sent as evidence. The server also refuses a time before release.
     const at = new Date(when);
     const next = { decision: !decision, note: decision === "REVISION_REQUESTED" && !note.trim(), attested: !attested,
-      when: !when || Number.isNaN(at.getTime()) || at.getTime() > Date.now() + 5 * 60000 };
+      when: !when || Number.isNaN(at.getTime()) || at.getTime() > Date.now() + 5 * 60000,
+      representative: confirmedBy === "REPRESENTATIVE" && !single && !representativeId };
     setErrors(next);
     setFailed(false);
     // The first problem takes focus, in the order the form reads, so the message beside it is the one heard first.
-    const first = next.decision ? firstDecision : next.when ? whenRef : next.note ? noteRef : next.attested ? attestRef : null;
+    const first = next.decision ? firstDecision : next.representative ? representativeRef : next.when ? whenRef : next.note ? noteRef : next.attested ? attestRef : null;
     if (first) { first.current?.focus(); return; }
     try {
       const result = await mutate(`/coordinator/cases/${caseId}/proposals/${proposal.versionId}/decision/on-behalf`, {
         decision, comment: note.trim() || undefined, channel, confirmedBy, conversationAt: at.toISOString(), attested,
+        representativeId: confirmedBy === "REPRESENTATIVE" ? (single?.id ?? representativeId) : undefined,
       });
       if (!result) setFailed(true);
     } catch { setFailed(true); }
@@ -93,7 +107,7 @@ export function RecordProposalDecision({ locale, caseId, proposal, busy, mutate 
       <fieldset>
         <legend className="text-[0.9375rem] font-semibold text-ink-900">{t.confirmedBy}</legend>
         <div className="mt-1">
-          {[["PATIENT", t.patient], ["REPRESENTATIVE", t.representative]].map(([value, label]) => (
+          {confirmers.map(([value, label]) => (
             <label key={value} className={radio}>
               <input type="radio" name={`confirmed-${proposal.versionId}`} className="h-5 w-5 flex-none" value={value}
                      checked={confirmedBy === value} onChange={() => setConfirmedBy(value)}/>
@@ -101,6 +115,18 @@ export function RecordProposalDecision({ locale, caseId, proposal, busy, mutate 
             </label>
           ))}
         </div>
+        {!representatives.length && <p className="mt-1 text-[0.875rem] leading-6 text-ink-600">{t.noRepresentative}</p>}
+        {confirmedBy === "REPRESENTATIVE" && !single && representatives.length > 1 && (
+          <label className="mt-3 block text-[0.9375rem] font-semibold text-ink-900">{t.whichRepresentative}
+            <select ref={representativeRef} name="confirming-representative" autoComplete="off" required className={`field mt-2 ${errors.representative ? "field-error" : ""}`}
+                    value={representativeId} aria-invalid={errors.representative || undefined} aria-describedby={errors.representative ? ids.representative : undefined}
+                    onChange={event => { setRepresentativeId(event.target.value); setErrors(e => ({ ...e, representative: false })); }}>
+              <option value="" disabled>{t.whichRepresentative}</option>
+              {representatives.map(r => <option key={r.id} value={r.id}>{describe(r)}</option>)}
+            </select>
+          </label>
+        )}
+        {errors.representative && <p id={ids.representative} role="alert" className="error-text mt-2">{t.representativeRequired}</p>}
       </fieldset>
 
       <div className="grid gap-4 sm:grid-cols-2">

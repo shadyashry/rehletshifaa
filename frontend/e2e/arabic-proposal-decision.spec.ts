@@ -93,6 +93,24 @@ for (const locale of ["en", "ar"] as const) {
     await page.screenshot({ path: shots(`my-care-recorded-${locale}-1440`), fullPage: true });
   });
 
+  test(`the coordinator picks which authorised representative confirmed (${locale})`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const { writes } = await setupPortal(page, "COORDINATOR", { assistedDecision: true, representatives: true });
+    await page.goto(`/${locale}/portal`);
+    const ar = locale === "ar";
+    await page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first().click();
+    const form = page.locator("#current-action").getByRole("group", { name: ar ? "تسجيل قرار المريض" : "Record the patient's decision" });
+    await form.getByRole("radio", { name: ar ? "الإقرار بالتقدير" : "Acknowledge the estimate" }).check();
+    await form.getByRole("radio", { name: ar ? "أحد ممثّلي المريض" : "One of their representatives" }).check();
+    const which = form.getByRole("combobox", { name: ar ? "أيّ ممثّل" : "Which representative" });
+    await expect(which.locator("option")).toHaveCount(3);
+    await which.selectOption("rep-2");
+    await form.getByRole("checkbox").check();
+    await page.screenshot({ path: path.join("../docs/ux-redesign/screenshots/pass-3", `record-decision-representative-${locale}-390.png`), fullPage: true });
+    await form.getByRole("button", { name: ar ? "تسجيل القرار" : "Record decision" }).click();
+    await expect.poll(() => writes.find(w => w.path.endsWith("/decision/on-behalf"))?.body).toMatchObject({ confirmedBy: "REPRESENTATIVE", representativeId: "rep-2" });
+  });
+
   test(`the owning coordinator records the decision from the current action (${locale})`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await setupPortal(page, "COORDINATOR", { assistedDecision: true });

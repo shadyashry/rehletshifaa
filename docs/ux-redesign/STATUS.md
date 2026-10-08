@@ -165,6 +165,17 @@ Update at the end of every phase.
     - [x] verify: backend full suite 619/0 (2 skipped); `PostgresJpaMappingTest` green on V77; typecheck ok; lint 24/12;
           unit 347 pass, 11 `ProposalSign`; Playwright 13 portal/patient specs incl. a11y 113 pass, 3 fail = pre-existing
           (`care-coordination` ×2, Control Center "Staff & teams"), plus one cold-start a11y timeout that passes alone
+  - [x] Owner: "merge and push, then rebuild the stack" — `40565e5` pushed; tunnel stack rebuilt, V77 applied, health UP.
+  - [x] Representative picker (owner request): `CaseWorkspace.representatives` (coordinator role only; in-force
+        `PATIENT_REPRESENTATIVE` links with relationship, since-date and the person's own portal display name when set —
+        no other name source exists); `RecordedDecisionRequest.representativeId` (optional; must be one of those links,
+        else `REPRESENTATIVE_NOT_AUTHORISED`; still `REPRESENTATIVE_AMBIGUOUS` with several and no pick). The form names a
+        single representative in the choice, asks "Which representative" when there are several, and offers only "The
+        patient" (with a reason) when there is none. No migration
+    - [x] verify: backend full suite 620/0 (2 skipped; +1 picker test); typecheck ok; lint 24/12; unit 348 pass, 11
+          `ProposalSign`; Playwright arabic-proposal-decision 10/10 (new en/ar picker test), portal-ux, staff-home, my-care,
+          portal-p2-pass-3, portal, workspace-case-switch, a11y 83 pass, 1 fail = pre-existing Control Center "Staff & teams"
+    - [x] screenshots: `docs/ux-redesign/screenshots/pass-3/record-decision-representative-{en,ar}-390.png`
 
 ## Decisions
 
@@ -208,7 +219,7 @@ Update at the end of every phase.
 
 Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08); the follow-up
 commit on `feat/ux-redesign-pass-3` is not merged or pushed yet. The tunnel stack runs `9e3b336` (V76); live checks must run from a network that
-reaches `*.rehletshifaa.com`. Next engineering candidates: a representative picker for recorded decisions, full
-Portal module split. The tunnel stack still runs `9e3b336`: rebuild it to get V77 and the new wording. Owner decisions
+reaches `*.rehletshifaa.com`. Next engineering candidate: the full Portal module split. The tunnel stack runs `40565e5`; the picker commit is
+not merged, pushed or deployed yet. Owner decisions
 still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
 amber tones; proposal drawer order (price first approved, recommendation-first suggestion kept in the backlog).

@@ -35,7 +35,14 @@ public final class JourneyDtos {
      */
     public record RecordedDecisionRequest(@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,@Size(max=10000)String comment,
         @NotBlank @Pattern(regexp="PHONE|WHATSAPP_CALL|VIDEO|IN_PERSON")String channel,@NotBlank @Pattern(regexp="PATIENT|REPRESENTATIVE")String confirmedBy,
-        @NotNull Instant conversationAt,boolean attested) {}
+        @NotNull Instant conversationAt,boolean attested,UUID representativeId) {
+        /** `representativeId`: which authorised representative confirmed (optional when there is exactly one). */
+        public RecordedDecisionRequest(String decision,String comment,String channel,String confirmedBy,Instant conversationAt,boolean attested){
+            this(decision,comment,channel,confirmedBy,conversationAt,attested,null);
+        }
+    }
+    /** Someone authorised to act for the case's patient right now, as the owning coordinator picks them (name when they set one). */
+    public record RepresentativeOption(UUID id,String name,String relationship,Instant since) {}
     /**
      * The assisted-decision facts of one proposal version, for the patient and the coordinator: when the patient asked for
      * the conversation, and, once decided, whether the decision was the patient's own or recorded by their coordinator.
@@ -123,7 +130,7 @@ public final class JourneyDtos {
     // Secure-delivery status of the latest released proposal notification (masked; no raw contact or token).
     public record DeliveryStatus(String status,String channel,String destinationMasked,int attempts,Instant deliveredAt,Instant nextAttemptAt) {}
     /** {@code patientAction} is the open request to the patient, so staff can see and record exactly what was asked. */
-    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions,PatientProposalState patientProposal) {}
+    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions,PatientProposalState patientProposal,List<RepresentativeOption> representatives) {}
     /**
      * The ONE answer to "can the patient see a proposal right now, and which one?" — shared by the signed-in
      * patient case page and the secure Check Case Status link. {@code state}: NONE, PREPARING, READY, ACCEPTED,

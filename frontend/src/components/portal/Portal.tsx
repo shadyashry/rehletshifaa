@@ -12,7 +12,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CoordinatorActionForm, MoreActions } from "@/components/portal/CoordinatorActions";
-import { RecordProposalDecision } from "@/components/portal/RecordProposalDecision";
+import { RecordProposalDecision, type RepresentativeOption } from "@/components/portal/RecordProposalDecision";
 import { CaseMessages } from "@/components/portal/CaseMessages";
 import type { ProposalCopy } from "@/components/portal/PatientProposal";
 import { PortalAccount, type Preferences } from "@/components/portal/PortalAccount";
@@ -61,7 +61,7 @@ type DeliveryStatus={status:string;channel:string;destinationMasked:string;attem
 type DepositComponentT={beneficiary:string;purpose:string;amountEgp:number;amountDisplay?:number;refundability:string;cancellationTerms?:string;creditedToFinal:boolean};
 type PaymentEvent={eventType:string;amountDisplay?:number;currency?:string;method?:string;provider?:string;providerReference?:string;status:string;reason?:string;occurredAt?:string};
 type DepositView={id:string;status:string;currency:string;totalEgp:number;totalDisplay?:number;paidDisplay?:number;balanceDisplay?:number;components:DepositComponentT[];events:PaymentEvent[]};
-type Workspace={preview?:boolean;intakeSummary?:string;patientAction?:{taskId:string;title:string;message?:string;blocking:boolean;dueAt?:string;items:{id:string;kind:string;code:string;label:string;required:boolean;completed:boolean;response?:string}[]}|null;caseSummary:CaseView;timeline:{type:string;label:string;occurredAt:string;status:string}[];tasks:Task[];messages:{id:string;senderRole:string;senderName?:string;direction:string;body:string;createdAt:string;internalOnly:boolean;read:boolean}[];assignments:Assignment[];clinicalReviews:Review[];proposal?:Proposal;gates?:ProposalGates|null;delivery?:DeliveryStatus|null;deposit?:DepositView|null;actions?:CaseActions|null;patientProposal?:PatientProposalState|null};
+type Workspace={preview?:boolean;intakeSummary?:string;patientAction?:{taskId:string;title:string;message?:string;blocking:boolean;dueAt?:string;items:{id:string;kind:string;code:string;label:string;required:boolean;completed:boolean;response?:string}[]}|null;caseSummary:CaseView;timeline:{type:string;label:string;occurredAt:string;status:string}[];tasks:Task[];messages:{id:string;senderRole:string;senderName?:string;direction:string;body:string;createdAt:string;internalOnly:boolean;read:boolean}[];assignments:Assignment[];clinicalReviews:Review[];proposal?:Proposal;gates?:ProposalGates|null;delivery?:DeliveryStatus|null;deposit?:DepositView|null;actions?:CaseActions|null;patientProposal?:PatientProposalState|null;representatives?:RepresentativeOption[]};
 type MutationResult={id?:string;status?:string};
 type Mutate=(path:string,body?:unknown,method?:string)=>Promise<MutationResult|undefined>;
 
@@ -522,7 +522,7 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
    busy={busy} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    onAcceptAssignment={()=>{if(!myPending)return;void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:true}).then(result=>{if(result&&isDoctor)setTab("clinical");});}}
    onDeclineAssignment={()=>setDeclineOpen(true)}
-   form={formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref} proposal={value.proposal}/>:undefined}/>
+   form={formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref} proposal={value.proposal} representatives={value.representatives}/>:undefined}/>
 
   {isCoordinator&&<CaseBlockers locale={locale} blockers={actions.blockers} deposit={value.deposit}/>}
 
@@ -608,7 +608,7 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
   {/* Recording a WhatsApp/phone answer opens its own dialog; the trigger is hidden and driven from More actions so the page carries one control per business action. */}
   {isCoordinator&&owned&&available.includes("RECORD_PATIENT_RESPONSE")&&<RecordPatientResponse locale={locale} caseId={c.id} action={value.patientAction} mutate={mutate} open={recordOpen} onOpenChange={setRecordOpen} hideTrigger/>}
   {recordDecisionOpen&&value.proposal&&<CaseDrawer locale={locale} title={work.recordDecision.title} onClose={()=>setRecordDecisionOpen(false)}>
-   <RecordProposalDecision key={value.proposal.versionId} locale={locale} caseId={c.id} proposal={value.proposal} busy={busy} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setRecordDecisionOpen(false);return result;}}/>
+   <RecordProposalDecision key={value.proposal.versionId} locale={locale} caseId={c.id} proposal={value.proposal} representatives={value.representatives} busy={busy} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setRecordDecisionOpen(false);return result;}}/>
   </CaseDrawer>}
   {proposalOpen&&<CaseDrawer locale={locale} title={t.proposal} onClose={()=>setProposalOpen(false)}>
    <div className="space-y-4">{recommendationBlock}{value.proposal&&<ProposalCard locale={locale} t={t} proposal={value.proposal}/>}{value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} caseId={c.id} versionId={value.proposal.versionId} locale={locale} busy={busy} mutate={mutate} canResend={false}/>}{value.deposit&&<DepositCard deposit={value.deposit} caseId={c.id} role={role} locale={locale} busy={busy} mutate={mutate}/>}</div>

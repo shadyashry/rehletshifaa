@@ -203,6 +203,40 @@ class AssistedProposalDecisionTest {
         assertThat(item.title()).isEqualTo("Patient declined the proposal");
     }
 
+    @Test void theCoordinatorPicksWhichAuthorisedRepresentativeConfirmed() throws Exception {
+        UUID caseId = ownedCase("+254700000815", "assist-o@local.test");
+        UUID versionId = releasedProposal(caseId);
+        UUID one = represent(caseId, "rep-picked-one", null, null);
+        UUID two = represent(caseId, "rep-picked-two", null, null);
+        UUID revoked = represent(caseId, "rep-picked-revoked", null, Instant.now().minusSeconds(60));
+        UUID otherCase = ownedCase("+254700000816", "assist-p@local.test");
+        UUID elsewhere = represent(otherCase, "rep-elsewhere", null, null);
+        jdbc.update("INSERT INTO portal_preferences(subject,display_name_encrypted,locale,updated_at) VALUES(?,?,?,?)", "rep-picked-two", crypto.encrypt("Omar Example"), "ar", Instant.now());
+        linkPatient(caseId, "patient-assist-o");
+
+        // The owning coordinator sees who may confirm: in-force links only, named when the person set a name.
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        var options = journey.workspace(caseId).representatives();
+        assertThat(options).extracting(RepresentativeOption::id).containsExactlyInAnyOrder(one, two);
+        assertThat(options).filteredOn(o -> o.id().equals(two)).first().satisfies(o -> {
+            assertThat(o.name()).isEqualTo("Omar Example");
+            assertThat(o.relationship()).isEqualTo("PARENT");
+            assertThat(o.since()).isNotNull();
+        });
+        // A revoked link, or another patient's representative, cannot be named as the one who confirmed.
+        assertCode("REPRESENTATIVE_NOT_AUTHORISED", () -> assistance.recordDecision(caseId, versionId,
+                new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "REPRESENTATIVE", Instant.now(), true, revoked)));
+        assertCode("REPRESENTATIVE_NOT_AUTHORISED", () -> assistance.recordDecision(caseId, versionId,
+                new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "REPRESENTATIVE", Instant.now(), true, elsewhere)));
+        assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "REPRESENTATIVE", Instant.now(), true, two));
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT confirmed_representative_subject FROM proposal_decisions WHERE proposal_version_id=?", String.class, versionId)).isEqualTo("rep-picked-two");
+
+        // The patient's own page never lists the people who may act for them.
+        authenticate("patient-assist-o", Role.PATIENT);
+        assertThat(journey.workspace(caseId).representatives()).isEmpty();
+    }
+
     @Test void anotherCasesVersionCannotBeRecordedOrRequestedThroughThisCase() throws Exception {
         UUID caseA = ownedCase("+254700000807", "assist-g@local.test");
         UUID caseB = ownedCase("+254700000808", "assist-h@local.test");
@@ -340,11 +374,13 @@ class AssistedProposalDecisionTest {
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", subject, caseId);
     }
 
-    private void represent(UUID caseId, String subject, Instant expiresAt, Instant revokedAt) {
+    private UUID represent(UUID caseId, String subject, Instant expiresAt, Instant revokedAt) {
         Instant now = Instant.now();
+        UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO patient_representatives(id,patient_id,representative_subject,relationship,permissions,effective_from,expires_at,revoked_at,created_at) "
                         + "SELECT ?,patient_id,?,'PARENT','VIEW,MESSAGE,COORDINATE',?,?,?,? FROM medical_cases WHERE id=?",
-                UUID.randomUUID(), subject, now.minusSeconds(3600), expiresAt, revokedAt, now, caseId);
+                id, subject, now.minusSeconds(3600), expiresAt, revokedAt, now, caseId);
+        return id;
     }
 
     private void seedCoordinatorProfile() {

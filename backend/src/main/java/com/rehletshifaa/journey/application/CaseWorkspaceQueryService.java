@@ -19,6 +19,8 @@ import com.rehletshifaa.journey.api.JourneyDtos.CostEstimateItem;
 import com.rehletshifaa.journey.api.JourneyDtos.DeliveryStatus;
 import com.rehletshifaa.journey.api.JourneyDtos.MessageView;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalView;
+import com.rehletshifaa.journey.api.JourneyDtos.RepresentativeOption;
+import com.rehletshifaa.journey.infrastructure.PortalPreferenceRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.TaskView;
 import com.rehletshifaa.journey.api.JourneyDtos.TimelineEvent;
 import com.rehletshifaa.journey.infrastructure.CaseMessageRepository;
@@ -76,6 +78,7 @@ public class CaseWorkspaceQueryService {
     private final ProposalAccessService proposalAccess;
     private final CurrencyService currency;
     private final CryptoService crypto;
+    private final PortalPreferenceRepository preferences;
     private final Clock clock;
 
     public CaseWorkspaceQueryService(Authority authority, CaseActionService caseActions, JourneyCaseQueryService caseQueries,
@@ -83,11 +86,11 @@ public class CaseWorkspaceQueryService {
                                      CaseTaskRepository tasks, CaseMessageRepository messages, CaseAssignmentRepository assignments,
                                      ClinicalReviewVersionRepository reviews, ClinicalReviewCostEstimateRepository estimates,
                                      DepositQueryService deposits, PatientActionQueryService patientActions, ProposalAccessService proposalAccess,
-                                     CurrencyService currency, CryptoService crypto, Clock clock) {
+                                     CurrencyService currency, CryptoService crypto, PortalPreferenceRepository preferences, Clock clock) {
         this.authority = authority; this.caseActions = caseActions; this.caseQueries = caseQueries; this.proposals = proposals;
         this.cases = cases; this.statusHistory = statusHistory; this.tasks = tasks; this.messages = messages; this.assignments = assignments;
         this.reviews = reviews; this.estimates = estimates; this.deposits = deposits; this.patientActions = patientActions;
-        this.proposalAccess = proposalAccess; this.currency = currency; this.crypto = crypto; this.clock = clock;
+        this.proposalAccess = proposalAccess; this.currency = currency; this.crypto = crypto; this.preferences = preferences; this.clock = clock;
     }
 
     /** Threads follow the relationship that authorized the request (Section 1.1), never a union of populations. */
@@ -130,7 +133,20 @@ public class CaseWorkspaceQueryService {
         DeliveryStatus delivery = latest != null && DELIVERED_STATUSES.contains(latest.status()) ? proposals.deliveryStatus(latest.versionId()) : null;
         return new CaseWorkspace(summary, timeline, taskViews, messageViews, assignmentViews, reviewViews, latest, proposals.gates(caseId, latest),
                 delivery, deposits.depositForCase(caseId), cases.findConditionDescription(caseId).orElse(null), patientActions.openAction(caseId),
-                actions, proposalAccess.state(caseId));
+                actions, proposalAccess.state(caseId), actor.role() == Role.COORDINATOR ? representatives(caseId) : List.of());
+    }
+
+    /**
+     * Who may confirm a decision for the patient, for the coordinator recording one: in-force PATIENT_REPRESENTATIVE links,
+     * named by the display name the person chose when there is one. Nobody else on the case is shown this list.
+     */
+    private List<RepresentativeOption> representatives(UUID caseId) {
+        var links = cases.findAuthorisedRepresentativesOf(caseId, clock.instant());
+        if (links.isEmpty()) return List.of();
+        Map<String, String> names = new HashMap<>();
+        preferences.findAllById(links.stream().map(MedicalCaseRepository.AuthorisedRepresentativeRow::getSubject).distinct().toList())
+                .forEach(p -> { if (p.getDisplayNameEncrypted() != null) names.put(p.getId(), crypto.decrypt(p.getDisplayNameEncrypted())); });
+        return links.stream().map(l -> new RepresentativeOption(l.getId(), names.get(l.getSubject()), l.getRelationship(), l.getSince())).toList();
     }
 
     /** Open work owned by the subject: most urgent first, then soonest due (undated last), then oldest. */

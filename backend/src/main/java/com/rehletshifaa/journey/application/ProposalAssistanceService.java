@@ -100,21 +100,25 @@ public class ProposalAssistanceService {
             throw new ApiException(400, "NOTE_REQUIRED", "Say what the patient wants changed");
         if (request.conversationAt().isAfter(clock.instant().plus(SKEW)))
             throw new ApiException(400, "CONVERSATION_IN_FUTURE", "The conversation time cannot be in the future");
-        String representative = "REPRESENTATIVE".equals(request.confirmedBy()) ? authorisedRepresentative(caseId) : null;
+        String representative = "REPRESENTATIVE".equals(request.confirmedBy()) ? authorisedRepresentative(caseId, request.representativeId()) : null;
         return journeys.applyRecordedDecision(caseId, versionId, request, representative, actor);
     }
 
     /**
-     * The one PATIENT_REPRESENTATIVE link in force for the case's patient. Who submitted the case, or how they described
-     * themselves, authorises nothing; with several representatives the record could not say which one confirmed.
+     * The PATIENT_REPRESENTATIVE link in force for the case's patient that confirmed: the one the coordinator picked, or the
+     * only one. Who submitted the case, or how they described themselves, authorises nothing; with several representatives
+     * and no pick the record could not say which one confirmed.
      */
-    private String authorisedRepresentative(UUID caseId) {
-        var subjects = cases.findAuthorisedRepresentativesOf(caseId, clock.instant());
-        if (subjects.isEmpty())
+    private String authorisedRepresentative(UUID caseId, UUID picked) {
+        var links = cases.findAuthorisedRepresentativesOf(caseId, clock.instant());
+        if (picked != null)
+            return links.stream().filter(link -> picked.equals(link.getId())).findFirst().map(MedicalCaseRepository.AuthorisedRepresentativeRow::getSubject)
+                    .orElseThrow(() -> new ApiException(409, "REPRESENTATIVE_NOT_AUTHORISED", "This person is not authorised to act for this patient"));
+        if (links.isEmpty())
             throw new ApiException(409, "REPRESENTATIVE_NOT_AUTHORISED", "Nobody is authorised to act for this patient");
-        if (subjects.size() > 1)
-            throw new ApiException(409, "REPRESENTATIVE_AMBIGUOUS", "Several people are authorised to act for this patient, so the record cannot say which one confirmed");
-        return subjects.get(0);
+        if (links.size() > 1)
+            throw new ApiException(409, "REPRESENTATIVE_AMBIGUOUS", "Several people are authorised to act for this patient: choose who confirmed");
+        return links.get(0).getSubject();
     }
 
     /** Opens the request and the coordinator's work item once per version; false when it already existed. */

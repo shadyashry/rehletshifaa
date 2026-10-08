@@ -6,7 +6,7 @@ import { ClipboardList, Handshake, Link2, MessageSquareText, Plane, Send, UserRo
 import type { Locale } from "@/lib/i18n";
 import { EligibleConsultantPicker, ReferralConfirmation, type Load } from "@/components/portal/ConsultantRouting";
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import { RecordProposalDecision, type RecordableProposal } from "@/components/portal/RecordProposalDecision";
+import { RecordProposalDecision, type RecordableProposal, type RepresentativeOption } from "@/components/portal/RecordProposalDecision";
 import { careAreaLabel, fillTemplate } from "@/lib/portal-labels";
 
 type CareCategory = { slug: string; nameEn: string; nameAr: string };
@@ -20,19 +20,21 @@ type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown
  * second card further down the page. Every other step either lives in its own panel (the proposal) or is somebody
  * else's move.
  */
-export function CoordinatorActionForm({ locale, code, caseId, version, careCategory, categories, staff, busy, mutate, load, consultantsHref, proposal }: {
+export function CoordinatorActionForm({ locale, code, caseId, version, careCategory, categories, staff, busy, mutate, load, consultantsHref, proposal, representatives }: {
   locale: Locale; code: string; caseId: string; version: number; careCategory?: string;
   categories: CareCategory[]; staff: StaffMember[]; busy: boolean; mutate: Mutate; load: Load;
   /** The Control Center's Consultants page, for people who can open it; the next step when nobody is eligible. */
   consultantsHref?: string | null;
   /** The released proposal whose decision is recorded (RECORD_PROPOSAL_DECISION). */
   proposal?: RecordableProposal | null;
+  /** Who may confirm a decision for the patient (only the owning coordinator receives this list). */
+  representatives?: RepresentativeOption[];
 }) {
   const ar = locale === "ar";
   const work = useWorkCopy();
   if (code === "RECORD_PROPOSAL_DECISION" && proposal)
     return <ActionFormShell id="case-actions" busy={busy} title={work.recordDecision.title} hint={work.recordDecision.hint}>
-      <RecordProposalDecision key={proposal.versionId} locale={locale} caseId={caseId} proposal={proposal} busy={busy} mutate={mutate}/>
+      <RecordProposalDecision key={proposal.versionId} locale={locale} caseId={caseId} proposal={proposal} representatives={representatives} busy={busy} mutate={mutate}/>
     </ActionFormShell>;
   if (code === "ASSIGN_CONSULTANT")
     return <ActionFormShell id="case-actions" busy={busy} title={work.assignConsultant.title} hint={work.assignConsultant.hint}>
