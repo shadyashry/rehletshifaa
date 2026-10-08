@@ -36,7 +36,7 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 | Done (pass 1) | Plurals are wrong ("1 cases", "1 work items", "1 documents"). Use `Intl.PluralRules`. | PC | `CaseQueue.tsx`, `MyWork.tsx`, `Portal.tsx` | clarify |
 | Done (pass 1) | Raw enum values reach the screen ("NORMAL", "cardiology"). Map them to words in both locales. | PC | `CaseQueue.tsx`, `MyWork.tsx`, `CurrentAction.tsx` | clarify |
 | Done (pass 2) | "Assign a verified consultant" breaks the never-say-"Verified" rule and the capital C in "Consultant". | PC | `Portal.tsx` / `ConsultantRouting.tsx` | clarify |
-| P2 | The case number is repeated as the title when there is no patient name. | PC | `CaseQueue.tsx` | clarify |
+| Done (run 2: the case number is the title only when there is no name, and is not repeated) | The case number is repeated as the title when there is no patient name. | PC | `CaseQueue.tsx` | clarify |
 | Done (pass 2) | "Assign consultant" only scrolls to a second "Confirm assignment" panel, so there are two controls for one job. | PC | `CoordinatorActions.tsx`, `ConsultantRouting.tsx` | distill |
 | Done (pass 2) | "No eligible Consultant" is a dead end. Add a next step (escalate or request staffing). | PC | `ConsultantRouting.tsx` | onboard / harden |
 
@@ -146,11 +146,11 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | Done (GATE 2, `--color-ink-350`) | Text-field borders are `--color-line-strong` (1.66:1 on white), below the 3:1 non-text contrast WCAG 1.4.11 requires. Token decision at GATE 2. | Tokens | `app/globals.css` `.field`, `theme-petrol.css` | polish |
 | Done (pass 2) | A hard-coded English `aria-label="Confirmed arrival"` overrides the Arabic label (label-in-name). | AU, WG | `CaseWorkflowActions.tsx:16` | clarify |
 | P2 | Broken unread-badge names ("Messages1 unread"). The staff Messages badge shows the total, not the unread count. Unread notifications and overdue tasks are shown by colour only. | AU, WG | `PatientNav.tsx:30`, `MyCare.tsx:55/212`, `Portal.tsx:402/603`, `NotificationBell.tsx:101` | harden |
-| P2 | Tablist arrow keys don't flip in RTL (ArrowLeft jumps to the far tab), and Home/End are missing. | AU, WG | `Portal.tsx:260/424`, `CaseQueue.tsx:143` | adapt |
+| Done (run 2: `tabKeyTarget` flips arrows in RTL and adds Home/End on every portal tablist) | Tablist arrow keys don't flip in RTL (ArrowLeft jumps to the far tab), and Home/End are missing. | AU, WG | `Portal.tsx:260/424`, `CaseQueue.tsx:143` | adapt |
 | P2 | My Care card titles are `<p>`, not headings. `CaseMessages` puts an h3 under the h1 (axe heading-order in en and ar). | AU | `MyCare.tsx:147/187/202/219`, `CaseMessages.tsx:18` | harden |
 | P2 | Tap targets: copy button 13px, chip remove about 17px, row checkboxes 16px, `!min-h-9` (36px) buttons, tabs 40–41px, "Back to dashboard" 33px. | AU, WG | `CaseQueue.tsx:179/206/253-297`, `Portal.tsx:212/378/531` | adapt |
 | P2 | The coordinator lock is `pointer-events-none opacity-50` only, so the release buttons stay keyboard-operable. | AU | `Portal.tsx:310` | harden |
-| P2 | Zero-value dashboard tiles are `disabled` at 0.55 opacity (about 2.6:1). | AU | `RoleDashboardSummary.tsx:69` | polish |
+| Done (pass 2: the count line replaced the tiles; zero counts are omitted) | Zero-value dashboard tiles are `disabled` at 0.55 opacity (about 2.6:1). | AU | `RoleDashboardSummary.tsx:69` | polish |
 | P2 | Repeated "Open/View/Download" buttons with no item context. Role-switcher active state is shown by styling only. `role="dialog"` on the inline `AccountLinkRequest` card. A focusable "disabled" mailto. | WG | `MyWork.tsx:87`, `CaseQueue.tsx:256`, `Portal.tsx:208/682`, `AccountLinkRequest.tsx:84` | harden |
 | P3 | Popovers with `role="dialog"` don't move focus. The result-count live region re-announces on every keystroke. Smooth scroll ignores reduced motion. "✓/♥" glyphs are read aloud. No new-tab notice. | AU, WG | `CaseQueue.tsx:164/223`, `NotificationBell.tsx:79`, `Portal.tsx:194/336`, `PortalAccount.tsx:95` | harden |
 
@@ -158,9 +158,9 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P2 | `tracking-[0.08–0.1em]` and `uppercase` on Arabic micro-labels (computed 1.15px letter-spacing on "الخطوة الحالية"). Add an RTL reset or use `.eyebrow`. | AU, WG | `MyCare.tsx:95/147/187/202/219`, `Portal.tsx:434-612`, `CurrentAction.tsx:45`, `JourneySnapshot.tsx:28`, `MyWork.tsx:108`, `PortalAccount.tsx:62` | typeset |
+| Partly done (`CurrentAction`, `JourneySnapshot` reset in RTL; `MyCare` kickers, `AssignmentHistory`, `CaseBlockers`, `ClinicalReview` h4s still track in Arabic) — P2 | `tracking-[0.08–0.1em]` and `uppercase` on Arabic micro-labels (computed 1.15px letter-spacing on "الخطوة الحالية"). Add an RTL reset or use `.eyebrow`. | AU, WG | `MyCare.tsx:95/147/187/202/219`, `Portal.tsx:434-612`, `CurrentAction.tsx:45`, `JourneySnapshot.tsx:28`, `MyWork.tsx:108`, `PortalAccount.tsx:62` | typeset |
 | P2 | `dir="ltr"` on Arabic money blocks flips alignment and digit order. Wrap only the figure in `<bdi>`. | AU, WG | `MyCare.tsx:148/155/188` | adapt |
-| P2 | Care-area labels: two local maps cover 3 of 9 areas, disagree with each other, and fall back to English slugs on Arabic pages. Use one shared source. | AU, WG | `MyCare.tsx:349`, `Portal.tsx:763`, `MyWork.tsx:72` | clarify |
+| Partly done (staff views share `careAreaLabel`; `MyCare.tsx` `careArea` keeps its own 3-area map) — P2 | Care-area labels: two local maps cover 3 of 9 areas, disagree with each other, and fall back to English slugs on Arabic pages. Use one shared source. | AU, WG | `MyCare.tsx:349`, `Portal.tsx:763`, `MyWork.tsx:72` | clarify |
 | P2 | One total is formatted with 0 and 2 decimals in different places. Use one shared money formatter. | WG, AU | `Portal.tsx:517/717/760`, `MyCare.tsx`, `ClinicalReview.tsx` | clarify |
 | P2 | Date of birth is parsed as UTC midnight, so it shows the previous day west of UTC. | WG | `PortalAccount.tsx:67` | harden |
 | P3 | Dates without a year; raw FX rate and ISO date; hard-coded "KB/MB"; English "Bank" placeholder and English error fallbacks in the Arabic UI; the wrong-account case detected by an English regex; Arabic IME Enter not guarded. | WG, AU | `CaseQueue.tsx:286`, `Portal.tsx:665/727/764`, `PortalDirectories.tsx:10`, `AccountLinkRequest.tsx:68`, `RequestInformationDialog.tsx:132` | clarify |
@@ -170,8 +170,8 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
 | P2 | Status, priority and attention chips and the journey "blocked" state use Tailwind amber, emerald, sky and stone colours with rounded-full pills. Map them to the status tokens (GATE 2) and the 8px badge. | AU | `Portal.tsx:768`, `CaseQueue.tsx:54-62`, `MyWork.tsx:64/103`, `JourneySnapshot.tsx:36-56` | colorize / polish |
-| P2 | The deposit panel uses `sand-50/200` (not remapped by petrol), and the current step fills with `brand-50`. Both break the Two Surfaces rule. | AU | `MyCare.tsx:94/146` | polish |
-| P2 | A filled petrol "Open" on every queue row and work card (up to 12 per page) breaks the One Action rule. | AU | `CaseQueue.tsx:256`, `MyWork.tsx:87` | quieter |
+| Done (pass 2 sweep: no `sand-*` or `brand-50` fill left in `MyCare.tsx`) | The deposit panel uses `sand-50/200` (not remapped by petrol), and the current step fills with `brand-50`. Both break the Two Surfaces rule. | AU | `MyCare.tsx:94/146` | polish |
+| Partly done (pass 2: queue Open is secondary, My work has one filled lead item and quiet links; Claim/Accept on a queue row stay filled) — P3 | A filled petrol "Open" on every queue row and work card (up to 12 per page) breaks the One Action rule. | AU | `CaseQueue.tsx:256`, `MyWork.tsx:87` | quieter |
 | P3 | `PortalFrame` uses a gradient with a hard-coded `#fff`; old-palette `rgba(28,51,58)` shadows; `shadow-xl`/`rounded-2xl` popovers. | AU | `Portal.tsx:236`, `CurrentAction.tsx:43`, `PortalAccount.tsx:49`, `NotificationBell.tsx:80`, `CaseQueue.tsx:165` | polish |
 
 ### Performance and code structure
@@ -218,7 +218,7 @@ The items below are deferred.
 | P2 | `.field:focus { outline: 0 }` replaces the 3px ring with a 1px border change and a 1.26:1 halo. | PM | `app/globals.css` | polish |
 | Done (pass 2) | Decline uses `window.confirm` over the modal (browser-language buttons, no consequence text). Use an in-drawer confirm step in en and ar. | WG | `PatientProposal.tsx` | harden |
 | Done | Done in Phase 6 polish: the drawer returns focus to the control that opened it. | RB, WG | `Portal.tsx` `CaseDrawer` | harden |
-| P2 | `<fieldset disabled={busy}>` dims the whole document and drops focus while sending, with no "Sending…" label. This is the same root cause as the portal P1. | WG, PM, RB | `Portal.tsx:368` | harden |
+| Done (pass 2: the workspace fieldset is gone; the ask button reads "Sending…" while busy) | `<fieldset disabled={busy}>` dims the whole document and drops focus while sending, with no "Sending…" label. This is the same root cause as the portal P1. | WG, PM, RB | `Portal.tsx:368` | harden |
 | P2 | The primary is disabled until the box is ticked, with no reason that keyboard or screen-reader users can reach. | WG, PM | `PatientProposal.tsx` | harden |
 | P2 | Optional items are priced but excluded from the total and can't be selected, and nothing says so. | WG | `PatientProposal.tsx` | clarify |
 | Done (pass 2) | The Arabic blocked note asks the patient to switch to English but has no direct link to the same view in `/en`. | WG | `PatientProposal.tsx` | harden |
@@ -370,4 +370,4 @@ One independent read-only review ran over `a9eee09`…`ed57af3`. Fixed in `fix(p
 | P2 | Leaving the case ("My dashboard") still discards typed drafts. Add a dirty-form warning. | Plan | `Portal.tsx` | harden |
 | P3 | The overview and clinical tabs stay mounted, so a Consultant's referral and eligibility reads run on every case open. Mount the clinical tab on its first visit and keep it mounted afterwards. | Review | `Portal.tsx` | optimize |
 | P3 | A full patient/staff module split of `Portal.tsx` (role panels are lazy now). | RB | `Portal.tsx` | optimize |
-| P3 | `mutate` returns the same value for a failure and for a call skipped while another runs. | RB | `Portal.tsx` | harden |
+| Duplicate of the P3 under "Arabic proposal decision" | `mutate` returns the same value for a failure and for a call skipped while another runs. | RB | `Portal.tsx` | harden |

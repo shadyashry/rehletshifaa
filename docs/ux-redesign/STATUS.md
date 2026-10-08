@@ -97,6 +97,14 @@ Update at the end of every phase.
         inside drawers, drafts survive tab switches, per-case bulk outcomes, labels; unit 342 pass (11 `ProposalSign`),
         `portal-reliability` e2e 3/3, portal-ux only the pre-existing Control Center failure
 
+- [ ] **Pass 3** (branch `feat/ux-redesign-pass-3` from `codex/platform-control-plane` @ `881c3d6`)
+  - Environment check (read-only, 2026-10-08): the tunnel stack is **not** on pass 2. The running backend image was built
+    2026-10-07 10:26 and `flyway_schema_history` ends at V73 (no V74 `assisted_proposal_decisions`). Pass 3 relies on
+    tests and mocked fixtures only; the stack needs a rebuild from `codex/platform-control-plane` before any live check.
+  - [x] Step 1 backlog tidy: 9 rows re-checked against code — done: case number title, RTL tablist keys, zero tiles,
+        deposit-panel washes, proposal fieldset; partly done with notes: Arabic micro-label tracking, care-area labels
+        (MyCare keeps a local map), filled row actions (Claim/Accept stay filled); a duplicate `mutate` row merged
+
 ## Decisions
 
 | Date | Decision | By |
@@ -136,6 +144,7 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Owner decisions still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens
-(B1) for the amber tones. Next engineering candidates: per-case representative relation (backend), dirty-form warning
-when leaving a case, full Portal module split. Pass 2 merged (fast-forward) into `codex/platform-control-plane` on 2026-10-08 at the owner's request; not pushed.
+Pass 3 step 2: per-case viewer relation (SELF / REPRESENTATIVE / STAFF) on the case workspace/actions view, tests first;
+then use it in Portal.tsx/MyCare and require an authorised representative in ProposalAssistanceService. Owner decisions
+still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
+amber tones; proposal drawer order (price first approved, recommendation-first suggestion kept in the backlog).
