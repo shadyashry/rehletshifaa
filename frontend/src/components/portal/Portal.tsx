@@ -5,35 +5,30 @@ import { useVirtualClinics, virtualClinicHref } from "@/components/virtual-clini
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { ReauthenticationReturnNotice } from "@/components/ReauthenticationNotices";
 import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { MessageSquare, MoreHorizontal, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CoordinatorActionForm, MoreActions } from "@/components/portal/CoordinatorActions";
-import { RecordPatientResponse } from "@/components/portal/RecordPatientResponse";
 import { RecordProposalDecision } from "@/components/portal/RecordProposalDecision";
 import { CaseMessages } from "@/components/portal/CaseMessages";
-import { PatientProposal, PatientProposalDecision, type ProposalCopy } from "@/components/portal/PatientProposal";
+import type { ProposalCopy } from "@/components/portal/PatientProposal";
 import { PortalAccount, type Preferences } from "@/components/portal/PortalAccount";
 import { RoleDashboardSummary, matchesKpi } from "@/components/portal/RoleDashboardSummary";
 import { CaseQueue, initialQueue, ownershipTab, type QueueState } from "@/components/portal/CaseQueue";
 import { StaffNav, StaffViewLinks, type StaffViewId, type StaffViewItem } from "@/components/portal/StaffNav";
 import { JourneyPulse, FullJourneyDialog } from "@/components/portal/JourneySnapshot";
 import { CurrentActionPanel, type CaseActions } from "@/components/portal/CurrentAction";
-import { ClinicalReviewPanel } from "@/components/portal/ClinicalReview";
-import { DeclineAssignmentDialog } from "@/components/portal/DeclineAssignmentDialog";
-import { MyCare, type CareView, type PatientProposalState } from "@/components/portal/MyCare";
-import { PatientIdentityStep } from "@/components/portal/PatientIdentityStep";
+import type { CareView, PatientProposalState } from "@/components/portal/MyCare";
 import { PatientNav } from "@/components/portal/PatientNav";
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
 import { MyWork, type WorkItem } from "@/components/portal/MyWork";
 import { WorkCopyProvider, useWorkCopy } from "@/components/portal/portal-copy";
 import { careAreaLabel, coordinatorLabel, tabKeyTarget, waitingLabel, type WorkCopy } from "@/lib/portal-labels";
-import { TransferOwnership } from "@/components/portal/TransferOwnership";
 import { AssignmentHistory, type AssignmentHistoryEntry } from "@/components/portal/AssignmentHistory";
 import { NotificationBell } from "@/components/portal/NotificationBell";
-import { AccountLinkRequest } from "@/components/portal/AccountLinkRequest";
 import { ccHref } from "@/components/platform-control-center/control-center-nav";
 import { useControlCenterEntry } from "@/components/platform-control-center/ControlCenterNavigation";
 import type { Locale } from "@/lib/i18n";
@@ -85,6 +80,17 @@ const copy={
 };
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
+// Role-specific panels, loaded on demand: a coordinator never downloads My Care, a patient never the clinical review.
+const MyCare=dynamic(()=>import("@/components/portal/MyCare").then(m=>m.MyCare));
+const PatientIdentityStep=dynamic(()=>import("@/components/portal/PatientIdentityStep").then(m=>m.PatientIdentityStep));
+const AccountLinkRequest=dynamic(()=>import("@/components/portal/AccountLinkRequest").then(m=>m.AccountLinkRequest));
+const PatientProposal=dynamic(()=>import("@/components/portal/PatientProposal").then(m=>m.PatientProposal));
+const PatientProposalDecision=dynamic(()=>import("@/components/portal/PatientProposal").then(m=>m.PatientProposalDecision));
+const ClinicalReviewPanel=dynamic(()=>import("@/components/portal/ClinicalReview").then(m=>m.ClinicalReviewPanel));
+const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAssignmentDialog").then(m=>m.DeclineAssignmentDialog));
+const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnership").then(m=>m.TransferOwnership));
+const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatientResponse").then(m=>m.RecordPatientResponse));
+
 /**
  * The page's success and error messages, also shown inside an open drawer: a modal dialog makes the page banner inert and
  * unseen, so a drawer action would otherwise end with no visible result. A drawer clears them when it opens, so it only
@@ -98,6 +104,12 @@ export function Portal({workCopy,...props}:{locale:Locale;proposalCopy:ProposalC
 
 function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCopy}){
   const t=copy[locale];const work=useWorkCopy();const{user,me,loading,signIn,signOut,refreshMe}=useAuth();
+  // Silent token renewal hands over a new User object every few minutes. Everything keyed on `api` (the queue load,
+  // reference data, polling) must not restart for that, so `api` follows the signed-in subject and reads the current
+  // token from a ref kept in step before any data effect runs.
+  const signedInSubject=user?.profile.sub;
+  const accessToken=useRef<string|undefined>(undefined);
+  useLayoutEffect(()=>{accessToken.current=user?.access_token;},[user]);
   // Case workspaces come from /api/v1/me. Control Center work lives in the Control Center: an account with only that
   // lands there directly; everyone else reaches it from the account menu. A signed-in account with no workforce
   // workspace is a patient-side account: it opens My Care, where the account is bound to its patient record.
@@ -123,7 +135,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const [documentError,setDocumentError]=useState(false);const [queueLoading,setQueueLoading]=useState(true);const [queueFor,setQueueFor]=useState<string|null>(null);const [landedRole,setLandedRole]=useState<string|null>(null);
   const currentRole=active&&available.includes(active)?active:available[0];
   useEffect(()=>{const selected=new URLSearchParams(window.location.search).get("role") as RoleKey;if(available.includes(selected))setActive(selected);},[available]);
-  const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{if(!user)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(user.access_token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){await requestReauthentication(signIn);throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[user,t.error,signIn]);
+  const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){await requestReauthentication(signIn);throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn]);
   const refresh=useCallback(async()=>{if(!currentRole||["admin","identity"].includes(currentRole))return;setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}},[currentRole,api,t.error]);
   const loadAssignmentHistory=useCallback((caseId:string)=>api<AssignmentHistoryEntry[]>(`/coordinator/cases/${caseId}/assignment-history`),[api]);
   useEffect(()=>{if(!user)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[user,api]);
@@ -151,7 +163,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   useEffect(()=>{if(currentRole!=="doctor")return;void api<DoctorProfile>("/doctor/me").then(setDoctorProfile).catch(()=>setDoctorProfile(null));void api<CatalogService[]>("/doctor/catalog").then(setCatalog).catch(()=>setCatalog([]));void api<FxRate[]>("/doctor/fx-rates").then(setFxRates).catch(()=>setFxRates([]));},[currentRole,api]);
   useEffect(()=>{if(currentRole!=="coordinator")return;void api<StaffProfile>("/coordinator/me").then(setCoordinatorProfile).catch(()=>setCoordinatorProfile(null));},[currentRole,api]);
   useEffect(()=>{if(currentRole!=="coordinator")return;void api<VerifiedDoctor[]>("/coordinator/doctors").then(setDoctors).catch(()=>setDoctors([]));void api<CareCategory[]>("/coordinator/care-categories").then(setCategories).catch(()=>setCategories([]));void api<FxRate[]>("/coordinator/fx-rates").then(setFxRates).catch(()=>setFxRates([]));void Promise.all([api<StaffMember[]>("/coordinator/staff?role=COORDINATOR"),api<StaffMember[]>("/coordinator/staff?role=OPERATIONS"),api<StaffMember[]>("/coordinator/staff?role=FINANCE")]).then(rows=>setStaff(rows.flat())).catch(()=>setStaff([]));},[currentRole,api]);
-  async function openCase(item:CaseView){
+  async function openCase(item:CaseView,preloaded?:Workspace){
     // While /me reloads there is no role yet; a role-scoped URL would read /undefined/cases/….
     if(!currentRole)return;
     const request=++opening.current;setBusy(true);setError("");setDocumentError(false);
@@ -161,9 +173,9 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
         const preview=await api<{caseSummary:CaseView;intakeSummary?:string}>(`/coordinator/cases/${item.id}/intake-preview`);
         if(request===opening.current){setWorkspace({...preview,preview:true,timeline:[],tasks:[],messages:[],assignments:[],clinicalReviews:[]});setDocuments([]);try{const docs=await api<CaseDocument[]>(`/cases/${item.id}/documents`);if(request===opening.current)setDocuments(docs);}catch{if(request===opening.current)setDocumentError(true);}}
       }else{
-        const ws=await api<Workspace>(`/${currentRole}/cases/${item.id}`);
-        if(request!==opening.current)return;setWorkspace(ws);setDocuments([]);
-        try{const docs=await api<CaseDocument[]>(`/cases/${item.id}/documents`);if(request===opening.current)setDocuments(docs);}catch{if(request===opening.current)setDocumentError(true);}
+        const [ws,docs]=await Promise.all([preloaded??api<Workspace>(`/${currentRole}/cases/${item.id}`),
+          api<CaseDocument[]>(`/cases/${item.id}/documents`).then(rows=>({rows,failed:false}),()=>({rows:[] as CaseDocument[],failed:true}))]);
+        if(request!==opening.current)return;setWorkspace(ws);setDocuments(docs.rows);if(docs.failed)setDocumentError(true);
       }
       if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);window.history.replaceState({},"",url);if(!workspace)requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());}
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}
@@ -177,7 +189,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     // exactly like a queued case: workspace and documents together. A consultant must never be asked to
     // accept or review an assignment without the patient's file in front of them.
     if(!currentRole)return;
-    try{const ws=await api<Workspace>(`/${currentRole}/cases/${caseId}`);await openCase(ws.caseSummary);}
+    try{const ws=await api<Workspace>(`/${currentRole}/cases/${caseId}`);await openCase(ws.caseSummary,ws);}
     catch(e){setError(e instanceof Error?e.message:t.error);}
   }
   function backToQueue(){opening.current++;setWorkspace(null);setError("");setNotice("");const url=new URL(window.location.href);url.searchParams.delete("case");window.history.replaceState({},"",url);requestAnimationFrame(()=>window.scrollTo({top:queuePosition.current,behavior:"instant"}));}
@@ -201,8 +213,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   async function mutate(path:string,body?:unknown,method="POST"):Promise<MutationResult|undefined>{
     if(mutationPending.current)return;mutationPending.current=true;setBusy(true);setError("");setNotice("");
     try{const result=await api<MutationResult>(path,{method,body:body===undefined?undefined:JSON.stringify(body)});setNotice(t.success);
-      await refresh();
-      if(workspace)await openCase(path.endsWith("/claim")?{...workspace.caseSummary,coordinatorSubject:user?.profile.sub}:workspace.caseSummary);
+      await Promise.all([refresh(),workspace?openCase(path.endsWith("/claim")?{...workspace.caseSummary,coordinatorSubject:user?.profile.sub}:workspace.caseSummary):undefined]);
       return result??{status:"SAVED"};
     }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);await refreshAfterRejectedAction(path,workspace,refresh,openCase);setError(message);return undefined;}
     finally{mutationPending.current=false;setBusy(false);}
