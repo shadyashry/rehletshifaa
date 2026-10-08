@@ -46,7 +46,7 @@ Update at the end of every phase.
   - [x] **GATE 5**: owner chose to merge directly (no PR) — `feat/ux-redesign` merged into `codex/platform-control-plane`
         as `06daa8e` and pushed (2026-10-08); `PR_DESCRIPTION.md` stays as the change summary
 
-- [ ] **Pass 2** (branch `feat/ux-redesign-pass-2` from `codex/platform-control-plane` @ `5f0b887`)
+- [x] **Pass 2** (branch `feat/ux-redesign-pass-2` from `codex/platform-control-plane` @ `5f0b887`)
   - [x] Step 1 shape: `plans/arabic-proposal-decision.md`. Findings: no backend path for a coordinator to record
         a proposal decision (`RecordPatientResponse` covers information requests only); the Arabic block applies to the
         portal drawer only — the secure link (`ProposalSign`) and activation deposit consent are not gated. Needs a
@@ -112,6 +112,7 @@ Update at the end of every phase.
 | 2026-10-08 | GATE 5 follow-ups: the Arabic proposal path becomes **coordinator-mediated** (Arabic page offers a coordinator who goes through the terms in Arabic and records the decision; Decline de-emphasised while Accept is blocked) — needs its own shape plan. **Next `/redesign-area` run: staff home distill** (stat tiles, toolbar, slim footer, staff nav; fold in the duplicated Assign Consultant action). PR description to be revised before opening. | Owner |
 | 2026-10-08 | GATE P2-1: `plans/arabic-proposal-decision.md` **approved**. O1: the coordinator-mediated rule covers every Arabic surface relying on the deposit/refund/cancellation terms (portal drawer and secure link; activation per legal L2). O2: keep a quiet "decide on the English page" link. O3: only the owning coordinator records a decision on the patient's behalf. Legal L1–L5 open; Arabic terms approval stays a launch blocker. | Owner |
 | 2026-10-08 | GATE P2-2: `plans/staff-home.md` **approved**. S1: remove the queue List/Cards toggle. S2: the slim footer replaces the marketing footer on all `/portal` routes (patients included). S3: Arabic "مهامي" for My work (pending native sign-off). | Owner |
+| 2026-10-08 | Owner: "commit and merge all" — pass 2 (`d09a3ad`…) fast-forwarded into `codex/platform-control-plane`; no push. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -137,4 +138,4 @@ Update at the end of every phase.
 
 Owner decisions still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens
 (B1) for the amber tones. Next engineering candidates: per-case representative relation (backend), dirty-form warning
-when leaving a case, full Portal module split. Nothing pushed; `feat/ux-redesign-pass-2` holds pass 2.
+when leaving a case, full Portal module split. Pass 2 merged (fast-forward) into `codex/platform-control-plane` on 2026-10-08 at the owner's request; not pushed.
