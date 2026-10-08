@@ -252,7 +252,7 @@ function copy(ar: boolean) {
     phases: ["استلمنا حالتك", "مراجعة المنسق", "مراجعة الاستشاري", "عرضك", "وديعة التنسيق", "العلاج", "المتابعة"],
     proposal: "عرضك", updated: "نسخة محدّثة", viewProposal: "عرض العرض",
     documentType: { PRELIMINARY_ESTIMATE: "تقدير مبدئي للرعاية", FINAL_TREATMENT_QUOTE: "خطة العلاج والعرض النهائي" } as Record<string, string>,
-    estimateBasis: "بناءً على التوصية الحالية والخدمات المشمولة. قد يتغيّر العلاج والسعر النهائي بعد الفحص الحضوري.",
+    estimateBasis: "هذا تقدير مبدئي غير ملزم، وليس سعرًا نهائيًا ولا ضمانًا للسعر. قد تتغيّر خطة علاجك ويرتفع سعرها أو ينخفض بعد أن يفحصك طبيبك المعالج حضوريًا.",
     proposalStatus: { READY: "جاهز للمراجعة", ACCEPTED: "تم الإقرار به", DECLINED: "مرفوض", EXPIRED: "منتهي الصلاحية" } as Record<string, string>,
     yourCoordinator: "منسقك", coordinatorHint: "جهة تواصلك طوال رحلة رعايتك.", coordinatorPending: "سيُعرّفك منسقك بنفسه قريبًا.", message: "مراسلة",
     documentsTitle: "المستندات التي شاركتها", documentsHint: "المستندات المرفقة بهذه الحالة. لإضافة مستند، استخدم الرابط الآمن الذي يرسله لك منسقك.", noDocuments: "لم تشارك أي مستندات بعد.",

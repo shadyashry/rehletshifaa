@@ -76,6 +76,8 @@ class AssistedProposalDecisionTest {
         assertThat(row.get("ACKNOWLEDGED")).isEqualTo(true);
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='PROPOSAL_TERMS_CALL' AND status='OPEN'", caseId)).isZero();
         assertThat(count("SELECT count(*) FROM audit_events WHERE event_type='PROPOSAL_DECIDED_ON_BEHALF' AND case_id=?", caseId)).isEqualTo(1);
+        // The patient is told once, on the case's contact channel, that a decision was recorded for them.
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE template_key='proposal-decision-recorded' AND idempotency_key=?", "proposal-decision-recorded:" + versionId)).isEqualTo(1);
         // The patient sees who recorded it and how — never a decision that looks like their own click.
         authenticate("patient-assist-b", Role.PATIENT);
         ProposalAssistanceView view = journey.workspace(caseId).proposal().assistance();
@@ -181,6 +183,9 @@ class AssistedProposalDecisionTest {
         em.flush();
         assertThat(status(caseId)).isEqualTo("REVISION_REQUESTED");
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='PROPOSAL_REVISION' AND status='OPEN'", caseId)).isEqualTo(1);
+        // The coordinator who recorded it is not emailed about their own entry; the patient is told.
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE ?", "work-email:%" + versionId + "%")).isZero();
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key=?", "proposal-decision-recorded:" + versionId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT comment FROM proposal_decisions WHERE proposal_version_id=?", String.class, versionId)).isEqualTo("A shorter stay, please");
     }
 

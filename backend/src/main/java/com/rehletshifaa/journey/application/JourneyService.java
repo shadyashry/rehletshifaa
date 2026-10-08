@@ -551,17 +551,31 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
      * item of the same type, and the notification is keyed to the version and decision. A repeated
      * decision cannot reach here anyway — the conditional status update above rejects it first.
      */
-    private void notifyCoordinatorOfPatientDecision(UUID caseId,UUID versionId,String decision,String comment){
+    private void notifyCoordinatorOfPatientDecision(UUID caseId,UUID versionId,String decision,String comment){notifyCoordinatorOfPatientDecision(caseId,versionId,decision,comment,true);}
+    private void notifyCoordinatorOfPatientDecision(UUID caseId,UUID versionId,String decision,String comment,boolean email){
         boolean declined="DECLINED".equals(decision);
         String coordinator=primaryCoordinator(caseId);
         String title=declined?"Patient declined the proposal":"Patient asked for changes to the proposal";
         String context=(declined?"The patient declined this proposal.":"The patient asked for changes before continuing.")
             +(hasText(comment)?" They said: "+comment.trim():"");
         work.openWorkItem(new NewWorkItem(caseId,declined?"PROPOSAL_DECLINED_REVIEW":"PROPOSAL_REVISION",title,context,coordinator,
-            "COORDINATOR",false,null,"SYSTEM","PATIENT_PROPOSAL_DECISION","proposal-decision:"+decision+":"+versionId,true));
+            "COORDINATOR",false,null,"SYSTEM","PATIENT_PROPOSAL_DECISION","proposal-decision:"+decision+":"+versionId,email));
         work.refreshWaitingOn(caseId,"STAFF",title);
     }
 
+    /**
+     * One message per version on the case's contact channel: what was recorded, with whom and when, and that the patient
+     * can tell their coordinator if it is not what was agreed. Carries no clinical detail and no link.
+     */
+    private void notifyPatientOfRecordedDecision(UUID caseId,UUID versionId,String decision,RecordedDecisionRequest request,Instant now){
+        Contact contact=proposalContact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";
+        String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();if(!hasText(destination))return;
+        String lang="ar".equals(cases.findPatientPreferredLanguage(caseId).orElse(null))?"ar":"en";
+        String date=request.conversationAt().atZone(ZoneOffset.UTC).toLocalDate().toString();
+        notificationOutbox.enqueueOnce("PROPOSAL_DECISION_RECORDED",channel,destination,"proposal-decision-recorded",
+            intake.encryptedJson("{\"decision\":\""+decision+"\",\"confirmedBy\":\""+request.confirmedBy()+"\",\"date\":\""+date+"\",\"lang\":\""+lang+"\"}"),
+            "proposal-decision-recorded:"+versionId,now);
+    }
     private void expireProposal(UUID caseId,UUID versionId){int changed=proposalVersions.expire(versionId);if(changed==1){work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Superseded — the proposal expired");shareTokens.revokeForVersion(versionId,micros(clock.instant()));publicTransition(caseId,"EXPIRED","Proposal expired");auditPublic("PROPOSAL_EXPIRED",caseId,versionId.toString(),"EXPIRE");}}
     private void auditPublic(String type,UUID caseId,String entityId,String action){auditTrail.event(type).actor("SECURE_LINK", "PATIENT").caseId(caseId).entity("ProposalVersion", entityId).action(action).record();}
     private record Contact(String caseNumber,String whatsapp,String email){}
@@ -615,7 +629,10 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Decision recorded with the patient");
         if(!isFinalQuote(versionId)){transitionWithoutVersion(caseId,versionStatus,"Patient proposal decision (recorded by coordinator)",actor);
             if(acceptish){onProposalAccepted(caseId);payment.createDepositForAcknowledgement(caseId,versionId);onboarding.createForAcknowledgement(caseId,versionId);caseActions.reconcileWaitingOn(caseId);}}
-        if(!acceptish)notifyCoordinatorOfPatientDecision(caseId,versionId,decision,comment);
+        // The follow-up work still opens, but the coordinator who just recorded it is not emailed about their own entry.
+        if(!acceptish)notifyCoordinatorOfPatientDecision(caseId,versionId,decision,comment,false);
+        // The patient is told, in their language, that a decision was recorded for them and how to dispute it.
+        notifyPatientOfRecordedDecision(caseId,versionId,decision,request,now);
         audit("PROPOSAL_DECIDED_ON_BEHALF",actor,caseId,"ProposalVersion",versionId.toString(),decision,"SUCCESS",null);
         return proposal(versionId);
     }

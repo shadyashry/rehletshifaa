@@ -17,12 +17,12 @@ Plan: `docs/ux-redesign/plans/patient-proposal.md`.
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P1 | The dialog title is third person ("Patient proposal" / "المقترح المقدم للمريض"). It should read "Your proposal" / "مقترحك". | PC | `components/portal/Portal.tsx` (proposal dialog) | clarify |
-| P1 | Raw proposal statuses reach the patient ("v1 · RELEASED"). Map every status in `statusLabel` to plain words. | PC | `Portal.tsx:753` `statusLabel` | clarify |
-| P1 | Dates are short US format ("Valid until 12/31/2026"). Use long, localised dates. | PC | `Portal.tsx` | clarify |
-| P1 | Order the dialog as price → "preliminary, can change" → decision. The terms wall currently comes before the decision. | PC | `Portal.tsx`, `components/PatientProposalDecision*` | clarify / shape |
-| P1 | Deposit, refund and cancellation terms should sit behind a disclosure, with wording unchanged and marked "pending legal review". | PC | `lib/commercial-terms.ts`, `Portal.tsx` | clarify |
-| P1 | The terms are English-only on `/ar`. The option chosen at GATE 2 (legal) applies here. | PC | `lib/commercial-terms.ts` | clarify |
+| Done (pass 1) | The dialog title is third person ("Patient proposal" / "المقترح المقدم للمريض"). It should read "Your proposal" / "مقترحك". | PC | `components/portal/Portal.tsx` (proposal dialog) | clarify |
+| Done (pass 1) | Raw proposal statuses reach the patient ("v1 · RELEASED"). Map every status in `statusLabel` to plain words. | PC | `Portal.tsx:753` `statusLabel` | clarify |
+| Done (pass 1) | Dates are short US format ("Valid until 12/31/2026"). Use long, localised dates. | PC | `Portal.tsx` | clarify |
+| Done (pass 1) | Order the dialog as price → "preliminary, can change" → decision. The terms wall currently comes before the decision. | PC | `Portal.tsx`, `components/PatientProposalDecision*` | clarify / shape |
+| Done (pass 1) | Deposit, refund and cancellation terms should sit behind a disclosure, with wording unchanged and marked "pending legal review". | PC | `lib/commercial-terms.ts`, `Portal.tsx` | clarify |
+| Done (pass 2) | The terms are English-only on `/ar`. The option chosen at GATE 2 (legal) applies here. | PC | `lib/commercial-terms.ts` | clarify |
 | P2 | The terms box is nested inside a tinted panel inside the dialog, which breaks the "no nested cards" rule. | PC | `Portal.tsx` | distill |
 
 ## Staff work views (portal)
@@ -31,14 +31,14 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P1 | Copy ignores who is viewing. A Consultant sees "Owned by another coordinator" and "Waiting on: the consultant"; resolve these to "you" for the coordinator, owner or Consultant concerned. | PC | `components/portal/CurrentAction.tsx`, `MyWork.tsx`, `CaseQueue.tsx` | clarify |
-| P1 | A coordinator sees "Coordinator: Unassigned" on their own case when the name is missing. Add a fallback name. | PC | `CurrentAction.tsx`, `CaseQueue.tsx` | clarify |
-| P1 | Plurals are wrong ("1 cases", "1 work items", "1 documents"). Use `Intl.PluralRules`. | PC | `CaseQueue.tsx`, `MyWork.tsx`, `Portal.tsx` | clarify |
-| P1 | Raw enum values reach the screen ("NORMAL", "cardiology"). Map them to words in both locales. | PC | `CaseQueue.tsx`, `MyWork.tsx`, `CurrentAction.tsx` | clarify |
-| P1 | "Assign a verified consultant" breaks the never-say-"Verified" rule and the capital C in "Consultant". | PC | `Portal.tsx` / `ConsultantRouting.tsx` | clarify |
+| Done (pass 1) | Copy ignores who is viewing. A Consultant sees "Owned by another coordinator" and "Waiting on: the consultant"; resolve these to "you" for the coordinator, owner or Consultant concerned. | PC | `components/portal/CurrentAction.tsx`, `MyWork.tsx`, `CaseQueue.tsx` | clarify |
+| Done (pass 1) | A coordinator sees "Coordinator: Unassigned" on their own case when the name is missing. Add a fallback name. | PC | `CurrentAction.tsx`, `CaseQueue.tsx` | clarify |
+| Done (pass 1) | Plurals are wrong ("1 cases", "1 work items", "1 documents"). Use `Intl.PluralRules`. | PC | `CaseQueue.tsx`, `MyWork.tsx`, `Portal.tsx` | clarify |
+| Done (pass 1) | Raw enum values reach the screen ("NORMAL", "cardiology"). Map them to words in both locales. | PC | `CaseQueue.tsx`, `MyWork.tsx`, `CurrentAction.tsx` | clarify |
+| Done (pass 2) | "Assign a verified consultant" breaks the never-say-"Verified" rule and the capital C in "Consultant". | PC | `Portal.tsx` / `ConsultantRouting.tsx` | clarify |
 | P2 | The case number is repeated as the title when there is no patient name. | PC | `CaseQueue.tsx` | clarify |
 | Done (pass 2) | "Assign consultant" only scrolls to a second "Confirm assignment" panel, so there are two controls for one job. | PC | `CoordinatorActions.tsx`, `ConsultantRouting.tsx` | distill |
-| P2 | "No eligible Consultant" is a dead end. Add a next step (escalate or request staffing). | PC | `ConsultantRouting.tsx` | onboard / harden |
+| Done (pass 2) | "No eligible Consultant" is a dead end. Add a next step (escalate or request staffing). | PC | `ConsultantRouting.tsx` | onboard / harden |
 
 ## Staff home and shell (portal)
 
@@ -67,7 +67,7 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 | P3 | Message timestamps use short US format. | PC | `CaseMessages.tsx` | clarify |
 | P3 | Currency is shown three ways ("$US 4,850.00", "4,850 US$", "$4,850"). | PC | `MyCare.tsx`, `Portal.tsx` | clarify |
 | P3 | Latin initials and country names appear on Arabic pages. | PC | `MyCare.tsx`, `Portal.tsx` | harden |
-| P3 | Nothing on My Care shows a representative whose account this is. | PC | `MyCare.tsx`, `PatientNav.tsx` | shape |
+| P2 | Nothing on My Care shows a representative whose account this is. | PC | `MyCare.tsx`, `PatientNav.tsx` | shape |
 | P3 | Every portal view has the same page title, "RehletShifaa". | PC (detector) | `app/[locale]/portal/page.tsx` | harden |
 | Done | P0 My Care reload loop for linked patients. | PC | `AuthProvider.tsx`, `Portal.tsx`, `e2e/my-care.spec.ts` | harden (`6ea32d2`) |
 
@@ -117,11 +117,11 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| **P0** | `WorkspaceView` (and `ProposalSendForm`, `FinalAssessment`, `FinalQuoteActions`, `RoleActions`) has no case key. Opening another case without returning to the queue (notification bell, `openCaseById`, `otherCases`) keeps the previous case's typed drafts and dialog flags, so they can be submitted against the wrong patient's case. Fix: `key={workspace.caseSummary.id}`. (verified) | RB | `Portal.tsx:216` | harden |
+| Done (`6f561e6`) | `WorkspaceView` (and `ProposalSendForm`, `FinalAssessment`, `FinalQuoteActions`, `RoleActions`) has no case key. Opening another case without returning to the queue (notification bell, `openCaseById`, `otherCases`) keeps the previous case's typed drafts and dialog flags, so they can be submitted against the wrong patient's case. Fix: `key={workspace.caseSummary.id}`. (verified) | RB | `Portal.tsx:216` | harden |
 | P1 | Drafts are lost on a tab switch or "My dashboard". The clinical review, proposal notes, final assessment and operations plan live in tab-panel state that unmounts. Keep the panels mounted, or lift the drafts and warn when a form is dirty. | WG | `ClinicalReview.tsx:51`, `Portal.tsx:649/685/750` | harden |
 | P1 | Bulk "Take ownership" clears errors per case and reports success even if one claim failed. Report "N of M" and keep the failed rows selected. | WG, AU | `CaseQueue.tsx:215` | harden |
 | P1 | Bulk "Request information" stops at the first failure. Resubmitting sends a second request and email to patients who already received one. Drop the succeeded cases and show a result per case. | WG | `RequestInformationDialog.tsx:82` | harden |
-| P1 | The Arabic preliminary-estimate disclaimer is weaker than the English one. It omits non-binding, "not a price guarantee" and "may increase or decrease". | AU | `MyCare.tsx:255/272`, `CaseMessages.tsx:38` | clarify |
+| Done (pass 2) | The Arabic preliminary-estimate disclaimer is weaker than the English one. It omits non-binding, "not a price guarantee" and "may increase or decrease". | AU | `MyCare.tsx:255/272`, `CaseMessages.tsx:38` | clarify |
 | P2 | Recording a refund has no confirmation. Submitting a second opinion permanently ends access with no confirmation. "Resend link" silently revokes the current link. | WG | `Portal.tsx:731/746`, `ConsultantRouting.tsx:174`, `CoordinatorActions.tsx:478` | harden |
 | P2 | "Request changes" can be sent with an empty note. `RecordPatientResponse` lets required items be blank. | WG | `CaseMessages.tsx:38`, `RecordPatientResponse.tsx:62` | harden |
 
@@ -143,7 +143,7 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
 | P1 | Unlabelled controls: the discharge-document select; the FinalAssessment currency select; manual service and amount inputs labelled only by placeholder; an English "remove" aria-label. | AU, WG | `CaseWorkflowActions.tsx:17`, `Portal.tsx:696/699` | harden |
-| P1 | Text-field borders are `--color-line-strong` (1.66:1 on white), below the 3:1 non-text contrast WCAG 1.4.11 requires. Token decision at GATE 2. | Tokens | `app/globals.css` `.field`, `theme-petrol.css` | polish |
+| Done (GATE 2, `--color-ink-350`) | Text-field borders are `--color-line-strong` (1.66:1 on white), below the 3:1 non-text contrast WCAG 1.4.11 requires. Token decision at GATE 2. | Tokens | `app/globals.css` `.field`, `theme-petrol.css` | polish |
 | P2 | A hard-coded English `aria-label="Confirmed arrival"` overrides the Arabic label (label-in-name). | AU, WG | `CaseWorkflowActions.tsx:16` | clarify |
 | P2 | Broken unread-badge names ("Messages1 unread"). The staff Messages badge shows the total, not the unread count. Unread notifications and overdue tasks are shown by colour only. | AU, WG | `PatientNav.tsx:30`, `MyCare.tsx:55/212`, `Portal.tsx:402/603`, `NotificationBell.tsx:101` | harden |
 | P2 | Tablist arrow keys don't flip in RTL (ArrowLeft jumps to the far tab), and Home/End are missing. | AU, WG | `Portal.tsx:260/424`, `CaseQueue.tsx:143` | adapt |
@@ -184,7 +184,7 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | P2 | Lint `set-state-in-effect`, `refs` and `purity` errors (12 in scope), each with a concrete fix in the RB report: queue loading derived state, `?role=` lazy init, `Date.now()` in render, dialog ref read in render, a shared `usePortalSlot` hook, the view-mode lazy init, directory and adoption loaders. | RB | `Portal.tsx:108/114/168/173/666`, `PortalAccount.tsx:38/55`, `NotificationBell.tsx:34`, `CaseQueue.tsx:87`, `PortalDirectories.tsx:11`, `WorkforceAdoptionPanel.tsx:20` | harden |
 | P2 | Composition: 27 `useState` hooks in Portal, 26 props into `WorkspaceView`, 8 boolean dialog flags. Introduce a `CaseWorkspaceProvider`, split the patient and staff views, and use one dialog union state. | RB | `Portal.tsx:276/323` | — |
 | P2 | `role={currentRole!}` can crash `WorkspaceView` when `/me` fails while a case is open. | RB | `Portal.tsx:216/285` | harden |
-| P3 | The hidden queue re-renders under the workspace; formatters are rebuilt on every render; polling continues in hidden tabs; both locales' copy ships to the client; dead code (`PatientStatusCard`, `PATIENT_JOURNEY`, `ProposalShareLinks`, `TaskActions`, a no-op `Panel wide`, the MyCare timeline no-op). | RB, WG, AU | `Portal.tsx`, `NotificationBell.tsx:41`, `CaseMessages.tsx:29`, `MyCare.tsx:235` | distill |
+| P3 | The hidden queue re-renders under the workspace; formatters are rebuilt on every render; polling continues in hidden tabs; both locales' copy ships to the client; dead code (`PatientStatusCard`, `PATIENT_JOURNEY` and `TaskActions` removed in pass 2; a no-op `Panel wide` and the MyCare timeline no-op remain). | RB, WG, AU | `Portal.tsx`, `NotificationBell.tsx:41`, `CaseMessages.tsx:29`, `MyCare.tsx:235` | distill |
 
 ## Patient proposal — deferred review findings (`/redesign-area` run 1, 2026-10-07)
 
@@ -349,7 +349,7 @@ These were fixed in the build:
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
 | **P1 (decision)** | Journey-bound cases: neither the patient's own decisions (portal and secure link post to the direct `/decision` endpoints) nor the recorded decision complete the journey runtime `REVIEW_PROPOSAL` action. This is pre-existing for self-service, and the recorded path keeps parity. Decide whether the UI moves to the `/actions/{id}/proposal-decision` endpoints or the direct paths sync the runtime. Then add a `RecordedDecision` handler variant. | AUTH | `JourneyService`, `ReviewProposalActionHandler`, `PatientProposal.tsx`, `ProposalSign.tsx` | harden |
-| P2 | The patient is not notified when a decision is recorded (the plan says "notified with the provenance line"). A recorded decline also notifies the recording coordinator about their own action. Needs an outbox template in en and ar, plus legal L4 (dispute window). | AUTH | `JourneyService.applyRecordedDecision`, notification templates | harden |
+| Done (pass 2) | The patient is not notified when a decision is recorded (the plan says "notified with the provenance line"). A recorded decline also notifies the recording coordinator about their own action. Needs an outbox template in en and ar, plus legal L4 (dispute window). | AUTH | `JourneyService.applyRecordedDecision`, notification templates | harden |
 | P2 | "Representative" means the submitting contact (`case_submission_contacts.contact_role`), not an authorised `PATIENT_REPRESENTATIVE` link, and no representative id is stored. Align with the representative model (legal L3). | AUTH | `ProposalAssistanceService` | harden |
 | P2 | Arabic secure link: the numbered "what happens next" list still starts with "acknowledge this estimate". | Build review | `ProposalSign.tsx` | clarify |
 | P2 | Activation's deposit-terms consent on `/ar` is unchanged, pending legal L2. | Plan O1 | `ProfileActivation.tsx` | — |

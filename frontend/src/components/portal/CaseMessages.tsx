@@ -24,8 +24,3 @@ export function CaseMessages({locale,role,caseId,messages,canSend,busy,mutate}:{
   </section>;
 }
 
-export function TaskActions({locale,caseId,task,mutate}:{locale:Locale;caseId:string;task:{id:string;status:string;version:number};mutate:Mutate}){
-  const [evidence,setEvidence]=useState("");const ar=locale==="ar";
-  if(!["OPEN","IN_PROGRESS"].includes(task.status))return null;
-  return <div className="mt-3 space-y-2">{task.status==="OPEN"&&<button className="btn-secondary" onClick={()=>void mutate(`/tasks/${task.id}/cases/${caseId}/start`,{expectedVersion:task.version})}>{ar?"بدء المهمة":"Start task"}</button>}<details><summary className="cursor-pointer py-2 text-sm font-semibold text-brand-700">{ar?"إكمال المهمة":"Complete task"}</summary><form className="mt-2 space-y-2" onSubmit={async e=>{e.preventDefault();const result=await mutate(`/tasks/${task.id}/cases/${caseId}/complete`,{expectedVersion:task.version,evidence:evidence.trim()});if(result)setEvidence("");}}><label className="block text-sm">{ar?"ما الذي تم إنجازه؟":"What was completed?"}<textarea className="field mt-2" required maxLength={10000} value={evidence} onChange={e=>setEvidence(e.target.value)}/></label><button className="btn-primary" disabled={!evidence.trim()}>{ar?"تسجيل الإكمال":"Record completion"}</button></form></details></div>;
-}
