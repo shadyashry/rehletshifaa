@@ -157,6 +157,7 @@ Update at the end of every phase.
 | 2026-10-08 | GATE P2-1: `plans/arabic-proposal-decision.md` **approved**. O1: the coordinator-mediated rule covers every Arabic surface relying on the deposit/refund/cancellation terms (portal drawer and secure link; activation per legal L2). O2: keep a quiet "decide on the English page" link. O3: only the owning coordinator records a decision on the patient's behalf. Legal L1–L5 open; Arabic terms approval stays a launch blocker. | Owner |
 | 2026-10-08 | GATE P2-2: `plans/staff-home.md` **approved**. S1: remove the queue List/Cards toggle. S2: the slim footer replaces the marketing footer on all `/portal` routes (patients included). S3: Arabic "مهامي" for My work (pending native sign-off). | Owner |
 | 2026-10-08 | Owner: "commit and merge all" — pass 2 (`d09a3ad`…) fast-forwarded into `codex/platform-control-plane`; no push. | Owner |
+| 2026-10-08 | Owner: "merge pass 3 into codex/platform-control-plane and push" — `feat/ux-redesign-pass-3` fast-forwarded and pushed to origin. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -180,7 +181,7 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Pass 3 is complete on `feat/ux-redesign-pass-3` (not pushed, not merged). Before any live check, rebuild the tunnel stack
+Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08). Before any live check, rebuild the tunnel stack
 from this branch (it runs a 2026-10-07 backend at V73; pass 3 adds V75/V76). Next engineering candidates: the step-4
 deferred P2s (Arabic services plural, name isolation), wording the remaining work types (backlog P3), a representative
 picker for recorded decisions, full Portal module split. Owner decisions
