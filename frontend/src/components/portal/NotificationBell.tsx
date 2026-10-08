@@ -77,12 +77,12 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
     </button>
     {open && (
       <div ref={panel} role="dialog" aria-label={t.label}
-           className="absolute end-0 top-14 z-50 max-h-[70vh] w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-line bg-white shadow-xl">
+           className="absolute end-0 top-14 z-50 max-h-[70vh] w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-line bg-white shadow-[var(--shadow-raised)]">
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <h2 className="font-bold text-ink-900">{t.label}</h2>
           <div className="flex items-center gap-1">
             {feed.unread > 0 && (
-              <button type="button" className="rounded-lg px-2 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50" onClick={() => void markRead()}>
+              <button type="button" className="rounded-lg px-2 py-1 text-[0.8125rem] font-semibold text-brand-700 hover:bg-brand-50" onClick={() => void markRead()}>
                 <Check size={14} className="me-1 inline" aria-hidden/>{t.markAll}
               </button>
             )}
@@ -98,13 +98,13 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
         ) : (
           <ul className="max-h-[calc(70vh-3.5rem)] divide-y divide-line overflow-y-auto">
             {feed.items.map(item => (
-              <li key={item.id} className={item.read ? "px-4 py-3" : "border-s-4 border-brand-600 bg-brand-50/60 px-4 py-3"}>
+              <li key={item.id} className={item.read ? "px-4 py-3" : "border border-brand-600 bg-brand-50/60 px-4 py-3"}>
                 <div className="flex items-start gap-2">
                   {!item.read && <span aria-hidden className="mt-1.5 h-2 w-2 flex-none rounded-full bg-brand-600"/>}
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold leading-6 text-ink-900">{item.title}</p>
                     {item.context && <p className="mt-0.5 text-sm leading-6 text-ink-600">{item.context}</p>}
-                    <p className="mt-1 text-xs text-ink-500">
+                    <p className="mt-1 text-[0.8125rem] text-ink-500">
                       {item.caseNumber && <span className="font-semibold text-brand-700">{item.caseNumber} · </span>}
                       {since(item.createdAt, locale, t)}
                     </p>

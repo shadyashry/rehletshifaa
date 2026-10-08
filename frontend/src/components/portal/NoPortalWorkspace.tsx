@@ -45,7 +45,7 @@ export function NoPortalWorkspace({ locale }: { locale: Locale }) {
       <p className="mt-2 text-sm leading-6 text-ink-600">{ar ? "لا يستخدم حسابك مساحات عمل الحالات في بوابة الرعاية. هذه هي المساحات المتاحة لك حسب دورك:" : "Your account doesn't use the care portal's case workspaces. These are the areas your role gives you:"}</p>
       <ul className="mt-5 grid gap-3 sm:grid-cols-2">
         {areas.map((item) => (
-          <li key={item.key}><Link className="block rounded-xl border border-line p-4 hover:bg-mist" href={ccHref(locale, item.path)}>
+          <li key={item.key}><Link className="block rounded-lg border border-line p-4 hover:bg-mist" href={ccHref(locale, item.path)}>
             <strong className="block text-ink-900">{pick(item.label, locale)}</strong><span className="text-sm text-ink-500">{pick(item.summary, locale)}</span>
           </Link></li>
         ))}

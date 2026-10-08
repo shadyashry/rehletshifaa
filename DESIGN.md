@@ -392,7 +392,7 @@ fills as it crosses the middle of the screen; step one is always filled ("you ar
 Petrol label text, opened by a 1rem × 2px coral rule. It is the most repeated brand signal on every page.
 
 ### Drawer (portal)
-A native modal `<dialog>` sized to 36rem (full width minus 2rem on phones), 8px radius, Raised shadow. Its header — the
+A native modal `<dialog>` sized to 36rem (full width minus 2rem on phones; a portal case drawer becomes a full-height sheet below 640px), 8px radius, Raised shadow. Its header — the
 title as `<h2>` naming the dialog, and a 44px Close icon button — stays pinned while the content scrolls, edged by a
 hairline. Escape closes it, and focus returns to the control that opened it. A result or error from an action inside
 the drawer is reported inside the drawer: the page behind a modal is inert.

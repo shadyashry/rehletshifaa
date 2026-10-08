@@ -18,12 +18,12 @@ export function CaseBlockers({ locale, blockers, deposit }: { locale: Locale; bl
   const money = (n?: number) => n == null ? null : new Intl.NumberFormat(locale, { style: "currency", currency: deposit?.currency || "EGP", maximumFractionDigits: 0 }).format(n);
 
   return (
-    <section aria-labelledby="case-blockers-title" className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+    <section aria-labelledby="case-blockers-title" className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 id="case-blockers-title" className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-amber-900">
+        <h2 id="case-blockers-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-amber-900">
           {ar ? "الجاهزية والمعوّقات" : "Readiness & blockers"}
         </h2>
-        <p className="text-[0.78rem] font-semibold text-amber-900">
+        <p className="text-[0.8125rem] font-semibold text-amber-900">
           {attention === 1 ? (ar ? "عنصر واحد يحتاج إلى متابعة" : "1 item needs attention") : ar ? `${attention} عناصر تحتاج إلى متابعة` : `${attention} items need attention`}
         </p>
       </div>

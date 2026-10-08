@@ -49,9 +49,9 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
   };
   const content = <>
     <details ref={menu} className="portal-account relative" onKeyDown={event => { if (event.key === "Escape" && menu.current) { menu.current.open = false; menu.current.querySelector("summary")?.focus(); } }}>
-      <summary aria-label={`${text.account}: ${name}`} className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full bg-brand-700 font-bold text-white ring-4 ring-brand-50">{name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase() || "•"}</summary>
-      <div className="absolute end-0 top-14 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-white p-2 shadow-xl">
-        <div className="border-b border-line px-3 py-3"><p className="break-words font-bold">{name}</p><p className="text-sm text-ink-500">{role}</p>{email && <p dir="auto" className="truncate text-xs text-ink-500">{email}</p>}</div>
+      <summary aria-label={`${text.account}: ${name}`} className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full bg-brand-700 font-bold text-white ring-4 ring-brand-50">{name.trim().split(/\s+/).slice(0, patient ? 1 : 2).map(part => part[0]).join("").toUpperCase() || "•"}</summary>
+      <div className="absolute end-0 top-14 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-white p-2 shadow-[var(--shadow-raised)]">
+        <div className="border-b border-line px-3 py-3"><p className="break-words font-bold">{name}</p><p className="text-sm text-ink-500">{role}</p>{email && <p dir="auto" className="truncate text-[0.8125rem] text-ink-500">{email}</p>}</div>
         {roles && <div role="group" aria-labelledby="account-roles" className="border-b border-line py-1">
           <p id="account-roles" className="px-3 pt-2 text-[0.8125rem] font-semibold text-ink-500">{roles.label}</p>
           {roles.options.map(option => <button key={option.key} type="button" className="account-option" aria-pressed={option.key === roles.current}
@@ -70,7 +70,7 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
       <div className="flex items-start justify-between gap-4"><h2 id="account-heading" className="title">{text.settings}</h2><button className="icon-button" aria-label={text.close} onClick={() => dialog.current?.close()}><X size={20}/></button></div>
       {patient && (
         <section aria-labelledby="profile-details" className="mt-5">
-          <h3 id="profile-details" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{text.details}</h3>
+          <h3 id="profile-details" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{text.details}</h3>
           {profileError ? <p role="alert" className="mt-2 text-sm text-alert-800">{profileError}</p> : !profile ? <p className="mt-2 text-sm text-ink-500">{text.loading}</p> : (
             <dl className="mt-2 grid gap-x-6 gap-y-2.5 text-[0.9rem] sm:grid-cols-2">
               {([
@@ -79,14 +79,14 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
                 [text.country, profile.country], [text.nationality, profile.nationality],
                 [text.preferredLanguage, profile.preferredLanguage === "ar" ? "العربية" : profile.preferredLanguage === "en" ? "English" : profile.preferredLanguage],
               ] as [string, string | null | undefined][]).filter(([, value]) => value).map(([label, value]) => (
-                <div key={label} className="min-w-0"><dt className="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-ink-500">{label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900">{value}</dd></div>
+                <div key={label} className="min-w-0"><dt className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">{label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900">{value}</dd></div>
               ))}
-              <div className="min-w-0"><dt className="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-ink-500">{text.email}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900" dir="ltr">{profile.email ?? text.notProvided}</dd>{profile.email && <dd className={`text-[0.78rem] font-semibold ${profile.emailVerified ? "text-brand-700" : "text-ink-500"}`}>{profile.emailVerified ? text.verified : text.notVerified}</dd>}</div>
-              <div className="min-w-0"><dt className="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-ink-500">{text.whatsapp}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900" dir="ltr">{profile.whatsappNumber ?? text.notProvided}</dd>{profile.whatsappNumber && <dd className={`text-[0.78rem] font-semibold ${profile.phoneVerified ? "text-brand-700" : "text-ink-500"}`}>{profile.phoneVerified ? text.verified : text.notVerified}</dd>}</div>
+              <div className="min-w-0"><dt className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">{text.email}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900" dir="ltr">{profile.email ?? text.notProvided}</dd>{profile.email && <dd className={`text-[0.8125rem] font-semibold ${profile.emailVerified ? "text-brand-700" : "text-ink-500"}`}>{profile.emailVerified ? text.verified : text.notVerified}</dd>}</div>
+              <div className="min-w-0"><dt className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">{text.whatsapp}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900" dir="ltr">{profile.whatsappNumber ?? text.notProvided}</dd>{profile.whatsappNumber && <dd className={`text-[0.8125rem] font-semibold ${profile.phoneVerified ? "text-brand-700" : "text-ink-500"}`}>{profile.phoneVerified ? text.verified : text.notVerified}</dd>}</div>
             </dl>
           )}
           <p className="mt-3 text-[0.82rem] text-ink-500">{text.correction}</p>
-          <h3 className="mt-5 text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{text.preferencesTitle}</h3>
+          <h3 className="mt-5 text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{text.preferencesTitle}</h3>
         </section>
       )}
       <form key={`${preferences.displayName}-${locale}`} className={`${patient ? "mt-3" : "mt-5"} space-y-5`} onSubmit={async event => {

@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { Check, FileText, MessageSquareText, UserRound } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
+import { useWorkCopy } from "@/components/portal/portal-copy";
+import { fillTemplate } from "@/lib/portal-labels";
 import type { CaseActions } from "@/components/portal/CurrentAction";
 /** The backend's one answer to "may the patient see a proposal, and which one" — rendered, never re-derived from the stage. */
 export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null };
@@ -16,7 +18,7 @@ export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" |
  * primary action at a time.
  */
 export type CaseSummary = {
-  id: string; caseNumber: string; status: string; careCategory?: string; coordinatorName?: string | null;
+  id: string; caseNumber: string; status: string; patientName?: string | null; careCategory?: string; coordinatorName?: string | null;
   doctorName?: string | null; waitingOn?: string | null; updatedAt: string; createdAt?: string;
 };
 export type PatientActionItem = { id: string; kind: string; code: string; label: string; required: boolean; completed: boolean };
@@ -26,13 +28,16 @@ export type DepositSummaryData = { status: string; currency: string; totalDispla
 export type CaseDocument = { documentId: string; fileName: string; status: string; createdAt: string };
 export type CareView = "care" | "documents" | "messages";
 
-export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, timeline, otherCases, view, onView, onOpenCase, onOpenProposal, identityStep, messagesPanel }: {
+export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, timeline, otherCases, view, onView, onOpenCase, onOpenProposal, identityStep, messagesPanel, representative = false }: {
   locale: Locale; caseSummary: CaseSummary; actions: CaseActions; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
   proposal?: ProposalSummaryData | null; deposit?: DepositSummaryData | null; documents: CaseDocument[]; unreadMessages: number;
   timeline: { status: string; occurredAt: string }[]; otherCases: CaseSummary[]; view: CareView; onView: (view: CareView) => void;
   onOpenCase: (id: string) => void; onOpenProposal: () => void; identityStep?: ReactNode; messagesPanel: ReactNode;
+  /** The signed-in account acts for the patient (a representative), so the page says whose care this is. */
+  representative?: boolean;
 }) {
   const ar = locale === "ar";
+  const work = useWorkCopy();
   const t = copy(ar);
   const c = caseSummary;
   const code = actions.currentAction.code;
@@ -52,14 +57,19 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
           <button key={id} type="button" aria-current={view === id ? "page" : undefined}
                   className={`-mb-px border-b-2 px-3 py-2.5 text-[0.9rem] font-bold transition ${view === id ? "border-brand-600 text-brand-800" : "border-transparent text-ink-500 hover:text-ink-800"}`}
                   onClick={() => onView(id)}>
-            {t.nav[id]}{id === "messages" && unreadMessages > 0 && <span className="ms-1.5 rounded-full bg-brand-600 px-1.5 text-[0.7rem] text-white">{unreadMessages}</span>}
+            {t.nav[id]}{id === "messages" && unreadMessages > 0 && <span className="ms-1.5 rounded-full bg-brand-600 px-1.5 text-[0.8125rem] text-white">{unreadMessages}</span>}
           </button>
         ))}
       </nav>
 
       {/* Case header: who and what, compactly — no identifiers beyond the reference the patient already knows. */}
-      <header id="case-heading" tabIndex={-1} className="card px-5 py-4 outline-none sm:px-6">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <header id="case-heading" tabIndex={-1} className="border-b border-line pb-4 outline-none">
+        {c.patientName && (
+          <p className="text-[1.15rem] font-bold leading-7 text-brand-900">
+            {representative ? fillTemplate(work.patient.careFor, { name: `\u2068${c.patientName}\u2069` }) : <bdi>{c.patientName}</bdi>}
+          </p>
+        )}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-[0.95rem] font-bold text-brand-700" dir="ltr">{c.caseNumber}</span>
           {c.careCategory && <><span aria-hidden className="text-ink-300">·</span><span className="text-[0.95rem] text-ink-700">{careArea(c.careCategory, locale)}</span></>}
         </div>
@@ -91,8 +101,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
       {view === "care" && (
         <div className="mt-5 flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,8fr)_minmax(0,4fr)] lg:items-start lg:gap-x-6 lg:gap-y-5">
           {/* CURRENT STEP — the strongest element on the page. */}
-          <section aria-labelledby="current-step-title" className="rounded-xl border border-brand-200 bg-brand-50 p-5 sm:p-6 lg:col-start-1 lg:row-start-1">
-            <p className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.currentStep}</p>
+          <section aria-labelledby="current-step-title" className="card border-brand-200 p-5 sm:p-6 lg:col-start-1 lg:row-start-1">
+            <p className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.currentStep}</p>
             <h2 id="current-step-title" className="mt-1.5 text-[1.35rem] font-bold leading-8 text-brand-900 sm:text-[1.5rem]">{step.title}</h2>
             <p className="mt-2 max-w-2xl text-[0.98rem] leading-7 text-ink-700">{step.body}</p>
 
@@ -135,7 +145,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
               </p>
             )}
             {step.next && (
-              <p className="mt-4 border-t border-brand-200 pt-3 text-[0.9rem] leading-6 text-ink-600">
+              <p className="mt-4 border-t border-line pt-3 text-[0.9rem] leading-6 text-ink-600">
                 <span className="font-bold text-ink-800">{t.next}:</span> {step.next}
               </p>
             )}
@@ -143,8 +153,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
 
           {/* DEPOSIT — the one place the amount lives. Truthful to the offline model: arranged by our side. */}
           {showDeposit && deposit && (
-            <section aria-labelledby="deposit-title" className={`rounded-xl border p-5 lg:col-start-2 lg:row-start-1 ${deposit.status === "PAID" ? "border-brand-200 bg-white" : "border-sand-200 bg-sand-50"}`}>
-              <p id="deposit-title" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.deposit}</p>
+            <section aria-labelledby="deposit-title" className="border-t border-line pt-4 lg:col-start-2 lg:row-start-1 lg:border-t-0 lg:pt-1">
+              <p id="deposit-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.deposit}</p>
               <p className="mt-1.5 text-[1.5rem] font-bold leading-8 text-brand-900" dir="ltr">{deposit.totalDisplay != null ? money(deposit.totalDisplay, deposit.currency) : "—"}</p>
               <p className="mt-1 flex items-center gap-1.5 text-[0.92rem] font-semibold text-ink-800">
                 {deposit.status === "PAID" && <Check size={15} strokeWidth={3} aria-hidden className="text-brand-700"/>}
@@ -158,7 +168,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
           )}
 
           {/* JOURNEY — orientation only; nothing here is a control. */}
-          <section aria-label={t.journey} className="card p-4 sm:p-5 lg:col-start-1 lg:row-start-2">
+          <section aria-label={t.journey} className="border-t border-line pt-4 lg:col-start-1 lg:row-start-2">
             <ol className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:gap-0">
               {t.phases.map((label, index) => {
                 const done = index < phase, now = index === phase;
@@ -181,10 +191,10 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
 
           {/* PROPOSAL — a summary and one action; the document itself opens on demand. */}
           {showProposal && proposal && patientProposal && (
-            <section aria-labelledby="proposal-title" className="card p-5 lg:col-start-1 lg:row-start-3">
+            <section aria-labelledby="proposal-title" className="border-t border-line pt-4 lg:col-start-1 lg:row-start-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p id="proposal-title" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.documentType[proposal.documentType ?? ""] ?? t.proposal}</p>
+                  <p id="proposal-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.documentType[proposal.documentType ?? ""] ?? t.proposal}</p>
                   {proposalTotal != null && <p className="mt-1.5 text-[1.5rem] font-bold leading-8 text-brand-900" dir="ltr">{money(proposalTotal, proposal.currency)}</p>}
                   <p className="mt-1 text-[0.92rem] font-semibold text-ink-800">{t.proposalStatus[patientProposal.state] ?? patientProposal.state}{proposal.versionNumber > 1 && <span className="font-normal text-ink-500"> · {t.updated}</span>}</p>
                   {proposal.documentType === "PRELIMINARY_ESTIMATE" && <p className="mt-1 max-w-md text-[0.85rem] leading-6 text-ink-600">{t.estimateBasis}</p>}
@@ -198,8 +208,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
           )}
 
           {/* COORDINATOR — the human contact, compact, with the one supported communication action. */}
-          <section aria-labelledby="coordinator-title" className="card p-5 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:self-start">
-            <p id="coordinator-title" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.yourCoordinator}</p>
+          <section aria-labelledby="coordinator-title" className="border-t border-line pt-4 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:self-start">
+            <p id="coordinator-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.yourCoordinator}</p>
             <div className="mt-2 flex items-center gap-3">
               <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand-100 text-brand-700"><UserRound size={20}/></span>
               <div className="min-w-0">
@@ -209,15 +219,15 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
             </div>
             {canMessage && (
               <button type="button" className="btn-secondary mt-4 w-full justify-center gap-2" onClick={() => onView("messages")}>
-                <MessageSquareText size={16} aria-hidden/>{t.message}{unreadMessages > 0 && <span className="rounded-full bg-brand-600 px-1.5 text-[0.7rem] text-white">{unreadMessages}</span>}
+                <MessageSquareText size={16} aria-hidden/>{t.message}{unreadMessages > 0 && <span className="rounded-full bg-brand-600 px-1.5 text-[0.8125rem] text-white">{unreadMessages}</span>}
               </button>
             )}
           </section>
 
           {otherCases.length > 0 && (
             <section aria-labelledby="other-cases-title" className="lg:col-start-1 lg:row-start-4">
-              <h2 id="other-cases-title" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.otherCases}</h2>
-              <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-white">
+              <h2 id="other-cases-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.otherCases}</h2>
+              <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-white">
                 {otherCases.map(other => (
                   <li key={other.id}>
                     <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-start hover:bg-mist/70" onClick={() => onOpenCase(other.id)}>

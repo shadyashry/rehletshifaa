@@ -27,7 +27,7 @@ export function PatientNav({ locale, view, unread, onView }: { locale: Locale; v
                 className={`rounded-lg px-3 py-2 text-[0.9rem] font-semibold transition ${view === item.id ? "bg-brand-50 text-brand-800" : "text-ink-600 hover:bg-mist hover:text-brand-800"}`}
                 onClick={() => onView(item.id)}>
           {item.label}
-          {item.id === "messages" && unread > 0 && <span className="ms-1.5 rounded-full bg-brand-600 px-1.5 text-[0.7rem] text-white" aria-label={ar ? `${unread} رسائل غير مقروءة` : `${unread} unread`}>{unread}</span>}
+          {item.id === "messages" && unread > 0 && <span className="ms-1.5 rounded-full bg-brand-600 px-1.5 text-[0.8125rem] text-white" aria-label={ar ? `${unread} رسائل غير مقروءة` : `${unread} unread`}>{unread}</span>}
         </button>
       ))}
     </nav>

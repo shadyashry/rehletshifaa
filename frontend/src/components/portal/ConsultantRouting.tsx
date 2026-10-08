@@ -84,14 +84,14 @@ export function EligibleConsultantPicker({ locale, caseId, careArea, value, onCh
   return <><fieldset>
     <legend className="text-sm font-bold">{t.choose}</legend>
     <p className="text-[0.8rem] text-ink-500">{t.chooseHint}</p>
-    <div className="mt-2 grid gap-2 md:grid-cols-2">{rows.map(c => <label key={c.practitionerId} className={`flex cursor-pointer gap-3 rounded-xl border p-3 text-sm ${value === c.practitionerId ? "border-brand-500 bg-brand-50" : "border-line"}`}>
+    <div className="mt-2 grid gap-2 md:grid-cols-2">{rows.map(c => <label key={c.practitionerId} className={`flex cursor-pointer gap-3 rounded-lg border p-3 text-sm ${value === c.practitionerId ? "border-brand-500 bg-brand-50" : "border-line"}`}>
       <input type="radio" name={`consultant-${caseId}`} className="mt-1" checked={value === c.practitionerId} onChange={() => onChange(c.practitionerId)}/>
       <span className="min-w-0">
         <strong className="block text-ink-900">{c.displayName}</strong>
         <span className="block text-ink-600">{[c.specialty, c.subspecialty].filter(Boolean).join(" · ")}</span>
-        {c.capabilities.length > 0 && <span className="mt-1 flex flex-wrap gap-1">{c.capabilities.map(k => <span key={`${k.type}:${k.code}`} className="rounded-full bg-mist px-2 py-0.5 text-[0.72rem] font-semibold text-ink-700">{k.label}</span>)}</span>}
-        <span className="mt-1 block text-[0.78rem] text-ink-500">{[c.expectedReviewHours ? t.reviewTime(c.expectedReviewHours) : null, t.workload(c.activeCases, c.pendingOffers), c.languages].filter(Boolean).join(" · ")}</span>
-        {c.matchedBy === "APPROVED_CAPABILITY" && <span className="mt-1 block text-[0.78rem] font-semibold text-brand-700">{t.viaCapability}</span>}
+        {c.capabilities.length > 0 && <span className="mt-1 flex flex-wrap gap-1">{c.capabilities.map(k => <span key={`${k.type}:${k.code}`} className="rounded-full bg-mist px-2 py-0.5 text-[0.8125rem] font-semibold text-ink-700">{k.label}</span>)}</span>}
+        <span className="mt-1 block text-[0.8125rem] text-ink-500">{[c.expectedReviewHours ? t.reviewTime(c.expectedReviewHours) : null, t.workload(c.activeCases, c.pendingOffers), c.languages].filter(Boolean).join(" · ")}</span>
+        {c.matchedBy === "APPROVED_CAPABILITY" && <span className="mt-1 block text-[0.8125rem] font-semibold text-brand-700">{t.viaCapability}</span>}
       </span>
     </label>)}</div>
   </fieldset>{footer}</>;
@@ -120,7 +120,7 @@ export function ReferralConfirmation({ locale, caseId, careCategory, categories,
   if (referral === undefined) return <p role="status" className="text-sm text-ink-500">{t.loading}</p>;
   if (!referral) return <p className="text-sm text-ink-500">{t.noOpen}</p>;
   return <div className="space-y-3">
-    <div className="rounded-xl border border-line bg-mist p-3 text-sm">
+    <div className="rounded-lg border border-line bg-mist p-3 text-sm">
       <p className="font-bold text-ink-900">{referral.type === "TRANSFER" ? t.transfer : t.secondOpinion} · {t.referralFrom} {referral.fromConsultantName}</p>
       <p className="mt-1 whitespace-pre-wrap text-ink-700"><span className="font-semibold">{t.reason}:</span> {referral.clinicalReason}</p>
       {(referral.suggestedCareArea || referral.suggestedCapability || referral.suggestedConsultantName) && <p className="mt-1 text-ink-600"><span className="font-semibold">{t.suggested}:</span> {[areaName(referral.suggestedCareArea, categories, locale), referral.suggestedCapability, referral.suggestedConsultantName].filter(Boolean).join(" · ")}</p>}
@@ -177,7 +177,7 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
   return <section className="card space-y-4 p-4 sm:p-5" aria-label={t.referrals}>
     {secondOpinion && <form id="case-actions" className="space-y-2" onSubmit={e => { e.preventDefault(); const opinion = String(new FormData(e.currentTarget).get("opinion") ?? "").trim(); if (opinion) void mutate(`/doctor/cases/${caseId}/referrals/${secondOpinion.id}/opinion`, { opinion }).then(reloadRows); }}>
       <h3 className="font-bold text-brand-900">{t.yourOpinion}</h3>
-      <p className="whitespace-pre-wrap rounded-xl bg-mist p-3 text-sm text-ink-700"><span className="font-semibold">{t.reason}:</span> {secondOpinion.clinicalReason} ({t.referralFrom} {secondOpinion.fromConsultantName})</p>
+      <p className="whitespace-pre-wrap rounded-lg bg-mist p-3 text-sm text-ink-700"><span className="font-semibold">{t.reason}:</span> {secondOpinion.clinicalReason} ({t.referralFrom} {secondOpinion.fromConsultantName})</p>
       <textarea name="opinion" required maxLength={20000} className="field min-h-32" aria-label={t.yourOpinion}/>
       <p className="text-[0.8rem] text-ink-500">{t.opinionHint}</p>
       <button className="btn-primary" disabled={busy}>{t.submitOpinion}</button>
@@ -202,7 +202,7 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
       <h3 className="font-bold text-brand-900">{t.refer}</h3>
       <p className="text-[0.8rem] text-ink-500">{t.referHint}</p>
       <fieldset className="grid gap-2 sm:grid-cols-2"><legend className="text-sm font-bold">{t.type}</legend>
-        {(["SECOND_OPINION", "TRANSFER"] as const).map(k => <label key={k} className={`flex gap-2 rounded-xl border p-3 text-sm ${type === k ? "border-brand-500 bg-brand-50" : "border-line"} ${openOfType(k) ? "opacity-50" : ""}`}>
+        {(["SECOND_OPINION", "TRANSFER"] as const).map(k => <label key={k} className={`flex gap-2 rounded-lg border p-3 text-sm ${type === k ? "border-brand-500 bg-brand-50" : "border-line"} ${openOfType(k) ? "opacity-50" : ""}`}>
           <input type="radio" name="type" checked={type === k} disabled={openOfType(k)} onChange={() => setType(k)}/>
           <span><strong className="block">{k === "TRANSFER" ? t.transfer : t.secondOpinion}</strong>{k === "TRANSFER" ? t.transferHint : t.secondHint}</span>
         </label>)}

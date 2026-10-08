@@ -56,10 +56,10 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P2 | Labels are set at 0.7rem, 0.72rem, 0.75rem or `text-xs`, below the 13px floor (37+ in `Portal.tsx`). | PC | `Portal.tsx`, `CaseQueue.tsx`, `ClinicalReview.tsx`, `MyCare.tsx`, `JourneySnapshot.tsx` | typeset |
-| P2 | `rounded-xl` is used about 40 times instead of the 6/8px radii. | PC | portal components | polish |
-| P2 | Five `border-s-4` side-stripe callouts. | PC (detector) | `NotificationBell.tsx:101`, `Portal.tsx:339/454/479/639` | polish |
-| P2 | Amber tones, plus petrol-50 and cream washes behind the My Care cards. | PC | `MyCare.tsx`, `Portal.tsx` | polish |
+| Done (pass 2 sweep) | Labels are set at 0.7rem, 0.72rem, 0.75rem or `text-xs`, below the 13px floor (37+ in `Portal.tsx`). | PC | `Portal.tsx`, `CaseQueue.tsx`, `ClinicalReview.tsx`, `MyCare.tsx`, `JourneySnapshot.tsx` | typeset |
+| Done (pass 2 sweep) | `rounded-xl` is used about 40 times instead of the 6/8px radii. | PC | portal components | polish |
+| Done (pass 2 sweep) | Five `border-s-4` side-stripe callouts. | PC (detector) | `NotificationBell.tsx:101`, `Portal.tsx:339/454/479/639` | polish |
+| Partly done (washes gone; amber status tones wait for B1 status tokens) | Amber tones, plus petrol-50 and cream washes behind the My Care cards. | PC | `MyCare.tsx`, `Portal.tsx` | polish |
 | P2 | Nested cards: the "Services & costs" table and the Consultant intake summary. | PC (detector) | `Portal.tsx`, `ClinicalReview.tsx` | distill |
 | P2 | "Mark read" buttons are 32px tall and don't say which message they apply to. | PC | `CaseMessages.tsx` | harden |
 | P2 | An h2 on My Care ("other cases") is styled as an 11.5px uppercase label. | PC | `MyCare.tsx` | typeset |
@@ -67,7 +67,7 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 | P3 | Message timestamps use short US format. | PC | `CaseMessages.tsx` | clarify |
 | P3 | Currency is shown three ways ("$US 4,850.00", "4,850 US$", "$4,850"). | PC | `MyCare.tsx`, `Portal.tsx` | clarify |
 | P3 | Latin initials and country names appear on Arabic pages. | PC | `MyCare.tsx`, `Portal.tsx` | harden |
-| P2 | Nothing on My Care shows a representative whose account this is. | PC | `MyCare.tsx`, `PatientNav.tsx` | shape |
+| Done (pass 2) | Nothing on My Care shows a representative whose account this is. | PC | `MyCare.tsx`, `PatientNav.tsx` | shape |
 | P3 | Every portal view has the same page title, "RehletShifaa". | PC (detector) | `app/[locale]/portal/page.tsx` | harden |
 | Done | P0 My Care reload loop for linked patients. | PC | `AuthProvider.tsx`, `Portal.tsx`, `e2e/my-care.spec.ts` | harden (`6ea32d2`) |
 
@@ -281,8 +281,8 @@ Source: `.impeccable/critique/2026-10-07T21-50-23Z__frontend-src-components-port
 | Done (pass 2) | Arabic patients cannot accept a proposal but can decline it. This follows the owner's GATE 2 decision (option B). Proposed: a coordinator-mediated path ("your coordinator goes through the terms with you in Arabic and records your decision"; `RecordPatientResponse` exists), de-emphasise Decline while Accept is blocked, and treat Arabic terms approval as a launch blocker. **Owner decision needed.** | Re-critique A | `PatientProposal.tsx`, `lib/commercial-terms.ts` | clarify / harden |
 | Done (pass 2) | Coordinator case: the current-action "Assign Consultant" button plus a second inline "Assign a Consultant" form with its own button. The care-area select is blank, and "No eligible consultant" has no next step. | Re-critique A | `CurrentAction.tsx`, `CoordinatorActions.tsx`, `ConsultantRouting.tsx` | clarify |
 | Done (pass 2) | The staff home is still a template dashboard: off-palette KPI tiles, disabled zero tiles, an empty My work landing, the marketing footer, and no staff navigation in the header. Already planned as the P2 staff-home distill; raised to P1. | Re-critique A | `RoleDashboardSummary.tsx`, `CaseQueue.tsx`, `MyWork.tsx`, `Portal.tsx`, `Footer.tsx` | distill / layout |
-| P2 | My Care is five boxed cards and never names the patient. A representative ("Care for: [name]") is invisible, and the avatar reads "ME". | Re-critique A | `MyCare.tsx`, `PatientNav.tsx` | layout |
-| P2 | Proposal drawer: the sticky header and the embedded deposit-terms box count as nested surfaces. The open drawer has a 1px border with a wide shadow. On phones it is a centred modal, not a full-height sheet. | Re-critique B, A | `Portal.tsx` `CaseDrawer`, `CoordinationDepositTerms.tsx` | polish / adapt |
+| Done (pass 2) | My Care is five boxed cards and never names the patient. A representative ("Care for: [name]") is invisible, and the avatar reads "ME". | Re-critique A | `MyCare.tsx`, `PatientNav.tsx` | layout |
+| Done (pass 2; phone sheet, unframed terms) | Proposal drawer: the sticky header and the embedded deposit-terms box count as nested surfaces. The open drawer has a 1px border with a wide shadow. On phones it is a centred modal, not a full-height sheet. | Re-critique B, A | `Portal.tsx` `CaseDrawer`, `CoordinationDepositTerms.tsx` | polish / adapt |
 | P2 | The drawer leads with the price, and the label says "recommended services" even when there is no recommendation. Consider the Consultant's recommendation first ("understanding before commitment"). | Re-critique A | `PatientProposal.tsx` | shape |
 | P2 | The deposit terms are badged "Pending legal review" but state concrete refund promises (F2 is open). This is a truthfulness tension for legal. | Re-critique A | `lib/commercial-terms.ts` | — (legal) |
 | P3 | AR "العرض" (My Care) vs "مقترحك" (drawer); the estimate card says "your treating doctor" where the drawer says "Consultant"; no WhatsApp route in My Care; the coordinator lead isn't labelled as a lead. | Re-critique A | `MyCare.tsx`, `messages/*.json`, `Portal.tsx` | clarify |

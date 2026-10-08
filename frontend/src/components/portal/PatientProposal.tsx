@@ -165,7 +165,7 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
               </div>
             </div>
           ) : (
-            <CoordinationDepositTerms id="portal-deposit-terms" locale={locale} currency={proposal.currency} level={3} />
+            <CoordinationDepositTerms id="portal-deposit-terms" locale={locale} currency={proposal.currency} level={3} framed={false} />
           )}
         </div>
       </details>

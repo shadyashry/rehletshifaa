@@ -118,12 +118,12 @@ export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClos
           <ul className="mt-3 grid gap-2 sm:grid-cols-2">
             {CATALOGUE.map(entry => (
               <li key={entry.code}>
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 text-sm has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 text-sm has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
                   <input type="checkbox" className="mt-0.5 h-4.5 w-4.5 flex-none accent-brand-600" checked={selected.includes(entry.code)}
                          onChange={event => setSelected(current => event.target.checked ? [...current, entry.code] : current.filter(code => code !== entry.code))}/>
                   <span>
                     <span className="font-semibold text-ink-800">{ar ? entry.ar : entry.en}</span>
-                    <span className="block text-xs text-ink-500">{entry.kind === "DOCUMENT" ? t.document : t.info}</span>
+                    <span className="block text-[0.8125rem] text-ink-500">{entry.kind === "DOCUMENT" ? t.document : t.info}</span>
                   </span>
                 </label>
               </li>
@@ -132,8 +132,8 @@ export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClos
           {custom.length > 0 && (
             <ul className="mt-2 space-y-2">
               {custom.map(item => (
-                <li key={item.code} className="flex items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm">
-                  <span className="font-semibold text-ink-800">{item.label} <span className="text-xs font-normal text-ink-500">· {item.kind === "DOCUMENT" ? t.document : t.info}</span></span>
+                <li key={item.code} className="flex items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm">
+                  <span className="font-semibold text-ink-800">{item.label} <span className="text-[0.8125rem] font-normal text-ink-500">· {item.kind === "DOCUMENT" ? t.document : t.info}</span></span>
                   <button type="button" className="icon-button" aria-label={`${t.cancel}: ${item.label}`}
                           onClick={() => setCustom(current => current.filter(entry => entry.code !== item.code))}><X size={16}/></button>
                 </li>
@@ -161,14 +161,14 @@ export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClos
         <label className="block text-sm font-bold text-ink-800">
           {t.message}
           <textarea className="field mt-2 min-h-24" maxLength={4000} value={message} onChange={event => setMessage(event.target.value)}/>
-          <span className="mt-1 block text-xs font-normal text-ink-500">{t.messageHint}</span>
+          <span className="mt-1 block text-[0.8125rem] font-normal text-ink-500">{t.messageHint}</span>
         </label>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3">
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3">
           <input type="checkbox" className="mt-1 h-4.5 w-4.5 flex-none accent-brand-600" checked={blocking} onChange={event => setBlocking(event.target.checked)}/>
           <span className="text-sm">
             <span className="font-semibold text-ink-800">{t.blocking}</span>
-            <span className="block text-xs text-ink-500">{t.blockingHint}</span>
+            <span className="block text-[0.8125rem] text-ink-500">{t.blockingHint}</span>
           </span>
         </label>
 
@@ -177,7 +177,7 @@ export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClos
           <input type="date" className="field mt-2" value={due} min={new Date().toISOString().slice(0, 10)} onChange={event => setDue(event.target.value)}/>
         </label>
 
-        {error && <p role="alert" className="rounded-xl bg-alert-50 p-3 text-sm text-alert-800">{error}</p>}
+        {error && <p role="alert" className="rounded-lg bg-alert-50 p-3 text-sm text-alert-800">{error}</p>}
 
         <div className="flex flex-col gap-2 sm:flex-row-reverse">
           <button className="btn-primary" disabled={busy}>{busy ? t.sending : t.send}</button>

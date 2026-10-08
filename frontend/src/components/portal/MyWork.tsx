@@ -66,19 +66,19 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
                       </span>
                     )}
                     {item.blocking && <span className="status-badge">{t.blocking}</span>}
-                    <span className="text-xs font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>
-                    {item.patientName && <bdi className="truncate text-xs font-semibold text-ink-700">{item.patientName}</bdi>}
+                    <span className="text-[0.8125rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>
+                    {item.patientName && <bdi className="truncate text-[0.8125rem] font-semibold text-ink-700">{item.patientName}</bdi>}
                   </div>
                   {/* The backend titles work in English; Arabic shows the work type in Arabic, English keeps the specific title. */}
                   <h3 id={titleId} dir="auto" className="mt-2 font-bold leading-6 text-ink-900">{workTitle(item, locale, work.workTitles)}</h3>
                   {/* Enough case identity to act without opening it first. */}
-                  <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] text-ink-600">
+                  <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-ink-600">
                     {item.careCategory && <span>{t.care}: <strong className="font-semibold text-ink-800">{careAreaLabel(item.careCategory, work.careAreas)}</strong></span>}
                     {item.coordinatorName && <span>{t.coordinator}: <strong className="font-semibold text-ink-800"><bdi>{item.coordinatorName}</bdi></strong></span>}
                     {!!item.documentCount && <span className="inline-flex items-center gap-1"><FileText size={12} aria-hidden/>{plural(locale, item.documentCount, work.plural.documents)}</span>}
                   </p>
                   {item.context && <p dir="auto" className="mt-1 line-clamp-2 text-sm leading-6 text-ink-600">{item.context}</p>}
-                  <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-500">
+                  <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.8125rem] text-ink-500">
                     <span className="inline-flex items-center gap-1"><Clock3 size={13} aria-hidden/>{age(item.createdAt, locale)}</span>
                     {item.dueAt && (
                       <span className={`inline-flex items-center gap-1 ${item.overdue ? "font-semibold text-alert-700" : ""}`}>
@@ -112,7 +112,7 @@ function PriorityChip({ priority, label }: { priority: string; label: string }) 
   if (priority === "URGENT") return <span className="status-badge !border-alert-200 !bg-alert-50 !text-alert-800">{label}</span>;
   if (priority === "HIGH") return <span className="status-badge">{label}</span>;
   if (priority === "NORMAL") return null;
-  return <span className="text-xs font-semibold text-ink-600">{label}</span>;
+  return <span className="text-[0.8125rem] font-semibold text-ink-600">{label}</span>;
 }
 
 function workTitle(item: WorkItem, locale: Locale, titles: Record<string, string>) {

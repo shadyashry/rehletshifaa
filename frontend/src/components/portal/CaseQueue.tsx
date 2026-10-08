@@ -162,13 +162,13 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
 
       <div className="relative">
         <button ref={filterButton} type="button" aria-expanded={filtersOpen} aria-controls="queue-filters"
-                className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-[0.85rem] font-semibold transition ${chips.length?"border-brand-600 bg-brand-50 text-brand-800":"border-line-strong bg-white text-ink-700 hover:border-brand-300"}`}
+                className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-[0.85rem] font-semibold transition ${chips.length?"border-brand-600 bg-brand-50 text-brand-800":"border-line-strong bg-white text-ink-700 hover:border-brand-300"}`}
                 onClick={()=>setFiltersOpen(value=>!value)}>
           <SlidersHorizontal size={16} aria-hidden/>{text.filters}
-          {chips.length>0&&<span className="rounded-full bg-brand-600 px-1.5 text-[0.7rem] font-bold text-white">{chips.length}</span>}
+          {chips.length>0&&<span className="rounded-full bg-brand-600 px-1.5 text-[0.8125rem] font-bold text-white">{chips.length}</span>}
         </button>
         {filtersOpen&&<div ref={filterPanel} id="queue-filters" role="dialog" aria-label={text.filters}
-             className="absolute end-0 top-12 z-40 w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-line bg-white p-4 shadow-xl">
+             className="absolute end-0 top-12 z-40 w-[min(30rem,calc(100vw-2rem))] rounded-lg border border-line bg-white p-4 shadow-[var(--shadow-raised)]">
           <div className="grid gap-3 sm:grid-cols-2">
             <FilterSelect label={text.status} value={current.status} options={[...new Set(scoped.map(item=>item.status))]} render={statusLabel} allLabel={text.all} onChange={value=>change({status:value||"active"})} baseLabel={text.active} baseValue="active"/>
             <FilterSelect label={text.country} value={current.country} options={countries} allLabel={text.allOption} onChange={value=>change({country:value})}/>
@@ -201,7 +201,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     </div>
 
     {chips.length>0&&<div className="flex flex-wrap items-center gap-2">
-      {chips.map(chip=><span key={String(chip.key)} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-mist px-2.5 py-1 text-[0.78rem] font-semibold text-ink-700">
+      {chips.map(chip=><span key={String(chip.key)} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-mist px-2.5 py-1 text-[0.8125rem] font-semibold text-ink-700">
         <span className="text-ink-500">{chip.label}:</span>{chip.value}
         <button type="button" className="-my-3 -me-2.5 inline-grid h-11 w-11 place-items-center rounded-full text-ink-500 hover:text-alert-700" aria-label={fillTemplate(text.remove,{label:chip.label,value:chip.value})} onClick={()=>clearChip(chip.key)}><X size={13}/></button>
       </span>)}
@@ -209,7 +209,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     </div>}
 
     {/* Bulk actions exist only once something is selected. */}
-    {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
+    {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2">
       <p className="text-[0.85rem] font-bold text-brand-900">{plural(locale,selectedCases.length,work.plural.selected)}</p>
       <div className="ms-auto flex flex-wrap gap-2">
         {canBulkClaim&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={async()=>{const failed:string[]=[];for(const item of selectedCases){const result=await onMutate(`/coordinator/cases/${item.id}/claim`);if(!result)failed.push(item.id);}
@@ -235,7 +235,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
 
       {!busy&&!list.length
         ?<div className="card px-6 py-10 text-center"><FolderOpen className="mx-auto mb-3 text-brand-600" size={26} aria-hidden/><h3 className="font-bold text-ink-900">{chips.length||state.search?text.noMatch:text.empty}</h3><p className="mt-1.5 text-[0.85rem] text-ink-500">{text.emptyHint}</p>{(chips.length>0||state.search)&&<button type="button" className="link-cta mt-4 text-[0.85rem]" onClick={()=>{clearAll();change({search:""});}}>{text.clearAll}</button>}</div>
-        :<ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
+        :<ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-white">
           {pageItems.map(item=>{
             const pending=item.assignmentStatus==="PENDING"&&item.assignmentId;
             const claimable=coordinator&&!item.coordinatorSubject&&item.status==="RECEIVED";
@@ -247,15 +247,15 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             const [titleBefore,titleAfter=""]=text.caseTitle.split("{number}");
             const title=item.patientName?<bdi>{item.patientName}</bdi>:<>{titleBefore}<bdi dir="ltr">{item.caseNumber}</bdi>{titleAfter}</>;
             const meta=<>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.72rem] font-bold ${statusTone(item.status)}`}>{statusLabel(item.status)}</span>
-              {item.waitingOn&&item.waitingOn!=="NONE"&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-600"><Hourglass size={12} className="text-brand-600" aria-hidden/>{text.waiting}: <strong className="font-semibold text-ink-800">{waitingLabel(item.waitingOn,work.waiting,{role,ownsCase:!!subject&&item.coordinatorSubject===subject})}</strong></span>}
-              {attention&&<span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.72rem] font-bold ${attention.tone}`}>{overdue&&<CircleAlert size={12} aria-hidden/>}{attention.label}</span>}
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.8125rem] font-bold ${statusTone(item.status)}`}>{statusLabel(item.status)}</span>
+              {item.waitingOn&&item.waitingOn!=="NONE"&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-600"><Hourglass size={12} className="text-brand-600" aria-hidden/>{text.waiting}: <strong className="font-semibold text-ink-800">{waitingLabel(item.waitingOn,work.waiting,{role,ownsCase:!!subject&&item.coordinatorSubject===subject})}</strong></span>}
+              {attention&&<span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.8125rem] font-bold ${attention.tone}`}>{overdue&&<CircleAlert size={12} aria-hidden/>}{attention.label}</span>}
             </>;
             const people=<>
-              <span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-600"><UserRound size={13} className="text-ink-400" aria-hidden/><bdi>{coordinatorLabel(item,subject,text)}</bdi></span>
-              {item.doctorName&&<span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-600"><Stethoscope size={13} className="text-ink-400" aria-hidden/><bdi>{item.doctorName}</bdi></span>}
-              {(item.openTaskCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-500"><ListTodo size={13} aria-hidden/>{plural(locale,item.openTaskCount??0,work.plural.openTasks)}</span>}
-              {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-500"><Files size={13} aria-hidden/>{plural(locale,item.documentCount??0,work.plural.documents)}</span>}
+              <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ink-600"><UserRound size={13} className="text-ink-400" aria-hidden/><bdi>{coordinatorLabel(item,subject,text)}</bdi></span>
+              {item.doctorName&&<span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ink-600"><Stethoscope size={13} className="text-ink-400" aria-hidden/><bdi>{item.doctorName}</bdi></span>}
+              {(item.openTaskCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><ListTodo size={13} aria-hidden/>{plural(locale,item.openTaskCount??0,work.plural.openTasks)}</span>}
+              {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><Files size={13} aria-hidden/>{plural(locale,item.documentCount??0,work.plural.documents)}</span>}
             </>;
             const actions=<>
               {claimable&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
@@ -271,8 +271,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                   <p className="truncate font-bold text-ink-900">{title}</p>
-                  {item.patientName&&<span className="text-[0.75rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>}
-                  {item.careCategory&&<span className="text-[0.75rem] text-ink-500">{categoryLabel(item.careCategory)}</span>}
+                  {item.patientName&&<span className="text-[0.8125rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>}
+                  {item.careCategory&&<span className="text-[0.8125rem] text-ink-500">{categoryLabel(item.careCategory)}</span>}
                   <button type="button" className="-my-3.5 inline-grid h-11 w-11 place-items-center text-ink-400 transition hover:text-brand-700" title={copied===item.id?text.copied:fillTemplate(text.copy,{number:item.caseNumber})} aria-label={fillTemplate(text.copy,{number:item.caseNumber})}
                           onClick={()=>{void navigator.clipboard?.writeText(item.caseNumber).then(()=>{setCopied(item.id);setTimeout(()=>setCopied(null),1500);}).catch(()=>{});}}>
                     {copied===item.id?<Check size={13}/>:<Copy size={13}/>}
@@ -280,7 +280,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">{meta}</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">{people}
-                  <span className="text-[0.75rem] text-ink-400">{claimable?text.received:text.updated} {new Intl.DateTimeFormat(locale,{day:"numeric",month:"short"}).format(new Date(claimable?item.createdAt:item.updatedAt))}</span>
+                  <span className="text-[0.8125rem] text-ink-400">{claimable?text.received:text.updated} {new Intl.DateTimeFormat(locale,{day:"numeric",month:"short"}).format(new Date(claimable?item.createdAt:item.updatedAt))}</span>
                 </div>
               </div>
               <div className="flex flex-none flex-wrap gap-2 sm:justify-end">{actions}</div>

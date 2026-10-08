@@ -33,7 +33,7 @@ export function WorkforceAdoptionPanel({ locale, token, onAccepted }: { locale: 
     <p className="mt-2 text-sm leading-6 text-ink-600">{ar ? "تحققت المنصة من البريد لدى مزود الهوية. يؤكد القبول ربط هذه الهوية؛ ولا تصبح الصلاحيات فعالة قبل التفعيل والتحقق بخطوتين." : "The platform resolved the verified email at the identity provider. Acceptance links this identity; authority remains inactive until activation and two-step verification succeed."}</p>
     {error && <p role="alert" className="mt-4 text-sm text-alert-800">{error}</p>}
     {items === null && !error ? <p role="status" className="mt-4 text-sm">{ar ? "جارٍ التحميل…" : "Loading…"}</p> : null}
-    {items?.map((item) => <div key={item.id} className="mt-5 rounded-xl border border-line p-4">
+    {items?.map((item) => <div key={item.id} className="mt-5 rounded-lg border border-line p-4">
       <strong className="block text-ink-900">{item.name}</strong><span className="block text-sm text-ink-600">{item.email}</span>
       <button type="button" className="btn-primary mt-4" onClick={() => void accept(item)}>{ar ? "قبول وربط هويتي" : "Accept and link my identity"}</button>
     </div>)}

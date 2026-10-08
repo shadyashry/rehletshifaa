@@ -143,7 +143,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
 
       {/* Evidence first: composing a recommendation should never mean leaving the page to find a file. */}
       <section aria-labelledby="review-documents" className="mt-4 rounded-lg border border-line bg-mist p-3">
-        <h4 id="review-documents" className="text-[0.7rem] font-bold uppercase tracking-[0.08em] text-ink-500">
+        <h4 id="review-documents" className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">
           {t.documents}{documents.length > 0 && <span className="text-ink-400"> · {documents.length}</span>}
         </h4>
         {documents.length === 0
@@ -179,7 +179,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
         {recommendationError && <p id="clinical-recommendation-error" role="alert" className="error-text mt-1">{recommendationError}</p>}
       </div>
 
-      <section aria-labelledby="recommended-services" className="mt-5 rounded-xl border border-line p-4">
+      <section aria-labelledby="recommended-services" className="mt-5 rounded-lg border border-line p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h4 id="recommended-services" className="text-[0.95rem] font-bold text-ink-900">{t.services}</h4>
@@ -193,7 +193,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
                 {currencies.map(code => <option key={code} value={code}>{CURRENCY_LABELS[code] ?? code}</option>)}
               </select>
             </label>
-            <p id="proposal-currency-hint" className="mt-1 max-w-xs text-[0.78rem] leading-5 text-ink-500">{t.currencyHint}</p>
+            <p id="proposal-currency-hint" className="mt-1 max-w-xs text-[0.8125rem] leading-5 text-ink-500">{t.currencyHint}</p>
           </div>
         </div>
 
@@ -208,11 +208,11 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
                       <input type="checkbox" className="h-4 w-4 flex-none accent-brand-600" checked={on} onChange={() => toggle(service.id)}/>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[0.9rem] font-semibold text-ink-900">{service.serviceName}</span>
-                        {service.category && <span className="block text-[0.78rem] text-ink-500">{service.category}</span>}
+                        {service.category && <span className="block text-[0.8125rem] text-ink-500">{service.category}</span>}
                       </span>
                       <span className="flex-none text-end">
                         <span className="block whitespace-nowrap text-[0.9rem] font-bold text-ink-800">{money(service.priceEgp, BASE, locale)}</span>
-                        {converted && <span className="block whitespace-nowrap text-[0.75rem] text-ink-500">≈ {money(service.priceEgp * rate, proposalCurrency, locale)}</span>}
+                        {converted && <span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">≈ {money(service.priceEgp * rate, proposalCurrency, locale)}</span>}
                       </span>
                     </label>
                   </li>
@@ -226,7 +226,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
               <li key={`${row.description}-${index}`} className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.9rem] font-semibold text-ink-900">{row.description}</span>
-                  <span className="block text-[0.75rem] font-bold text-amber-900">{t.needsFinance}</span>
+                  <span className="block text-[0.8125rem] font-bold text-amber-900">{t.needsFinance}</span>
                 </span>
                 <span className="flex-none whitespace-nowrap text-[0.9rem] font-bold text-ink-800">{money(row.amountEgp, BASE, locale)}</span>
                 <button type="button" className="flex-none text-[0.8rem] font-bold text-ink-500 hover:text-alert-700"
@@ -262,33 +262,33 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
       </div>
 
       {/* A last read-through before it leaves the consultant's hands — not another page, not another click. */}
-      <section aria-labelledby="recommendation-summary" className="mt-5 rounded-xl border border-brand-200 bg-brand-50 p-4">
-        <h4 id="recommendation-summary" className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.summary}</h4>
+      <section aria-labelledby="recommendation-summary" className="mt-5 rounded-lg border border-brand-200 bg-brand-50 p-4">
+        <h4 id="recommendation-summary" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.summary}</h4>
         <dl className="mt-3 grid gap-x-6 gap-y-3 text-[0.85rem] sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <dt className="text-[0.75rem] font-semibold text-ink-500">{t.recommendation}</dt>
+            <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.recommendation}</dt>
             <dd className="mt-0.5 line-clamp-2 font-semibold text-ink-900">{recommendation.trim() || <span className="font-normal text-ink-400">{t.notRecorded}</span>}</dd>
           </div>
           <div>
-            <dt className="text-[0.75rem] font-semibold text-ink-500">{t.servicesShort}</dt>
+            <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.servicesShort}</dt>
             <dd className="mt-0.5 font-semibold text-ink-900">{t.selectedCount(serviceCount)}</dd>
           </div>
           <div>
-            <dt className="text-[0.75rem] font-semibold text-ink-500">{t.documentsReviewed}</dt>
+            <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.documentsReviewed}</dt>
             <dd className="mt-0.5 font-semibold text-ink-900">{readyDocuments.length}</dd>
           </div>
           <div>
-            <dt className="text-[0.75rem] font-semibold text-ink-500">{t.baseEstimate}</dt>
+            <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.baseEstimate}</dt>
             <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(baseTotal, BASE, locale)}</dd>
           </div>
           {converted && (
             <div>
-              <dt className="text-[0.75rem] font-semibold text-ink-500">{t.proposalEstimate}</dt>
+              <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.proposalEstimate}</dt>
               <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(baseTotal * rate, proposalCurrency, locale)}</dd>
             </div>
           )}
         </dl>
-        {converted && <p className="mt-2 text-[0.75rem] text-ink-500">{t.approxNote}</p>}
+        {converted && <p className="mt-2 text-[0.8125rem] text-ink-500">{t.approxNote}</p>}
 
         {error && <p role="alert" className="mt-3 rounded-lg border border-alert-200 bg-white px-3 py-2 text-[0.85rem] font-semibold text-alert-700">{error}</p>}
 
@@ -299,7 +299,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
       </section>
 
       {/* One disclosure, not four permanent cards: these are exits from the normal path, not alternatives to it. */}
-      <details className="mt-4 rounded-xl border border-line px-4 py-3">
+      <details className="mt-4 rounded-lg border border-line px-4 py-3">
         <summary className="cursor-pointer text-[0.85rem] font-semibold text-ink-600">{t.otherOutcome}</summary>
         <div className="mt-3 space-y-2" role="group" aria-label={t.otherOutcome}>
           {OUTCOMES.map(option => (
@@ -319,7 +319,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
                         onChange={event => setOutcomeReason(event.target.value)} placeholder={t.outcomeReasonPlaceholder}/>
               <button type="button" disabled={busy || !outcomeReason.trim()}
                       className={outcome === "NOT_SUITABLE"
-                        ? "mt-3 rounded-xl border border-alert-300 bg-alert-50 px-4 py-2 text-[0.9rem] font-bold text-alert-700 transition hover:border-alert-400 disabled:opacity-50"
+                        ? "mt-3 rounded-lg border border-alert-300 bg-alert-50 px-4 py-2 text-[0.9rem] font-bold text-alert-700 transition hover:border-alert-400 disabled:opacity-50"
                         : "btn-secondary mt-3"}
                       onClick={() => { if (outcome !== "NOT_SUITABLE" || window.confirm(t.confirmUnsuitable)) submitOutcome(); }}>
                 {t.outcomeConfirm[outcome]}

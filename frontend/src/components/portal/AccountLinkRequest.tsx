@@ -84,14 +84,14 @@ export function AccountLinkRequest({ locale, token, api, onResolved }: { locale:
     <section className="card mb-6 border-brand-200 p-6 md:p-8" role="dialog" aria-labelledby="account-link-title" lang={locale}>
       <p className="eyebrow">{t.eyebrow}</p>
       <h2 id="account-link-title" className="title mt-2">{t.title}</h2>
-      {error && <p role="alert" className="mt-4 rounded-xl bg-alert-50 p-4 text-sm text-alert-800">{error}</p>}
+      {error && <p role="alert" className="mt-4 rounded-lg bg-alert-50 p-4 text-sm text-alert-800">{error}</p>}
       {view && !done && (
         <>
           <p className="lead mt-3">{t.intro(view.caseNumber, view.patientDisplayName)}</p>
           <p className="mt-2 text-sm leading-6 text-ink-500">{t.why}</p>
           <div className="mt-6 grid gap-3" role="radiogroup" aria-label={t.title}>
             {([["SAME_PATIENT", t.me, t.meHelp], ["REPRESENTATIVE", t.rep, t.repHelp], ["DECLINED", t.decline, t.declineHelp]] as const).map(([key, label, help]) => (
-              <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${choice === key ? "border-brand-600 bg-brand-50" : "border-line bg-white hover:border-brand-300"}`}>
+              <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${choice === key ? "border-brand-600 bg-brand-50" : "border-line bg-white hover:border-brand-300"}`}>
                 <input type="radio" name="account-link" className="mt-1 h-5 w-5 accent-brand-600" value={key} checked={choice === key} onChange={() => setChoice(key)} />
                 <span><strong className="block text-ink-900">{label}</strong><span className="text-sm leading-6 text-ink-500">{help}</span></span>
               </label>

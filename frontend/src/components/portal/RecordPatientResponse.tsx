@@ -76,7 +76,7 @@ export function RecordPatientResponse({ locale, caseId, action, mutate, open: co
                 {t.note}
                 <textarea className="field mt-2 min-h-16" maxLength={4000} value={note} onChange={event => setNote(event.target.value)}/>
               </label>
-              <p className="rounded-xl bg-mist p-3 text-xs leading-5 text-ink-600">{t.provenance}</p>
+              <p className="rounded-lg bg-mist p-3 text-[0.8125rem] leading-5 text-ink-600">{t.provenance}</p>
               <div className="flex flex-col gap-2 sm:flex-row-reverse">
                 <button className="btn-primary" disabled={busy}>{busy ? t.saving : t.save}</button>
                 <button type="button" className="btn-secondary" onClick={() => dialog.current?.close()}>{t.cancel}</button>

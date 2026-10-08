@@ -80,7 +80,7 @@ export function DeclineAssignmentDialog({ locale, caseNumber, busy, onConfirm, o
           <ul className="mt-2.5 space-y-2">
             {REASONS.map((entry, index) => (
               <li key={entry.code}>
-                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line px-3.5 py-2.5 text-[0.9rem] transition has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-line px-3.5 py-2.5 text-[0.9rem] transition has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
                   <input type="radio" name={`${groupId}-reason`} value={entry.code} className="h-4 w-4 flex-none accent-brand-600"
                          checked={code === entry.code} autoFocus={index === 0}
                          onChange={() => { setCode(entry.code); setTouched(false); }}/>
@@ -99,7 +99,7 @@ export function DeclineAssignmentDialog({ locale, caseNumber, busy, onConfirm, o
         </label>
 
         <div className="flex flex-col gap-2 sm:flex-row-reverse">
-          <button className="inline-flex min-h-11 items-center justify-center rounded-xl border border-alert-200 bg-white px-4 font-semibold text-alert-700 transition hover:border-alert-400 hover:bg-alert-50 disabled:opacity-55"
+          <button className="inline-flex min-h-11 items-center justify-center rounded-lg border border-alert-200 bg-white px-4 font-semibold text-alert-700 transition hover:border-alert-400 hover:bg-alert-50 disabled:opacity-55"
                   disabled={busy}>
             {t.confirm}
           </button>

@@ -1138,6 +1138,9 @@
       "hint": "Select a count to show only those cases. Select it again to show every case.",
       "nothing": "No cases need action right now."
     },
+    "patient": {
+      "careFor": "Care for {name}"
+    },
     "nav": {
       "label": "Your work",
       "work": "My work",

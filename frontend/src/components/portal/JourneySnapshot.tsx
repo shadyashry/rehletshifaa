@@ -27,7 +27,7 @@ export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, o
 
   return (
     <section aria-labelledby="journey-pulse-title" className="card p-4">
-      <h2 id="journey-pulse-title" className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">
+      <h2 id="journey-pulse-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">
         {ar ? "الرحلة" : "Journey"}
       </h2>
 
@@ -54,7 +54,7 @@ export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, o
       </ol>
 
       {waitingOn && waitingOn !== "NONE" && (
-        <p className={`mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.72rem] font-bold ${
+        <p className={`mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.8125rem] font-bold ${
           blocked ? "border-amber-200 bg-amber-50 text-amber-900" : "border-brand-200 bg-brand-50 text-brand-800"}`}>
           {work.waiting.label}: {waitingLabel(waitingOn, work.waiting, { role: viewerRole, ownsCase })}
         </p>
@@ -94,7 +94,7 @@ export function FullJourneyDialog({ locale, timeline, caseNumber, onClose }: {
         {groups.length === 0 && <p className="text-[0.9rem] text-ink-500">{ar ? "لا يوجد سجل بعد." : "No history yet."}</p>}
         {groups.map(group => (
           <section key={group.key} className="mb-5 last:mb-0">
-            <h3 className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">{group.label}</h3>
+            <h3 className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">{group.label}</h3>
             <ol className="relative mt-2.5 space-y-3.5 border-s border-line ps-4">
               {group.events.map(event => (
                 <li key={`${event.status}-${event.occurredAt}`} className="relative">
@@ -105,12 +105,12 @@ export function FullJourneyDialog({ locale, timeline, caseNumber, onClose }: {
                   <p className={`text-[0.9rem] leading-5 ${event.current ? "font-bold text-brand-900" : "font-semibold text-ink-800"}`}>
                     {stageLabel(event.status, locale)}
                   </p>
-                  <p className="mt-0.5 text-[0.78rem] leading-5 text-ink-500">
+                  <p className="mt-0.5 text-[0.8125rem] leading-5 text-ink-500">
                     {new Date(event.occurredAt).toLocaleString(locale, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                     {event.actorName ? ` · ${event.actorName}` : ""}
                     {event.actorRole && event.actorName && event.actorRole !== "SYSTEM" ? ` · ${roleLabel(event.actorRole, locale)}` : ""}
                   </p>
-                  {event.note && <p className="mt-1 text-[0.78rem] leading-5 text-ink-600">{event.note}</p>}
+                  {event.note && <p className="mt-1 text-[0.8125rem] leading-5 text-ink-600">{event.note}</p>}
                 </li>
               ))}
             </ol>

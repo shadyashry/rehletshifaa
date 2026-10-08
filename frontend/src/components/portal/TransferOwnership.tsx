@@ -69,11 +69,11 @@ export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, cu
   };
 
   if (step === "done") return <div className="space-y-4">
-    <p ref={result} tabIndex={-1} role="status" className="rounded-xl bg-brand-50 p-4 text-sm text-brand-800 outline-none">{self ? t.doneSelf : t.done(name)}</p>
+    <p ref={result} tabIndex={-1} role="status" className="rounded-lg bg-brand-50 p-4 text-sm text-brand-800 outline-none">{self ? t.doneSelf : t.done(name)}</p>
     <button type="button" className="btn-secondary w-full justify-center" onClick={onClose}>{t.close}</button>
   </div>;
 
-  if (!coordinators.length) return <p className="rounded-xl border border-dashed border-line-strong bg-mist p-4 text-sm text-ink-600">{t.none}</p>;
+  if (!coordinators.length) return <p className="rounded-lg border border-dashed border-line-strong bg-mist p-4 text-sm text-ink-600">{t.none}</p>;
 
   if (step === "review") return <section aria-labelledby="transfer-review-title" className="space-y-4">
     <h3 id="transfer-review-title" className="font-bold text-brand-900">{t.review}</h3>
@@ -122,7 +122,7 @@ export function TransferOwnership({ locale, caseId, caseNumber, currentOwner, cu
     </fieldset>
     <label className="block text-sm font-bold">{t.reason}
       <textarea className="field mt-2 min-h-24" required maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t.placeholder} aria-describedby="transfer-reason-hint"/>
-      <span id="transfer-reason-hint" className="mt-1 block text-xs font-normal text-ink-500">{t.reasonHint}</span>
+      <span id="transfer-reason-hint" className="mt-1 block text-[0.8125rem] font-normal text-ink-500">{t.reasonHint}</span>
     </label>
     <div className="flex flex-wrap justify-end gap-2">
       <button type="button" className="btn-secondary" onClick={onClose}>{t.cancel}</button>
