@@ -219,7 +219,8 @@ Update at the end of every phase.
 
 Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08); the follow-up
 commit on `feat/ux-redesign-pass-3` is not merged or pushed yet. The tunnel stack runs `9e3b336` (V76); live checks must run from a network that
-reaches `*.rehletshifaa.com`. Next engineering candidate: the full Portal module split. The tunnel stack runs `40565e5`; the picker commit is
-not merged, pushed or deployed yet. Owner decisions
+reaches `*.rehletshifaa.com`. Next engineering candidate: the full Portal module split. `cfc1394` (representative picker) is pushed and deployed: the tunnel
+stack runs it (schema 77). A Docker engine restart stopped the stack right after that rebuild; it was brought back
+with the standard tunnel-overlay command (only cloudflared restarts on its own). Owner decisions
 still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
 amber tones; proposal drawer order (price first approved, recommendation-first suggestion kept in the backlog).
