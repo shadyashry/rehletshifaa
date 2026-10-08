@@ -52,11 +52,13 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
     java.util.List<PatientActionRow> findOpenPatientActionRowsOfType(@Param("caseId") UUID caseId, @Param("type") String type,
                                                                      org.springframework.data.domain.Limit limit);
 
-    interface CaseWorkRow { UUID getId(); String getTaskType(); String getTitle(); String getDescription(); Instant getDueAt(); Long getVersion(); }
+    interface CaseWorkRow { UUID getId(); String getTaskType(); String getTitle(); String getDescription(); Instant getDueAt(); Long getVersion();
+        String getCopyCode(); String getCopyParams(); }
 
     /** The subject's open internal work on one case: blocking first, then most urgent, then oldest (pass {@code Limit.of(1)}). */
     @Query("""
-            select t.id as id, t.taskType as taskType, t.title as title, t.description as description, t.dueAt as dueAt, t.version as version
+            select t.id as id, t.taskType as taskType, t.title as title, t.description as description, t.dueAt as dueAt, t.version as version,
+                t.copyCode as copyCode, t.copyParams as copyParams
             from CaseTask t
             where t.caseId = :caseId and t.ownerSubject = :owner and t.visibilityScope = 'INTERNAL' and t.status in ('OPEN', 'IN_PROGRESS')
             order by case when t.blocking = true then 0 else 1 end,
@@ -69,7 +71,7 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
         UUID getId(); UUID getCaseId(); String getTaskType(); String getTitle(); String getDescription(); String getPriority();
         String getStatus(); Boolean getBlocking(); Instant getDueAt(); Instant getCreatedAt(); Long getVersion();
         String getCaseNumber(); com.rehletshifaa.casemanagement.domain.CaseStatus getCaseStatus(); String getWaitingOn();
-        String getCareCategory(); String getPatientName();
+        String getCareCategory(); String getPatientName(); String getCopyCode(); String getCopyParams();
     }
 
     /** Open work owned by the subject: most urgent first, then soonest due (undated last), then oldest. */
@@ -77,7 +79,8 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
             select t.id as id, t.caseId as caseId, t.taskType as taskType, t.title as title, t.description as description,
                 t.priority as priority, t.status as status, t.blocking as blocking, t.dueAt as dueAt, t.createdAt as createdAt,
                 t.version as version, c.caseNumber as caseNumber, c.status as caseStatus, c.waitingOn as waitingOn,
-                c.careCategory as careCategory, trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as patientName
+                c.careCategory as careCategory, trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as patientName,
+                t.copyCode as copyCode, t.copyParams as copyParams
             from CaseTask t join MedicalCase c on c.id = t.caseId left join PatientProfile p on p.id = c.patientId
             where t.ownerSubject = :owner and t.status in ('OPEN', 'IN_PROGRESS')
             order by case t.priority when 'URGENT' then 0 when 'HIGH' then 1 when 'NORMAL' then 2 else 3 end,

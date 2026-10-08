@@ -1197,6 +1197,65 @@
       "INFORMATION_REQUEST": "Follow up the information request",
       "DOCUMENT_REVIEW": "Review the documents"
     },
+    "workCopy": {
+      "said": "They said: “{text}”",
+      "fallback": {
+        "consultant": "The Consultant",
+        "assignee": "The Consultant",
+        "patient": "The patient",
+        "caseNumber": "this case"
+      },
+      "items": {
+        "NEW_ASSIGNMENT_CLINICAL": {
+          "title": "New clinical assignment",
+          "context": "You have been assigned case {caseNumber} for clinical review. Accept it to start, or decline so the coordinator can reassign."
+        },
+        "NEW_ASSIGNMENT": {
+          "title": "New case assignment",
+          "context": "You have been assigned case {caseNumber} for review. Accept it to start, or decline so the coordinator can reassign."
+        },
+        "RECOMMENDATION_READY": {
+          "title": "Clinical recommendation ready — prepare the proposal",
+          "context": "{consultant} submitted a clinical recommendation and the recommended services. Review them and prepare the patient proposal."
+        },
+        "SECOND_OPINION_REQUESTED": {
+          "title": "Second opinion requested — assign another Consultant",
+          "context": "{consultant} asked for a second opinion. Choose the additional Consultant."
+        },
+        "CLINICALLY_UNSUITABLE": {
+          "title": "Case marked clinically unsuitable",
+          "context": "{consultant} assessed this case as not clinically suitable."
+        },
+        "RETURNED_WITHOUT_RECOMMENDATION": {
+          "title": "Case returned without a clinical recommendation",
+          "context": "{consultant} returned the case without a recommendation."
+        },
+        "CLINICAL_REVIEW_DUE": {
+          "title": "Review the case and give your clinical recommendation",
+          "context": "Review the intake summary and documents, then record your recommendation."
+        },
+        "ASSIGNMENT_DECLINED": {
+          "title": "Assignment declined — reassign the case",
+          "context": "{assignee} declined this assignment. Choose another Consultant."
+        },
+        "PROPOSAL_DECLINED": {
+          "title": "Patient declined the proposal",
+          "context": "The patient declined this proposal."
+        },
+        "PROPOSAL_CHANGES_REQUESTED": {
+          "title": "Patient asked for changes to the proposal",
+          "context": "The patient asked for changes before continuing."
+        },
+        "PATIENT_RESPONDED": {
+          "title": "Review the information the patient provided",
+          "context": "{patient} answered your information request."
+        },
+        "PROPOSAL_TERMS_CALL": {
+          "title": "Go through the proposal terms with the patient in Arabic",
+          "context": "The patient asked you to go through the proposal’s terms with them in Arabic and record their decision."
+        }
+      }
+    },
     "assignConsultant": {
       "title": "Assign a Consultant",
       "hint": "Confirm or correct the care area, then choose a named Consultant. Only available Consultants with current credentials who match the area are listed.",

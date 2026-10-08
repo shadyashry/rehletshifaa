@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import en from "@/messages/en.json";
 import ar from "@/messages/ar.json";
 
-import { careAreaLabel, coordinatorLabel, plural, priorityLabel, tabKeyTarget, waitingLabel } from "./portal-labels";
+import { careAreaLabel, coordinatorLabel, plural, priorityLabel, tabKeyTarget, waitingLabel, workCopyText } from "./portal-labels";
 
 const keys = (value: unknown, prefix = ""): string[] =>
   value && typeof value === "object"
@@ -65,5 +65,22 @@ describe("portal labels", () => {
     expect(coordinatorLabel({ coordinatorSubject: "other", coordinatorName: "Sara Ahmed" }, "me", copy)).toBe("Sara Ahmed");
     expect(coordinatorLabel({ coordinatorSubject: "other", coordinatorName: null }, "me", copy)).toBe("Coordinator (name not set)");
     expect(coordinatorLabel({ coordinatorSubject: null, coordinatorName: null }, "me", copy)).toBe("Unassigned");
+  });
+});
+
+describe("workCopyText", () => {
+  const iso = (value: string) => `\u2068${value}\u2069`;
+  it("words a work item from its code in both locales, isolating names and the patient's words", () => {
+    const copy = { code: "PROPOSAL_DECLINED", params: { said: "Too far to travel" } };
+    expect(workCopyText(copy, en.portalWork.workCopy)).toEqual({ title: "Patient declined the proposal",
+      context: `The patient declined this proposal. They said: “${iso("Too far to travel")}”` });
+    expect(workCopyText(copy, ar.portalWork.workCopy)?.title).toBe("رفض المريض العرض");
+    expect(workCopyText(copy, ar.portalWork.workCopy)?.context).toContain(`«${iso("Too far to travel")}»`);
+    expect(workCopyText({ code: "RECOMMENDATION_READY", params: { consultant: "Dr Ahmed Alashry" } }, ar.portalWork.workCopy)?.context).toContain(iso("Dr Ahmed Alashry"));
+  });
+  it("falls back to a neutral name, and to the backend's English for an unknown code", () => {
+    expect(workCopyText({ code: "ASSIGNMENT_DECLINED", params: {} }, en.portalWork.workCopy)?.context).toBe("The Consultant declined this assignment. Choose another Consultant.");
+    expect(workCopyText({ code: "SOMETHING_NEW" }, en.portalWork.workCopy)).toBeNull();
+    expect(workCopyText(null, en.portalWork.workCopy)).toBeNull();
   });
 });

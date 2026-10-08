@@ -4,7 +4,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -20,7 +22,21 @@ public final class WorkDtos {
                                String waitingOn, String careCategory, String coordinatorName, long documentCount,
                                String type, String title, String context, String priority,
                                String status, boolean blocking, Instant dueAt, boolean overdue, Instant createdAt,
-                               long version) {}
+                               long version, WorkCopy copy) {}
+
+    /**
+     * How the portal words a work item in the reader's language: a message code plus its parameters (names, the
+     * patient's own words). Null for work that only has its English title.
+     */
+    public record WorkCopy(String code, Map<String, String> params) {
+        /** {@code keyValues} alternate key, value; blank values are left out so the message falls back to its default. */
+        public static WorkCopy of(String code, String... keyValues) {
+            Map<String, String> params = new LinkedHashMap<>();
+            for (int i = 0; i + 1 < keyValues.length; i += 2)
+                if (keyValues[i + 1] != null && !keyValues[i + 1].isBlank()) params.put(keyValues[i], keyValues[i + 1].trim());
+            return new WorkCopy(code, Map.copyOf(params));
+        }
+    }
 
     /**
      * Internal command for opening a work item; never bound from a request body. It carries no priority:
@@ -29,7 +45,13 @@ public final class WorkDtos {
      */
     public record NewWorkItem(UUID caseId, String type, String title, String context, String ownerSubject,
                               String ownerRole, boolean blocking, Instant dueAt, String createdBy,
-                              String eventType, String idempotencyKey, boolean email) {}
+                              String eventType, String idempotencyKey, boolean email, WorkCopy copy) {
+        /** Work worded only by its English title (no message code yet). */
+        public NewWorkItem(UUID caseId, String type, String title, String context, String ownerSubject, String ownerRole,
+                           boolean blocking, Instant dueAt, String createdBy, String eventType, String idempotencyKey, boolean email) {
+            this(caseId, type, title, context, ownerSubject, ownerRole, blocking, dueAt, createdBy, eventType, idempotencyKey, email, null);
+        }
+    }
 
     public record NotificationView(UUID id, UUID caseId, String caseNumber, UUID taskId, String eventType,
                                    String title, String context, Instant createdAt, boolean read) {}

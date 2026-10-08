@@ -51,7 +51,7 @@ public class CaseActionQueryService {
         boolean hasAssignment(String role) { return openAssignments.stream().anyMatch(a -> a.role().equals(role)); }
     }
 
-    record WorkItem(UUID id, String type, String title, String context, Instant dueAt, long version) {}
+    record WorkItem(UUID id, String type, String title, String context, Instant dueAt, long version, com.rehletshifaa.journey.api.WorkDtos.WorkCopy copy) {}
 
     record Proposal(String status, boolean requiresFinance, boolean operationsDone, boolean financeDone, boolean finalQuote) {}
 
@@ -72,7 +72,7 @@ public class CaseActionQueryService {
     WorkItem myWork(UUID caseId, String subject) {
         return tasks.findOpenInternalWorkOf(caseId, subject, Limit.of(1)).stream().findFirst()
                 .map(t -> new WorkItem(t.getId(), t.getTaskType(), work.decryptText(t.getTitle()), work.decryptText(t.getDescription()),
-                        t.getDueAt(), t.getVersion()))
+                        t.getDueAt(), t.getVersion(), work.copyOf(t.getCopyCode(), t.getCopyParams())))
                 .orElse(null);
     }
 

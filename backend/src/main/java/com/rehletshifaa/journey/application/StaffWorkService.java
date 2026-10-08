@@ -94,7 +94,9 @@ public class StaffWorkService {
             return existing;
         }
         UUID id = UUID.randomUUID();
-        tasks.saveAndFlush(new CaseTask(id, item.caseId(), item.type(), encrypt(item.title()), encryptNullable(item.context()), item.ownerSubject(), item.ownerRole(), "INTERNAL", derivePriority(item.blocking(), item.dueAt(), now), item.blocking(), item.dueAt(), item.createdBy(), now));
+        CaseTask task = new CaseTask(id, item.caseId(), item.type(), encrypt(item.title()), encryptNullable(item.context()), item.ownerSubject(), item.ownerRole(), "INTERNAL", derivePriority(item.blocking(), item.dueAt(), now), item.blocking(), item.dueAt(), item.createdBy(), now);
+        if (item.copy() != null) task.withCopy(item.copy().code(), encrypt(writeParams(item.copy().params())));
+        tasks.saveAndFlush(task);
         audit(item.caseId(), "CASE_WORK_ITEM_OPENED", id, item.type());
         notify(item, id, now);
         return id;
@@ -305,6 +307,27 @@ public class StaffWorkService {
     private String decrypt(String value) { return com.rehletshifaa.shared.crypto.EncryptedText.decodeNullable(crypto, value); }
     /** Work-item text as stored by this service (encrypted at rest). */
     public String decryptText(String stored) { return decrypt(stored); }
+
+    /** The stored code and encrypted parameters as the portal reads them; null when the task has only its English title. */
+    public WorkCopy copyOf(String code, String storedParams) { return copyOf(crypto, code, storedParams); }
+
+    static WorkCopy copyOf(CryptoService crypto, String code, String storedParams) {
+        if (code == null) return null;
+        String raw = com.rehletshifaa.shared.crypto.EncryptedText.decodeNullable(crypto, storedParams);
+        try {
+            return new WorkCopy(code, raw == null || raw.isBlank() ? java.util.Map.of() : JSON.readValue(raw, PARAMS));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException unreadable) {
+            return new WorkCopy(code, java.util.Map.of()); // the message's defaults rather than a broken page
+        }
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+    private static final com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, String>> PARAMS = new com.fasterxml.jackson.core.type.TypeReference<>() {};
+
+    private static String writeParams(java.util.Map<String, String> params) {
+        try { return JSON.writeValueAsString(params == null ? java.util.Map.of() : params); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException impossible) { throw new IllegalStateException(impossible); }
+    }
     private static String json(String value) { return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\""); }
 
     private void audit(UUID caseId, String type, UUID entityId, String reason) {

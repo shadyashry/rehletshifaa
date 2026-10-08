@@ -78,7 +78,7 @@ public class StaffWorkQueryService {
                 names.get(coordinators.get(row.getCaseId())), documentCounts.getOrDefault(row.getCaseId(), 0L),
                 row.getTaskType(), decrypt(row.getTitle()), decrypt(row.getDescription()), row.getPriority(), row.getStatus(),
                 Boolean.TRUE.equals(row.getBlocking()), row.getDueAt(), row.getDueAt() != null && row.getDueAt().isBefore(now),
-                row.getCreatedAt(), row.getVersion())).toList();
+                row.getCreatedAt(), row.getVersion(), StaffWorkService.copyOf(crypto, row.getCopyCode(), row.getCopyParams()))).toList();
     }
 
     /** My latest notifications and how many are unread. Listing never marks anything read. */

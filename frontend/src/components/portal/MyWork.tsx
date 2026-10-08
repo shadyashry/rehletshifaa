@@ -4,13 +4,15 @@ import { ArrowRight, CalendarClock, CircleAlert, Clock3, FileText } from "lucide
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import type { Locale } from "@/lib/i18n";
-import { careAreaLabel, plural, priorityLabel, waitingLabel } from "@/lib/portal-labels";
+import { careAreaLabel, plural, priorityLabel, waitingLabel, workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
 
 export type WorkItem = {
   id: string; caseId: string; caseNumber: string; patientName: string | null; caseStatus: string;
   waitingOn: string | null; careCategory?: string | null; coordinatorName?: string | null; documentCount?: number;
   type: string; title: string; context: string | null; priority: string;
   status: string; blocking: boolean; dueAt: string | null; overdue: boolean; createdAt: string; version: number;
+  /** The wording code and parameters; the English `title`/`context` are the fallback for codes this page does not know. */
+  copy?: WorkItemCopy | null;
 };
 
 /**
@@ -54,6 +56,7 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
           {items.map((item, index) => {
             const lead = index === 0 && (item.overdue || item.priority === "URGENT");
             const titleId = `work-item-${item.id}`;
+            const text = worded(item, locale, work);
             return (
             <li key={item.id}>
               <article aria-labelledby={titleId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:gap-6">
@@ -70,14 +73,14 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
                     {item.patientName && <bdi className="truncate text-[0.8125rem] font-semibold text-ink-700">{item.patientName}</bdi>}
                   </div>
                   {/* The backend titles work in English; Arabic shows the work type in Arabic, English keeps the specific title. */}
-                  <h3 id={titleId} dir="auto" className="mt-2 font-bold leading-6 text-ink-900">{workTitle(item, locale, work.workTitles)}</h3>
+                  <h3 id={titleId} dir="auto" className="mt-2 font-bold leading-6 text-ink-900">{text.title}</h3>
                   {/* Enough case identity to act without opening it first. */}
                   <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-ink-600">
                     {item.careCategory && <span>{t.care}: <strong className="font-semibold text-ink-800">{careAreaLabel(item.careCategory, work.careAreas)}</strong></span>}
                     {item.coordinatorName && <span>{t.coordinator}: <strong className="font-semibold text-ink-800"><bdi>{item.coordinatorName}</bdi></strong></span>}
                     {!!item.documentCount && <span className="inline-flex items-center gap-1"><FileText size={12} aria-hidden/>{plural(locale, item.documentCount, work.plural.documents)}</span>}
                   </p>
-                  {item.context && <p dir="auto" className="mt-1 line-clamp-2 text-sm leading-6 text-ink-600">{item.context}</p>}
+                  {text.context && <p dir="auto" className="mt-1 line-clamp-2 text-sm leading-6 text-ink-600">{text.context}</p>}
                   <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.8125rem] text-ink-500">
                     <span className="inline-flex items-center gap-1"><Clock3 size={13} aria-hidden/>{age(item.createdAt, locale)}</span>
                     {item.dueAt && (
@@ -115,9 +118,12 @@ function PriorityChip({ priority, label }: { priority: string; label: string }) 
   return <span className="text-[0.8125rem] font-semibold text-ink-600">{label}</span>;
 }
 
-function workTitle(item: WorkItem, locale: Locale, titles: Record<string, string>) {
-  const localized = Object.hasOwn(titles, item.type) ? titles[item.type] : undefined;
-  return (locale === "ar" ? localized : undefined) ?? (item.title || localized || "");
+/** From the wording code when this page knows it; otherwise the backend's English, titled by type in Arabic. */
+function worded(item: WorkItem, locale: Locale, work: ReturnType<typeof useWorkCopy>) {
+  const known = workCopyText(item.copy, work.workCopy);
+  if (known) return known;
+  const localized = Object.hasOwn(work.workTitles, item.type) ? work.workTitles[item.type as keyof typeof work.workTitles] : undefined;
+  return { title: (locale === "ar" ? localized : undefined) ?? (item.title || localized || ""), context: item.context };
 }
 
 function age(iso: string, locale: Locale) {

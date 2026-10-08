@@ -349,7 +349,7 @@ public class CaseActionService {
 
     private CurrentActionView workItem(WorkItem w) {
         boolean overdue = w.dueAt() != null && w.dueAt().isBefore(clock.instant());
-        return new CurrentActionView("WORK_ITEM", "COMPLETE".equals(kindFor(w.type())) ? "COMPLETE" : "FOCUS", w.title(), w.context(), w.id(), w.version(), w.type(), w.dueAt(), overdue, null);
+        return new CurrentActionView("WORK_ITEM", "COMPLETE".equals(kindFor(w.type())) ? "COMPLETE" : "FOCUS", w.title(), w.context(), w.id(), w.version(), w.type(), w.dueAt(), overdue, null, w.copy());
     }
 
     /** Whether finishing the item is acknowledged in place or done through the form that does the real work. */

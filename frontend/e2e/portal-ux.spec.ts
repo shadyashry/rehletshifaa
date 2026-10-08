@@ -108,6 +108,14 @@ for(const locale of ["en","ar"]){
   }
 }
 
+test("My work words an item from its code in Arabic, keeping the case number in order",async({page})=>{
+  await setup(page,"DOCTOR",{pendingWork:true});await page.goto("/ar/portal");
+  await staffView(page,/مهامي/).click();
+  await expect(page.getByRole("heading",{name:"تعيين سريري جديد"})).toBeVisible();
+  await expect(page.getByText(/عُيّنت لك الحالة \u2068RS-2026-000009\u2069 للمراجعة السريرية/)).toBeVisible();
+  await expect(page.getByText(/You have been assigned/)).toHaveCount(0);
+});
+
 // A pending assignment is reachable only from My Work, and the consultant decides on it there: the
 // patient's documents must load on that path exactly as they do for a queued case.
 test("a consultant opening a pending assignment from My Work sees the patient's documents",async({page})=>{

@@ -9,6 +9,28 @@ export const fillTemplate = (template: string, values: Record<string, string | n
   template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
 
 /** A counted phrase in the locale's own plural category (Arabic has six); the number is formatted with Intl. */
+/** A work item's wording from the backend: a message code plus parameters (names, the patient's own words). */
+export type WorkItemCopy = { code: string; params?: Record<string, string> | null };
+type WordedEntry = { title: string; context?: string };
+
+/**
+ * A work item's title and context in this locale, or null when the code is unknown here — the caller then shows the
+ * backend's English. Parameters are bidi-isolated so a Latin name or a quoted comment keeps its order on an Arabic page;
+ * a missing name reads as the message's neutral default ("The Consultant").
+ */
+export function workCopyText(copy: WorkItemCopy | null | undefined, messages: WorkCopy["workCopy"]): { title: string; context: string | null } | null {
+  if (!copy) return null;
+  const items: Record<string, WordedEntry> = messages.items;
+  const entry = Object.hasOwn(items, copy.code) ? items[copy.code] : undefined;
+  if (!entry) return null;
+  const params = copy.params ?? {};
+  const values: Record<string, string> = { ...messages.fallback };
+  for (const [key, value] of Object.entries(params)) if (key !== "said" && value) values[key] = `\u2068${value}\u2069`;
+  const said = params.said ? fillTemplate(messages.said, { text: `\u2068${params.said}\u2069` }) : null;
+  const context = [entry.context ? fillTemplate(entry.context, values) : null, said].filter(Boolean).join(" ");
+  return { title: fillTemplate(entry.title, values), context: context || null };
+}
+
 export function plural(locale: Locale, count: number, forms: PluralForms) {
   const category = new Intl.PluralRules(locale).select(count);
   return fillTemplate(forms[category] ?? forms.other, { count: new Intl.NumberFormat(locale).format(count) });

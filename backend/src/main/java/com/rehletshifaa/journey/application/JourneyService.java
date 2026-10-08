@@ -30,6 +30,7 @@ import com.rehletshifaa.journey.api.ReferralDtos.ConsultantAssignmentRequest;
 import com.rehletshifaa.journey.api.WorkDtos.InformationRequestCommand;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
 import com.rehletshifaa.journey.api.WorkDtos.OnBehalfRequest;
+import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.domain.CaseMessage;
 import com.rehletshifaa.journey.domain.CaseMessageRead;
 import com.rehletshifaa.journey.domain.ClinicalReviewCostEstimate;
@@ -191,7 +192,8 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String caseNumber=cases.findCaseNumber(caseId).orElse("");
         work.openWorkItem(new NewWorkItem(caseId,ASSIGNMENT_WORK,"DOCTOR".equals(role)?"New clinical assignment":"New case assignment",
             "You have been assigned case "+caseNumber+" for "+("DOCTOR".equals(role)?"clinical review":"review")+". Accept it to start, or decline so the coordinator can reassign.",
-            request.assigneeSubject(),role,false,null,actor.subject(),"ASSIGNMENT_CREATED","assignment:"+id,true));
+            request.assigneeSubject(),role,false,null,actor.subject(),"ASSIGNMENT_CREATED","assignment:"+id,true,
+            WorkCopy.of("DOCTOR".equals(role)?"NEW_ASSIGNMENT_CLINICAL":"NEW_ASSIGNMENT","caseNumber",caseNumber)));
         if("DOCTOR".equals(role))work.refreshWaitingOn(caseId,"CONSULTANT","Awaiting the consultant to accept the assignment");
         audit("CASE_ASSIGNED",actor,caseId,"CaseAssignment",id.toString(),"ASSIGN","SUCCESS",request.reason());return new IdResponse(id,status);}
 
@@ -250,19 +252,20 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
                 consultant+" asked for more information before recommending"+detail,"consultant-outcome:INFO:"+caseId,true);
             return;
         }
-        String type,title,context;
+        String type,title,context,code;
         switch(decision){
-            case "ACCEPT"->{type="PREPARE_PROPOSAL";title="Clinical recommendation ready — prepare the proposal";
+            case "ACCEPT"->{type="PREPARE_PROPOSAL";code="RECOMMENDATION_READY";title="Clinical recommendation ready — prepare the proposal";
                 context=consultant+" submitted a clinical recommendation and the recommended services. Review them and prepare the patient proposal.";}
-            case "REASSIGN"->{type="REASSIGN_CONSULTANT";title="Second opinion requested — assign another consultant";
+            case "REASSIGN"->{type="REASSIGN_CONSULTANT";code="SECOND_OPINION_REQUESTED";title="Second opinion requested — assign another consultant";
                 context=consultant+" asked for a second opinion"+detail+" Choose the additional consultant.";}
-            case "NOT_SUITABLE"->{type=CLINICAL_OUTCOME_WORK;title="Case marked clinically unsuitable";
+            case "NOT_SUITABLE"->{type=CLINICAL_OUTCOME_WORK;code="CLINICALLY_UNSUITABLE";title="Case marked clinically unsuitable";
                 context=consultant+" assessed this case as not clinically suitable"+detail;}
-            default->{type=CLINICAL_OUTCOME_WORK;title="Case returned without a clinical recommendation";
+            default->{type=CLINICAL_OUTCOME_WORK;code="RETURNED_WITHOUT_RECOMMENDATION";title="Case returned without a clinical recommendation";
                 context=consultant+" returned the case without a recommendation"+detail;}
         }
         work.openWorkItem(new NewWorkItem(caseId,type,title,context,coordinator,"COORDINATOR",false,null,
-            actor.subject(),"CONSULTANT_OUTCOME_RECORDED","consultant-outcome:"+decision+":"+caseId,true));
+            actor.subject(),"CONSULTANT_OUTCOME_RECORDED","consultant-outcome:"+decision+":"+caseId,true,
+            WorkCopy.of(code,"consultant",who,"said","ACCEPT".equals(decision)?null:reason)));
         // The clinical work item is closed by now, so responsibility genuinely sits with our team again —
         // except for a terminal clinical outcome, where the stage already decided nobody is waiting.
         if(!"NOT_SUITABLE".equals(decision))work.refreshWaitingOn(caseId,"STAFF",title);
@@ -309,7 +312,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
             if(accept){
                 work.openWorkItem(new NewWorkItem(caseId,CLINICAL_WORK,"Review case and provide clinical recommendation",
                     "Review the intake summary and documents, then record your recommendation.",actor.subject(),"DOCTOR",
-                    false,null,actor.subject(),"CLINICAL_REVIEW_DUE","clinical-review:"+assignmentId,false));
+                    false,null,actor.subject(),"CLINICAL_REVIEW_DUE","clinical-review:"+assignmentId,false,WorkCopy.of("CLINICAL_REVIEW_DUE")));
                 work.refreshWaitingOn(caseId,"CONSULTANT","Awaiting the clinical recommendation");
             } else {
                 returnToCoordinator(caseId,actor,request.reason());
@@ -325,7 +328,8 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String who=caseQueries.actorName(actor.subject(),actor.label());
         work.openWorkItem(new NewWorkItem(caseId,"REASSIGN_CONSULTANT","Assignment declined — reassign the case",
             (who==null?"The assignee":who)+" declined this assignment"+(hasText(reason)?": "+reason.trim():".")+" Choose another consultant.",
-            coordinator,"COORDINATOR",false,null,"SYSTEM","ASSIGNMENT_DECLINED","assignment-declined:"+caseId+":"+actor.subject(),true));
+            coordinator,"COORDINATOR",false,null,"SYSTEM","ASSIGNMENT_DECLINED","assignment-declined:"+caseId+":"+actor.subject(),true,
+            WorkCopy.of("ASSIGNMENT_DECLINED","assignee",who,"said",reason)));
         work.refreshWaitingOn(caseId,"STAFF","Assignment declined — awaiting reassignment");
     }
 
@@ -559,7 +563,8 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String context=(declined?"The patient declined this proposal.":"The patient asked for changes before continuing.")
             +(hasText(comment)?" They said: "+comment.trim():"");
         work.openWorkItem(new NewWorkItem(caseId,declined?"PROPOSAL_DECLINED_REVIEW":"PROPOSAL_REVISION",title,context,coordinator,
-            "COORDINATOR",false,null,"SYSTEM","PATIENT_PROPOSAL_DECISION","proposal-decision:"+decision+":"+versionId,email));
+            "COORDINATOR",false,null,"SYSTEM","PATIENT_PROPOSAL_DECISION","proposal-decision:"+decision+":"+versionId,email,
+            WorkCopy.of(declined?"PROPOSAL_DECLINED":"PROPOSAL_CHANGES_REQUESTED","said",comment)));
         work.refreshWaitingOn(caseId,"STAFF",title);
     }
 

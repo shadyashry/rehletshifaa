@@ -5,13 +5,15 @@ import { ArrowRight, CalendarClock, CircleAlert, FileText, MessageSquareText } f
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import type { Locale } from "@/lib/i18n";
-import type { WorkCopy } from "@/lib/portal-labels";
+import { workCopyText, type WorkCopy, type WorkItemCopy } from "@/lib/portal-labels";
 
 /** The backend's resolution of what this person should do now — rendered, never re-derived here. */
 export type CurrentActionView = {
   code: string; kind: "COMPLETE" | "FOCUS" | "CLAIM" | "ACCEPT" | "WAIT" | "NONE";
   title?: string | null; context?: string | null; workItemId?: string | null; workItemVersion?: number | null;
   workType?: string | null; dueAt?: string | null; overdue?: boolean; blockerCode?: string | null;
+  /** For a work item: the wording code and parameters (the English `title`/`context` are the fallback). */
+  copy?: WorkItemCopy | null;
 };
 export type BlockerView = { code: string; labelEn: string; labelAr: string; owner: "PATIENT" | "STAFF" | "LATER"; gating: boolean };
 /** `viewer`: who is looking at this case, per case — the patient (SELF), someone acting for them (REPRESENTATIVE) or STAFF. */
@@ -41,7 +43,7 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
   const [note, setNote] = useState("");
   if (role === "patient") return null;
 
-  const copy = describe(action, role, t, locale === "ar" ? work.workTitles : null);
+  const copy = describe(action, role, t, locale === "ar" ? work.workTitles : null, work.workCopy);
   const found = primaryFor(action, t);
   // With the step's form inline, its submit is the primary; a second button for the same job would only repeat it.
   const primary: Primary = form && found.kind === "focus" ? { label: "", kind: "none" } : found;
@@ -141,8 +143,12 @@ const state = (table: Record<string, Described>, key: string) => (Object.hasOwn(
  * Title and explanation per resolved action, in the viewer's terms. A work item speaks for itself; view-only and new
  * assignments read differently for a coordinator than for a Consultant or another team.
  */
-function describe(action: CurrentActionView, role: string, t: ActionCopy, localizedWork: Record<string, string> | null): Described {
-  // Work items are titled by the backend in English; Arabic shows the work type in Arabic and keeps the context.
+function describe(action: CurrentActionView, role: string, t: ActionCopy, localizedWork: Record<string, string> | null, wording: WorkCopy["workCopy"]): Described {
+  if (action.code === "WORK_ITEM") {
+    const known = workCopyText(action.copy, wording);
+    if (known) return { title: known.title, body: known.context };
+  }
+  // Work without a known code keeps the backend's English; Arabic shows the work type in Arabic and keeps the context.
   if (action.code === "WORK_ITEM") return { title: pick(localizedWork ?? {}, action.workType) ?? action.title ?? "",
     body: localizedWork && LOCALIZED_FORM_HINT.has(action.workType ?? "") ? null : action.context };
   if (action.code === "VIEW_ONLY") return role === "coordinator" ? t.states.VIEW_ONLY : t.states.VIEW_ONLY_STAFF;

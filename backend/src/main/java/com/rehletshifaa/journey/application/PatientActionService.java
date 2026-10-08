@@ -236,7 +236,8 @@ public class PatientActionService {
         String patient = cases.findPatientName(caseId).orElse(null);
         work.openWorkItem(new NewWorkItem(caseId, REVIEW_TYPE, "Review information provided by the patient",
                 summary(patient, note), coordinator, "COORDINATOR", false, null, "SYSTEM",
-                "PATIENT_RESPONDED", "patient-response:" + taskId, true));
+                "PATIENT_RESPONDED", "patient-response:" + taskId, true,
+                WorkCopy.of("PATIENT_RESPONDED", "patient", patient, "said", note == null ? null : note.substring(0, Math.min(note.length(), 240)))));
     }
 
     /** A blocking request parked the stage; answering it returns the case to intake review. */

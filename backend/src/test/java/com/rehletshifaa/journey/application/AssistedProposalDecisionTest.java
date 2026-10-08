@@ -36,6 +36,7 @@ class AssistedProposalDecisionTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired ProposalAssistanceService assistance;
     @Autowired PublicCaseAccessService publicCases; @Autowired JdbcTemplate jdbc; @Autowired ObjectMapper json;
     @Autowired CryptoService crypto; @Autowired EntityManager em; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle;
+    @Autowired StaffWorkQueryService staffWork;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     @Test void thePatientAsksOnceAndTheOwningCoordinatorGetsOneWorkItem() throws Exception {
@@ -160,6 +161,41 @@ class AssistedProposalDecisionTest {
         assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "PATIENT", Instant.now(), true));
         em.flush();
         assertThat(jdbc.queryForObject("SELECT confirmed_representative_subject FROM proposal_decisions WHERE proposal_version_id=?", String.class, versionId)).isNull();
+    }
+
+    @Test void workItemsCarryACopyCodeAndParametersSoThePortalCanWordThemInEveryLocale() throws Exception {
+        UUID caseId = ownedCase("+254700000813", "assist-m@local.test");
+        // The consultant's recommendation opened "prepare the proposal" work, keyed for translation; the name is encrypted.
+        UUID versionId = releasedProposal(caseId);
+        Map<String, Object> prepare = jdbc.queryForMap("SELECT copy_code, copy_params FROM case_tasks WHERE case_id=? AND task_type='PREPARE_PROPOSAL'", caseId);
+        assertThat(prepare.get("COPY_CODE")).isEqualTo("RECOMMENDATION_READY");
+        String params = (String) prepare.get("COPY_PARAMS");
+        assertThat(params).startsWith("enc:");
+        assertThat(json.readValue(crypto.decrypt(params.substring(4)), new TypeReference<Map<String, String>>() {})).containsEntry("consultant", "Doctor One");
+
+        linkPatient(caseId, "patient-assist-m");
+        authenticate("patient-assist-m", Role.PATIENT);
+        assistance.requestFromPortal(caseId, versionId);
+        em.flush();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        var item = staffWork.myWork().stream().filter(w -> w.caseId().equals(caseId) && ProposalAssistanceService.WORK_TYPE.equals(w.type())).findFirst().orElseThrow();
+        assertThat(item.copy()).isEqualTo(new com.rehletshifaa.journey.api.WorkDtos.WorkCopy("PROPOSAL_TERMS_CALL", Map.of()));
+        var current = journey.workspace(caseId).actions().currentAction();
+        assertThat(current.workType()).isEqualTo(ProposalAssistanceService.WORK_TYPE);
+        assertThat(current.copy()).isEqualTo(item.copy());
+    }
+
+    @Test void aDeclineBecomesWorkWhoseCopyQuotesThePatient() throws Exception {
+        UUID caseId = ownedCase("+254700000814", "assist-n@local.test");
+        releasedProposal(caseId);
+        var link = openViaStatusLink(caseId, "+254700000814");
+        journey.decideProposalPublic(link.token(), link.grant(), new PublicProposalDecisionRequest(link.grant(), "DECLINED", "Too far to travel", null));
+        em.flush();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        var item = staffWork.myWork().stream().filter(w -> w.caseId().equals(caseId) && "PROPOSAL_DECLINED_REVIEW".equals(w.type())).findFirst().orElseThrow();
+        assertThat(item.copy()).isEqualTo(new com.rehletshifaa.journey.api.WorkDtos.WorkCopy("PROPOSAL_DECLINED", Map.of("said", "Too far to travel")));
+        // The English text stays for e-mail and older clients.
+        assertThat(item.title()).isEqualTo("Patient declined the proposal");
     }
 
     @Test void anotherCasesVersionCannotBeRecordedOrRequestedThroughThisCase() throws Exception {

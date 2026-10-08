@@ -139,7 +139,12 @@ public final class JourneyDtos {
     // alone. It is resolved fresh on every read (never cached) by CaseActionService; every action endpoint
     // still re-validates independently, so this is a rendering contract, never an authorization decision.
     /** {@code kind}: COMPLETE (finish the work item), FOCUS (open the form that does the work), CLAIM, ACCEPT, WAIT (somebody else's move), NONE. */
-    public record CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode) {}
+    /** {@code copy}: for a work item, the code and parameters the portal words it from (null when it has only an English title). */
+    public record CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode,WorkDtos.WorkCopy copy) {
+        public CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode){
+            this(code,kind,title,context,workItemId,workItemVersion,workType,dueAt,overdue,blockerCode,null);
+        }
+    }
     /** {@code owner}: PATIENT, STAFF, or LATER (queued behind another blocker). {@code gating} is false for a step that must be done before a later commitment (identity before travel is confirmed) but does not hold the current stage. Labels are patient-safe, like {@link BlockingItem}. */
     public record BlockerView(String code,String labelEn,String labelAr,String owner,boolean gating) {}
     /** {@code viewer}: who is looking at this case — SELF (the patient), REPRESENTATIVE (acting for them) or STAFF. */

@@ -113,6 +113,17 @@ Update at the end of every phase.
     - [x] verify: backend full suite 617/0 (2 skipped; +4 `CaseViewerRelationTest`, +2 assisted-decision tests);
           `PostgresJpaMappingTest` green on V75 (throwaway `rs-jpa-mapping-pg`, schema reset); typecheck ok; unit 343 pass,
           11 `ProposalSign` (pre-existing); Playwright `my-care` 10/10 incl. 2 new per-case relation tests
+  - [x] Step 3 work-item wording as code + parameters: `V76__work_item_copy` (`case_tasks.copy_code`, encrypted
+        `copy_params` JSON), `WorkDtos.WorkCopy` on `WorkItemView` and `CurrentActionView`; codes emitted by
+        `JourneyService` (new assignment, the four clinical outcomes, clinical review due, assignment declined, patient
+        decline / change request), `PatientActionService` (patient responded) and `ProposalAssistanceService` (terms call);
+        `CaseActionService` passes it through. The English title/context stay for e-mail, audit and unknown codes. Frontend:
+        `portalWork.workCopy` (en + ar, neutral Arabic beside names, pending native review), `workCopyText()` isolates
+        names and the patient's quoted words; `MyWork` and `CurrentAction` render from it in both locales and fall back
+        to the old per-type title for codes they do not know
+    - [x] verify: backend full suite 619/0 (2 skipped; +2 copy tests); `PostgresJpaMappingTest` green on V76; typecheck ok;
+          lint 24/12 (= baseline); unit 345 pass, 11 `ProposalSign` (pre-existing); Playwright arabic-proposal-decision,
+          portal-ux, staff-home, my-care 58 pass, 1 fail = pre-existing Control Center "Staff & teams"
 
 ## Decisions
 
@@ -153,7 +164,7 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Pass 3 step 3: work-item title/context as a code plus parameters (`case_tasks.copy_code` + encrypted `copy_params`,
-`WorkCopy` on work items and the current action), rendered from `portalWork.workCopy` in en/ar. Owner decisions
+Pass 3 step 4: portal P2s through /redesign-area (plan `plans/portal-p2-pass-3.md` first), then the four read-only
+reviewers. Owner decisions
 still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
 amber tones; proposal drawer order (price first approved, recommendation-first suggestion kept in the backlog).

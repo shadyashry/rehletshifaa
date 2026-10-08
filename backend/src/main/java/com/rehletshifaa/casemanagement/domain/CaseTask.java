@@ -43,6 +43,8 @@ public class CaseTask extends AssignedIdEntity {
     @Column(name = "coordination_team_id") private UUID coordinationTeamId;
     @Column(name = "coordination_queue_reason", length = 100) private String coordinationQueueReason;
     @Column(name = "coordination_queued_at") private Instant coordinationQueuedAt;
+    @Column(name = "copy_code", length = 80) private String copyCode;
+    @Column(name = "copy_params", columnDefinition = "text") private String copyParams;
 
     protected CaseTask() {}
 
@@ -55,6 +57,9 @@ public class CaseTask extends AssignedIdEntity {
         this.status = "OPEN"; this.blocking = blocking; this.dueAt = dueAt == null ? null : micros(dueAt); this.createdBy = createdBy;
         this.createdAt = micros(now); this.updatedAt = micros(now);
     }
+
+    /** The message code and (already encrypted) parameters the portal words this task from. */
+    public CaseTask withCopy(String code, String encryptedParams) { this.copyCode = code; this.copyParams = encryptedParams; return this; }
 
     public UUID getCaseId() { return caseId; }
     public String getTaskType() { return taskType; }

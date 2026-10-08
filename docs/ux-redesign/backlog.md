@@ -258,7 +258,8 @@ The items below are deferred.
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P2 | **Backend follow-up.** Work-item titles and context are English text from the backend. Arabic now shows a per-type title, but the context stays English. Emit a title code plus parameters instead of prose. | I18N | backend `CaseActionService`, `JourneyService`, `PatientActionService`; `MyWork.tsx`, `CurrentAction.tsx` | harden |
+| Done (pass 3) | **Backend follow-up.** Work-item titles and context are English text from the backend. Arabic now shows a per-type title, but the context stays English. Emit a title code plus parameters instead of prose. | I18N | backend `CaseActionService`, `JourneyService`, `PatientActionService`; `MyWork.tsx`, `CurrentAction.tsx` | harden |
+| P3 | Work still worded only in English: `ConsultantReferralService` (transfer / second-opinion offers and confirmations), `CaseHandoffService` (deposit, travel), `AssignmentEngine` (coordinator routing), the journey-runtime action handlers (node labels), staff notifications (`NotificationView`) and `waitingReason` ("Waiting for the patient: …"). Give each a `WorkCopy` code. | Pass 3 | backend services above; `NotificationBell.tsx`, `Portal.tsx` | harden |
 | P2 | `WorkItem` has no `coordinatorSubject`, so My Work still prints your own name where the queue says "You". This needs a field in the work API. | WG | backend work API, `MyWork.tsx` | harden |
 | P2 | The work-copy context carries no locale, so callers pair a `locale` prop with context copy (a mismatch is possible). Put the locale in the context value. | RB | `portal-copy.tsx`, `portal-labels.ts` | harden |
 | P2 | Numbers rely on the engine's default numbering system for "ar". Pin one system (e.g. `-u-nu-latn`, per the Western-digits default) in `plural()`, dates and money. The page counter and filter badge are raw numbers. | I18N, RB | `portal-labels.ts`, `CaseQueue.tsx` | harden |
