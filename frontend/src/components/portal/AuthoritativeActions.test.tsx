@@ -2,7 +2,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CaseWorkflowActions } from "./CaseWorkflowActions";
-import { RoleActions, refreshAfterRejectedAction } from "./Portal";
+import { refreshAfterRejectedAction } from "./portal-model";
+import { RoleActions } from "./StaffCaseView";
 
 const t = { operationsComplete: "Complete operational plan", financeApprove: "Approve commercial terms" } as never;
 const c = { id: "case-1", caseNumber: "RS-1", status: "PROPOSAL_PREPARATION", patientName: "Patient", country: "AE", preferredLanguage: "en", createdAt: "2026-01-01", updatedAt: "2026-01-01", version: 1 };

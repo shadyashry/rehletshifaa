@@ -176,6 +176,19 @@ Update at the end of every phase.
           `ProposalSign`; Playwright arabic-proposal-decision 10/10 (new en/ar picker test), portal-ux, staff-home, my-care,
           portal-p2-pass-3, portal, workspace-case-switch, a11y 83 pass, 1 fail = pre-existing Control Center "Staff & teams"
     - [x] screenshots: `docs/ux-redesign/screenshots/pass-3/record-decision-representative-{en,ar}-390.png`
+  - [x] Portal module split (owner request; structure only, no behaviour change): `Portal.tsx` (138 KB) → shell
+        `Portal.tsx` (39 KB: auth, routing, queue state, leave guard), `StaffQueue.tsx`, `StaffCaseView.tsx` (the staff
+        case page and its proposal/deposit/assessment forms), `PatientCaseView.tsx` (My Care + proposal drawer),
+        `portal-ui.tsx` (copy, feedback context, drawer, panel, status), `portal-model.ts` (types and pure helpers). Code
+        moved verbatim by script; the only rewrite is the patient/staff seam of the old `WorkspaceView`. The case page is
+        fetched per role as soon as the role is known (`useCaseView`) and then rendered without suspending — a lazy
+        component left the queue hidden over a blank page on the first "Open" (caught by `portal-ux` "a claim another
+        coordinator won"). Production build: the portal shell chunk (47 KB) has neither staff case code (118 KB chunk) nor
+        My Care
+    - [x] verify: typecheck ok; lint 24/12; unit 348 pass, 11 `ProposalSign`; `next build` ok; Playwright 18 portal/
+          patient/governance specs 133 pass; failures = pre-existing (access-governance ×2, credential-reviews ×2,
+          care-coordination ×2, Control Center "Staff & teams") plus two cold-run timeouts (a11y how-it-works, my-care
+          Arabic) that pass alone
 
 ## Decisions
 
@@ -219,7 +232,7 @@ Update at the end of every phase.
 
 Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08); the follow-up
 commit on `feat/ux-redesign-pass-3` is not merged or pushed yet. The tunnel stack runs `9e3b336` (V76); live checks must run from a network that
-reaches `*.rehletshifaa.com`. Next engineering candidate: the full Portal module split. `cfc1394` (representative picker) is pushed and deployed: the tunnel
+reaches `*.rehletshifaa.com`. Portal module split done on `feat/ux-redesign-pass-3` (not merged or pushed yet). `cfc1394` (representative picker) is pushed and deployed: the tunnel
 stack runs it (schema 77). A Docker engine restart stopped the stack right after that rebuild; it was brought back
 with the standard tunnel-overlay command (only cloudflared restarts on its own). Owner decisions
 still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
