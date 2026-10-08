@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 
 import { MyCare } from "./MyCare";
+import { renderWithWork } from "./test-copy";
 import type { CaseActions } from "./CurrentAction";
 
 /**
@@ -21,7 +22,7 @@ const accepted = { state: "ACCEPTED", action: "VIEW_PROPOSAL" as const, versionI
 
 function renderCare(overrides: Partial<Parameters<typeof MyCare>[0]> = {}) {
   const onView = vi.fn(), onOpenProposal = vi.fn(), onOpenCase = vi.fn();
-  render(<MyCare locale="en" caseSummary={base} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
+  renderWithWork(<MyCare locale="en" caseSummary={base} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
                  deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} timeline={timeline} otherCases={[]}
                  view="care" onView={onView} onOpenCase={onOpenCase} onOpenProposal={onOpenProposal} messagesPanel={<p>messages panel</p>} {...overrides}/>);
   return { onView, onOpenProposal, onOpenCase };
@@ -29,6 +30,14 @@ function renderCare(overrides: Partial<Parameters<typeof MyCare>[0]> = {}) {
 
 describe("MyCare", () => {
   afterEach(cleanup);
+
+  it("names the patient, and says whose care it is to a representative", () => {
+    renderCare({ caseSummary: { ...base, patientName: "Maya Example" } });
+    expect(document.getElementById("case-heading")?.textContent).toContain("Maya Example");
+    cleanup();
+    renderCare({ caseSummary: { ...base, patientName: "Maya Example" }, representative: true });
+    expect(document.getElementById("case-heading")?.textContent).toMatch(/Care for .*Maya Example/);
+  });
 
   it("at the deposit stage: no primary action, the deposit arranging with authoritative money, one proposal link, one message control", () => {
     const { onOpenProposal, onView } = renderCare();
@@ -167,7 +176,7 @@ describe("MyCare", () => {
 
   it("reads right-to-left with Arabic copy for the same state", () => {
     const onOpenProposal = vi.fn();
-    render(<MyCare locale="ar" caseSummary={base} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
+    renderWithWork(<MyCare locale="ar" caseSummary={base} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
                    deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} timeline={timeline} otherCases={[]}
                    view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={onOpenProposal} messagesPanel={null}/>);
     expect(screen.getByRole("heading", { name: "ترتيبات الوديعة" })).toBeTruthy();
