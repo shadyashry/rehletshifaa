@@ -87,7 +87,8 @@ public class StaffWorkQueryService {
         String subject = Principal.current().subject();
         List<NotificationView> items = notifications.findFeed(subject, Limit.of(FEED_SIZE)).stream()
                 .map(n -> new NotificationView(n.getId(), n.getCaseId(), n.getCaseNumber(), n.getTaskId(), n.getEventType(),
-                        decrypt(n.getTitle()), decrypt(n.getContext()), n.getCreatedAt(), n.getReadAt() != null))
+                        decrypt(n.getTitle()), decrypt(n.getContext()), n.getCreatedAt(), n.getReadAt() != null,
+                        StaffWorkService.copyOf(crypto, n.getCopyCode(), n.getCopyParams())))
                 .toList();
         return new NotificationFeed((int) notifications.countByRecipientSubjectAndReadAtIsNull(subject), items);
     }

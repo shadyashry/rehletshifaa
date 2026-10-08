@@ -131,7 +131,7 @@ public class StaffWorkService {
         if (item.ownerSubject() == null) return; // unassigned work waits in the team queue; nobody to notify yet
         String key = item.idempotencyKey();
         boolean fresh = insertNotification(item.ownerSubject(), item.caseId(), taskId, item.eventType(),
-                item.title(), item.context(), key, now);
+                item.title(), item.context(), key, now, item.copy());
         if (fresh && item.email()) emailStaff(item.ownerSubject(), item.ownerRole(), item.caseId(), item.title(), key, now);
     }
 
@@ -144,9 +144,15 @@ public class StaffWorkService {
     @Transactional
     public void notifyStaff(String recipientSubject, UUID caseId, UUID taskId, String eventType,
                             String title, String context, String idempotencyKey, boolean email) {
+        notifyStaff(recipientSubject, caseId, taskId, eventType, title, context, idempotencyKey, email, null);
+    }
+
+    /** As above, with the code and parameters the portal words the notification from ({@code copy}; null: English only). */
+    public void notifyStaff(String recipientSubject, UUID caseId, UUID taskId, String eventType,
+                            String title, String context, String idempotencyKey, boolean email, WorkCopy copy) {
         if (recipientSubject == null || recipientSubject.isBlank()) return;
         Instant now = clock.instant();
-        if (insertNotification(recipientSubject, caseId, taskId, eventType, title, context, idempotencyKey, now) && email)
+        if (insertNotification(recipientSubject, caseId, taskId, eventType, title, context, idempotencyKey, now, copy) && email)
             emailStaff(recipientSubject, null, caseId, title, idempotencyKey, now);
     }
 
@@ -164,8 +170,9 @@ public class StaffWorkService {
     }
 
     private boolean insertNotification(String recipient, UUID caseId, UUID taskId, String eventType,
-                                       String title, String context, String key, Instant now) {
-        return notifications.notifyOnce(UUID.randomUUID(), recipient, caseId, taskId, eventType, encrypt(title), encryptNullable(context), key, micros(now)) == 1;
+                                       String title, String context, String key, Instant now, WorkCopy copy) {
+        return notifications.notifyOnce(UUID.randomUUID(), recipient, caseId, taskId, eventType, encrypt(title), encryptNullable(context), key, micros(now),
+                copy == null ? null : copy.code(), copy == null ? null : encrypt(writeParams(copy.params()))) == 1;
     }
 
     /**
@@ -227,7 +234,7 @@ public class StaffWorkService {
      * every internal department stays STAFF — the work item itself names the responsible person or team.
      */
     @Transactional
-    public void refreshWaitingOn(UUID caseId, String fallback, String reason) {
+    public void refreshWaitingOn(UUID caseId, String fallback, WaitingReason reason) {
         String resolved = resolveWaitingOn(caseId, fallback, false);
         setWaitingOn(caseId, resolved, resolved.equals(fallback) ? reason : defaultReason(resolved));
     }
@@ -241,7 +248,7 @@ public class StaffWorkService {
      * action. Returns the responsibility now on record.
      */
     @Transactional
-    public String reconcileWaitingOn(UUID caseId, String fallback, String reason, boolean patientOwed) {
+    public String reconcileWaitingOn(UUID caseId, String fallback, WaitingReason reason, boolean patientOwed) {
         String resolved = resolveWaitingOn(caseId, fallback, patientOwed);
         String current = cases.findWaitingOn(caseId).orElse(null);
         if (resolved.equals(current)) return resolved;
@@ -280,12 +287,12 @@ public class StaffWorkService {
         return tasks.existsByCaseIdAndVisibilityScopeAndOwnerRoleAndStatusIn(caseId, "INTERNAL", ownerRole, OPEN);
     }
 
-    private static String defaultReason(String actor) {
+    private static WaitingReason defaultReason(String actor) {
         return switch (actor) {
-            case "PATIENT" -> "Waiting for information requested from the patient";
-            case "CONSULTANT" -> "Waiting for the consultant";
-            case "STAFF" -> "Waiting for our team";
-            default -> null;
+            case "PATIENT" -> WaitingReason.of("DEFAULT_PATIENT", "Waiting for information requested from the patient");
+            case "CONSULTANT" -> WaitingReason.of("DEFAULT_CONSULTANT", "Waiting for the consultant");
+            case "STAFF" -> WaitingReason.of("DEFAULT_STAFF", "Waiting for our team");
+            default -> WaitingReason.text(null);
         };
     }
 
@@ -294,10 +301,11 @@ public class StaffWorkService {
      * different questions, and conflating them is what produces status sprawl.
      */
     @Transactional
-    public void setWaitingOn(UUID caseId, String actor, String reason) {
+    public void setWaitingOn(UUID caseId, String actor, WaitingReason reason) {
         if (!WAITING.contains(actor)) throw new ApiException(400, "INVALID_WAITING_ACTOR", "Unsupported responsibility value");
+        WaitingReason why = reason == null ? WaitingReason.text(null) : reason;
         // Keep waiting_since as the moment responsibility actually moved, not the last time it was re-stated.
-        cases.waitOn(caseId, actor, reason, micros(clock.instant()));
+        cases.waitOn(caseId, actor, why.text(), why.text() == null ? null : why.code(), micros(clock.instant()));
     }
 
     // ---------------- helpers ----------------

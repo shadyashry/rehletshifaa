@@ -54,7 +54,18 @@ public final class WorkDtos {
     }
 
     public record NotificationView(UUID id, UUID caseId, String caseNumber, UUID taskId, String eventType,
-                                   String title, String context, Instant createdAt, boolean read) {}
+                                   String title, String context, Instant createdAt, boolean read, WorkCopy copy) {}
+
+    /**
+     * Why the case waits, as text (e-mail, audit, older clients) and as a code the portal words: a fixed reason,
+     * {@code WORK:<work copy code>} for the work item the team owes, or {@code PATIENT_STEP:<blocker code>}.
+     */
+    public record WaitingReason(String code, String text) {
+        public static WaitingReason of(String code, String text) { return new WaitingReason(code, text); }
+        public static WaitingReason work(String workCode, String text) { return new WaitingReason(workCode == null ? null : "WORK:" + workCode, text); }
+        public static WaitingReason patientStep(String blockerCode, String text) { return new WaitingReason("PATIENT_STEP:" + blockerCode, text); }
+        public static WaitingReason text(String text) { return new WaitingReason(null, text); }
+    }
 
     public record NotificationFeed(int unread, List<NotificationView> items) {}
 

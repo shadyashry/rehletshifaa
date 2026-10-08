@@ -9,6 +9,7 @@ const subject="qa-coordinator";
 const baseCase={country:"Kenya",careCategory:"cardiology",preferredLanguage:"en",createdAt:stamp,updatedAt:stamp,version:1,travelPackageRequested:false};
 // The backend's action contract, as the real resolver would answer for each fixture case.
 const actionsFor=(c:{status:string;coordinatorSubject?:string},viewer:string)=>({journeyStage:c.status,waitingOn:c.coordinatorSubject?"STAFF":"NONE",blockers:[],
+  ...(c.coordinatorSubject?{waitingReason:"Waiting for our team",waitingReasonCode:"DEFAULT_STAFF"}:{}),
   currentAction:!c.coordinatorSubject?{code:"CLAIM_CASE",kind:"CLAIM"}:c.coordinatorSubject!==viewer?{code:"VIEW_ONLY",kind:"NONE"}:{code:"ASSIGN_CONSULTANT",kind:"FOCUS"},
   availableActions:c.coordinatorSubject===viewer?["REQUEST_INFORMATION","ASSIGN_CONSULTANT","SET_TRAVEL_PACKAGE","CANCEL_CASE"]:[]});
 /** The platform roles behind each fixture persona (the portal reads them from `/me`, never from the token). */
@@ -17,7 +18,7 @@ const PLATFORM_ROLES:Record<string,string[]>={COORDINATOR_LEAD:["COORDINATOR"],D
 /** The staff views (My work, My cases, Team queue) are navigation — in the header from md, inline below — not tabs. */
 export const staffView=(page:Page,name:RegExp)=>page.getByRole("navigation",{name:/^(Your work|أقسام العمل)$/}).getByRole("link",{name});
 export const portalAlerts=(page:Page)=>page.locator('[role="alert"]:not(#__next-route-announcer__)');
-export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean;pendingWork?:boolean;assistedDecision?:boolean}={}){
+export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean;pendingWork?:boolean;assistedDecision?:boolean;notifications?:boolean}={}){
   const roles=role==="COORDINATOR_LEAD"?["COORDINATOR",role]:[role];
   await page.addInitScript(({roles,subject,authority})=>{
     const value=JSON.stringify({access_token:"synthetic-test-token",token_type:"Bearer",scope:"openid profile email",profile:{sub:subject,name:"Layla Hassan",email:"layla@example.test",roles},expires_at:Math.floor(Date.now()/1000)+3600});
@@ -60,6 +61,10 @@ export async function setupPortal(page:Page, role="COORDINATOR", options:{docume
     if(api==="/patient/account/profile")return reply({givenName:"Maya",familyName:"Example",displayName:"Maya Example",country:"Kenya",preferredLanguage:"en",email:"maya@example.test",emailVerified:true,whatsappNumber:"+254700000000",phoneVerified:true,accountStatus:"ACTIVE"});
     if(api==="/tasks/mine")return reply([]);
     // A pending consultant assignment is work, not yet one of "my cases": it is reachable only from My Work.
+    // A coded notification (pass 3 wording): the bell words it from its code; the English is the fallback.
+    if(api==="/notifications"&&options.notifications)return reply({unread:1,items:[{id:"n1",caseId:"owned",caseNumber:"RS-2026-000001",taskId:null,eventType:"CASE_OWNERSHIP_TRANSFERRED",
+      title:"A case has been transferred to you",context:"You are now the owner of case RS-2026-000001, transferred by Sara Ahmed.",createdAt:stamp,read:false,
+      copy:{code:"CASE_OWNERSHIP_TRANSFERRED",params:{caseNumber:"RS-2026-000001",by:"Sara Ahmed"}}}]});
     if(api==="/work/mine")return reply(options.pendingWork?[{id:"w-pending",caseId:"pending",caseNumber:"RS-2026-000009",patientName:"Nour Example",caseStatus:"CONSULTANT_ASSIGNMENT_PENDING",waitingOn:"CONSULTANT",careCategory:"cardiology",coordinatorName:"Layla Hassan",documentCount:1,type:"CONSULTANT_ASSIGNMENT",title:"New clinical assignment",context:"You have been assigned case RS-2026-000009 for clinical review.",priority:"NORMAL",status:"OPEN",blocking:false,dueAt:null,overdue:false,createdAt:stamp,version:0,copy:{code:"NEW_ASSIGNMENT_CLINICAL",params:{caseNumber:"RS-2026-000009"}}}]:[]);
     if(api.endsWith("/cases/pending"))return reply({caseSummary:{...baseCase,id:"pending",caseNumber:"RS-2026-000009",patientName:"Nour Example",status:"CONSULTANT_ASSIGNMENT_PENDING",coordinatorSubject:"owner",coordinatorName:"Layla Hassan",waitingOn:"CONSULTANT"},actions:{journeyStage:"CONSULTANT_ASSIGNMENT_PENDING",waitingOn:"CONSULTANT",blockers:[],currentAction:{code:"ACCEPT_ASSIGNMENT",kind:"ACCEPT"},availableActions:[]},intakeSummary:"Cardiac reports submitted for review.",timeline:[{type:"STATUS",label:"Received",status:"RECEIVED",occurredAt:stamp}],tasks:[],messages:[],assignments:[{id:"a-pending",assigneeSubject:subject,assigneeName:"Dr Layla Hassan",assigneeRole:"DOCTOR",assignmentType:"PRIMARY",status:"PENDING",assignedAt:stamp,version:0}],clinicalReviews:[]});
     if(api.endsWith("/cases"))return reply(cases);

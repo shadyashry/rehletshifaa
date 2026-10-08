@@ -11,7 +11,8 @@ export const fillTemplate = (template: string, values: Record<string, string | n
 /** A counted phrase in the locale's own plural category (Arabic has six); the number is formatted with Intl. */
 /** A work item's wording from the backend: a message code plus parameters (names, the patient's own words). */
 export type WorkItemCopy = { code: string; params?: Record<string, string> | null };
-type WordedEntry = { title: string; context?: string };
+/** `extras`: a sentence per optional parameter, added only when that parameter is present. */
+type WordedEntry = { title: string; context?: string; extras?: Record<string, string> };
 
 /**
  * A work item's title and context in this locale, or null when the code is unknown here — the caller then shows the
@@ -27,8 +28,29 @@ export function workCopyText(copy: WorkItemCopy | null | undefined, messages: Wo
   const values: Record<string, string> = { ...messages.fallback };
   for (const [key, value] of Object.entries(params)) if (key !== "said" && value) values[key] = `\u2068${value}\u2069`;
   const said = params.said ? fillTemplate(messages.said, { text: `\u2068${params.said}\u2069` }) : null;
-  const context = [entry.context ? fillTemplate(entry.context, values) : null, said].filter(Boolean).join(" ");
+  const extras = Object.entries(entry.extras ?? {}).filter(([key]) => params[key]).map(([, template]) => fillTemplate(template, values));
+  const context = [entry.context ? fillTemplate(entry.context, values) : null, ...extras, said].filter(Boolean).join(" ");
   return { title: fillTemplate(entry.title, values), context: context || null };
+}
+
+/**
+ * Why the case waits, in this locale: a fixed reason, the title of the work item the team owes (`WORK:<code>`), or a
+ * patient step named by its blocker (`PATIENT_STEP:<code>`, labelled from the case's own blockers). Unknown codes and
+ * reasons without a code keep the backend's English.
+ */
+export function waitingReasonText(actions: { waitingReason?: string | null; waitingReasonCode?: string | null; blockers?: { code: string; labelEn: string; labelAr: string }[] },
+                                  work: Pick<WorkCopy, "waitingReason" | "workCopy">, locale: Locale): string | null {
+  const code = actions.waitingReasonCode;
+  if (code) {
+    const reasons: Record<string, string> = work.waitingReason.reasons;
+    if (Object.hasOwn(reasons, code)) return reasons[code];
+    if (code.startsWith("WORK:")) { const known = workCopyText({ code: code.slice(5) }, work.workCopy); if (known) return known.title; }
+    if (code.startsWith("PATIENT_STEP:")) {
+      const step = actions.blockers?.find(b => b.code === code.slice(13));
+      if (step) return fillTemplate(work.waitingReason.patientStep, { step: locale === "ar" ? step.labelAr : step.labelEn.toLocaleLowerCase("en") });
+    }
+  }
+  return actions.waitingReason ?? null;
 }
 
 export function plural(locale: Locale, count: number, forms: PluralForms) {

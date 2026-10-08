@@ -27,7 +27,7 @@ import { PatientNav } from "@/components/portal/PatientNav";
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
 import { MyWork, type WorkItem } from "@/components/portal/MyWork";
 import { WorkCopyProvider, useWorkCopy } from "@/components/portal/portal-copy";
-import { careAreaLabel, coordinatorLabel, fillTemplate, plural, tabKeyTarget, waitingLabel, type WorkCopy } from "@/lib/portal-labels";
+import { careAreaLabel, coordinatorLabel, fillTemplate, plural, tabKeyTarget, waitingLabel, waitingReasonText, type WorkCopy } from "@/lib/portal-labels";
 import { AssignmentHistory, type AssignmentHistoryEntry } from "@/components/portal/AssignmentHistory";
 import { NotificationBell } from "@/components/portal/NotificationBell";
 import { ccHref } from "@/components/platform-control-center/control-center-nav";
@@ -684,7 +684,7 @@ function CoordinatorBrief({locale,t,mySubject,c,actions,documents,preview,intake
   <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-2 lg:grid-cols-3">
    {facts.map(fact=><div key={fact.label} className="min-w-0"><dt className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">{fact.label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-800">{fact.value}</dd></div>)}
   </dl>
-  {actions.waitingReason&&<p className="mt-3 text-[0.82rem] text-ink-600">{actions.waitingReason}</p>}
+  {waitingReasonText(actions,work,locale)&&<p className="mt-3 text-[0.82rem] text-ink-600">{waitingReasonText(actions,work,locale)}</p>}
   <div className="mt-4 border-t border-line pt-3">
    <p className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">{ar?"ملخص الحالة عند الاستقبال":"Intake summary"}</p>
    {summary?<p className="mt-1 line-clamp-4 whitespace-pre-wrap break-words text-[0.88rem] leading-6 text-ink-700">{summary}</p>:<p className="mt-1 text-[0.85rem] text-ink-500">{ar?"لم يكتب المريض وصفًا للحالة.":"The patient did not describe their condition."}</p>}

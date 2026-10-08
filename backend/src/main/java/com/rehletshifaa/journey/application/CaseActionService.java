@@ -4,6 +4,7 @@ import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.journey.api.WorkDtos.PatientActionView;
+import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
 import com.rehletshifaa.journey.application.CaseActionQueryService.Facts;
 import com.rehletshifaa.journey.application.CaseActionQueryService.Proposal;
 import com.rehletshifaa.journey.application.CaseActionQueryService.WorkItem;
@@ -85,7 +86,7 @@ public class CaseActionService {
         boolean patientBlocked = blockers.stream().anyMatch(CaseActionService::patientGate);
         WorkItem mine = queries.myWork(caseId, actor.subject());
         String waitingOn = reconcileWaitingOn(caseId, f.status(), blockers, patientAction, mine);
-        String waitingReason = queries.waitingReason(caseId);
+        WaitingReason waitingReason = queries.waitingReason(caseId);
 
         boolean patient = actor.role() == Role.PATIENT || actor.role() == Role.PATIENT_REPRESENTATIVE;
         // Per case, never per account: one person can be the patient on their own case and a representative on a relative's.
@@ -97,7 +98,7 @@ public class CaseActionService {
         CurrentActionView current = currentAction(caseId, f, proposal, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
         List<String> available = coordinator && owned ? availableActions(f, proposal, patientAction, blockers)
                 : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of();
-        return new CaseActionsView(f.status(), waitingOn, waitingReason, current, blockers, available, "STAFF");
+        return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), current, blockers, available, "STAFF", waitingReason.code());
     }
 
     // ---------------- the patient's own answer ----------------
@@ -120,13 +121,13 @@ public class CaseActionService {
      * arranged offline by staff today, so it is a WAIT and never a "pay" action; a future online step would
      * be a new FOCUS code from this same resolver.
      */
-    private CaseActionsView patientView(UUID caseId, Facts f, String waitingOn, String waitingReason, PatientActionView patientAction,
+    private CaseActionsView patientView(UUID caseId, Facts f, String waitingOn, WaitingReason waitingReason, PatientActionView patientAction,
                                         List<BlockerView> blockers, String viewer) {
         List<BlockerView> mine = blockers.stream().filter(b -> "PATIENT".equals(b.owner())).toList();
         List<String> available = new ArrayList<>();
         if (!TERMINAL.contains(f.status()) && f.coordinatorSubject() != null) available.add("MESSAGE_COORDINATOR");
         CurrentActionView current = patientCurrentAction(caseId, f.status(), patientAction, mine);
-        return new CaseActionsView(f.status(), waitingOn, waitingReason, current, mine, available, viewer);
+        return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), current, mine, available, viewer, waitingReason.code());
     }
 
     private CurrentActionView patientCurrentAction(UUID caseId, String status, PatientActionView patientAction, List<BlockerView> mine) {
@@ -329,8 +330,9 @@ public class CaseActionService {
         String fallback = StaffWorkService.stageDefault(status);
         // Open coordinator work means our team owes the next move, unless the stage says the ball is elsewhere.
         if (Set.of("STAFF", "PAYMENT", "TRAVEL_TEAM", "NONE").contains(fallback) && work.hasOpenWork(caseId, "COORDINATOR")) fallback = "STAFF";
-        String reason = patientStep.map(b -> "Waiting for the patient: " + b.labelEn().toLowerCase(Locale.ROOT))
-                .orElse("PAYMENT".equals(fallback) ? "Waiting for the coordination deposit" : mine != null && "STAFF".equals(fallback) ? mine.title() : null);
+        WaitingReason reason = patientStep.map(b -> WaitingReason.patientStep(b.code(), "Waiting for the patient: " + b.labelEn().toLowerCase(Locale.ROOT)))
+                .orElse("PAYMENT".equals(fallback) ? WaitingReason.of("DEPOSIT_PENDING", "Waiting for the coordination deposit")
+                        : mine != null && "STAFF".equals(fallback) ? WaitingReason.work(mine.copy() == null ? null : mine.copy().code(), mine.title()) : null);
         return work.reconcileWaitingOn(caseId, fallback, reason, patientStep.isPresent() || patientAction != null);
     }
 

@@ -10,6 +10,7 @@ import com.rehletshifaa.journey.api.JourneyDtos.ProposalAssistanceView;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalView;
 import com.rehletshifaa.journey.api.JourneyDtos.RecordedDecisionRequest;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
+import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
 import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.domain.ProposalAssistanceRequest;
 import com.rehletshifaa.journey.infrastructure.ProposalAssistanceRequestRepository;
@@ -135,7 +136,7 @@ public class ProposalAssistanceService {
                 "The patient asked you to go through the proposal's terms with them in Arabic and record their decision.",
                 coordinator, "COORDINATOR", false, null, "SYSTEM", "PROPOSAL_ASSISTANCE_REQUESTED", "proposal-assistance:" + versionId, true,
                 WorkCopy.of(WORK_TYPE)));
-        work.refreshWaitingOn(caseId, "STAFF", title);
+        work.refreshWaitingOn(caseId, "STAFF", WaitingReason.work(WORK_TYPE, title));
         return true;
     }
 }

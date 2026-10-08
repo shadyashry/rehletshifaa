@@ -8,6 +8,8 @@ import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.coordination.domain.Routing.*;
 import com.rehletshifaa.coordination.infrastructure.CoordinationRepository;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
+import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
+import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.application.CoordinatorRoutingPort;
 import com.rehletshifaa.journey.application.StaffWorkService;
 import com.rehletshifaa.shared.api.ApiException;
@@ -235,18 +237,18 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
         if (selection.subject() == null) {
             UUID task = work.openWorkItem(new NewWorkItem(c.id(), "COORDINATION_ROUTING", "Coordinator assignment needed",
                     "Review the coordination queue", null, "COORDINATOR", false, p == null ? null : now.plus(Duration.ofHours(p.configuration().queueHours())),
-                    actor, "COORDINATION_QUEUED", "routing:" + id, false));
+                    actor, "COORDINATION_QUEUED", "routing:" + id, false, WorkCopy.of("COORDINATION_ROUTING")));
             repo.queue(task, selection.team(), selection.path(), now);
             for (var manager : workforce.activeHolders("CARE_COORDINATION_MANAGER"))
                 work.notifyStaff(manager.subject(), c.id(), task, "COORDINATION_QUEUED", "Coordinator assignment needs attention",
-                        "Review the coordination queue", "routing:" + id + ":" + manager.subject(), true);
+                        "Review the coordination queue", "routing:" + id + ":" + manager.subject(), true, WorkCopy.of("COORDINATION_QUEUED_MANAGER"));
         } else {
             work.closeWorkItems(c.id(), "COORDINATION_ROUTING", "Coordination queue resolved");
             // Nobody is told about a case they already own, or one they claimed or took over themselves.
             if (!Objects.equals(c.owner(), selection.subject()) && !selection.subject().equals(actor)) {
                 if (c.owner() == null)
                     work.notifyStaff(selection.subject(), c.id(), null, "COORDINATOR_ASSIGNED", "Care coordination assigned",
-                            "Review your work queue", "routing:" + id + ":" + selection.subject(), true);
+                            "Review your work queue", "routing:" + id + ":" + selection.subject(), true, WorkCopy.of("COORDINATOR_ASSIGNED"));
                 else transferred(c, selection.subject(), actor, id);
             }
         }
@@ -270,7 +272,7 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
                 "You are now the owner of case " + caseNumber + (from == null ? "" : " (previously " + from + ")")
                         + (by == null ? "" : ", transferred by " + by)
                         + ". Open coordinator work on the case is now yours; the reason is in the assignment history.",
-                "ownership-transfer:" + decision, true);
+                "ownership-transfer:" + decision, true, WorkCopy.of("CASE_OWNERSHIP_TRANSFERRED", "caseNumber", caseNumber, "from", from, "by", by));
     }
 
     private String name(String subject) {

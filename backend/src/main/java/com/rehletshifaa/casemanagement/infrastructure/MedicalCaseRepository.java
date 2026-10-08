@@ -45,6 +45,11 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select c.waitingReason from MedicalCase c where c.id = :id")
     Optional<String> findWaitingReason(@Param("id") UUID id);
 
+    interface WaitingReasonRow { String getText(); String getCode(); }
+
+    @Query("select c.waitingReason as text, c.waitingReasonCode as code from MedicalCase c where c.id = :id")
+    Optional<WaitingReasonRow> findWaitingReasonRow(@Param("id") UUID id);
+
     /** The case stage and revision a guarded transition starts from. */
     interface StageAndVersion { CaseStatus getStatus(); Long getVersion(); }
 
@@ -245,8 +250,8 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     /** Who the case waits on; the waiting clock keeps running while the party stays the same. Not a case revision. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-            update MedicalCase c set c.waitingOn = :on, c.waitingReason = :reason,
+            update MedicalCase c set c.waitingOn = :on, c.waitingReason = :reason, c.waitingReasonCode = :code,
                 c.waitingSince = case when c.waitingOn = :on then coalesce(c.waitingSince, cast(:now as Instant)) else cast(:now as Instant) end
             where c.id = :id""")
-    int waitOn(@Param("id") UUID id, @Param("on") String on, @Param("reason") String reason, @Param("now") Instant now);
+    int waitOn(@Param("id") UUID id, @Param("on") String on, @Param("reason") String reason, @Param("code") String code, @Param("now") Instant now);
 }

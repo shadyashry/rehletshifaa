@@ -30,6 +30,7 @@ import com.rehletshifaa.journey.api.ReferralDtos.ConsultantAssignmentRequest;
 import com.rehletshifaa.journey.api.WorkDtos.InformationRequestCommand;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
 import com.rehletshifaa.journey.api.WorkDtos.OnBehalfRequest;
+import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
 import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.domain.CaseMessage;
 import com.rehletshifaa.journey.domain.CaseMessageRead;
@@ -194,7 +195,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
             "You have been assigned case "+caseNumber+" for "+("DOCTOR".equals(role)?"clinical review":"review")+". Accept it to start, or decline so the coordinator can reassign.",
             request.assigneeSubject(),role,false,null,actor.subject(),"ASSIGNMENT_CREATED","assignment:"+id,true,
             WorkCopy.of("DOCTOR".equals(role)?"NEW_ASSIGNMENT_CLINICAL":"NEW_ASSIGNMENT","caseNumber",caseNumber)));
-        if("DOCTOR".equals(role))work.refreshWaitingOn(caseId,"CONSULTANT","Awaiting the consultant to accept the assignment");
+        if("DOCTOR".equals(role))work.refreshWaitingOn(caseId,"CONSULTANT",WaitingReason.of("AWAITING_CONSULTANT_ACCEPTANCE","Awaiting the consultant to accept the assignment"));
         audit("CASE_ASSIGNED",actor,caseId,"CaseAssignment",id.toString(),"ASSIGN","SUCCESS",request.reason());return new IdResponse(id,status);}
 
     @Transactional public CaseView reviewDecision(UUID caseId,ReviewDecisionRequest request){var actor=authority.authorize("ACCEPT".equals(request.decision())?Permission.CLINICAL_APPROVE:Permission.CLINICAL_REVIEW,Resource.ofCase(caseId));requireState(caseId,"CONSULTANT_REVIEW");String treatment=request.recommendedTreatment();String risks=request.risksAndLimitations();String decision=request.decision()==null?"":request.decision();
@@ -249,7 +250,8 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         // "Information required" is owed by the patient, not the coordinator — they get told, not tasked.
         if("INFO".equals(decision)){
             work.notifyStaff(coordinator,caseId,null,"CONSULTANT_REQUESTED_INFORMATION","Consultant needs more information from the patient",
-                consultant+" asked for more information before recommending"+detail,"consultant-outcome:INFO:"+caseId,true);
+                consultant+" asked for more information before recommending"+detail,"consultant-outcome:INFO:"+caseId,true,
+                WorkCopy.of("CONSULTANT_NEEDS_INFORMATION","consultant",who,"said",reason));
             return;
         }
         String type,title,context,code;
@@ -268,7 +270,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
             WorkCopy.of(code,"consultant",who,"said","ACCEPT".equals(decision)?null:reason)));
         // The clinical work item is closed by now, so responsibility genuinely sits with our team again —
         // except for a terminal clinical outcome, where the stage already decided nobody is waiting.
-        if(!"NOT_SUITABLE".equals(decision))work.refreshWaitingOn(caseId,"STAFF",title);
+        if(!"NOT_SUITABLE".equals(decision))work.refreshWaitingOn(caseId,"STAFF",WaitingReason.work(code,title));
     }
     private void saveCostEstimates(UUID reviewId,UUID practitionerId,List<CostEstimateItem>estimates){if(estimates==null)return;int order=0;for(CostEstimateItem item:estimates){if(item==null||item.serviceDescription()==null||item.serviceDescription().isBlank()||item.estimatedCost()==null||item.currency()==null||item.currency().isBlank())continue;UUID catalogId=item.catalogServiceId();
         // Amounts arrive in the consultant's chosen display currency; the EGP base (used for all margin/policy
@@ -313,7 +315,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
                 work.openWorkItem(new NewWorkItem(caseId,CLINICAL_WORK,"Review case and provide clinical recommendation",
                     "Review the intake summary and documents, then record your recommendation.",actor.subject(),"DOCTOR",
                     false,null,actor.subject(),"CLINICAL_REVIEW_DUE","clinical-review:"+assignmentId,false,WorkCopy.of("CLINICAL_REVIEW_DUE")));
-                work.refreshWaitingOn(caseId,"CONSULTANT","Awaiting the clinical recommendation");
+                work.refreshWaitingOn(caseId,"CONSULTANT",WaitingReason.of("AWAITING_RECOMMENDATION","Awaiting the clinical recommendation"));
             } else {
                 returnToCoordinator(caseId,actor,request.reason());
             }
@@ -330,7 +332,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
             (who==null?"The assignee":who)+" declined this assignment"+(hasText(reason)?": "+reason.trim():".")+" Choose another consultant.",
             coordinator,"COORDINATOR",false,null,"SYSTEM","ASSIGNMENT_DECLINED","assignment-declined:"+caseId+":"+actor.subject(),true,
             WorkCopy.of("ASSIGNMENT_DECLINED","assignee",who,"said",reason)));
-        work.refreshWaitingOn(caseId,"STAFF","Assignment declined — awaiting reassignment");
+        work.refreshWaitingOn(caseId,"STAFF",WaitingReason.of("ASSIGNMENT_DECLINED_REASSIGN","Assignment declined — awaiting reassignment"));
     }
 
     /** Thread membership (the role's threads) is defined once, beside the case page that lists the threads. */
@@ -565,7 +567,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         work.openWorkItem(new NewWorkItem(caseId,declined?"PROPOSAL_DECLINED_REVIEW":"PROPOSAL_REVISION",title,context,coordinator,
             "COORDINATOR",false,null,"SYSTEM","PATIENT_PROPOSAL_DECISION","proposal-decision:"+decision+":"+versionId,email,
             WorkCopy.of(declined?"PROPOSAL_DECLINED":"PROPOSAL_CHANGES_REQUESTED","said",comment)));
-        work.refreshWaitingOn(caseId,"STAFF",title);
+        work.refreshWaitingOn(caseId,"STAFF",WaitingReason.work(declined?"PROPOSAL_DECLINED":"PROPOSAL_CHANGES_REQUESTED",title));
     }
 
     /**

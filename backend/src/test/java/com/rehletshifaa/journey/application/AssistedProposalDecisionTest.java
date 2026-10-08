@@ -180,9 +180,14 @@ class AssistedProposalDecisionTest {
         authenticate("coordinator-subject", Role.COORDINATOR);
         var item = staffWork.myWork().stream().filter(w -> w.caseId().equals(caseId) && ProposalAssistanceService.WORK_TYPE.equals(w.type())).findFirst().orElseThrow();
         assertThat(item.copy()).isEqualTo(new com.rehletshifaa.journey.api.WorkDtos.WorkCopy("PROPOSAL_TERMS_CALL", Map.of()));
-        var current = journey.workspace(caseId).actions().currentAction();
+        var actions = journey.workspace(caseId).actions();
+        var current = actions.currentAction();
         assertThat(current.workType()).isEqualTo(ProposalAssistanceService.WORK_TYPE);
         assertThat(current.copy()).isEqualTo(item.copy());
+        // The stage still waits on the patient's decision, so the reason is the patient default — now as a code too.
+        assertThat(actions.waitingReasonCode()).isEqualTo("DEFAULT_PATIENT");
+        var notice = staffWork.myNotifications().items().stream().filter(n -> caseId.equals(n.caseId()) && "PROPOSAL_ASSISTANCE_REQUESTED".equals(n.eventType())).findFirst().orElseThrow();
+        assertThat(notice.copy()).isEqualTo(item.copy());
     }
 
     @Test void aDeclineBecomesWorkWhoseCopyQuotesThePatient() throws Exception {
@@ -239,6 +244,8 @@ class AssistedProposalDecisionTest {
         assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "VIDEO", "PATIENT", Instant.now(), true));
         em.flush();
         assertThat(count("SELECT count(*) FROM deposits WHERE case_id=?", caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT copy_code FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", String.class, caseId)).isEqualTo("DEPOSIT_DUE");
+        assertThat(jdbc.queryForObject("SELECT waiting_reason_code FROM medical_cases WHERE id=?", String.class, caseId)).isNotNull();
         assertThat(count("SELECT count(*) FROM patient_onboardings WHERE case_id=?", caseId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT acknowledgement_version FROM proposal_decisions WHERE proposal_version_id=?", String.class, versionId))
                 .isEqualTo("proposal-ack-assisted-ar-2026-10-08");
@@ -251,6 +258,8 @@ class AssistedProposalDecisionTest {
         assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("REVISION_REQUESTED", "A shorter stay, please", "WHATSAPP_CALL", "PATIENT", Instant.now(), true));
         em.flush();
         assertThat(status(caseId)).isEqualTo("REVISION_REQUESTED");
+        // Our team owes the revision: the case waits on that work item, worded from its code.
+        assertThat(jdbc.queryForObject("SELECT waiting_reason_code FROM medical_cases WHERE id=?", String.class, caseId)).isEqualTo("WORK:PROPOSAL_CHANGES_REQUESTED");
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='PROPOSAL_REVISION' AND status='OPEN'", caseId)).isEqualTo(1);
         // The coordinator who recorded it is not emailed about their own entry; the patient is told.
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE ?", "work-email:%" + versionId + "%")).isZero();

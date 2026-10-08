@@ -4,11 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bell, Check, X } from "lucide-react";
 
+import { useWorkCopy } from "@/components/portal/portal-copy";
 import { intlLocale, type Locale } from "@/lib/i18n";
+import { workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
 
 export type StaffNotification = {
   id: string; caseId: string | null; caseNumber: string | null; taskId: string | null;
   eventType: string; title: string; context: string | null; createdAt: string; read: boolean;
+  /** The wording code and parameters; the English `title`/`context` are the fallback for codes this page does not know. */
+  copy?: WorkItemCopy | null;
 };
 type Feed = { unread: number; items: StaffNotification[] };
 type Api = <T,>(path: string, init?: RequestInit) => Promise<T>;
@@ -20,6 +24,8 @@ type Api = <T,>(path: string, init?: RequestInit) => Promise<T>;
  * member to the case where the actual work lives. Rendered into the header slot beside the account avatar.
  */
 export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; api: Api; onOpenCase: (caseId: string) => void }) {
+  const wording = useWorkCopy().workCopy;
+  const worded = (item: StaffNotification) => workCopyText(item.copy, wording) ?? { title: item.title, context: item.context };
   const ar = locale === "ar";
   const t = ar
     ? { label: "الإشعارات", unread: "غير مقروءة", empty: "لا توجد إشعارات بعد.", emptyHint: "سنُعلمك عندما يحتاج شيء إلى تدخلك.", markAll: "تعليم الكل كمقروء", markOne: "تعليم كمقروء", open: "فتح الحالة", close: "إغلاق", now: "الآن", ago: "منذ" }
@@ -102,8 +108,8 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
                 <div className="flex items-start gap-2">
                   {!item.read && <span aria-hidden className="mt-1.5 h-2 w-2 flex-none rounded-full bg-brand-600"/>}
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold leading-6 text-ink-900">{item.title}</p>
-                    {item.context && <p className="mt-0.5 text-sm leading-6 text-ink-600">{item.context}</p>}
+                    <p dir="auto" className="font-semibold leading-6 text-ink-900">{worded(item).title}</p>
+                    {worded(item).context && <p dir="auto" className="mt-0.5 text-sm leading-6 text-ink-600">{worded(item).context}</p>}
                     <p className="mt-1 text-[0.8125rem] text-ink-500">
                       {item.caseNumber && <span className="font-semibold text-brand-700">{item.caseNumber} · </span>}
                       {since(item.createdAt, locale, t)}
@@ -116,7 +122,7 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
                     )}
                   </div>
                   {!item.read && (
-                    <button type="button" className="icon-button flex-none" aria-label={`${t.markOne}: ${item.title}`} onClick={() => void markRead(item.id)}>
+                    <button type="button" className="icon-button flex-none" aria-label={`${t.markOne}: ${worded(item).title}`} onClick={() => void markRead(item.id)}>
                       <Check size={16}/>
                     </button>
                   )}

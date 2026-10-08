@@ -66,7 +66,10 @@ public class CaseActionQueryService {
         return new Facts(c.getStatus().name(), Boolean.TRUE.equals(c.getTravelPackageRequested()), open);
     }
 
-    String waitingReason(UUID caseId) { return cases.findWaitingReason(caseId).orElse(null); }
+    com.rehletshifaa.journey.api.WorkDtos.WaitingReason waitingReason(UUID caseId) {
+        return cases.findWaitingReasonRow(caseId).map(r -> com.rehletshifaa.journey.api.WorkDtos.WaitingReason.of(r.getCode(), r.getText()))
+                .orElse(com.rehletshifaa.journey.api.WorkDtos.WaitingReason.text(null));
+    }
 
     /** The one open item assigned to this person: blocking first, then by priority, then oldest. */
     WorkItem myWork(UUID caseId, String subject) {

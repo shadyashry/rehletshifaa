@@ -44,6 +44,19 @@ for (const locale of ["en", "ar"] as const) {
   });
 }
 
+test("notifications and the waiting reason are worded from their codes in Arabic", async ({ page }) => {
+  await setupPortal(page, "COORDINATOR", { notifications: true });
+  await page.goto("/ar/portal");
+  await page.getByRole("button", { name: /الإشعارات/ }).click();
+  await expect(page.getByText("نُقلت إليك حالة")).toBeVisible();
+  await expect(page.getByText(/نقلها: \u2068Sara Ahmed\u2069\./)).toBeVisible();
+  await expect(page.getByText("A case has been transferred to you")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await openFirstCase(page, true);
+  await expect(page.getByText("بانتظار فريقنا")).toBeVisible();
+  await expect(page.getByText("Waiting for our team")).toHaveCount(0);
+});
+
 test("leaving a case without typed text never asks", async ({ page }) => {
   await setupPortal(page, "COORDINATOR");
   await page.goto("/en/portal");

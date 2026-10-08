@@ -14,6 +14,8 @@ import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.IdResponse;
 import com.rehletshifaa.journey.api.ReferralDtos.*;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
+import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
+import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.domain.ConsultantReferral;
 import com.rehletshifaa.journey.infrastructure.ConsultantReferralRepository;
 import com.rehletshifaa.shared.api.ApiException;
@@ -104,7 +106,8 @@ public class ConsultantReferralService {
                 transfer ? "Consultant transfer requested — confirm the handover" : "Second opinion requested — choose a consultant",
                 consultant + (transfer ? " asked to transfer this case to another consultant." : " asked for a second opinion.")
                         + " Review the referral and choose an eligible consultant, or decline it.",
-                coordinator(caseId), "COORDINATOR", false, null, actor.subject(), "REFERRAL_REQUESTED", "referral-requested:" + id, true));
+                coordinator(caseId), "COORDINATOR", false, null, actor.subject(), "REFERRAL_REQUESTED", "referral-requested:" + id, true,
+                WorkCopy.of(transfer ? "REFERRAL_TRANSFER_REQUESTED" : "REFERRAL_SECOND_OPINION_REQUESTED", "consultant", consultant)));
         audit(actor, caseId, "REFERRAL_REQUESTED", "ConsultantReferral", id, "CREATE", request.type());
         return view(id, "REFERRER");
     }
@@ -137,9 +140,11 @@ public class ConsultantReferralService {
         work.closeWorkItems(caseId, "SECOND_OPINION", "Second opinion submitted");
         String who = queries.consultantName(r.targetPractitioner());
         work.notifyStaff(r.fromSubject(), caseId, null, "SECOND_OPINION_SUBMITTED", "Second opinion received",
-                who + " submitted the second opinion you asked for.", "second-opinion:" + referralId + ":referrer", true);
+                who + " submitted the second opinion you asked for.", "second-opinion:" + referralId + ":referrer", true,
+                WorkCopy.of("SECOND_OPINION_RECEIVED_REFERRER", "consultant", who));
         work.notifyStaff(coordinator(caseId), caseId, null, "SECOND_OPINION_SUBMITTED", "Second opinion received",
-                who + " submitted a second opinion on this case.", "second-opinion:" + referralId + ":coordinator", false);
+                who + " submitted a second opinion on this case.", "second-opinion:" + referralId + ":coordinator", false,
+                WorkCopy.of("SECOND_OPINION_RECEIVED_COORDINATOR", "consultant", who));
         audit(actor, caseId, "SECOND_OPINION_SUBMITTED", "ConsultantReferral", referralId, "COMPLETE", null);
         audit(actor, caseId, "ASSIGNMENT_ENDED", "CaseAssignment", r.targetAssignment(), "END", "Second opinion submitted");
         return view(referralId, "RECEIVER");
@@ -179,7 +184,8 @@ public class ConsultantReferralService {
                 transfer ? "Case transfer offered to you" : "Second opinion requested from you",
                 (transfer ? "Case " + caseNumber + " is offered to you as its new consultant." : "You are asked for a second opinion on case " + caseNumber + ".")
                         + " Accept to start, or decline so the coordinator can choose someone else.",
-                subject, "DOCTOR", false, null, actor.subject(), "ASSIGNMENT_CREATED", "referral-offer:" + assignment, true));
+                subject, "DOCTOR", false, null, actor.subject(), "ASSIGNMENT_CREATED", "referral-offer:" + assignment, true,
+                WorkCopy.of(transfer ? "REFERRAL_TRANSFER_OFFERED" : "REFERRAL_SECOND_OPINION_OFFERED", "caseNumber", caseNumber)));
         audit(actor, caseId, "REFERRAL_CONFIRMED", "ConsultantReferral", referralId, "CONFIRM", blankToNull(request.note()));
         audit(actor, caseId, "CASE_ASSIGNED", "CaseAssignment", assignment, "ASSIGN", r.type());
         return view(referralId, "COORDINATOR");
@@ -195,7 +201,8 @@ public class ConsultantReferralService {
         if (changed != 1) throw conflict();
         work.closeWorkItems(caseId, confirmWork(r.type()), "Referral declined");
         work.notifyStaff(r.fromSubject(), caseId, null, "REFERRAL_DECLINED", "Your referral was not confirmed",
-                "The coordinator did not confirm your " + label(r.type()) + ": " + request.note().trim(), "referral-declined:" + referralId, true);
+                "The coordinator did not confirm your " + label(r.type()) + ": " + request.note().trim(), "referral-declined:" + referralId, true,
+                WorkCopy.of("TRANSFER".equals(r.type()) ? "REFERRAL_TRANSFER_NOT_CONFIRMED" : "REFERRAL_SECOND_OPINION_NOT_CONFIRMED", "said", request.note()));
         audit(actor, caseId, "REFERRAL_DECLINED_BY_COORDINATOR", "ConsultantReferral", referralId, "DECLINE", request.note().trim());
         return view(referralId, "COORDINATOR");
     }
@@ -229,7 +236,8 @@ public class ConsultantReferralService {
             work.closeWorkItems(caseId, offerWork(r.type()), "Referral declined");
             work.openWorkItem(new NewWorkItem(caseId, confirmWork(r.type()), "Referral declined — choose another consultant",
                     receiver + " declined the " + label(r.type()) + (blankToNull(reason) == null ? "." : ": " + reason.trim()) + " Choose another eligible consultant, or decline the referral.",
-                    coordinator(caseId), "COORDINATOR", false, null, "SYSTEM", "REFERRAL_DECLINED_BY_CONSULTANT", "referral-declined:" + assignmentId, true));
+                    coordinator(caseId), "COORDINATOR", false, null, "SYSTEM", "REFERRAL_DECLINED_BY_CONSULTANT", "referral-declined:" + assignmentId, true,
+                    WorkCopy.of("TRANSFER".equals(r.type()) ? "REFERRAL_TRANSFER_DECLINED" : "REFERRAL_SECOND_OPINION_DECLINED", "consultant", receiver, "said", reason)));
             audit(actor, caseId, "ASSIGNMENT_DECISION", "CaseAssignment", assignmentId, "DECLINE", reason);
             audit(actor, caseId, "REFERRAL_DECLINED_BY_CONSULTANT", "ConsultantReferral", referralId, "DECLINE", reason);
             return new IdResponse(assignmentId, "DECLINED");
@@ -249,12 +257,14 @@ public class ConsultantReferralService {
             work.closeWorkItems(caseId, CLINICAL_WORK, "Case transferred to another consultant");
             work.openWorkItem(new NewWorkItem(caseId, CLINICAL_WORK, "Review case and provide clinical recommendation",
                     "Review the intake summary and documents, then record your recommendation.", actor.subject(), "DOCTOR",
-                    false, null, actor.subject(), "CLINICAL_REVIEW_DUE", "clinical-review:" + assignmentId, false));
-            work.refreshWaitingOn(caseId, "CONSULTANT", "Awaiting the clinical recommendation");
+                    false, null, actor.subject(), "CLINICAL_REVIEW_DUE", "clinical-review:" + assignmentId, false, WorkCopy.of("CLINICAL_REVIEW_DUE")));
+            work.refreshWaitingOn(caseId, "CONSULTANT", WaitingReason.of("AWAITING_RECOMMENDATION", "Awaiting the clinical recommendation"));
             work.notifyStaff(r.fromSubject(), caseId, null, "CONSULTANT_TRANSFER_COMPLETED", "Case transferred",
-                    receiver + " accepted the transfer. Your assignment on this case has ended.", "transfer-completed:" + referralId + ":referrer", true);
+                    receiver + " accepted the transfer. Your assignment on this case has ended.", "transfer-completed:" + referralId + ":referrer", true,
+                    WorkCopy.of("TRANSFER_COMPLETED_REFERRER", "consultant", receiver));
             work.notifyStaff(coordinator(caseId), caseId, null, "CONSULTANT_TRANSFER_COMPLETED", "Consultant transfer completed",
-                    receiver + " is now the case's consultant.", "transfer-completed:" + referralId + ":coordinator", false);
+                    receiver + " is now the case's consultant.", "transfer-completed:" + referralId + ":coordinator", false,
+                    WorkCopy.of("TRANSFER_COMPLETED_COORDINATOR", "consultant", receiver));
             audit(actor, caseId, "ASSIGNMENT_ENDED", "CaseAssignment", r.sourceAssignment(), "END", "Transferred to another consultant");
         } else {
             assignments.accept(assignmentId, micros(now));
@@ -262,9 +272,10 @@ public class ConsultantReferralService {
             work.closeWorkItems(caseId, offerWork(r.type()), "Second opinion accepted");
             work.openWorkItem(new NewWorkItem(caseId, "SECOND_OPINION", "Provide your second opinion",
                     "Review the case and submit your opinion. Your access ends when you submit it.", actor.subject(), "DOCTOR",
-                    false, null, actor.subject(), "SECOND_OPINION_DUE", "second-opinion-due:" + assignmentId, false));
+                    false, null, actor.subject(), "SECOND_OPINION_DUE", "second-opinion-due:" + assignmentId, false, WorkCopy.of("SECOND_OPINION_DUE")));
             work.notifyStaff(r.fromSubject(), caseId, null, "SECOND_OPINION_ACCEPTED", "Second opinion accepted",
-                    receiver + " accepted your second-opinion request.", "second-opinion-accepted:" + referralId, false);
+                    receiver + " accepted your second-opinion request.", "second-opinion-accepted:" + referralId, false,
+                    WorkCopy.of("SECOND_OPINION_ACCEPTED", "consultant", receiver));
         }
         audit(actor, caseId, "ASSIGNMENT_DECISION", "CaseAssignment", assignmentId, "ACCEPT", reason);
         audit(actor, caseId, "REFERRAL_ACCEPTED", "ConsultantReferral", referralId, "ACCEPT", r.type());

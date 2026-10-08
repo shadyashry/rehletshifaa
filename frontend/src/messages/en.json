@@ -1204,6 +1204,26 @@
       "DOCUMENT_REVIEW": "Review the documents"
     },
     "proposalVersion": "v{number}",
+    "waitingReason": {
+      "patientStep": "Waiting for the patient: {step}",
+      "reasons": {
+        "DEPOSIT_TO_ARRANGE": "Coordination deposit to be arranged with the patient",
+        "DEPOSIT_RECEIVED_START": "Deposit received — coordinator to start the treatment journey",
+        "READY_AND_DEPOSIT_SETTLED": "Patient ready and deposit settled — coordinator to start the treatment journey",
+        "AWAITING_RECOMMENDATION": "Awaiting the clinical recommendation",
+        "AWAITING_CONSULTANT_ACCEPTANCE": "Awaiting the Consultant to accept the assignment",
+        "ASSIGNMENT_DECLINED_REASSIGN": "Assignment declined — awaiting reassignment",
+        "PATIENT_INFO_RECORDED": "Patient information recorded by the coordinator",
+        "PATIENT_RESPONDED_REVIEW": "Patient responded — awaiting coordinator review",
+        "PATIENT_INFO_REQUESTED": "Waiting for information requested from the patient",
+        "PATIENT_INFO_OPTIONAL": "Optional information requested from the patient",
+        "PATIENT_JOURNEY_ACTION": "Waiting for the patient’s current journey step",
+        "DEPOSIT_PENDING": "Waiting for the coordination deposit",
+        "DEFAULT_PATIENT": "Waiting for the patient",
+        "DEFAULT_CONSULTANT": "Waiting for the Consultant",
+        "DEFAULT_STAFF": "Waiting for our team"
+      }
+    },
     "leaveCase": {
       "title": "Leave this case?",
       "body": "Text you typed in this case hasn’t been sent. If you leave now, it will be lost.",
@@ -1266,6 +1286,94 @@
         "PROPOSAL_TERMS_CALL": {
           "title": "Go through the proposal terms with the patient in Arabic",
           "context": "The patient asked you to go through the proposal’s terms with them in Arabic and record their decision."
+        },
+        "REFERRAL_TRANSFER_REQUESTED": {
+          "title": "Consultant transfer requested — confirm the handover",
+          "context": "{consultant} asked to transfer this case to another Consultant. Review the referral and choose an eligible Consultant, or decline it."
+        },
+        "REFERRAL_SECOND_OPINION_REQUESTED": {
+          "title": "Second opinion requested — choose a Consultant",
+          "context": "{consultant} asked for a second opinion. Review the referral and choose an eligible Consultant, or decline it."
+        },
+        "REFERRAL_TRANSFER_OFFERED": {
+          "title": "Case transfer offered to you",
+          "context": "Case {caseNumber} is offered to you as its new Consultant. Accept to start, or decline so the coordinator can choose someone else."
+        },
+        "REFERRAL_SECOND_OPINION_OFFERED": {
+          "title": "Second opinion requested from you",
+          "context": "You are asked for a second opinion on case {caseNumber}. Accept to start, or decline so the coordinator can choose someone else."
+        },
+        "REFERRAL_TRANSFER_DECLINED": {
+          "title": "Referral declined — choose another Consultant",
+          "context": "{consultant} declined the transfer. Choose another eligible Consultant, or decline the referral."
+        },
+        "REFERRAL_SECOND_OPINION_DECLINED": {
+          "title": "Referral declined — choose another Consultant",
+          "context": "{consultant} declined the second-opinion request. Choose another eligible Consultant, or decline the referral."
+        },
+        "SECOND_OPINION_DUE": {
+          "title": "Give your second opinion",
+          "context": "Review the case and submit your opinion. Your access ends when you submit it."
+        },
+        "DEPOSIT_DUE": {
+          "title": "Patient acknowledged the estimate — arrange the coordination deposit",
+          "context": "The patient acknowledged their preliminary estimate and a coordination deposit is now due. Send the payment instructions, then record the amount received."
+        },
+        "TREATMENT_COORDINATION_START": {
+          "title": "Start treatment coordination — deposit received",
+          "context": "The coordination deposit is confirmed. Begin the treatment journey for this case."
+        },
+        "COORDINATION_ROUTING": {
+          "title": "Coordinator assignment needed",
+          "context": "Review the coordination queue."
+        },
+        "COORDINATION_QUEUED_MANAGER": {
+          "title": "Coordinator assignment needs attention",
+          "context": "Review the coordination queue."
+        },
+        "COORDINATOR_ASSIGNED": {
+          "title": "Care coordination assigned",
+          "context": "Review your work queue."
+        },
+        "CASE_OWNERSHIP_TRANSFERRED": {
+          "title": "A case has been transferred to you",
+          "context": "You are now the owner of case {caseNumber}. Open coordinator work on the case is now yours; the reason is in the assignment history.",
+          "extras": {
+            "from": "Previously owned by {from}.",
+            "by": "Transferred by {by}."
+          }
+        },
+        "SECOND_OPINION_RECEIVED_REFERRER": {
+          "title": "Second opinion received",
+          "context": "{consultant} submitted the second opinion you asked for."
+        },
+        "SECOND_OPINION_RECEIVED_COORDINATOR": {
+          "title": "Second opinion received",
+          "context": "{consultant} submitted a second opinion on this case."
+        },
+        "REFERRAL_TRANSFER_NOT_CONFIRMED": {
+          "title": "Your referral was not confirmed",
+          "context": "The coordinator did not confirm your transfer."
+        },
+        "REFERRAL_SECOND_OPINION_NOT_CONFIRMED": {
+          "title": "Your referral was not confirmed",
+          "context": "The coordinator did not confirm your second-opinion request."
+        },
+        "TRANSFER_COMPLETED_REFERRER": {
+          "title": "Case transferred",
+          "context": "{consultant} accepted the transfer. Your assignment on this case has ended."
+        },
+        "TRANSFER_COMPLETED_COORDINATOR": {
+          "title": "Consultant transfer completed",
+          "context": "{consultant} is now the case’s Consultant."
+        },
+        "SECOND_OPINION_ACCEPTED": {
+          "title": "Second opinion accepted",
+          "context": "{consultant} accepted your second-opinion request."
+        },
+        "CONSULTANT_NEEDS_INFORMATION": {
+          "title": "The Consultant needs more information from the patient",
+          "context": "{consultant} asked for more information before recommending."
         }
       }
     },

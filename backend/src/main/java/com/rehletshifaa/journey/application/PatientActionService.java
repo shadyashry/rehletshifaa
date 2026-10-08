@@ -101,8 +101,8 @@ public class PatientActionService {
                             message == null ? "Information requested from the patient" : message, now);
         }
         work.setWaitingOn(caseId, "PATIENT", command.blocking()
-                ? "Waiting for information requested from the patient"
-                : "Optional information requested from the patient");
+                ? WaitingReason.of("PATIENT_INFO_REQUESTED", "Waiting for information requested from the patient")
+                : WaitingReason.of("PATIENT_INFO_OPTIONAL", "Optional information requested from the patient"));
         audit(caseId, "PATIENT_INFORMATION_REQUESTED", actorSubject, actorRole, taskId,
                 (command.blocking() ? "blocking" : "non-blocking") + " request with " + items.size() + " item(s)");
         return taskId;
@@ -141,7 +141,7 @@ public class PatientActionService {
         Instant now = clock.instant();
         UUID id = UUID.randomUUID();
         tasks.saveAndFlush(new CaseTask(id, caseId, type, encrypt(label), null, null, "PATIENT", "PATIENT_ACTION", StaffWorkService.derivePriority(blocking, null, now), blocking, null, actorSubject, now));
-        work.setWaitingOn(caseId, "PATIENT", "Waiting for the patient's current Journey action");
+        work.setWaitingOn(caseId, "PATIENT", WaitingReason.of("PATIENT_JOURNEY_ACTION", "Waiting for the patient's current Journey action"));
         audit(caseId, "JOURNEY_PATIENT_ACTION_OPENED", actorSubject, "SYSTEM", id, type);
         return id;
     }
@@ -186,7 +186,7 @@ public class PatientActionService {
         if (taskId == null) throw new ApiException(409, "NO_OPEN_PATIENT_ACTION", "There is no open information request for this case");
         applyResponses(taskId, request.items(), "PATIENT_REPORTED", channel, actorSubject, true);
         tasks.complete(taskId, encrypt("Recorded by staff from the patient via " + channel), micros(clock.instant()));
-        work.refreshWaitingOn(caseId, "STAFF", "Patient information recorded by the coordinator");
+        work.refreshWaitingOn(caseId, "STAFF", WaitingReason.of("PATIENT_INFO_RECORDED", "Patient information recorded by the coordinator"));
         restoreStage(caseId);
         audit(caseId, "PATIENT_INFORMATION_RECORDED_ON_BEHALF", actorSubject, actorRole, taskId,
                 "channel=" + channel + "; source=PATIENT_REPORTED");
@@ -229,7 +229,7 @@ public class PatientActionService {
     private void completeAction(UUID caseId, UUID taskId, String note, String who) {
         Instant now = clock.instant();
         int closed = tasks.complete(taskId, encrypt("Information supplied by " + who), micros(now));
-        work.refreshWaitingOn(caseId, "STAFF", "Patient responded — awaiting coordinator review");
+        work.refreshWaitingOn(caseId, "STAFF", WaitingReason.of("PATIENT_RESPONDED_REVIEW", "Patient responded — awaiting coordinator review"));
         if (closed != 1) return; // already completed: never open a second review or send a second notification
         restoreStage(caseId);
         String coordinator = assignments.findActivePrimaryCoordinator(caseId, Limit.of(1)).stream().findFirst().orElse(null);

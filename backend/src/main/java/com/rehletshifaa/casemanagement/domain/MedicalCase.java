@@ -34,6 +34,7 @@ public class MedicalCase extends AssignedIdEntity {
     @Column(name="claimed_at") private Instant claimedAt;
     @Column(name="waiting_on", nullable=false, length=20) private String waitingOn;
     @Column(name="waiting_reason", length=240) private String waitingReason;
+    @Column(name="waiting_reason_code", length=120) private String waitingReasonCode;
     @Column(name="waiting_since") private Instant waitingSince;
 
     protected MedicalCase() {}

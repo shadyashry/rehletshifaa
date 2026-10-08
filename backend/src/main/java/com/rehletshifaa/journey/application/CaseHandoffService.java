@@ -6,6 +6,8 @@ import com.rehletshifaa.casemanagement.domain.CaseStatus;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
+import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
+import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.audit.AuditEventRepository;
 import com.rehletshifaa.shared.audit.AuditTrail;
@@ -77,10 +79,10 @@ public class CaseHandoffService {
         work.openWorkItem(new NewWorkItem(caseId, DEPOSIT_WORK, "Patient acknowledged the estimate — arrange the coordination deposit",
                 "The patient acknowledged their preliminary estimate and a coordination deposit is now due. Send the payment instructions, then record the amount received.",
                 coordinator, "COORDINATOR", false, null, "SYSTEM", "DEPOSIT_REQUIRED",
-                "deposit-required:" + caseId, true));
+                "deposit-required:" + caseId, true, WorkCopy.of("DEPOSIT_DUE")));
         // Unowned: the shared queue must still learn about it — with the wording of THIS event, not the settlement's.
         if (coordinator == null) notifyTeamMailbox(caseId, "deposit-required-coordinator", "deposit-required-team:" + caseId, now);
-        work.refreshWaitingOn(caseId, "STAFF", "Coordination deposit to be arranged with the patient");
+        work.refreshWaitingOn(caseId, "STAFF", WaitingReason.of("DEPOSIT_TO_ARRANGE", "Coordination deposit to be arranged with the patient"));
         return true;
     }
 
@@ -109,12 +111,12 @@ public class CaseHandoffService {
             work.openWorkItem(new NewWorkItem(caseId, "TRAVEL", "Start treatment coordination — deposit received",
                     "The coordination deposit is confirmed. Begin the treatment journey for this case.",
                     coordinator, "COORDINATOR", false, null, "SYSTEM", "DEPOSIT_SETTLED",
-                    "deposit-settled:" + caseId, true));
+                    "deposit-settled:" + caseId, true, WorkCopy.of("TREATMENT_COORDINATION_START")));
             if (coordinator == null) notifyTeamMailbox(caseId, "deposit-settled-coordinator", "deposit-settled-team:" + caseId, now); // unowned: the shared queue must still see it
             notifyPatient(caseId, now);
         }
         boolean moved = advanceToCoordination(caseId, status, now);
-        if (first || moved) work.refreshWaitingOn(caseId, "STAFF", "Deposit received — coordinator to start the treatment journey");
+        if (first || moved) work.refreshWaitingOn(caseId, "STAFF", WaitingReason.of("DEPOSIT_RECEIVED_START", "Deposit received — coordinator to start the treatment journey"));
         if (first) audit(caseId, "CASE_DEPOSIT_HANDOFF", moved ? "Deposit settled; case returned to coordinator"
                 : "ACCEPTED".equals(status) ? "Deposit settled; coordination starts once the patient completes their profile" : "Deposit settled; case already in coordination");
         return first;
@@ -130,7 +132,7 @@ public class CaseHandoffService {
         String status = lockedStatus(caseId);
         if (!"ACCEPTED".equals(status)) return false;
         boolean moved = advanceToCoordination(caseId, status, clock.instant());
-        if (moved) work.refreshWaitingOn(caseId, "STAFF", "Patient ready and deposit settled — coordinator to start the treatment journey");
+        if (moved) work.refreshWaitingOn(caseId, "STAFF", WaitingReason.of("READY_AND_DEPOSIT_SETTLED", "Patient ready and deposit settled — coordinator to start the treatment journey"));
         return moved;
     }
 

@@ -1228,6 +1228,26 @@
       "DOCUMENT_REVIEW": "مراجعة المستندات"
     },
     "proposalVersion": "الإصدار {number}",
+    "waitingReason": {
+      "patientStep": "بانتظار المريض: {step}",
+      "reasons": {
+        "DEPOSIT_TO_ARRANGE": "ترتيب وديعة التنسيق مع المريض",
+        "DEPOSIT_RECEIVED_START": "استُلمت الوديعة — بانتظار بدء المنسّق رحلة العلاج",
+        "READY_AND_DEPOSIT_SETTLED": "المريض جاهز والوديعة مسدَّدة — بانتظار بدء المنسّق رحلة العلاج",
+        "AWAITING_RECOMMENDATION": "بانتظار التوصية السريرية",
+        "AWAITING_CONSULTANT_ACCEPTANCE": "بانتظار قبول الاستشاري للتعيين",
+        "ASSIGNMENT_DECLINED_REASSIGN": "تعذّر قبول التعيين — بانتظار إعادة التعيين",
+        "PATIENT_INFO_RECORDED": "سجّل المنسّق معلومات المريض",
+        "PATIENT_RESPONDED_REVIEW": "ردّ المريض — بانتظار مراجعة المنسّق",
+        "PATIENT_INFO_REQUESTED": "بانتظار معلومات مطلوبة من المريض",
+        "PATIENT_INFO_OPTIONAL": "طُلبت معلومات اختيارية من المريض",
+        "PATIENT_JOURNEY_ACTION": "بانتظار الخطوة الحالية من المريض",
+        "DEPOSIT_PENDING": "بانتظار وديعة التنسيق",
+        "DEFAULT_PATIENT": "بانتظار المريض",
+        "DEFAULT_CONSULTANT": "بانتظار الاستشاري",
+        "DEFAULT_STAFF": "بانتظار فريقنا"
+      }
+    },
     "leaveCase": {
       "title": "مغادرة هذه الحالة؟",
       "body": "لم يُرسَل النص الذي كتبته في هذه الحالة بعد. إذا غادرت الآن فسيضيع.",
@@ -1290,6 +1310,94 @@
         "PROPOSAL_TERMS_CALL": {
           "title": "مراجعة شروط المقترح مع المريض بالعربية",
           "context": "طلب المريض مراجعة شروط المقترح معه بالعربية وتسجيل قراره."
+        },
+        "REFERRAL_TRANSFER_REQUESTED": {
+          "title": "طلب نقل الحالة إلى استشاري آخر — تأكيد التسليم",
+          "context": "طلب نقل هذه الحالة إلى استشاري آخر من {consultant}. الخطوة التالية: مراجعة الإحالة واختيار استشاري مؤهَّل، أو رفضها."
+        },
+        "REFERRAL_SECOND_OPINION_REQUESTED": {
+          "title": "طلب رأي ثانٍ — اختيار استشاري",
+          "context": "طلب رأي ثانٍ من {consultant}. الخطوة التالية: مراجعة الإحالة واختيار استشاري مؤهَّل، أو رفضها."
+        },
+        "REFERRAL_TRANSFER_OFFERED": {
+          "title": "عرض نقل حالة إليك",
+          "context": "عُرضت عليك الحالة {caseNumber} لتكون استشاريها الجديد. يمكنك قبولها للبدء، أو الاعتذار عنها ليختار المنسّق شخصًا آخر."
+        },
+        "REFERRAL_SECOND_OPINION_OFFERED": {
+          "title": "طلب رأي ثانٍ منك",
+          "context": "طُلب منك رأي ثانٍ في الحالة {caseNumber}. يمكنك القبول للبدء، أو الاعتذار ليختار المنسّق شخصًا آخر."
+        },
+        "REFERRAL_TRANSFER_DECLINED": {
+          "title": "تعذّر قبول الإحالة — اختيار استشاري آخر",
+          "context": "تعذّر على {consultant} قبول النقل. الخطوة التالية: اختيار استشاري مؤهَّل آخر، أو رفض الإحالة."
+        },
+        "REFERRAL_SECOND_OPINION_DECLINED": {
+          "title": "تعذّر قبول الإحالة — اختيار استشاري آخر",
+          "context": "تعذّر على {consultant} قبول طلب الرأي الثاني. الخطوة التالية: اختيار استشاري مؤهَّل آخر، أو رفض الإحالة."
+        },
+        "SECOND_OPINION_DUE": {
+          "title": "تقديم الرأي الثاني",
+          "context": "مراجعة الحالة وتقديم الرأي. ينتهي الوصول إلى الحالة عند الإرسال."
+        },
+        "DEPOSIT_DUE": {
+          "title": "أقرّ المريض بالتقدير — ترتيب وديعة التنسيق",
+          "context": "أقرّ المريض بتقديره المبدئي، وأصبحت وديعة التنسيق مستحقة. الخطوة التالية: إرسال تعليمات الدفع ثم تسجيل المبلغ المستلَم."
+        },
+        "TREATMENT_COORDINATION_START": {
+          "title": "بدء تنسيق العلاج — استُلمت الوديعة",
+          "context": "تأكّدت وديعة التنسيق. الخطوة التالية: بدء رحلة العلاج لهذه الحالة."
+        },
+        "COORDINATION_ROUTING": {
+          "title": "مطلوب تعيين منسّق",
+          "context": "مراجعة قائمة التنسيق."
+        },
+        "COORDINATION_QUEUED_MANAGER": {
+          "title": "تعيين منسّق يحتاج إلى متابعة",
+          "context": "مراجعة قائمة التنسيق."
+        },
+        "COORDINATOR_ASSIGNED": {
+          "title": "أُسند إليك تنسيق رعاية",
+          "context": "مراجعة قائمة مهامك."
+        },
+        "CASE_OWNERSHIP_TRANSFERRED": {
+          "title": "نُقلت إليك حالة",
+          "context": "انتقلت إليك مسؤولية الحالة {caseNumber}، ومعها أعمال المنسّق المفتوحة عليها؛ السبب في سجل التعيينات.",
+          "extras": {
+            "from": "المسؤول السابق: {from}.",
+            "by": "نقلها: {by}."
+          }
+        },
+        "SECOND_OPINION_RECEIVED_REFERRER": {
+          "title": "وصل الرأي الثاني",
+          "context": "وصل الرأي الثاني الذي طلبته من {consultant}."
+        },
+        "SECOND_OPINION_RECEIVED_COORDINATOR": {
+          "title": "وصل الرأي الثاني",
+          "context": "وصل رأي ثانٍ في هذه الحالة من {consultant}."
+        },
+        "REFERRAL_TRANSFER_NOT_CONFIRMED": {
+          "title": "لم تُؤكَّد إحالتك",
+          "context": "لم يؤكّد المنسّق طلب النقل."
+        },
+        "REFERRAL_SECOND_OPINION_NOT_CONFIRMED": {
+          "title": "لم تُؤكَّد إحالتك",
+          "context": "لم يؤكّد المنسّق طلب الرأي الثاني."
+        },
+        "TRANSFER_COMPLETED_REFERRER": {
+          "title": "نُقلت الحالة",
+          "context": "قُبل النقل من {consultant}، وانتهى تعيينك على هذه الحالة."
+        },
+        "TRANSFER_COMPLETED_COORDINATOR": {
+          "title": "اكتمل نقل الاستشاري",
+          "context": "استشاري هذه الحالة الآن: {consultant}."
+        },
+        "SECOND_OPINION_ACCEPTED": {
+          "title": "قُبل طلب الرأي الثاني",
+          "context": "قُبل طلب الرأي الثاني من {consultant}."
+        },
+        "CONSULTANT_NEEDS_INFORMATION": {
+          "title": "يحتاج الاستشاري إلى مزيد من المعلومات من المريض",
+          "context": "طُلب مزيد من المعلومات قبل التوصية من {consultant}."
         }
       }
     },

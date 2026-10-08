@@ -149,6 +149,22 @@ Update at the end of every phase.
         proposal version label (`portalWork.proposalVersion`, Arabic «الإصدار») and file sizes (Intl unit) are localised
     - [x] verify: typecheck ok; lint 24/12; unit 345 pass, 11 `ProposalSign`; Playwright 11 portal/patient specs incl. a11y
           105 pass, 1 fail = pre-existing Control Center "Staff & teams"
+  - [x] Owner: "merge and push" — `7633977` fast-forwarded into `codex/platform-control-plane` and pushed (from the main
+        checkout, which now has that branch checked out).
+  - [x] Remaining work-item wording (owner request): `V77__notification_and_waiting_copy` (`staff_notifications.copy_code`
+        + encrypted `copy_params`, `medical_cases.waiting_reason_code`). Work-item codes for `ConsultantReferralService`
+        (transfer / second-opinion requested, offered, declined; second opinion due), `CaseHandoffService` (deposit due,
+        treatment coordination start) and `AssignmentEngine` (coordination routing). Notifications inherit their work item's
+        code; direct notifications got their own (routing, assignment, ownership transfer with optional "previously / by"
+        sentences, second opinion received/accepted, referral not confirmed, transfer completed, Consultant needs
+        information). `WaitingReason(code, text)` replaces the string reason everywhere: fixed codes, `WORK:<code>` and
+        `PATIENT_STEP:<blocker>`; `CaseActionsView.waitingReasonCode`. Frontend: `portalWork.workCopy` (33 items),
+        `portalWork.waitingReason`, `workCopyText` `extras`, `waitingReasonText()`; NotificationBell and the coordinator
+        brief render from them. The default patient reason now reads "Waiting for the patient" instead of "information
+        requested". Journey-runtime action handlers keep their admin-defined node labels (content, not code)
+    - [x] verify: backend full suite 619/0 (2 skipped); `PostgresJpaMappingTest` green on V77; typecheck ok; lint 24/12;
+          unit 347 pass, 11 `ProposalSign`; Playwright 13 portal/patient specs incl. a11y 113 pass, 3 fail = pre-existing
+          (`care-coordination` ×2, Control Center "Staff & teams"), plus one cold-start a11y timeout that passes alone
 
 ## Decisions
 
@@ -192,7 +208,7 @@ Update at the end of every phase.
 
 Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08); the follow-up
 commit on `feat/ux-redesign-pass-3` is not merged or pushed yet. The tunnel stack runs `9e3b336` (V76); live checks must run from a network that
-reaches `*.rehletshifaa.com`. Next engineering candidates: wording the remaining work types (backlog P3), a
-representative picker for recorded decisions, full Portal module split. Owner decisions
+reaches `*.rehletshifaa.com`. Next engineering candidates: a representative picker for recorded decisions, full
+Portal module split. The tunnel stack still runs `9e3b336`: rebuild it to get V77 and the new wording. Owner decisions
 still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
 amber tones; proposal drawer order (price first approved, recommendation-first suggestion kept in the backlog).

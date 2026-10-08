@@ -426,20 +426,20 @@ describe("notification bell unread state", () => {
 
   it("shows a red count badge only while something is unread", async () => {
     const api = vi.fn(() => Promise.resolve(unreadFeed));
-    render(<NotificationBell locale="en" api={api as never} onOpenCase={vi.fn()}/>);
+    renderWithWork(<NotificationBell locale="en" api={api as never} onOpenCase={vi.fn()}/>);
     const bell = await screen.findByRole("button", { name: /notifications: 2 unread/i });
     expect(bell.querySelector("span.bg-alert-600")).toBeTruthy();
 
     cleanup();
     const empty = vi.fn(() => Promise.resolve({ unread: 0, items: [] }));
-    render(<NotificationBell locale="en" api={empty as never} onOpenCase={vi.fn()}/>);
+    renderWithWork(<NotificationBell locale="en" api={empty as never} onOpenCase={vi.fn()}/>);
     const quiet = await screen.findByRole("button", { name: /^notifications$/i });
     expect(quiet.querySelector("span.bg-alert-600")).toBeNull();
   });
 
   it("opening the drawer does not acknowledge anything", async () => {
     const api = vi.fn(() => Promise.resolve(unreadFeed));
-    render(<NotificationBell locale="en" api={api as never} onOpenCase={vi.fn()}/>);
+    renderWithWork(<NotificationBell locale="en" api={api as never} onOpenCase={vi.fn()}/>);
     fireEvent.click(await screen.findByRole("button", { name: /notifications: 2 unread/i }));
     expect(await screen.findAllByText("New clinical assignment")).toHaveLength(2);
     // Listing and opening are reads, never writes.
@@ -448,7 +448,7 @@ describe("notification bell unread state", () => {
 
   it("acknowledging one notification marks only that one", async () => {
     const api = vi.fn((path: string) => path === "/notifications" ? Promise.resolve(unreadFeed) : Promise.resolve({ unread: 1 }));
-    render(<NotificationBell locale="en" api={api as never} onOpenCase={vi.fn()}/>);
+    renderWithWork(<NotificationBell locale="en" api={api as never} onOpenCase={vi.fn()}/>);
     fireEvent.click(await screen.findByRole("button", { name: /notifications: 2 unread/i }));
     fireEvent.click(screen.getAllByRole("button", { name: /^mark as read:/i })[0]);
     await waitFor(() => expect(api).toHaveBeenCalledWith("/notifications/read?id=n1", { method: "POST" }));

@@ -4,7 +4,7 @@ import { intlLocale } from "@/lib/i18n";
 import en from "@/messages/en.json";
 import ar from "@/messages/ar.json";
 
-import { careAreaLabel, coordinatorLabel, plural, priorityLabel, tabKeyTarget, waitingLabel, workCopyText } from "./portal-labels";
+import { careAreaLabel, coordinatorLabel, plural, priorityLabel, tabKeyTarget, waitingLabel, waitingReasonText, workCopyText } from "./portal-labels";
 
 const keys = (value: unknown, prefix = ""): string[] =>
   value && typeof value === "object"
@@ -91,5 +91,23 @@ describe("workCopyText", () => {
     expect(workCopyText({ code: "ASSIGNMENT_DECLINED", params: {} }, en.portalWork.workCopy)?.context).toBe("The Consultant declined this assignment. Choose another Consultant.");
     expect(workCopyText({ code: "SOMETHING_NEW" }, en.portalWork.workCopy)).toBeNull();
     expect(workCopyText(null, en.portalWork.workCopy)).toBeNull();
+  });
+});
+
+describe("waitingReasonText", () => {
+  const enWork = { waitingReason: en.portalWork.waitingReason, workCopy: en.portalWork.workCopy };
+  const arWork = { waitingReason: ar.portalWork.waitingReason, workCopy: ar.portalWork.workCopy };
+  it("words a fixed reason, a work item and a patient step, and keeps the English for anything unknown", () => {
+    expect(waitingReasonText({ waitingReasonCode: "DEFAULT_PATIENT", waitingReason: "Waiting for information requested from the patient" }, enWork, "en")).toBe("Waiting for the patient");
+    expect(waitingReasonText({ waitingReasonCode: "WORK:PROPOSAL_CHANGES_REQUESTED" }, arWork, "ar")).toBe("طلب المريض تعديلات على العرض");
+    const blockers = [{ code: "CONTACT_NOT_VERIFIED", labelEn: "Contact channel verification", labelAr: "تأكيد وسيلة التواصل" }];
+    expect(waitingReasonText({ waitingReasonCode: "PATIENT_STEP:CONTACT_NOT_VERIFIED", blockers }, arWork, "ar")).toBe("بانتظار المريض: تأكيد وسيلة التواصل");
+    expect(waitingReasonText({ waitingReasonCode: "SOMETHING_NEW", waitingReason: "Legacy English" }, arWork, "ar")).toBe("Legacy English");
+    expect(waitingReasonText({ waitingReason: null }, enWork, "en")).toBeNull();
+  });
+  it("adds an optional sentence only when its parameter is present", () => {
+    const base = { code: "CASE_OWNERSHIP_TRANSFERRED", params: { caseNumber: "RS-2026-000001" } };
+    expect(workCopyText(base, en.portalWork.workCopy)?.context).not.toContain("Transferred by");
+    expect(workCopyText({ ...base, params: { ...base.params, by: "Sara Ahmed" } }, en.portalWork.workCopy)?.context).toContain("Transferred by ⁨Sara Ahmed⁩.");
   });
 });

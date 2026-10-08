@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { MyWork, type WorkItem } from "./MyWork";
 import { NotificationBell } from "./NotificationBell";
@@ -69,7 +69,7 @@ describe("NotificationBell", () => {
   it("badges unread notifications and opens the case without clearing the work", async () => {
     const api = vi.fn((path: string) => path === "/notifications" ? Promise.resolve(feed) : Promise.resolve({ unread: 0 }));
     const onOpenCase = vi.fn();
-    render(<NotificationBell locale="en" api={api as never} onOpenCase={onOpenCase}/>);
+    renderWithWork(<NotificationBell locale="en" api={api as never} onOpenCase={onOpenCase}/>);
 
     const bell = await screen.findByRole("button", { name: /notifications: 1 unread/i });
     fireEvent.click(bell);
@@ -83,7 +83,7 @@ describe("NotificationBell", () => {
 
   it("shows an empty inbox rather than a stale badge", async () => {
     const api = vi.fn(() => Promise.resolve({ unread: 0, items: [] }));
-    render(<NotificationBell locale="en" api={api as never} onOpenCase={vi.fn()}/>);
+    renderWithWork(<NotificationBell locale="en" api={api as never} onOpenCase={vi.fn()}/>);
     fireEvent.click(await screen.findByRole("button", { name: /^notifications$/i }));
     expect(await screen.findByText(/no notifications yet/i)).toBeTruthy();
   });

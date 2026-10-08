@@ -18,7 +18,9 @@ export type CurrentActionView = {
 export type BlockerView = { code: string; labelEn: string; labelAr: string; owner: "PATIENT" | "STAFF" | "LATER"; gating: boolean };
 /** `viewer`: who is looking at this case, per case — the patient (SELF), someone acting for them (REPRESENTATIVE) or STAFF. */
 export type CaseViewer = "SELF" | "REPRESENTATIVE" | "STAFF";
-export type CaseActions = { journeyStage: string; waitingOn?: string | null; waitingReason?: string | null; currentAction: CurrentActionView; blockers: BlockerView[]; availableActions: string[]; viewer?: CaseViewer };
+export type CaseActions = { journeyStage: string; waitingOn?: string | null; waitingReason?: string | null; currentAction: CurrentActionView; blockers: BlockerView[]; availableActions: string[]; viewer?: CaseViewer;
+  /** The code `waitingReason` is worded from (see `waitingReasonText`). */
+  waitingReasonCode?: string | null };
 export type ResponseContext = { message?: string | null; documentName?: string | null; receivedAt?: string | null };
 export type SecondaryAction = { label: string; onClick: () => void };
 
