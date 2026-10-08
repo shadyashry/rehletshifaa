@@ -1128,6 +1128,9 @@
       "updatedFrom": "Updated from",
       "updatedTo": "Updated to",
       "accept": "Accept assignment",
+      "bulkClaimResult": "Took ownership of {done} of {total} cases. The others could not be claimed — another coordinator may have taken them — and stay selected.",
+      "bulkRequestResult": "Sent to {done} of {total} cases. The others were not sent and stay selected; sending again retries only those.",
+      "requestFailed": "The request was not sent. Nothing has changed; try again.",
       "unownedInQueue": "No coordinator yet — in the team queue"
     },
     "summary": {

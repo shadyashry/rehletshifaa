@@ -68,9 +68,9 @@ test("My Care in Arabic: the drawer offers the coordinator, and Decline asks aga
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("checkbox")).toHaveCount(0);
   await dialog.getByRole("button", { name: /Sara Ahmed.*مراجعة الشروط معي/ }).click();
-  await expect(dialog.getByRole("status")).toContainText("ستصلك رسالة من");
+  await expect(dialog.getByRole("status").filter({ hasText: "ستصلك رسالة من" })).toBeVisible();
   // The confirmation takes the focus the replaced button had, inside the drawer.
-  await expect(dialog.getByRole("status")).toBeFocused();
+  await expect(dialog.getByRole("status").filter({ hasText: "ستصلك رسالة من" })).toBeFocused();
   expect(writes.some(w => w.path.endsWith("/proposals/v1/assistance"))).toBe(true);
   await page.screenshot({ path: shots("my-care-assisted-ar-390"), fullPage: true });
   await dialog.getByRole("button", { name: "لا أرغب في المتابعة بهذا المقترح" }).click();

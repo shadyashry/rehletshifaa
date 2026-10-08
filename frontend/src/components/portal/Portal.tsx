@@ -5,7 +5,7 @@ import { useVirtualClinics, virtualClinicHref } from "@/components/virtual-clini
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { ReauthenticationReturnNotice } from "@/components/ReauthenticationNotices";
 import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import { MessageSquare, MoreHorizontal, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
@@ -85,6 +85,13 @@ const copy={
 };
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
+/**
+ * The page's success and error messages, also shown inside an open drawer: a modal dialog makes the page banner inert and
+ * unseen, so a drawer action would otherwise end with no visible result. A drawer clears them when it opens, so it only
+ * shows what happened while it was open.
+ */
+type Feedback={notice:string;error:string;clear:()=>void};
+const FeedbackContext=createContext<Feedback>({notice:"",error:"",clear:()=>{}});
 export function Portal({workCopy,...props}:{locale:Locale;proposalCopy:ProposalCopy;workCopy:WorkCopy}){
   return <WorkCopyProvider copy={workCopy}><PortalView {...props}/></WorkCopyProvider>;
 }
@@ -214,6 +221,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   function selectStaffView(id:StaffViewId){if(workspace)backToQueue();changeQueue({...queueState,view:id,viewChosen:true,tab:id==="team"?"unowned":id==="mine"?"mine":queueState.tab,page:1});}
   function switchRole(role:RoleKey){setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}
   const clinicLink=hasClinic?{href:virtualClinicHref(locale),label:work.nav.clinic}:null;
+  const clearFeedback=useCallback(()=>{setNotice("");setError("");},[]);
   if(loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
   if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح مركز التحكم…":"Opening the Control Center…"}/>;
   if(user&&!workforce&&!careEntry&&clinicAccess.loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
@@ -227,7 +235,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const descriptions:Record<RoleKey,string>=locale==="ar"?{coordinator:"راجع الحالات ونسّق الخطوة التالية للرعاية.",doctor:"راجع الحالات المسندة إليك وسجّل قراراتك السريرية.",operations:"تابع الترتيبات والإجراءات المطلوبة منك.",finance:"راجع المدفوعات والموافقات المطلوبة.",patient:"تابع رعايتك وتعرّف على الخطوة التالية."}:{coordinator:"Review cases and coordinate the next step in care.",doctor:"Review assigned cases and record your clinical decisions.",operations:"Manage your assigned care and travel arrangements.",finance:"Review payments and commercial approvals that need your attention.",patient:"Follow your care and see what happens next."};
   const inWorkspace=!!workspace&&!!currentRole&&!["admin","identity"].includes(currentRole);
   const isPatientRole=currentRole==="patient";
-  return <PortalFrame title={isPatientRole?(locale==="ar"?"رعايتي":"My Care"):currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
+  return <FeedbackContext.Provider value={{notice,error,clear:clearFeedback}}><PortalFrame title={isPatientRole?(locale==="ar"?"رعايتي":"My Care"):currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>void openCaseById(caseId)}/>}
     {staffViews&&<StaffNav locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView}/>}
     {isPatientRole&&workspace&&<PatientNav locale={locale} view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
@@ -252,7 +260,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div hidden={!!workspace}><Queue views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} clinic={clinicLink} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff} openCase={openCase} mutate={mutate}/></div>}
 
     {currentRole==="finance"&&!workspace&&holds(me,"COMMERCIAL_POLICY_READ")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
-  </PortalFrame>;
+  </PortalFrame></FeedbackContext.Provider>;
 }
 
 /** A signed-in patient with no case yet: one calm sentence and the one thing they can do. */
@@ -303,6 +311,8 @@ function Queue({views,view:current,onSelectView,clinic,loading,locale,role,cases
 
 function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,careView="care",onCareView,otherCases=[],openCaseById,consultantsHref}:{locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null}){
  const work=useWorkCopy();
+ // The drawer's own confirmation replaces the generic page notice, so it is not announced twice.
+ const feedback=useContext(FeedbackContext);
  const c=value.caseSummary;const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
  const doctorPhase=["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
@@ -389,13 +399,13 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
      documents={documents} unreadMessages={unread} timeline={value.timeline} otherCases={otherCases.filter(other=>other.id!==c.id)} view={careView} onView={view=>onCareView?.(view)}
      onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)}
      identityStep={actions.currentAction.code==="VERIFY_IDENTITY"?<PatientIdentityStep locale={locale} caseId={c.id} identity={null} busy={busy} mutate={mutate}/>:undefined}
-     messagesPanel={<fieldset disabled={busy} className="min-w-0"><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={true} busy={busy} mutate={mutate}/></fieldset>}/>
+     messagesPanel={<div aria-busy={busy||undefined} className="min-w-0"><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={true} busy={busy} mutate={mutate}/></div>}/>
     {proposalOpen&&value.proposal&&<CaseDrawer locale={locale} title={proposalCopy.title} onClose={()=>setProposalOpen(false)}>
-     <fieldset disabled={busy} className="min-w-0"><PatientProposal locale={locale} copy={proposalCopy} proposal={value.proposal}
+     <div aria-busy={busy||undefined} className="min-w-0"><PatientProposal locale={locale} copy={proposalCopy} proposal={value.proposal}
       recommendation={approved?{treatment:approved.recommendedTreatment,risks:approved.risksAndLimitations}:null}
       decision={proposalReady?<PatientProposalDecision key={value.proposal.versionId} locale={locale} copy={proposalCopy} caseId={c.id} proposal={value.proposal}
-       coordinatorName={c.coordinatorName} englishHref={locale==="ar"?`/en/portal?case=${c.id}`:undefined} onRequestAssistance={path=>mutate(path)}
-       onMessage={onCareView?()=>{setProposalOpen(false);onCareView("messages");}:undefined} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setProposalOpen(false);return result;}}/>:null}/></fieldset>
+       coordinatorName={c.coordinatorName} englishHref={locale==="ar"?`/en/portal?case=${c.id}`:undefined} onRequestAssistance={async path=>{const result=await mutate(path);if(result)feedback.clear();return result;}}
+       onMessage={onCareView?()=>{setProposalOpen(false);onCareView("messages");}:undefined} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setProposalOpen(false);return result;}}/>:null}/></div>
     </CaseDrawer>}
    </div>;
   }
@@ -449,7 +459,7 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
 
   {isCoordinator&&<CaseBlockers locale={locale} blockers={actions.blockers} deposit={value.deposit}/>}
 
-  <fieldset disabled={busy} className="min-w-0">
+  <div aria-busy={busy||undefined} className="min-w-0">
    <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
     <div className="min-w-0">
      {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex flex-wrap gap-1 border-b border-line-strong">
@@ -461,7 +471,8 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
      </div>}
 
      <div id="case-tab-panel" role="tabpanel" aria-labelledby={`case-tab-${tab}`} tabIndex={0} className="space-y-4">
-      {tab==="overview"&&<>
+      {/* Kept mounted while hidden so typed drafts (proposal notes, operations plan) survive a tab switch. */}
+      <div hidden={tab!=="overview"} className="space-y-4">
        {/* Before accepting, a consultant needs the case in front of them — summary and documents, not
            a decision taken blind. Acceptance itself stays in the single Current action panel above. */}
        {myPending&&isDoctor&&<section className="card p-4" aria-labelledby="assignment-preview">
@@ -487,9 +498,10 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
        {!isCoordinator&&!isDoctor&&(value.proposal||value.deposit)&&proposalPanel}
        {/* The case brief: the facts a coordinator decides ownership on, and the operational context once they own it. */}
        {isCoordinator&&<CoordinatorBrief locale={locale} t={t} mySubject={mySubject} c={c} actions={actions} documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} consultantName={consultantOnCase} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
-      </>}
+      </div>
 
-      {tab==="clinical"&&<>
+      {/* Kept mounted for the same reason: the clinical review and final assessment drafts. */}
+      <div hidden={tab!=="clinical"} className="space-y-4">
        {doctorReviewComplete&&<div className="card flex items-center gap-3 border-s-4 border-brand-500 bg-brand-50 p-4"><span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-brand-600 font-bold text-white">✓</span><p className="font-bold text-brand-800">{c.status==="CLINICAL_RECOMMENDATION_READY"?t.doctorAccepted:c.status==="INFORMATION_REQUIRED"?t.doctorInfoSent:c.status==="CLINICALLY_NOT_SUITABLE"?t.doctorNotSuitable:t.doctorReturned}</p></div>}
        {clinicalReviewPanel}
        {isDoctor&&<ConsultantReferrals key={c.id} locale={locale} caseId={c.id} careCategory={c.careCategory} categories={categories} canRefer={c.status==="CONSULTANT_REVIEW"&&!myPending&&!secondOpinionOnly} busy={busy} load={load} mutate={mutate}/>}
@@ -497,7 +509,7 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
        {/* While the consultant is composing, the review history would only repeat their own draft back at them. */}
        {!clinicalReviewPanel&&clinicalPanel}
        {!intakePanel&&!clinicalPanel&&!clinicalReviewPanel&&!doctorReviewComplete&&<p className="text-sm text-ink-500">{locale==="ar"?"لا توجد معلومات سريرية بعد.":"No clinical information yet."}</p>}
-      </>}
+      </div>
 
       {tab==="documents"&&(documentsPanel??<p className="text-sm text-ink-500">{locale==="ar"?"لم يتم رفع مستندات بعد.":"No documents uploaded yet."}</p>)}
 
@@ -516,7 +528,7 @@ function WorkspaceView({locale,t,proposalCopy,role,value,documents,doctors,categ
    {/* Explains why the workspace is read-only. The Take ownership button lives once, in the current-
        action panel above; repeating it here put the same claim on screen twice under one label. */}
    {isCoordinator&&!owned&&<p className="card mt-5 border-s-4 border-brand-400 p-4 text-ink-600">{c.coordinatorSubject?t.ownedByOther:t.ownershipHint}</p>}
-  </fieldset>
+  </div>
 
   {journeyOpen&&<FullJourneyDialog locale={locale} timeline={value.timeline} caseNumber={c.caseNumber} onClose={()=>setJourneyOpen(false)}/>}
   {messagesOpen&&<CaseDrawer locale={locale} title={locale==="ar"?"الرسائل الآمنة":"Secure messages"} onClose={()=>setMessagesOpen(false)}><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={showActions} busy={busy} mutate={mutate}/></CaseDrawer>}
@@ -623,6 +635,10 @@ function HeaderFact({label,value}:{label:string;value:string}){
 /** Secure messages and administration as side panels: one click away, never occupying the case page. */
 function CaseDrawer({locale,title,onClose,children}:{locale:Locale;title:string;onClose:()=>void;children:React.ReactNode}){
  const dialog=useRef<HTMLDialogElement>(null);
+ const feedback=useContext(FeedbackContext);
+ // Start clean: what the page said before this drawer opened is not this drawer's result.
+ const {clear}=feedback;
+ useEffect(()=>{clear();},[clear]);
  const titleId=useId();
  // Return focus to whatever opened the drawer once it has really left the page. Closing it from the cleanup would fire
  // `close` (and onClose) under StrictMode's double effects, so the cleanup only restores focus after removal.
@@ -630,7 +646,11 @@ function CaseDrawer({locale,title,onClose,children}:{locale:Locale;title:string;
  useEffect(()=>{const node=dialog.current;opener.current??=document.activeElement instanceof HTMLElement?document.activeElement:null;node?.showModal();return()=>{setTimeout(()=>{if(node&&!node.isConnected)opener.current?.focus();},0);};},[]);
  return <dialog ref={dialog} className="account-dialog !w-[min(36rem,calc(100%-2rem))]" aria-labelledby={titleId} onClose={onClose}>
   <div className="sticky -top-6 z-10 -mx-6 -mt-6 flex items-start justify-between gap-4 border-b border-line bg-white px-6 pb-3 pt-6"><h2 id={titleId} className="title">{title}</h2><button type="button" className="icon-button" aria-label={locale==="ar"?"إغلاق":"Close"} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
-  <div className="mt-4">{children}</div>
+  <div className="mt-4">
+   {feedback.error&&<p role="alert" className="mb-4 rounded-lg bg-alert-50 p-3 text-[0.9rem] text-alert-800">{feedback.error}</p>}
+   {feedback.notice&&<p role="status" className="mb-4 rounded-lg bg-brand-50 p-3 text-[0.9rem] text-brand-800">{feedback.notice}</p>}
+   {children}
+  </div>
  </dialog>;
 }
 
@@ -707,10 +727,10 @@ function FinalAssessment({caseId,busy,locale,catalog,fxRates,mutate}:{caseId:str
   <div><h4 className="title text-base">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.intro}</p></div>
   <label className="block text-sm font-bold">{g.treatment}<textarea className="field mt-1" value={treatment} onChange={e=>setTreatment(e.target.value)}/></label>
   <label className="block text-sm font-bold">{g.risks}<textarea className="field mt-1" value={risks} onChange={e=>setRisks(e.target.value)}/></label>
-  <div className="rounded-xl border border-brand-200 bg-brand-50 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold text-brand-800">{g.services}</span><select className="field !mt-0 w-auto py-1" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></div>
+  <div className="rounded-xl border border-brand-200 bg-brand-50 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold text-brand-800">{g.services}</span><select aria-label={g.currency} className="field !mt-0 w-auto py-1" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></div>
    {catalog.length>0&&<div className="mt-2 space-y-1.5">{catalog.map(s=>{const on=selected.has(s.id);return <button type="button" key={s.id} onClick={()=>toggle(s.id)} aria-pressed={on} className={`flex w-full items-center justify-between gap-3 rounded-lg border p-2.5 text-start transition ${on?"border-brand-500 bg-white":"border-line bg-white/60"}`}><span className="flex items-center gap-2.5"><span className={`flex h-5 w-5 flex-none items-center justify-center rounded border text-xs ${on?"border-brand-500 bg-brand-500 text-white":"border-line"}`} aria-hidden>{on?"✓":""}</span><span className="text-sm font-semibold text-ink-800">{s.serviceName}</span></span><span className="text-sm font-bold">{money(s.priceEgp*rate,currency,locale)}</span></button>;})}</div>}
    <p className="mt-3 text-sm font-bold text-ink-700">{g.manual}</p>
-   <div className="mt-1 space-y-2">{costs.map((row,i)=><div key={i} className="flex gap-2"><input className="field flex-1" value={row.description} onChange={e=>updateCost(i,"description",e.target.value)} placeholder={g.service}/><input className="field w-32" type="number" min="0" step="0.01" value={row.amount} onChange={e=>updateCost(i,"amount",e.target.value)} placeholder={`${g.amount} (${currency})`}/>{costs.length>1&&<button type="button" className="btn-secondary" onClick={()=>setCosts(rows=>rows.filter((_,idx)=>idx!==i))} aria-label="remove">×</button>}</div>)}</div>
+   <div className="mt-1 space-y-2">{costs.map((row,i)=><div key={i} className="flex gap-2"><input aria-label={g.service} className="field flex-1" value={row.description} onChange={e=>updateCost(i,"description",e.target.value)} placeholder={g.service}/><input aria-label={g.amount} className="field w-32" type="number" min="0" step="0.01" value={row.amount} onChange={e=>updateCost(i,"amount",e.target.value)} placeholder={`${g.amount} (${currency})`}/>{costs.length>1&&<button type="button" className="btn-secondary" onClick={()=>setCosts(rows=>rows.filter((_,idx)=>idx!==i))} aria-label={locale==="ar"?"إزالة الخدمة":"Remove service"}>×</button>}</div>)}</div>
    <button type="button" className="btn-secondary mt-2" onClick={()=>setCosts(rows=>[...rows,{description:"",amount:""}])}>+ {g.add}</button>
   </div>
   <button className="btn-primary w-full sm:w-auto" disabled={busy} onClick={save}>{g.save}</button>

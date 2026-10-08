@@ -4,6 +4,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
+import { useWorkCopy } from "@/components/portal/portal-copy";
+import { fillTemplate } from "@/lib/portal-labels";
 
 export type RequestedItem = { kind: "INFORMATION" | "DOCUMENT"; code: string; label: string; required: boolean };
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
@@ -24,9 +26,12 @@ const CATALOGUE: { code: string; kind: "INFORMATION" | "DOCUMENT"; en: string; a
  * the journey waits for it, and by when. One backend command creates the patient action, sends the secure
  * link and moves responsibility to the patient.
  */
-export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClose, onDone }: {
+export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClose, onDone, onPartial }: {
   locale: Locale; caseIds: string[]; busy: boolean; mutate: Mutate; onClose: () => void; onDone?: () => void;
+  /** Some cases were sent and some were not: the caller keeps only the unsent ones selected. */
+  onPartial?: (failedCaseIds: string[]) => void;
 }) {
+  const work = useWorkCopy();
   const ar = locale === "ar";
   const t = ar
     ? { title: "طلب معلومات من المريض", intro: "حدّد ما تحتاجه بالضبط. سيصل المريض إلى نموذج آمن يعرض هذه العناصر فقط.",
@@ -52,6 +57,8 @@ export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClos
   const [blocking, setBlocking] = useState(true);
   const [due, setDue] = useState("");
   const [error, setError] = useState("");
+  // Cases already sent in this dialog are never sent twice: a retry goes only to the ones that failed.
+  const [sent, setSent] = useState<string[]>([]);
 
   useEffect(() => { dialog.current?.showModal(); }, []);
 
@@ -79,9 +86,18 @@ export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClos
       message: message.trim() || null, items: requested, blocking,
       dueAt: due ? new Date(`${due}T23:59:59`).toISOString() : null, language: locale,
     };
-    for (const caseId of caseIds) {
+    const done = [...sent], failed: string[] = [];
+    for (const caseId of caseIds.filter(id => !sent.includes(id))) {
       const result = await mutate(`/coordinator/cases/${caseId}/information-requests`, body);
-      if (!result) return; // the portal surfaces the error; keep the dialog open with everything typed
+      if (result) done.push(caseId); else failed.push(caseId);
+    }
+    setSent(done);
+    if (failed.length) {
+      // Keep the dialog open with everything typed, and say exactly how far it got.
+      const n = (value: number) => new Intl.NumberFormat(locale).format(value);
+      setError(caseIds.length > 1 ? fillTemplate(work.queue.bulkRequestResult, { done: n(done.length), total: n(caseIds.length) }) : work.queue.requestFailed);
+      onPartial?.(failed);
+      return;
     }
     onDone?.();
     onClose();

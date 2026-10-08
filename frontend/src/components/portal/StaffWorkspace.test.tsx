@@ -98,10 +98,28 @@ describe("RequestInformationDialog", () => {
     HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new Event("close")); };
   });
 
+  it("sends a bulk request once per case and retries only the cases that failed", async () => {
+    let failC2 = true;
+    const mutate = vi.fn((path: string) => Promise.resolve(path.includes("/c2/") && failC2 ? undefined : { status: "REQUESTED" }));
+    const onPartial = vi.fn(), onDone = vi.fn();
+    renderWithWork(<RequestInformationDialog locale="en" caseIds={["c1", "c2", "c3"]} busy={false} mutate={mutate} onClose={vi.fn()} onDone={onDone} onPartial={onPartial}/>);
+    fireEvent.click(screen.getByRole("checkbox", { name: /current medication/i }));
+    fireEvent.click(screen.getByRole("button", { name: /send request/i }));
+    expect(await screen.findByText(/Sent to 2 of 3 cases/)).toBeTruthy();
+    expect(onPartial).toHaveBeenCalledWith(["c2"]);
+    expect(mutate).toHaveBeenCalledTimes(3);
+    failC2 = false;
+    fireEvent.click(screen.getByRole("button", { name: /send request/i }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    // The retry went to c2 only: c1 and c3 never get the request twice.
+    expect(mutate.mock.calls.map(call => call[0]).filter(path => path.includes("/c1/"))).toHaveLength(1);
+    expect(mutate).toHaveBeenCalledTimes(4);
+  });
+
   it("sends exactly the requested items, the message and the blocking choice", async () => {
     const mutate = vi.fn(() => Promise.resolve({ status: "REQUESTED" }));
     const onClose = vi.fn();
-    render(<RequestInformationDialog locale="en" caseIds={["c1"]} busy={false} mutate={mutate} onClose={onClose}/>);
+    renderWithWork(<RequestInformationDialog locale="en" caseIds={["c1"]} busy={false} mutate={mutate} onClose={onClose}/>);
 
     fireEvent.click(screen.getByRole("checkbox", { name: /current medication/i }));
     fireEvent.change(screen.getByLabelText(/message to the patient/i), { target: { value: "Please confirm your medication." } });
@@ -117,7 +135,7 @@ describe("RequestInformationDialog", () => {
 
   it("refuses an empty request instead of sending a bare status change", async () => {
     const mutate = vi.fn(() => Promise.resolve({}));
-    render(<RequestInformationDialog locale="en" caseIds={["c1"]} busy={false} mutate={mutate} onClose={vi.fn()}/>);
+    renderWithWork(<RequestInformationDialog locale="en" caseIds={["c1"]} busy={false} mutate={mutate} onClose={vi.fn()}/>);
     fireEvent.click(screen.getByRole("button", { name: /send request/i }));
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(mutate).not.toHaveBeenCalled();
@@ -125,7 +143,7 @@ describe("RequestInformationDialog", () => {
 
   it("supports a non-blocking request for optional information", async () => {
     const mutate = vi.fn(() => Promise.resolve({ status: "REQUESTED" }));
-    render(<RequestInformationDialog locale="en" caseIds={["c1"]} busy={false} mutate={mutate} onClose={vi.fn()}/>);
+    renderWithWork(<RequestInformationDialog locale="en" caseIds={["c1"]} busy={false} mutate={mutate} onClose={vi.fn()}/>);
     fireEvent.click(screen.getByRole("checkbox", { name: /preferred treatment dates/i }));
     fireEvent.click(screen.getByRole("checkbox", { name: /journey cannot continue/i }));
     fireEvent.click(screen.getByRole("button", { name: /send request/i }));

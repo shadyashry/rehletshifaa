@@ -80,7 +80,7 @@ test("the clinical recommendation shows in the proposal panel and a document fai
   // "Doctor reviews" panel.
   await expect(page.getByRole("heading",{name:"Patient proposal"})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Doctor reviews"})).toHaveCount(0);
-  await expect(page.getByText("Review finding visible to the care team")).toBeVisible();
+  await expect(page.getByText("Review finding visible to the care team").filter({ visible: true }).first()).toBeVisible();
   await expect(portalAlerts(page)).toContainText("Documents");
 });
 
@@ -91,7 +91,8 @@ test("a failed message submission retains the draft",async({page})=>{
   await page.getByRole("button",{name:"Messages",exact:true}).click();
   const draft=page.locator('textarea[dir="auto"]');await draft.fill("Please review these details");
   await page.getByRole("button",{name:"Send message",exact:true}).click();
-  await expect(portalAlerts(page)).toContainText("Unable to save");await expect(draft).toHaveValue("Please review these details");
+  // The drawer shows the error itself (the page banner sits behind the modal).
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("Unable to save");await expect(draft).toHaveValue("Please review these details");
 });
 
 for(const locale of ["en","ar"]){

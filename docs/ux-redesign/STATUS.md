@@ -90,6 +90,12 @@ Update at the end of every phase.
     - [x] screenshots: `docs/ux-redesign/screenshots/pass-2/` (secure-link-assisted-ar-*, my-care-assisted-ar-390,
           my-care-recorded-{en,ar}-1440, record-decision-{en,ar}-1440)
   - [x] **GATE P2-4** approved (2026-10-08) → committed
+  - [x] Owner standing instruction (2026-10-08): run the recommended follow-ups end to end, no further gates; decisions
+        logged here and in the plans. Step 1 (`a9eee09`): dead 'verified consultant' copy removed, Arabic estimate
+        disclaimer aligned, patient notified of a recorded decision, backlog tidied.
+  - [x] Step 2 portal reliability (`plans/portal-reliability.md`): workspace no longer disabled while busy, feedback
+        inside drawers, drafts survive tab switches, per-case bulk outcomes, labels; unit 341 pass (11 `ProposalSign`),
+        `portal-reliability` e2e 3/3, portal-ux only the pre-existing Control Center failure
 
 ## Decisions
 

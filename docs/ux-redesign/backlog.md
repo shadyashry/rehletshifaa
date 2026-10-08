@@ -118,9 +118,9 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
 | Done (`6f561e6`) | `WorkspaceView` (and `ProposalSendForm`, `FinalAssessment`, `FinalQuoteActions`, `RoleActions`) has no case key. Opening another case without returning to the queue (notification bell, `openCaseById`, `otherCases`) keeps the previous case's typed drafts and dialog flags, so they can be submitted against the wrong patient's case. Fix: `key={workspace.caseSummary.id}`. (verified) | RB | `Portal.tsx:216` | harden |
-| P1 | Drafts are lost on a tab switch or "My dashboard". The clinical review, proposal notes, final assessment and operations plan live in tab-panel state that unmounts. Keep the panels mounted, or lift the drafts and warn when a form is dirty. | WG | `ClinicalReview.tsx:51`, `Portal.tsx:649/685/750` | harden |
-| P1 | Bulk "Take ownership" clears errors per case and reports success even if one claim failed. Report "N of M" and keep the failed rows selected. | WG, AU | `CaseQueue.tsx:215` | harden |
-| P1 | Bulk "Request information" stops at the first failure. Resubmitting sends a second request and email to patients who already received one. Drop the succeeded cases and show a result per case. | WG | `RequestInformationDialog.tsx:82` | harden |
+| Done (pass 2; leaving the case still discards drafts — P2) | Drafts are lost on a tab switch or "My dashboard". The clinical review, proposal notes, final assessment and operations plan live in tab-panel state that unmounts. Keep the panels mounted, or lift the drafts and warn when a form is dirty. | WG | `ClinicalReview.tsx:51`, `Portal.tsx:649/685/750` | harden |
+| Done (pass 2) | Bulk "Take ownership" clears errors per case and reports success even if one claim failed. Report "N of M" and keep the failed rows selected. | WG, AU | `CaseQueue.tsx:215` | harden |
+| Done (pass 2) | Bulk "Request information" stops at the first failure. Resubmitting sends a second request and email to patients who already received one. Drop the succeeded cases and show a result per case. | WG | `RequestInformationDialog.tsx:82` | harden |
 | Done (pass 2) | The Arabic preliminary-estimate disclaimer is weaker than the English one. It omits non-binding, "not a price guarantee" and "may increase or decrease". | AU | `MyCare.tsx:255/272`, `CaseMessages.tsx:38` | clarify |
 | P2 | Recording a refund has no confirmation. Submitting a second opinion permanently ends access with no confirmation. "Resend link" silently revokes the current link. | WG | `Portal.tsx:731/746`, `ConsultantRouting.tsx:174`, `CoordinatorActions.tsx:478` | harden |
 | P2 | "Request changes" can be sent with an empty note. `RecordPatientResponse` lets required items be blank. | WG | `CaseMessages.tsx:38`, `RecordPatientResponse.tsx:62` | harden |
@@ -129,8 +129,8 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P1 | `<fieldset disabled={busy}>` around the whole workspace disables the focused control on every action. Focus drops to `<body>` and is never restored, and the workspace dims to 65%. Confirmed with a keyboard probe in en and ar. | AU, WG | `Portal.tsx:418/363/365`, `app/globals.css:731` | harden |
-| P1 | Success and error notices render behind an open modal `<dialog>`, so drawer actions show no result. This affects More actions, Transfer ownership, Request info and the patient decision. Errors far down the page appear only in the top banner. | WG | `Portal.tsx:212` | harden |
+| Done (pass 2) | `<fieldset disabled={busy}>` around the whole workspace disables the focused control on every action. Focus drops to `<body>` and is never restored, and the workspace dims to 65%. Confirmed with a keyboard probe in en and ar. | AU, WG | `Portal.tsx:418/363/365`, `app/globals.css:731` | harden |
+| Done (pass 2) | Success and error notices render behind an open modal `<dialog>`, so drawer actions show no result. This affects More actions, Transfer ownership, Request info and the patient decision. Errors far down the page appear only in the top banner. | WG | `Portal.tsx:212` | harden |
 | P2 | `refresh` has no stale-result guard, and one shared `busy` flag serves concurrent loads. Reference-data effects are not cancelled or reset when the role changes. | RB | `Portal.tsx:110/134-136` | harden |
 | P2 | `refreshMe` blanks `me`, so Portal returns the loading frame and unmounts the tree (dialogs and drafts are lost). Keep the previous `me` while revalidating. | RB | `AuthProvider.tsx:41`, `Portal.tsx:191` | harden |
 | P2 | Missing empty states: an empty message thread; TeamAssignment with nobody in the role; a care-area select whose value is not among its options. | WG | `CaseMessages.tsx:20`, `CoordinatorActions.tsx:87`, `ConsultantRouting.tsx:126` | onboard |
@@ -142,9 +142,9 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P1 | Unlabelled controls: the discharge-document select; the FinalAssessment currency select; manual service and amount inputs labelled only by placeholder; an English "remove" aria-label. | AU, WG | `CaseWorkflowActions.tsx:17`, `Portal.tsx:696/699` | harden |
+| Done (pass 2) | Unlabelled controls: the discharge-document select; the FinalAssessment currency select; manual service and amount inputs labelled only by placeholder; an English "remove" aria-label. | AU, WG | `CaseWorkflowActions.tsx:17`, `Portal.tsx:696/699` | harden |
 | Done (GATE 2, `--color-ink-350`) | Text-field borders are `--color-line-strong` (1.66:1 on white), below the 3:1 non-text contrast WCAG 1.4.11 requires. Token decision at GATE 2. | Tokens | `app/globals.css` `.field`, `theme-petrol.css` | polish |
-| P2 | A hard-coded English `aria-label="Confirmed arrival"` overrides the Arabic label (label-in-name). | AU, WG | `CaseWorkflowActions.tsx:16` | clarify |
+| Done (pass 2) | A hard-coded English `aria-label="Confirmed arrival"` overrides the Arabic label (label-in-name). | AU, WG | `CaseWorkflowActions.tsx:16` | clarify |
 | P2 | Broken unread-badge names ("Messages1 unread"). The staff Messages badge shows the total, not the unread count. Unread notifications and overdue tasks are shown by colour only. | AU, WG | `PatientNav.tsx:30`, `MyCare.tsx:55/212`, `Portal.tsx:402/603`, `NotificationBell.tsx:101` | harden |
 | P2 | Tablist arrow keys don't flip in RTL (ArrowLeft jumps to the far tab), and Home/End are missing. | AU, WG | `Portal.tsx:260/424`, `CaseQueue.tsx:143` | adapt |
 | P2 | My Care card titles are `<p>`, not headings. `CaseMessages` puts an h3 under the h1 (axe heading-order in en and ar). | AU | `MyCare.tsx:147/187/202/219`, `CaseMessages.tsx:18` | harden |

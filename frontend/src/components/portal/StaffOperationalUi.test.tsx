@@ -265,6 +265,18 @@ describe("CaseQueue", () => {
     expect(screen.getAllByRole("button", { name: /^open$/i })).toHaveLength(2);
   });
 
+  it("reports a partial bulk claim and keeps the cases that failed selected", async () => {
+    const unowned = (id: string, number: string) => ({ ...cases[0], id, caseNumber: number, patientName: null, status: "RECEIVED", coordinatorSubject: undefined, coordinatorName: undefined });
+    const onMutate = vi.fn((path: string) => Promise.resolve(path.includes("/u2/") ? undefined : { status: "SAVED" }));
+    renderWithWork(<CaseQueue {...props} scope="team" cases={[unowned("u1", "RS-2026-000041"), unowned("u2", "RS-2026-000042")]} state={{ ...initialQueue, tab: "unowned" }} onMutate={onMutate}/>);
+    fireEvent.click(screen.getByRole("checkbox", { name: /RS-2026-000041/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /RS-2026-000042/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /take ownership/i }).find(button => button.closest("li") === null)!);
+    expect(await screen.findByText(/Took ownership of 1 of 2 cases/)).toBeTruthy();
+    expect((screen.getByRole("checkbox", { name: /RS-2026-000042/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("checkbox", { name: /RS-2026-000041/ }) as HTMLInputElement).checked).toBe(false);
+  });
+
   it("offers row selection only where a bulk action exists", () => {
     const teamCase = { ...cases[0], id: "3", caseNumber: "RS-2026-000031", coordinatorSubject: "other", coordinatorName: "Mona" };
     renderWithWork(<CaseQueue {...props} lead scope="team" cases={[teamCase]} state={{ ...initialQueue, tab: "team" }}/>);

@@ -85,6 +85,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   const [filtersOpen,setFiltersOpen]=useState(false);
   const [infoDialog,setInfoDialog]=useState(false);
   const [selectedIds,setSelectedIds]=useState<Set<string>>(new Set());
+  const [bulkResult,setBulkResult]=useState("");
   const filterPanel=useRef<HTMLDivElement>(null);
   const filterButton=useRef<HTMLButtonElement>(null);
 
@@ -111,8 +112,9 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   // Bulk work exists only for unowned requests (take ownership) and my own cases (request information).
   const selectable=coordinator&&(scope==="mine"||(scope==="team"&&selected==="unowned"));
   const canBulkRequestInfo=coordinator&&selectedCases.length>0&&selectedCases.every(item=>item.coordinatorSubject===subject&&item.status==="INTAKE_REVIEW");
+  const count=(value:number)=>new Intl.NumberFormat(locale).format(value);
   const toggle=(id:string)=>setSelectedIds(current=>{const next=new Set(current);if(next.has(id))next.delete(id);else next.add(id);return next;});
-  const clearSelection=()=>setSelectedIds(new Set());
+  const clearSelection=()=>{setSelectedIds(new Set());setBulkResult("");};
   const change=(patch:Partial<QueueState>)=>onChange({...current,page:1,...patch});
 
   const scoped=coordinator?cases.filter(item=>ownershipTab(item,subject)===selected):cases;
@@ -136,7 +138,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   const headingId=`queue-heading-${scope}`;
   return <section aria-label={title?undefined:text.title} aria-labelledby={title?headingId:undefined} className="space-y-4" aria-busy={busy}>
     {title&&<h2 id={headingId} className="title">{title}</h2>}
-    {infoDialog&&<RequestInformationDialog locale={locale} caseIds={selectedCases.map(item=>item.id)} busy={busy} mutate={onMutate as (path:string,body?:unknown,method?:string)=>Promise<unknown>} onClose={()=>setInfoDialog(false)} onDone={clearSelection}/>}
+    {infoDialog&&<RequestInformationDialog locale={locale} caseIds={selectedCases.map(item=>item.id)} busy={busy} mutate={onMutate as (path:string,body?:unknown,method?:string)=>Promise<unknown>} onClose={()=>setInfoDialog(false)} onDone={clearSelection}
+      onPartial={failed=>{setSelectedIds(new Set(failed));}}/>}
 
     {scope!=="all"&&<p className="-mt-2 text-[0.85rem] text-ink-600">{scope==="team"?(selected==="team"?text.teamHint:text.unownedHint):coordinator?text.mineHint:text.assignedHint}</p>}
     {tabs.length>0&&<div role="tablist" aria-label={text.title} className="flex flex-wrap gap-1 border-b border-line-strong">
@@ -209,13 +212,15 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
       <p className="text-[0.85rem] font-bold text-brand-900">{plural(locale,selectedCases.length,work.plural.selected)}</p>
       <div className="ms-auto flex flex-wrap gap-2">
-        {canBulkClaim&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={async()=>{for(const item of selectedCases)await onMutate(`/coordinator/cases/${item.id}/claim`);clearSelection();}}><Check size={14}/>{text.claim}</button>}
+        {canBulkClaim&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={async()=>{const failed:string[]=[];for(const item of selectedCases){const result=await onMutate(`/coordinator/cases/${item.id}/claim`);if(!result)failed.push(item.id);}
+          setSelectedIds(new Set(failed));setBulkResult(failed.length?fillTemplate(text.bulkClaimResult,{done:count(selectedCases.length-failed.length),total:count(selectedCases.length)}):"");}}><Check size={14}/>{text.claim}</button>}
         {canBulkRequestInfo&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>setInfoDialog(true)}>{text.requestInfo}</button>}
         <button type="button" className="text-[0.82rem] font-semibold text-ink-600 hover:text-brand-700" onClick={clearSelection}>{text.clearSelection}</button>
       </div>
     </div>}
 
     <p role="status" className="sr-only">{copied?text.copied:""}</p>
+    {bulkResult&&<p role="status" className="text-[0.875rem] font-semibold text-alert-700">{bulkResult}</p>}
 
     <div id="queue-panel" role={tabs.length?"tabpanel":undefined} aria-labelledby={tabs.length?`queue-tab-${selected}`:undefined} tabIndex={tabs.length?0:undefined}>
       <div className="mb-2.5 flex items-center justify-between gap-3">
