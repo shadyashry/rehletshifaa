@@ -59,6 +59,8 @@ export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClos
   const [error, setError] = useState("");
   // Cases already sent in this dialog are never sent twice: a retry goes only to the ones that failed.
   const [sent, setSent] = useState<string[]>([]);
+  // The selection narrows to the failed cases after a partial send; the count always speaks of the original request.
+  const [total] = useState(caseIds.length);
 
   useEffect(() => { dialog.current?.showModal(); }, []);
 
@@ -95,7 +97,7 @@ export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClos
     if (failed.length) {
       // Keep the dialog open with everything typed, and say exactly how far it got.
       const n = (value: number) => new Intl.NumberFormat(locale).format(value);
-      setError(caseIds.length > 1 ? fillTemplate(work.queue.bulkRequestResult, { done: n(done.length), total: n(caseIds.length) }) : work.queue.requestFailed);
+      setError(total > 1 ? fillTemplate(work.queue.bulkRequestResult, { done: n(done.length), total: n(total) }) : work.queue.requestFailed);
       onPartial?.(failed);
       return;
     }

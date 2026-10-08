@@ -98,7 +98,7 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
         ) : (
           <ul className="max-h-[calc(70vh-3.5rem)] divide-y divide-line overflow-y-auto">
             {feed.items.map(item => (
-              <li key={item.id} className={item.read ? "px-4 py-3" : "border border-brand-600 bg-brand-50/60 px-4 py-3"}>
+              <li key={item.id} className={item.read ? "px-4 py-3" : "bg-brand-50/60 px-4 py-3"}>
                 <div className="flex items-start gap-2">
                   {!item.read && <span aria-hidden className="mt-1.5 h-2 w-2 flex-none rounded-full bg-brand-600"/>}
                   <div className="min-w-0 flex-1">

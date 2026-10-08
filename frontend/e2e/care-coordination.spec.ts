@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { OIDC_AUTHORITY } from "./env";
 import { leadsCoordinationTeam, meFor, routeMe } from "./me-fixture";
+import { staffView } from "./portal-fixture";
 
 // UX-7 live sanity: synthetic HTTP fixtures render the real built UI; every write is blocked and recorded (enforcement has
 // its own integration tests). Staff Portal Team queue, transfer and assignment history; Coordination Setup sections.
@@ -80,7 +81,7 @@ for (const locale of ["en", "ar"] as const) test(`Staff Portal team queue, trans
   const writes = await serve(page, [], ["COORDINATOR", "COORDINATOR_LEAD"]);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/${locale}/portal`);
-  await page.getByRole("tab", { name: en ? /Team queue/ : /قائمة الفريق/ }).click();
+  await staffView(page, en ? /Team queue/ : /قائمة الفريق/).click();
   await expect(page.getByRole("tab", { name: en ? "Needs an owner" : "بلا منسق مسؤول" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("Layla Hassan")).toBeVisible();
   await sane(page); await shot("team-queue-unowned-desktop");
@@ -99,10 +100,10 @@ for (const locale of ["en", "ar"] as const) test(`Staff Portal team queue, trans
   await sane(page); await shot("transfer-review-mobile");
   await page.keyboard.press("Escape");
   await sane(page); await shot("team-queue-mobile");
-  await page.getByRole("tab", { name: en ? /My work/ : /عملي/ }).click();
+  await staffView(page, en ? /My work/ : /مهامي/).click();
   await sane(page); await shot("my-work-mobile");
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole("tab", { name: en ? /Team queue/ : /قائمة الفريق/ }).click();
+  await staffView(page, en ? /Team queue/ : /قائمة الفريق/).click();
   await page.getByRole("tab", { name: en ? "Owned by your team" : "يتولاها فريقي" }).click();
   await page.getByRole("button", { name: en ? /^Open/ : /^فتح/ }).first().click();
   await page.getByRole("tab", { name: en ? "Activity" : "السجل" }).click();

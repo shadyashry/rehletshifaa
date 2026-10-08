@@ -59,9 +59,16 @@ case "deposit-settled-patient"->new Template("Your treatment journey is now acti
     private static String caseRef(Map<String,String> data){String c=data.get("case");return c==null||c.isBlank()?"":" for case "+c;}
     private record Template(String subject,String body){}
 
+    /** "8 October 2026" / "8 أكتوبر 2026" from an ISO day; the raw value if it is not one. */
+    private static String readableDate(String iso,boolean ar){
+        if(iso==null||iso.isBlank())return "";
+        try{return java.time.LocalDate.parse(iso).format(java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy",ar?java.util.Locale.forLanguageTag("ar"):java.util.Locale.ENGLISH));}
+        catch(java.time.format.DateTimeParseException e){return iso;}
+    }
+
     /** A decision the coordinator recorded for the patient (Arabic assisted path): plain words in the patient's language. */
     private Template decisionRecorded(Map<String,String> data){
-        boolean ar="ar".equals(lang(data));String decision=data.getOrDefault("decision","");String date=data.getOrDefault("date","");
+        boolean ar="ar".equals(lang(data));String decision=data.getOrDefault("decision","");String date=readableDate(data.get("date"),ar);
         boolean representative="REPRESENTATIVE".equals(data.get("confirmedBy"));
         if(ar){
             String what=switch(decision){case "ACKNOWLEDGED"->"الإقرار بالتقدير المبدئي";case "ACCEPTED"->"قبول العرض النهائي";case "REVISION_REQUESTED"->"طلب تعديلات";case "DECLINED"->"رفض المقترح";default->"قرار بشأن المقترح";};

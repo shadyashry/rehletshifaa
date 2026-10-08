@@ -571,11 +571,12 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         Contact contact=proposalContact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";
         String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();if(!hasText(destination))return;
         String lang="ar".equals(cases.findPatientPreferredLanguage(caseId).orElse(null))?"ar":"en";
-        String date=request.conversationAt().atZone(ZoneOffset.UTC).toLocalDate().toString();
+        String date=request.conversationAt().atZone(ZoneId.of("Africa/Cairo")).toLocalDate().toString();
         notificationOutbox.enqueueOnce("PROPOSAL_DECISION_RECORDED",channel,destination,"proposal-decision-recorded",
-            intake.encryptedJson("{\"decision\":\""+decision+"\",\"confirmedBy\":\""+request.confirmedBy()+"\",\"date\":\""+date+"\",\"lang\":\""+lang+"\"}"),
+            intake.encryptedJson("{\"decision\":"+jsonText(decision)+",\"confirmedBy\":"+jsonText(request.confirmedBy())+",\"date\":"+jsonText(date)+",\"lang\":"+jsonText(lang)+"}"),
             "proposal-decision-recorded:"+versionId,now);
     }
+    private static String jsonText(String value){return value==null?"null":"\""+value.replace("\\","\\\\").replace("\"","\\\"")+"\"";}
     private void expireProposal(UUID caseId,UUID versionId){int changed=proposalVersions.expire(versionId);if(changed==1){work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Superseded — the proposal expired");shareTokens.revokeForVersion(versionId,micros(clock.instant()));publicTransition(caseId,"EXPIRED","Proposal expired");auditPublic("PROPOSAL_EXPIRED",caseId,versionId.toString(),"EXPIRE");}}
     private void auditPublic(String type,UUID caseId,String entityId,String action){auditTrail.event(type).actor("SECURE_LINK", "PATIENT").caseId(caseId).entity("ProposalVersion", entityId).action(action).record();}
     private record Contact(String caseNumber,String whatsapp,String email){}

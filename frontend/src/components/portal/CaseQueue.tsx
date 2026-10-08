@@ -115,7 +115,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   const count=(value:number)=>new Intl.NumberFormat(locale).format(value);
   const toggle=(id:string)=>setSelectedIds(current=>{const next=new Set(current);if(next.has(id))next.delete(id);else next.add(id);return next;});
   const clearSelection=()=>{setSelectedIds(new Set());setBulkResult("");};
-  const change=(patch:Partial<QueueState>)=>onChange({...current,page:1,...patch});
+  const change=(patch:Partial<QueueState>)=>{setBulkResult("");onChange({...current,page:1,...patch});};
 
   const scoped=coordinator?cases.filter(item=>ownershipTab(item,subject)===selected):cases;
   const unique=(values:(string|undefined)[])=>[...new Set(values.filter((value):value is string=>!!value))].sort((a,b)=>a.localeCompare(b));
@@ -220,7 +220,10 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     </div>}
 
     <p role="status" className="sr-only">{copied?text.copied:""}</p>
-    {bulkResult&&<p role="status" className="text-[0.875rem] font-semibold text-alert-700">{bulkResult}</p>}
+    {bulkResult&&<div className="flex flex-wrap items-center gap-x-3" role="status">
+      <p className="text-[0.875rem] font-semibold text-alert-700">{bulkResult}</p>
+      <button type="button" className="inline-flex min-h-11 items-center text-[0.875rem] font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current" onClick={()=>setBulkResult("")}>{text.done}</button>
+    </div>}
 
     <div id="queue-panel" role={tabs.length?"tabpanel":undefined} aria-labelledby={tabs.length?`queue-tab-${selected}`:undefined} tabIndex={tabs.length?0:undefined}>
       <div className="mb-2.5 flex items-center justify-between gap-3">

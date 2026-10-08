@@ -94,7 +94,7 @@ Update at the end of every phase.
         logged here and in the plans. Step 1 (`a9eee09`): dead 'verified consultant' copy removed, Arabic estimate
         disclaimer aligned, patient notified of a recorded decision, backlog tidied.
   - [x] Step 2 portal reliability (`plans/portal-reliability.md`): workspace no longer disabled while busy, feedback
-        inside drawers, drafts survive tab switches, per-case bulk outcomes, labels; unit 341 pass (11 `ProposalSign`),
+        inside drawers, drafts survive tab switches, per-case bulk outcomes, labels; unit 342 pass (11 `ProposalSign`),
         `portal-reliability` e2e 3/3, portal-ux only the pre-existing Control Center failure
 
 ## Decisions
@@ -135,6 +135,6 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Owner: decide the journey-runtime follow-up (backlog "Arabic proposal decision" P1 decision: UI on the journey-action
-endpoints, or direct endpoints sync the runtime). Then the next pass-2 item from the backlog (patient notification of a
-recorded decision, P2). Legal L1–L5 open; Arabic terms approval remains a launch blocker; native Arabic review pending.
+Owner decisions still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens
+(B1) for the amber tones. Next engineering candidates: per-case representative relation (backend), dirty-form warning
+when leaving a case, full Portal module split. Nothing pushed; `feat/ux-redesign-pass-2` holds pass 2.

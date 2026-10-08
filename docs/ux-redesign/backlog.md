@@ -359,3 +359,15 @@ These were fixed in the build:
 | P3 | The staff form's Note label doesn't say it becomes required for Request changes. The time field has no `min` (release time) on the client, though the server enforces it. | WG, RB | `RecordProposalDecision.tsx` | clarify |
 | P3 | The quiet links' resting underline uses `line-strong` (1.66:1). It is the cue beside near-identical text colours. Consider `decoration-current`. | PM | `PatientProposal.tsx`, `ProposalSign.tsx` | polish |
 | P3 | The "requested" line names no channel ("You will hear from …"). Interpolate the patient's actual contact channel once the backend exposes it. | I18N | `messages/*.json` | clarify |
+
+## Pass 2 follow-ups — deferred review findings (autonomous run, 2026-10-08)
+
+One independent read-only review ran over `a9eee09`…`ed57af3`. Fixed in `fix(portal): review follow-ups`: the request-dialog retry total, the busy gap between the parallel refresh and case reload, the My Care chunk preload, a dismissible bulk outcome, the unread notification style, drawers no longer wiping a page error, preferences keyed on the subject, workspace shown before documents, the Cairo-day localised date and escaped JSON in the patient message, Arabic counts without noun agreement, and the `care-coordination` spec missed when the staff navigation changed.
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P2 | "Care for …" uses an account-level rule (PATIENT_REPRESENTATIVE without PATIENT). A person with their own record who also acts for a relative sees the relative's case under the bare name. Needs a per-case actor relation from the backend (workspace or actions). | Review | `Portal.tsx`, backend workspace view | harden |
+| P2 | Leaving the case ("My dashboard") still discards typed drafts. Add a dirty-form warning. | Plan | `Portal.tsx` | harden |
+| P3 | The overview and clinical tabs stay mounted, so a Consultant's referral and eligibility reads run on every case open. Mount the clinical tab on its first visit and keep it mounted afterwards. | Review | `Portal.tsx` | optimize |
+| P3 | A full patient/staff module split of `Portal.tsx` (role panels are lazy now). | RB | `Portal.tsx` | optimize |
+| P3 | `mutate` returns the same value for a failure and for a call skipped while another runs. | RB | `Portal.tsx` | harden |

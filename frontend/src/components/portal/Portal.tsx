@@ -96,8 +96,8 @@ const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatien
  * unseen, so a drawer action would otherwise end with no visible result. A drawer clears them when it opens, so it only
  * shows what happened while it was open.
  */
-type Feedback={notice:string;error:string;clear:()=>void};
-const FeedbackContext=createContext<Feedback>({notice:"",error:"",clear:()=>{}});
+type Feedback={notice:string;error:string;clear:()=>void;clearNotice:()=>void};
+const FeedbackContext=createContext<Feedback>({notice:"",error:"",clear:()=>{},clearNotice:()=>{}});
 export function Portal({workCopy,...props}:{locale:Locale;proposalCopy:ProposalCopy;workCopy:WorkCopy}){
   return <WorkCopyProvider copy={workCopy}><PortalView {...props}/></WorkCopyProvider>;
 }
@@ -123,6 +123,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const controlCenter=useControlCenterEntry(locale);const router=useRouter();
   useEffect(()=>{if(controlCenterOnly)router.replace(ccHref(locale));},[controlCenterOnly,router,locale]);
   // Virtual clinic: a consultant opens their own; an account that only manages a consultant's clinic lands there.
+  useEffect(()=>{if(patientView)void import("@/components/portal/MyCare");},[patientView]);
   const clinicAccess=useVirtualClinics(!!user&&!controlCenterOnly);const hasClinic=clinicAccess.clinics.length>0;
   const[careEntry]=useState(()=>{if(typeof window==="undefined")return false;const q=new URLSearchParams(window.location.search);return q.get("workspace")==="care"||["link","case","continue"].some(k=>q.has(k));});
   const managedClinicLanding=!!user&&!workforce&&!careEntry&&clinicAccess.clinics.some(c=>c.relation==="PRACTICE_MANAGER");
@@ -136,9 +137,9 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const currentRole=active&&available.includes(active)?active:available[0];
   useEffect(()=>{const selected=new URLSearchParams(window.location.search).get("role") as RoleKey;if(available.includes(selected))setActive(selected);},[available]);
   const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){await requestReauthentication(signIn);throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn]);
-  const refresh=useCallback(async()=>{if(!currentRole||["admin","identity"].includes(currentRole))return;setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}},[currentRole,api,t.error]);
+  const refresh=useCallback(async(managedBusy=false)=>{if(!currentRole||["admin","identity"].includes(currentRole))return;if(!managedBusy)setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{if(!managedBusy)setBusy(false);}},[currentRole,api,t.error]);
   const loadAssignmentHistory=useCallback((caseId:string)=>api<AssignmentHistoryEntry[]>(`/coordinator/cases/${caseId}/assignment-history`),[api]);
-  useEffect(()=>{if(!user)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[user,api]);
+  useEffect(()=>{if(!signedInSubject)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[signedInSubject,api]);
   useEffect(()=>{
     if(!currentRole||["admin","identity"].includes(currentRole)||deferPatient){setQueueLoading(false);return;}
     let cancelled=false;setQueueLoading(true);setCases([]);setMyTasks([]);setError("");
@@ -163,23 +164,24 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   useEffect(()=>{if(currentRole!=="doctor")return;void api<DoctorProfile>("/doctor/me").then(setDoctorProfile).catch(()=>setDoctorProfile(null));void api<CatalogService[]>("/doctor/catalog").then(setCatalog).catch(()=>setCatalog([]));void api<FxRate[]>("/doctor/fx-rates").then(setFxRates).catch(()=>setFxRates([]));},[currentRole,api]);
   useEffect(()=>{if(currentRole!=="coordinator")return;void api<StaffProfile>("/coordinator/me").then(setCoordinatorProfile).catch(()=>setCoordinatorProfile(null));},[currentRole,api]);
   useEffect(()=>{if(currentRole!=="coordinator")return;void api<VerifiedDoctor[]>("/coordinator/doctors").then(setDoctors).catch(()=>setDoctors([]));void api<CareCategory[]>("/coordinator/care-categories").then(setCategories).catch(()=>setCategories([]));void api<FxRate[]>("/coordinator/fx-rates").then(setFxRates).catch(()=>setFxRates([]));void Promise.all([api<StaffMember[]>("/coordinator/staff?role=COORDINATOR"),api<StaffMember[]>("/coordinator/staff?role=OPERATIONS"),api<StaffMember[]>("/coordinator/staff?role=FINANCE")]).then(rows=>setStaff(rows.flat())).catch(()=>setStaff([]));},[currentRole,api]);
-  async function openCase(item:CaseView,preloaded?:Workspace){
+  async function openCase(item:CaseView,preloaded?:Workspace,managedBusy=false){
     // While /me reloads there is no role yet; a role-scoped URL would read /undefined/cases/….
     if(!currentRole)return;
-    const request=++opening.current;setBusy(true);setError("");setDocumentError(false);
+    const request=++opening.current;if(!managedBusy)setBusy(true);setError("");setDocumentError(false);
     if(!workspace)queuePosition.current=window.scrollY;
     try{
       if(currentRole==="coordinator"&&!item.coordinatorSubject){
         const preview=await api<{caseSummary:CaseView;intakeSummary?:string}>(`/coordinator/cases/${item.id}/intake-preview`);
         if(request===opening.current){setWorkspace({...preview,preview:true,timeline:[],tasks:[],messages:[],assignments:[],clinicalReviews:[]});setDocuments([]);try{const docs=await api<CaseDocument[]>(`/cases/${item.id}/documents`);if(request===opening.current)setDocuments(docs);}catch{if(request===opening.current)setDocumentError(true);}}
       }else{
-        const [ws,docs]=await Promise.all([preloaded??api<Workspace>(`/${currentRole}/cases/${item.id}`),
-          api<CaseDocument[]>(`/cases/${item.id}/documents`).then(rows=>({rows,failed:false}),()=>({rows:[] as CaseDocument[],failed:true}))]);
-        if(request!==opening.current)return;setWorkspace(ws);setDocuments(docs.rows);if(docs.failed)setDocumentError(true);
+        const pending=api<CaseDocument[]>(`/cases/${item.id}/documents`).then(rows=>({rows,failed:false}),()=>({rows:[] as CaseDocument[],failed:true}));
+        const ws=preloaded??await api<Workspace>(`/${currentRole}/cases/${item.id}`);
+        if(request!==opening.current)return;setWorkspace(ws);setDocuments([]);
+        const docs=await pending;if(request===opening.current){setDocuments(docs.rows);if(docs.failed)setDocumentError(true);}
       }
       if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);window.history.replaceState({},"",url);if(!workspace)requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());}
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}
-    finally{if(request===opening.current)setBusy(false);}
+    finally{if(request===opening.current&&!managedBusy)setBusy(false);}
   }
   /** Open a case by id (from My Work or a notification), even before the queue has loaded it. */
   async function openCaseById(caseId:string){
@@ -213,7 +215,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   async function mutate(path:string,body?:unknown,method="POST"):Promise<MutationResult|undefined>{
     if(mutationPending.current)return;mutationPending.current=true;setBusy(true);setError("");setNotice("");
     try{const result=await api<MutationResult>(path,{method,body:body===undefined?undefined:JSON.stringify(body)});setNotice(t.success);
-      await Promise.all([refresh(),workspace?openCase(path.endsWith("/claim")?{...workspace.caseSummary,coordinatorSubject:user?.profile.sub}:workspace.caseSummary):undefined]);
+      await Promise.all([refresh(true),workspace?openCase(path.endsWith("/claim")?{...workspace.caseSummary,coordinatorSubject:user?.profile.sub}:workspace.caseSummary,undefined,true):undefined]);
       return result??{status:"SAVED"};
     }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);await refreshAfterRejectedAction(path,workspace,refresh,openCase);setError(message);return undefined;}
     finally{mutationPending.current=false;setBusy(false);}
@@ -232,7 +234,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   function selectStaffView(id:StaffViewId){if(workspace)backToQueue();changeQueue({...queueState,view:id,viewChosen:true,tab:id==="team"?"unowned":id==="mine"?"mine":queueState.tab,page:1});}
   function switchRole(role:RoleKey){setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("role",role);window.history.replaceState({},"",url);}
   const clinicLink=hasClinic?{href:virtualClinicHref(locale),label:work.nav.clinic}:null;
-  const clearFeedback=useCallback(()=>{setNotice("");setError("");},[]);
+  const clearFeedback=useCallback(()=>{setNotice("");setError("");},[]);const clearNotice=useCallback(()=>setNotice(""),[]);
   if(loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
   if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح مركز التحكم…":"Opening the Control Center…"}/>;
   if(user&&!workforce&&!careEntry&&clinicAccess.loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
@@ -246,7 +248,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const descriptions:Record<RoleKey,string>=locale==="ar"?{coordinator:"راجع الحالات ونسّق الخطوة التالية للرعاية.",doctor:"راجع الحالات المسندة إليك وسجّل قراراتك السريرية.",operations:"تابع الترتيبات والإجراءات المطلوبة منك.",finance:"راجع المدفوعات والموافقات المطلوبة.",patient:"تابع رعايتك وتعرّف على الخطوة التالية."}:{coordinator:"Review cases and coordinate the next step in care.",doctor:"Review assigned cases and record your clinical decisions.",operations:"Manage your assigned care and travel arrangements.",finance:"Review payments and commercial approvals that need your attention.",patient:"Follow your care and see what happens next."};
   const inWorkspace=!!workspace&&!!currentRole&&!["admin","identity"].includes(currentRole);
   const isPatientRole=currentRole==="patient";
-  return <FeedbackContext.Provider value={{notice,error,clear:clearFeedback}}><PortalFrame title={isPatientRole?(locale==="ar"?"رعايتي":"My Care"):currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
+  return <FeedbackContext.Provider value={{notice,error,clear:clearFeedback,clearNotice}}><PortalFrame title={isPatientRole?(locale==="ar"?"رعايتي":"My Care"):currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>void openCaseById(caseId)}/>}
     {staffViews&&<StaffNav locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView}/>}
     {isPatientRole&&workspace&&<PatientNav locale={locale} view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
@@ -648,9 +650,10 @@ function HeaderFact({label,value}:{label:string;value:string}){
 function CaseDrawer({locale,title,onClose,children}:{locale:Locale;title:string;onClose:()=>void;children:React.ReactNode}){
  const dialog=useRef<HTMLDialogElement>(null);
  const feedback=useContext(FeedbackContext);
- // Start clean: what the page said before this drawer opened is not this drawer's result.
- const {clear}=feedback;
- useEffect(()=>{clear();},[clear]);
+ // What the page said before this drawer opened is not this drawer's result: a stale success notice is cleared, an
+ // earlier error stays on the page (with its Retry) and is simply not repeated in here.
+ const {clearNotice}=feedback;const [errorAtOpen]=useState(feedback.error);
+ useEffect(()=>{clearNotice();},[clearNotice]);
  const titleId=useId();
  // Return focus to whatever opened the drawer once it has really left the page. Closing it from the cleanup would fire
  // `close` (and onClose) under StrictMode's double effects, so the cleanup only restores focus after removal.
@@ -659,7 +662,7 @@ function CaseDrawer({locale,title,onClose,children}:{locale:Locale;title:string;
  return <dialog ref={dialog} className="account-dialog case-drawer !w-[min(36rem,calc(100%-2rem))]" aria-labelledby={titleId} onClose={onClose}>
   <div className="sticky -top-6 z-10 -mx-6 -mt-6 flex items-start justify-between gap-4 border-b border-line bg-white px-6 pb-3 pt-6"><h2 id={titleId} className="title">{title}</h2><button type="button" className="icon-button" aria-label={locale==="ar"?"إغلاق":"Close"} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
   <div className="mt-4">
-   {feedback.error&&<p role="alert" className="mb-4 rounded-lg bg-alert-50 p-3 text-[0.9rem] text-alert-800">{feedback.error}</p>}
+   {feedback.error&&feedback.error!==errorAtOpen&&<p role="alert" className="mb-4 rounded-lg bg-alert-50 p-3 text-[0.9rem] text-alert-800">{feedback.error}</p>}
    {feedback.notice&&<p role="status" className="mb-4 rounded-lg bg-brand-50 p-3 text-[0.9rem] text-brand-800">{feedback.notice}</p>}
    {children}
   </div>
