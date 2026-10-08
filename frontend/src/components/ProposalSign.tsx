@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { ProposalDecisionDialog } from "@/components/ProposalDecisionDialog";
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
 import { apiUrl } from "@/lib/api";
@@ -318,8 +318,8 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const money = (n?: number) => {
     if (n == null) return "—";
     const whole = Number.isInteger(n);
-    try { return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(n); }
-    catch { return `${currency} ${n.toLocaleString(locale)}`; }
+    try { return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(n); }
+    catch { return `${currency} ${n.toLocaleString(intlLocale(locale))}`; }
   };
   const items = useMemo(() => proposal?.items.filter((i) => !i.optional) ?? [], [proposal]);
   const itemsTotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
@@ -348,7 +348,9 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const primaryLabel = isFinal ? t.acceptFinal : t.acknowledge;
   const ackShort = isFinal ? t.ackShortFinal : t.ackShort;
   const ackLong = isFinal ? t.finalConsentStatement : t.ackStatement;
+  // On the assisted path the patient does not acknowledge on the page: the first step is the conversation.
   const nextSteps = (isFinal ? t.nextFinal : t.nextPrelim)
+    .map((step, index) => assisted && index === 0 ? (isFinal ? assistedCopy.nextFirstQuote : assistedCopy.nextFirst) : step)
     .filter((_, index) => !(!isFinal && index === 2 && !(proposal?.depositDueDisplay && proposal.depositDueDisplay > 0)));
   const doneCopy = outcome === "DECLINED" ? { title: t.declinedTitle, msg: t.declinedMsg }
     : outcome === "REVISION_REQUESTED" ? { title: t.revisionTitle, msg: t.revisionMsg }
@@ -421,7 +423,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                 {proposal.validUntil && (
                   <div>
                     <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.validUntil}</dt>
-                    <dd className="mt-0.5 font-bold text-ink-900">{new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(new Date(proposal.validUntil))}</dd>
+                    <dd className="mt-0.5 font-bold text-ink-900">{new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(proposal.validUntil))}</dd>
                   </div>
                 )}
               </dl>
@@ -553,7 +555,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                         <p className="max-w-[60ch] text-[0.95rem] leading-7 text-ink-800">{isFinal ? assistedCopy.explainQuote : assistedCopy.explain}</p>
                         {proposal.assistance?.requestedAt ? (
                           <p ref={requestedRef} tabIndex={-1} role="status" className="text-[0.95rem] font-semibold leading-6 text-brand-900 outline-none">
-                            {fillTemplate(assistedCopy.requested, { date: new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(new Date(proposal.assistance.requestedAt)), name: assistedCopy.nameFallback })}
+                            {fillTemplate(assistedCopy.requested, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(proposal.assistance.requestedAt)), name: assistedCopy.nameFallback })}
                           </p>
                         ) : (
                           <div>
@@ -625,7 +627,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                     {proposal.validUntil && (
                       <div className="flex justify-between gap-4">
                         <dt className="text-ink-600">{t.validUntil}</dt>
-                        <dd className="font-semibold text-ink-800">{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(proposal.validUntil))}</dd>
+                        <dd className="font-semibold text-ink-800">{new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(proposal.validUntil))}</dd>
                       </div>
                     )}
                   </dl>

@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Check, FileText, MessageSquareText, UserRound } from "lucide-react";
 
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { fillTemplate } from "@/lib/portal-labels";
 import type { CaseActions } from "@/components/portal/CurrentAction";
@@ -44,7 +44,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
   const step = stepCopy(code, ar, { patientAction, proposalState: patientProposal?.state ?? null, status: c.status });
   const phase = phaseIndex(c.status);
   const canMessage = actions.availableActions.includes("MESSAGE_COORDINATOR");
-  const money = (n: number, currency: string) => new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+  const money = (n: number, currency: string) => new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
   const proposalTotal = proposal ? proposal.items.filter(i => !i.optional).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0) : null;
   const showProposal = !!patientProposal && ["READY", "ACCEPTED", "DECLINED", "EXPIRED"].includes(patientProposal.state) && !!proposal;
   const showDeposit = !!deposit && deposit.status !== "CANCELLED";
@@ -89,7 +89,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
                   <li key={doc.documentId} className="flex items-center gap-3 py-3">
                     <FileText size={17} aria-hidden className="flex-none text-brand-600"/>
                     <span className="min-w-0 flex-1 truncate font-semibold text-ink-800">{doc.fileName}</span>
-                    <span className="text-[0.8rem] text-ink-500">{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(doc.createdAt))}</span>
+                    <span className="text-[0.8rem] text-ink-500">{new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(doc.createdAt))}</span>
                   </li>
                 ))}
               </ul>}
@@ -110,7 +110,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
               <p className="mt-2 text-[0.88rem] text-ink-600">
                 {c.coordinatorName && <>{t.requestedBy} <bdi className="font-semibold text-ink-800">{c.coordinatorName}</bdi></>}
                 {c.coordinatorName && patientAction.dueAt && " · "}
-                {patientAction.dueAt && <>{t.replyBy} {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(patientAction.dueAt))}</>}
+                {patientAction.dueAt && <>{t.replyBy} {new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(patientAction.dueAt))}</>}
               </p>
             )}
             {code === "PROVIDE_INFORMATION" && patientAction && patientAction.items.length > 0 && (

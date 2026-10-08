@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 
 export type AssignmentHistoryEntry = {
   role: string; assigneeName: string | null; status: string; assignedAt: string; endedAt: string | null;
@@ -31,9 +31,9 @@ export function AssignmentHistory({ locale, caseId, load }: { locale: Locale; ca
     load(caseId).then((rows) => { if (live) setEntries(rows); }).catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
   }, [caseId, load]);
-  const when = (value: string) => new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  const when = (value: string) => new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
   const status = (entry: AssignmentHistoryEntry) => entry.status === "ACTIVE" ? t.current : entry.status === "PENDING" ? t.pending : entry.status === "DECLINED" ? t.declined
-    : `${t.ended}${entry.endedAt ? ` ${new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(entry.endedAt))}` : ""}`;
+    : `${t.ended}${entry.endedAt ? ` ${new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short" }).format(new Date(entry.endedAt))}` : ""}`;
   const by = (entry: AssignmentHistoryEntry) => entry.assignedByKind === "ROUTING" ? t.routing : entry.assignedByKind === "SYSTEM" ? t.system : entry.assignedByName ? <bdi>{entry.assignedByName}</bdi> : t.someone;
 
   return <section className="card p-4" aria-labelledby="assignment-history-title">

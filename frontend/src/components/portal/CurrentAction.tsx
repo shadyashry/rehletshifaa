@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { ArrowRight, CalendarClock, CircleAlert, FileText, MessageSquareText } from "lucide-react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { workCopyText, type WorkCopy, type WorkItemCopy } from "@/lib/portal-labels";
 
 /** The backend's resolution of what this person should do now — rendered, never re-derived here. */
@@ -59,7 +59,7 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
           <span className={`inline-flex items-center gap-1 text-[0.8125rem] ${action.overdue ? "font-bold text-alert-700" : "text-ink-500"}`}>
             {action.overdue ? <CircleAlert size={13} aria-hidden/> : <CalendarClock size={13} aria-hidden/>}
             {action.overdue ? t.overdue : t.due}{": "}
-            {new Date(action.dueAt).toLocaleDateString(locale, { day: "numeric", month: "short" })}
+            {new Date(action.dueAt).toLocaleDateString(intlLocale(locale), { day: "numeric", month: "short" })}
           </span>
         )}
       </div>

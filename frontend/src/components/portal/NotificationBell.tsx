@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bell, Check, X } from "lucide-react";
 
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 
 export type StaffNotification = {
   id: string; caseId: string | null; caseNumber: string | null; taskId: string | null;
@@ -82,7 +82,7 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
           <h2 className="font-bold text-ink-900">{t.label}</h2>
           <div className="flex items-center gap-1">
             {feed.unread > 0 && (
-              <button type="button" className="rounded-lg px-2 py-1 text-[0.8125rem] font-semibold text-brand-700 hover:bg-brand-50" onClick={() => void markRead()}>
+              <button type="button" className="inline-flex min-h-11 items-center rounded-lg px-3 text-[0.8125rem] font-semibold text-brand-700 hover:bg-brand-50" onClick={() => void markRead()}>
                 <Check size={14} className="me-1 inline" aria-hidden/>{t.markAll}
               </button>
             )}
@@ -138,8 +138,8 @@ function since(iso: string, locale: Locale, t: { now: string; ago: string }) {
   const units: [Intl.RelativeTimeFormatUnit, number][] = [["minute", 60], ["hour", 24], ["day", 30]];
   let value = minutes;
   for (const [unit, limit] of units) {
-    if (value < limit) return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-value, unit);
+    if (value < limit) return new Intl.RelativeTimeFormat(intlLocale(locale), { numeric: "auto" }).format(-value, unit);
     value = Math.floor(value / limit);
   }
-  return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-value, "month");
+  return new Intl.RelativeTimeFormat(intlLocale(locale), { numeric: "auto" }).format(-value, "month");
 }

@@ -148,6 +148,10 @@
     --button-font-size: 1rem;
     --button-font-size-compact: 0.9375rem;
     --button-disabled-opacity: 0.55;
+    /* A disabled button is a flat inert fill with a readable label, not 55% opacity on petrol (2.6:1). */
+    --button-disabled-bg: var(--color-mist-deep);
+    --button-disabled-fg: var(--color-ink-500);
+    --button-disabled-border: var(--color-line-strong);
     --button-primary-bg: var(--color-brand-600);
     --button-primary-border: var(--color-brand-600);
     --button-primary-fg: var(--color-surface-default);
@@ -155,7 +159,7 @@
     --button-primary-shadow-hover: 0 12px 26px -18px rgb(31 107 115 / 0.8);
     --button-secondary-bg: var(--color-surface-default);
     --button-secondary-fg: var(--color-brand-900);
-    --button-secondary-border: var(--color-line-strong);
+    --button-secondary-border: var(--color-ink-350); /* Field Edge: 3.6:1 on white (WCAG 1.4.11) */
     --button-secondary-bg-hover: var(--color-brand-50);
     --button-secondary-fg-hover: var(--color-brand-700);
     --button-secondary-border-hover: var(--color-brand-600);
@@ -163,7 +167,7 @@
     --button-inverse-fg: var(--color-brand-700);
     --button-inverse-bg-hover: var(--color-brand-50);
     --button-outline-fg: var(--color-brand-700);
-    --button-outline-border: var(--color-line-strong);
+    --button-outline-border: var(--color-ink-350);
     --button-outline-bg-hover: var(--color-brand-50);
     --button-outline-border-hover: var(--color-brand-300);
     --button-outline-fg-hover: var(--color-brand-800);
@@ -645,6 +649,12 @@
     outline: 0;
   }
 
+  /* Keyboard focus (and any focus in a text field) keeps the site's 3px ring; the halo alone is ~1.2:1. */
+  .field:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+
   .field-error {
     border-color: var(--field-border-error);
   }
@@ -831,7 +841,13 @@
   @media (max-width: 640px) {
     .account-dialog.case-drawer { width: 100% !important; max-width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; border-radius: 0; }
   }
-  .portal-shell button:disabled, .account-dialog button:disabled, .portal-account button:disabled { opacity: var(--button-disabled-opacity); cursor: not-allowed; }
+  :is(.portal-shell, .account-dialog, .portal-account) button:disabled:not(:root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline)) { opacity: var(--button-disabled-opacity); cursor: not-allowed; }
+  /* Filled and edged buttons go inert by colour, so the label stays legible; after the hover rules so hover cannot wake them. */
+  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):disabled, :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):disabled:hover {
+    opacity: 1; cursor: not-allowed; transform: none; box-shadow: none;
+    background: var(--button-disabled-bg); color: var(--button-disabled-fg); border-color: var(--button-disabled-border);
+  }
+  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):disabled::after { display: none; }
   .portal-shell .card { box-shadow: var(--shadow-card); }
   .portal-shell fieldset:disabled { opacity: .65; }
   .portal-shell h2, .portal-shell h3 { scroll-margin-top: 7rem; }

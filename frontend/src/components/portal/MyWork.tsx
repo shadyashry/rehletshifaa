@@ -3,7 +3,7 @@
 import { ArrowRight, CalendarClock, CircleAlert, Clock3, FileText } from "lucide-react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { careAreaLabel, plural, priorityLabel, waitingLabel, workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
 
 export type WorkItem = {
@@ -85,7 +85,7 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
                     <span className="inline-flex items-center gap-1"><Clock3 size={13} aria-hidden/>{age(item.createdAt, locale)}</span>
                     {item.dueAt && (
                       <span className={`inline-flex items-center gap-1 ${item.overdue ? "font-semibold text-alert-700" : ""}`}>
-                        <CalendarClock size={13} aria-hidden/>{t.due}: {new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(item.dueAt))}
+                        <CalendarClock size={13} aria-hidden/>{t.due}: {new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short" }).format(new Date(item.dueAt))}
                       </span>
                     )}
                     {item.waitingOn && item.waitingOn !== "NONE" && <span>{work.waiting.label}: {waitingLabel(item.waitingOn, work.waiting, { role })}</span>}
@@ -128,7 +128,7 @@ function worded(item: WorkItem, locale: Locale, work: ReturnType<typeof useWorkC
 
 function age(iso: string, locale: Locale) {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  const format = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const format = new Intl.RelativeTimeFormat(intlLocale(locale), { numeric: "auto" });
   if (minutes < 60) return format.format(-Math.max(minutes, 1), "minute");
   if (minutes < 1440) return format.format(-Math.floor(minutes / 60), "hour");
   return format.format(-Math.floor(minutes / 1440), "day");

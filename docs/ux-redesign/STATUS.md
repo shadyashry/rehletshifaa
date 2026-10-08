@@ -97,7 +97,7 @@ Update at the end of every phase.
         inside drawers, drafts survive tab switches, per-case bulk outcomes, labels; unit 342 pass (11 `ProposalSign`),
         `portal-reliability` e2e 3/3, portal-ux only the pre-existing Control Center failure
 
-- [ ] **Pass 3** (branch `feat/ux-redesign-pass-3` from `codex/platform-control-plane` @ `881c3d6`)
+- [x] **Pass 3** (branch `feat/ux-redesign-pass-3` from `codex/platform-control-plane` @ `881c3d6`)
   - Environment check (read-only, 2026-10-08): the tunnel stack is **not** on pass 2. The running backend image was built
     2026-10-07 10:26 and `flyway_schema_history` ends at V73 (no V74 `assisted_proposal_decisions`). Pass 3 relies on
     tests and mocked fixtures only; the stack needs a rebuild from `codex/platform-control-plane` before any live check.
@@ -124,6 +124,22 @@ Update at the end of every phase.
     - [x] verify: backend full suite 619/0 (2 skipped; +2 copy tests); `PostgresJpaMappingTest` green on V76; typecheck ok;
           lint 24/12 (= baseline); unit 345 pass, 11 `ProposalSign` (pre-existing); Playwright arabic-proposal-decision,
           portal-ux, staff-home, my-care 58 pass, 1 fail = pre-existing Control Center "Staff & teams"
+  - [x] Step 4 portal P2s through /redesign-area (plan `plans/portal-p2-pass-3.md`, owner brief = approval; committed per
+        the owner's "commit each step when green" instead of the skill's wait-for-approval): unsent-text guard
+        (`LeaveCaseGuard.tsx`: text fields baselined on first focus, rebaselined after a successful save; in-page alertdialog
+        on My dashboard, another case, a staff view, a role switch and browser Back; `beforeunload`); staff view in the URL
+        (`?view=` pushed per pick, read on load and on popstate, views are links, focus to the view heading); Western digits
+        in Arabic (`intlLocale()` → `ar-u-nu-latn` in the portal, secure proposal/status links and activation); `.field:focus-
+        visible` 3px ring; tokens `--button-secondary-border`/`--button-outline-border` → ink-350 and new
+        `--button-disabled-bg/fg/border` (aliases of existing palette, Petrol only; `token-proposals.md`, `DESIGN.md`); 44px
+        targets; Arabic secure link's next steps start with the coordinator conversation on the assisted path
+    - [x] four reviewers: 9 HIGH fixed (RB ×3, WG ×2, I18N ×2 + 2 HIGH-equivalent history bugs); MEDIUM/LOW fixed where
+          cheap, the rest in backlog.md "Portal P2s — deferred review findings"
+    - [x] verify: typecheck ok; lint 24/12 (= baseline); unit 345 pass, 11 `ProposalSign` (pre-existing); Playwright
+          `portal-p2-pass-3` 9/9 (×4 repeat stable); 19 portal/patient specs incl. a11y 138 pass, 3 fail = pre-existing
+          `care-coordination` "Coordination Setup" ×2 and Control Center "Staff & teams"; e2e staff-view selectors moved from
+          button to link (fixture + portal-live, portal-gateway-live, uat-walkthrough-live)
+    - [x] screenshots: `docs/ux-redesign/screenshots/pass-3/leave-case-{en,ar}-{390,1440}.png`
 
 ## Decisions
 
@@ -164,7 +180,9 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Pass 3 step 4: portal P2s through /redesign-area (plan `plans/portal-p2-pass-3.md` first), then the four read-only
-reviewers. Owner decisions
+Pass 3 is complete on `feat/ux-redesign-pass-3` (not pushed, not merged). Before any live check, rebuild the tunnel stack
+from this branch (it runs a 2026-10-07 backend at V73; pass 3 adds V75/V76). Next engineering candidates: the step-4
+deferred P2s (Arabic services plural, name isolation), wording the remaining work types (backlog P3), a representative
+picker for recorded decisions, full Portal module split. Owner decisions
 still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
 amber tones; proposal drawer order (price first approved, recommendation-first suggestion kept in the backlog).

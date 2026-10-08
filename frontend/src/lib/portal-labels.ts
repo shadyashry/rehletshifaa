@@ -1,5 +1,5 @@
 import type { Dictionary } from "@/lib/dictionary";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 
 /** Staff work copy (`messages/*.json` → `portalWork`) plus the care-area titles for this locale, keyed by slug. */
 export type WorkCopy = Dictionary["portalWork"] & { careAreas: Record<string, string> };
@@ -32,8 +32,8 @@ export function workCopyText(copy: WorkItemCopy | null | undefined, messages: Wo
 }
 
 export function plural(locale: Locale, count: number, forms: PluralForms) {
-  const category = new Intl.PluralRules(locale).select(count);
-  return fillTemplate(forms[category] ?? forms.other, { count: new Intl.NumberFormat(locale).format(count) });
+  const category = new Intl.PluralRules(intlLocale(locale)).select(count);
+  return fillTemplate(forms[category] ?? forms.other, { count: new Intl.NumberFormat(intlLocale(locale)).format(count) });
 }
 
 /**

@@ -9,7 +9,7 @@ import {
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { matchesKpi, type KpiFilter } from "@/components/portal/RoleDashboardSummary";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { coordinatorLabel, fillTemplate, plural, tabKeyTarget, waitingLabel, type WorkCopy } from "@/lib/portal-labels";
 
 export type QueueCase = { id:string; caseNumber:string; patientName?:string|null; status:string; waitingOn?:string|null; waitingReason?:string|null; country:string; preferredLanguage?:string; careCategory?:string; coordinatorSubject?:string; coordinatorName?:string; doctorName?:string; travelPackageRequested?:boolean; createdAt:string; updatedAt:string; assignmentId?:string; assignmentStatus?:string; openTaskCount?:number; overdueTaskCount?:number; documentCount?:number; blockingOverdueCount?:number; highPriorityCount?:number; nextDueAt?:string|null; patientResponsePending?:boolean };
@@ -112,7 +112,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   // Bulk work exists only for unowned requests (take ownership) and my own cases (request information).
   const selectable=coordinator&&(scope==="mine"||(scope==="team"&&selected==="unowned"));
   const canBulkRequestInfo=coordinator&&selectedCases.length>0&&selectedCases.every(item=>item.coordinatorSubject===subject&&item.status==="INTAKE_REVIEW");
-  const count=(value:number)=>new Intl.NumberFormat(locale).format(value);
+  const count=(value:number)=>new Intl.NumberFormat(intlLocale(locale)).format(value);
   const toggle=(id:string)=>setSelectedIds(current=>{const next=new Set(current);if(next.has(id))next.delete(id);else next.add(id);return next;});
   const clearSelection=()=>{setSelectedIds(new Set());setBulkResult("");};
   const change=(patch:Partial<QueueState>)=>{setBulkResult("");onChange({...current,page:1,...patch});};
@@ -283,7 +283,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">{meta}</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">{people}
-                  <span className="text-[0.8125rem] text-ink-400">{claimable?text.received:text.updated} {new Intl.DateTimeFormat(locale,{day:"numeric",month:"short"}).format(new Date(claimable?item.createdAt:item.updatedAt))}</span>
+                  <span className="text-[0.8125rem] text-ink-400">{claimable?text.received:text.updated} {new Intl.DateTimeFormat(intlLocale(locale),{day:"numeric",month:"short"}).format(new Date(claimable?item.createdAt:item.updatedAt))}</span>
                 </div>
               </div>
               <div className="flex flex-none flex-wrap gap-2 sm:justify-end">{actions}</div>
@@ -293,7 +293,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
 
       {pages>1&&<nav className="mt-4 flex items-center justify-between gap-3" aria-label={text.pages}>
         <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={page===1} onClick={()=>change({page:page-1})}>{text.previous}</button>
-        <span className="text-[0.82rem] text-ink-500">{fillTemplate(text.pageOf,{page:new Intl.NumberFormat(locale).format(page),pages:new Intl.NumberFormat(locale).format(pages)})}</span>
+        <span className="text-[0.82rem] text-ink-500">{fillTemplate(text.pageOf,{page:new Intl.NumberFormat(intlLocale(locale)).format(page),pages:new Intl.NumberFormat(intlLocale(locale)).format(pages)})}</span>
         <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={page===pages} onClick={()=>change({page:page+1})}>{text.next}</button>
       </nav>}
     </div>

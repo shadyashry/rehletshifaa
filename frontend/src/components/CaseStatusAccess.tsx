@@ -6,7 +6,7 @@ import { FileUp, LockKeyhole, ShieldCheck, X } from "lucide-react";
 
 import { PatientJourneyTracker, phaseExplanation } from "@/components/PatientJourneyTracker";
 
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
 
 type Summary = { caseNumber: string; destinationHint: string };
@@ -269,7 +269,7 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
             {/* No technical version number for the patient: only whether this is an updated document, and its validity. */}
             {status.proposal.state !== "REVISION_REQUESTED" && ((status.proposal.versionNumber ?? 0) > 1 || (status.proposal.validUntil && status.proposal.state === "READY")) && (
               <p className="mt-1 text-[0.82rem] text-ink-500">
-                {[t.proposalVersion(status.proposal.versionNumber ?? 0), status.proposal.validUntil && status.proposal.state === "READY" ? `${t.proposalValid} ${new Date(status.proposal.validUntil).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""].filter(Boolean).join(" · ")}
+                {[t.proposalVersion(status.proposal.versionNumber ?? 0), status.proposal.validUntil && status.proposal.state === "READY" ? `${t.proposalValid} ${new Date(status.proposal.validUntil).toLocaleDateString(intlLocale(locale), { day: "numeric", month: "short", year: "numeric" })}` : ""].filter(Boolean).join(" · ")}
               </p>
             )}
             {status.proposal.action === "REVIEW_PROPOSAL" && (
@@ -286,7 +286,7 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
             {/* Only the coordinator's own words go here. The generic fallback repeated, almost verbatim,
                 the explanation already shown above this form. */}
             {action?.message && <p className="mt-2 leading-7 text-ink-600">{action.message}</p>}
-            {action?.dueAt && <p className="mt-1 text-sm font-semibold text-ink-700">{t.due} {new Date(action.dueAt).toLocaleDateString(locale)}</p>}
+            {action?.dueAt && <p className="mt-1 text-sm font-semibold text-ink-700">{t.due} {new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(action.dueAt))}</p>}
 
             <div className="mt-6 space-y-5">
               {(action?.items ?? []).map(item => (

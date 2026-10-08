@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Check, X } from "lucide-react";
 
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { waitingLabel } from "@/lib/portal-labels";
 
@@ -60,7 +60,7 @@ export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, o
         </p>
       )}
 
-      <button type="button" className="mt-3 block w-full rounded-lg border border-line px-3 py-1.5 text-[0.8rem] font-semibold text-brand-800 transition hover:border-brand-300 hover:bg-brand-50"
+      <button type="button" className="mt-3 block min-h-11 w-full rounded-lg border border-line px-3 text-[0.8rem] font-semibold text-brand-800 transition hover:border-brand-300 hover:bg-brand-50"
               onClick={onViewJourney}>
         {ar ? "عرض الرحلة كاملة" : "View full journey"}
       </button>
@@ -106,7 +106,7 @@ export function FullJourneyDialog({ locale, timeline, caseNumber, onClose }: {
                     {stageLabel(event.status, locale)}
                   </p>
                   <p className="mt-0.5 text-[0.8125rem] leading-5 text-ink-500">
-                    {new Date(event.occurredAt).toLocaleString(locale, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                    {new Date(event.occurredAt).toLocaleString(intlLocale(locale), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                     {event.actorName ? ` · ${event.actorName}` : ""}
                     {event.actorRole && event.actorName && event.actorRole !== "SYSTEM" ? ` · ${roleLabel(event.actorRole, locale)}` : ""}
                   </p>

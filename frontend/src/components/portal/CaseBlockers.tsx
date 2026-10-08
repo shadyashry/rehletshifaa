@@ -1,6 +1,6 @@
 "use client";
 
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import type { BlockerView } from "@/components/portal/CurrentAction";
 
 type Deposit = { status: string; currency: string; totalDisplay?: number; paidDisplay?: number };
@@ -15,7 +15,7 @@ export function CaseBlockers({ locale, blockers, deposit }: { locale: Locale; bl
   if (!blockers.length) return null;
   // Items somebody must act on now; a step queued behind another (the deposit behind the profile) is listed, not counted.
   const attention = blockers.filter(b => b.gating && b.owner !== "LATER").length;
-  const money = (n?: number) => n == null ? null : new Intl.NumberFormat(locale, { style: "currency", currency: deposit?.currency || "EGP", maximumFractionDigits: 0 }).format(n);
+  const money = (n?: number) => n == null ? null : new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: deposit?.currency || "EGP", maximumFractionDigits: 0 }).format(n);
 
   return (
     <section aria-labelledby="case-blockers-title" className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3">

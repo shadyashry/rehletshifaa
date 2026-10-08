@@ -29,16 +29,16 @@ async function signIn(page: Page, locale = "en") {
 test("a coordinator signs in and sees their real workspace", async ({ page }) => {
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Coordinator" })).toBeVisible({ timeout: 20000 });
-  await expect(page.getByRole("navigation", { name: "Your work" }).getByRole("button", { name: /My work/ })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Your work" }).getByRole("button", { name: /My cases/ })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Your work" }).getByRole("button", { name: /Team queue/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Your work" }).getByRole("link", { name: /My work/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Your work" }).getByRole("link", { name: /My cases/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Your work" }).getByRole("link", { name: /Team queue/ })).toBeVisible();
   // A page-level alert here means a real API call failed under real auth.
   await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toHaveCount(0);
 });
 
 test("the team queue lists real submitted cases and offers exactly one ownership action", async ({ page }) => {
   await signIn(page);
-  await page.getByRole("navigation", { name: "Your work" }).getByRole("button", { name: /Team queue/ }).click();
+  await page.getByRole("navigation", { name: "Your work" }).getByRole("link", { name: /Team queue/ }).click();
   await expect(page.getByRole("button", { name: "Take ownership" }).first()).toBeVisible({ timeout: 20000 });
   // One ownership control per case row: the duplicate-action rule for this screen.
   const rows = await page.getByRole("button", { name: "Take ownership" }).count();

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { intlLocale } from "@/lib/i18n";
 import en from "@/messages/en.json";
 import ar from "@/messages/ar.json";
 
@@ -26,6 +27,11 @@ describe("portal labels", () => {
     expect(plural("en", 1, en.portalWork.plural.cases)).toBe("1 case");
     expect(plural("en", 3, en.portalWork.plural.cases)).toBe("3 cases");
     expect(plural("ar", 1, ar.portalWork.plural.cases)).toBe("حالة واحدة");
+    // Western digits on Arabic pages (owner default until native review), for the few and many forms alike.
+    expect(plural("ar", 3, ar.portalWork.plural.cases)).toBe("3 حالات");
+    expect(plural("ar", 11, ar.portalWork.plural.cases)).toBe("11 حالة");
+    expect(plural("ar", 1250, ar.portalWork.plural.cases)).toMatch(/^1[,٬]250 حالة$/);
+    expect(new Intl.DateTimeFormat(intlLocale("ar"), { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date("2026-10-08T00:00:00Z"))).toMatch(/^8 .+ 2026$/);
     expect(plural("ar", 2, ar.portalWork.plural.cases)).toBe("حالتان");
     expect(plural("ar", 5, ar.portalWork.plural.cases)).toBe("5 حالات");
     expect(plural("ar", 11, ar.portalWork.plural.cases)).toBe("11 حالة");

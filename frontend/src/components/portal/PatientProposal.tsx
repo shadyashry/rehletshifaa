@@ -7,7 +7,7 @@ import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms"
 import { ARABIC_PENDING_NOTICE, ARABIC_TERMS_APPROVED, finalQuoteTerms } from "@/lib/commercial-terms";
 import { fillTemplate } from "@/lib/portal-labels";
 import type { Dictionary } from "@/lib/dictionary";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 
 export type ProposalCopy = Dictionary["portalProposal"];
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
@@ -22,7 +22,7 @@ export type PatientProposalData = {
   items: Item[]; coordinatorNotes?: string; assistance?: ProposalAssistance | null;
 };
 
-const longDate = (iso: string, locale: Locale) => new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(new Date(iso));
+const longDate = (iso: string, locale: Locale) => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(iso));
 
 /**
  * "Recorded by … after a phone call with you": a decision the coordinator recorded never reads as the patient's own
@@ -48,10 +48,10 @@ const fill = (template: string, values: Record<string, string | number>) =>
 /** Whole amounts without decimals, otherwise the currency's own precision (2 for USD, 3 for KWD, 0 for JPY). */
 function formatMoney(amount: number, currency: string, locale: Locale) {
   try {
-    const digits = new Intl.NumberFormat(locale, { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
-    return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: Number.isInteger(amount) ? 0 : digits, maximumFractionDigits: digits }).format(amount);
+    const digits = new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
+    return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency, minimumFractionDigits: Number.isInteger(amount) ? 0 : digits, maximumFractionDigits: digits }).format(amount);
   } catch {
-    return `${amount.toLocaleString(locale)} ${currency}`;
+    return `${amount.toLocaleString(intlLocale(locale))} ${currency}`;
   }
 }
 
@@ -76,7 +76,7 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
   const total = proposal.items.filter((item) => !item.optional).reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const validUntil = proposal.validUntil
     // The viewer's own calendar day: a UTC day can read one day later than the real expiry west of UTC.
-    ? fill(copy.validUntil, { date: new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(new Date(proposal.validUntil)) })
+    ? fill(copy.validUntil, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(proposal.validUntil)) })
     : null;
   const hasRecommendation = !!(recommendation?.treatment || recommendation?.risks);
 

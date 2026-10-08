@@ -841,6 +841,8 @@
     "declineConsequence": "Your coordinator will be told. You can still talk to them before you decide.",
     "declineKeep": "Keep the proposal",
     "assisted": {
+      "nextFirst": "Your coordinator goes through the terms with you in Arabic and records your decision.",
+      "nextFirstQuote": "Your coordinator goes through the quote's payment terms with you in Arabic and records your decision.",
       "explain": "The deposit, refund and cancellation terms are not yet available in approved Arabic wording. Your coordinator will go through them with you in Arabic and record your decision.",
       "explainQuote": "The payment terms of this quote are not yet available in approved Arabic wording. Your coordinator will go through them with you in Arabic and record your decision.",
       "ask": "Ask {name} to go through the terms with me",
@@ -1196,6 +1198,12 @@
       "REVIEW": "Review",
       "INFORMATION_REQUEST": "Follow up the information request",
       "DOCUMENT_REVIEW": "Review the documents"
+    },
+    "leaveCase": {
+      "title": "Leave this case?",
+      "body": "Text you typed in this case hasn’t been sent. If you leave now, it will be lost.",
+      "stay": "Keep editing",
+      "leave": "Leave and discard the text"
     },
     "workCopy": {
       "said": "They said: “{text}”",

@@ -252,12 +252,14 @@ A cool, inky petrol family on warm paper, with a single coral accent from the lo
 - **Paper** (paper): the page canvas and alternating section ground; also the facts panel and upload areas.
 - **Deep Paper** (paper-deep): icon wells and progress tracks only.
 - **White** (surface-white): cards, fields, the header bar, and the alternating white sections.
-- **Hairline** (line) and **Strong Hairline** (line-strong): every divider and card edge. Strong Hairline is for
-  secondary-button edges and the hero photo's frame. Both are decorative (below 3:1), so neither may be the only
-  boundary of a control.
+- **Hairline** (line) and **Strong Hairline** (line-strong): every divider and card edge, the hero photo's frame and
+  a disabled button's edge. Both are decorative (below 3:1), so neither may be the only boundary of an active control.
 - **Field Edge** (ink-350): the border of every text field, select and composite input (country search, phone
-  prefix). It is the quietest grey that meets WCAG 1.4.11 non-text contrast: 3.63 on white, 3.31 on paper, 3.03 on
-  deep paper.
+  prefix), and of secondary and outline buttons (pass 3). It is the quietest grey that meets WCAG 1.4.11 non-text
+  contrast: 3.63 on white, 3.31 on paper, 3.03 on deep paper.
+- **Inert** (pass 3): a disabled filled or edged button is deep paper with Supporting Ink text (`--button-disabled-bg/
+  fg/border` = paper-deep / ink-500 / line-strong), never 55% opacity, so its label stays readable. Text fields show
+  the 3px petrol focus ring on focus, with the soft halo kept underneath.
 
 ### Semantic
 - **Alert** (alert-50 → alert-800): safety notices, errors and unread counts. White on alert-600 clears AA;

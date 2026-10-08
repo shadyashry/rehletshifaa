@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { scrollIntoView } from "@/lib/scroll";
 import { FileText } from "lucide-react";
 
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 
 export type CatalogService = { id: string; serviceCode: string; serviceName: string; category?: string; priceEgp: number; active: boolean };
 export type FxRate = { currency: string; rate: number; rateDate: string; source: string };
@@ -25,8 +25,8 @@ const CURRENCY_LABELS: Record<string, string> = {
 };
 
 function money(amount: number, currency: string, locale: Locale) {
-  try { return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(amount); }
-  catch { return `${amount.toLocaleString(locale)} ${currency}`; }
+  try { return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency, maximumFractionDigits: 0 }).format(amount); }
+  catch { return `${amount.toLocaleString(intlLocale(locale))} ${currency}`; }
 }
 
 /**

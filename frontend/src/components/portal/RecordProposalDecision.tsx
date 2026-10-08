@@ -4,6 +4,7 @@ import { useId, useRef, useState, type FormEvent } from "react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { fillTemplate } from "@/lib/portal-labels";
+import { intlLocale } from "@/lib/i18n";
 
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
 export type RecordableProposal = { versionId: string; versionNumber?: number; documentType?: string };
@@ -72,7 +73,7 @@ export function RecordProposalDecision({ locale, caseId, proposal, busy, mutate 
   return (
     <form className="space-y-5" onSubmit={submit} noValidate>
       <p className="text-[0.875rem] text-ink-600">
-        {proposal.versionNumber ? fillTemplate(t.document, { type: quote ? t.quote : t.estimate, version: new Intl.NumberFormat(locale).format(proposal.versionNumber) }) : (quote ? t.quote : t.estimate)}
+        {proposal.versionNumber ? fillTemplate(t.document, { type: quote ? t.quote : t.estimate, version: new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber) }) : (quote ? t.quote : t.estimate)}
       </p>
 
       <fieldset aria-describedby={errors.decision ? ids.decision : undefined}>

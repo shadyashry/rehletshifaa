@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
 
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { fillTemplate } from "@/lib/portal-labels";
 
@@ -96,7 +96,7 @@ export function RequestInformationDialog({ locale, caseIds, busy, mutate, onClos
     setSent(done);
     if (failed.length) {
       // Keep the dialog open with everything typed, and say exactly how far it got.
-      const n = (value: number) => new Intl.NumberFormat(locale).format(value);
+      const n = (value: number) => new Intl.NumberFormat(intlLocale(locale)).format(value);
       setError(total > 1 ? fillTemplate(work.queue.bulkRequestResult, { done: n(done.length), total: n(total) }) : work.queue.requestFailed);
       onPartial?.(failed);
       return;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
 import { DEPOSIT_TERMS_CONSENT } from "@/lib/commercial-terms";
@@ -877,10 +877,10 @@ function money(amount: number | null, currency: string, locale: Locale) {
   // Decimals only when the amount has them, matching how the proposal states the same money.
   const whole = Number.isInteger(amount);
   try {
-    return new Intl.NumberFormat(locale, {
+    return new Intl.NumberFormat(intlLocale(locale), {
       style: "currency", currency,
       minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2,
     }).format(amount);
   }
-  catch { return `${amount.toLocaleString(locale)} ${currency}`; }
+  catch { return `${amount.toLocaleString(intlLocale(locale))} ${currency}`; }
 }

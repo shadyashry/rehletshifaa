@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Check, Languages, LayoutDashboard, LogOut, Settings, X, ExternalLink } from "lucide-react";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { OIDC_AUTHORITY } from "@/lib/api";
 
 export type Preferences = { displayName: string | null; locale: Locale | null };
@@ -75,7 +75,7 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
             <dl className="mt-2 grid gap-x-6 gap-y-2.5 text-[0.9rem] sm:grid-cols-2">
               {([
                 [text.givenName, profile.givenName], [text.familyName, profile.familyName], [text.preferredName, profile.preferredName],
-                [text.dob, profile.dateOfBirth ? new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(new Date(profile.dateOfBirth)) : null],
+                [text.dob, profile.dateOfBirth ? new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(profile.dateOfBirth)) : null],
                 [text.country, profile.country], [text.nationality, profile.nationality],
                 [text.preferredLanguage, profile.preferredLanguage === "ar" ? "العربية" : profile.preferredLanguage === "en" ? "English" : profile.preferredLanguage],
               ] as [string, string | null | undefined][]).filter(([, value]) => value).map(([label, value]) => (

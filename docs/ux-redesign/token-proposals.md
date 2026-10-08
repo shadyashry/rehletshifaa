@@ -270,8 +270,23 @@ sideways. If horizontal scroll is unavoidable, the wrapper is `overflow-x:auto` 
    either way.
 5. **Control Center convergence order.** Should CC adopt the B1/B2 tokens first (low risk, colour only), before its
    radius, pill-badge and type changes?
-6. **Arabic numerals in money and tables.** Western digits (current `Intl` output) or Arabic-Indic in `ar`? This
+6. **Arabic numerals in money and tables.** *(Pass 3: Western digits pinned with `intlLocale()` → `ar-u-nu-latn`
+   in the portal and secure link, per the GATE 2 default; native review still decides.)* Western digits (current `Intl` output) or Arabic-Indic in `ar`? This
    affects `--text-table-numeric` alignment testing, and needs a native-review decision.
 7. **Legacy semantic names.** May the 13 collapsed petrol aliases (`surface-clinical/sage/ivory/warm/hospitality`,
    `wash-*`, `mist*`, `sand-*`, `accent-*`) be deleted once components move to component tokens? The
    clean-cutover policy suggests yes.
+
+## Pass 3 — button edge and disabled tokens (applied 2026-10-08, plan `plans/portal-p2-pass-3.md` §5)
+
+Aliases of existing palette values only; no new colour.
+
+| Token | Base → petrol value | Contrast |
+|---|---|---|
+| `--button-secondary-border` | `line-strong` → `ink-350` (#7a898c) | 3.63 on white (was 1.66) ✓ 1.4.11 |
+| `--button-outline-border` | `line-strong` → `ink-350` | 3.63 on white ✓ |
+| `--button-disabled-bg` *(new)* | `mist-deep` → paper-deep #efeae0 | inert fill |
+| `--button-disabled-fg` *(new)* | `ink-500` (#41555a) | ~6.4 on the fill |
+| `--button-disabled-border` *(new)* | `line-strong` | decorative, deliberately below an active edge |
+
+The owner may revert any of these; the backlog rows that asked for them are marked done.
