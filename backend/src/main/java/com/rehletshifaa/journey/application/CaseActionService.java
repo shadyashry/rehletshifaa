@@ -88,14 +88,16 @@ public class CaseActionService {
         String waitingReason = queries.waitingReason(caseId);
 
         boolean patient = actor.role() == Role.PATIENT || actor.role() == Role.PATIENT_REPRESENTATIVE;
-        if (patient) return patientView(caseId, f, waitingOn, waitingReason, patientAction, blockers);
+        // Per case, never per account: one person can be the patient on their own case and a representative on a relative's.
+        if (patient) return patientView(caseId, f, waitingOn, waitingReason, patientAction, blockers,
+                queries.patientsOwnCase(caseId, actor.subject()) ? "SELF" : "REPRESENTATIVE");
 
         boolean coordinator = actor.role() == Role.COORDINATOR;
         boolean owned = coordinator && actor.subject().equals(f.coordinatorSubject());
         CurrentActionView current = currentAction(caseId, f, proposal, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
         List<String> available = coordinator && owned ? availableActions(f, proposal, patientAction, blockers)
                 : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of();
-        return new CaseActionsView(f.status(), waitingOn, waitingReason, current, blockers, available);
+        return new CaseActionsView(f.status(), waitingOn, waitingReason, current, blockers, available, "STAFF");
     }
 
     // ---------------- the patient's own answer ----------------
@@ -118,12 +120,13 @@ public class CaseActionService {
      * arranged offline by staff today, so it is a WAIT and never a "pay" action; a future online step would
      * be a new FOCUS code from this same resolver.
      */
-    private CaseActionsView patientView(UUID caseId, Facts f, String waitingOn, String waitingReason, PatientActionView patientAction, List<BlockerView> blockers) {
+    private CaseActionsView patientView(UUID caseId, Facts f, String waitingOn, String waitingReason, PatientActionView patientAction,
+                                        List<BlockerView> blockers, String viewer) {
         List<BlockerView> mine = blockers.stream().filter(b -> "PATIENT".equals(b.owner())).toList();
         List<String> available = new ArrayList<>();
         if (!TERMINAL.contains(f.status()) && f.coordinatorSubject() != null) available.add("MESSAGE_COORDINATOR");
         CurrentActionView current = patientCurrentAction(caseId, f.status(), patientAction, mine);
-        return new CaseActionsView(f.status(), waitingOn, waitingReason, current, mine, available);
+        return new CaseActionsView(f.status(), waitingOn, waitingReason, current, mine, available, viewer);
     }
 
     private CurrentActionView patientCurrentAction(UUID caseId, String status, PatientActionView patientAction, List<BlockerView> mine) {

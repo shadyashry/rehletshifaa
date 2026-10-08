@@ -36,6 +36,7 @@ public class ProposalDecision extends AssignedIdEntity {
     @Column(name = "confirmed_by", length = 20) private String confirmedBy;
     @Column(name = "conversation_at") private Instant conversationAt;
     @Column(name = "terms_language", length = 8) private String termsLanguage;
+    @Column(name = "confirmed_representative_subject") private String confirmedRepresentativeSubject;
 
     public static final String SOURCE_PATIENT = "PATIENT_SELF";
     public static final String SOURCE_RECORDED = "RECORDED_ON_BEHALF";
@@ -56,10 +57,15 @@ public class ProposalDecision extends AssignedIdEntity {
         return this;
     }
 
-    /** Marks the decision as recorded by staff for the patient, after an assisted conversation in {@code termsLanguage}. */
-    public ProposalDecision recordedOnBehalf(String recordedBy, String channel, String confirmedBy, Instant conversationAt, String termsLanguage) {
+    /**
+     * Marks the decision as recorded by staff for the patient, after an assisted conversation in {@code termsLanguage}.
+     * {@code representativeSubject} is the authorised representative who confirmed it, when one did.
+     */
+    public ProposalDecision recordedOnBehalf(String recordedBy, String channel, String confirmedBy, String representativeSubject,
+                                             Instant conversationAt, String termsLanguage) {
         this.decisionSource = SOURCE_RECORDED; this.recordedBy = recordedBy; this.decisionChannel = channel;
-        this.confirmedBy = confirmedBy; this.conversationAt = micros(conversationAt); this.termsLanguage = termsLanguage;
+        this.confirmedBy = confirmedBy; this.confirmedRepresentativeSubject = representativeSubject;
+        this.conversationAt = micros(conversationAt); this.termsLanguage = termsLanguage;
         return this;
     }
 

@@ -350,7 +350,8 @@ These were fixed in the build:
 |---|---|---|---|---|
 | **P1 (decision)** | Journey-bound cases: neither the patient's own decisions (portal and secure link post to the direct `/decision` endpoints) nor the recorded decision complete the journey runtime `REVIEW_PROPOSAL` action. This is pre-existing for self-service, and the recorded path keeps parity. Decide whether the UI moves to the `/actions/{id}/proposal-decision` endpoints or the direct paths sync the runtime. Then add a `RecordedDecision` handler variant. | AUTH | `JourneyService`, `ReviewProposalActionHandler`, `PatientProposal.tsx`, `ProposalSign.tsx` | harden |
 | Done (pass 2) | The patient is not notified when a decision is recorded (the plan says "notified with the provenance line"). A recorded decline also notifies the recording coordinator about their own action. Needs an outbox template in en and ar, plus legal L4 (dispute window). | AUTH | `JourneyService.applyRecordedDecision`, notification templates | harden |
-| P2 | "Representative" means the submitting contact (`case_submission_contacts.contact_role`), not an authorised `PATIENT_REPRESENTATIVE` link, and no representative id is stored. Align with the representative model (legal L3). | AUTH | `ProposalAssistanceService` | harden |
+| Done (pass 3, legal L3 still open) | "Representative" means the submitting contact (`case_submission_contacts.contact_role`), not an authorised `PATIENT_REPRESENTATIVE` link, and no representative id is stored. Now: exactly one in-force link is required and its subject is stored (V75). | AUTH | `ProposalAssistanceService` | harden |
+| P3 | The staff "Confirmed by → Representative" option shows even when the patient has no authorised representative (the server refuses), and with two representatives the record cannot name one (`REPRESENTATIVE_AMBIGUOUS`). Expose the authorised representatives on the workspace and let the coordinator pick. | Pass 3 | `RecordProposalDecision.tsx`, `ProposalAssistanceService` | harden |
 | P2 | Arabic secure link: the numbered "what happens next" list still starts with "acknowledge this estimate". | Build review | `ProposalSign.tsx` | clarify |
 | P2 | Activation's deposit-terms consent on `/ar` is unchanged, pending legal L2. | Plan O1 | `ProfileActivation.tsx` | — |
 | P3 | `englishHref` opens the English case without the proposal drawer. Add a deep link that opens it. | WG | `Portal.tsx` | harden |
@@ -366,7 +367,7 @@ One independent read-only review ran over `a9eee09`…`ed57af3`. Fixed in `fix(p
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P2 | "Care for …" uses an account-level rule (PATIENT_REPRESENTATIVE without PATIENT). A person with their own record who also acts for a relative sees the relative's case under the bare name. Needs a per-case actor relation from the backend (workspace or actions). | Review | `Portal.tsx`, backend workspace view | harden |
+| Done (pass 3) | "Care for …" uses an account-level rule (PATIENT_REPRESENTATIVE without PATIENT). A person with their own record who also acts for a relative sees the relative's case under the bare name. Now from `actions.viewer` per case. | Review | `Portal.tsx`, backend workspace view | harden |
 | P2 | Leaving the case ("My dashboard") still discards typed drafts. Add a dirty-form warning. | Plan | `Portal.tsx` | harden |
 | P3 | The overview and clinical tabs stay mounted, so a Consultant's referral and eligibility reads run on every case open. Mount the clinical tab on its first visit and keep it mounted afterwards. | Review | `Portal.tsx` | optimize |
 | P3 | A full patient/staff module split of `Portal.tsx` (role panels are lazy now). | RB | `Portal.tsx` | optimize |

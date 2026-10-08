@@ -104,6 +104,15 @@ Update at the end of every phase.
   - [x] Step 1 backlog tidy: 9 rows re-checked against code — done: case number title, RTL tablist keys, zero tiles,
         deposit-panel washes, proposal fieldset; partly done with notes: Arabic micro-label tracking, care-area labels
         (MyCare keeps a local map), filled row actions (Claim/Accept stay filled); a duplicate `mutate` row merged
+  - [x] Step 2 per-case viewer relation: `CaseActionsView.viewer` = SELF / REPRESENTATIVE / STAFF, resolved per case from
+        the patient record's subject (a person can be the patient on their own case and a representative on a relative's);
+        Portal/MyCare say "Care for …" from it (account-level role rule removed). `ProposalAssistanceService` now requires
+        exactly one in-force `PATIENT_REPRESENTATIVE` link for a representative confirmation (`REPRESENTATIVE_NOT_AUTHORISED`,
+        `REPRESENTATIVE_AMBIGUOUS`) instead of the submission contact's role, and `V75__proposal_decision_representative`
+        stores the confirming representative's subject (check constraint ties it to `confirmed_by`)
+    - [x] verify: backend full suite 617/0 (2 skipped; +4 `CaseViewerRelationTest`, +2 assisted-decision tests);
+          `PostgresJpaMappingTest` green on V75 (throwaway `rs-jpa-mapping-pg`, schema reset); typecheck ok; unit 343 pass,
+          11 `ProposalSign` (pre-existing); Playwright `my-care` 10/10 incl. 2 new per-case relation tests
 
 ## Decisions
 
@@ -144,7 +153,7 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Pass 3 step 2: per-case viewer relation (SELF / REPRESENTATIVE / STAFF) on the case workspace/actions view, tests first;
-then use it in Portal.tsx/MyCare and require an authorised representative in ProposalAssistanceService. Owner decisions
+Pass 3 step 3: work-item title/context as a code plus parameters (`case_tasks.copy_code` + encrypted `copy_params`,
+`WorkCopy` on work items and the current action), rendered from `portalWork.workCopy` in en/ar. Owner decisions
 still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
 amber tones; proposal drawer order (price first approved, recommendation-first suggestion kept in the backlog).

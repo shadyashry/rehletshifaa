@@ -139,6 +139,22 @@ test("Arabic is right-to-left with the same single-action discipline", async ({ 
   await page.screenshot({ path: "e2e/screenshots/my-care-deposit-ar-1440.png", fullPage: true });
 });
 
+test("whose care it is follows the case, not the account's roles", async ({ page }) => {
+  // A patient with their own record who also acts for a relative, looking at the relative's case.
+  await setupPatient(page, "deposit-arranging", { viewer: "REPRESENTATIVE", roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
+  await page.goto("/en/portal");
+  await expect(page.getByText(/Care for ⁨?Maya Example/)).toBeVisible();
+  await page.goto("/ar/portal");
+  await expect(page.getByText(/رعاية ⁨?Maya Example/)).toBeVisible();
+});
+
+test("a representative account looking at its own case sees the bare name", async ({ page }) => {
+  await setupPatient(page, "deposit-arranging", { viewer: "SELF", roles: ["PATIENT_REPRESENTATIVE"] });
+  await page.goto("/en/portal");
+  await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
+  await expect(page.getByText(/Care for/)).toHaveCount(0);
+});
+
 test("a patient with no case yet gets a calm explanation, not an empty dashboard", async ({ page }) => {
   await setupPatient(page, "no-case");
   await page.goto("/en/portal");

@@ -5,7 +5,7 @@ import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
-import com.rehletshifaa.casemanagement.infrastructure.CaseSubmissionContactRepository;
+import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalAssistanceView;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalView;
 import com.rehletshifaa.journey.api.JourneyDtos.RecordedDecisionRequest;
@@ -48,16 +48,16 @@ public class ProposalAssistanceService {
     private final ProposalVersionRepository versions;
     private final ProposalAssistanceRequestRepository requests;
     private final CaseAssignmentRepository assignments;
-    private final CaseSubmissionContactRepository submitters;
+    private final MedicalCaseRepository cases;
     private final StaffWorkService work;
     private final AuditTrail auditTrail;
     private final Clock clock;
 
     public ProposalAssistanceService(Authority authority, JourneyService journeys, ProposalQueryService proposals, ProposalVersionRepository versions,
                                      ProposalAssistanceRequestRepository requests, CaseAssignmentRepository assignments,
-                                     CaseSubmissionContactRepository submitters, StaffWorkService work, AuditTrail auditTrail, Clock clock) {
+                                     MedicalCaseRepository cases, StaffWorkService work, AuditTrail auditTrail, Clock clock) {
         this.authority = authority; this.journeys = journeys; this.proposals = proposals; this.versions = versions; this.requests = requests;
-        this.assignments = assignments; this.submitters = submitters; this.work = work; this.auditTrail = auditTrail; this.clock = clock;
+        this.assignments = assignments; this.cases = cases; this.work = work; this.auditTrail = auditTrail; this.clock = clock;
     }
 
     /** The signed-in patient (or their representative) asks for the conversation from My Care. */
@@ -87,7 +87,7 @@ public class ProposalAssistanceService {
     /**
      * The owning coordinator records the patient's decision. Recording is a commitment on the patient's behalf, so it
      * needs step-up authentication, the attestation, a note for a change request, a conversation that has happened, and —
-     * when a representative confirmed — a representative who is actually on the case.
+     * when a representative confirmed — the one person authorised to act for the patient right now.
      */
     @Transactional(noRollbackFor = ApiException.class)
     public ProposalView recordDecision(UUID caseId, UUID versionId, RecordedDecisionRequest request) {
@@ -98,10 +98,21 @@ public class ProposalAssistanceService {
             throw new ApiException(400, "NOTE_REQUIRED", "Say what the patient wants changed");
         if (request.conversationAt().isAfter(clock.instant().plus(SKEW)))
             throw new ApiException(400, "CONVERSATION_IN_FUTURE", "The conversation time cannot be in the future");
-        if ("REPRESENTATIVE".equals(request.confirmedBy())
-                && !submitters.findByCaseId(caseId).map(contact -> "REPRESENTATIVE".equals(contact.getContactRole())).orElse(false))
-            throw new ApiException(409, "REPRESENTATIVE_NOT_ON_CASE", "This case has no representative on file");
-        return journeys.applyRecordedDecision(caseId, versionId, request, actor);
+        String representative = "REPRESENTATIVE".equals(request.confirmedBy()) ? authorisedRepresentative(caseId) : null;
+        return journeys.applyRecordedDecision(caseId, versionId, request, representative, actor);
+    }
+
+    /**
+     * The one PATIENT_REPRESENTATIVE link in force for the case's patient. Who submitted the case, or how they described
+     * themselves, authorises nothing; with several representatives the record could not say which one confirmed.
+     */
+    private String authorisedRepresentative(UUID caseId) {
+        var subjects = cases.findAuthorisedRepresentativesOf(caseId, clock.instant());
+        if (subjects.isEmpty())
+            throw new ApiException(409, "REPRESENTATIVE_NOT_AUTHORISED", "Nobody is authorised to act for this patient");
+        if (subjects.size() > 1)
+            throw new ApiException(409, "REPRESENTATIVE_AMBIGUOUS", "Several people are authorised to act for this patient, so the record cannot say which one confirmed");
+        return subjects.get(0);
     }
 
     /** Opens the request and the coordinator's work item once per version; false when it already existed. */

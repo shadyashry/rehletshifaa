@@ -142,7 +142,8 @@ public final class JourneyDtos {
     public record CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode) {}
     /** {@code owner}: PATIENT, STAFF, or LATER (queued behind another blocker). {@code gating} is false for a step that must be done before a later commitment (identity before travel is confirmed) but does not hold the current stage. Labels are patient-safe, like {@link BlockingItem}. */
     public record BlockerView(String code,String labelEn,String labelAr,String owner,boolean gating) {}
-    public record CaseActionsView(String journeyStage,String waitingOn,String waitingReason,CurrentActionView currentAction,List<BlockerView>blockers,List<String>availableActions) {}
+    /** {@code viewer}: who is looking at this case — SELF (the patient), REPRESENTATIVE (acting for them) or STAFF. */
+    public record CaseActionsView(String journeyStage,String waitingOn,String waitingReason,CurrentActionView currentAction,List<BlockerView>blockers,List<String>availableActions,String viewer) {}
     public record IdResponse(UUID id,String status) {}
     // --- Consultant price catalog, specialty templates, and FX (Phase 2) ---
     public record CatalogServiceView(UUID id,String serviceCode,String serviceName,String category,BigDecimal priceEgp,boolean active,LocalDate validUntil) {}

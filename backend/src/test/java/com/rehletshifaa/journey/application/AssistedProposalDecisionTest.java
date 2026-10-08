@@ -122,11 +122,44 @@ class AssistedProposalDecisionTest {
         assertCode("ATTESTATION_REQUIRED", () -> assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "PATIENT", now, false)));
         assertCode("NOTE_REQUIRED", () -> assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("REVISION_REQUESTED", "  ", "PHONE", "PATIENT", now, true)));
         assertCode("CONVERSATION_IN_FUTURE", () -> assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "PATIENT", now.plusSeconds(3600), true)));
-        // The patient submitted this case themselves, so there is no representative who could have confirmed.
-        assertCode("REPRESENTATIVE_NOT_ON_CASE", () -> assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "REPRESENTATIVE", now, true)));
+        // Nobody holds an authorised representative link for this patient, so no representative could have confirmed.
+        assertCode("REPRESENTATIVE_NOT_AUTHORISED", () -> assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "REPRESENTATIVE", now, true)));
         em.flush();
         assertThat(count("SELECT count(*) FROM proposal_decisions WHERE proposal_version_id=?", versionId)).isZero();
         assertThat(status(caseId)).isEqualTo("PATIENT_DECISION");
+    }
+
+    @Test void onlyAnAuthorisedRepresentativeCanConfirmAndTheRecordSaysWhich() throws Exception {
+        UUID caseId = ownedCase("+254700000811", "assist-k@local.test");
+        UUID versionId = releasedProposal(caseId);
+        RecordedDecisionRequest byRepresentative = new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "REPRESENTATIVE", Instant.now(), true);
+        // A submitter who called themselves a representative holds no authorisation to act for the patient.
+        jdbc.update("UPDATE case_submission_contacts SET contact_role='REPRESENTATIVE' WHERE case_id=?", caseId);
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        assertCode("REPRESENTATIVE_NOT_AUTHORISED", () -> assistance.recordDecision(caseId, versionId, byRepresentative));
+        // Expired and revoked links do not count either.
+        represent(caseId, "rep-expired", Instant.now().minusSeconds(60), null);
+        represent(caseId, "rep-revoked", null, Instant.now().minusSeconds(60));
+        assertCode("REPRESENTATIVE_NOT_AUTHORISED", () -> assistance.recordDecision(caseId, versionId, byRepresentative));
+        represent(caseId, "rep-in-force", null, null);
+        assistance.recordDecision(caseId, versionId, byRepresentative);
+        em.flush();
+        Map<String, Object> row = jdbc.queryForMap("SELECT * FROM proposal_decisions WHERE proposal_version_id=?", versionId);
+        assertThat(row.get("CONFIRMED_BY")).isEqualTo("REPRESENTATIVE");
+        assertThat(row.get("CONFIRMED_REPRESENTATIVE_SUBJECT")).isEqualTo("rep-in-force");
+    }
+
+    @Test void twoAuthorisedRepresentativesAreAmbiguousAndAPatientConfirmationNamesNoRepresentative() throws Exception {
+        UUID caseId = ownedCase("+254700000812", "assist-l@local.test");
+        UUID versionId = releasedProposal(caseId);
+        represent(caseId, "rep-one", null, null);
+        represent(caseId, "rep-two", null, null);
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        assertCode("REPRESENTATIVE_AMBIGUOUS", () -> assistance.recordDecision(caseId, versionId,
+                new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "REPRESENTATIVE", Instant.now(), true)));
+        assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "PHONE", "PATIENT", Instant.now(), true));
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT confirmed_representative_subject FROM proposal_decisions WHERE proposal_version_id=?", String.class, versionId)).isNull();
     }
 
     @Test void anotherCasesVersionCannotBeRecordedOrRequestedThroughThisCase() throws Exception {
@@ -260,6 +293,13 @@ class AssistedProposalDecisionTest {
 
     private void linkPatient(UUID caseId, String subject) {
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", subject, caseId);
+    }
+
+    private void represent(UUID caseId, String subject, Instant expiresAt, Instant revokedAt) {
+        Instant now = Instant.now();
+        jdbc.update("INSERT INTO patient_representatives(id,patient_id,representative_subject,relationship,permissions,effective_from,expires_at,revoked_at,created_at) "
+                        + "SELECT ?,patient_id,?,'PARENT','VIEW,MESSAGE,COORDINATE',?,?,?,? FROM medical_cases WHERE id=?",
+                UUID.randomUUID(), subject, now.minusSeconds(3600), expiresAt, revokedAt, now, caseId);
     }
 
     private void seedCoordinatorProfile() {

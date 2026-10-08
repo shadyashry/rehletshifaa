@@ -55,6 +55,9 @@ public class CaseActionQueryService {
 
     record Proposal(String status, boolean requiresFinance, boolean operationsDone, boolean financeDone, boolean finalQuote) {}
 
+    /** A patient-side viewer who is not the patient themselves reached the case as their representative. */
+    boolean patientsOwnCase(UUID caseId, String subject) { return cases.isPatientsOwnCase(caseId, subject); }
+
     Facts facts(UUID caseId) {
         MedicalCaseRepository.ActionFacts c = cases.findActionFacts(caseId)
                 .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));

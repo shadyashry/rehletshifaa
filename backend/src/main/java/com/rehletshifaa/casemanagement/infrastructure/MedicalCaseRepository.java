@@ -95,6 +95,17 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
                 and (r.expiresAt is null or r.expiresAt > :now)))""")
     boolean isOwnPatientCase(@Param("id") UUID id, @Param("subject") String subject, @Param("now") Instant now);
 
+    /** The identity is the case's patient themselves (their own patient record), not someone acting for them. */
+    @Query("select count(c) > 0 from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id and p.externalSubject = :subject")
+    boolean isPatientsOwnCase(@Param("id") UUID id, @Param("subject") String subject);
+
+    /** Who may act for the case's patient at {@code now}: unrevoked representative links in force, oldest first. */
+    @Query("""
+            select r.representativeSubject from MedicalCase c join PatientRepresentative r on r.patientId = c.patientId
+            where c.id = :id and r.revokedAt is null and r.effectiveFrom <= :now and (r.expiresAt is null or r.expiresAt > :now)
+            order by r.effectiveFrom""")
+    java.util.List<String> findAuthorisedRepresentativesOf(@Param("id") UUID id, @Param("now") Instant now);
+
     /** The case and its patient as the onboarding page heads them (display name: the {@code CASE_ROW} rule). */
     interface OnboardingHeader {
         String getCaseNumber(); UUID getPatientId(); String getFullName(); String getCountry(); String getWhatsappNumber(); String getEmail();

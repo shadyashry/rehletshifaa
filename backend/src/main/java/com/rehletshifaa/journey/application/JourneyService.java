@@ -612,7 +612,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
      * the version is decided once, the secure link is revoked, an estimate moves the case and opens the deposit and
      * profile steps, a decline or change request becomes coordinator work. Only the row says who recorded it.
      */
-    ProposalView applyRecordedDecision(UUID caseId,UUID versionId,RecordedDecisionRequest request,Actor actor){
+    ProposalView applyRecordedDecision(UUID caseId,UUID versionId,RecordedDecisionRequest request,String representativeSubject,Actor actor){
         ensureProposalBelongs(caseId,versionId);ProposalView view=proposal(versionId);
         if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");
         Instant now=clock.instant();
@@ -625,7 +625,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String comment=hasText(request.comment())?request.comment().trim():null;
         proposalDecisions.saveAndFlush(new ProposalDecision(UUID.randomUUID(),versionId,"COORDINATOR_RECORDED",decision,null,comment,actor.authenticatedAt(),now)
             .acknowledged(acceptish,acceptish?request.conversationAt():null,acceptish?ASSISTED_ACKNOWLEDGEMENT_VERSION:null)
-            .recordedOnBehalf(actor.subject(),request.channel(),request.confirmedBy(),request.conversationAt(),"ar"));
+            .recordedOnBehalf(actor.subject(),request.channel(),request.confirmedBy(),representativeSubject,request.conversationAt(),"ar"));
         shareTokens.revokeForVersion(versionId,micros(now));
         work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Decision recorded with the patient");
         if(!isFinalQuote(versionId)){transitionWithoutVersion(caseId,versionStatus,"Patient proposal decision (recorded by coordinator)",actor);
