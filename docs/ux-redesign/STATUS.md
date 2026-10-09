@@ -286,6 +286,9 @@ Update at the end of every phase.
 
 ## Next exact action
 
+**Finish plan:** [`plans/finish-plan.md`](plans/finish-plan.md) (2026-10-09). Next: owner decisions D1–D4 in one sitting, then
+Batch 0 (trustworthy test baseline). One verification, merge and rebuild per batch.
+
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
 tunnel stack runs `6cd977d` (role crash guard, portal lint and `refreshMe` fix; all merged and pushed). Next candidates: Control Center lint
 (13 errors, P2) and the `refresh` stale-result guard / shared `busy` flag (P2). Earlier notes:
