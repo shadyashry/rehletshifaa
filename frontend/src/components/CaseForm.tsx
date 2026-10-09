@@ -3,7 +3,7 @@ import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useSta
 import Script from "next/script";
 import { ArrowLeft, ArrowRight, CheckCircle2, FileUp, FileText, LockKeyhole, ChevronDown, Search, Check, X, Trash2, Plus, UserRound, Users } from "lucide-react";
 import type { Dictionary } from "@/lib/dictionary";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { buildCaseSchema, filesAreValid, RELATIONSHIPS, type Relationship } from "@/lib/case-form-schema";
 import { track } from "@/lib/analytics";
 import { whatsappHref } from "@/lib/links";
@@ -52,7 +52,6 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const [phoneLocal, setPhoneLocal] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [careArea, setCareArea] = useState<CareAreaKey>("");
-  const [travelPackage, setTravelPackage] = useState(false);
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({});
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
@@ -66,52 +65,8 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const isPatient = !!user && roles.includes("PATIENT");
   const someoneElse = values.caseFor === "SOMEONE_ELSE";
 
-  const t = {
-    countryPlaceholder: ar ? "ابحث عن دولتك…" : "Search your country…",
-    countryEmpty: ar ? "لا توجد نتائج مطابقة" : "No matching country",
-    selectCountryFirst: ar ? "اختر الدولة أولًا" : "Select the country first",
-    emailHint: ar ? "للتواصل فقط في هذه المرحلة — لن يصبح بريد الدخول قبل التحقق منه لاحقًا." : "For contact only at this stage — it won't become your sign-in email until you verify it later.",
-    localNumber: ar ? "رقم الهاتف" : "Phone number",
-    requiredMark: ar ? "مطلوب" : "Required",
-    reviewTitle: ar ? "أكمل الحقول المطلوبة للإرسال" : "Complete the required fields to send",
-    clearCountry: ar ? "مسح الدولة" : "Clear country",
-    countryLabel: ar ? "دولة إقامة المريض" : "Patient's country of residence",
-    progress: ar ? "تقدم إرسال الحالة" : "Case submission progress",
-    steps: ar ? ["المريض والتواصل", "الحالة والمستندات", "المراجعة والموافقة"] : ["Patient & contact", "Case & documents", "Review & consent"],
-    next: ar ? "التالي" : "Continue",
-    back: ar ? "السابق" : "Back",
-    review: ar ? "راجع البيانات قبل الإرسال" : "Review before sending",
-    reviewHelp: ar ? "يمكنك الرجوع لتعديل أي معلومة. لن تُرسل البيانات قبل الضغط على زر الإرسال النهائي." : "You can go back to change anything. Nothing is submitted until you use the final send button.",
-    whoTitle: ar ? "لمن هذه الحالة؟" : "Who is this case for?",
-    myself: ar ? "لي أنا" : "Myself",
-    myselfHelp: ar ? "أنا المريض" : "I am the patient",
-    someoneElse: ar ? "لشخص آخر" : "Someone else",
-    someoneElseHelp: ar ? "أساعد أحد أفراد العائلة أو شخصًا أرعاه" : "I'm helping a family member or someone in my care",
-    patientSection: ar ? "بيانات المريض" : "About the patient",
-    patientSectionSelf: ar ? "بياناتك" : "About you",
-    namesHelp: ar ? "كما تُستخدم عادةً — لا نحتاج جواز السفر أو الهوية الآن." : "As usually written — we don't need passport or ID details now.",
-    singleName: ar ? "للمريض اسم قانوني واحد فقط (بدون اسم عائلة)" : "The patient has a single legal name (no family name)",
-    repSection: ar ? "بياناتك أنت (مقدّم الطلب)" : "About you (the person submitting)",
-    repName: ar ? "اسمك" : "Your name",
-    repRelationship: ar ? "صلتك بالمريض" : "Your relationship to the patient",
-    contactSection: ar ? "بيانات التواصل" : "Contact details",
-    contactSectionRep: ar ? "بيانات التواصل معك" : "How we reach you",
-    contactRepHint: ar ? "سنتواصل معك أنت بشأن هذه الحالة. تبقى هذه البيانات منفصلة عن هوية المريض." : "We'll coordinate with you about this case. These details stay separate from the patient's own identity.",
-    relationships: ar
-      ? { PARENT: "أحد الوالدين", CHILD: "ابن/ابنة", SPOUSE: "زوج/زوجة", SIBLING: "أخ/أخت", RELATIVE: "قريب", GUARDIAN: "وصي", OTHER: "أخرى" }
-      : { PARENT: "Parent", CHILD: "Child", SPOUSE: "Spouse", SIBLING: "Sibling", RELATIVE: "Relative", GUARDIAN: "Guardian", OTHER: "Other" },
-    selectOption: ar ? "اختر…" : "Select…",
-    haveAccount: ar ? "لديك حساب في رحلة شفاء؟" : "Already have a RehletShifaa account?",
-    signInSaved: ar ? "سجّل الدخول لاستخدام بياناتك المحفوظة." : "Sign in to use your saved details.",
-    signedInAs: ar ? "مسجّل الدخول باسم" : "Signed in as",
-    savedDetails: ar ? "سنستخدم بياناتك المحفوظة — أدخل فقط ما يخص هذه الحالة الجديدة." : "We'll use your saved details — only tell us about this new case.",
-    notYou: ar ? "ليس أنت؟" : "Not you?",
-    goToPortal: ar ? "الذهاب إلى حالتي" : "Go to my case",
-    startNew: ar ? "إرسال الحالة الجديدة" : "Send my new case",
-    successReturning: ar ? "أُضيفت حالتك الجديدة إلى ملفك." : "Your new case has been added to your profile.",
-    forName: ar ? "المريض" : "Patient",
-    submittedBy: ar ? "مقدّم الطلب" : "Submitted by",
-  };
+  // The flow's own words, from the message files like the rest of the form.
+  const t = d.form.flow;
 
   useEffect(() => {
     const target = window as typeof window & { onRehletShifaaTurnstile?: (token: string) => void };
@@ -237,7 +192,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
           representative: data.caseFor === "SOMEONE_ELSE" ? { name: data.representativeName, relationship: data.representativeRelationship } : null,
           country: data.country, whatsappNumber: data.whatsappNumber, email: data.email || null,
           conditionDescription: describedCase(data.conditionDescription), preferredLanguage: locale, consent: true,
-          careArea: careArea || null, travelPackageRequested: travelPackage, turnstileToken,
+          careArea: careArea || null, turnstileToken,
         };
         const createResponse = await fetch(apiUrl(`/cases`), { method: "POST", headers: { "Content-Type": "application/json", "X-Request-ID": crypto.randomUUID() }, body: JSON.stringify(payload) });
         if (!createResponse.ok) throw new SubmitFailure("server");
@@ -266,7 +221,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     try {
       let created = draftCase.current;
       if (!created) {
-        const response = await apiFetchAs(user.access_token, "/patient/cases", { method: "POST", body: JSON.stringify({ conditionDescription: describedCase(values.conditionDescription.trim()), careArea: careArea || null, travelPackageRequested: travelPackage, consent: true }) });
+        const response = await apiFetchAs(user.access_token, "/patient/cases", { method: "POST", body: JSON.stringify({ conditionDescription: describedCase(values.conditionDescription.trim()), careArea: careArea || null, consent: true }) });
         if (!response.ok) throw new SubmitFailure("server");
         created = await response.json() as CreateCaseResponse;
         draftCase.current = created;
@@ -297,7 +252,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
           <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{ar ? "عن حالتك الجديدة" : "About your new case"}</legend>
           {caseFields()}
         </fieldset>
-        {travelAndConsent()}
+        {consentField()}
         {errors.server && <p className="mt-6 rounded-md border border-alert-200 bg-alert-50 p-4 text-sm text-alert-800" role="alert">{errors.server}</p>}
         <button className="btn-primary mt-6 w-full transition-opacity disabled:opacity-50 disabled:saturate-[.6] disabled:cursor-not-allowed" disabled={busy || !values.consent || !valid.files} type="submit">{busy ? d.form.sending : t.startNew}</button>
         <p className="mt-4 flex items-center justify-center gap-2 text-xs text-ink-500"><LockKeyhole size={14} />{d.form.secureNote}</p>
@@ -310,14 +265,14 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     return <>
       <div className="mt-4"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} <span className="font-normal text-ink-400">({d.form.optional})</span></span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option>{additionalCareAreas(locale).map(area => <option key={area.slug} value={area.slug}>{area.title}</option>)}</select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
       <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.description} <span className="font-normal text-ink-400">({d.form.optional})</span></span><textarea className="field min-h-28 resize-y" value={values.conditionDescription} maxLength={1900} onChange={e => update("conditionDescription", e.target.value)} /></label></div>
-      <div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><span className="block text-sm font-bold text-ink-800">{d.form.files} <span className="font-normal text-ink-400">({d.form.optional})</span></span>{files.length>0&&<span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800">{files.length} {d.form.selected}</span>}</div><div className="overflow-hidden rounded-2xl border border-line bg-white"><label className="flex cursor-pointer items-center gap-4 border-b border-dashed border-line-strong bg-brand-50 p-5 transition hover:border-brand-600 hover:bg-brand-100/60"><span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-white text-accent-700 shadow-sm"><FileUp /></span><span className="min-w-0 flex-1"><strong className="block text-brand-800">{d.form.choose}</strong><span className="mt-1 block text-sm text-ink-500">{d.form.uploadHelp}</span></span><Plus className="flex-none text-brand-700"/><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => { onFiles(Array.from(e.currentTarget.files ?? []));e.currentTarget.value="";touch("files"); }} /></label>{files.length>0&&<ul className="grid gap-2 p-3 sm:grid-cols-2">{files.map((file,index)=><li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-mist/50 p-3"><FileText className="flex-none text-brand-600" size={20}/><span className="min-w-0 flex-1"><strong className="block truncate text-sm" title={file.name}>{file.name}</strong><span className="text-xs text-ink-500">{(file.size/1024/1024).toFixed(file.size<1024*1024?2:1)} MB</span></span><button type="button" className="rounded-lg p-2 text-ink-500 hover:bg-alert-50 hover:text-alert-800" aria-label={`${ar?"حذف":"Remove"} ${file.name}`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><Trash2 size={17}/></button></li>)}</ul>}</div>{fieldError("files") && <p className="error-text mt-2">{fieldError("files")}</p>}</div>
+      <div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><span className="block text-sm font-bold text-ink-800">{d.form.files} <span className="font-normal text-ink-400">({d.form.optional})</span></span>{files.length>0&&<span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800">{files.length} {d.form.selected}</span>}</div><div className="overflow-hidden rounded-lg border border-line bg-white"><label className="flex cursor-pointer items-center gap-4 border-b border-dashed border-line-strong bg-surface-pearl p-5 transition hover:border-brand-600 hover:bg-brand-50"><span className="flex h-12 w-12 flex-none items-center justify-center rounded-lg bg-white text-brand-700 ring-1 ring-line"><FileUp aria-hidden /></span><span className="min-w-0 flex-1"><strong className="block text-brand-800">{d.form.choose}</strong><span className="mt-1 block text-sm text-ink-500">{d.form.uploadHelp}</span></span><Plus aria-hidden className="flex-none text-brand-700"/><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => { onFiles(Array.from(e.currentTarget.files ?? []));e.currentTarget.value="";touch("files"); }} /></label>{files.length>0&&<ul className="grid gap-2 p-3 sm:grid-cols-2">{files.map((file,index)=><li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-lg border border-line bg-surface-pearl p-3"><FileText aria-hidden className="flex-none text-brand-600" size={20}/><span className="min-w-0 flex-1"><strong className="block truncate text-sm" title={file.name}>{file.name}</strong><span className="text-xs text-ink-500">{new Intl.NumberFormat(intlLocale(locale),{style:"unit",unit:"megabyte",unitDisplay:"short",maximumFractionDigits:file.size<1024*1024?2:1}).format(file.size/1024/1024)}</span></span><button type="button" className="inline-grid h-11 w-11 flex-none place-items-center rounded-lg text-ink-500 hover:bg-alert-50 hover:text-alert-800" aria-label={`${ar?"حذف":"Remove"} ${file.name}`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><Trash2 aria-hidden size={17}/></button></li>)}</ul>}</div>{fieldError("files") && <p className="error-text mt-2">{fieldError("files")}</p>}</div>
     </>;
   }
 
-  function travelAndConsent() {
+  function consentField() {
     return <>
-      <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white p-4"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={travelPackage} onChange={e => { begin(); setTravelPackage(e.target.checked); }} /><span className="text-sm leading-6 text-ink-700"><strong className="block text-ink-900">{ar ? "أرغب في تنظيم باقة سفر وعلاج متكاملة" : "I'd like a full travel & treatment package"}</strong>{ar ? "إذا قُبلت حالتي من قبل الاستشاري، يتولى فريق رحلة شفاء ترتيب الطيران والتأشيرة والإقامة والتنقلات من وإلى المستشفى." : "If my case is accepted by the consultant, RehletShifaa will arrange your flights, visa, accommodation, and hospital transfers."}</span></label>
-      <label className="mt-4 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={values.consent} onChange={e => { update("consent", e.target.checked); touch("consent"); }} /><span className="text-sm leading-6 text-ink-700">{d.form.consent} <a className="font-bold text-brand-700 underline" href={`/${locale}/privacy`}>{d.common.privacy}</a></span></label>{fieldError("consent") && <p className="error-text mt-2">{fieldError("consent")}</p>}
+      {/* Travel support is not asked here: no proposal exists yet. The coordinator asks while preparing it and records it in the portal. */}
+      <label className="mt-6 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={values.consent} onChange={e => { update("consent", e.target.checked); touch("consent"); }} /><span className="text-sm leading-6 text-ink-700">{d.form.consent} <a className="font-bold text-brand-700 underline" href={`/${locale}/privacy`}>{d.common.privacy}</a></span></label>{fieldError("consent") && <p className="error-text mt-2">{fieldError("consent")}</p>}
     </>;
   }
 
@@ -423,7 +378,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
       {/* Section 3 — review, options & consent */}
       {step===3&&<><div className="rounded-2xl border border-brand-200 bg-brand-50 p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{t.forName}</dt><dd className="font-bold text-ink-900">{[values.givenName.trim(), values.familyName.trim()].filter(Boolean).join(" ")}</dd></div>{someoneElse && <div><dt className="text-ink-500">{t.submittedBy}</dt><dd className="font-bold text-ink-900">{values.representativeName.trim()} <span className="font-normal text-ink-500">({values.representativeRelationship ? t.relationships[values.representativeRelationship] : ""})</span></dd></div>}<div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country?.name}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{d.form.files}</dt><dd className="font-bold text-ink-900">{files.length}</dd></div></dl></div>
-      {travelAndConsent()}
+      {consentField()}
 
       {siteKey && <div className="cf-turnstile mt-6" data-sitekey={siteKey} data-callback="onRehletShifaaTurnstile" />}
       {errors.server && <p className="mt-6 rounded-md border border-alert-200 bg-alert-50 p-4 text-sm text-alert-800" role="alert">{errors.server}</p>}

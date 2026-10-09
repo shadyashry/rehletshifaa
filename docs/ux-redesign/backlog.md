@@ -75,24 +75,24 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P2 | Four different step models (4 / 7 / 5 / 3). Use one canonical 4-stage model, with sub-steps only on How it works. | SC | `components/home/*`, `components/journey/*`, `care-areas/CaseRouter.tsx` | clarify |
-| P2 | "9 care areas" is shown above 6 cards. Use "body systems" for the 6 and "care areas" for the 9. | SC | `messages/*.json`, `home/CarePathways.tsx` | clarify |
-| P2 | The care-areas H1 "Choose the care area closest to your need" contradicts the later "you don't need to choose". | SC | `messages/*.json` (`careAreasPage`) | clarify |
-| P2 | "Final quote" appears on no page. Add a preliminary-estimate → final-quote diagram to How it works. | SC | `components/journey/*` | shape |
-| P2 | The intake form asks about a travel package before any proposal exists. | SC | `components/CaseForm.tsx` | clarify |
-| P2 | The coordinator is never introduced (name, face, languages, hours). | SC | `components/home/*` | shape |
+| Done (Batch 3: home film and the How it works preview are the four stages; the care-area/Consultant routers are unnumbered and link to How it works; the 7 sub-steps stay on How it works) | Four different step models (4 / 7 / 5 / 3). Use one canonical 4-stage model, with sub-steps only on How it works. | SC | `components/home/*`, `components/journey/*`, `care-areas/CaseRouter.tsx` | clarify |
+| Done (Batch 3: "9 care areas across 6 body systems") | "9 care areas" is shown above 6 cards. Use "body systems" for the 6 and "care areas" for the 9. | SC | `messages/*.json`, `home/CarePathways.tsx` | clarify |
+| Done (Batch 3: "Explore care by body system") | The care-areas H1 "Choose the care area closest to your need" contradicts the later "you don't need to choose". | SC | `messages/*.json` (`careAreasPage`) | clarify |
+| Done (Batch 3: "How the cost is settled" — preliminary estimate → final quote, in the decision phase) | "Final quote" appears on no page. Add a preliminary-estimate → final-quote diagram to How it works. | SC | `components/journey/*` | shape |
+| Done (Batch 3, owner B3-1: removed from intake; the coordinator sets it in the portal) | The intake form asks about a travel package before any proposal exists. | SC | `components/CaseForm.tsx` | clarify |
+| Done (Batch 3, D4 + owner B3-2: generic introduction — one bilingual coordinator, Arabic and English, WhatsApp; no name, photo or hours) | The coordinator is never introduced (name, face, languages, hours). | SC | `components/home/*` | shape |
 
 ## Public site — pages and form
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P2 | Care-area detail pages still carry a hero button plus the closing link (two routes to the form). | SC (polish) | `components/care-areas/CareAreaDetail.tsx` | distill |
-| P2 | How it works: the "You" and "Next" labels are 10.5–11.5px, and phase headings have 0px of space above them. | SC (detector) | `components/journey/*` | typeset / layout |
-| P2 | Consultants: an h2 is followed by h4 cards (a skipped heading level). | SC (detector) | `consultants/ConsultantPanel.tsx`, `ConsultantCard.tsx` | harden |
-| P2 | Consultant cards stack about six levels of information, and the page is 13k px tall on phones. | SC | `consultants/ConsultantCard.tsx` | distill |
-| P2 | `PageHero` uses a radial gradient with a physical 88% position, which is not mirrored in RTL. | SC | `components/PageHero.tsx:22` | polish |
-| P2 | The CaseForm upload area uses `rounded-2xl`/`rounded-xl`, `bg-mist` and `shadow-sm`. Form copy is hard-coded in a `t` object instead of the message files. | SC | `components/CaseForm.tsx` | polish / clarify |
-| P2 | Scroll-driven reveals hide about 47% of the home page until it is scrolled, and some reveals blur. | SC (detector) | `app/theme-petrol.css` | animate |
+| Done (Batch 3: the hero button is gone; the closing router link is the one route) | Care-area detail pages still carry a hero button plus the closing link (two routes to the form). | SC (polish) | `components/care-areas/CareAreaDetail.tsx` | distill |
+| Done (Batch 3: `.label-micro` 13px; more space above each phase header) | How it works: the "You" and "Next" labels are 10.5–11.5px, and phase headings have 0px of space above them. | SC (detector) | `components/journey/*` | typeset / layout |
+| Done (Batch 3: card names are always h3) | Consultants: an h2 is followed by h4 cards (a skipped heading level). | SC (detector) | `consultants/ConsultantPanel.tsx`, `ConsultantCard.tsx` | harden |
+| Done (Batch 3: on phones no distinction block, two facets, tighter padding) | Consultant cards stack about six levels of information, and the page is 13k px tall on phones. | SC | `consultants/ConsultantCard.tsx` | distill |
+| Done (Batch 3: `rtl:` gradient at 12%) | `PageHero` uses a radial gradient with a physical 88% position, which is not mirrored in RTL. | SC | `components/PageHero.tsx:22` | polish |
+| Done (Batch 3: 8px radii, pearl surface, no shadow, 44px remove, Intl file sizes; the flow copy is `form.flow` in the message files) | The CaseForm upload area uses `rounded-2xl`/`rounded-xl`, `bg-mist` and `shadow-sm`. Form copy is hard-coded in a `t` object instead of the message files. | SC | `components/CaseForm.tsx` | polish / clarify |
+| Done (Batch 3: heading and content reveals removed; the journey still fills as it is read) | Scroll-driven reveals hide about 47% of the home page until it is scrolled, and some reveals blur. | SC (detector) | `app/theme-petrol.css` | animate |
 | P3 | Title Case headings ("Send Your Medical Case", "Your Case Has Been Received"). | SC | `messages/*.json` | clarify |
 | P3 | Consultant cards: "Professional distinction" repeats the job title; the CV qualifiers are inconsistent; a Germany-based Consultant has no explanation. | SC | `lib/consultants.ts`, `lib/attached-consultants.ts` | clarify |
 | P3 | `CarePathways.tsx:58` "View all care areas" fires the `send_case_cta_clicked` analytics event. | SC | `components/home/CarePathways.tsx` | harden |
@@ -413,3 +413,14 @@ audit/harden + the detector, 0 findings) reviewed the Batch 2 diff. No P0–P2. 
 | P3 | `CaseMessages` builds a date formatter per message; `UnreadCount` a number formatter per render. | RB | `CaseMessages.tsx`, `portal-ui.tsx` | optimize |
 | P3 | Seen in the Batch 2 screenshots, older than it: the staff proposal summary shows the raw status ("RELEASED") beside the version in both locales. | Impeccable | `StaffCaseView.tsx` `ProposalSummary` | clarify |
 | P3 | Web guidelines prefer a submit that stays enabled; the proposal primary stays disabled until the box is ticked (approved at GATE 3) and now says why in visible text. | WG | `PatientProposal.tsx` | — (design decision) |
+
+## Batch 3 — deferred review findings (2026-10-09)
+
+The four skills reviewed the Batch 3 diff (Impeccable detector: 0 findings). No P0–P2.
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P3 | The travel section numbers its services 01–04 on a connector line, which reads as a fifth sequence; they are not steps. | Impeccable | `components/home/TravelServices.tsx` | distill |
+| P3 | Dead code: `SupportBand.tsx` and `home.steps` (an old five-step model) are never rendered. | RB | `components/home/SupportBand.tsx`, `messages/*.json` | distill |
+| P3 | The home journey heading "What happens after you send your case" sits above a first stage that includes sending it. | Impeccable | `messages/*.json` (`home.howTitle`) | clarify |
+| P3 | The new Arabic stage, coordinator and cost copy uses masculine second person like the rest of the site. Pending native review. | I18N | `messages/ar.json` | clarify |

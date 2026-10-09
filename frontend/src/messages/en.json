@@ -79,25 +79,29 @@
       "label": "RehletShifaa patient journey from sharing medical reports to coordinated follow-up",
       "steps": [
         {
-          "title": "Share what you have",
-          "body": "A report, any tests, and a short note. A complete file is not required."
+          "title": "Understand your case",
+          "body": "Share what you already have. Your coordinator prepares it, and a Consultant in the right specialty reviews it."
         },
         {
-          "title": "Your coordinator reviews it",
-          "body": "One person checks what you sent and tells you if anything is missing."
+          "title": "Understand your options",
+          "body": "You receive the recommendation and a preliminary cost estimate, and decide in your own time."
         },
         {
-          "title": "A Consultant assesses your case",
-          "body": "We route it by clinical need, so you do not have to choose a specialty."
+          "title": "Prepare your care in Egypt",
+          "body": "If you go ahead, we arrange your appointments and, where agreed, your travel."
         },
         {
-          "title": "You decide what happens next",
-          "body": "You will know the recommendation, the likely cost and the practical steps first."
+          "title": "Continue your care",
+          "body": "Treatment, then follow-up with your Consultant and coordinator after you return home."
         }
       ]
     },
+    "coordinatorIntro": {
+      "title": "Your coordinator",
+      "body": "One bilingual coordinator, in Arabic and English, stays with your case from your first message to follow-up. You can reach them on WhatsApp."
+    },
     "areasEyebrow": "What we care for",
-    "areasTitle": "{count} care areas, one coordinated path",
+    "areasTitle": "{count} care areas across {systems} body systems",
     "areas": [
       {
         "title": "Cardiology",
@@ -321,11 +325,10 @@
     "title": "Your Care Journey, Clearly Coordinated",
     "intro": "From the medical information you already have to treatment and follow-up, RehletShifaa helps you understand each step and coordinates what comes next.",
     "preview": [
-      "Medical information",
-      "Clinical review",
-      "Your decision",
-      "Care in Egypt",
-      "Follow-up"
+      "Understand your case",
+      "Understand your options",
+      "Prepare your care in Egypt",
+      "Continue your care"
     ],
     "labels": {
       "phase": "Phase",
@@ -417,6 +420,13 @@
       "eyebrow": "You remain in control",
       "statement": "Reviewing your recommendation does not commit you to treatment or travel. You decide whether to continue."
     },
+    "costs": {
+      "title": "How the cost is settled",
+      "estimate": "Preliminary estimate",
+      "estimateBody": "Comes with your recommendation, before you travel. It is non-binding and can change.",
+      "quote": "Final quote",
+      "quoteBody": "Prepared after your in-person assessment in Egypt: the confirmed services and their price, before treatment."
+    },
     "gate": {
       "decide": "You decide",
       "yes": "Continue journey",
@@ -466,6 +476,62 @@
     }
   },
   "form": {
+    "flow": {
+      "countryPlaceholder": "Search your country…",
+      "countryEmpty": "No matching country",
+      "selectCountryFirst": "Select the country first",
+      "emailHint": "For contact only at this stage — it won't become your sign-in email until you verify it later.",
+      "localNumber": "Phone number",
+      "requiredMark": "Required",
+      "reviewTitle": "Complete the required fields to send",
+      "clearCountry": "Clear country",
+      "countryLabel": "Patient's country of residence",
+      "progress": "Case submission progress",
+      "steps": [
+        "Patient & contact",
+        "Case & documents",
+        "Review & consent"
+      ],
+      "next": "Continue",
+      "back": "Back",
+      "review": "Review before sending",
+      "reviewHelp": "You can go back to change anything. Nothing is submitted until you use the final send button.",
+      "whoTitle": "Who is this case for?",
+      "myself": "Myself",
+      "myselfHelp": "I am the patient",
+      "someoneElse": "Someone else",
+      "someoneElseHelp": "I'm helping a family member or someone in my care",
+      "patientSection": "About the patient",
+      "patientSectionSelf": "About you",
+      "namesHelp": "As usually written — we don't need passport or ID details now.",
+      "singleName": "The patient has a single legal name (no family name)",
+      "repSection": "About you (the person submitting)",
+      "repName": "Your name",
+      "repRelationship": "Your relationship to the patient",
+      "contactSection": "Contact details",
+      "contactSectionRep": "How we reach you",
+      "contactRepHint": "We'll coordinate with you about this case. These details stay separate from the patient's own identity.",
+      "relationships": {
+        "PARENT": "Parent",
+        "CHILD": "Child",
+        "SPOUSE": "Spouse",
+        "SIBLING": "Sibling",
+        "RELATIVE": "Relative",
+        "GUARDIAN": "Guardian",
+        "OTHER": "Other"
+      },
+      "selectOption": "Select…",
+      "haveAccount": "Already have a RehletShifaa account?",
+      "signInSaved": "Sign in to use your saved details.",
+      "signedInAs": "Signed in as",
+      "savedDetails": "We'll use your saved details — only tell us about this new case.",
+      "notYou": "Not you?",
+      "goToPortal": "Go to my case",
+      "startNew": "Send my new case",
+      "successReturning": "Your new case has been added to your profile.",
+      "forName": "Patient",
+      "submittedBy": "Submitted by"
+    },
     "eyebrow": "A secure first step",
     "title": "Send Your Medical Case",
     "intro": "You don't need to know which specialty you need. Send what you already have and we'll help guide the next step.",
@@ -526,7 +592,7 @@
   },
   "careAreasPage": {
     "eyebrow": "Care areas",
-    "title": "Choose the care area closest to your need",
+    "title": "Explore care by body system",
     "intro": "Consultant-led review across {count} care areas, each led by named senior Consultants. Explore by body system — or send your case and we will route it for you.",
     "tabsLabel": "Care areas",
     "tabs": {
@@ -587,6 +653,7 @@
       "title": "You don’t need to choose a care area",
       "body": "Many cases cross more than one specialty. Send what you already have — your coordinator reads it and routes it to the right Consultant.",
       "note": "No treatment or travel commitment.",
+      "howLink": "See the whole journey on How it works",
       "steps": [
         {
           "title": "Share your reports",
@@ -731,6 +798,7 @@
       "title": "You don’t need to choose a Consultant",
       "body": "Send what you already have. Your coordinator reviews it and matches your case to the Consultant whose expertise fits it best.",
       "note": "No treatment or travel commitment.",
+      "howLink": "See the whole journey on How it works",
       "steps": [
         {
           "title": "Share your reports",

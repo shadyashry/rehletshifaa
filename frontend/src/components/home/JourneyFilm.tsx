@@ -1,4 +1,4 @@
-import { ArrowRight, HeartPulse } from "lucide-react";
+import { ArrowRight, MessageCircle } from "lucide-react";
 
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
@@ -8,7 +8,8 @@ import { JourneyLine } from "./JourneyConnector";
 import { JourneyVideo } from "./JourneyVideo";
 
 /**
- * The process as one care journey: four numbered moments joined by the flowing connector, and beside
+ * The process as one care journey: the four stages used on every page (How it works carries the sub-steps), joined by
+ * the flowing connector, then who carries the patient through them. Beside
  * them the film inline: a composed poster with one play control, native controls once it plays.
  * Desktop: journey left, film right (≈44% of the section); phone and tablet: journey, then film.
  */
@@ -49,12 +50,12 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
                 </li>
               ))}
             </ol>
-            {/* The journey does not end at the decision or at the flight home: the care continues. */}
-            <p className="journey-afterward mt-6 flex items-start gap-3 rounded-[12px] border border-border-subtle bg-surface-default px-4 py-3.5 text-[0.9375rem] leading-6 text-ink-700 sm:ms-[3.25rem] lg:mt-7">
-              <HeartPulse size={18} strokeWidth={1.9} aria-hidden="true" className="mt-0.5 flex-none text-accent-700" />
+            {/* One person through all four stages: a generic team introduction until real coordinator content exists (D4). */}
+            <p className="journey-afterward mt-6 flex items-start gap-3 rounded-lg border border-border-subtle bg-surface-default px-4 py-3.5 text-[0.9375rem] leading-6 text-ink-700 sm:ms-[3.25rem] lg:mt-7">
+              <MessageCircle size={18} strokeWidth={1.9} aria-hidden="true" className="mt-0.5 flex-none text-brand-700" />
               <span>
-                <strong className="font-semibold text-brand-900">{arabic ? "وبعد عودتك إلى بلدك" : "And after you return home"}</strong>
-                {arabic ? " — يبقى استشاريك ومنسّقك معك لمتابعة تعافيك." : " — your Consultant and coordinator stay with you to follow up on your recovery."}
+                <strong className="font-semibold text-brand-900">{d.home.coordinatorIntro.title}</strong>
+                <span className="mt-0.5 block">{d.home.coordinatorIntro.body}</span>
               </span>
             </p>
           </div>

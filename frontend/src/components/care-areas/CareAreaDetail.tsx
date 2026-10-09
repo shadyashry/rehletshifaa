@@ -6,7 +6,6 @@ import { CaseRouter } from "@/components/care-areas/CaseRouter";
 import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import { ConsultantCard } from "@/components/consultants/ConsultantCard";
 import { HeroStats } from "@/components/HeroStats";
-import { TrackedLink } from "@/components/TrackedLink";
 import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
 import { consultantUi, universityFacultySlugs } from "@/lib/consultants";
 import type { Dictionary } from "@/lib/dictionary";
@@ -111,12 +110,9 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
                 />
               )}
             </div>
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
-              <TrackedLink event="send_case_cta_clicked" className="btn-primary w-full sm:w-auto" href={localeHref(locale, "send-my-case")}>
-                {d.common.send}
-                <ArrowRight size={18} aria-hidden="true" className="rtl:-scale-x-100" />
-              </TrackedLink>
-              <a href="#area-consultants" className="link-cta justify-center text-[0.9375rem] sm:justify-start">
+            {/* One in-content route to the form, at the close (CaseRouter); the header carries the primary action. */}
+            <div className="mt-6">
+              <a href="#area-consultants" className="link-cta text-[0.9375rem]">
                 {t.meet}
                 <ArrowDown size={16} aria-hidden="true" />
               </a>

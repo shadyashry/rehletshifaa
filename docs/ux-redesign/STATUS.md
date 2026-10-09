@@ -337,6 +337,31 @@ Update at the end of every phase.
         a11y 20/20 at baseline. First full run: 30 failures, all stale selectors on the old names (`"Open"` exact, "Messages1",
         file name now also in its actions) — updated; the affected specs then 82/82
 
+  - [x] Owner: "merge batch one and batch 2 and push and reload" — `023731e` fast-forwarded into `codex/platform-control-plane`, pushed
+        and deployed by the owner (the auto-mode classifier refused the git step here); checked after: local = origin = `023731e`, backend
+        UP, localhost 3000/8081/8180 and `https://dev.rehletshifaa.com/en`, `/en/portal`, api-dev health all 200, served CSS has the
+        Batch 2 tokens
+
+- [x] **Finish plan — Batch 3: public site** (branch `feat/ux-redesign-batch-3` from `codex/platform-control-plane` @ `023731e`,
+      2026-10-09; owner decisions B3-1..3 below). Skills loaded at the start and used for build and review: react-best-practices,
+      composition-patterns, web-design-guidelines (fresh rules), Impeccable (context, animate playbook, craft floor, detector: 0)
+  - [x] One journey: the home film and the How it works preview are the four stages (Understand your case → Understand your options
+        → Prepare your care in Egypt → Continue your care); the 7 numbered sub-steps stay on How it works only; the care-area and
+        Consultant routers are unnumbered and link to How it works (B3-3)
+  - [x] Body systems vs care areas: "9 care areas across 6 body systems"; care-areas H1 "Explore care by body system"
+  - [x] How it works: "How the cost is settled" — preliminary estimate (with the recommendation, before travel, non-binding) → final
+        quote (after the in-person assessment, before treatment); "You"/"Next" labels at 13px; more room above phase headers
+  - [x] Intake: no travel-package question (B3-1); the coordinator sets it in the portal. Coordinator introduction in the home
+        journey (D4, B3-2): one bilingual coordinator, Arabic and English, WhatsApp — no name, photo or hours
+  - [x] Care-area pages: one in-content route to the form (hero button removed). Consultant cards: names are h3 (no h2→h4 skip);
+        shorter on phones (no distinction block, two facets). `PageHero` mist mirrored in RTL. CaseForm upload area on tokens (8px,
+        pearl, no shadow, 44px remove, Intl file sizes) and its flow copy in `messages/*.json` (`form.flow`)
+  - [x] Scroll reveals: heading and content reveals removed (nothing waits for a scroll); kept the hero arrival, header, reading
+        progress and the journey filling as it is read
+  - [x] Review (four skills): no P0–P2; 4 P3s in backlog.md "Batch 3 — deferred"
+  - [x] verify: typecheck ok; lint 0 errors / 10 warnings; unit 371/371; Playwright full suite **243 passed, 0 failed**, 38 skipped
+        (+10 `public-batch-3.spec.ts`, each failing on the pre-Batch-3 pages); a11y 20/20 at baseline. No backend change
+
 ## Decisions
 
 | Date | Decision | By |
@@ -356,6 +381,7 @@ Update at the end of every phase.
 | 2026-10-08 | Owner: "merge pass 3 into codex/platform-control-plane and push" — `feat/ux-redesign-pass-3` fast-forwarded and pushed to origin. | Owner |
 | 2026-10-09 | Owner: "merge pass 4 into codex/platform-control-plane and push" — `feat/ux-redesign-pass-4` (`23a1f77`) fast-forwarded and pushed to origin. | Owner |
 | 2026-10-09 | Owner: "go with your recommendations for D1–D4" (finish plan). **D1** journey-bound cases: a known limitation, because no admission policy is current and no case was ever admitted (dev DB); the fix is a precondition for turning journey admission on. **D2** B1 status tokens approved as proposed (`token-proposals.md`). **D3** price first stays; the recommendation-first suggestion is closed. **D4** the public site uses the four stages as on How it works, and a generic team introduction until real coordinator content exists. | Owner |
+| 2026-10-09 | Batch 3 (owner): **B3-1** the travel-package question leaves the intake (the coordinator sets it in the portal); **B3-2** coordinator introduction = role, Arabic and English, WhatsApp (no name, photo or hours); **B3-3** the routers are unnumbered and link to How it works. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -383,9 +409,10 @@ Update at the end of every phase.
 D1–D4 decided (see Decisions); Batch 1 merged, pushed and deployed (`f304421`); Batch 1a (skill review fixes) done on
 `feat/ux-redesign-batch-1a` (`fc03f0b`), not merged or pushed. Owner: Batch 2 runs in a **new session on the same branch**
 (`feat/ux-redesign-batch-1a`, worktree `vigilant-roentgen-29caab`) and Batch 1a is merged **together with Batch 2** (one merge,
-push and rebuild). Batch 2 (portal accessibility and Arabic formatting, B1 status tokens) is done on the same branch and not merged or pushed.
-Next: on the owner's word, merge Batch 1a + Batch 2 once, push and rebuild the stack; then Batch 3 (public site, D4).
-Baselines: unit 371/371, Playwright full suite 233 passed, lint 0 errors / 10 warnings, backend 620/0.
+push and rebuild). Batch 1a + Batch 2 are merged, pushed and deployed (`023731e`). Batch 3 (public site) is done on `feat/ux-redesign-batch-3`,
+not merged or pushed. Next: the finish plan's **Close** — one portal and one public-site re-critique (scores here), move every open
+P3 to a "Post-launch" section of backlog.md, the final STATUS entry; then one merge, push and rebuild on the owner's word.
+Baselines: unit 371/371, Playwright full suite 243 passed, lint 0 errors / 10 warnings, backend 620/0.
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
 tunnel stack runs `6cd977d` (role crash guard, portal lint and `refreshMe` fix; all merged and pushed). Next candidates: Control Center lint

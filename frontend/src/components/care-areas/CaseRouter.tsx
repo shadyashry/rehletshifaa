@@ -1,6 +1,6 @@
+import Link from "next/link";
 import { ArrowRight, ClipboardCheck, FileUp, UserRoundCheck } from "lucide-react";
 
-import { JourneyLine } from "@/components/home/JourneyConnector";
 import { TrackedLink } from "@/components/TrackedLink";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -8,14 +8,14 @@ import { localeHref } from "@/lib/links";
 const STEP_ICONS = [FileUp, ClipboardCheck, UserRoundCheck] as const;
 
 /**
- * The page's closing answer to "which one is mine?": the patient does not have to choose. Three moments
- * joined by the care-journey line — outlined markers, one filled anchor at the matched Consultant — and one
- * quiet text link to the case form. The header already carries the primary action, so the page body does not
+ * The page's closing answer to "which one is mine?": the patient does not have to choose. What routing involves is
+ * said in three short, unnumbered lines (the one numbered journey, four stages, lives on How it works, linked here),
+ * with one quiet text link to the case form. The header already carries the primary action, so the page body does not
  * repeat it as a button.
  */
 export function CaseRouter({ locale, copy, button }: {
   locale: Locale;
-  copy: { eyebrow: string; title: string; body: string; note: string; steps: readonly { title: string; body: string }[] };
+  copy: { eyebrow: string; title: string; body: string; note: string; howLink: string; steps: readonly { title: string; body: string }[] };
   button: string;
 }) {
   return (
@@ -36,31 +36,28 @@ export function CaseRouter({ locale, copy, button }: {
           </div>
         </div>
 
-        <ol className="relative grid gap-8 rounded-lg border border-border-clinical bg-surface-default p-6 sm:p-8 md:grid-cols-3 md:gap-6">
-          <div aria-hidden className="absolute end-[calc(16.67%+0.5rem)] start-[calc(16.67%+0.5rem)] top-[3.375rem] hidden h-6 -translate-y-1/2 md:block"><JourneyLine orientation="horizontal" className="h-full w-full" /></div>
-          {copy.steps.map((step, index) => {
-            const Icon = STEP_ICONS[index] ?? FileUp;
-            const last = index === copy.steps.length - 1;
-            return (
-              <li key={step.title} className="relative flex gap-4 md:flex-col md:items-center md:text-center">
-                {last ? null : (
-                  <div aria-hidden className="absolute -bottom-8 start-[1.375rem] top-11 w-6 -translate-x-1/2 rtl:translate-x-1/2 md:hidden"><JourneyLine className="h-full w-full" /></div>
-                )}
-                <span
-                  aria-hidden
-                  className={`relative grid h-11 w-11 flex-none place-items-center rounded-full ${last ? "bg-brand-700 text-white ring-4 ring-brand-100" : "bg-surface-default text-brand-800 ring-[1.75px] ring-brand-600"}`}
-                >
-                  <Icon size={19} strokeWidth={1.7} />
-                </span>
-                <div>
-                  <p className="text-[0.8125rem] font-semibold tabular-nums tracking-[0.08em] text-brand-600 rtl:tracking-normal">0{index + 1}</p>
-                  <h3 className="mt-0.5 text-[1.0625rem] font-semibold leading-snug text-brand-900">{step.title}</h3>
-                  <p className="mt-1 text-[0.9375rem] leading-6 text-ink-600 md:max-w-[22ch] md:mx-auto">{step.body}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+        <div className="rounded-lg border border-border-clinical bg-surface-default p-6 sm:p-8">
+          <ul className="grid gap-6 md:grid-cols-3">
+            {copy.steps.map((step, index) => {
+              const Icon = STEP_ICONS[index] ?? FileUp;
+              return (
+                <li key={step.title} className="flex gap-4 md:flex-col">
+                  <span aria-hidden className="grid h-11 w-11 flex-none place-items-center rounded-full bg-surface-default text-brand-800 ring-[1.75px] ring-brand-600">
+                    <Icon size={19} strokeWidth={1.7} />
+                  </span>
+                  <div>
+                    <h3 className="text-[1.0625rem] font-semibold leading-snug text-brand-900">{step.title}</h3>
+                    <p className="mt-1 text-[0.9375rem] leading-6 text-ink-600">{step.body}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <Link className="mt-6 inline-flex min-h-11 items-center gap-1.5 border-t border-border-subtle pt-4 text-[0.9375rem] font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current md:w-full" href={localeHref(locale, "how-it-works")}>
+            {copy.howLink}
+            <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
+          </Link>
+        </div>
       </div>
     </section>
   );

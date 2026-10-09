@@ -14,12 +14,12 @@ export function PageHero({
   children?: ReactNode;
   /** Pearl tone only: a compact visual that sits beside the copy from lg and under it below. */
   aside?: ReactNode;
-  /** "pearl": the quiet selection-page hero — pearl canvas, a barely-there clinical mist, no glow. */
+  /** "pearl": the quiet selection-page hero — pearl canvas, a barely-there clinical mist (at the end edge, mirrored in RTL), no glow. */
   tone?: "mist" | "pearl";
 }) {
   if (tone === "pearl") {
     return (
-      <section className="page-hero border-b border-border-subtle bg-surface-pearl bg-[radial-gradient(70%_120%_at_88%_-10%,var(--color-surface-clinical),var(--color-surface-pearl)_72%)]">
+      <section className="page-hero border-b border-border-subtle bg-surface-pearl bg-[radial-gradient(70%_120%_at_88%_-10%,var(--color-surface-clinical),var(--color-surface-pearl)_72%)] rtl:bg-[radial-gradient(70%_120%_at_12%_-10%,var(--color-surface-clinical),var(--color-surface-pearl)_72%)]">
         <div className={`container-site pb-11 pt-9 md:pb-12 md:pt-12 ${aside ? "lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-center lg:gap-x-16" : ""}`}>
           <div>
             <p className="eyebrow">{eyebrow}</p>

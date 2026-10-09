@@ -1,4 +1,4 @@
-import { CheckCircle2, FileText, MapPin, Repeat, Route, Stethoscope, UserRound } from "lucide-react";
+import { ArrowRight, CheckCircle2, FileText, MapPin, Repeat, Route, Stethoscope, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { Dictionary } from "@/lib/dictionary";
@@ -8,21 +8,21 @@ type How = Dictionary["how"];
 type Stage = How["stages"][number];
 
 /**
- * The whole journey in one glance, for the hero: five semantic markers on one thin line. It does not
- * repeat the seven stages below — it gives the mental model in three seconds.
+ * The whole journey in one glance, for the hero: the four stages every page uses, on one thin line. It does not
+ * repeat the seven sub-steps below — it gives the mental model in three seconds. The decision stage is filled.
  */
 export function JourneyPreview({ items }: { items: How["preview"] }) {
-  const icons = [FileText, Stethoscope, CheckCircle2, MapPin, Repeat] as const;
+  const icons = [FileText, CheckCircle2, MapPin, Repeat] as const;
   return (
-    <ol className="relative grid grid-cols-5 gap-1 before:absolute before:inset-x-[10%] before:top-[19px] before:h-px before:bg-brand-400 sm:max-w-[44rem] sm:gap-3 lg:max-w-none">
+    <ol className="relative grid grid-cols-4 gap-1 before:absolute before:inset-x-[12.5%] before:top-[19px] before:h-px before:bg-brand-400 sm:max-w-[44rem] sm:gap-3 lg:max-w-none">
       {items.map((label, i) => {
         const Icon = icons[i] ?? FileText;
         return (
           <li key={label} className="relative flex flex-col items-center gap-2 text-center">
-            <span className={`grid h-[38px] w-[38px] place-items-center rounded-full border ${i === 2 ? "border-brand-600 bg-brand-600 text-white" : "border-brand-400 bg-surface-elevated text-brand-700"}`}>
+            <span className={`grid h-[38px] w-[38px] place-items-center rounded-full border ${i === 1 ? "border-brand-600 bg-brand-600 text-white" : "border-brand-400 bg-surface-elevated text-brand-700"}`}>
               <Icon size={17} strokeWidth={1.9} aria-hidden="true" />
             </span>
-            <span className="text-[0.72rem] font-semibold leading-4 text-ink-700 sm:text-[0.875rem] sm:leading-5">{label}</span>
+            <span className="text-[0.8125rem] font-semibold leading-[1.15rem] text-ink-700 sm:text-[0.875rem] sm:leading-5">{label}</span>
           </li>
         );
       })}
@@ -35,8 +35,8 @@ function StageNotes({ stage, labels }: { stage: Stage; labels: How["labels"] }) 
   return (
     <dl className="mt-3 space-y-1 text-[0.9375rem] leading-6">
       {[[labels.you, stage.you], [labels.next, stage.next]].map(([term, detail]) => (
-        <div key={term} className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2 rtl:grid-cols-[3.25rem_minmax(0,1fr)]">
-          <dt className="pt-[0.25rem] text-[0.66rem] font-bold uppercase tracking-[0.1em] text-brand-600 rtl:text-[0.78rem] rtl:normal-case rtl:tracking-normal">{term}</dt>
+        <div key={term} className="grid grid-cols-[3.75rem_minmax(0,1fr)] gap-x-2 rtl:grid-cols-[3.5rem_minmax(0,1fr)]">
+          <dt className="label-micro pt-[0.125rem] text-brand-600">{term}</dt>
           <dd className="text-ink-600">{detail}</dd>
         </div>
       ))}
@@ -66,6 +66,28 @@ function StageBlock({ number, stage, labels, tone = "clinical", strong = false, 
         {children}
       </div>
     </li>
+  );
+}
+
+/**
+ * The two cost stages, said once where the estimate arrives: a preliminary estimate with the recommendation, then a
+ * final quote after the in-person assessment. Indented past the spine; hairlines, not a card.
+ */
+function CostStages({ v }: { v: How["costs"] }) {
+  const stages = [[v.estimate, v.estimateBody], [v.quote, v.quoteBody]] as const;
+  return (
+    <section aria-labelledby="cost-stages-title" className="ms-12 mt-7 border-t border-border-clinical pt-5 lg:mt-8">
+      <h3 id="cost-stages-title" className="text-[1.0625rem] font-semibold leading-6 text-brand-900">{v.title}</h3>
+      <ol className="mt-3 grid gap-4 sm:grid-cols-2 sm:gap-x-5">
+        {stages.map(([title, body], i) => (
+          <li key={title} className={`relative min-w-0 ${i > 0 ? "sm:ps-8" : ""}`}>
+            {i > 0 && <ArrowRight aria-hidden size={18} strokeWidth={1.8} className="absolute start-0 top-0.5 hidden text-brand-500 rtl:-scale-x-100 sm:block" />}
+            <p className="text-[0.9375rem] font-semibold leading-6 text-brand-900">{title}</p>
+            <p className="mt-0.5 max-w-[44ch] text-[0.9375rem] leading-6 text-ink-600">{body}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -115,7 +137,7 @@ export function CareJourney({ how }: { how: How }) {
       {/* Phase 2 — understand your options: the page's strongest moment, on the clinical mist */}
       <section className="canvas-clinical" aria-labelledby="phase-2">
         <div className={`container-site ${decision}`}>
-          <div className="h-6 md:h-7" />
+          <div className="h-8 md:h-10" />
           {/* The trust anchor of the page — said once, at the head of the decision phase, beside its header on desktop. */}
           <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10">
             <PhaseHeader index={2} phase={phases[1]} labels={labels} />
@@ -133,6 +155,7 @@ export function CareJourney({ how }: { how: How }) {
               <div className="mt-5 rounded-[12px] border border-border-clinical bg-surface-elevated/60 px-3 pb-4 pt-3 sm:px-4"><DecisionGate v={how.gate} /></div>
             </StageBlock>
           </ol>
+          <CostStages v={how.costs} />
           <div className="h-7 md:h-9" />
         </div>
       </section>
@@ -140,7 +163,7 @@ export function CareJourney({ how }: { how: How }) {
       {/* Phase 3 — prepare your care in Egypt: the practical, warm phase */}
       <section className="canvas-hospitality" aria-labelledby="phase-3">
         <div className={`container-site ${warm}`}>
-          <div className="h-6 md:h-7" />
+          <div className="h-8 md:h-10" />
           <PhaseHeader index={3} phase={phases[2]} labels={labels} tone="warm" />
           <div className="md:grid md:grid-cols-[minmax(0,6fr)_minmax(0,6fr)] md:items-start md:gap-x-8 lg:gap-x-10">
             <ol start={6}>
@@ -177,7 +200,7 @@ export function CareJourney({ how }: { how: How }) {
       {/* Phase 4 — continue your care; the spine ends at the last marker */}
       <section className="bg-surface-pearl pb-12 md:pb-14" aria-labelledby="phase-4">
         <div className={`container-site ${clinical} before:bottom-auto before:h-[5.75rem] md:before:h-[6rem]`}>
-          <div className="h-6 md:h-7" />
+          <div className="h-8 md:h-10" />
           <PhaseHeader index={4} phase={phases[3]} labels={labels} />
           <div className="md:grid md:grid-cols-[minmax(0,6fr)_minmax(0,6fr)] md:items-center md:gap-x-8 lg:gap-x-10">
             <ol start={7}>
