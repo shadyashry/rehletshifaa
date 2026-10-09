@@ -437,7 +437,7 @@ D1–D4 decided (see Decisions); Batch 1 merged, pushed and deployed (`f304421`)
 (`feat/ux-redesign-batch-1a`, worktree `vigilant-roentgen-29caab`) and Batch 1a is merged **together with Batch 2** (one merge,
 push and rebuild). **The redesign epic is at its finish line** (finish plan): Batches 0–3 and the Close are done on `feat/ux-redesign-batch-3`, not
 merged or pushed; re-critique scores are recorded above; every remaining item is on backlog.md's Post-launch list or Blocked on a
-named decision. Next: the owner merges (one merge into `codex/platform-control-plane`, push and rebuild the stack. Open for the
+named decision. Next: the owner fast-forwards `codex/platform-control-plane` to this branch (one merge), pushes and rebuilds the stack. Open for the
 owner: legal L1–L5; the native Arabic review; the two confirmation styles.
 Baselines: unit 377/377, Playwright full suite green, lint 0 errors / 10 warnings, backend 620/0, a11y baseline empty.
 
