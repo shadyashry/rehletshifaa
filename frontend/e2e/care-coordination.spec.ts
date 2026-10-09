@@ -2,6 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { OIDC_AUTHORITY } from "./env";
 import { leadsCoordinationTeam, meFor, routeMe } from "./me-fixture";
 import { staffView } from "./portal-fixture";
+import { automaticEntry, coordBase as base, coordConsultant, coordPeople, coordPolicy, coordTeam, manualEntry, routingOverview, simulation }
+  from "../src/components/platform-control-center/coordination-test-support";
 
 // UX-7 live sanity: synthetic HTTP fixtures render the real built UI; every write is blocked and recorded (enforcement has
 // its own integration tests). Staff Portal Team queue, transfer and assignment history; Coordination Setup sections.
@@ -21,27 +23,15 @@ const history = [
   { role: "COORDINATOR", assigneeName: "Omar Nabil", status: "ACTIVE", assignedAt: iso(-20), endedAt: null, assignedByKind: "PERSON", assignedByName: "Mohamed Ali", reason: "Coverage change" },
   { role: "COORDINATOR", assigneeName: "Sara Ahmed", status: "ENDED", assignedAt: iso(-48), endedAt: iso(-20), assignedByKind: "PERSON", assignedByName: "Sara Ahmed", reason: "Coordinator claimed intake queue case" },
 ];
-const base = "/admin/coordination/org-1";
-const team = { id: "team-1", organizationId: "org-1", name: "Cardiology Desk", configuration: { active: true, purpose: "Cardiology intake and follow-up", careAreas: ["cardiology"], languages: ["en", "ar"], timeZone: "Africa/Cairo", fallbackTeam: null }, revision: 1 };
-const people = [
-  { subject: "kc-sara", name: "Sara Ahmed", account: "ACTIVE", member: true, workload: 3, teams: [{ team: "team-1", active: true, lead: true, effectiveFrom: iso(-900), effectiveTo: null, revision: 2 }], capacity: { subject: "kc-sara", maximum: 12, onDuty: true, languages: ["en", "ar"], careAreas: [], revision: 1 } },
-  { subject: "kc-omar", name: "عمر نبيل", account: "ACTIVE", member: true, workload: 7, teams: [{ team: "team-1", active: true, lead: false, effectiveFrom: iso(-900), effectiveTo: null, revision: 1 }], capacity: { subject: "kc-omar", maximum: 8, onDuty: false, languages: ["ar"], careAreas: ["cardiology"], revision: 3 } },
-  { subject: "kc-hala", name: "Hala Mostafa", account: "DISABLED", member: true, workload: 0, teams: [], capacity: null },
-];
+// Coordination Setup reads the same typed fixtures as its unit tests, so the two cannot drift apart again (they had: an
+// organisation segment, an "evaluation mode" and team shapes removed in 19a970c).
 const coordination: Record<string, unknown> = {
-  "/admin/coordination/organizations": [{ id: "org-1", displayName: "Al Noor Hospital", type: "HOSPITAL", status: "ACTIVE" }],
-  [`${base}/overview`]: { liveCases: 0, evaluatedCases: 14, liveQueue: 0, policyVersion: 2, policyEffectiveFrom: iso(-2000), policyEffectiveTo: iso(4000) },
-  [`${base}/teams`]: [team], [`${base}/people`]: people,
-  [`${base}/consultants`]: [{ consultantId: "prac-1", name: "Dr Salma Farouk", current: { id: "p1", organizationId: "org-1", consultantId: "prac-1", version: 1, effectiveFrom: iso(-900), effectiveTo: iso(4000), coordinator: "kc-sara", team: "team-1", fallbackTeam: null }, latest: null }, { consultantId: "prac-2", name: "د. هاني رزق", current: null, latest: null }],
-  [`${base}/policies`]: [{ id: "policy-2", organizationId: "org-1", version: 2, effectiveFrom: iso(-2000), effectiveTo: iso(4000), configuration: { capacityWeight: 80, languageWeight: 20, requireOnDuty: true, mandatoryLanguage: false, providerTeam: "team-1", careAreaTeams: { cardiology: "team-1" }, defaultTeam: null, fallbackTeam: null, queueHours: 24 } }],
-  [`${base}/decisions`]: [
-    { id: "d-2", caseId: "c-2", caseNumber: "RS-2026-0102", mode: "SHADOW", path: "PREFERRED_COORDINATOR", source: "LEGACY_ASSIGNMENT", actorName: null, previousOwner: "kc-omar", previousOwnerName: "Omar Nabil", selectedOwner: "kc-sara", selectedOwnerName: "Sara Ahmed", team: "team-1", reason: null, evaluatedAt: iso(-20), legacyMatches: false, policyVersion: 2 },
-    { id: "d-1", caseId: "c-3", caseNumber: "RS-2026-0103", mode: "SHADOW", path: "CONTINUITY", source: "LEGACY_ASSIGNMENT", actorName: null, previousOwner: "kc-lead", previousOwnerName: "Mohamed Ali", selectedOwner: "kc-lead", selectedOwnerName: "Mohamed Ali", team: "team-1", reason: null, evaluatedAt: iso(-30), legacyMatches: true, policyVersion: 2 },
-  ],
+  [`${base}/overview`]: routingOverview,
+  [`${base}/teams`]: [coordTeam], [`${base}/people`]: coordPeople,
+  [`${base}/consultants`]: [coordConsultant, { consultantId: "prac-2", name: "د. هاني رزق", current: null, latest: null }],
+  [`${base}/policies`]: [coordPolicy],
+  [`${base}/decisions`]: [manualEntry, automaticEntry],
 };
-const simulation = { policyId: "policy-2", policyVersion: 2, algorithm: "coordination-v1",
-  candidates: [{ subject: "kc-sara", teams: ["team-1"], maximum: 12, workload: 3, onDuty: true, languageMatch: true, lastAssignment: null, exclusions: [] }, { subject: "kc-omar", teams: ["team-1"], maximum: 8, workload: 7, onDuty: false, languageMatch: true, lastAssignment: null, exclusions: ["OFF_DUTY"] }],
-  selection: { subject: "kc-sara", team: "team-1", path: "PROVIDER_TEAM", scores: [{ candidate: { subject: "kc-sara", teams: ["team-1"], maximum: 12, workload: 3, onDuty: true, languageMatch: true, lastAssignment: null, exclusions: [] }, capacityFactor: "0.75", languageFactor: "1", score: "80" }] } };
 const KEYS = ["assignment.team.view", "assignment.policy.view", "assignment.simulate", "assignment.audit.view", "assignment.queue.manage", "assignment.team.manage", "assignment.preference.manage", "assignment.policy.manage"];
 
 async function serve(page: Page, keys: string[], roles: string[]) {
@@ -119,17 +109,21 @@ for (const locale of ["en", "ar"] as const) test(`Coordination Setup sections ($
   const writes = await serve(page, KEYS, []);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/${locale}/portal/control-center/coordination`);
-  await expect(page).toHaveURL(/\/coordination\/org-1/);
-  await expect(page.getByText(en ? "Evaluation mode" : "وضع التقييم")).toBeVisible();
+  // One coordination workspace since 19a970c (no per-organisation route); it opens on Teams & People.
+  await expect(page).toHaveURL(/\/portal\/control-center\/coordination$/);
+  // Routing is live (no evaluation mode since 19a970c): the banner says so and counts the routed cases.
+  await expect(page.getByText(en ? "Routing is in effect · 4 cases routed so far" : "التوجيه ساري · وُجّهت 4 حالة حتى الآن")).toBeVisible();
   await expect(page.getByText("3 of 12 cases").or(page.getByText("3 من 12 حالات"))).toBeVisible();
   await sane(page); await shot("teams-people-desktop");
-  await page.getByRole("button", { name: en ? "Add person" : "إضافة شخص" }).click();
-  await shot("add-person-desktop");
+  // People join through the workforce (no "Add person" since 19a970c); capacity is set here.
+  await page.getByRole("button", { name: en ? "Set capacity" : "تحديد السعة" }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await shot("capacity-desktop");
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 390, height: 844 });
   await sane(page); await shot("teams-people-mobile");
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole("tab", { name: en ? "Clinician Preferences" : "تفضيلات الأطباء" }).click();
+  await page.getByRole("tab", { name: en ? "Consultant Preferences" : "تفضيلات الاستشاريين" }).click();
   await expect(page.getByText("Dr Salma Farouk")).toBeVisible();
   await sane(page); await shot("preferences-desktop");
   await page.getByRole("tab", { name: en ? "Rules" : "القواعد" }).click();

@@ -46,7 +46,7 @@ These stay with others and run in parallel. They are not on the critical path of
 - **Native Arabic review** of all `portalWork` and proposal wording.
 - **Final-quote validity:** a business decision, needed for 8C, not for this plan.
 
-## Batch 0 — trustworthy test baseline (1 session)
+## Batch 0 — trustworthy test baseline (1 session) — done 2026-10-09, see `STATUS.md`
 
 Why first: every verification run in this epic has needed reruns and side-by-side comparisons to prove nothing new
 broke. Removing that noise makes every later batch cheaper.

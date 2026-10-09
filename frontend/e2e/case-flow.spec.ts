@@ -2,6 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { API } from "./env";
 
+// Nothing here is mocked, so it needs a backend that accepts this origin: the tunnel stack via the AGENTS.md command
+// (which sets PLAYWRIGHT_API_BASE_URL). Against localhost:3100 the backend's CORS (tunnel-only) refuses every call.
+test.skip(!process.env.PLAYWRIGHT_API_BASE_URL, "PLAYWRIGHT_API_BASE_URL is not set; the case flow submits to a real backend");
+
 /**
  * Journey A — public patient entry, end to end against the real backend.
  * Nothing is mocked: the case number and status link come from the API, so a regression in

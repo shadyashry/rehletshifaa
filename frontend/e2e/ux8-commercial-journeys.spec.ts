@@ -67,8 +67,9 @@ async function serve(page: Page, keys: string[], roles: string[], extra: Record<
     else if (path.startsWith("/provider-workspace/cases")) body = { items: [], page: 0, hasMore: false };
     return route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
-  // Commercial pages are Finance's; Care Journeys are edited and approved by the journey roles.
-  await routeMe(page, meFor("kc-checker", roles.includes("PATIENT") ? ["PATIENT"] : roles.includes("FINANCE") ? ["FINANCE", "FINANCE_MANAGER"]
+  // Commercial pages: Finance owns rates, margin and deposit; Consultant Operations owns the consultant price lists (since
+  // 19a970c). Care Journeys are edited and approved by the journey roles.
+  await routeMe(page, meFor("kc-checker", roles.includes("PATIENT") ? ["PATIENT"] : roles.includes("FINANCE") ? ["FINANCE", "FINANCE_MANAGER", "CONSULTANT_OPERATIONS_MANAGER"]
     : ["JOURNEY_MANAGER", "JOURNEY_APPROVER"], { displayName: "Mona Checker" }));
   return writes;
 }
@@ -82,22 +83,15 @@ for (const locale of ["en", "ar"] as const) test(`Commercial: Price Lists, Excha
   const shot = async (name: string) => { await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" })); await page.screenshot({ path: testInfo.outputPath(`${name}-${locale}.png`), fullPage: true }); };
   const writes = await serve(page, KEYS, ["SYSTEM_ADMIN", "FINANCE", "FINANCE_LEAD"]);
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`/${locale}/portal/control-center/commercial/prices?org=org-1&clinician=prac-1`);
-  await expect(page.getByText(en ? /Overrides the organization price for this service/ : /يحل محل سعر الجهة لهذه الخدمة/)).toBeVisible();
-  await expect(page.getByText(en ? /Using organization price · Organization: Al Noor Hospital/ : /يُطبَّق سعر الجهة · الجهة: Al Noor Hospital/)).toBeVisible();
+  // Price Lists is the consultant price hub since 19a970c (organisation and clinician overrides were retired with provider
+  // organisations); its behaviour is covered by CommercialPages.test.tsx. Here: it opens, with access, in both layouts.
+  await page.goto(`/${locale}/portal/control-center/commercial/prices`);
+  await expect(page.getByRole("heading", { level: 1, name: en ? "Price Lists" : "قوائم الأسعار" })).toBeVisible();
+  await expect(page.getByText(en ? /don't have access to price lists/ : /ليس لديك وصول إلى قوائم الأسعار/)).toHaveCount(0);
   await sane(page); await shot("price-lists-desktop");
-  await page.getByRole("heading", { level: 4, name: en ? "Clinician-specific price" : "سعر خاص بالطبيب" }).first().locator("..").getByRole("button", { name: en ? "Retire" : "إنهاء" }).click();
-  await expect(page.getByRole("dialog")).toContainText(en ? "the organization price applies to this clinician" : "يُطبَّق سعر الجهة على هذا الطبيب");
-  await shot("price-retire-dialog-desktop");
-  await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 390, height: 844 });
   await sane(page); await shot("price-lists-mobile");
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole("button", { name: en ? "Direct clinician prices" : "أسعار الأطباء المباشرين" }).click();
-  const picker = page.getByRole("combobox", { name: en ? /Direct clinician/ : /الطبيب المباشر/ });
-  await expect(picker.locator("option")).toHaveText([en ? "Choose a Direct clinician" : "اختر طبيبًا مباشرًا", "Dr Omar Said — Cardiology"]);
-  await picker.selectOption("d-1");
-  await sane(page); await shot("price-lists-direct-desktop");
   await page.goto(`/${locale}/portal/control-center/commercial/exchange-rates`);
   await expect(page.getByText(en ? /not live market prices/ : /ليست أسعار سوق لحظية/)).toBeVisible();
   await sane(page); await shot("exchange-rates-desktop");
@@ -116,22 +110,6 @@ for (const locale of ["en", "ar"] as const) test(`Commercial: Price Lists, Excha
   expect(writes).toEqual([]);
 });
 
-test("Organization profile (en)", async ({ page }, testInfo) => {
-  const shot = async (name: string) => { await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" })); await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true }); };
-  const writes = await serve(page, KEYS, []);
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/en/portal/control-center/providers/org-1");
-  await expect(page.getByRole("heading", { name: "Organization profile" })).toBeVisible();
-  await sane(page); await shot("org-profile-desktop");
-  await page.getByRole("button", { name: "Edit profile" }).click();
-  await page.getByRole("button", { name: "Save profile" }).click();
-  await expect(page.locator("#org-profile-errors")).toContainText("Say why you are making this change.");
-  await shot("org-profile-edit-errors-desktop");
-  await page.setViewportSize({ width: 390, height: 844 });
-  await sane(page); await shot("org-profile-edit-mobile");
-  expect(writes).toEqual([]);
-});
-
 for (const locale of ["en", "ar"] as const) test(`Care Journeys: list, detail, check, test, approval (${locale})`, async ({ page }, testInfo) => {
   const en = locale === "en";
   const shot = async (name: string) => { await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" })); await page.screenshot({ path: testInfo.outputPath(`${name}-${locale}.png`), fullPage: true }); };
@@ -141,7 +119,7 @@ for (const locale of ["en", "ar"] as const) test(`Care Journeys: list, detail, c
   await expect(page.getByText(en ? "Needs approval" : "يحتاج موافقة")).toBeVisible();
   await sane(page); await shot("journey-list-desktop");
   await page.goto(`/${locale}/portal/control-center/journeys/def-1`);
-  await expect(page.getByText(en ? /Production intake is off/ : /الاستقبال الفعلي متوقف/)).toBeVisible();
+  await expect(page.getByText(en ? /Journey admission is off/ : /قبول الرحلات متوقف/)).toBeVisible();
   await sane(page); await shot("journey-detail-desktop");
   await page.setViewportSize({ width: 390, height: 844 });
   await sane(page); await shot("journey-detail-mobile");
@@ -168,21 +146,9 @@ for (const locale of ["en", "ar"] as const) test(`Care Journeys: list, detail, c
   await page.unroute("**/api/v1/admin/journeys/def-1");
   await page.goto(`/${locale}/portal/control-center/journeys/def-1/versions/v-2?tab=publish`);
   await page.getByRole("button", { name: en ? "Publish" : "نشر", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText(en ? "Production intake is off" : "الاستقبال الفعلي متوقف");
+  await expect(page.getByRole("dialog")).toContainText(en ? "Publishing does not select this version for new cases" : "لا يختار النشر هذا الإصدار للحالات الجديدة");
   await shot("journey-publish-confirm-desktop");
   await page.setViewportSize({ width: 390, height: 844 });
   await shot("journey-publish-confirm-mobile");
-  expect(writes).toEqual([]);
-});
-
-test("Provider Workspace: my prices (en)", async ({ page }, testInfo) => {
-  const writes = await serve(page, [], ["PATIENT"]);
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/en/portal/practice?view=prices");
-  await expect(page.getByText(/Overrides the organization price for this service/)).toBeVisible();
-  await expect(page.getByRole("button", { name: /New price|Edit draft|Publish|Retire/ })).toHaveCount(0);
-  await sane(page); await page.screenshot({ path: testInfo.outputPath("workspace-prices-desktop.png"), fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await sane(page); await page.screenshot({ path: testInfo.outputPath("workspace-prices-mobile.png"), fullPage: true });
   expect(writes).toEqual([]);
 });

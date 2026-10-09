@@ -234,6 +234,11 @@ Backend:
 - general local gate: `cd backend && mvn -o -q test`
 - Maven is offline; do not add dependencies that are absent from local `~/.m2`
 
+Local end-to-end (`cd frontend && pnpm test:e2e`, nothing else running on :3100): Playwright builds the frontend and runs
+`next start`, 4 workers, about three minutes for the full suite, which is green apart from env-gated live specs.
+`PLAYWRIGHT_DEV_SERVER=true` uses `next dev` for quick targeted runs only: under parallel workers the dev server can
+corrupt `.next/dev/prerender-manifest.json` mid-run and fail every later page.
+
 End-to-end (Playwright, Chromium) against the running tunnel stack — all three URLs must match how
 the frontend was built, or the specs’ route mocks never intercept:
 ```bash

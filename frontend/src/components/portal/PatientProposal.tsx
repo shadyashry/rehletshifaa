@@ -199,6 +199,13 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
   const [requesting, setRequesting] = useState(false);
   const [confirmingDecline, setConfirmingDecline] = useState(false);
   const statusRef = useRef<HTMLParagraphElement>(null);
+  // The confirmation replaces the button that had focus, but it renders only once the refreshed case arrives, which can
+  // take longer than a frame: focus it when it mounts, or at once if it is already there.
+  const focusStatusPending = useRef(false);
+  const statusMounted = (node: HTMLParagraphElement | null) => {
+    statusRef.current = node;
+    if (node && focusStatusPending.current) { focusStatusPending.current = false; node.focus(); }
+  };
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const declineRef = useRef<HTMLButtonElement>(null);
   const keepRef = useRef<HTMLButtonElement>(null);
@@ -223,7 +230,7 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
     setRequesting(false);
     if (!result) { setRequestFailed(true); return; }
     // The button that had focus is replaced by the confirmation: take focus there so it is read and the drawer keeps it.
-    requestAnimationFrame(() => statusRef.current?.focus());
+    if (statusRef.current) statusRef.current.focus(); else focusStatusPending.current = true;
   };
 
   // A change request with no note tells the coordinator nothing, so it asks for one first.
@@ -246,7 +253,7 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
           <p className="max-w-[60ch] text-[0.9375rem] leading-7 text-ink-700">{quote ? t.explainQuote : t.explain}</p>
           {requestedAt ? (
             <div className="space-y-1">
-              <p ref={statusRef} tabIndex={-1} role="status" className="text-[0.9375rem] font-semibold leading-6 text-brand-900 outline-none">
+              <p ref={statusMounted} tabIndex={-1} role="status" className="text-[0.9375rem] font-semibold leading-6 text-brand-900 outline-none">
                 {fillTemplate(t.requested, { date: longDate(requestedAt, locale), name: isolate(coordinatorName || t.nameFallback) })}
               </p>
               {onMessage && (

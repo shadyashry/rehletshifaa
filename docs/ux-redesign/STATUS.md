@@ -245,6 +245,27 @@ Update at the end of every phase.
   - [x] Owner: "merge and push, then rebuild the stack" — `6cd977d` fast-forwarded into `codex/platform-control-plane` and
         pushed; stack rebuilt (backend UP, localhost 3000/8081/8180, `https://dev.rehletshifaa.com/en` and `/en/portal` 200)
 
+- [x] **Finish plan — Batch 0: trustworthy test baseline** (branch `feat/ux-redesign-batch-0`, 2026-10-09; plan
+      `plans/finish-plan.md`)
+  - [x] 11 `ProposalSign` unit tests: the fixture's fixed `validUntil` (2026-10-01) had passed, so every decision test saw
+        the correct "expired" view. Validity is now relative to today. Not a product regression
+  - [x] Specs left behind by the Control Center rework (`19a970c`, 2026-10-04): care-coordination "Coordination Setup" now
+        reads the unit tests' typed fixtures (`coordination-test-support.ts`) and the current screens; ux8 commercial checks
+        the consultant Price Lists hub (persona gains Consultant Operations) and the current journey wording; owner-approved
+        deletions of tests for removed screens: `access-governance.spec.ts`, `credential-reviews.spec.ts`, portal-ux
+        "Staff & teams", ux8 "Organization profile" and "Provider Workspace: my prices" (coverage gap row in backlog)
+  - [x] Environment-bound specs: case-flow submits to a real backend, so it now skips unless `PLAYWRIGHT_API_BASE_URL` names
+        a stack (as the live specs do); home-media plays H.264 video, which Playwright's Chromium cannot decode, so it uses
+        installed Chrome by default
+  - [x] Cold-run timeouts, root cause: under parallel workers `next dev` corrupted `.next/dev/prerender-manifest.json`
+        mid-run (then every page failed), and 11 browsers on this laptop stalled page creation. Playwright now builds and
+        runs `next start` (`PLAYWRIGHT_DEV_SERVER=true` keeps dev for quick runs), with 4 workers locally; the a11y scans run
+        in parallel with 60s each
+  - [x] Found under load, fixed in the app: after "ask my coordinator" the drawer focused the confirmation one frame later,
+        before it rendered, so focus was lost; it now focuses it when it mounts (`PatientProposal.tsx`)
+  - [x] verify: typecheck ok; lint 13/11 (unchanged, Control Center in Batch 1); unit **360/360**; Playwright full suite on
+        two consecutive cold runs **229 passed, 0 failed**, 38 skipped (env-gated live specs), under three minutes each
+
 ## Decisions
 
 | Date | Decision | By |
@@ -286,8 +307,9 @@ Update at the end of every phase.
 
 ## Next exact action
 
-**Finish plan:** [`plans/finish-plan.md`](plans/finish-plan.md) (2026-10-09). Next: owner decisions D1–D4 in one sitting, then
-Batch 0 (trustworthy test baseline). One verification, merge and rebuild per batch.
+**Finish plan:** [`plans/finish-plan.md`](plans/finish-plan.md) (2026-10-09). Batch 0 is done on `feat/ux-redesign-batch-0`
+(not merged or pushed). Next: owner decisions D1–D4, then Batch 1. One verification, merge and rebuild per batch.
+New baselines: unit 360/360, Playwright full suite green, lint 13/11.
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
 tunnel stack runs `6cd977d` (role crash guard, portal lint and `refreshMe` fix; all merged and pushed). Next candidates: Control Center lint

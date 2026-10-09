@@ -26,7 +26,8 @@ const proposal = {
     { id: "i3", category: "MEDICAL", description: "Dual chamber pacemaker implant", quantity: 1, unitPrice: 6250, optional: false },
   ],
   totalExpected: 8200, includedServices: "Stress test; angiography; pacemaker implant",
-  validUntil: "2026-10-01T00:00:00Z", decided: false,
+  // Always in the future: a fixed date here expired on 2026-10-01 and silently turned every decision test into the expired view.
+  validUntil: new Date(Date.now() + 30 * 86_400_000).toISOString(), decided: false,
   recommendedTreatment: "Dual-chamber pacemaker implantation", depositDueDisplay: 820, consultantName: "Dr. Yasmine Farouk",
 };
 

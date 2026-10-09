@@ -23,6 +23,10 @@ const UPDATE = process.env.A11Y_UPDATE_BASELINE === "1";
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 const BLOCKING = new Set(["serious", "critical"]);
 
+// Twenty full-page axe scans in one worker slowed its browser until opening the next page took over 30s in a full run.
+// Spread them across workers and give each scan room; a baseline update still runs with --workers=1 (see above).
+test.describe.configure({ mode: "parallel", timeout: 60_000 });
+
 type Baseline = Record<string, string[]>;
 const readBaseline = (): Baseline => {
   try { return JSON.parse(readFileSync(BASELINE_PATH, "utf8")) as Baseline; } catch { return {}; }

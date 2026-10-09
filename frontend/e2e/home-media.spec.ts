@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-// Use a branded browser when the local Playwright Chromium lacks H.264/AAC decoders.
-test.use({ channel: process.env.PLAYWRIGHT_MEDIA_CHANNEL });
+// Playwright's bundled Chromium has no H.264/AAC decoders, so the journey video needs a branded browser: installed Chrome
+// by default (present on GitHub's Ubuntu runners too), or the channel named in PLAYWRIGHT_MEDIA_CHANNEL.
+test.use({ channel: process.env.PLAYWRIGHT_MEDIA_CHANNEL ?? "chrome" });
 
 for (const locale of ["en", "ar"] as const) {
   test(`homepage image and journey video load ${locale}`, async ({ page }) => {
