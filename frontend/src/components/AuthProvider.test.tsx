@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { AuthProvider, useAuth } from "./AuthProvider";
 import { apiFetchAs } from "@/lib/api";
@@ -49,5 +49,28 @@ describe("STF-02 activation after an invited person's first sign-in", () => {
     render(<AuthProvider><Probe /></AuthProvider>);
     await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("COORDINATOR|-|-"));
     expect(calls()).toEqual(["GET /me"]);
+  });
+});
+
+describe("refreshMe", () => {
+  function Refreshing({ onReady }: { onReady: (refresh: () => void) => void }) {
+    const { refreshMe } = useAuth();
+    onReady(refreshMe);
+    return <Probe />;
+  }
+
+  it("keeps the previous answer on screen while it re-reads /me for the same person", async () => {
+    let answer: (response: Response) => void = () => {};
+    vi.mocked(apiFetchAs).mockResolvedValueOnce(json(active))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { answer = resolve; }));
+    let refresh = () => {};
+    render(<AuthProvider><Refreshing onReady={value => { refresh = value; }} /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("COORDINATOR|-|-"));
+    act(() => refresh());
+    await waitFor(() => expect(calls()).toEqual(["GET /me", "GET /me"]));
+    // Still the previous answer, never the loading state, while the re-read is in flight.
+    expect(screen.getByTestId("state")).toHaveTextContent("COORDINATOR|-|-");
+    await act(async () => answer(json(meWith([], { roles: ["COORDINATOR", "FINANCE"], workspaces: ["COORDINATION"] }))));
+    await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("COORDINATOR,FINANCE|-|-"));
   });
 });

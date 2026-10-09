@@ -24,7 +24,7 @@ export function AuthProvider({children}:{children:React.ReactNode}){
   // One /me read per signed-in subject (or explicit refresh), not per silent token renewal. The answer is kept with the
   // key it was read for, so a stale answer is never shown for another subject and loading is derived, not stored.
   const key=token&&subject?`${subject}#${attempt}`:null;
-  const[result,setResult]=useState<{key:string|null;me:Me|null;failed:boolean;activationIssue:ActivationIssue|null}>({key:null,me:null,failed:false,activationIssue:null});
+  const[result,setResult]=useState<{key:string|null;subject:string|null;me:Me|null;failed:boolean;activationIssue:ActivationIssue|null}>({key:null,subject:null,me:null,failed:false,activationIssue:null});
   useEffect(()=>{
     if(!token||!key)return;
     let live=true;
@@ -33,12 +33,16 @@ export function AuthProvider({children}:{children:React.ReactNode}){
       if(!value.pendingActions?.includes("ACTIVATE_ACCOUNT"))return {me:value,activationIssue:null};
       const issue=await activate(token);
       return issue?{me:value,activationIssue:issue}:{me:await read(),activationIssue:null};
-    }).then(value=>{if(live)setResult({key,...value,failed:false});}).catch(()=>{if(live)setResult({key,me:null,failed:true,activationIssue:null});});
+    }).then(value=>{if(live)setResult({key,subject:subject??null,...value,failed:false});}).catch(()=>{if(live)setResult({key,subject:subject??null,me:null,failed:true,activationIssue:null});});
     return()=>{live=false;};
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[key]);
   const current=!!key&&result.key===key;
-  const me=current?result.me:null;const meFailed=current&&result.failed;const activationIssue=current?result.activationIssue:null;const meLoading=!!key&&!current;
+  // A re-read for the same person (refreshMe) keeps the previous answer until the new one arrives: blanking it unmounted
+  // every consumer — the portal's open case, its dialogs and drafts — for the length of a request. An activation retry
+  // still shows as loading, so its refusal is never shown beside a stale answer.
+  const revalidating=!!key&&!current&&result.subject===subject&&!!result.me&&!result.activationIssue;
+  const me=current||revalidating?result.me:null;const meFailed=current&&result.failed;const activationIssue=current?result.activationIssue:null;const meLoading=!!key&&!current&&!revalidating;
   const refreshMe=useCallback(()=>setAttempt(n=>n+1),[]);
   // signIn reads `me` through a ref so its identity never changes: consumers put it in effect and callback dependencies
   // (the portal's `api`), and a new signIn on every /me reload re-ran those effects — including the patient session

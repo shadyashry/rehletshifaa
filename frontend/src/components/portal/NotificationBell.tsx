@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Bell, Check, X } from "lucide-react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
+import { usePortalSlot } from "@/components/portal/portal-slot";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
 
@@ -31,13 +32,11 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
     ? { label: "الإشعارات", unread: "غير مقروءة", empty: "لا توجد إشعارات بعد.", emptyHint: "سنُعلمك عندما يحتاج شيء إلى تدخلك.", markAll: "تعليم الكل كمقروء", markOne: "تعليم كمقروء", open: "فتح الحالة", close: "إغلاق", now: "الآن", ago: "منذ" }
     : { label: "Notifications", unread: "unread", empty: "No notifications yet.", emptyHint: "We'll tell you when something needs you.", markAll: "Mark all as read", markOne: "Mark as read", open: "Open case", close: "Close", now: "Just now", ago: "ago" };
 
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const slot = usePortalSlot("portal-account-slot");
   const [feed, setFeed] = useState<Feed>({ unread: 0, items: [] });
   const [open, setOpen] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => { setSlot(document.getElementById("portal-account-slot")); }, []);
 
   const load = useCallback(async () => {
     try { setFeed(await api<Feed>("/notifications")); } catch { /* the bell must never break the portal */ }

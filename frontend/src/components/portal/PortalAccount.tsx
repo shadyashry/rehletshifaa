@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Check, Languages, LayoutDashboard, LogOut, Settings, X, ExternalLink } from "lucide-react";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { OIDC_AUTHORITY } from "@/lib/api";
+import { usePortalSlot } from "@/components/portal/portal-slot";
 
 export type Preferences = { displayName: string | null; locale: Locale | null };
 type Api = <T,>(path: string, init?: RequestInit) => Promise<T>;
@@ -27,7 +28,9 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
   const [profileError, setProfileError] = useState("");
   const loadProfile = () => { setProfileError(""); api<PatientProfile>("/patient/account/profile").then(setProfile).catch(e => setProfileError(e instanceof Error ? e.message : "")); };
   const router = useRouter();
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const slot = usePortalSlot("portal-account-slot");
+  // Whether the settings dialog is open, kept as state: the menu's error line is hidden while the dialog shows it.
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const menu = useRef<HTMLDetailsElement>(null);
@@ -39,7 +42,6 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
     : { account: "Account", settings: patient ? "Profile & Security" : "Account settings", name: "Display name", language: "Language", save: "Save changes", saving: "Saving…", close: "Close", signOut: "Sign out", security: "Password & account security", hint: "Your display name is used in the portal. It does not change your legal name or credentials.",
       details: "Your details", givenName: "Given name(s)", familyName: "Family name", preferredName: "Preferred name", dob: "Date of birth", country: "Country of residence", nationality: "Nationality", preferredLanguage: "Preferred language", email: "Email", whatsapp: "WhatsApp / mobile", verified: "Verified", notVerified: "Not verified", notProvided: "Not provided", correction: "To correct these details, message your coordinator.", preferencesTitle: "Portal preferences", loading: "Loading…" };
   useEffect(() => {
-    setSlot(document.getElementById("portal-account-slot"));
     const close = (event: PointerEvent) => { if (menu.current && !menu.current.contains(event.target as Node)) menu.current.open = false; };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
@@ -60,13 +62,13 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
           </button>)}
         </div>}
         {controlCenter && <a className="account-option" href={controlCenter.href}><LayoutDashboard size={18}/>{controlCenter.label}</a>}
-        <button className="account-option" onClick={() => { trigger.current = menu.current?.querySelector("summary") ?? null; if(menu.current)menu.current.open=false; setError(""); if (patient) loadProfile(); dialog.current?.showModal(); }}><Settings size={18}/>{text.settings}</button>
+        <button className="account-option" onClick={() => { trigger.current = menu.current?.querySelector("summary") ?? null; if(menu.current)menu.current.open=false; setError(""); if (patient) loadProfile(); dialog.current?.showModal(); setDialogOpen(true); }}><Settings size={18}/>{text.settings}</button>
         <button className="account-option" disabled={busy} onClick={async () => { setBusy(true); setError(""); try { const next = ar ? "en" : "ar"; const value = await api<Preferences>("/account/preferences", { method: "PUT", body: JSON.stringify({ ...preferences, locale: next }) }); onSaved(value); changeLanguage(next); } catch (e) { setError(e instanceof Error ? e.message : text.settings); } finally { setBusy(false); } }}><Languages size={18}/><span lang={ar ? "en" : "ar"}>{ar ? "English" : "العربية"}</span></button>
         <button className="account-option" onClick={() => void signOut()}><LogOut size={18}/>{text.signOut}</button>
-        {error && !dialog.current?.open && <p role="alert" className="p-3 text-sm text-alert-800">{error}</p>}
+        {error && !dialogOpen && <p role="alert" className="p-3 text-sm text-alert-800">{error}</p>}
       </div>
     </details>
-    <dialog ref={dialog} className="account-dialog" aria-labelledby="account-heading" onClose={() => trigger.current?.focus()}>
+    <dialog ref={dialog} className="account-dialog" aria-labelledby="account-heading" onClose={() => { setDialogOpen(false); trigger.current?.focus(); }}>
       <div className="flex items-start justify-between gap-4"><h2 id="account-heading" className="title">{text.settings}</h2><button className="icon-button" aria-label={text.close} onClick={() => dialog.current?.close()}><X size={20}/></button></div>
       {patient && (
         <section aria-labelledby="profile-details" className="mt-5">

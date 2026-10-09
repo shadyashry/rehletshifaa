@@ -65,6 +65,16 @@ function RoleCaseView({view:View,...props}:CaseViewProps&{view:ComponentType<Cas
 
 function withView(state:QueueState,id:StaffViewId):QueueState{return {...state,view:id,viewChosen:true,tab:id==="team"?"unowned":id==="mine"?"mine":state.tab,page:1};}
 
+/**
+ * The queue view this person last used in this role, kept for the browser session. A staff view named in the URL (a deep
+ * link, a reload or "open in new tab") is an explicit choice and wins.
+ */
+function savedQueueState(subject:string,role:RoleKey):QueueState{
+  let next=initialQueue;try{const saved=sessionStorage.getItem(`portal-queue:${subject}:${role}`);if(saved)next={...initialQueue,...JSON.parse(saved)};}catch{}
+  const linked=role!=="patient"?new URLSearchParams(window.location.search).get("view"):null;
+  return isStaffViewId(linked)?withView(next,linked):next;
+}
+
 function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCopy}){
   const t=copy[locale];const work=useWorkCopy();const{user,me,loading,meFailed,signIn,signOut,refreshMe}=useAuth();
   // Silent token renewal hands over a new User object every few minutes. Everything keyed on `api` (the queue load,
@@ -93,28 +103,35 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const managedClinicLanding=!!user&&!workforce&&!careEntry&&clinicAccess.clinics.some(c=>c.relation==="PRACTICE_MANAGER");
   const deferPatient=!workforce&&!careEntry&&(clinicAccess.loading||managedClinicLanding);
   useEffect(()=>{if(managedClinicLanding)router.replace(virtualClinicHref(locale));},[managedClinicLanding,router,locale]);
-  const[active,setActive]=useState<RoleKey|undefined>();const[cases,setCases]=useState<CaseView[]>([]);const[myTasks,setMyTasks]=useState<Task[]>([]);const[workspace,setWorkspace]=useState<Workspace|null>(null);const[documents,setDocuments]=useState<CaseDocument[]>([]);const[doctors,setDoctors]=useState<VerifiedDoctor[]>([]);const[categories,setCategories]=useState<CareCategory[]>([]);const[staff,setStaff]=useState<StaffMember[]>([]);const[share,setShare]=useState<{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null>(null);const[doctorProfile,setDoctorProfile]=useState<DoctorProfile|null>(null);const[coordinatorProfile,setCoordinatorProfile]=useState<StaffProfile|null>(null);const[catalog,setCatalog]=useState<CatalogService[]>([]);const[fxRates,setFxRates]=useState<FxRate[]>([]);const[busy,setBusy]=useState(false);const[notice,setNotice]=useState("");const[error,setError]=useState("");
+  const[chosenRole,setActive]=useState<RoleKey|undefined>();const[cases,setCases]=useState<CaseView[]>([]);const[myTasks,setMyTasks]=useState<Task[]>([]);const[workspace,setWorkspace]=useState<Workspace|null>(null);const[documents,setDocuments]=useState<CaseDocument[]>([]);const[doctors,setDoctors]=useState<VerifiedDoctor[]>([]);const[categories,setCategories]=useState<CareCategory[]>([]);const[staff,setStaff]=useState<StaffMember[]>([]);const[share,setShare]=useState<{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null>(null);const[doctorProfile,setDoctorProfile]=useState<DoctorProfile|null>(null);const[coordinatorProfile,setCoordinatorProfile]=useState<StaffProfile|null>(null);const[catalog,setCatalog]=useState<CatalogService[]>([]);const[fxRates,setFxRates]=useState<FxRate[]>([]);const[busy,setBusy]=useState(false);const[notice,setNotice]=useState("");const[error,setError]=useState("");
   const [preferences,setPreferences]=useState<Preferences>({displayName:null,locale:null});
   const [queueState,setQueueState]=useState<QueueState>(initialQueue);
   const queuePosition=useRef(0);const opening=useRef(0);const mutationPending=useRef(false);
   const [documentError,setDocumentError]=useState(false);const [queueLoading,setQueueLoading]=useState(true);const [queueFor,setQueueFor]=useState<string|null>(null);const [landedRole,setLandedRole]=useState<string|null>(null);
+  // A role named in the URL (a deep link, or a switch kept there) holds until the person switches; read once, not synced.
+  const [roleParam]=useState(()=>typeof window==="undefined"?null:new URLSearchParams(window.location.search).get("role") as RoleKey|null);
+  const active=chosenRole??(roleParam&&available.includes(roleParam)?roleParam:undefined);
   const currentRole=active&&available.includes(active)?active:available[0];
   // The role a case page opens under. It is gone when /me fails (no roles are known then), so an open case waits for a
   // retry instead of rendering under a role this person may no longer hold.
   const caseRole=currentRole&&!["admin","identity"].includes(currentRole)?currentRole:null;
   const CaseViewFor=useCaseView(!caseRole?null:caseRole==="patient"?"patient":"staff");
-  useEffect(()=>{const selected=new URLSearchParams(window.location.search).get("role") as RoleKey;if(available.includes(selected))setActive(selected);},[available]);
-  const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){await requestReauthentication(signIn);throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn]);
+  const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){await requestReauthentication(signIn);throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn,locale]);
   const refresh=useCallback(async(managedBusy=false)=>{if(!currentRole||["admin","identity"].includes(currentRole))return;if(!managedBusy)setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{if(!managedBusy)setBusy(false);}},[currentRole,api,t.error]);
   const loadAssignmentHistory=useCallback((caseId:string)=>api<AssignmentHistoryEntry[]>(`/coordinator/cases/${caseId}/assignment-history`),[api]);
   useEffect(()=>{if(!signedInSubject)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[signedInSubject,api]);
+  // The queue belongs to one person in one role. When either changes, the previous list is cleared and marked loading while
+  // rendering, so no frame shows the old role's cases as loaded; the effect only fetches.
+  const queueKey=signedInSubject&&currentRole&&!["admin","identity"].includes(currentRole)&&!deferPatient?`${signedInSubject}:${currentRole}`:null;
+  const [queueKeyShown,setQueueKeyShown]=useState<string|null|undefined>(undefined);
+  if(queueKey!==queueKeyShown){setQueueKeyShown(queueKey);setQueueLoading(!!queueKey);if(queueKey){setCases([]);setMyTasks([]);setError("");}}
   useEffect(()=>{
-    if(!currentRole||["admin","identity"].includes(currentRole)||deferPatient){setQueueLoading(false);return;}
-    let cancelled=false;setQueueLoading(true);setCases([]);setMyTasks([]);setError("");
+    if(!queueKey||!currentRole)return;
+    let cancelled=false;
     void Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),["coordinator","doctor","operations","finance","patient"].includes(currentRole)?api<Task[]>("/work/mine"):Promise.resolve([])])
       .then(([nextCases,nextTasks])=>{if(!cancelled){setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}}).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:t.error);}).finally(()=>{if(!cancelled){setQueueLoading(false);setQueueFor(currentRole);}});
     return()=>{cancelled=true;};
-  },[currentRole,api,t.error,deferPatient]);
+  },[queueKey,currentRole,api,t.error]);
   // One-shot entry flags. ?signin=1 (header "Sign in", "use your saved details") and ?continue=1 (returning
   // from identity-provider account setup, where a Keycloak session already exists) start sign-in at once so
   // the patient never has to find a button. The flag is stripped from the return path first: a cancelled or
@@ -125,8 +142,8 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   // activates the account, and the answer says which case is current and whether an "is this you?" question waits.
   const [linkToken,setLinkToken]=useState<string|null>(()=>typeof window==="undefined"?null:new URLSearchParams(window.location.search).get("link"));
   const [landed,setLanded]=useState(false);
-  // Once per signed-in subject, not per render of its inputs: a linked session refreshes /me, which briefly clears
-  // patientView, and re-registering on its return would refresh /me again, forever.
+  // Once per signed-in subject, not per render of its inputs: a linked session refreshes /me, and re-registering whenever
+  // that answer changes an input would refresh /me again, forever.
   const sessionRegisteredFor=useRef<string|null>(null);
   useEffect(()=>{if(!user||deferPatient||!patientView)return;const subject=user.profile.sub;if(sessionRegisteredFor.current===subject)return;sessionRegisteredFor.current=subject;const params=new URLSearchParams(window.location.search);const link=params.get("link");if(link){params.delete("link");window.history.replaceState({},"",`${window.location.pathname}${params.toString()?`?${params}`:""}`);}void api<{linked:boolean;currentCaseId:string|null;accountStatus:string}>("/patient/account/session",{method:"POST"}).then(session=>{if(session.linked)refreshMe();if(!params.get("case")&&session.currentCaseId&&!link){const url=new URL(window.location.href);url.searchParams.set("case",session.currentCaseId);window.history.replaceState({},"",url);}}).catch(()=>{}).finally(()=>setLanded(true));},[user,patientView,api,deferPatient,refreshMe]);
   useEffect(()=>{if(currentRole!=="doctor")return;void api<DoctorProfile>("/doctor/me").then(setDoctorProfile).catch(()=>setDoctorProfile(null));void api<CatalogService[]>("/doctor/catalog").then(setCatalog).catch(()=>setCatalog([]));void api<FxRate[]>("/doctor/fx-rates").then(setFxRates).catch(()=>setFxRates([]));},[currentRole,api]);
@@ -168,17 +185,18 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   // Keep only navigation preferences in this browser session, scoped to the signed-in account.
   // Keyed by the subject, not the User object: a silent token renew hands over a new User and must not reset the view.
   const userSubject=user?.profile.sub;
-  useEffect(()=>{if(!userSubject||!currentRole)return;let next=initialQueue;try{const saved=sessionStorage.getItem(`portal-queue:${userSubject}:${currentRole}`);if(saved)next={...initialQueue,...JSON.parse(saved)};}catch{}
-    // A deep link, a reload or "open in new tab" names the staff view in the URL: that is an explicit choice.
-    const linked=currentRole!=="patient"?new URLSearchParams(window.location.search).get("view"):null;
-    setQueueState(isStaffViewId(linked)?withView(next,linked):next);},[userSubject,currentRole]);
+  // Restored once per person and role, while rendering (this only runs in the browser: there is no subject on the server).
+  const [queueStateFor,setQueueStateFor]=useState<string|null>(null);
+  if(userSubject&&currentRole&&queueStateFor!==`${userSubject}:${currentRole}`){setQueueStateFor(`${userSubject}:${currentRole}`);setQueueState(savedQueueState(userSubject,currentRole));}
   function changeQueue(next:QueueState){setQueueState(next);if(user&&currentRole)try{sessionStorage.setItem(`portal-queue:${user.profile.sub}:${currentRole}`,JSON.stringify(next));}catch{}}
   const restored=useRef(false);
   // For patients, wait for the session answer: it may have just pointed ?case= at their current case.
   // Wait for a role too: while /me reloads, the previous answer's cases are still listed but no case can be opened yet.
   useEffect(()=>{if(queueLoading||restored.current||!cases.length||!currentRole)return;if(patientView&&!landed)return;restored.current=true;const id=new URLSearchParams(window.location.search).get("case");
+    // Opening is an async load that sets busy and errors itself, so it starts just after this effect body (as the
+    // bell's first fetch does), not inside it.
     // A patient never lands on a list: the session named their current case; failing that, the most recent one.
-    const item=cases.find(c=>c.id===id)??(patientView?cases[0]:undefined);if(item)void openCase(item);});
+    const item=cases.find(c=>c.id===id)??(patientView?cases[0]:undefined);if(item)queueMicrotask(()=>void openCase(item));});
   // The patient's three destinations are one page with a view switch, kept in the URL so a reload or a shared link lands in the same place.
   const [careView,setCareView]=useState<CareView>(()=>{if(typeof window==="undefined")return "care";const v=new URLSearchParams(window.location.search).get("view");return v==="documents"||v==="messages"?v:"care";});
   const changeCareView=(view:CareView)=>{setCareView(view);const url=new URL(window.location.href);if(view==="care")url.searchParams.delete("view");else url.searchParams.set("view",view);window.history.replaceState({},"",url);requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());};

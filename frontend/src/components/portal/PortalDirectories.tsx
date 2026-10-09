@@ -7,8 +7,11 @@ type Identity={id:string;subjectType:string;status:string;documentType?:string;i
 export function IdentityReviewQueue({api,locale}:{api:Api;locale:Locale}) {
   const [items,setItems]=useState<Identity[]>([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
   const ar=locale==="ar";
-  const load=useCallback(async()=>{setLoading(true);setError("");try{setItems(await api<Identity[]>("/identity-review/queue"));}catch(e){setError(e instanceof Error?e.message:"Unable to load identity reviews");}finally{setLoading(false);}},[api]);
-  useEffect(()=>{void load();},[load]);
+  const fetchQueue=useCallback(()=>api<Identity[]>("/identity-review/queue"),[api]);
+  const failed=(e:unknown)=>e instanceof Error?e.message:"Unable to load identity reviews";
+  // A retry or a recorded decision reloads with a visible "loading"; the first load starts in that state already.
+  const load=async()=>{setLoading(true);setError("");try{setItems(await fetchQueue());}catch(e){setError(failed(e));}finally{setLoading(false);}};
+  useEffect(()=>{let live=true;fetchQueue().then(rows=>{if(live)setItems(rows);},e=>{if(live)setError(failed(e));}).finally(()=>{if(live)setLoading(false);});return()=>{live=false;};},[fetchQueue]);
   return <section className="space-y-4" aria-label={ar?"طلبات التحقق":"Verification requests"}>
     {loading&&<p role="status">{ar?"جارٍ التحميل…":"Loading requests…"}</p>}{error&&<p role="alert" className="card p-4 text-alert-800">{error} <button className="link-cta" onClick={()=>void load()}>{ar?"إعادة المحاولة":"Retry"}</button></p>}{notice&&<p role="status" className="card p-4 text-brand-700">{notice}</p>}
     {!loading&&!items.length&&!error&&<div className="card p-8"><h2 className="title">{ar?"لا توجد طلبات بانتظار المراجعة":"No verification requests waiting"}</h2><p className="mt-2 text-sm text-ink-500">{ar?"ستظهر الطلبات الجديدة هنا.":"New requests will appear here."}</p></div>}

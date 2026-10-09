@@ -77,3 +77,21 @@ test("a patient whose access re-check fails is told so, not left loading, and ge
   await expect(alert).toBeHidden();
   await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
 });
+
+test("a patient's case stays on screen while their access is re-read", async ({ page }) => {
+  await setupPatient(page, "deposit-paid");
+  // Hold the second /me read (the linked session's refresh) until the page has been checked.
+  let reads = 0, release = () => {};
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/v1/me", async route => {
+    if (route.request().method() !== "GET") return route.fallback();
+    reads++;
+    if (reads === 2) await held;
+    return route.fallback();
+  });
+  await page.goto("/en/portal");
+  await expect.poll(() => reads).toBe(2);
+  await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
+  release();
+  await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
+});

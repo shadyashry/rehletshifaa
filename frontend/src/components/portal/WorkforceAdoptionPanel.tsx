@@ -11,13 +11,14 @@ export function WorkforceAdoptionPanel({ locale, token, onAccepted }: { locale: 
   const ar = locale === "ar";
   const [items, setItems] = useState<Adoption[] | null>(null);
   const [error, setError] = useState("");
-  const load = async () => {
-    setError("");
-    const response = await apiFetchAs(token, "/me/workforce-adoptions");
-    if (!response.ok) throw new Error(String(response.status));
-    setItems(await response.json() as Adoption[]);
-  };
-  useEffect(() => { void load().catch(() => setError(ar ? "تعذّر تحميل الدعوة." : "We couldn't load the invitation.")); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let live = true;
+    void apiFetchAs(token, "/me/workforce-adoptions")
+      .then(async response => { if (!response.ok) throw new Error(String(response.status)); return await response.json() as Adoption[]; })
+      .then(rows => { if (live) { setError(""); setItems(rows); } })
+      .catch(() => { if (live) setError(ar ? "تعذّر تحميل الدعوة." : "We couldn't load the invitation."); });
+    return () => { live = false; };
+  }, [token, ar]);
   const accept = async (item: Adoption) => {
     setError("");
     const response = await apiFetchAs(token, `/me/workforce-adoptions/${item.id}/accept`, { method: "POST", body: JSON.stringify({ revision: item.revision }) });

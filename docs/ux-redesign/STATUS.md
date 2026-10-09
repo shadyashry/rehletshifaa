@@ -226,6 +226,22 @@ Update at the end of every phase.
   - [x] Owner: "merge and push, then rebuild the stack" — `2aa23d8` fast-forwarded into `codex/platform-control-plane` and
         pushed; stack rebuilt (backend UP, localhost 3000/8081/8180 and `https://dev.rehletshifaa.com/en` 200; the portal
         serves the new access-alert copy in en and ar)
+  - [x] Portal lint and `refreshMe` (owner: "carry on with the lint errors and the refreshMe fix"; backlog P2 ×2)
+    - [x] the 11 portal compiler-rule errors: `?role=` read once into lazy state and the role derived (no effect);
+          the queue clear/loading and the saved queue view adjusted while rendering when the person or role changes (the
+          effect only fetches); the case restore starts its async open just after the effect body (as the bell's first
+          fetch); `usePortalSlot` (`portal-slot.ts`, `useSyncExternalStore`) for the bell and account menu; PortalAccount
+          keeps the dialog's open state instead of reading the ref in render; PortalDirectories and WorkforceAdoptionPanel
+          fetch without synchronous resets; `validUntilInDays()` replaces `Date.now()` in render. Plus the Portal `api`
+          `locale` dependency warning. The 13 Control Center errors are a new backlog row
+    - [x] `refreshMe`: AuthProvider keeps the previous `/me` answer while re-reading for the same person, so the portal
+          no longer swaps to the loading frame and unmounts the open case, its dialogs and drafts. An activation retry
+          still shows as loading; a failed re-read still clears roles (the access alert)
+    - [x] verify: typecheck ok; lint 13/11 (was 24/12; no new findings); unit 349 pass (+1 AuthProvider re-read test, fails on
+          the old provider), 11 `ProposalSign`; `next build` ok, shell chunk 48 KB without staff case code; Playwright 11
+          specs (the 10 portal/patient specs + credential-reviews) 102 pass, 5 fail = pre-existing (care-coordination ×2,
+          credential-reviews ×2, "Staff & teams"); new `portal-reliability` test (case stays on screen during a held `/me`
+          re-read) fails on the old provider
 
 ## Decisions
 
@@ -269,9 +285,9 @@ Update at the end of every phase.
 ## Next exact action
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
-tunnel stack runs `2aa23d8`, which includes the role crash guard (merged and pushed). Next
-code-structure candidate from the same backlog section: the lint `set-state-in-effect`/`refs`/`purity` errors (P2, incl.
-`Date.now()` in `ProposalSendForm`). Earlier notes:
+tunnel stack runs `2aa23d8`, which includes the role crash guard (merged and pushed). The portal lint fixes and the
+`refreshMe` fix are committed on `feat/ux-redesign-pass-4`, not merged or pushed. Next candidates: Control Center lint
+(13 errors, P2) and the `refresh` stale-result guard / shared `busy` flag (P2). Earlier notes:
 
 Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08); the follow-up
 commit on `feat/ux-redesign-pass-3` is not merged or pushed yet. The tunnel stack runs `9e3b336` (V76); live checks must run from a network that
