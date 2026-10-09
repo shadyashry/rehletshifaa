@@ -223,6 +223,9 @@ Update at the end of every phase.
           first-load failure en/ar, patient re-read failure) — all 3 fail on the previous `Portal.tsx` and pass now; the 10
           portal/patient specs 99 pass, 5 fail = 3 pre-existing (care-coordination ×2, "Staff & teams") + 2 cold-run
           timeouts (a11y care-areas, portal-ux team queue) that pass alone
+  - [x] Owner: "merge and push, then rebuild the stack" — `2aa23d8` fast-forwarded into `codex/platform-control-plane` and
+        pushed; stack rebuilt (backend UP, localhost 3000/8081/8180 and `https://dev.rehletshifaa.com/en` 200; the portal
+        serves the new access-alert copy in en and ar)
 
 ## Decisions
 
@@ -266,7 +269,7 @@ Update at the end of every phase.
 ## Next exact action
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
-tunnel stack runs `5a79f90`. The role crash guard is committed on `feat/ux-redesign-pass-4`, not merged or pushed. Next
+tunnel stack runs `2aa23d8`, which includes the role crash guard (merged and pushed). Next
 code-structure candidate from the same backlog section: the lint `set-state-in-effect`/`refs`/`purity` errors (P2, incl.
 `Date.now()` in `ProposalSendForm`). Earlier notes:
 
