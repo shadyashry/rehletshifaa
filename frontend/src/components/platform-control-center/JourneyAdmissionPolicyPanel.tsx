@@ -47,7 +47,9 @@ export function JourneyAdmissionPolicyPanel({ locale, definitionId, versions, pe
   const [scope, setScope] = useState("ALL_NEW_CASES");
   const [categories, setCategories] = useState("");
   const [reason, setReason] = useState("");
-  const [readiness, setReadiness] = useState<string | null>(null);
+  // Runtime readiness is kept with the version it was read for; another version's is unknown until read.
+  const [readinessRead, setReadinessRead] = useState<{ versionId: string; status: string } | null>(null);
+  const readiness = readinessRead?.versionId === versionId ? readinessRead.status : null;
   const [decision, setDecision] = useState<{ action: "approve" | "reject" | "pause"; policy: JourneyAdmissionPolicy } | null>(null);
   const [decisionReason, setDecisionReason] = useState("");
   const allowed = (permission: string) => permissions.includes(permission);
@@ -64,14 +66,11 @@ export function JourneyAdmissionPolicyPanel({ locale, definitionId, versions, pe
       (e) => { if (live) { setPolicies(null); setError(e instanceof Error ? e.message : t.error); } });
     return () => { live = false; };
   }, [api, t.error]);
-  // A different version's readiness is unknown until it is read: cleared while rendering, read by the effect.
-  const [readinessFor, setReadinessFor] = useState(versionId);
-  if (readinessFor !== versionId) { setReadinessFor(versionId); setReadiness(null); }
   useEffect(() => {
     let cancelled = false;
     if (versionId) void api<JourneyReadiness>(`/admin/journeys/${definitionId}/versions/${versionId}/runtime`)
-      .then((value) => { if (!cancelled) setReadiness(value.status); })
-      .catch(() => { if (!cancelled) setReadiness("UNKNOWN"); });
+      .then((value) => { if (!cancelled) setReadinessRead({ versionId, status: value.status }); })
+      .catch(() => { if (!cancelled) setReadinessRead({ versionId, status: "UNKNOWN" }); });
     return () => { cancelled = true; };
   }, [api, definitionId, versionId]);
 

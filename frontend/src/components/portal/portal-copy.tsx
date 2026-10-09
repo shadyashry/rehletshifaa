@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, use, type ReactNode } from "react";
 
 import type { WorkCopy } from "@/lib/portal-labels";
 
@@ -11,11 +11,11 @@ import type { WorkCopy } from "@/lib/portal-labels";
 const WorkCopyContext = createContext<WorkCopy | null>(null);
 
 export function WorkCopyProvider({ copy, children }: { copy: WorkCopy; children: ReactNode }) {
-  return <WorkCopyContext.Provider value={copy}>{children}</WorkCopyContext.Provider>;
+  return <WorkCopyContext value={copy}>{children}</WorkCopyContext>;
 }
 
 export function useWorkCopy(): WorkCopy {
-  const copy = useContext(WorkCopyContext);
+  const copy = use(WorkCopyContext);
   if (!copy) throw new Error("useWorkCopy must be used inside WorkCopyProvider");
   return copy;
 }

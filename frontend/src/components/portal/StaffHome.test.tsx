@@ -53,6 +53,15 @@ describe("one entry point for assigning a Consultant", () => {
     expect((screen.getByRole("combobox", { name: /case care area/i }) as HTMLSelectElement).value).toBe("cardiology");
   });
 
+  it("tells a team with nobody to assign apart from a team list that could not be loaded", () => {
+    renderWithWork(form({ code: "ASSIGN_OPERATIONS", staff: [] }));
+    expect(screen.getByText(/No one on the Operations team can be assigned yet/)).toBeTruthy();
+    cleanup();
+    renderWithWork(form({ code: "ASSIGN_OPERATIONS", staff: null }));
+    expect(screen.getByRole("alert").textContent).toMatch(/team list couldn't be loaded/);
+    expect(screen.queryByText(/Ask the team's manager/)).toBeNull();
+  });
+
   it("explains an unclassified case instead of a blank select", () => {
     renderWithWork(form({ careCategory: undefined }));
     expect(screen.getByRole("combobox", { name: /case care area/i }).getAttribute("aria-describedby")).toBeTruthy();

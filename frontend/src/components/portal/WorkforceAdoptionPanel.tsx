@@ -43,7 +43,7 @@ export function WorkforceAdoptionPanel({ locale, token, onAccepted }: { locale: 
     {items === null && !error ? <p role="status" className="mt-4 text-sm">{ar ? "جارٍ التحميل…" : "Loading…"}</p> : null}
     {items?.map((item) => <div key={item.id} className="mt-5 rounded-lg border border-line p-4">
       <strong className="block text-ink-900">{item.name}</strong><span className="block text-sm text-ink-600">{item.email}</span>
-      <button type="button" className="btn-primary mt-4" disabled={busy} aria-busy={busy || undefined} onClick={() => void accept(item)}>{ar ? "قبول وربط هويتي" : "Accept and link my identity"}</button>
+      <button type="button" className="btn-primary mt-4" disabled={busy} aria-busy={busy || undefined} onClick={() => void accept(item)}>{busy ? (ar ? "جارٍ القبول…" : "Accepting…") : (ar ? "قبول وربط هويتي" : "Accept and link my identity")}</button>
     </div>)}
   </section>;
 }

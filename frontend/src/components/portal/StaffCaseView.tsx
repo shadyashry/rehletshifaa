@@ -1,7 +1,7 @@
 "use client";
 
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, use, useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, MessageSquare, MoreHorizontal } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
@@ -30,7 +30,7 @@ const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAss
 const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnership").then(m=>m.TransferOwnership));
 const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatientResponse").then(m=>m.RecordPatientResponse));
 
-export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
+export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
 
 /**
  * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
@@ -40,11 +40,11 @@ type CaseWorkspace={locale:Locale;t:typeof copy.en;role:RoleKey;c:CaseView;busy:
 const CaseWorkspaceContext=createContext<CaseWorkspace|null>(null);
 
 function CaseWorkspaceProvider({value,children}:{value:CaseWorkspace;children:ReactNode}){
- return <CaseWorkspaceContext.Provider value={value}>{children}</CaseWorkspaceContext.Provider>;
+ return <CaseWorkspaceContext value={value}>{children}</CaseWorkspaceContext>;
 }
 
 function useCaseWorkspace():CaseWorkspace{
- const workspace=useContext(CaseWorkspaceContext);
+ const workspace=use(CaseWorkspaceContext);
  if(!workspace)throw new Error("useCaseWorkspace must be used inside CaseWorkspaceProvider");
  return workspace;
 }
@@ -91,7 +91,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
  // Operations and consultants keep their stage forms; the coordinator's work is driven by the current action.
- const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff} documents={documents} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired}/></div>:null;
+ const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired}/></div>:null;
  const recommendationBlock=approved&&(approved.recommendedTreatment||approved.risksAndLimitations)?<div className="rounded-lg border border-line p-4"><p className="mb-2 text-[0.8125rem] font-bold uppercase tracking-wide text-brand-700">{locale==="ar"?"التوصية السريرية للاستشاري":"Consultant's clinical recommendation"}</p>{approved.recommendedTreatment&&<div className="mb-3"><p className="text-sm font-bold text-ink-800">{t.reviewTreatment}</p><p className="mt-0.5 whitespace-pre-wrap text-ink-700">{approved.recommendedTreatment}</p></div>}{approved.risksAndLimitations&&<div><p className="text-sm font-bold text-ink-800">{t.reviewRisks}</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-600">{approved.risksAndLimitations}</p></div>}</div>:null;
  // The proposal is the coordinator's work while it is being prepared or released (or, at arrival, finalised);
  // once decided it becomes reference history.
@@ -272,7 +272,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   {overlay==="proposal"&&<CaseDrawer locale={locale} title={t.proposal} onClose={()=>closeOverlay("proposal")}>
    <div className="space-y-4">{recommendationBlock}{value.proposal&&<ProposalCard proposal={value.proposal}/>}{value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={false}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}</div>
   </CaseDrawer>}
-  {overlay==="transfer"&&<CaseDrawer locale={locale} title={locale==="ar"?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>closeOverlay("transfer")}><TransferOwnership locale={locale} caseId={c.id} caseNumber={c.caseNumber} currentOwner={c.coordinatorSubject} currentOwnerName={c.coordinatorName} mySubject={mySubject} staff={staff} busy={busy} mutate={mutate} onClose={()=>closeOverlay("transfer")}/></CaseDrawer>}
+  {overlay==="transfer"&&<CaseDrawer locale={locale} title={locale==="ar"?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>closeOverlay("transfer")}><TransferOwnership locale={locale} caseId={c.id} caseNumber={c.caseNumber} currentOwner={c.coordinatorSubject} currentOwnerName={c.coordinatorName} mySubject={mySubject} staff={staff??[]} busy={busy} mutate={mutate} onClose={()=>closeOverlay("transfer")}/></CaseDrawer>}
   {overlay==="requestInfo"&&<RequestInformationDialog locale={locale} caseIds={[c.id]} busy={busy} mutate={mutate} onClose={()=>closeOverlay("requestInfo")}/>}
   {overlay==="decline"&&myPending&&<DeclineAssignmentDialog locale={locale} caseNumber={c.caseNumber} busy={busy} onClose={()=>closeOverlay("decline")}
    onConfirm={reason=>void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:false,reason})}/>}
@@ -312,11 +312,11 @@ function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?
    {(delivery||resendProfile)&&<div className="flex flex-wrap items-baseline justify-between gap-x-3"><dt className="text-ink-500">{ar?"الرابط الآمن":"Secure link"}</dt><dd className="flex flex-wrap items-center gap-x-2 font-semibold text-ink-800">
     {delivery&&!resendProfile&&<span>{deliveryLabel} · {delivery.channel==="WHATSAPP"?(ar?"واتساب":"WhatsApp"):(ar?"البريد":"Email")} · <span dir="ltr">{delivery.destinationMasked}</span></span>}
     {resendProfile&&<span>{linkLabel}{delivery?<> · {delivery.channel==="WHATSAPP"?(ar?"واتساب":"WhatsApp"):(ar?"البريد":"Email")} · <span dir="ltr">{delivery.destinationMasked}</span></>:null}</span>}
-    {resendProposal&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} onClick={()=>setResendPath(`/coordinator/cases/${caseId}/proposals/${proposal.versionId}/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
-    {resendProfile&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} onClick={()=>setResendPath(`/coordinator/cases/${caseId}/onboarding-link/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
+    {resendProposal&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>setResendPath(`/coordinator/cases/${caseId}/proposals/${proposal.versionId}/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
+    {resendProfile&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>setResendPath(`/coordinator/cases/${caseId}/onboarding-link/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
    </dd></div>}
   </dl>
-  {resendPath&&<ConfirmDialog title={work.confirm.resendTitle} body={work.confirm.resendBody} confirm={work.confirm.resend} cancel={work.confirm.cancel}
+  {resendPath&&<ConfirmDialog title={work.confirm.resendTitle} body={delivery?fillTemplate(work.confirm.resendBodyTo,{destination:`\u2068${delivery.destinationMasked}\u2069`}):work.confirm.resendBody} confirm={work.confirm.resend} cancel={work.confirm.cancel}
    onCancel={()=>setResendPath(null)} onConfirm={()=>{const path=resendPath;setResendPath(null);void mutate(path);}}/>}
  </section>;
 }
@@ -501,9 +501,9 @@ function DeliveryCard({delivery,versionId,canResend=true}:{delivery:DeliveryStat
  const cls=delivery.status==="DELIVERED"?"bg-brand-50 text-brand-700":delivery.status==="FAILED"?"bg-alert-50 text-alert-700":"bg-mist text-ink-600";
  return <div className="mt-4 rounded-lg border border-line p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-bold text-ink-800">{g.title}</p><span className={`rounded px-2 py-0.5 text-[0.8125rem] font-bold ${cls}`}>{label}</span></div>
   <p className="mt-2 text-sm text-ink-600">{g.channel}: <strong>{delivery.channel}</strong> · {g.to} <span dir="ltr">{delivery.destinationMasked}</span>{delivery.attempts>0?` · ${g.attempts}: ${delivery.attempts}`:""}</p>
-  {canResend&&<button type="button" className="btn-secondary mt-3" disabled={busy} onClick={()=>setResending(true)}>{g.resend}</button>}
+  {canResend&&<button type="button" className="btn-secondary mt-3" disabled={busy} aria-haspopup="dialog" onClick={()=>setResending(true)}>{g.resend}</button>}
   {canResend&&<p className="mt-2 text-[0.8125rem] text-ink-500">{g.resendHint}</p>}
-  {resending&&<ConfirmDialog title={confirmCopy.resendTitle} body={confirmCopy.resendBody} confirm={confirmCopy.resend} cancel={confirmCopy.cancel}
+  {resending&&<ConfirmDialog title={confirmCopy.resendTitle} body={fillTemplate(confirmCopy.resendBodyTo,{destination:`\u2068${delivery.destinationMasked}\u2069`})} confirm={confirmCopy.resend} cancel={confirmCopy.cancel}
    onCancel={()=>setResending(false)} onConfirm={()=>{setResending(false);void mutate(`/coordinator/cases/${caseId}/proposals/${versionId}/resend`);}}/>}</div>;
 }
 

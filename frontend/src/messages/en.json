@@ -868,13 +868,15 @@
       "thread": "No messages in this conversation yet.",
       "noOperations": "No one on the Operations team can be assigned yet. Ask the team's manager to add someone.",
       "noFinance": "No one on the Finance team can be assigned yet. Ask the team's manager to add someone.",
-      "chooseArea": "Choose a care area"
+      "chooseArea": "Choose a care area",
+      "teamUnavailable": "The team list couldn't be loaded. Reload the page to try again."
     },
     "confirm": {
       "cancel": "Cancel",
       "keepEditing": "Keep editing",
       "resendTitle": "Send a new secure link?",
       "resendBody": "The link the patient has now will stop working. A new one goes to their verified contact.",
+      "resendBodyTo": "The link the patient has now will stop working. A new one goes to {destination}.",
       "resend": "Send new link",
       "refundTitle": "Record a refund of {amount}?",
       "refundBody": "This records money returned to the patient on this deposit. Check the amount before you continue.",

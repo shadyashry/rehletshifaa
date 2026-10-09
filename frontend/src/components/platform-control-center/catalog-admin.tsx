@@ -191,8 +191,7 @@ export function CareAreaTemplates({ locale, api, editable }: { locale: Locale; a
   }, [api]);
   const readItems = useCallback((id: string) => api<TemplateItem[]>(`/admin/service-templates/${id}/items`), [api]);
   const loadItems = useCallback(async (id: string) => { if (!id) { setItems([]); return; } try { setItems(await readItems(id)); } catch (e) { setError(e); } }, [readItems]);
-  // No template chosen: no items (adjusted while rendering); otherwise the effect reads the chosen template's items.
-  if (!selected && items.length > 0) setItems([]);
+  // Items render only under a chosen template, so with none chosen there is nothing to read or clear.
   useEffect(() => {
     if (!selected) return;
     let live = true;

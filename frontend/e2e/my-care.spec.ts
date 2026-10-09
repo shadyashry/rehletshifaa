@@ -175,6 +175,8 @@ test("identity verification shows a submission awaiting review instead of the fo
 test("identity verification shows a rejection with its reason and the form to resubmit", async ({ page }) => {
   await setupPatient(page, "deposit-paid", { identity: { status: "REJECTED", rejectionReason: "The photo page was unreadable" } });
   await page.goto("/en/portal");
-  await expect(page.getByRole("alert").filter({ hasText: "Not verified. Please resubmit." })).toContainText("The photo page was unreadable");
+  // Shown, not announced: an earlier rejection is information on arrival, not an interruption.
+  await expect(page.getByText(/Not verified. Please resubmit./)).toContainText("The photo page was unreadable");
+  await expect(page.getByRole("alert").filter({ hasText: "Not verified" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Submit for verification" })).toBeVisible();
 });

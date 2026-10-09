@@ -34,7 +34,7 @@ export function PatientIdentityStep({ locale, caseId, identity, busy, mutate }: 
       if (!complete) return;
       void mutate(`/patient/cases/${caseId}/identity`, { subjectType: "PATIENT", ...form });
     }}>
-      {status === "REJECTED" && <p role="alert" className="mb-3 rounded-lg bg-alert-50 px-3 py-2 text-[0.88rem] text-alert-800">{t.rejected}{identity?.rejectionReason ? ` — ${identity.rejectionReason}` : ""}</p>}
+      {status === "REJECTED" && <p className="mb-3 rounded-lg bg-alert-50 px-3 py-2 text-[0.88rem] text-alert-800">{t.rejected}{identity?.rejectionReason ? ` — ${identity.rejectionReason}` : ""}</p>}
       <div className="grid gap-3 sm:grid-cols-2">
         {field("legalName", t.legalName, { autoComplete: "name" })}
         {field("dateOfBirth", t.dob, { type: "date" })}

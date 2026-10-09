@@ -288,6 +288,26 @@ Update at the end of every phase.
   - [x] verify: typecheck ok; lint **0 errors** / 10 warnings; unit 360/360; Playwright full suite cold **233 passed, 0 failed**,
         38 skipped (+4 new: identity awaiting review / rejected, resend asks first en/ar; the second-opinion unit test now
         confirms before sending)
+  - [x] Owner: "merge push and rebuild" — `f304421` fast-forwarded and pushed; stack rebuilt (backend UP, localhost and tunnel 200;
+        the portal serves the new confirm and empty-state copy in en and ar)
+
+- [x] **Batch 1a — skill review of this session's work and fixes** (owner: "are you sure you take installed plugins…"; branch
+      `feat/ux-redesign-batch-1a`). Until then the session had not loaded the skills CLAUDE.md requires; the review loaded
+      `vercel-react-best-practices`, `vercel-composition-patterns`, `web-design-guidelines` (fresh rules) and Impeccable (context +
+      audit/clarify playbooks) over `764535a..f304421`. 13 findings: no P0/P1; 6 P2 and 3 P3 fixed, 2 deferred, 2 kept with reasons.
+  - [x] Fixed: a failed team-list load is no longer shown as "no one on the team" (`staff: null`, `portalWork.empty.teamUnavailable`);
+        the identity status is re-read by the submit handler (no state-triggered effect), with the submit's own answer as
+        fallback; Control Center results/readiness kept with the key they were read for (derived, no render-time resets);
+        a past identity rejection is shown, not announced (`role="alert"` removed); Resend link triggers carry
+        `aria-haspopup="dialog"`; React 19 `use()` and `<Context value>` for the case workspace and work-copy contexts;
+        "Accepting…" while a workforce invitation is accepted; the resend question names the destination
+        (`portalWork.confirm.resendBodyTo`); focus moves to the referrals section after a second opinion is sent
+  - [x] Kept: the case restore's `queueMicrotask` start (behaviour unchanged; a pending-restore state machine would be a larger
+        rewrite) and Portal's render-time resets on a role switch (many writers; React's adjust-while-rendering pattern)
+  - [x] Rule from here: each batch loads the relevant skills at its start and runs the reviewers before its verification
+  - [x] verify: typecheck ok; lint 0 errors / 10 warnings; unit 361/361 (+1 team unavailable vs empty); Playwright full suite cold
+        232 passed, 1 failed = the new identity test still expecting `role="alert"` (updated), then my-care + portal-reliability
+        21/21
 
 ## Decisions
 
@@ -332,9 +352,9 @@ Update at the end of every phase.
 ## Next exact action
 
 **Finish plan:** [`plans/finish-plan.md`](plans/finish-plan.md) (2026-10-09). Batch 0 merged, pushed and deployed (`7441dbf`);
-D1–D4 decided (see Decisions); Batch 1 done on `feat/ux-redesign-batch-1`, not merged or pushed. Next: Batch 2 (portal
-accessibility and Arabic formatting, including the B1 status tokens). Baselines: unit 360/360, Playwright full suite green,
-lint 0 errors / 10 warnings.
+D1–D4 decided (see Decisions); Batch 1 merged, pushed and deployed (`f304421`); Batch 1a (skill review fixes) done on
+`feat/ux-redesign-batch-1a`, not merged or pushed. Next: Batch 2 (portal accessibility and Arabic formatting, including the
+B1 status tokens), starting by loading the skills. Baselines: unit 361/361, Playwright full suite green, lint 0 errors / 10 warnings.
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
 tunnel stack runs `6cd977d` (role crash guard, portal lint and `refreshMe` fix; all merged and pushed). Next candidates: Control Center lint

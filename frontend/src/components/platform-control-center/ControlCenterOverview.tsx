@@ -53,21 +53,20 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
   const { user, loading: authLoading, signIn } = useAuth();
   const access = useControlCenterAccess();
   const api = useAdminApi();
-  const [results, setResults] = useState<Result[] | null>(null);
   const [attempt, setAttempt] = useState(0);
   const sources = access.loading ? [] : SOURCES.filter((s) => s.applies(access));
   const sourceKeys = sources.map((s) => s.key).join();
-  // A new set of sources, person, language or retry starts from "loading", cleared while rendering (not in the effect).
+  // Results are kept with the sources, person, language and attempt they were read for: anything else is still loading.
   const resultsKey = `${sourceKeys}|${user?.profile?.sub ?? ""}|${locale}|${attempt}`;
-  const [resultsFor, setResultsFor] = useState(resultsKey);
-  if (resultsFor !== resultsKey) { setResultsFor(resultsKey); setResults(null); }
+  const [read, setRead] = useState<{ key: string; results: Result[] } | null>(null);
+  const results = read?.key === resultsKey ? read.results : null;
 
   useEffect(() => {
     if (access.loading || !user) return;
     let live = true;
     const ctx: Ctx = { api, locale };
     void Promise.all(sources.map((source) => source.find(ctx).then((found): Result => ({ source, found }), (): Result => ({ source, failed: true }))))
-      .then((r) => { if (live) setResults(r); });
+      .then((r) => { if (live) setRead({ key: resultsKey, results: r }); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [access.loading, sourceKeys, user?.profile?.sub, locale, attempt]);

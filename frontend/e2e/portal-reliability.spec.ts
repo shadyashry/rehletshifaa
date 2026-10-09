@@ -108,6 +108,8 @@ for (const locale of ["en", "ar"] as const) {
     await resend.click();
     const confirm = page.getByRole("alertdialog", { name: ar ? "إرسال رابط آمن جديد؟" : "Send a new secure link?" });
     await expect(confirm).toBeVisible();
+    // It names where the new link goes.
+    await expect(confirm).toContainText("•••• 7898");
     await expect(confirm.getByRole("button", { name: ar ? "إلغاء" : "Cancel" })).toBeFocused();
     await confirm.getByRole("button", { name: ar ? "إلغاء" : "Cancel" }).click();
     await expect(confirm).toBeHidden();

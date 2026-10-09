@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { careAreaLabel } from "@/lib/portal-labels";
@@ -165,6 +165,8 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
   const [type, setType] = useState<"TRANSFER" | "SECOND_OPINION">("SECOND_OPINION");
   // Submitting the opinion ends this consultant's access, so it is confirmed first.
   const [pendingOpinion, setPendingOpinion] = useState<string | null>(null);
+  // The opinion form goes away once it is sent; the focus moves to the referrals section rather than the page body.
+  const section = useRef<HTMLElement>(null);
   const confirmCopy = useWorkCopy().confirm;
   const [area, setArea] = useState("");
   const [candidates, setCandidates] = useState<EligibleConsultant[]>([]);
@@ -185,7 +187,7 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
   const secondOpinion = rows.find(r => r.viewerRelation === "RECEIVER" && r.type === "SECOND_OPINION" && r.status === "IN_PROGRESS");
   const openOfType = (kind: string) => rows.some(r => r.viewerRelation === "REFERRER" && r.type === kind && ["AWAITING_COORDINATOR", "AWAITING_CONSULTANT", "IN_PROGRESS"].includes(r.status));
   if (!rows.length && !canRefer && !secondOpinion) return null;
-  return <section className="card space-y-4 p-4 sm:p-5" aria-label={t.referrals}>
+  return <section ref={section} tabIndex={-1} className="card space-y-4 p-4 outline-none sm:p-5" aria-label={t.referrals}>
     {secondOpinion && <form id="case-actions" className="space-y-2" onSubmit={e => { e.preventDefault(); const opinion = String(new FormData(e.currentTarget).get("opinion") ?? "").trim(); if (opinion) setPendingOpinion(opinion); }}>
       <h3 className="font-bold text-brand-900">{t.yourOpinion}</h3>
       <p className="whitespace-pre-wrap rounded-lg bg-mist p-3 text-sm text-ink-700"><span className="font-semibold">{t.reason}:</span> {secondOpinion.clinicalReason} ({t.referralFrom} {secondOpinion.fromConsultantName})</p>
@@ -195,7 +197,7 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
     </form>}
     {secondOpinion && pendingOpinion !== null && <ConfirmDialog title={confirmCopy.opinionTitle} body={confirmCopy.opinionBody} confirm={confirmCopy.opinion} cancel={confirmCopy.keepEditing}
       onCancel={() => setPendingOpinion(null)}
-      onConfirm={() => { const opinion = pendingOpinion; setPendingOpinion(null); void mutate(`/doctor/cases/${caseId}/referrals/${secondOpinion.id}/opinion`, { opinion }).then(reloadRows); }}/>}
+      onConfirm={() => { const opinion = pendingOpinion; setPendingOpinion(null); void mutate(`/doctor/cases/${caseId}/referrals/${secondOpinion.id}/opinion`, { opinion }).then(result => { reloadRows(); if (result) section.current?.focus(); }); }}/>}
 
     {rows.filter(r => r !== secondOpinion).length > 0 && <div>
       <h3 className="font-bold text-brand-900">{t.referrals}</h3>

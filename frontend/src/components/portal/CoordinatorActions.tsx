@@ -22,7 +22,8 @@ type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown
  */
 export function CoordinatorActionForm({ locale, code, caseId, version, careCategory, categories, staff, busy, mutate, load, consultantsHref, proposal, representatives }: {
   locale: Locale; code: string; caseId: string; version: number; careCategory?: string;
-  categories: CareCategory[]; staff: StaffMember[]; busy: boolean; mutate: Mutate; load: Load;
+  /** `null`: the team list could not be loaded. */
+  categories: CareCategory[]; staff: StaffMember[] | null; busy: boolean; mutate: Mutate; load: Load;
   /** The Control Center's Consultants page, for people who can open it; the next step when nobody is eligible. */
   consultantsHref?: string | null;
   /** The released proposal whose decision is recorded (RECORD_PROPOSAL_DECISION). */
@@ -114,10 +115,12 @@ function ConsultantAssignment({ locale, caseId, version, careCategory, categorie
   </div>;
 }
 
-function TeamAssignment({ locale, caseId, role, staff, busy, mutate }: { locale: Locale; caseId: string; role: "OPERATIONS" | "FINANCE"; staff: StaffMember[]; busy: boolean; mutate: Mutate }) {
+function TeamAssignment({ locale, caseId, role, staff, busy, mutate }: { locale: Locale; caseId: string; role: "OPERATIONS" | "FINANCE"; staff: StaffMember[] | null; busy: boolean; mutate: Mutate }) {
   const ar = locale === "ar";
-  const members = staff.filter(person => person.role === role || person.role === role + "_LEAD");
   const empty = useWorkCopy().empty;
+  // A failed load is not an empty team: say which, so nobody is sent to the manager over a network error.
+  if (staff === null) return <p role="alert" className="text-sm text-alert-800">{empty.teamUnavailable}</p>;
+  const members = staff.filter(person => person.role === role || person.role === role + "_LEAD");
   if (!members.length) return <p className="text-sm text-ink-600">{role === "OPERATIONS" ? empty.noOperations : empty.noFinance}</p>;
   return <form className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end" onSubmit={e => submit(e, data => mutate(`/coordinator/cases/${caseId}/assignments`, { assigneeSubject: data.get("assignee"), assigneeRole: role, assignmentType: "PRIMARY", pod: null, reason: `Assigned to ${role.toLowerCase()}` }))}>
     <label className="block text-sm font-bold">{ar ? "عضو الفريق" : "Team member"}

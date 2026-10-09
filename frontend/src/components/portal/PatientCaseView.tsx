@@ -48,18 +48,20 @@ type SubmittedIdentity={status:string;rejectionReason?:string|null}|null;
 
 /**
  * The identity step as it stands: the latest submission (under review, or rejected with the reason) from the patient's
- * onboarding, not an empty form after every submit. Read again once a submission succeeds.
+ * onboarding, not an empty form after every submit. Read again by the submit itself; the submission's own answer stands in
+ * if that read fails.
  */
 function IdentityStep({locale,caseId,busy,mutate,load}:{locale:Locale;caseId:string;busy:boolean;mutate:Mutate;load:<T>(path:string)=>Promise<T>}){
   const [identity,setIdentity]=useState<SubmittedIdentity|undefined>(undefined);
-  const [reads,setReads]=useState(0);
   useEffect(()=>{
     let live=true;
     // A failed read falls back to the form, as before.
     load<{identity?:SubmittedIdentity}>(`/patient/cases/${caseId}/onboarding`).then(view=>{if(live)setIdentity(view?.identity??null);},()=>{if(live)setIdentity(null);});
     return()=>{live=false;};
-  },[load,caseId,reads]);
+  },[load,caseId]);
   if(identity===undefined)return null;
   return <PatientIdentityStep locale={locale} caseId={caseId} identity={identity} busy={busy}
-    mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setReads(n=>n+1);return result;}}/>;
+    mutate={async(path,body,method)=>{const result=await mutate(path,body,method);
+      if(result){const view=await load<{identity?:SubmittedIdentity}>(`/patient/cases/${caseId}/onboarding`).catch(()=>null);setIdentity(view?view.identity??null:{status:result.status??"PENDING"});}
+      return result;}}/>;
 }
