@@ -66,7 +66,7 @@ function RoleCaseView({view:View,...props}:CaseViewProps&{view:ComponentType<Cas
 function withView(state:QueueState,id:StaffViewId):QueueState{return {...state,view:id,viewChosen:true,tab:id==="team"?"unowned":id==="mine"?"mine":state.tab,page:1};}
 
 function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCopy}){
-  const t=copy[locale];const work=useWorkCopy();const{user,me,loading,signIn,signOut,refreshMe}=useAuth();
+  const t=copy[locale];const work=useWorkCopy();const{user,me,loading,meFailed,signIn,signOut,refreshMe}=useAuth();
   // Silent token renewal hands over a new User object every few minutes. Everything keyed on `api` (the queue load,
   // reference data, polling) must not restart for that, so `api` follows the signed-in subject and reads the current
   // token from a ref kept in step before any data effect runs.
@@ -99,7 +99,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const queuePosition=useRef(0);const opening=useRef(0);const mutationPending=useRef(false);
   const [documentError,setDocumentError]=useState(false);const [queueLoading,setQueueLoading]=useState(true);const [queueFor,setQueueFor]=useState<string|null>(null);const [landedRole,setLandedRole]=useState<string|null>(null);
   const currentRole=active&&available.includes(active)?active:available[0];
-  const CaseViewFor=useCaseView(!currentRole||["admin","identity"].includes(currentRole)?null:currentRole==="patient"?"patient":"staff");
+  // The role a case page opens under. It is gone when /me fails (no roles are known then), so an open case waits for a
+  // retry instead of rendering under a role this person may no longer hold.
+  const caseRole=currentRole&&!["admin","identity"].includes(currentRole)?currentRole:null;
+  const CaseViewFor=useCaseView(!caseRole?null:caseRole==="patient"?"patient":"staff");
   useEffect(()=>{const selected=new URLSearchParams(window.location.search).get("role") as RoleKey;if(available.includes(selected))setActive(selected);},[available]);
   const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){await requestReauthentication(signIn);throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn]);
   const refresh=useCallback(async(managedBusy=false)=>{if(!currentRole||["admin","identity"].includes(currentRole))return;if(!managedBusy)setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{if(!managedBusy)setBusy(false);}},[currentRole,api,t.error]);
@@ -257,7 +260,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const baseName=preferences.displayName||profileName||accountName;
   const displayName=isDoctorRole&&profileName&&!/^d(r|octor)\b/i.test(baseName)?`Dr. ${baseName}`:baseName;
   const descriptions:Record<RoleKey,string>=locale==="ar"?{coordinator:"راجع الحالات ونسّق الخطوة التالية للرعاية.",doctor:"راجع الحالات المسندة إليك وسجّل قراراتك السريرية.",operations:"تابع الترتيبات والإجراءات المطلوبة منك.",finance:"راجع المدفوعات والموافقات المطلوبة.",patient:"تابع رعايتك وتعرّف على الخطوة التالية."}:{coordinator:"Review cases and coordinate the next step in care.",doctor:"Review assigned cases and record your clinical decisions.",operations:"Manage your assigned care and travel arrangements.",finance:"Review payments and commercial approvals that need your attention.",patient:"Follow your care and see what happens next."};
-  const inWorkspace=!!workspace&&!!currentRole&&!["admin","identity"].includes(currentRole);
+  const inWorkspace=!!workspace&&!!caseRole;
   const isPatientRole=currentRole==="patient";
   return <FeedbackContext.Provider value={{notice,error,clear:clearFeedback,clearNotice}}><PortalFrame title={isPatientRole?(locale==="ar"?"رعايتي":"My Care"):currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>workspace&&workspace.caseSummary.id!==caseId?guardLeave(()=>void openCaseById(caseId)):void openCaseById(caseId)}/>}
@@ -270,6 +273,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     <ReauthenticationReturnNotice locale={locale} className="mb-4 rounded-lg bg-brand-50 p-4 text-brand-800"/>
     {!available.length&&<NoPortalWorkspace locale={locale}/>}
     {linkToken&&currentRole==="patient"&&<AccountLinkRequest locale={locale} token={linkToken} api={api} onResolved={()=>{setLinkToken(null);restored.current=false;void refresh();}}/>}
+    {meFailed&&<div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-alert-50 p-4 text-alert-800"><span>{work.accessUnavailable.message}</span><button type="button" className="btn-secondary !px-3 !text-[0.82rem]" onClick={refreshMe}>{work.accessUnavailable.retry}</button></div>}
     {notice&&<p role="status" className="mb-4 rounded-lg bg-brand-50 p-4 text-brand-800">{notice}</p>}{error&&<div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-alert-50 p-4 text-alert-800"><span>{error}</span><button type="button" className="btn-secondary !px-3 !text-[0.82rem]" onClick={()=>{setError("");void refresh();}}>{locale==="ar"?"إعادة المحاولة":"Retry"}</button></div>}
     {leaveTo&&<LeaveCaseDialog onStay={()=>setLeaveTo(null)} onLeave={()=>{const go=leaveTo;setLeaveTo(null);go();}}/>}
     {busy&&workspace&&<p role="status" className="mb-3 text-sm text-ink-500">{t.loading}</p>}
@@ -277,7 +281,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     {workspace
         // Keyed by case: opening another case straight from a notification or My Work must not carry this case's
         // drafts, tab or open dialogs into it (or let them be submitted against the wrong patient's case).
-        ? !CaseViewFor ? <p role="status" className="text-sm text-ink-500">{t.loading}</p> : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={currentRole!} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null}/></div>
+        ? !caseRole||!CaseViewFor ? (meFailed?null:<p role="status" className="text-sm text-ink-500">{t.loading}</p>) : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={caseRole} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} share={share&&share.caseId===workspace.caseSummary.id?share:null} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null}/></div>
         : isPatientRole ? (queueLoading||(!landed&&patientView)||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)

@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
+import { setupPatient } from "./patient-fixture";
 import { setupPortal } from "./portal-fixture";
 
 /**
@@ -36,3 +37,43 @@ for (const locale of ["en", "ar"] as const) {
     await expect(page.getByRole("button", { name: ar ? "المزيد" : "More" })).toBeEnabled();
   });
 }
+
+/** A failed /me read leaves no known role. The portal says so and offers a retry instead of an empty page. */
+const accessAlert = (page: Page, ar: boolean) => page.getByRole("alert").filter({ hasText: ar ? /تعذّر التحقق من صلاحياتك/ : /couldn't confirm your access/ });
+
+for (const locale of ["en", "ar"] as const) {
+  test(`a failed access check says so and recovers on retry (${locale})`, async ({ page }) => {
+    await setupPortal(page, "COORDINATOR");
+    let failing = true;
+    // Registered after the fixture, so it answers first.
+    await page.route("**/api/v1/me", route => failing && route.request().method() === "GET"
+      ? route.fulfill({ status: 503, contentType: "application/json", body: "{}" }) : route.fallback());
+    await page.goto(`/${locale}/portal`);
+    const ar = locale === "ar";
+    const alert = accessAlert(page, ar);
+    await expect(alert).toBeVisible();
+    failing = false;
+    await alert.getByRole("button", { name: ar ? "إعادة المحاولة" : "Try again" }).click();
+    await expect(alert).toBeHidden();
+    await expect(page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first()).toBeVisible();
+  });
+}
+
+test("a patient whose access re-check fails is told so, not left loading, and gets the case back on retry", async ({ page }) => {
+  await setupPatient(page, "deposit-paid");
+  // A linked patient's session registration re-reads /me once: that second read fails.
+  let reads = 0, failing = true;
+  await page.route("**/api/v1/me", route => {
+    if (route.request().method() !== "GET") return route.fallback();
+    reads++;
+    return reads >= 2 && failing ? route.fulfill({ status: 503, contentType: "application/json", body: "{}" }) : route.fallback();
+  });
+  await page.goto("/en/portal");
+  const alert = accessAlert(page, false);
+  await expect(alert).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Loading your workspace" })).toHaveCount(0);
+  failing = false;
+  await alert.getByRole("button", { name: "Try again" }).click();
+  await expect(alert).toBeHidden();
+  await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
+});

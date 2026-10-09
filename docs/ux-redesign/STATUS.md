@@ -211,6 +211,18 @@ Update at the end of every phase.
         my-care, a11y: cold run 94 pass / 7 fail; rerun of the 7: 4 pass (cold timeouts: portal-ux ×2, portal-p2-pass-3,
         workspace-case-switch), 3 = pre-existing (care-coordination "Coordination Setup" ×2, Control Center "Staff & teams");
         warm rerun of portal-ux, portal-p2-pass-3 and workspace-case-switch: 38 pass, 1 = "Staff & teams"
+  - [x] Owner: "merge pass 4 into codex/platform-control-plane and push" (`5a79f90`), then "rebuild the stack": rebuilt
+        from `5a79f90`, backend UP, schema V77, localhost 3000/8081/8180 and `https://dev.rehletshifaa.com/en` 200
+  - [x] Role crash guard (owner: "carry on with the role crash guard"; backlog P2). Since the pass-3 split `role={currentRole!}`
+        could no longer crash (`useCaseView(null)` renders nothing), but a failed `/me` re-read left an open case on an
+        endless "Loading your workspace…", and a failed first read left an empty page: the portal never read `meFailed`.
+        The shell now derives `caseRole` (the role a case page opens under; none while `/me` has failed) and passes it
+        without `!`; while `meFailed` it shows one alert (`portalWork.accessUnavailable`, en + ar) with Try again
+        (`refreshMe`). The open case stays in state and comes back on a successful retry
+    - [x] verify: typecheck ok; lint 24/12; unit 348 pass, 11 `ProposalSign`; Playwright `portal-reliability` +3 tests (staff
+          first-load failure en/ar, patient re-read failure) — all 3 fail on the previous `Portal.tsx` and pass now; the 10
+          portal/patient specs 99 pass, 5 fail = 3 pre-existing (care-coordination ×2, "Staff & teams") + 2 cold-run
+          timeouts (a11y care-areas, portal-ux team queue) that pass alone
 
 ## Decisions
 
@@ -254,9 +266,9 @@ Update at the end of every phase.
 ## Next exact action
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
-tunnel stack was not rebuilt for it. Next code-structure candidates from the same backlog section: the `role={currentRole!}`
-crash guard (P2) and the lint `set-state-in-effect`/`refs`/`purity` errors (P2, incl. `Date.now()` in
-`ProposalSendForm`). Earlier notes:
+tunnel stack runs `5a79f90`. The role crash guard is committed on `feat/ux-redesign-pass-4`, not merged or pushed. Next
+code-structure candidate from the same backlog section: the lint `set-state-in-effect`/`refs`/`purity` errors (P2, incl.
+`Date.now()` in `ProposalSendForm`). Earlier notes:
 
 Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08); the follow-up
 commit on `feat/ux-redesign-pass-3` is not merged or pushed yet. The tunnel stack runs `9e3b336` (V76); live checks must run from a network that

@@ -864,6 +864,10 @@
     "decisionFailed": "Your decision was not sent. Check your connection and try again; nothing has changed yet."
   },
   "portalWork": {
+    "accessUnavailable": {
+      "message": "We couldn't confirm your access, so your workspace can't be shown. Nothing was changed.",
+      "retry": "Try again"
+    },
     "waiting": {
       "label": "Waiting on",
       "you": "you",
