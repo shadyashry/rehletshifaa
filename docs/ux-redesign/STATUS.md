@@ -353,8 +353,10 @@ Update at the end of every phase.
 
 **Finish plan:** [`plans/finish-plan.md`](plans/finish-plan.md) (2026-10-09). Batch 0 merged, pushed and deployed (`7441dbf`);
 D1–D4 decided (see Decisions); Batch 1 merged, pushed and deployed (`f304421`); Batch 1a (skill review fixes) done on
-`feat/ux-redesign-batch-1a`, not merged or pushed. Next: Batch 2 (portal accessibility and Arabic formatting, including the
-B1 status tokens), starting by loading the skills. Baselines: unit 361/361, Playwright full suite green, lint 0 errors / 10 warnings.
+`feat/ux-redesign-batch-1a` (`fc03f0b`), not merged or pushed. Owner: Batch 2 runs in a **new session on the same branch**
+(`feat/ux-redesign-batch-1a`, worktree `vigilant-roentgen-29caab`) and Batch 1a is merged **together with Batch 2** (one merge,
+push and rebuild). Next: Batch 2 (portal accessibility and Arabic formatting, including the B1 status tokens), starting by
+loading the skills. Baselines: unit 361/361, Playwright full suite green, lint 0 errors / 10 warnings.
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
 tunnel stack runs `6cd977d` (role crash guard, portal lint and `refreshMe` fix; all merged and pushed). Next candidates: Control Center lint
