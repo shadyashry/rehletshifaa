@@ -1,7 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
+import { renderWithWork } from "./test-copy";
 import { ConsultantReferrals, EligibleConsultantPicker, ReferralConfirmation, type EligibleConsultant, type Load, type Referral } from "./ConsultantRouting";
+
+// jsdom implements <dialog> only partially.
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new Event("close")); };
+});
 
 const categories = [{ slug: "cardiology", nameEn: "Cardiology", nameAr: "أمراض القلب" }, { slug: "orthopedics", nameEn: "Orthopedics", nameAr: "جراحة العظام" }];
 const consultants: EligibleConsultant[] = [
@@ -34,7 +41,7 @@ describe("Consultant routing", () => {
   it("lets the coordinator confirm a referral to the suggested consultant", async () => {
     const load = vi.fn((path: string) => Promise.resolve(path.includes("/referrals") ? [referral()] : consultants)) as unknown as Load;
     const mutate = vi.fn().mockResolvedValue({});
-    render(<ReferralConfirmation locale="en" caseId="case-1" careCategory="cardiology" categories={categories} busy={false} load={load} mutate={mutate}/>);
+    renderWithWork(<ReferralConfirmation locale="en" caseId="case-1" careCategory="cardiology" categories={categories} busy={false} load={load} mutate={mutate}/>);
     expect(await screen.findByText(/Needs electrophysiology/)).toBeTruthy();
     expect(await screen.findByText("Dr B")).toBeTruthy();
     expect((screen.getByRole("radio", { name: /Dr A/ }) as HTMLInputElement).checked).toBe(true);
@@ -45,7 +52,7 @@ describe("Consultant routing", () => {
   it("requires a reason for the coordinator to decline", async () => {
     const load = vi.fn((path: string) => Promise.resolve(path.includes("/referrals") ? [referral()] : consultants)) as unknown as Load;
     const mutate = vi.fn().mockResolvedValue({});
-    render(<ReferralConfirmation locale="en" caseId="case-1" careCategory="cardiology" categories={categories} busy={false} load={load} mutate={mutate}/>);
+    renderWithWork(<ReferralConfirmation locale="en" caseId="case-1" careCategory="cardiology" categories={categories} busy={false} load={load} mutate={mutate}/>);
     fireEvent.click(await screen.findByRole("button", { name: "Decline referral" }));
     fireEvent.change(screen.getByLabelText("Why this referral is not confirmed"), { target: { value: "Keep with current consultant" } });
     fireEvent.click(screen.getByRole("button", { name: "Decline" }));
@@ -55,17 +62,21 @@ describe("Consultant routing", () => {
   it("gives a second-opinion consultant the opinion form and nothing to refer", async () => {
     const load = vi.fn().mockResolvedValue([referral({ type: "SECOND_OPINION", status: "IN_PROGRESS", viewerRelation: "RECEIVER" })]);
     const mutate = vi.fn().mockResolvedValue({});
-    render(<ConsultantReferrals locale="en" caseId="case-1" careCategory="cardiology" categories={categories} canRefer={false} busy={false} load={load} mutate={mutate}/>);
+    renderWithWork(<ConsultantReferrals locale="en" caseId="case-1" careCategory="cardiology" categories={categories} canRefer={false} busy={false} load={load} mutate={mutate}/>);
     fireEvent.change(await screen.findByLabelText("Your second opinion"), { target: { value: "Ablation is reasonable." } });
     expect(screen.queryByRole("button", { name: "Refer this case" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Submit second opinion" }));
+    // Ending access is confirmed first: nothing is sent until the consultant agrees.
+    const confirm = await screen.findByRole("alertdialog", { name: "Submit your second opinion?" });
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(within(confirm).getByRole("button", { name: "Submit and end access" }));
     expect(mutate).toHaveBeenCalledWith("/doctor/cases/case-1/referrals/r1/opinion", { opinion: "Ablation is reasonable." });
   });
 
   it("sends the primary consultant's referral to the coordinator, never to a consultant directly", async () => {
     const load = vi.fn((path: string) => Promise.resolve(path.includes("/referrals") ? [] : consultants)) as unknown as Load;
     const mutate = vi.fn().mockResolvedValue({});
-    render(<ConsultantReferrals locale="en" caseId="case-1" careCategory="cardiology" categories={categories} canRefer busy={false} load={load} mutate={mutate}/>);
+    renderWithWork(<ConsultantReferrals locale="en" caseId="case-1" careCategory="cardiology" categories={categories} canRefer busy={false} load={load} mutate={mutate}/>);
     fireEvent.click(await screen.findByRole("button", { name: "Refer this case" }));
     fireEvent.click(screen.getByRole("radio", { name: /Transfer/ }));
     fireEvent.change(screen.getByLabelText("Clinical reason for the referral"), { target: { value: "Needs electrophysiology" } });

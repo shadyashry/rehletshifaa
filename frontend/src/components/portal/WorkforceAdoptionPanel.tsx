@@ -11,6 +11,8 @@ export function WorkforceAdoptionPanel({ locale, token, onAccepted }: { locale: 
   const ar = locale === "ar";
   const [items, setItems] = useState<Adoption[] | null>(null);
   const [error, setError] = useState("");
+  // One acceptance at a time: a double click must not send the same acceptance twice.
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
     void apiFetchAs(token, "/me/workforce-adoptions")
@@ -20,11 +22,16 @@ export function WorkforceAdoptionPanel({ locale, token, onAccepted }: { locale: 
     return () => { live = false; };
   }, [token, ar]);
   const accept = async (item: Adoption) => {
-    setError("");
-    const response = await apiFetchAs(token, `/me/workforce-adoptions/${item.id}/accept`, { method: "POST", body: JSON.stringify({ revision: item.revision }) });
+    if (busy) return;
+    setError(""); setBusy(true);
+    const failed = ar ? "تعذّر قبول الدعوة." : "We couldn't accept the invitation.";
+    let response: Response;
+    try { response = await apiFetchAs(token, `/me/workforce-adoptions/${item.id}/accept`, { method: "POST", body: JSON.stringify({ revision: item.revision }) }); }
+    catch { setError(failed); return; }
+    finally { setBusy(false); }
     if (!response.ok) {
       const body = await response.json().catch(() => ({})) as { message?: string };
-      setError(body.message ?? (ar ? "تعذّر قبول الدعوة." : "We couldn't accept the invitation."));
+      setError(body.message ?? failed);
       return;
     }
     onAccepted();
@@ -36,7 +43,7 @@ export function WorkforceAdoptionPanel({ locale, token, onAccepted }: { locale: 
     {items === null && !error ? <p role="status" className="mt-4 text-sm">{ar ? "جارٍ التحميل…" : "Loading…"}</p> : null}
     {items?.map((item) => <div key={item.id} className="mt-5 rounded-lg border border-line p-4">
       <strong className="block text-ink-900">{item.name}</strong><span className="block text-sm text-ink-600">{item.email}</span>
-      <button type="button" className="btn-primary mt-4" onClick={() => void accept(item)}>{ar ? "قبول وربط هويتي" : "Accept and link my identity"}</button>
+      <button type="button" className="btn-primary mt-4" disabled={busy} aria-busy={busy || undefined} onClick={() => void accept(item)}>{ar ? "قبول وربط هويتي" : "Accept and link my identity"}</button>
     </div>)}
   </section>;
 }

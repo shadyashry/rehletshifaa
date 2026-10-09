@@ -79,7 +79,7 @@ export function RecordProposalDecision({ locale, caseId, proposal, representativ
         decision, comment: note.trim() || undefined, channel, confirmedBy, conversationAt: at.toISOString(), attested,
         representativeId: confirmedBy === "REPRESENTATIVE" ? (single?.id ?? representativeId) : undefined,
       });
-      if (!result) setFailed(true);
+      if (result === undefined) setFailed(true);
     } catch { setFailed(true); }
   }
 

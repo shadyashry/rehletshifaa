@@ -32,7 +32,10 @@ export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Loca
   const [intake, setIntake] = useState<JourneyCutoverStatus | "error" | null>(null);
   const [runtime, setRuntime] = useState<Record<string, JourneyReadiness | "error"> | null>(null);
   const [history, setHistory] = useState<JourneyHistoryEntry[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Loading is what is not known yet: nothing while signed out, /me first (it decides what may be read), then the page.
+  const [fetching, setLoading] = useState(true);
+  const canRead = !!me?.permissions.includes("JOURNEY_READ");
+  const loading = !!user && (!me || (canRead && fetching));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [cloning, setCloning] = useState<JourneyVersion | null>(null);
@@ -53,18 +56,21 @@ export function JourneyVersionWorkspace({ locale, definitionId }: { locale: Loca
   }, [user, t, signIn, locale]);
   const base = "/admin/journeys/" + definitionId;
 
+  const load = useCallback(() => Promise.all([api<JourneyDetail>(base), api<JourneyCutoverStatus>("/admin/journey-cutover").catch(() => "error" as const)])
+    .then(([d, cutover]) => { setDetail(d); setIntake(cutover); }), [api, base]);
+  const failed = useCallback((e: unknown) => setError(e instanceof Error ? e.message : t.error), [t.error]);
+  // Retry and after an action: a visible reload that also forgets the runtime read for the previous state.
   const refresh = useCallback(async () => {
-    if (!user) { setLoading(false); return; }
-    if (!me) return; // wait for /api/v1/me before deciding what the caller may read
+    if (!canRead) return;
     setLoading(true); setError(""); setRuntime(null);
-    try {
-      if (me?.permissions.includes("JOURNEY_READ")) {
-        const [d, cutover] = await Promise.all([api<JourneyDetail>(base), api<JourneyCutoverStatus>("/admin/journey-cutover").catch(() => "error" as const)]);
-        setDetail(d); setIntake(cutover);
-      }
-    } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
-  }, [api, user, me, t.error, base]);
-  useEffect(() => { void refresh(); }, [refresh]);
+    try { await load(); } catch (e) { failed(e); } finally { setLoading(false); }
+  }, [canRead, load, failed]);
+  useEffect(() => {
+    if (!user || !canRead) return;
+    let live = true;
+    load().catch((e) => { if (live) failed(e); }).finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [user, canRead, load, failed]);
 
   const loadHistory = async () => {
     setBusy(true); setError("");

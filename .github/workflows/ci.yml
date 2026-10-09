@@ -17,8 +17,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
+      # Builds the frontend itself (playwright.config.ts webServer: next build + next start) and tests that build, so a
+      # failed build fails here; a separate build step only built it twice.
       - run: pnpm test:e2e
   backend:
     runs-on: ubuntu-latest

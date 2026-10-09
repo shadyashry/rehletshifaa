@@ -60,7 +60,7 @@ export function RecordPatientResponse({ locale, caseId, action, mutate, open: co
               {items.map(item => (
                 <label key={item.id} className="block text-sm font-bold text-ink-800">
                   {item.label}{item.required && <span aria-hidden className="ms-1 text-alert-600">*</span>}
-                  <textarea className="field mt-2 min-h-20" maxLength={4000} value={values[item.id] ?? ""}
+                  <textarea className="field mt-2 min-h-20" maxLength={4000} required={item.required} value={values[item.id] ?? ""}
                             onChange={event => setValues(current => ({ ...current, [item.id]: event.target.value }))}/>
                 </label>
               ))}

@@ -53,7 +53,9 @@ export type Workspace={preview?:boolean;intakeSummary?:string;patientAction?:{ta
 
 export type MutationResult={id?:string;status?:string};
 
-export type Mutate=(path:string,body?:unknown,method?:string)=>Promise<MutationResult|undefined>;
+/** Resolves to the result when the action succeeded, `undefined` when it failed (the page shows the error), and `null` when it
+ * was not sent because another action was still running. Success checks use truthiness; failure messages check `=== undefined`. */
+export type Mutate=(path:string,body?:unknown,method?:string)=>Promise<MutationResult|null|undefined>;
 
 /** A rejected command means the rendered action contract may be stale; refresh it before showing the error. */
 export async function refreshAfterRejectedAction(path:string,workspace:Workspace|null,refresh:()=>Promise<void>,reopen:(item:CaseView)=>Promise<void>){

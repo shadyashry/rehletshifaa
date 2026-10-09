@@ -67,7 +67,7 @@ broke. Removing that noise makes every later batch cheaper.
 
 Done when: unit tests are all green, and the portal/patient/governance Playwright set is green on a single cold run.
 
-## Batch 1 — portal safety and reliability (1 session)
+## Batch 1 — portal safety and reliability (1 session) — done 2026-10-09, see `STATUS.md`
 
 | Item | Backlog source |
 |---|---|

@@ -221,14 +221,15 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
   const decide = async (decision: string) => {
     setFailed(false);
     const result = await mutate(`/patient/cases/${caseId}/proposals/${proposal.versionId}/decision`, { decision, selectedOptionalItemIds: [], comment: comment.trim() || undefined });
-    if (!result) setFailed(true);
+    if (result === undefined) setFailed(true);
   };
   const requestAssistance = async () => {
     setRequestFailed(false); setRequesting(true);
     const send = onRequestAssistance ?? ((path: string) => mutate(path));
     const result = await send(`/patient/cases/${caseId}/proposals/${proposal.versionId}/assistance`);
     setRequesting(false);
-    if (!result) { setRequestFailed(true); return; }
+    if (result === undefined) { setRequestFailed(true); return; }
+    if (!result) return;
     // The button that had focus is replaced by the confirmation: take focus there so it is read and the drawer keeps it.
     if (statusRef.current) statusRef.current.focus(); else focusStatusPending.current = true;
   };

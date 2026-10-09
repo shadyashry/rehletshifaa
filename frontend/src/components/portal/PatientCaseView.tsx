@@ -1,11 +1,13 @@
 "use client";
 
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { CaseMessages } from "@/components/portal/CaseMessages";
 import type { CaseActions } from "@/components/portal/CurrentAction";
 import { FeedbackContext, CaseDrawer } from "@/components/portal/portal-ui";
 import type { CaseViewProps } from "@/components/portal/StaffCaseView";
+import type { Locale } from "@/lib/i18n";
+import type { Mutate } from "@/components/portal/portal-model";
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
 // Role-specific panels, loaded on demand: a coordinator never downloads My Care, a patient never the clinical review.
@@ -19,7 +21,7 @@ const PatientProposalDecision=dynamic(()=>import("@/components/portal/PatientPro
  * the proposal itself opens on demand in a drawer, where the decision (when one is owed) is the only control. Patients
  * enter their care journey, not a console, so this module never loads the staff workspace.
  */
-export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,mutate,careView="care",onCareView,otherCases=[],openCaseById}:CaseViewProps){
+export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,mutate,load,careView="care",onCareView,otherCases=[],openCaseById}:CaseViewProps){
   const feedback=useContext(FeedbackContext);
   const [proposalOpen,setProposalOpen]=useState(false);
   const c=value.caseSummary;const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
@@ -30,7 +32,7 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
     <MyCare locale={locale} representative={actions.viewer==="REPRESENTATIVE"} caseSummary={c} actions={actions} patientAction={value.patientAction} patientProposal={value.patientProposal} proposal={value.proposal??null} deposit={value.deposit??null}
      documents={documents} unreadMessages={unread} timeline={value.timeline} otherCases={otherCases.filter(other=>other.id!==c.id)} view={careView} onView={view=>onCareView?.(view)}
      onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)}
-     identityStep={actions.currentAction.code==="VERIFY_IDENTITY"?<PatientIdentityStep locale={locale} caseId={c.id} identity={null} busy={busy} mutate={mutate}/>:undefined}
+     identityStep={actions.currentAction.code==="VERIFY_IDENTITY"?<IdentityStep key={c.id} locale={locale} caseId={c.id} busy={busy} mutate={mutate} load={load}/>:undefined}
      messagesPanel={<div aria-busy={busy||undefined} className="min-w-0"><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={true} busy={busy} mutate={mutate}/></div>}/>
     {proposalOpen&&value.proposal&&<CaseDrawer locale={locale} title={proposalCopy.title} onClose={()=>setProposalOpen(false)}>
      <div aria-busy={busy||undefined} className="min-w-0"><PatientProposal locale={locale} copy={proposalCopy} proposal={value.proposal}
@@ -40,4 +42,24 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
        onMessage={onCareView?()=>{setProposalOpen(false);onCareView("messages");}:undefined} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setProposalOpen(false);return result;}}/>:null}/></div>
     </CaseDrawer>}
    </div>;
+}
+
+type SubmittedIdentity={status:string;rejectionReason?:string|null}|null;
+
+/**
+ * The identity step as it stands: the latest submission (under review, or rejected with the reason) from the patient's
+ * onboarding, not an empty form after every submit. Read again once a submission succeeds.
+ */
+function IdentityStep({locale,caseId,busy,mutate,load}:{locale:Locale;caseId:string;busy:boolean;mutate:Mutate;load:<T>(path:string)=>Promise<T>}){
+  const [identity,setIdentity]=useState<SubmittedIdentity|undefined>(undefined);
+  const [reads,setReads]=useState(0);
+  useEffect(()=>{
+    let live=true;
+    // A failed read falls back to the form, as before.
+    load<{identity?:SubmittedIdentity}>(`/patient/cases/${caseId}/onboarding`).then(view=>{if(live)setIdentity(view?.identity??null);},()=>{if(live)setIdentity(null);});
+    return()=>{live=false;};
+  },[load,caseId,reads]);
+  if(identity===undefined)return null;
+  return <PatientIdentityStep locale={locale} caseId={caseId} identity={identity} busy={busy}
+    mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setReads(n=>n+1);return result;}}/>;
 }

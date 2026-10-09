@@ -23,7 +23,7 @@ import { SITE_URL } from "@/lib/api";
 import { scrollIntoView } from "@/lib/scroll";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
 import { type CaseView, type CatalogService, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
-import { copy, HeaderFact, CaseDrawer, Panel, Empty, Status } from "@/components/portal/portal-ui";
+import { copy, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status } from "@/components/portal/portal-ui";
 
 const ClinicalReviewPanel=dynamic(()=>import("@/components/portal/ClinicalReview").then(m=>m.ClinicalReviewPanel));
 const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAssignmentDialog").then(m=>m.DeclineAssignmentDialog));
@@ -285,6 +285,8 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
  * currently holds is shown compactly with its one utility — resend — only while resending is valid.
  */
 function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?:Proposal;deposit?:DepositView|null;delivery?:DeliveryStatus|null;available:string[];onView:()=>void}){const work=useWorkCopy();const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
+ // A resend revokes the link the patient holds, so it is confirmed first.
+ const [resendPath,setResendPath]=useState<string|null>(null);
  const ar=locale==="ar";
  const total=proposal?proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0):null;
  const services=proposal?.items.length??0;
@@ -310,10 +312,12 @@ function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?
    {(delivery||resendProfile)&&<div className="flex flex-wrap items-baseline justify-between gap-x-3"><dt className="text-ink-500">{ar?"الرابط الآمن":"Secure link"}</dt><dd className="flex flex-wrap items-center gap-x-2 font-semibold text-ink-800">
     {delivery&&!resendProfile&&<span>{deliveryLabel} · {delivery.channel==="WHATSAPP"?(ar?"واتساب":"WhatsApp"):(ar?"البريد":"Email")} · <span dir="ltr">{delivery.destinationMasked}</span></span>}
     {resendProfile&&<span>{linkLabel}{delivery?<> · {delivery.channel==="WHATSAPP"?(ar?"واتساب":"WhatsApp"):(ar?"البريد":"Email")} · <span dir="ltr">{delivery.destinationMasked}</span></>:null}</span>}
-    {resendProposal&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} onClick={()=>void mutate(`/coordinator/cases/${caseId}/proposals/${proposal.versionId}/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
-    {resendProfile&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} onClick={()=>void mutate(`/coordinator/cases/${caseId}/onboarding-link/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
+    {resendProposal&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} onClick={()=>setResendPath(`/coordinator/cases/${caseId}/proposals/${proposal.versionId}/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
+    {resendProfile&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} onClick={()=>setResendPath(`/coordinator/cases/${caseId}/onboarding-link/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
    </dd></div>}
   </dl>
+  {resendPath&&<ConfirmDialog title={work.confirm.resendTitle} body={work.confirm.resendBody} confirm={work.confirm.resend} cancel={work.confirm.cancel}
+   onCancel={()=>setResendPath(null)} onConfirm={()=>{const path=resendPath;setResendPath(null);void mutate(path);}}/>}
  </section>;
 }
 
@@ -458,6 +462,9 @@ function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;proposal?
 
 function DepositCard({deposit}:{deposit:DepositView}){
  const {locale,role,c:{id:caseId},busy,mutate}=useCaseWorkspace();
+ const confirmCopy=useWorkCopy().confirm;
+ // A refund is money leaving: the amount is read back before it is recorded.
+ const [refund,setRefund]=useState<{form:HTMLFormElement;amountEgp:number;reason:string}|null>(null);
  const isFinance=role==="finance";
  const g=locale==="ar"?{title:"وديعة التنسيق والدفعات",total:"الإجمالي",paid:"المدفوع",balance:"المتبقي",record:"تسجيل دفعة",refund:"تسجيل استرداد",amount:"المبلغ (ج.م)",method:"الطريقة",reference:"مرجع المزوّد",reason:"سبب الاسترداد",note:"تسجيل دون اتصال فقط — يسجّل الدفعات المستلمة فعليًا؛ لا تُدخل بيانات بطاقة.",credited:"تُخصم من الرصيد النهائي",REQUESTED:"مطلوبة",PARTIALLY_PAID:"مدفوعة جزئيًا",PAID:"مدفوعة",CANCELLED:"ملغاة",REFUNDED:"مستردة"}:{title:"Coordination deposit & payments",total:"Total",paid:"Paid",balance:"Balance",record:"Record a payment",refund:"Record a refund",amount:"Amount (EGP)",method:"Method",reference:"Provider reference",reason:"Refund reason",note:"Offline record-only — records payments actually received; no card data is entered.",credited:"credited to final",REQUESTED:"Requested",PARTIALLY_PAID:"Partially paid",PAID:"Paid",CANCELLED:"Cancelled",REFUNDED:"Refunded"};
  const money=(n?:number)=>n==null?"—":new Intl.NumberFormat(intlLocale(locale),{style:"currency",currency:deposit.currency||"EGP"}).format(n);
@@ -474,25 +481,30 @@ function DepositCard({deposit}:{deposit:DepositView}){
     <label className="text-[0.8125rem] font-bold">{g.reference}<input className="field w-32" name="reference"/></label>
     <button className="btn-primary" disabled={busy}>{g.record}</button>
    </form>
-   <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/refunds`,{amountEgp:Number(d.get("amount"))||0,reason:String(d.get("reason")||"").trim(),idempotencyKey:crypto.randomUUID()}).then(result=>{if(result)f.reset();});}}>
+   <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);setRefund({form:f,amountEgp:Number(d.get("amount"))||0,reason:String(d.get("reason")||"").trim()});}}>
     <label className="text-[0.8125rem] font-bold">{g.amount}<input className="field w-28" name="amount" type="number" min="0.01" step="0.01" required/></label>
     <label className="flex-1 text-[0.8125rem] font-bold">{g.reason}<input className="field" name="reason" required/></label>
     <button className="btn-secondary" disabled={busy}>{g.refund}</button>
    </form>
    <p className="mt-2 text-[0.8125rem] text-ink-500">{g.note}</p>
   </>}
+  {refund&&<ConfirmDialog title={fillTemplate(confirmCopy.refundTitle,{amount:new Intl.NumberFormat(intlLocale(locale),{style:"currency",currency:"EGP"}).format(refund.amountEgp)})} body={confirmCopy.refundBody} confirm={confirmCopy.refund} cancel={confirmCopy.cancel}
+   onCancel={()=>setRefund(null)} onConfirm={()=>{const r=refund;setRefund(null);void mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/refunds`,{amountEgp:r.amountEgp,reason:r.reason,idempotencyKey:crypto.randomUUID()}).then(result=>{if(result)r.form.reset();});}}/>}
  </div>;
 }
 
 function DeliveryCard({delivery,versionId,canResend=true}:{delivery:DeliveryStatus;versionId:string;canResend?:boolean}){
  const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
+ const confirmCopy=useWorkCopy().confirm;const [resending,setResending]=useState(false);
  const g=locale==="ar"?{title:"حالة إرسال الرابط الآمن",channel:"القناة",to:"إلى",attempts:"المحاولات",resend:"إعادة إرسال الرابط",QUEUED:"في قائمة الإرسال",DELIVERED:"تم التسليم",RETRY:"إعادة المحاولة",FAILED:"فشل الإرسال",resendHint:"يُلغي الرابط ورمز التحقق السابقين ويُرسل رابطًا آمنًا جديدًا. لا يُنشئ عرضًا جديدًا ولا يغيّر حالة الطلب."}:{title:"Secure link delivery",channel:"Channel",to:"To",attempts:"Attempts",resend:"Resend link",QUEUED:"Queued",DELIVERED:"Delivered",RETRY:"Retrying",FAILED:"Failed",resendHint:"Revokes the previous link and code and sends a fresh secure link to the patient's verified contact. It does not create a new proposal or change the case."};
  const label=(g as Record<string,string>)[delivery.status]??delivery.status;
  const cls=delivery.status==="DELIVERED"?"bg-brand-50 text-brand-700":delivery.status==="FAILED"?"bg-alert-50 text-alert-700":"bg-mist text-ink-600";
  return <div className="mt-4 rounded-lg border border-line p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-bold text-ink-800">{g.title}</p><span className={`rounded px-2 py-0.5 text-[0.8125rem] font-bold ${cls}`}>{label}</span></div>
   <p className="mt-2 text-sm text-ink-600">{g.channel}: <strong>{delivery.channel}</strong> · {g.to} <span dir="ltr">{delivery.destinationMasked}</span>{delivery.attempts>0?` · ${g.attempts}: ${delivery.attempts}`:""}</p>
-  {canResend&&<button type="button" className="btn-secondary mt-3" disabled={busy} onClick={()=>void mutate(`/coordinator/cases/${caseId}/proposals/${versionId}/resend`)}>{g.resend}</button>}
-  {canResend&&<p className="mt-2 text-[0.8125rem] text-ink-500">{g.resendHint}</p>}</div>;
+  {canResend&&<button type="button" className="btn-secondary mt-3" disabled={busy} onClick={()=>setResending(true)}>{g.resend}</button>}
+  {canResend&&<p className="mt-2 text-[0.8125rem] text-ink-500">{g.resendHint}</p>}
+  {resending&&<ConfirmDialog title={confirmCopy.resendTitle} body={confirmCopy.resendBody} confirm={confirmCopy.resend} cancel={confirmCopy.cancel}
+   onCancel={()=>setResending(false)} onConfirm={()=>{setResending(false);void mutate(`/coordinator/cases/${caseId}/proposals/${versionId}/resend`);}}/>}</div>;
 }
 
 /** Also rendered on its own (`AuthoritativeActions.test.tsx`), so it keeps explicit props rather than reading the case workspace. */

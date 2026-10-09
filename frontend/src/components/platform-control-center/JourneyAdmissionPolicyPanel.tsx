@@ -58,10 +58,17 @@ export function JourneyAdmissionPolicyPanel({ locale, definitionId, versions, pe
     try { setPolicies(await api<JourneyAdmissionPolicy[]>(base)); setError(""); }
     catch (e) { setPolicies(null); setError(e instanceof Error ? e.message : t.error); }
   }, [api, t.error]);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    let live = true;
+    api<JourneyAdmissionPolicy[]>(base).then((rows) => { if (live) { setPolicies(rows); setError(""); } },
+      (e) => { if (live) { setPolicies(null); setError(e instanceof Error ? e.message : t.error); } });
+    return () => { live = false; };
+  }, [api, t.error]);
+  // A different version's readiness is unknown until it is read: cleared while rendering, read by the effect.
+  const [readinessFor, setReadinessFor] = useState(versionId);
+  if (readinessFor !== versionId) { setReadinessFor(versionId); setReadiness(null); }
   useEffect(() => {
     let cancelled = false;
-    setReadiness(null);
     if (versionId) void api<JourneyReadiness>(`/admin/journeys/${definitionId}/versions/${versionId}/runtime`)
       .then((value) => { if (!cancelled) setReadiness(value.status); })
       .catch(() => { if (!cancelled) setReadiness("UNKNOWN"); });

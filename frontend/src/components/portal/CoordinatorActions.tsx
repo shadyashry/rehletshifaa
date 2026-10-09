@@ -117,6 +117,8 @@ function ConsultantAssignment({ locale, caseId, version, careCategory, categorie
 function TeamAssignment({ locale, caseId, role, staff, busy, mutate }: { locale: Locale; caseId: string; role: "OPERATIONS" | "FINANCE"; staff: StaffMember[]; busy: boolean; mutate: Mutate }) {
   const ar = locale === "ar";
   const members = staff.filter(person => person.role === role || person.role === role + "_LEAD");
+  const empty = useWorkCopy().empty;
+  if (!members.length) return <p className="text-sm text-ink-600">{role === "OPERATIONS" ? empty.noOperations : empty.noFinance}</p>;
   return <form className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end" onSubmit={e => submit(e, data => mutate(`/coordinator/cases/${caseId}/assignments`, { assigneeSubject: data.get("assignee"), assigneeRole: role, assignmentType: "PRIMARY", pod: null, reason: `Assigned to ${role.toLowerCase()}` }))}>
     <label className="block text-sm font-bold">{ar ? "عضو الفريق" : "Team member"}
       <select name="assignee" className="field mt-1.5" required defaultValue="">

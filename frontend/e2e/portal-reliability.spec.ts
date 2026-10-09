@@ -95,3 +95,25 @@ test("a patient's case stays on screen while their access is re-read", async ({ 
   release();
   await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
 });
+
+// Resending revokes the link the patient holds: it is confirmed first, and backing out sends nothing.
+for (const locale of ["en", "ar"] as const) {
+  test(`resending the secure link asks first (${locale})`, async ({ page }) => {
+    const ar = locale === "ar";
+    const { writes } = await setupPortal(page, "COORDINATOR", { assistedDecision: true, delivery: true });
+    await page.goto(`/${locale}/portal`);
+    await page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first().click();
+    const resend = page.getByRole("button", { name: ar ? "إعادة الإرسال" : "Resend link" });
+    const resent = () => writes.filter(w => w.path.endsWith("/resend")).length;
+    await resend.click();
+    const confirm = page.getByRole("alertdialog", { name: ar ? "إرسال رابط آمن جديد؟" : "Send a new secure link?" });
+    await expect(confirm).toBeVisible();
+    await expect(confirm.getByRole("button", { name: ar ? "إلغاء" : "Cancel" })).toBeFocused();
+    await confirm.getByRole("button", { name: ar ? "إلغاء" : "Cancel" }).click();
+    await expect(confirm).toBeHidden();
+    expect(resent()).toBe(0);
+    await resend.click();
+    await page.getByRole("alertdialog").getByRole("button", { name: ar ? "إرسال رابط جديد" : "Send new link" }).click();
+    await expect.poll(resent).toBe(1);
+  });
+}

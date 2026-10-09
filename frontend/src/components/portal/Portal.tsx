@@ -103,7 +103,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const managedClinicLanding=!!user&&!workforce&&!careEntry&&clinicAccess.clinics.some(c=>c.relation==="PRACTICE_MANAGER");
   const deferPatient=!workforce&&!careEntry&&(clinicAccess.loading||managedClinicLanding);
   useEffect(()=>{if(managedClinicLanding)router.replace(virtualClinicHref(locale));},[managedClinicLanding,router,locale]);
-  const[chosenRole,setActive]=useState<RoleKey|undefined>();const[cases,setCases]=useState<CaseView[]>([]);const[myTasks,setMyTasks]=useState<Task[]>([]);const[workspace,setWorkspace]=useState<Workspace|null>(null);const[documents,setDocuments]=useState<CaseDocument[]>([]);const[doctors,setDoctors]=useState<VerifiedDoctor[]>([]);const[categories,setCategories]=useState<CareCategory[]>([]);const[staff,setStaff]=useState<StaffMember[]>([]);const[share,setShare]=useState<{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null>(null);const[doctorProfile,setDoctorProfile]=useState<DoctorProfile|null>(null);const[coordinatorProfile,setCoordinatorProfile]=useState<StaffProfile|null>(null);const[catalog,setCatalog]=useState<CatalogService[]>([]);const[fxRates,setFxRates]=useState<FxRate[]>([]);const[busy,setBusy]=useState(false);const[notice,setNotice]=useState("");const[error,setError]=useState("");
+  const[chosenRole,setActive]=useState<RoleKey|undefined>();const[cases,setCases]=useState<CaseView[]>([]);const[myTasks,setMyTasks]=useState<Task[]>([]);const[workspace,setWorkspace]=useState<Workspace|null>(null);const[documents,setDocuments]=useState<CaseDocument[]>([]);const[doctors,setDoctors]=useState<VerifiedDoctor[]>([]);const[categories,setCategories]=useState<CareCategory[]>([]);const[staff,setStaff]=useState<StaffMember[]>([]);const[share,setShare]=useState<{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null>(null);const[doctorProfile,setDoctorProfile]=useState<DoctorProfile|null>(null);const[coordinatorProfile,setCoordinatorProfile]=useState<StaffProfile|null>(null);const[catalog,setCatalog]=useState<CatalogService[]>([]);const[fxRates,setFxRates]=useState<FxRate[]>([]);const[busyCount,setBusyCount]=useState(0);const busy=busyCount>0;const[notice,setNotice]=useState("");const[error,setError]=useState("");
   const [preferences,setPreferences]=useState<Preferences>({displayName:null,locale:null});
   const [queueState,setQueueState]=useState<QueueState>(initialQueue);
   const queuePosition=useRef(0);const opening=useRef(0);const mutationPending=useRef(false);
@@ -117,7 +117,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const caseRole=currentRole&&!["admin","identity"].includes(currentRole)?currentRole:null;
   const CaseViewFor=useCaseView(!caseRole?null:caseRole==="patient"?"patient":"staff");
   const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){await requestReauthentication(signIn);throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn,locale]);
-  const refresh=useCallback(async(managedBusy=false)=>{if(!currentRole||["admin","identity"].includes(currentRole))return;if(!managedBusy)setBusy(true);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{if(!managedBusy)setBusy(false);}},[currentRole,api,t.error]);
+  // Busy counts the operations in flight, so one finishing cannot clear it while another still runs. A refresh answers
+  // only if it is still the latest one for this role: an older one, or one from before a role switch, is dropped.
+  const refreshing=useRef(0);
+  const refresh=useCallback(async(managedBusy=false)=>{if(!currentRole||["admin","identity"].includes(currentRole))return;const request=++refreshing.current;if(!managedBusy)setBusyCount(n=>n+1);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);if(request!==refreshing.current)return;setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){if(request===refreshing.current)setError(e instanceof Error?e.message:t.error);}finally{if(!managedBusy)setBusyCount(n=>n-1);}},[currentRole,api,t.error]);
   const loadAssignmentHistory=useCallback((caseId:string)=>api<AssignmentHistoryEntry[]>(`/coordinator/cases/${caseId}/assignment-history`),[api]);
   useEffect(()=>{if(!signedInSubject)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[signedInSubject,api]);
   // The queue belongs to one person in one role. When either changes, the previous list is cleared and marked loading while
@@ -126,6 +129,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const [queueKeyShown,setQueueKeyShown]=useState<string|null|undefined>(undefined);
   if(queueKey!==queueKeyShown){setQueueKeyShown(queueKey);setQueueLoading(!!queueKey);if(queueKey){setCases([]);setMyTasks([]);setError("");}}
   useEffect(()=>{
+    refreshing.current++;
     if(!queueKey||!currentRole)return;
     let cancelled=false;
     void Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),["coordinator","doctor","operations","finance","patient"].includes(currentRole)?api<Task[]>("/work/mine"):Promise.resolve([])])
@@ -146,13 +150,22 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   // that answer changes an input would refresh /me again, forever.
   const sessionRegisteredFor=useRef<string|null>(null);
   useEffect(()=>{if(!user||deferPatient||!patientView)return;const subject=user.profile.sub;if(sessionRegisteredFor.current===subject)return;sessionRegisteredFor.current=subject;const params=new URLSearchParams(window.location.search);const link=params.get("link");if(link){params.delete("link");window.history.replaceState({},"",`${window.location.pathname}${params.toString()?`?${params}`:""}`);}void api<{linked:boolean;currentCaseId:string|null;accountStatus:string}>("/patient/account/session",{method:"POST"}).then(session=>{if(session.linked)refreshMe();if(!params.get("case")&&session.currentCaseId&&!link){const url=new URL(window.location.href);url.searchParams.set("case",session.currentCaseId);window.history.replaceState({},"",url);}}).catch(()=>{}).finally(()=>setLanded(true));},[user,patientView,api,deferPatient,refreshMe]);
-  useEffect(()=>{if(currentRole!=="doctor")return;void api<DoctorProfile>("/doctor/me").then(setDoctorProfile).catch(()=>setDoctorProfile(null));void api<CatalogService[]>("/doctor/catalog").then(setCatalog).catch(()=>setCatalog([]));void api<FxRate[]>("/doctor/fx-rates").then(setFxRates).catch(()=>setFxRates([]));},[currentRole,api]);
-  useEffect(()=>{if(currentRole!=="coordinator")return;void api<StaffProfile>("/coordinator/me").then(setCoordinatorProfile).catch(()=>setCoordinatorProfile(null));},[currentRole,api]);
-  useEffect(()=>{if(currentRole!=="coordinator")return;void api<VerifiedDoctor[]>("/coordinator/doctors").then(setDoctors).catch(()=>setDoctors([]));void api<CareCategory[]>("/coordinator/care-categories").then(setCategories).catch(()=>setCategories([]));void api<FxRate[]>("/coordinator/fx-rates").then(setFxRates).catch(()=>setFxRates([]));void Promise.all([api<StaffMember[]>("/coordinator/staff?role=COORDINATOR"),api<StaffMember[]>("/coordinator/staff?role=OPERATIONS"),api<StaffMember[]>("/coordinator/staff?role=FINANCE")]).then(rows=>setStaff(rows.flat())).catch(()=>setStaff([]));},[currentRole,api]);
+  // Reference data belongs to the role that read it: cleared while rendering when the role changes, and a read that
+  // finishes after a switch is dropped (the consultant's and the coordinator's FX rates share one slot).
+  const [referenceRole,setReferenceRole]=useState(currentRole);
+  if(referenceRole!==currentRole){setReferenceRole(currentRole);setDoctorProfile(null);setCatalog([]);setFxRates([]);setCoordinatorProfile(null);setDoctors([]);setCategories([]);setStaff([]);}
+  useEffect(()=>{if(currentRole!=="doctor")return;let live=true;const keep=<T,>(set:(value:T)=>void)=>(value:T)=>{if(live)set(value);};
+    void api<DoctorProfile>("/doctor/me").then(keep(setDoctorProfile),()=>keep(setDoctorProfile)(null));void api<CatalogService[]>("/doctor/catalog").then(keep(setCatalog),()=>keep(setCatalog)([]));void api<FxRate[]>("/doctor/fx-rates").then(keep(setFxRates),()=>keep(setFxRates)([]));
+    return()=>{live=false;};},[currentRole,api]);
+  useEffect(()=>{if(currentRole!=="coordinator")return;let live=true;const keep=<T,>(set:(value:T)=>void)=>(value:T)=>{if(live)set(value);};
+    void api<StaffProfile>("/coordinator/me").then(keep(setCoordinatorProfile),()=>keep(setCoordinatorProfile)(null));
+    void api<VerifiedDoctor[]>("/coordinator/doctors").then(keep(setDoctors),()=>keep(setDoctors)([]));void api<CareCategory[]>("/coordinator/care-categories").then(keep(setCategories),()=>keep(setCategories)([]));void api<FxRate[]>("/coordinator/fx-rates").then(keep(setFxRates),()=>keep(setFxRates)([]));
+    void Promise.all([api<StaffMember[]>("/coordinator/staff?role=COORDINATOR"),api<StaffMember[]>("/coordinator/staff?role=OPERATIONS"),api<StaffMember[]>("/coordinator/staff?role=FINANCE")]).then(rows=>keep(setStaff)(rows.flat()),()=>keep(setStaff)([]));
+    return()=>{live=false;};},[currentRole,api]);
   async function openCase(item:CaseView,preloaded?:Workspace,managedBusy=false){
     // While /me reloads there is no role yet; a role-scoped URL would read /undefined/cases/….
     if(!currentRole)return;
-    const request=++opening.current;if(!managedBusy)setBusy(true);setError("");setDocumentError(false);
+    const request=++opening.current;if(!managedBusy)setBusyCount(n=>n+1);setError("");setDocumentError(false);
     if(!workspace)queuePosition.current=window.scrollY;
     try{
       if(currentRole==="coordinator"&&!item.coordinatorSubject){
@@ -166,7 +179,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
       }
       if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);window.history.replaceState({},"",url);if(!workspace)requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());}
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}
-    finally{if(request===opening.current&&!managedBusy)setBusy(false);}
+    finally{if(!managedBusy)setBusyCount(n=>n-1);}
   }
   /** Open a case by id (from My Work or a notification), even before the queue has loaded it. */
   async function openCaseById(caseId:string){
@@ -202,9 +215,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const changeCareView=(view:CareView)=>{setCareView(view);const url=new URL(window.location.href);if(view==="care")url.searchParams.delete("view");else url.searchParams.set("view",view);window.history.replaceState({},"",url);requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());};
   async function downloadDoc(id:string){setError("");try{const res=await api<{downloadUrl:string}>(`/documents/${id}/download`);if(res?.downloadUrl)window.open(res.downloadUrl,"_blank","noopener,noreferrer");}catch(e){setError(e instanceof Error?e.message:t.error);}}
   async function viewDoc(id:string){setError("");try{const res=await api<{downloadUrl:string}>(`/documents/${id}/view`);if(res?.downloadUrl)window.open(res.downloadUrl,"_blank","noopener,noreferrer");}catch(e){setError(e instanceof Error?e.message:t.error);}}
-  async function sendProposal(caseId:string,body:unknown){setBusy(true);setError("");setNotice("");try{await api(`/coordinator/cases/${caseId}/proposals`,{method:"POST",body:JSON.stringify(body)});setShare(null);setNotice(t.success);if(workspace)await openCase(workspace.caseSummary);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusy(false);}}
-  async function mutate(path:string,body?:unknown,method="POST"):Promise<MutationResult|undefined>{
-    if(mutationPending.current)return;mutationPending.current=true;setBusy(true);setError("");setNotice("");
+  async function sendProposal(caseId:string,body:unknown){setBusyCount(n=>n+1);setError("");setNotice("");try{await api(`/coordinator/cases/${caseId}/proposals`,{method:"POST",body:JSON.stringify(body)});setShare(null);setNotice(t.success);if(workspace)await openCase(workspace.caseSummary);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusyCount(n=>n-1);}}
+  async function mutate(path:string,body?:unknown,method="POST"):Promise<MutationResult|null|undefined>{
+    // Another action is still running: nothing was sent, which is not a failure (null, not undefined).
+    if(mutationPending.current)return null;mutationPending.current=true;setBusyCount(n=>n+1);setError("");setNotice("");
     const origin=document.activeElement instanceof HTMLElement&&document.activeElement!==document.body?document.activeElement:null;
     try{const result=await api<MutationResult>(path,{method,body:body===undefined?undefined:JSON.stringify(body)});setNotice(t.success);
       await Promise.all([refresh(true),workspace?openCase(path.endsWith("/claim")?{...workspace.caseSummary,coordinatorSubject:user?.profile.sub}:workspace.caseSummary,undefined,true):undefined]);
@@ -212,7 +226,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
       requestAnimationFrame(()=>rebaseline(origin));
       return result??{status:"SAVED"};
     }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);await refreshAfterRejectedAction(path,workspace,refresh,openCase);setError(message);return undefined;}
-    finally{mutationPending.current=false;setBusy(false);}
+    finally{mutationPending.current=false;setBusyCount(n=>n-1);}
   }
   // Staff views (My work, My cases, Team queue) in one place: the header navigation, the inline phone navigation and
   // the landing rule all read the same items and counts.

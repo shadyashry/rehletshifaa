@@ -32,7 +32,10 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
   const [graph, setGraph] = useState<JourneyGraph | null>(null);
   const [registry, setRegistry] = useState<JourneyCapability[]>([]);
   const [registryMeta, setRegistryMeta] = useState<JourneyRegistryMetadata | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Loading is what is not known yet: nothing while signed out, /me first (it decides what may be read), then the page.
+  const [fetching, setLoading] = useState(true);
+  const canRead = !!me?.permissions.includes("JOURNEY_READ");
+  const loading = !!user && (!me || (canRead && fetching));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -59,29 +62,33 @@ export function JourneyDesigner({ locale, definitionId, versionId, initialTab }:
     }
     const text = await response.text();
     return text ? JSON.parse(text) : (undefined as T);
-  }, [user, t, signIn]);
+  }, [user, t, signIn, locale]);
 
   const version = detail?.versions.find((v) => v.id === versionId) ?? null;
   const editable = version ? ["DRAFT", "VALIDATED", "SIMULATED"].includes(version.status) : false;
 
+  const load = useCallback(() => Promise.all([
+    api<JourneyDetail>("/" + definitionId),
+    api<JourneyCapability[]>("/registry"),
+    api<JourneyRegistryMetadata>("/registry/metadata"),
+  ]).then(([d, reg, meta]) => {
+    setDetail(d); setRegistry(reg); setRegistryMeta(meta);
+    const v = d.versions.find((x) => x.id === versionId);
+    if (v) { setSavedGraph(v.graph); setGraph(v.graph); }
+  }), [api, definitionId, versionId]);
+  const failed = useCallback((e: unknown) => setError(e instanceof Error ? e.message : t.error), [t.error]);
+  // Reload after a conflict or an action: visible, and it clears the "changed elsewhere" notice.
   const refresh = useCallback(async () => {
-    if (!user) { setLoading(false); return; }
-    if (!me) return; // wait for /api/v1/me before deciding what the caller may read
+    if (!canRead) return;
     setLoading(true); setError(""); setStale(false);
-    try {
-      if (me?.permissions.includes("JOURNEY_READ")) {
-        const [d, reg, meta] = await Promise.all([
-          api<JourneyDetail>("/" + definitionId),
-          api<JourneyCapability[]>("/registry"),
-          api<JourneyRegistryMetadata>("/registry/metadata"),
-        ]);
-        setDetail(d); setRegistry(reg); setRegistryMeta(meta);
-        const v = d.versions.find((x) => x.id === versionId);
-        if (v) { setSavedGraph(v.graph); setGraph(v.graph); }
-      }
-    } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
-  }, [api, user, me, t.error, definitionId, versionId]);
-  useEffect(() => { void refresh(); }, [refresh]);
+    try { await load(); } catch (e) { failed(e); } finally { setLoading(false); }
+  }, [canRead, load, failed]);
+  useEffect(() => {
+    if (!user || !canRead) return;
+    let live = true;
+    load().catch((e) => { if (live) failed(e); }).finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [user, canRead, load, failed]);
 
   const dirty = useMemo(() => JSON.stringify(graph) !== JSON.stringify(savedGraph), [graph, savedGraph]);
 

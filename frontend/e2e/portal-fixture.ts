@@ -18,7 +18,7 @@ const PLATFORM_ROLES:Record<string,string[]>={COORDINATOR_LEAD:["COORDINATOR"],D
 /** The staff views (My work, My cases, Team queue) are navigation — in the header from md, inline below — not tabs. */
 export const staffView=(page:Page,name:RegExp)=>page.getByRole("navigation",{name:/^(Your work|أقسام العمل)$/}).getByRole("link",{name});
 export const portalAlerts=(page:Page)=>page.locator('[role="alert"]:not(#__next-route-announcer__)');
-export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean;pendingWork?:boolean;assistedDecision?:boolean;notifications?:boolean;representatives?:boolean}={}){
+export async function setupPortal(page:Page, role="COORDINATOR", options:{documentsFail?:boolean;claimConflict?:boolean;reviews?:boolean;saveFail?:boolean;empty?:boolean;pendingWork?:boolean;assistedDecision?:boolean;notifications?:boolean;representatives?:boolean;delivery?:boolean}={}){
   const roles=role==="COORDINATOR_LEAD"?["COORDINATOR",role]:[role];
   await page.addInitScript(({roles,subject,authority})=>{
     const value=JSON.stringify({access_token:"synthetic-test-token",token_type:"Bearer",scope:"openid profile email",profile:{sub:subject,name:"Layla Hassan",email:"layla@example.test",roles},expires_at:Math.floor(Date.now()/1000)+3600});
@@ -71,6 +71,7 @@ export async function setupPortal(page:Page, role="COORDINATOR", options:{docume
     if(api.endsWith("/documents"))return options.documentsFail?reply({message:"Documents temporarily unavailable"},503):reply(options.reviews||options.pendingWork?[{documentId:"doc",fileName:"Clinical report.pdf",contentType:"application/pdf",sizeBytes:1024,status:"CLEAN",createdAt:stamp}]:[]);
     if(api.endsWith("/proposals/v1/decision/on-behalf")){recorded=true;return reply({...releasedProposal,status:"ACCEPTED"});}
     if(/\/cases\/(owned|unowned|team)$/.test(api)){const c=cases.find(c=>api.endsWith(c.id))!;return reply({caseSummary:assisted(c)?{...c,status:recorded?"ACCEPTED":"PATIENT_DECISION"}:c,actions:assisted(c)?assistedActions():actionsFor(c,subject),...(assisted(c)?{proposal:{...releasedProposal,...(recorded?{status:"ACCEPTED"}:{})}}:{}),
+      ...(assisted(c)&&options.delivery?{delivery:{status:"DELIVERED",channel:"WHATSAPP",destinationMasked:"•••• 7898",attempts:1}}:{}),
       ...(assisted(c)&&options.representatives?{representatives:[{id:"rep-1",name:"Omar Example",relationship:"PARENT",since:"2026-09-01T09:00:00Z"},{id:"rep-2",name:null,relationship:"SIBLING",since:"2026-09-05T09:00:00Z"}]}:{}),intakeSummary:"Cardiac reports submitted for review.",timeline:[{type:"STATUS",label:"Received",status:"RECEIVED",occurredAt:stamp}],tasks:[],messages:[],assignments:[],clinicalReviews:options.reviews?[{id:"review",versionNumber:1,status:"APPROVED",recommendedTreatment:"Review finding visible to the care team",createdAt:stamp}]:[]});}
     if(api.endsWith("/messages"))return options.saveFail?reply({message:"Unable to save changes"},500):reply({id:"message",status:"SENT"});
     if(api.endsWith("/me"))return reply({displayName:"Layla Hassan",specialty:"Cardiology"});

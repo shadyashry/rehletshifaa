@@ -265,6 +265,29 @@ Update at the end of every phase.
         before it rendered, so focus was lost; it now focuses it when it mounts (`PatientProposal.tsx`)
   - [x] verify: typecheck ok; lint 13/11 (unchanged, Control Center in Batch 1); unit **360/360**; Playwright full suite on
         two consecutive cold runs **229 passed, 0 failed**, 38 skipped (env-gated live specs), under three minutes each
+  - [x] Owner: "merge and push, then rebuild the stack" — `7441dbf` (with `3b40a09`) fast-forwarded and pushed; stack rebuilt
+        (backend UP, localhost 3000/8081/8180, `https://dev.rehletshifaa.com/en` and `/en/portal` 200)
+
+- [x] **Finish plan — Batch 1: portal safety and reliability** (branch `feat/ux-redesign-batch-1`, 2026-10-09)
+  - [x] Control Center lint (13 `set-state-in-effect`): effects only fetch and apply in `.then` with a liveness guard; the
+        journey pages derive loading (signed out, `/me` pending, no read permission); resets on a new key are adjusted while
+        rendering; the language link reads the URL through `useSyncExternalStore`. Lint 0 errors
+  - [x] Confirmations (one `ConfirmDialog` alertdialog, safe choice focused, en + ar copy in `portalWork.confirm`): recording a
+        refund (amount read back), Resend link on the proposal summary and the delivery card (both revoke the patient's link,
+        checked in `JourneyService`/`PublicCaseAccessService`), and submitting a second opinion (ends the consultant's access)
+  - [x] Required items in `RecordPatientResponse` are `required`; the "Request changes" note was already required
+  - [x] Portal reliability: busy counts operations in flight; a refresh answers only if it is the latest for the role; reference
+        data is cleared on a role switch and its reads are guarded; `mutate` returns `null` for a skipped overlapping call
+        (not a failure) and `undefined` for a failure
+  - [x] Identity step shows the latest submission (awaiting review / under review / rejected with the reason) from the patient's
+        onboarding read instead of an empty form; re-read after a submit. No backend change
+  - [x] Workforce adoption accept: busy while sending (no double send), network failure shown
+  - [x] Empty states: empty conversation; no one to assign in Operations/Finance; the referral care area keeps an unlisted
+        value and asks to choose when there is none (en + ar copy in `portalWork.empty`)
+  - [x] CI: the separate `pnpm build` step is gone (Playwright builds and tests the production build itself)
+  - [x] verify: typecheck ok; lint **0 errors** / 10 warnings; unit 360/360; Playwright full suite cold **233 passed, 0 failed**,
+        38 skipped (+4 new: identity awaiting review / rejected, resend asks first en/ar; the second-opinion unit test now
+        confirms before sending)
 
 ## Decisions
 
@@ -284,6 +307,7 @@ Update at the end of every phase.
 | 2026-10-08 | Owner: "commit and merge all" — pass 2 (`d09a3ad`…) fast-forwarded into `codex/platform-control-plane`; no push. | Owner |
 | 2026-10-08 | Owner: "merge pass 3 into codex/platform-control-plane and push" — `feat/ux-redesign-pass-3` fast-forwarded and pushed to origin. | Owner |
 | 2026-10-09 | Owner: "merge pass 4 into codex/platform-control-plane and push" — `feat/ux-redesign-pass-4` (`23a1f77`) fast-forwarded and pushed to origin. | Owner |
+| 2026-10-09 | Owner: "go with your recommendations for D1–D4" (finish plan). **D1** journey-bound cases: a known limitation, because no admission policy is current and no case was ever admitted (dev DB); the fix is a precondition for turning journey admission on. **D2** B1 status tokens approved as proposed (`token-proposals.md`). **D3** price first stays; the recommendation-first suggestion is closed. **D4** the public site uses the four stages as on How it works, and a generic team introduction until real coordinator content exists. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -307,9 +331,10 @@ Update at the end of every phase.
 
 ## Next exact action
 
-**Finish plan:** [`plans/finish-plan.md`](plans/finish-plan.md) (2026-10-09). Batch 0 is done on `feat/ux-redesign-batch-0`
-(not merged or pushed). Next: owner decisions D1–D4, then Batch 1. One verification, merge and rebuild per batch.
-New baselines: unit 360/360, Playwright full suite green, lint 13/11.
+**Finish plan:** [`plans/finish-plan.md`](plans/finish-plan.md) (2026-10-09). Batch 0 merged, pushed and deployed (`7441dbf`);
+D1–D4 decided (see Decisions); Batch 1 done on `feat/ux-redesign-batch-1`, not merged or pushed. Next: Batch 2 (portal
+accessibility and Arabic formatting, including the B1 status tokens). Baselines: unit 360/360, Playwright full suite green,
+lint 0 errors / 10 warnings.
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
 tunnel stack runs `6cd977d` (role crash guard, portal lint and `refreshMe` fix; all merged and pushed). Next candidates: Control Center lint

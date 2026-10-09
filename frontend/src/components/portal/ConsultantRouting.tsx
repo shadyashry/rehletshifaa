@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import type { Locale } from "@/lib/i18n";
+import { useWorkCopy } from "@/components/portal/portal-copy";
+import { careAreaLabel } from "@/lib/portal-labels";
+import { ConfirmDialog } from "@/components/portal/portal-ui";
 
 /**
  * Consultant routing on the case page: choosing a named, eligible consultant; the coordinator's confirmation of a
@@ -106,6 +109,10 @@ export function ReferralConfirmation({ locale, caseId, careCategory, categories,
   const [area, setArea] = useState("");
   const [chosen, setChosen] = useState("");
   const [declining, setDeclining] = useState(false);
+  // The suggested (or the case's) area stays listed even when the category list lacks it; with no area the coordinator
+  // chooses one, so the select never shows one area while the consultant search uses another.
+  const work = useWorkCopy(); const empty = work.empty;
+  const areaOptions = area && !categories.some(c => c.slug === area) ? [...categories, { slug: area, nameEn: careAreaLabel(area, work.careAreas), nameAr: careAreaLabel(area, work.careAreas) }] : categories;
   useEffect(() => {
     let live = true;
     void load<Referral[]>(`/coordinator/cases/${caseId}/referrals`).then(rows => {
@@ -127,8 +134,9 @@ export function ReferralConfirmation({ locale, caseId, careCategory, categories,
       {referral.receiverReason && <p className="mt-1 text-alert-800"><span className="font-semibold">{t.declinedBy}:</span> {referral.receiverReason}</p>}
     </div>
     <label className="block max-w-sm text-sm font-bold">{t.careArea}
-      <select className="field mt-1.5" value={area} onChange={e => { setArea(e.target.value); setChosen(""); }}>
-        {categories.map(c => <option key={c.slug} value={c.slug}>{locale === "ar" ? c.nameAr : c.nameEn}</option>)}
+      <select className="field mt-1.5" value={area} required onChange={e => { setArea(e.target.value); setChosen(""); }}>
+        {!area && <option value="" disabled>{empty.chooseArea}</option>}
+        {areaOptions.map(c => <option key={c.slug} value={c.slug}>{locale === "ar" ? c.nameAr : c.nameEn}</option>)}
       </select>
     </label>
     <EligibleConsultantPicker locale={locale} caseId={caseId} careArea={area} value={chosen} onChange={setChosen} load={load}/>
@@ -155,6 +163,9 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
   const [rows, setRows] = useState<Referral[]>([]);
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<"TRANSFER" | "SECOND_OPINION">("SECOND_OPINION");
+  // Submitting the opinion ends this consultant's access, so it is confirmed first.
+  const [pendingOpinion, setPendingOpinion] = useState<string | null>(null);
+  const confirmCopy = useWorkCopy().confirm;
   const [area, setArea] = useState("");
   const [candidates, setCandidates] = useState<EligibleConsultant[]>([]);
   const [version, setVersion] = useState(0);
@@ -175,13 +186,16 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
   const openOfType = (kind: string) => rows.some(r => r.viewerRelation === "REFERRER" && r.type === kind && ["AWAITING_COORDINATOR", "AWAITING_CONSULTANT", "IN_PROGRESS"].includes(r.status));
   if (!rows.length && !canRefer && !secondOpinion) return null;
   return <section className="card space-y-4 p-4 sm:p-5" aria-label={t.referrals}>
-    {secondOpinion && <form id="case-actions" className="space-y-2" onSubmit={e => { e.preventDefault(); const opinion = String(new FormData(e.currentTarget).get("opinion") ?? "").trim(); if (opinion) void mutate(`/doctor/cases/${caseId}/referrals/${secondOpinion.id}/opinion`, { opinion }).then(reloadRows); }}>
+    {secondOpinion && <form id="case-actions" className="space-y-2" onSubmit={e => { e.preventDefault(); const opinion = String(new FormData(e.currentTarget).get("opinion") ?? "").trim(); if (opinion) setPendingOpinion(opinion); }}>
       <h3 className="font-bold text-brand-900">{t.yourOpinion}</h3>
       <p className="whitespace-pre-wrap rounded-lg bg-mist p-3 text-sm text-ink-700"><span className="font-semibold">{t.reason}:</span> {secondOpinion.clinicalReason} ({t.referralFrom} {secondOpinion.fromConsultantName})</p>
       <textarea name="opinion" required maxLength={20000} className="field min-h-32" aria-label={t.yourOpinion}/>
       <p className="text-[0.8rem] text-ink-500">{t.opinionHint}</p>
       <button className="btn-primary" disabled={busy}>{t.submitOpinion}</button>
     </form>}
+    {secondOpinion && pendingOpinion !== null && <ConfirmDialog title={confirmCopy.opinionTitle} body={confirmCopy.opinionBody} confirm={confirmCopy.opinion} cancel={confirmCopy.keepEditing}
+      onCancel={() => setPendingOpinion(null)}
+      onConfirm={() => { const opinion = pendingOpinion; setPendingOpinion(null); void mutate(`/doctor/cases/${caseId}/referrals/${secondOpinion.id}/opinion`, { opinion }).then(reloadRows); }}/>}
 
     {rows.filter(r => r !== secondOpinion).length > 0 && <div>
       <h3 className="font-bold text-brand-900">{t.referrals}</h3>

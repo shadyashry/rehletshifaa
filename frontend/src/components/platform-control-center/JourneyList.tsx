@@ -23,7 +23,10 @@ export function JourneyList({ locale }: { locale: Locale }) {
   const t = journeyCopy[locale];
   const { user, me, loading: authLoading, signIn } = useAuth();
   const [journeys, setJourneys] = useState<JourneySummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Loading is what is not known yet: nothing while signed out, /me first (it decides what may be read), then the page.
+  const [fetching, setLoading] = useState(true);
+  const canRead = !!me?.permissions.includes("JOURNEY_READ");
+  const loading = !!user && (!me || (canRead && fetching));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -42,15 +45,20 @@ export function JourneyList({ locale }: { locale: Locale }) {
     return text ? JSON.parse(text) : (undefined as T);
   }, [user, t, signIn, locale]);
 
+  const load = useCallback(() => api<JourneySummary[]>("/summaries").then(setJourneys), [api]);
+  const failed = useCallback((e: unknown) => { setJourneys([]); setError(e instanceof Error ? e.message : t.error); }, [t.error]);
+  // Retry and after an action: a visible reload.
   const refresh = useCallback(async () => {
-    if (!user) { setLoading(false); return; }
-    if (!me) return; // wait for /api/v1/me before deciding what the caller may read
+    if (!canRead) return;
     setLoading(true); setError("");
-    try {
-      if (me?.permissions.includes("JOURNEY_READ")) setJourneys(await api<JourneySummary[]>("/summaries"));
-    } catch (e) { setJourneys([]); setError(e instanceof Error ? e.message : t.error); } finally { setLoading(false); }
-  }, [api, user, me, t.error]);
-  useEffect(() => { void refresh(); }, [refresh]);
+    try { await load(); } catch (e) { failed(e); } finally { setLoading(false); }
+  }, [canRead, load, failed]);
+  useEffect(() => {
+    if (!user || !canRead) return;
+    let live = true;
+    load().catch((e) => { if (live) failed(e); }).finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [user, canRead, load, failed]);
 
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError("");

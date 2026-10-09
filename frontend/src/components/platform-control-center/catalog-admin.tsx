@@ -31,8 +31,13 @@ export function ConsultantPriceList({ locale, api, practitionerId, careArea, edi
   const [rows, setRows] = useState<CatalogService[] | null>(null); const [fx, setFx] = useState<FxRate[]>([]);
   const [busy, setBusy] = useState(false); const [notice, setNotice] = useState(""); const [error, setError] = useState<unknown>(null);
   const [display, setDisplay] = useState("EGP"); const [importFile, setImportFile] = useState<File | null>(null); const [preview, setPreview] = useState<ImportResult | null>(null); const [adding, setAdding] = useState(false);
-  const load = useCallback(async () => { try { const [cat, rates] = await Promise.all([api<CatalogService[]>(base), api<FxRate[]>("/admin/fx-rates")]); setRows(cat); setFx(rates); } catch (e) { setError(e); setRows([]); } }, [api, base]);
-  useEffect(() => { void load(); }, [load]);
+  const read = useCallback(() => Promise.all([api<CatalogService[]>(base), api<FxRate[]>("/admin/fx-rates")]), [api, base]);
+  const load = useCallback(async () => { try { const [cat, rates] = await read(); setRows(cat); setFx(rates); } catch (e) { setError(e); setRows([]); } }, [read]);
+  useEffect(() => {
+    let live = true;
+    read().then(([cat, rates]) => { if (live) { setRows(cat); setFx(rates); } }, (e) => { if (live) { setError(e); setRows([]); } });
+    return () => { live = false; };
+  }, [read]);
   const run = async (work: () => Promise<unknown>, done = ar ? "تم الحفظ." : "Saved.") => { setBusy(true); setError(null); setNotice(""); try { await work(); setNotice(done); await load(); return true; } catch (e) { setError(e); return false; } finally { setBusy(false); } };
   const patch = (id: string, field: keyof CatalogService, value: string | number | boolean) => setRows((rs) => rs?.map((r) => (r.id === id ? { ...r, [field]: value } : r)) ?? null);
   const upload = async (file: File, commit: boolean) => {
@@ -108,8 +113,13 @@ export function ExchangeRates({ locale, api, editable }: { locale: Locale; api: 
   const ar = locale === "ar";
   const [date, setDate] = useState("");
   const [fx, setFx] = useState<FxRate[] | null>(null); const [error, setError] = useState<unknown>(null); const [notice, setNotice] = useState(""); const [busy, setBusy] = useState(false);
-  const load = useCallback(async () => { try { setFx(await api<FxRate[]>(`/admin/fx-rates${date ? `?date=${date}` : ""}`)); } catch (e) { setError(e); setFx([]); } }, [api, date]);
-  useEffect(() => { void load(); }, [load]);
+  const read = useCallback(() => api<FxRate[]>(`/admin/fx-rates${date ? `?date=${date}` : ""}`), [api, date]);
+  const load = useCallback(async () => { try { setFx(await read()); } catch (e) { setError(e); setFx([]); } }, [read]);
+  useEffect(() => {
+    let live = true;
+    read().then((rates) => { if (live) setFx(rates); }, (e) => { if (live) { setError(e); setFx([]); } });
+    return () => { live = false; };
+  }, [read]);
   const pin = async (currency: string, rate: number) => { setBusy(true); setError(null); setNotice(""); try { await api(`/admin/fx-rates/${currency}`, json("PUT", { rate })); setNotice(ar ? `تم حفظ سعر ${currency} لليوم.` : `${currency} rate saved for today.`); await load(); return true; } catch (e) { setError(e); return false; } finally { setBusy(false); } };
   if (fx === null) return <p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>;
   const rows = fx.filter((f) => f.currency !== "EGP");
@@ -173,10 +183,22 @@ export function CareAreaTemplates({ locale, api, editable }: { locale: Locale; a
   const ar = locale === "ar";
   const [templates, setTemplates] = useState<Template[] | null>(null); const [selected, setSelected] = useState(""); const [items, setItems] = useState<TemplateItem[]>([]);
   const [busy, setBusy] = useState(false); const [error, setError] = useState<unknown>(null); const [notice, setNotice] = useState(""); const [adding, setAdding] = useState(false);
-  const loadTemplates = useCallback(async () => { try { const rows = await api<Template[]>("/admin/service-templates"); setTemplates(rows); setSelected((v) => v || rows[0]?.id || ""); } catch (e) { setError(e); setTemplates([]); } }, [api]);
-  useEffect(() => { void loadTemplates(); }, [loadTemplates]);
-  const loadItems = useCallback(async (id: string) => { if (!id) { setItems([]); return; } try { setItems(await api<TemplateItem[]>(`/admin/service-templates/${id}/items`)); } catch (e) { setError(e); } }, [api]);
-  useEffect(() => { void loadItems(selected); }, [selected, loadItems]);
+  useEffect(() => {
+    let live = true;
+    api<Template[]>("/admin/service-templates").then((rows) => { if (live) { setTemplates(rows); setSelected((v) => v || rows[0]?.id || ""); } },
+      (e) => { if (live) { setError(e); setTemplates([]); } });
+    return () => { live = false; };
+  }, [api]);
+  const readItems = useCallback((id: string) => api<TemplateItem[]>(`/admin/service-templates/${id}/items`), [api]);
+  const loadItems = useCallback(async (id: string) => { if (!id) { setItems([]); return; } try { setItems(await readItems(id)); } catch (e) { setError(e); } }, [readItems]);
+  // No template chosen: no items (adjusted while rendering); otherwise the effect reads the chosen template's items.
+  if (!selected && items.length > 0) setItems([]);
+  useEffect(() => {
+    if (!selected) return;
+    let live = true;
+    readItems(selected).then((rows) => { if (live) setItems(rows); }, (e) => { if (live) setError(e); });
+    return () => { live = false; };
+  }, [selected, readItems]);
   const run = async (work: () => Promise<unknown>) => { setBusy(true); setError(null); setNotice(""); try { await work(); setNotice(ar ? "تم حفظ القالب." : "Template saved."); await loadItems(selected); return true; } catch (e) { setError(e); return false; } finally { setBusy(false); } };
   if (templates === null) return <p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>;
   if (!templates.length) return <><ErrorNotice error={error} locale={locale} action="load" /><EmptyState title={ar ? "لا توجد قوالب خدمات" : "No service templates"} /></>;

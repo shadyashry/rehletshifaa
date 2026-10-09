@@ -162,3 +162,19 @@ test("a patient with no case yet gets a calm explanation, not an empty dashboard
   await expect(page.getByRole("link", { name: "Send my case" })).toBeVisible();
   await expect(page.getByRole("tab")).toHaveCount(0);
 });
+
+// The identity step shows the latest submission: "awaiting review" instead of an empty form, and a rejection with its
+// reason above the form to resubmit (it always showed the empty form, as if nothing had been sent).
+test("identity verification shows a submission awaiting review instead of the form", async ({ page }) => {
+  await setupPatient(page, "deposit-paid", { identity: { status: "PENDING" } });
+  await page.goto("/en/portal");
+  await expect(page.getByText("Submitted — awaiting review.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Submit for verification" })).toHaveCount(0);
+});
+
+test("identity verification shows a rejection with its reason and the form to resubmit", async ({ page }) => {
+  await setupPatient(page, "deposit-paid", { identity: { status: "REJECTED", rejectionReason: "The photo page was unreadable" } });
+  await page.goto("/en/portal");
+  await expect(page.getByRole("alert").filter({ hasText: "Not verified. Please resubmit." })).toContainText("The photo page was unreadable");
+  await expect(page.getByRole("button", { name: "Submit for verification" })).toBeVisible();
+});

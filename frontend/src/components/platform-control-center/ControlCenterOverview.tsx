@@ -57,11 +57,14 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
   const [attempt, setAttempt] = useState(0);
   const sources = access.loading ? [] : SOURCES.filter((s) => s.applies(access));
   const sourceKeys = sources.map((s) => s.key).join();
+  // A new set of sources, person, language or retry starts from "loading", cleared while rendering (not in the effect).
+  const resultsKey = `${sourceKeys}|${user?.profile?.sub ?? ""}|${locale}|${attempt}`;
+  const [resultsFor, setResultsFor] = useState(resultsKey);
+  if (resultsFor !== resultsKey) { setResultsFor(resultsKey); setResults(null); }
 
   useEffect(() => {
     if (access.loading || !user) return;
     let live = true;
-    setResults(null);
     const ctx: Ctx = { api, locale };
     void Promise.all(sources.map((source) => source.find(ctx).then((found): Result => ({ source, found }), (): Result => ({ source, failed: true }))))
       .then((r) => { if (live) setResults(r); });

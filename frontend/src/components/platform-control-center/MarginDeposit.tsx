@@ -34,12 +34,18 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   const allowed = access.can("COMMERCIAL_POLICY_READ");
   // Reading is shared with Consultant Operations and the auditor; only Finance publishes a new version.
   const canEdit = access.can("COMMERCIAL_POLICY_MANAGE");
+  const read = useCallback(() => Promise.all([api<CommercialPolicy[]>("/finance/commercial-policies"), api<DepositPolicy[]>("/finance/deposit-policies")]), [api]);
   const load = useCallback(async () => {
     setLoadError(null);
-    try { const [c, d] = await Promise.all([api<CommercialPolicy[]>("/finance/commercial-policies"), api<DepositPolicy[]>("/finance/deposit-policies")]); setMargins(c); setDeposits(d); }
+    try { const [c, d] = await read(); setMargins(c); setDeposits(d); }
     catch (e) { setLoadError(e); setMargins([]); }
-  }, [api]);
-  useEffect(() => { if (user && allowed) void load(); }, [user, allowed, load]);
+  }, [read]);
+  useEffect(() => {
+    if (!user || !allowed) return;
+    let live = true;
+    read().then(([c, d]) => { if (live) { setMargins(c); setDeposits(d); } }, (e) => { if (live) { setLoadError(e); setMargins([]); } });
+    return () => { live = false; };
+  }, [user, allowed, read]);
   const confirm = async () => {
     if (!pending) return;
     setBusy(true); setSaveError(null); setNotice("");

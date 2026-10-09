@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronDown, ExternalLink, Languages, LayoutGrid, LogOut, Menu, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
@@ -126,7 +126,9 @@ export function ControlCenterShell({ locale, active, crumbs = [], title, intro, 
 function NavTree({ locale, groups, line, onNavigate }: { locale: Locale; groups: ReturnType<typeof sidebarGroups>; line: NavKey; onNavigate: () => void }) {
   const currentGroup = groups.find((g) => g.items.some((i) => i.key === line))?.key;
   const [open, setOpen] = useState<Set<string>>(() => new Set(currentGroup ? [currentGroup] : []));
-  useEffect(() => { if (currentGroup) setOpen((s) => (s.has(currentGroup) ? s : new Set(s).add(currentGroup))); }, [currentGroup]);
+  // Navigating into another group opens it (others stay as the person left them); adjusted while rendering.
+  const [openedFor, setOpenedFor] = useState(currentGroup);
+  if (openedFor !== currentGroup) { setOpenedFor(currentGroup); if (currentGroup && !open.has(currentGroup)) setOpen(new Set(open).add(currentGroup)); }
   const base = useId();
   const link = (i: NavItem, label: string, Icon?: typeof Menu) => (
     <Link href={ccHref(locale, i.path)} aria-current={i.key === line ? "page" : undefined} onClick={onNavigate}>
@@ -157,12 +159,16 @@ function NavTree({ locale, groups, line, onNavigate }: { locale: Locale; groups:
 }
 
 /** Switches language on the same page, keeping the query (a selected organization, tab or clinician). */
+const noSubscription = () => () => {};
+
 function LanguageLink({ locale }: { locale: Locale }) {
   const target = alternateLocale(locale);
   const here = () => swapLocale(window.location.pathname, target) + window.location.search;
-  const [href, setHref] = useState(ccHref(target));
-  // Pages update their query with router.replace, so the link is refreshed whenever it is about to be used.
-  useEffect(() => { setHref(here()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // The current page in the other language, read from the URL (the server renders the section root). Pages update their
+  // query with router.replace, so the link is refreshed again whenever it is about to be used.
+  const initial = useSyncExternalStore(noSubscription, here, () => ccHref(target));
+  const [used, setHref] = useState<string | null>(null);
+  const href = used ?? initial;
   return (
     <Link className="cc-topbar-link" href={href} hrefLang={target} lang={target} onMouseEnter={() => setHref(here())} onFocus={() => setHref(here())} onPointerDown={() => setHref(here())}>
       <Languages size={17} aria-hidden /><span>{target === "ar" ? "العربية" : "English"}</span>

@@ -864,6 +864,25 @@
     "decisionFailed": "Your decision was not sent. Check your connection and try again; nothing has changed yet."
   },
   "portalWork": {
+    "empty": {
+      "thread": "No messages in this conversation yet.",
+      "noOperations": "No one on the Operations team can be assigned yet. Ask the team's manager to add someone.",
+      "noFinance": "No one on the Finance team can be assigned yet. Ask the team's manager to add someone.",
+      "chooseArea": "Choose a care area"
+    },
+    "confirm": {
+      "cancel": "Cancel",
+      "keepEditing": "Keep editing",
+      "resendTitle": "Send a new secure link?",
+      "resendBody": "The link the patient has now will stop working. A new one goes to their verified contact.",
+      "resend": "Send new link",
+      "refundTitle": "Record a refund of {amount}?",
+      "refundBody": "This records money returned to the patient on this deposit. Check the amount before you continue.",
+      "refund": "Record refund",
+      "opinionTitle": "Submit your second opinion?",
+      "opinionBody": "Submitting ends your access to this case, so check your opinion before you send it.",
+      "opinion": "Submit and end access"
+    },
     "accessUnavailable": {
       "message": "We couldn't confirm your access, so your workspace can't be shown. Nothing was changed.",
       "retry": "Try again"
