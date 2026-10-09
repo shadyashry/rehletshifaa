@@ -1,14 +1,15 @@
 "use client";
 
-import { ArrowRight, CalendarClock, CircleAlert, Clock3, FileText } from "lucide-react";
+import { ArrowRight, CalendarClock, Clock3, FileText } from "lucide-react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
+import { StatusBadge } from "@/components/portal/StatusBadge";
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { careAreaLabel, plural, priorityLabel, waitingLabel, workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
+import { careAreaLabel, coordinatorLabel, plural, priorityLabel, waitingLabel, workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
 
 export type WorkItem = {
   id: string; caseId: string; caseNumber: string; patientName: string | null; caseStatus: string;
-  waitingOn: string | null; careCategory?: string | null; coordinatorName?: string | null; documentCount?: number;
+  waitingOn: string | null; careCategory?: string | null; coordinatorSubject?: string | null; coordinatorName?: string | null; documentCount?: number;
   type: string; title: string; context: string | null; priority: string;
   status: string; blocking: boolean; dueAt: string | null; overdue: boolean; createdAt: string; version: number;
   /** The wording code and parameters; the English `title`/`context` are the fallback for codes this page does not know. */
@@ -24,8 +25,10 @@ export type WorkItem = {
  * <p>Rows are a hairline list with one quiet action each. Only an overdue or urgent first item earns the filled
  * button, so the page never shows a column of identical primaries. An empty list points to the next useful place.
  */
-export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onTeamQueue }: {
+export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting = 0, onTeamQueue }: {
   locale: Locale; role?: string; items: WorkItem[]; busy: boolean; onOpen: (caseId: string) => void;
+  /** The viewer, so their own case reads "You" as it does in the queue. */
+  subject?: string;
   /** New cases nobody owns yet (coordinators), offered as the next place to look when nothing is assigned. */
   teamWaiting?: number; onTeamQueue?: () => void;
 }) {
@@ -39,7 +42,7 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
           <h2 id="my-work-title" className="title">{t.title}</h2>
           <p className="mt-1 text-sm text-ink-500">{t.hint}</p>
         </div>
-        <p role="status" className="text-sm text-ink-500">{busy ? t.loading : items.length ? plural(locale, items.length, work.plural.workItems) : ""}</p>
+        <p role="status" className="text-sm text-ink-500">{busy ? t.loading : items.length ? plural(work.locale, items.length, work.plural.workItems) : ""}</p>
       </div>
 
       {!busy && items.length === 0 ? (
@@ -47,7 +50,7 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
           <p className="font-semibold text-ink-900">{t.empty}</p>
           {teamWaiting > 0 && onTeamQueue
             ? <button type="button" className="mt-1 inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current" onClick={onTeamQueue}>
-                {plural(locale, teamWaiting, work.plural.teamWaiting)}<ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
+                {plural(work.locale, teamWaiting, work.plural.teamWaiting)}<ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
               </button>
             : <p className="mt-1 text-ink-600">{t.emptyHint}</p>}
         </div>
@@ -63,12 +66,8 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <PriorityChip priority={item.priority} label={priorityLabel(item.priority, work.priority)}/>
-                    {item.overdue && (
-                      <span className="status-badge items-center gap-1 !border-alert-200 !bg-alert-50 !text-alert-800">
-                        <CircleAlert size={13} aria-hidden/>{t.overdue}
-                      </span>
-                    )}
-                    {item.blocking && <span className="status-badge">{t.blocking}</span>}
+                    {item.overdue && <StatusBadge tone="danger">{t.overdue}</StatusBadge>}
+                    {item.blocking && <StatusBadge tone="info">{t.blocking}</StatusBadge>}
                     <span className="text-[0.8125rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>
                     {item.patientName && <bdi className="truncate text-[0.8125rem] font-semibold text-ink-700">{item.patientName}</bdi>}
                   </div>
@@ -77,8 +76,8 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
                   {/* Enough case identity to act without opening it first. */}
                   <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-ink-600">
                     {item.careCategory && <span>{t.care}: <strong className="font-semibold text-ink-800">{careAreaLabel(item.careCategory, work.careAreas)}</strong></span>}
-                    {item.coordinatorName && <span>{t.coordinator}: <strong className="font-semibold text-ink-800"><bdi>{item.coordinatorName}</bdi></strong></span>}
-                    {!!item.documentCount && <span className="inline-flex items-center gap-1"><FileText size={12} aria-hidden/>{plural(locale, item.documentCount, work.plural.documents)}</span>}
+                    {(item.coordinatorSubject || item.coordinatorName) && <span>{t.coordinator}: <strong className="font-semibold text-ink-800"><bdi>{coordinatorLabel(item, subject, work.queue)}</bdi></strong></span>}
+                    {!!item.documentCount && <span className="inline-flex items-center gap-1"><FileText size={12} aria-hidden/>{plural(work.locale, item.documentCount, work.plural.documents)}</span>}
                   </p>
                   {text.context && <p dir="auto" className="mt-1 line-clamp-2 text-sm leading-6 text-ink-600">{text.context}</p>}
                   <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.8125rem] text-ink-500">
@@ -91,10 +90,12 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
                     {item.waitingOn && item.waitingOn !== "NONE" && <span>{work.waiting.label}: {waitingLabel(item.waitingOn, work.waiting, { role })}</span>}
                   </p>
                 </div>
-                <button type="button" aria-describedby={titleId}
+                <button type="button"
                         className={lead ? "btn-primary w-full justify-center sm:w-auto" : "inline-flex min-h-11 items-center gap-1.5 self-start font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current sm:self-center"}
                         onClick={() => onOpen(item.caseId)}>
-                  {item.type==="CONSULTANT_ASSIGNMENT"?t.reviewAssignment:t.open}<ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
+                  {item.type==="CONSULTANT_ASSIGNMENT"?t.reviewAssignment:t.open}
+                  {/* Every row repeats the same action word; the name also says which work it opens. */}
+                  <span className="sr-only">{locale === "ar" ? "، " : ": "}{text.title}{locale === "ar" ? "، " : ", "}{item.caseNumber}</span><ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
                 </button>
               </article>
             </li>
@@ -108,12 +109,12 @@ export function MyWork({ locale, role, items, busy, onOpen, teamWaiting = 0, onT
 
 /**
  * Words, not the enum: no uppercase styling, so "Normal" never reads as the raw value "NORMAL". Only a priority that
- * changes the order is marked — urgent in alert, high as the petrol badge, low as plain text — and Normal, the
+ * changes the order is marked — urgent as danger, high as warning, low as plain text — and Normal, the
  * default for most rows, carries no chip at all.
  */
 function PriorityChip({ priority, label }: { priority: string; label: string }) {
-  if (priority === "URGENT") return <span className="status-badge !border-alert-200 !bg-alert-50 !text-alert-800">{label}</span>;
-  if (priority === "HIGH") return <span className="status-badge">{label}</span>;
+  if (priority === "URGENT") return <StatusBadge tone="danger">{label}</StatusBadge>;
+  if (priority === "HIGH") return <StatusBadge tone="warning">{label}</StatusBadge>;
   if (priority === "NORMAL") return null;
   return <span className="text-[0.8125rem] font-semibold text-ink-600">{label}</span>;
 }

@@ -41,14 +41,14 @@ export function PatientJourneyTracker({ locale, phase, waitingOnPatient = false,
       <ol className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:gap-0">
         {PATIENT_PHASES.map((entry, index) => {
           const done = index < current, now = index === current;
-          const tone = done ? "text-ink-600" : now ? (waitingOnPatient ? "text-amber-900" : "text-brand-900") : "text-ink-400";
+          const tone = done ? "text-ink-600" : now ? (waitingOnPatient ? "text-status-warning-fg" : "text-brand-900") : "text-ink-400";
           return (
             <li key={entry.key} className="flex items-start gap-2.5 sm:flex-1 sm:flex-col sm:items-center sm:gap-2 sm:text-center">
               <span aria-hidden className="relative flex h-5 w-5 flex-none items-center justify-center sm:w-full">
                 <span className="absolute inset-x-0 top-1/2 hidden h-px -translate-y-1/2 bg-line sm:block"/>
                 <span className={`relative z-10 grid h-5 w-5 place-items-center rounded-full ${
                   done ? "bg-brand-100 text-brand-700"
-                    : now ? (waitingOnPatient ? "bg-amber-500 text-white" : "bg-brand-600 text-white")
+                    : now ? (waitingOnPatient ? "bg-status-warning-fg text-white" : "bg-brand-600 text-white")
                     : "border border-line-strong bg-white"}`}>
                   {done ? <Check size={11} strokeWidth={3}/> : now ? <span className="h-1.5 w-1.5 rounded-full bg-white"/> : null}
                 </span>

@@ -309,6 +309,34 @@ Update at the end of every phase.
         232 passed, 1 failed = the new identity test still expecting `role="alert"` (updated), then my-care + portal-reliability
         21/21
 
+- [x] **Finish plan — Batch 2: portal accessibility and Arabic formatting** (same branch `feat/ux-redesign-batch-1a`, 2026-10-09;
+      **Batch 1a merges together with this batch**: one merge, push and rebuild when the owner says so). Skills loaded at the start
+      and used for build and review: react-best-practices, composition-patterns, web-design-guidelines (fresh rules), Impeccable
+      (context, audit/harden playbooks, craft floor, detector: 0 findings)
+  - [x] B1 status tokens (D2): `--color-status-*` in `@theme`, `--badge-{tone}-*`, `.status-badge[data-tone]`; one `StatusBadge`
+        (word + the Control Center's icon per tone) and one `caseStatusTone` for the case header and the queue; queue status and
+        attention chips, My Work priority/overdue/blocking, assignment history, journey "blocked", Case blockers, the Consultant
+        review's finance rows, the secure link and the patient tracker moved off Tailwind amber/emerald/sky. No amber left in My Care
+  - [x] Accessibility: unread counts named in words (`UnreadCount`, `plural.unreadMessages`; staff badge = unread the viewer can mark
+        read, not the total); bell items say "Unread"; overdue Case activity says "Overdue"; My Care section titles and other cases are
+        h2 (other cases styled as a heading); `CaseMessages` h2; coordinator lock is `inert` (`LockedSection`); repeated actions name
+        their item (queue "Open RS-…", My Work "Open: title, case", View/Preview/Download name the file, bell "Open case RS-…", Mark
+        read names sender and time); inline `AccountLinkRequest` is not a dialog; no-email is text, not a dead mailto; the count line
+        has a polite live region. Role switch already had a check icon + `aria-pressed`
+  - [x] Patient proposal: visible reason under the disabled primary (approved disabled design kept); optional items explained; terms
+        id from `useId` and the checkbox described by one short sentence naming the disclosure
+  - [x] Arabic formatting: one `formatMoney` (`lib/money.ts`) for every amount; `<bdi dir="ltr">` on My Care figures instead of
+        `dir="ltr"` blocks; date of birth formatted in UTC (`formatCalendarDate`); `.label-micro` with an RTL reset replaces every
+        portal micro-label; My Care care areas from the shared atlas; the work-copy context carries its locale (plurals read it)
+  - [x] Nested cards: Services & costs and the Consultant review's documents/services/summary are hairline sections in their card
+  - [x] Backend: `WorkItemView.coordinatorSubject` (My Work says "You" on the viewer's own case)
+  - [x] Review (four skills over the batch diff): no P0–P2; 6 P3s + 1 older screenshot finding in backlog.md "Batch 2 — deferred"
+  - [x] verify: backend full suite 620/0 (2 skipped); typecheck ok; lint 0 errors / 10 warnings; unit **371/371** (+10: count-line live
+        region, proposal reason/optional/terms reference, date of birth west of UTC (fails without the fix), My Care headings/unread
+        words/Arabic figure, My Work "You", `LockedSection`, status tone); Playwright full suite **233 passed, 0 failed**, 38 skipped;
+        a11y 20/20 at baseline. First full run: 30 failures, all stale selectors on the old names (`"Open"` exact, "Messages1",
+        file name now also in its actions) — updated; the affected specs then 82/82
+
 ## Decisions
 
 | Date | Decision | By |
@@ -355,8 +383,9 @@ Update at the end of every phase.
 D1–D4 decided (see Decisions); Batch 1 merged, pushed and deployed (`f304421`); Batch 1a (skill review fixes) done on
 `feat/ux-redesign-batch-1a` (`fc03f0b`), not merged or pushed. Owner: Batch 2 runs in a **new session on the same branch**
 (`feat/ux-redesign-batch-1a`, worktree `vigilant-roentgen-29caab`) and Batch 1a is merged **together with Batch 2** (one merge,
-push and rebuild). Next: Batch 2 (portal accessibility and Arabic formatting, including the B1 status tokens), starting by
-loading the skills. Baselines: unit 361/361, Playwright full suite green, lint 0 errors / 10 warnings.
+push and rebuild). Batch 2 (portal accessibility and Arabic formatting, B1 status tokens) is done on the same branch and not merged or pushed.
+Next: on the owner's word, merge Batch 1a + Batch 2 once, push and rebuild the stack; then Batch 3 (public site, D4).
+Baselines: unit 371/371, Playwright full suite 233 passed, lint 0 errors / 10 warnings, backend 620/0.
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
 tunnel stack runs `6cd977d` (role crash guard, portal lint and `refreshMe` fix; all merged and pushed). Next candidates: Control Center lint

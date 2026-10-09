@@ -5,7 +5,9 @@ import { Check, FileText, MessageSquareText, UserRound } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import { fillTemplate } from "@/lib/portal-labels";
+import { careAreaLabel, fillTemplate } from "@/lib/portal-labels";
+import { UnreadCount } from "@/components/portal/portal-ui";
+import { formatMoney } from "@/lib/money";
 import type { CaseActions } from "@/components/portal/CurrentAction";
 /** The backend's one answer to "may the patient see a proposal, and which one" — rendered, never re-derived from the stage. */
 export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null };
@@ -44,7 +46,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
   const step = stepCopy(code, ar, { patientAction, proposalState: patientProposal?.state ?? null, status: c.status });
   const phase = phaseIndex(c.status);
   const canMessage = actions.availableActions.includes("MESSAGE_COORDINATOR");
-  const money = (n: number, currency: string) => new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+  const money = (n: number, currency: string) => formatMoney(n, currency, locale);
   const proposalTotal = proposal ? proposal.items.filter(i => !i.optional).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0) : null;
   const showProposal = !!patientProposal && ["READY", "ACCEPTED", "DECLINED", "EXPIRED"].includes(patientProposal.state) && !!proposal;
   const showDeposit = !!deposit && deposit.status !== "CANCELLED";
@@ -57,7 +59,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
           <button key={id} type="button" aria-current={view === id ? "page" : undefined}
                   className={`-mb-px border-b-2 px-3 py-2.5 text-[0.9rem] font-bold transition ${view === id ? "border-brand-600 text-brand-800" : "border-transparent text-ink-500 hover:text-ink-800"}`}
                   onClick={() => onView(id)}>
-            {t.nav[id]}{id === "messages" && unreadMessages > 0 && <span className="ms-1.5 rounded-full bg-brand-600 px-1.5 text-[0.8125rem] text-white">{unreadMessages}</span>}
+            {t.nav[id]}{id === "messages" && unreadMessages > 0 && <UnreadCount count={unreadMessages}/>}
           </button>
         ))}
       </nav>
@@ -71,7 +73,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
         )}
         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-[0.95rem] font-bold text-brand-700" dir="ltr">{c.caseNumber}</span>
-          {c.careCategory && <><span aria-hidden className="text-ink-300">·</span><span className="text-[0.95rem] text-ink-700">{careArea(c.careCategory, locale)}</span></>}
+          {c.careCategory && <><span aria-hidden className="text-ink-300">·</span><span className="text-[0.95rem] text-ink-700">{careAreaLabel(c.careCategory, work.careAreas)}</span></>}
         </div>
         <dl className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-[0.9rem]">
           <div className="flex items-baseline gap-1.5"><dt className="text-ink-500">{t.coordinator}</dt><dd className="font-semibold text-ink-900">{c.coordinatorName ?? t.notAssigned}</dd></div>
@@ -102,7 +104,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
         <div className="mt-5 flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,8fr)_minmax(0,4fr)] lg:items-start lg:gap-x-6 lg:gap-y-5">
           {/* CURRENT STEP — the strongest element on the page. */}
           <section aria-labelledby="current-step-title" className="card border-brand-200 p-5 sm:p-6 lg:col-start-1 lg:row-start-1">
-            <p className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.currentStep}</p>
+            <p className="label-micro text-brand-700">{t.currentStep}</p>
             <h2 id="current-step-title" className="mt-1.5 text-[1.35rem] font-bold leading-8 text-brand-900 sm:text-[1.5rem]">{step.title}</h2>
             <p className="mt-2 max-w-2xl text-[0.98rem] leading-7 text-ink-700">{step.body}</p>
 
@@ -154,14 +156,14 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
           {/* DEPOSIT — the one place the amount lives. Truthful to the offline model: arranged by our side. */}
           {showDeposit && deposit && (
             <section aria-labelledby="deposit-title" className="border-t border-line pt-4 lg:col-start-2 lg:row-start-1 lg:border-t-0 lg:pt-1">
-              <p id="deposit-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.deposit}</p>
-              <p className="mt-1.5 text-[1.5rem] font-bold leading-8 text-brand-900" dir="ltr">{deposit.totalDisplay != null ? money(deposit.totalDisplay, deposit.currency) : "—"}</p>
+              <h2 id="deposit-title" className="label-micro text-ink-500">{t.deposit}</h2>
+              <p className="mt-1.5 text-[1.5rem] font-bold leading-8 text-brand-900 tabular-nums"><bdi dir="ltr">{deposit.totalDisplay != null ? money(deposit.totalDisplay, deposit.currency) : "—"}</bdi></p>
               <p className="mt-1 flex items-center gap-1.5 text-[0.92rem] font-semibold text-ink-800">
                 {deposit.status === "PAID" && <Check size={15} strokeWidth={3} aria-hidden className="text-brand-700"/>}
                 {t.depositStatus[deposit.status] ?? deposit.status}
               </p>
               {deposit.status === "PARTIALLY_PAID" && deposit.paidDisplay != null && (
-                <p className="mt-1 text-[0.85rem] text-ink-600">{t.received} <span dir="ltr">{money(deposit.paidDisplay, deposit.currency)}</span></p>
+                <p className="mt-1 text-[0.85rem] text-ink-600">{t.received} <bdi dir="ltr">{money(deposit.paidDisplay, deposit.currency)}</bdi></p>
               )}
               <p className="mt-2 text-[0.85rem] leading-6 text-ink-600">{t.depositNote[deposit.status] ?? ""}</p>
             </section>
@@ -194,8 +196,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
             <section aria-labelledby="proposal-title" className="border-t border-line pt-4 lg:col-start-1 lg:row-start-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p id="proposal-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.documentType[proposal.documentType ?? ""] ?? t.proposal}</p>
-                  {proposalTotal != null && <p className="mt-1.5 text-[1.5rem] font-bold leading-8 text-brand-900" dir="ltr">{money(proposalTotal, proposal.currency)}</p>}
+                  <h2 id="proposal-title" className="label-micro text-ink-500">{t.documentType[proposal.documentType ?? ""] ?? t.proposal}</h2>
+                  {proposalTotal != null && <p className="mt-1.5 text-[1.5rem] font-bold leading-8 text-brand-900 tabular-nums"><bdi dir="ltr">{money(proposalTotal, proposal.currency)}</bdi></p>}
                   <p className="mt-1 text-[0.92rem] font-semibold text-ink-800">{t.proposalStatus[patientProposal.state] ?? patientProposal.state}{proposal.versionNumber > 1 && <span className="font-normal text-ink-500"> · {t.updated}</span>}</p>
                   {proposal.documentType === "PRELIMINARY_ESTIMATE" && <p className="mt-1 max-w-md text-[0.85rem] leading-6 text-ink-600">{t.estimateBasis}</p>}
                 </div>
@@ -209,7 +211,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
 
           {/* COORDINATOR — the human contact, compact, with the one supported communication action. */}
           <section aria-labelledby="coordinator-title" className="border-t border-line pt-4 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:self-start">
-            <p id="coordinator-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.yourCoordinator}</p>
+            <h2 id="coordinator-title" className="label-micro text-ink-500">{t.yourCoordinator}</h2>
             <div className="mt-2 flex items-center gap-3">
               <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand-100 text-brand-700"><UserRound size={20}/></span>
               <div className="min-w-0">
@@ -219,19 +221,19 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
             </div>
             {canMessage && (
               <button type="button" className="btn-secondary mt-4 w-full justify-center gap-2" onClick={() => onView("messages")}>
-                <MessageSquareText size={16} aria-hidden/>{t.message}{unreadMessages > 0 && <span className="rounded-full bg-brand-600 px-1.5 text-[0.8125rem] text-white">{unreadMessages}</span>}
+                <MessageSquareText size={16} aria-hidden/>{t.message}{unreadMessages > 0 && <UnreadCount count={unreadMessages}/>}
               </button>
             )}
           </section>
 
           {otherCases.length > 0 && (
             <section aria-labelledby="other-cases-title" className="lg:col-start-1 lg:row-start-4">
-              <h2 id="other-cases-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.otherCases}</h2>
+              <h2 id="other-cases-title" className="text-[1.05rem] font-bold text-brand-900">{t.otherCases}</h2>
               <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-white">
                 {otherCases.map(other => (
                   <li key={other.id}>
                     <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-start hover:bg-mist/70" onClick={() => onOpenCase(other.id)}>
-                      <span><span className="font-semibold text-brand-700" dir="ltr">{other.caseNumber}</span>{other.careCategory && <span className="text-ink-600"> · {careArea(other.careCategory, locale)}</span>}</span>
+                      <span><span className="font-semibold text-brand-700" dir="ltr">{other.caseNumber}</span>{other.careCategory && <span className="text-ink-600"> · {careAreaLabel(other.careCategory, work.careAreas)}</span>}</span>
                       <span className="text-[0.8rem] text-ink-500">{t.phases[phaseIndex(other.status)]}</span>
                     </button>
                   </li>
@@ -355,12 +357,3 @@ const PHASES = [
   ["ACCEPTED"], ["TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS"], ["DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED"],
 ];
 export function phaseIndex(status: string) { const found = PHASES.findIndex(group => group.includes(status)); return found < 0 ? 0 : found; }
-
-function careArea(value: string, locale: Locale) {
-  const map: Record<string, { en: string; ar: string }> = {
-    cardiology: { en: "Cardiology", ar: "أمراض القلب" }, orthopedics: { en: "Orthopedics", ar: "جراحة العظام" },
-    "rheumatology-rehabilitation": { en: "Rehabilitation & rheumatology", ar: "التأهيل والروماتيزم" },
-  };
-  const entry = map[value];
-  return entry ? (locale === "ar" ? entry.ar : entry.en) : value.replaceAll("-", " ");
-}

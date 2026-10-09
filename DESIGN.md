@@ -407,7 +407,10 @@ note as plain text; the terms in a disclosure marked "Pending legal review", ope
 decision with Request changes and Decline as secondary actions.
 
 ### Status badge
-8px, petrol-50 fill, petrol-200 edge, petrol-800 text at 12px/600, for case and workflow states in the portal.
+8px, 12px/600, for case and workflow states in the portal. The default is petrol-50 fill, petrol-200 edge, petrol-800
+text; a status with a tone (`StatusBadge`: success, warning, danger, info, neutral) reads the `--badge-{tone}-*` tokens
+and always shows its tone's icon beside the word, because the tints alone are too close under colour-vision
+deficiency. Warning is an ochre amber for status only, never a wash behind a card.
 
 ### Component tokens
 Buttons, status badges, tables, dialogs, fields and cards read component tokens (`--button-*`, `--badge-*`,
@@ -415,7 +418,8 @@ Buttons, status badges, tables, dialogs, fields and cards read component tokens 
 `globals.css` (`:root` in `@layer base`) as aliases of the ramp and semantic tokens, so they follow the theme
 automatically. `theme-petrol.css` overrides only where Petrol & Paper differs in structure: 8px radii, a flat primary
 hover and the secondary-button hover. New components use these tokens rather than reading ramps or hex values directly.
-The status, chart and dense-table tokens in `docs/ux-redesign/token-proposals.md` (B1–B3) are deferred, not adopted.
+The status tokens (B1, `--color-status-*` in `@theme`) are adopted (owner decision D2, 2026-10-09); the chart and
+dense-table tokens in `docs/ux-redesign/token-proposals.md` (B2, B3) are deferred, not adopted.
 
 ## Do's and Don'ts
 

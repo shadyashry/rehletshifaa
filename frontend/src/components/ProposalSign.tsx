@@ -9,6 +9,7 @@ import { apiUrl } from "@/lib/api";
 import { ARABIC_TERMS_APPROVED, estimateTerms, exchangeRateStatement, finalQuoteTerms, generalDisclaimers, isForeignCurrency, LEGACY_PLACEHOLDER_TERMS } from "@/lib/commercial-terms";
 import { getDictionary } from "@/lib/dictionary";
 import { fillTemplate } from "@/lib/portal-labels";
+import { formatMoney } from "@/lib/money";
 import { scrollIntoView } from "@/lib/scroll";
 
 type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean };
@@ -317,9 +318,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   // Amounts are computed and rounded by the backend; this only formats them.
   const money = (n?: number) => {
     if (n == null) return "—";
-    const whole = Number.isInteger(n);
-    try { return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(n); }
-    catch { return `${currency} ${n.toLocaleString(intlLocale(locale))}`; }
+    return formatMoney(n, currency, locale);
   };
   const items = useMemo(() => proposal?.items.filter((i) => !i.optional) ?? [], [proposal]);
   const itemsTotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
@@ -400,7 +399,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
           <>
             {/* Identity of the document first: what it is, who it is for, and how long it stands. */}
             <header className="rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(28,51,58,0.05)] sm:p-7">
-              <span className={`inline-block rounded-full px-3 py-1 text-[0.72rem] font-bold ${isFinal ? "bg-brand-600 text-white" : "bg-amber-50 text-amber-900 ring-1 ring-amber-200"}`}>
+              <span className={`inline-block rounded-full px-3 py-1 text-[0.72rem] font-bold ${isFinal ? "bg-brand-600 text-white" : "bg-status-warning-surface text-status-warning-fg ring-1 ring-status-warning-border"}`}>
                 {isFinal ? t.finalBadge : t.prelimBadge}
               </span>
               <h1 className="mt-3 text-[1.6rem] font-bold leading-8 text-brand-900 sm:text-[1.9rem]">{isFinal ? t.finalTitle : t.prelimTitle}</h1>
@@ -430,7 +429,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
             </header>
 
             {blocked && (
-              <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[0.92rem] leading-6 text-amber-900">
+              <p role="status" className="mt-4 rounded-lg border border-status-warning-border bg-status-warning-surface p-4 text-[0.92rem] leading-6 text-status-warning-fg">
                 {blockedMessage} <span className="text-ink-700">{t.contactCoordinator}</span>
               </p>
             )}

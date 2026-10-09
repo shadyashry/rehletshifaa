@@ -10,7 +10,7 @@ import { setupPortal } from "./portal-fixture";
 test("a consultant's clinical draft survives switching tabs", async ({ page }) => {
   await setupPortal(page, "DOCTOR");
   await page.goto("/en/portal");
-  await page.getByRole("button", { name: "Open", exact: true }).first().click();
+  await page.getByRole("button", { name: /^Open(:| RS-)/ }).first().click();
   await page.getByRole("tab", { name: /Clinical/ }).click();
   const draft = page.locator("#clinical-recommendation");
   await draft.fill("Dual-chamber pacemaker; synthetic draft text");
@@ -25,7 +25,7 @@ for (const locale of ["en", "ar"] as const) {
     await setupPortal(page, "COORDINATOR");
     await page.goto(`/${locale}/portal`);
     const ar = locale === "ar";
-    await page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first().click();
+    await page.getByRole("button", { name: ar ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first().click();
     await page.getByRole("button", { name: ar ? "المزيد" : "More" }).click();
     const drawer = page.getByRole("dialog");
     await drawer.getByRole("button", { name: ar ? /تفعيل باقة السفر المتكاملة/ : /Turn on the full travel package/ }).click();
@@ -55,7 +55,7 @@ for (const locale of ["en", "ar"] as const) {
     failing = false;
     await alert.getByRole("button", { name: ar ? "إعادة المحاولة" : "Try again" }).click();
     await expect(alert).toBeHidden();
-    await expect(page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: ar ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first()).toBeVisible();
   });
 }
 
@@ -102,7 +102,7 @@ for (const locale of ["en", "ar"] as const) {
     const ar = locale === "ar";
     const { writes } = await setupPortal(page, "COORDINATOR", { assistedDecision: true, delivery: true });
     await page.goto(`/${locale}/portal`);
-    await page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first().click();
+    await page.getByRole("button", { name: ar ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first().click();
     const resend = page.getByRole("button", { name: ar ? "إعادة الإرسال" : "Resend link" });
     const resent = () => writes.filter(w => w.path.endsWith("/resend")).length;
     await resend.click();

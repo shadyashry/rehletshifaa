@@ -64,7 +64,7 @@ async function openCase(page: Page, caseNumber: string, locale = "en") {
   await page.getByRole("tab", { name: locale === "ar" ? /حالاتي/ : /My cases/ }).click();
   const row = page.locator("li", { hasText: caseNumber }).first();
   await expect(row).toBeVisible({ timeout: 20000 });
-  await row.getByRole("button", { name: locale === "ar" ? "فتح" : "Open", exact: true }).first().click();
+  await row.getByRole("button", { name: locale === "ar" ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first().click();
   await expect(page.locator("#current-action")).toBeVisible({ timeout: 20000 });
 }
 
@@ -170,7 +170,7 @@ test("consultant: dashboard and case open through the gateway without a single r
   await signIn(page, "doctor");
   await expect(page.getByRole("heading", { name: /Consultant workspace/ })).toBeVisible({ timeout: 20000 });
   await page.getByRole("navigation", { name: "Your work" }).getByRole("link", { name: /My cases/ }).click();
-  const open = page.getByRole("button", { name: "Open", exact: true }).first();
+  const open = page.getByRole("button", { name: /^Open(:| RS-)/ }).first();
   if (await open.count()) {
     await open.click();
     await expect(page.locator("#current-action")).toBeVisible({ timeout: 20000 });
@@ -186,7 +186,7 @@ test("patient: dashboard, case and the public proposal route through the gateway
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, "patient");
   await expect(page.getByRole("heading", { name: "Patient" })).toBeVisible({ timeout: 20000 });
-  const open = page.getByRole("button", { name: "Open", exact: true }).first();
+  const open = page.getByRole("button", { name: /^Open(:| RS-)/ }).first();
   if (await open.count()) {
     await open.click();
     await expect(page.getByRole("button", { name: /My dashboard/ })).toBeVisible({ timeout: 20000 });

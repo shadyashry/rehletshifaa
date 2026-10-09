@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
+import { StatusBadge } from "@/components/portal/StatusBadge";
 
 export type AssignmentHistoryEntry = {
   role: string; assigneeName: string | null; status: string; assignedAt: string; endedAt: string | null;
@@ -37,7 +38,7 @@ export function AssignmentHistory({ locale, caseId, load }: { locale: Locale; ca
   const by = (entry: AssignmentHistoryEntry) => entry.assignedByKind === "ROUTING" ? t.routing : entry.assignedByKind === "SYSTEM" ? t.system : entry.assignedByName ? <bdi>{entry.assignedByName}</bdi> : t.someone;
 
   return <section className="card p-4" aria-labelledby="assignment-history-title">
-    <h3 id="assignment-history-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{t.title}</h3>
+    <h3 id="assignment-history-title" className="label-micro text-ink-500">{t.title}</h3>
     {failed ? <p role="alert" className="mt-2 text-sm text-alert-700">{t.failed}</p>
       : entries === null ? <p role="status" className="mt-2 text-sm text-ink-500">{t.loading}</p>
       : !entries.length ? <p className="mt-2 text-sm text-ink-500">{t.empty}</p>
@@ -45,7 +46,7 @@ export function AssignmentHistory({ locale, caseId, load }: { locale: Locale; ca
         {entries.map((entry, index) => <li key={`${entry.assignedAt}-${index}`} className="border-b border-line py-2.5 text-[0.85rem] last:border-0">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="font-semibold text-ink-800">{roleLabel(entry.role)}: {entry.assigneeName ? <bdi>{entry.assigneeName}</bdi> : t.unknown}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[0.8125rem] font-bold ${entry.status === "ACTIVE" ? "bg-brand-50 text-brand-800" : entry.status === "PENDING" ? "bg-amber-50 text-amber-900" : "bg-mist text-ink-600"}`}>{status(entry)}</span>
+            <StatusBadge tone={entry.status === "ACTIVE" ? "info" : entry.status === "PENDING" ? "warning" : "neutral"}>{status(entry)}</StatusBadge>
           </div>
           <p className="mt-0.5 text-[0.8125rem] text-ink-500"><time dateTime={entry.assignedAt}>{when(entry.assignedAt)}</time> · {t.by} {by(entry)}</p>
           {entry.reason && <p className="mt-0.5 text-[0.8125rem] text-ink-600">{t.reason}: {entry.reason}</p>}

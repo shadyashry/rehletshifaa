@@ -2,8 +2,11 @@
 
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { statusLabel } from "@/components/portal/portal-model";
+import { StatusBadge, caseStatusTone } from "@/components/portal/StatusBadge";
+import { useWorkCopy } from "@/components/portal/portal-copy";
+import { plural } from "@/lib/portal-labels";
 
 /**
  * Asks once before an action that cannot be taken back (a refund, a revoked link, an ended access). An in-page alert
@@ -68,6 +71,23 @@ export function Panel({title,children,wide=false}:{title:string;children:React.R
 export function Empty(){return <p className="text-ink-500">—</p>}
 
 export function Status({value,locale="en"}:{value:string;locale?:Locale}){
- const tone=["INFORMATION_REQUIRED","REVISION_REQUESTED","EXPIRED"].includes(value)?"border-amber-200 bg-amber-50 text-amber-900":["CANCELLED","DECLINED","CLINICALLY_NOT_SUITABLE"].includes(value)?"border-alert-200 bg-alert-50 text-alert-800":["CLOSED","DISCHARGED","FOLLOW_UP"].includes(value)?"border-emerald-200 bg-emerald-50 text-emerald-800":"border-brand-200 bg-brand-50 text-brand-800";
- return <span className={`rounded-full border px-3 py-1 text-sm font-bold ${tone}`}>{statusLabel(value,locale)}</span>
+ return <StatusBadge tone={caseStatusTone(value)}>{statusLabel(value,locale)}</StatusBadge>;
+}
+
+/**
+ * An unread count beside a label (Messages): the figure is for the eye, the words are what a screen reader hears, so
+ * the control is named "Messages (2 unread messages)" instead of "Messages2".
+ */
+export function UnreadCount({count}:{count:number}){
+ const work=useWorkCopy();
+ return <><span aria-hidden className="ms-1.5 rounded-full bg-brand-600 px-1.5 text-[0.8125rem] font-bold text-white tabular-nums">{new Intl.NumberFormat(intlLocale(work.locale)).format(count)}</span><span className="sr-only"> ({plural(work.locale,count,work.plural.unreadMessages)})</span></>;
+}
+
+/**
+ * Controls that exist but are not this person's to use right now (a coordinator's release actions while the Consultant
+ * has the case). `inert` takes them out of clicks, the tab order and the accessibility tree together; dimming alone
+ * left them keyboard-operable.
+ */
+export function LockedSection({locked,children}:{locked:boolean;children:React.ReactNode}){
+ return <div inert={locked||undefined} className={locked?"opacity-50":undefined}>{children}</div>;
 }

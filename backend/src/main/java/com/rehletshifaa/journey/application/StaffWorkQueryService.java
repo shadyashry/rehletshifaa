@@ -75,7 +75,7 @@ public class StaffWorkQueryService {
         Instant now = clock.instant();
         return rows.stream().map(row -> new WorkItemView(row.getId(), row.getCaseId(), row.getCaseNumber(), row.getPatientName(),
                 row.getCaseStatus() == null ? null : row.getCaseStatus().name(), row.getWaitingOn(), row.getCareCategory(),
-                names.get(coordinators.get(row.getCaseId())), documentCounts.getOrDefault(row.getCaseId(), 0L),
+                coordinators.get(row.getCaseId()), names.get(coordinators.get(row.getCaseId())), documentCounts.getOrDefault(row.getCaseId(), 0L),
                 row.getTaskType(), decrypt(row.getTitle()), decrypt(row.getDescription()), row.getPriority(), row.getStatus(),
                 Boolean.TRUE.equals(row.getBlocking()), row.getDueAt(), row.getDueAt() != null && row.getDueAt().isBefore(now),
                 row.getCreatedAt(), row.getVersion(), StaffWorkService.copyOf(crypto, row.getCopyCode(), row.getCopyParams()))).toList();
@@ -93,7 +93,7 @@ public class StaffWorkQueryService {
         return new NotificationFeed((int) notifications.countByRecipientSubjectAndReadAtIsNull(subject), items);
     }
 
-    /** Coordinator names come from the staff directory; a subject is never handed to the interface. */
+    /** Coordinator names come from the staff directory; a subject is never shown as a name. */
     private Map<String, String> staffDisplayNames(java.util.Collection<String> subjects) {
         List<String> wanted = subjects.stream().filter(s -> s != null && !s.isBlank()).distinct().toList();
         Map<String, String> names = new HashMap<>();

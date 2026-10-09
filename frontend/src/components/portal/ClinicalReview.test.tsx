@@ -45,7 +45,9 @@ describe("ClinicalReviewPanel", () => {
 
   it("keeps the documents in reach without leaving the page", () => {
     const { viewDoc } = setup();
-    fireEvent.click(within(screen.getByText("Medical report.pdf").closest("li")!).getByRole("button", { name: "Preview" }));
+    // Repeated Preview / Download name the file they act on.
+    fireEvent.click(screen.getByRole("button", { name: /^Preview ?Medical report\.pdf$/ }));
+    expect(screen.getByRole("button", { name: /^Download ?Medical report\.pdf$/ })).toBeTruthy();
     expect(viewDoc).toHaveBeenCalledWith("d1");
   });
 

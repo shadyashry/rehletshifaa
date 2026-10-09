@@ -23,7 +23,7 @@ Plan: `docs/ux-redesign/plans/patient-proposal.md`.
 | Done (pass 1) | Order the dialog as price → "preliminary, can change" → decision. The terms wall currently comes before the decision. | PC | `Portal.tsx`, `components/PatientProposalDecision*` | clarify / shape |
 | Done (pass 1) | Deposit, refund and cancellation terms should sit behind a disclosure, with wording unchanged and marked "pending legal review". | PC | `lib/commercial-terms.ts`, `Portal.tsx` | clarify |
 | Done (pass 2) | The terms are English-only on `/ar`. The option chosen at GATE 2 (legal) applies here. | PC | `lib/commercial-terms.ts` | clarify |
-| P2 | The terms box is nested inside a tinted panel inside the dialog, which breaks the "no nested cards" rule. | PC | `Portal.tsx` | distill |
+| Done (pass 2 drawer unframed; Batch 2 confirmed: `framed={false}`, id from `useId`) | The terms box is nested inside a tinted panel inside the dialog, which breaks the "no nested cards" rule. | PC | `Portal.tsx` | distill |
 
 ## Staff work views (portal)
 
@@ -59,10 +59,10 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 | Done (pass 2 sweep) | Labels are set at 0.7rem, 0.72rem, 0.75rem or `text-xs`, below the 13px floor (37+ in `Portal.tsx`). | PC | `Portal.tsx`, `CaseQueue.tsx`, `ClinicalReview.tsx`, `MyCare.tsx`, `JourneySnapshot.tsx` | typeset |
 | Done (pass 2 sweep) | `rounded-xl` is used about 40 times instead of the 6/8px radii. | PC | portal components | polish |
 | Done (pass 2 sweep) | Five `border-s-4` side-stripe callouts. | PC (detector) | `NotificationBell.tsx:101`, `Portal.tsx:339/454/479/639` | polish |
-| Partly done (washes gone; amber status tones wait for B1 status tokens) | Amber tones, plus petrol-50 and cream washes behind the My Care cards. | PC | `MyCare.tsx`, `Portal.tsx` | polish |
-| P2 | Nested cards: the "Services & costs" table and the Consultant intake summary. | PC (detector) | `Portal.tsx`, `ClinicalReview.tsx` | distill |
-| P2 | "Mark read" buttons are 32px tall and don't say which message they apply to. | PC | `CaseMessages.tsx` | harden |
-| P2 | An h2 on My Care ("other cases") is styled as an 11.5px uppercase label. | PC | `MyCare.tsx` | typeset |
+| Done (Batch 2: no amber left in My Care; status tones read the B1 `--color-status-*` tokens) | Amber tones, plus petrol-50 and cream washes behind the My Care cards. | PC | `MyCare.tsx`, `Portal.tsx` | polish |
+| Done (Batch 2: Services & costs and the Consultant review's documents/services/summary are hairline sections inside their card) | Nested cards: the "Services & costs" table and the Consultant intake summary. | PC (detector) | `Portal.tsx`, `ClinicalReview.tsx` | distill |
+| Done (pass 3: 44px; Batch 2: named by sender and time) | "Mark read" buttons are 32px tall and don't say which message they apply to. | PC | `CaseMessages.tsx` | harden |
+| Done (Batch 2: styled as a heading) | An h2 on My Care ("other cases") is styled as an 11.5px uppercase label. | PC | `MyCare.tsx` | typeset |
 | P3 | The tab list wraps onto two rows on phones in Arabic (Consultant view). | PC | `Portal.tsx` | adapt |
 | P3 | Message timestamps use short US format. | PC | `CaseMessages.tsx` | clarify |
 | P3 | Currency is shown three ways ("$US 4,850.00", "4,850 US$", "$4,850"). | PC | `MyCare.tsx`, `Portal.tsx` | clarify |
@@ -145,31 +145,31 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | Done (pass 2) | Unlabelled controls: the discharge-document select; the FinalAssessment currency select; manual service and amount inputs labelled only by placeholder; an English "remove" aria-label. | AU, WG | `CaseWorkflowActions.tsx:17`, `Portal.tsx:696/699` | harden |
 | Done (GATE 2, `--color-ink-350`) | Text-field borders are `--color-line-strong` (1.66:1 on white), below the 3:1 non-text contrast WCAG 1.4.11 requires. Token decision at GATE 2. | Tokens | `app/globals.css` `.field`, `theme-petrol.css` | polish |
 | Done (pass 2) | A hard-coded English `aria-label="Confirmed arrival"` overrides the Arabic label (label-in-name). | AU, WG | `CaseWorkflowActions.tsx:16` | clarify |
-| P2 | Broken unread-badge names ("Messages1 unread"). The staff Messages badge shows the total, not the unread count. Unread notifications and overdue tasks are shown by colour only. | AU, WG | `PatientNav.tsx:30`, `MyCare.tsx:55/212`, `Portal.tsx:402/603`, `NotificationBell.tsx:101` | harden |
+| Done (Batch 2: `UnreadCount` — figure `aria-hidden`, words via `plural.unreadMessages`; staff badge = unread the viewer can mark read; bell items say "Unread"; Case activity says "Overdue") | Broken unread-badge names ("Messages1 unread"). The staff Messages badge shows the total, not the unread count. Unread notifications and overdue tasks are shown by colour only. | AU, WG | `PatientNav.tsx:30`, `MyCare.tsx:55/212`, `Portal.tsx:402/603`, `NotificationBell.tsx:101` | harden |
 | Done (run 2: `tabKeyTarget` flips arrows in RTL and adds Home/End on every portal tablist) | Tablist arrow keys don't flip in RTL (ArrowLeft jumps to the far tab), and Home/End are missing. | AU, WG | `Portal.tsx:260/424`, `CaseQueue.tsx:143` | adapt |
-| P2 | My Care card titles are `<p>`, not headings. `CaseMessages` puts an h3 under the h1 (axe heading-order in en and ar). | AU | `MyCare.tsx:147/187/202/219`, `CaseMessages.tsx:18` | harden |
+| Done (Batch 2: deposit, proposal, coordinator, other cases are h2; `CaseMessages` h2) | My Care card titles are `<p>`, not headings. `CaseMessages` puts an h3 under the h1 (axe heading-order in en and ar). | AU | `MyCare.tsx:147/187/202/219`, `CaseMessages.tsx:18` | harden |
 | Done (pass 3: Mark read, Mark all read, Retry, My dashboard, View proposal, View full journey are 44px; copy/chip/checkbox hit areas were 44px already) | Tap targets: copy button 13px, chip remove about 17px, row checkboxes 16px, `!min-h-9` (36px) buttons, tabs 40–41px, "Back to dashboard" 33px. | AU, WG | `CaseQueue.tsx:179/206/253-297`, `Portal.tsx:212/378/531` | adapt |
-| P2 | The coordinator lock is `pointer-events-none opacity-50` only, so the release buttons stay keyboard-operable. | AU | `Portal.tsx:310` | harden |
+| Done (Batch 2: `LockedSection` with `inert`) | The coordinator lock is `pointer-events-none opacity-50` only, so the release buttons stay keyboard-operable. | AU | `Portal.tsx:310` | harden |
 | Done (pass 2: the count line replaced the tiles; zero counts are omitted) | Zero-value dashboard tiles are `disabled` at 0.55 opacity (about 2.6:1). | AU | `RoleDashboardSummary.tsx:69` | polish |
-| P2 | Repeated "Open/View/Download" buttons with no item context. Role-switcher active state is shown by styling only. `role="dialog"` on the inline `AccountLinkRequest` card. A focusable "disabled" mailto. | WG | `MyWork.tsx:87`, `CaseQueue.tsx:256`, `Portal.tsx:208/682`, `AccountLinkRequest.tsx:84` | harden |
+| Done (Batch 2: queue actions named "Open RS-…", My work "Open: title, case", document View/Preview/Download name the file, bell "Open case RS-…"; role switch already had a check icon + `aria-pressed`; inline `AccountLinkRequest` is a section; no-email is text, not a dead mailto) | Repeated "Open/View/Download" buttons with no item context. Role-switcher active state is shown by styling only. `role="dialog"` on the inline `AccountLinkRequest` card. A focusable "disabled" mailto. | WG | `MyWork.tsx:87`, `CaseQueue.tsx:256`, `Portal.tsx:208/682`, `AccountLinkRequest.tsx:84` | harden |
 | P3 | Popovers with `role="dialog"` don't move focus. The result-count live region re-announces on every keystroke. Smooth scroll ignores reduced motion. "✓/♥" glyphs are read aloud. No new-tab notice. | AU, WG | `CaseQueue.tsx:164/223`, `NotificationBell.tsx:79`, `Portal.tsx:194/336`, `PortalAccount.tsx:95` | harden |
 
 ### RTL, i18n and formatting
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| Partly done (`CurrentAction`, `JourneySnapshot` reset in RTL; `MyCare` kickers, `AssignmentHistory`, `CaseBlockers`, `ClinicalReview` h4s still track in Arabic) — P2 | `tracking-[0.08–0.1em]` and `uppercase` on Arabic micro-labels (computed 1.15px letter-spacing on "الخطوة الحالية"). Add an RTL reset or use `.eyebrow`. | AU, WG | `MyCare.tsx:95/147/187/202/219`, `Portal.tsx:434-612`, `CurrentAction.tsx:45`, `JourneySnapshot.tsx:28`, `MyWork.tsx:108`, `PortalAccount.tsx:62` | typeset |
-| P2 | `dir="ltr"` on Arabic money blocks flips alignment and digit order. Wrap only the figure in `<bdi>`. | AU, WG | `MyCare.tsx:148/155/188` | adapt |
-| Partly done (staff views share `careAreaLabel`; `MyCare.tsx` `careArea` keeps its own 3-area map) — P2 | Care-area labels: two local maps cover 3 of 9 areas, disagree with each other, and fall back to English slugs on Arabic pages. Use one shared source. | AU, WG | `MyCare.tsx:349`, `Portal.tsx:763`, `MyWork.tsx:72` | clarify |
-| P2 | One total is formatted with 0 and 2 decimals in different places. Use one shared money formatter. | WG, AU | `Portal.tsx:517/717/760`, `MyCare.tsx`, `ClinicalReview.tsx` | clarify |
-| P2 | Date of birth is parsed as UTC midnight, so it shows the previous day west of UTC. | WG | `PortalAccount.tsx:67` | harden |
+| Done (Batch 2: one `.label-micro` class with an RTL reset replaces every portal micro-label) | `tracking-[0.08–0.1em]` and `uppercase` on Arabic micro-labels (computed 1.15px letter-spacing on "الخطوة الحالية"). Add an RTL reset or use `.eyebrow`. | AU, WG | `MyCare.tsx:95/147/187/202/219`, `Portal.tsx:434-612`, `CurrentAction.tsx:45`, `JourneySnapshot.tsx:28`, `MyWork.tsx:108`, `PortalAccount.tsx:62` | typeset |
+| Done (Batch 2: `<bdi dir="ltr">` on the figure only) | `dir="ltr"` on Arabic money blocks flips alignment and digit order. Wrap only the figure in `<bdi>`. | AU, WG | `MyCare.tsx:148/155/188` | adapt |
+| Done (Batch 2: My Care uses `careAreaLabel` with the shared atlas) | Care-area labels: two local maps cover 3 of 9 areas, disagree with each other, and fall back to English slugs on Arabic pages. Use one shared source. | AU, WG | `MyCare.tsx:349`, `Portal.tsx:763`, `MyWork.tsx:72` | clarify |
+| Done (Batch 2: `lib/money.ts` `formatMoney` everywhere — whole amounts without decimals, others at the currency's precision) | One total is formatted with 0 and 2 decimals in different places. Use one shared money formatter. | WG, AU | `Portal.tsx:517/717/760`, `MyCare.tsx`, `ClinicalReview.tsx` | clarify |
+| Done (Batch 2: `formatCalendarDate`, UTC; test west of UTC) | Date of birth is parsed as UTC midnight, so it shows the previous day west of UTC. | WG | `PortalAccount.tsx:67` | harden |
 | P3 | Dates without a year; raw FX rate and ISO date; hard-coded "KB/MB"; English "Bank" placeholder and English error fallbacks in the Arabic UI; the wrong-account case detected by an English regex; Arabic IME Enter not guarded. | WG, AU | `CaseQueue.tsx:286`, `Portal.tsx:665/727/764`, `PortalDirectories.tsx:10`, `AccountLinkRequest.tsx:68`, `RequestInformationDialog.tsx:132` | clarify |
 
 ### Design-system drift (beyond items above)
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P2 — unblocked (D2 approved B1 as proposed; Batch 2) | Status, priority and attention chips and the journey "blocked" state use Tailwind amber, emerald, sky and stone colours with rounded-full pills. Map them to the status tokens (GATE 2) and the 8px badge. | AU | `Portal.tsx:768`, `CaseQueue.tsx:54-62`, `MyWork.tsx:64/103`, `JourneySnapshot.tsx:36-56` | colorize / polish |
+| Done (Batch 2: B1 tokens in `@theme`, `--badge-{tone}-*`, one `StatusBadge` with the Control Center's icon per tone and one `caseStatusTone`) | Status, priority and attention chips and the journey "blocked" state use Tailwind amber, emerald, sky and stone colours with rounded-full pills. Map them to the status tokens (GATE 2) and the 8px badge. | AU | `Portal.tsx:768`, `CaseQueue.tsx:54-62`, `MyWork.tsx:64/103`, `JourneySnapshot.tsx:36-56` | colorize / polish |
 | Done (pass 2 sweep: no `sand-*` or `brand-50` fill left in `MyCare.tsx`) | The deposit panel uses `sand-50/200` (not remapped by petrol), and the current step fills with `brand-50`. Both break the Two Surfaces rule. | AU | `MyCare.tsx:94/146` | polish |
 | Partly done (pass 2: queue Open is secondary, My work has one filled lead item and quiet links; Claim/Accept on a queue row stay filled) — P3 | A filled petrol "Open" on every queue row and work card (up to 12 per page) breaks the One Action rule. | AU | `CaseQueue.tsx:256`, `MyWork.tsx:87` | quieter |
 | P3 | `PortalFrame` uses a gradient with a hard-coded `#fff`; old-palette `rgba(28,51,58)` shadows; `shadow-xl`/`rounded-2xl` popovers. | AU | `Portal.tsx:236`, `CurrentAction.tsx:43`, `PortalAccount.tsx:49`, `NotificationBell.tsx:80`, `CaseQueue.tsx:165` | polish |
@@ -223,10 +223,10 @@ The items below are deferred.
 | Done (pass 2) | Decline uses `window.confirm` over the modal (browser-language buttons, no consequence text). Use an in-drawer confirm step in en and ar. | WG | `PatientProposal.tsx` | harden |
 | Done | Done in Phase 6 polish: the drawer returns focus to the control that opened it. | RB, WG | `Portal.tsx` `CaseDrawer` | harden |
 | Done (pass 2: the workspace fieldset is gone; the ask button reads "Sending…" while busy) | `<fieldset disabled={busy}>` dims the whole document and drops focus while sending, with no "Sending…" label. This is the same root cause as the portal P1. | WG, PM, RB | `Portal.tsx:368` | harden |
-| P2 | The primary is disabled until the box is ticked, with no reason that keyboard or screen-reader users can reach. | WG, PM | `PatientProposal.tsx` | harden |
-| P2 | Optional items are priced but excluded from the total and can't be selected, and nothing says so. | WG | `PatientProposal.tsx` | clarify |
+| Done (Batch 2: visible "Tick the box above to continue." described by the primary; the approved disabled design kept) | The primary is disabled until the box is ticked, with no reason that keyboard or screen-reader users can reach. | WG, PM | `PatientProposal.tsx` | harden |
+| Done (Batch 2: `optionalNote` under the list) | Optional items are priced but excluded from the total and can't be selected, and nothing says so. | WG | `PatientProposal.tsx` | clarify |
 | Done (pass 2) | The Arabic blocked note asks the patient to switch to English but has no direct link to the same view in `/en`. | WG | `PatientProposal.tsx` | harden |
-| P2 | The terms id `portal-deposit-terms` is hard-coded and shared across components, and the checkbox description reads the whole English terms block. Use `useId` and a short summary target, and test the real target. | RB, WG | `PatientProposal.tsx`, `CoordinationDepositTerms.tsx`, test | harden |
+| Done (Batch 2: `useId` for the terms; the checkbox is described by one short sentence naming the disclosure; tested) | The terms id `portal-deposit-terms` is hard-coded and shared across components, and the checkbox description reads the whole English terms block. Use `useId` and a short summary target, and test the real target. | RB, WG | `PatientProposal.tsx`, `CoordinationDepositTerms.tsx`, test | harden |
 | P3 | Fixed section ids and a region landmark per section; an unnamed fieldset group around the read-only document; an inline `mutate` wrapper (use `onDecided`); formatters rebuilt per item. | RB | `PatientProposal.tsx`, `Portal.tsx` | distill |
 | Done | Done in Phase 6 polish: the drawer header and Close stay pinned while the content scrolls. | PM | `Portal.tsx` `CaseDrawer` | adapt |
 | Done | Done in Phase 6 polish: the dialog is named by its h2 through `aria-labelledby`. | WG | `Portal.tsx` | harden |
@@ -264,8 +264,8 @@ The items below are deferred.
 |---|---|---|---|---|
 | Done (pass 3) | **Backend follow-up.** Work-item titles and context are English text from the backend. Arabic now shows a per-type title, but the context stays English. Emit a title code plus parameters instead of prose. | I18N | backend `CaseActionService`, `JourneyService`, `PatientActionService`; `MyWork.tsx`, `CurrentAction.tsx` | harden |
 | Partly done (pass 3 follow-up: referrals, deposit/travel handoffs, coordinator routing, staff notifications and the waiting reason carry codes; journey-runtime action handlers keep their admin-defined node labels, which are content, not code) — P3 | Work still worded only in English: `ConsultantReferralService` (transfer / second-opinion offers and confirmations), `CaseHandoffService` (deposit, travel), `AssignmentEngine` (coordinator routing), the journey-runtime action handlers (node labels), staff notifications (`NotificationView`) and `waitingReason` ("Waiting for the patient: …"). Give each a `WorkCopy` code. | Pass 3 | backend services above; `NotificationBell.tsx`, `Portal.tsx` | harden |
-| P2 | `WorkItem` has no `coordinatorSubject`, so My Work still prints your own name where the queue says "You". This needs a field in the work API. | WG | backend work API, `MyWork.tsx` | harden |
-| P2 | The work-copy context carries no locale, so callers pair a `locale` prop with context copy (a mismatch is possible). Put the locale in the context value. | RB | `portal-copy.tsx`, `portal-labels.ts` | harden |
+| Done (Batch 2: `WorkItemView.coordinatorSubject`; My Work uses `coordinatorLabel`) | `WorkItem` has no `coordinatorSubject`, so My Work still prints your own name where the queue says "You". This needs a field in the work API. | WG | backend work API, `MyWork.tsx` | harden |
+| Done (Batch 2: `WorkCopyProvider locale`, `useWorkCopy().locale`; plurals read it; the count line lost its `locale` prop) | The work-copy context carries no locale, so callers pair a `locale` prop with context copy (a mismatch is possible). Put the locale in the context value. | RB | `portal-copy.tsx`, `portal-labels.ts` | harden |
 | Done (pass 3: `intlLocale()`; the page counter and badge format through it) | Numbers rely on the engine's default numbering system for "ar". Pin one system (e.g. `-u-nu-latn`, per the Western-digits default) in `plural()`, dates and money. The page counter and filter badge are raw numbers. | I18N, RB | `portal-labels.ts`, `CaseQueue.tsx` | harden |
 | Done | Done in Phase 6 polish: pressed state has a petrol ring; toggle, Clear all and row/bulk/pager buttons are 44px. | PM | `CaseQueue.tsx` | polish |
 | Done (pass 3, same fix) | Search and sort fields have no focus outline (`.field:focus { outline: 0 }`, halo about 1.2:1). This is global and duplicates the patient-proposal item. | PM | `app/globals.css` | polish |
@@ -322,11 +322,11 @@ These were fixed in the run:
 |---|---|---|---|---|
 | Done (pass 3: `?view=` pushed per pick, read on load and on Back/Forward; views are links) | The staff view lives only in sessionStorage. Back/Forward, deep links and "open in new tab" don't reach a view. Write `?view=` as `changeCareView` does, or render views as links. | WG | `Portal.tsx`, `StaffNav.tsx` | harden |
 | Done (pass 3: `intlLocale()` in the portal, secure links and activation; Arabic few/many test) | Pin Western digits (`-u-nu-latn`) in `plural()` and the nav count. This is the existing numbering-system item, and this run adds more call sites. Add an Arabic test for a few/many count. | I18N | `lib/portal-labels.ts`, `StaffNav.tsx` | harden |
-| P2 | The count line has no live region, so screen-reader users miss updates when counts arrive or change. | WG | `RoleDashboardSummary.tsx` | harden |
+| Done (Batch 2: polite sr-only status with the counts in words) | The count line has no live region, so screen-reader users miss updates when counts arrive or change. | WG | `RoleDashboardSummary.tsx` | harden |
 | Done (pass 3: focus moves to the view's visible heading; also after My dashboard) | Picking a view from inside a case keeps focus on the header nav. Move it to the view's `<h2>`. | WG | `Portal.tsx` | harden |
 | P3 | A failed eligible-consultants load reads as "nobody eligible" with routing advice. Give it its own error state. | RB | `ConsultantRouting.tsx` | harden |
 | P3 | "Assign Consultant" is disabled with no reason until a Consultant is picked. Use an inline "Choose a Consultant" error, or a described-by hint. | WG | `CoordinatorActions.tsx` | harden |
-| P3 | Row actions in My work are all named "Open"/"Review assignment" (the title is only a description). Add the title as an sr-only part of the name. | WG | `MyWork.tsx` | clarify |
+| Done (Batch 2) | Row actions in My work are all named "Open"/"Review assignment" (the title is only a description). Add the title as an sr-only part of the name. | WG | `MyWork.tsx` | clarify |
 | P3 | `{area}` is interpolated as plain text, so a Latin fallback name can't be wrapped in `<bdi>` on Arabic pages. | I18N | `CoordinatorActions.tsx` | adapt |
 | P3 | Memoise `staffViewItems` and pass the counts down instead of re-filtering in `RoleDashboardSummary`. | RB | `Portal.tsx`, `RoleDashboardSummary.tsx` | optimize |
 | P3 | `FooterSwitch` serialises both footers into every RSC payload. A portal route-group layout would avoid it. Acceptable for now. | RB | `app/[locale]/layout.tsx` | optimize |
@@ -398,3 +398,18 @@ a text-arrow glyph; 36px View proposal and 32px View full journey; feminine Arab
 | P3 | `LeaveCaseDialog` opens on mount only; any future path that swaps the pending exit without an unmount would leave it closed. Key it per request if such a path appears. | RB | `LeaveCaseGuard.tsx` | harden |
 | P3 | Arabic: منسّق vs منسق mixed across portalWork; `PROPOSAL_TERMS_CALL` says «المقترح» where siblings say «العرض» and its context is masculine. Pending native review. | I18N | `messages/ar.json` | clarify |
 | Done (pass 3 follow-up: `portalWork.proposalVersion`, Intl unit file sizes) | A Latin "v{versionNumber}" in the Arabic proposal summary; `formatBytes` uses `toFixed` and English KB/MB. | I18N | `Portal.tsx` | clarify |
+
+## Batch 2 — deferred review findings (2026-10-09)
+
+The four skills (react-best-practices, composition-patterns, web-design-guidelines with fresh rules, Impeccable context +
+audit/harden + the detector, 0 findings) reviewed the Batch 2 diff. No P0–P2. These P3s are for the post-launch list:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P3 | The danger tone's icon is the Control Center's `XCircle`, which reads as "failed/cancelled" on an Overdue or Urgent badge. Consider an alert icon for danger in both `StatusBadge`s together. | Impeccable | `StatusBadge.tsx`, `cc-ui.tsx` | polish |
+| P3 | In the staff Messages drawer the thread's own "Secure messages" h2 repeats the drawer title. | WG | `CaseMessages.tsx`, `StaffCaseView.tsx` | distill |
+| P3 | If the case enters the Consultant phase while focus is inside the locked actions, `inert` drops focus to the page. | WG | `portal-ui.tsx` `LockedSection` | harden |
+| P3 | The Consultant review's "needs finance" rows are still bordered, tinted list items inside the card. | Impeccable | `ClinicalReview.tsx` | distill |
+| P3 | `CaseMessages` builds a date formatter per message; `UnreadCount` a number formatter per render. | RB | `CaseMessages.tsx`, `portal-ui.tsx` | optimize |
+| P3 | Seen in the Batch 2 screenshots, older than it: the staff proposal summary shows the raw status ("RELEASED") beside the version in both locales. | Impeccable | `StaffCaseView.tsx` `ProposalSummary` | clarify |
+| P3 | Web guidelines prefer a submit that stays enabled; the proposal primary stays disabled until the box is ticked (approved at GATE 3) and now says why in visible text. | WG | `PatientProposal.tsx` | — (design decision) |

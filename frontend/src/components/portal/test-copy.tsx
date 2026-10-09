@@ -16,5 +16,5 @@ export function workCopyFor(locale: Locale): WorkCopy {
 /** Renders inside the work-copy provider; `rerender` keeps the provider. */
 export function renderWithWork(ui: ReactElement, locale: Locale = "en") {
   const copy = workCopyFor(locale);
-  return render(ui, { wrapper: ({ children }: { children: ReactNode }) => <WorkCopyProvider copy={copy}>{children}</WorkCopyProvider> });
+  return render(ui, { wrapper: ({ children }: { children: ReactNode }) => <WorkCopyProvider locale={locale} copy={copy}>{children}</WorkCopyProvider> });
 }

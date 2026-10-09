@@ -81,7 +81,7 @@ export function AccountLinkRequest({ locale, token, api, onResolved }: { locale:
   }
 
   return (
-    <section className="card mb-6 border-brand-200 p-6 md:p-8" role="dialog" aria-labelledby="account-link-title" lang={locale}>
+    <section className="card mb-6 border-brand-200 p-6 md:p-8" aria-labelledby="account-link-title" lang={locale}>
       <p className="eyebrow">{t.eyebrow}</p>
       <h2 id="account-link-title" className="title mt-2">{t.title}</h2>
       {error && <p role="alert" className="mt-4 rounded-lg bg-alert-50 p-4 text-sm text-alert-800">{error}</p>}

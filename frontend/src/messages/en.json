@@ -814,6 +814,7 @@
     "totalLabel": "Total for the recommended services",
     "itemsLabel": "What the price covers",
     "optional": "optional",
+    "optionalNote": "Optional items are not included in the total. Ask your coordinator if you would like any of them.",
     "quantity": "× {count}",
     "honestyEstimate": "This is a preliminary, non-binding estimate, not a final price or a price guarantee. Your treatment and its price may increase or decrease after your treating doctor examines you in person.",
     "honestyQuote": "Prepared after your in-person assessment. It covers the confirmed services listed, at the price shown. Accepting this quote is not medical consent. Your treating doctor will ask for separate informed consent before treatment.",
@@ -824,6 +825,8 @@
     "termsEstimate": "Deposit, refunds and cancellation",
     "termsQuote": "Payment and changes",
     "pendingReview": "Pending legal review",
+    "termsReference": "The terms are under “{terms}” above, pending legal review.",
+    "acknowledgeFirst": "Tick the box above to continue.",
     "decisionTitle": "Your decision",
     "introEstimate": "Continuing does not accept a final treatment plan or confirm a booking.",
     "introQuote": "Review your final treatment plan and quote before deciding.",
@@ -945,8 +948,10 @@
       "unownedCases": { "one": "{count} case without a coordinator", "other": "{count} cases without a coordinator" },
       "newAssignments": { "one": "{count} new assignment", "other": "{count} new assignments" },
       "overdueCases": { "one": "{count} case overdue", "other": "{count} cases overdue" },
-      "teamWaiting": { "one": "{count} new case is waiting for an owner in the Team queue", "other": "{count} new cases are waiting for an owner in the Team queue" }
+      "teamWaiting": { "one": "{count} new case is waiting for an owner in the Team queue", "other": "{count} new cases are waiting for an owner in the Team queue" },
+      "unreadMessages": { "one": "{count} unread message", "other": "{count} unread messages" }
     },
+    "unread": "Unread",
     "currentAction": {
       "label": "Current action",
       "overdue": "Overdue",

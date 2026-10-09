@@ -31,6 +31,26 @@ function renderCare(overrides: Partial<Parameters<typeof MyCare>[0]> = {}) {
 describe("MyCare", () => {
   afterEach(cleanup);
 
+  it("names its sections as headings and says unread messages in words", () => {
+    renderCare({ unreadMessages: 2, otherCases: [{ ...base, id: "c2", caseNumber: "RS-2026-000082" }] });
+    for (const name of ["Coordination deposit", "Your proposal", "Your coordinator", "Your other cases"])
+      expect(screen.getByRole("heading", { level: 2, name })).toBeTruthy();
+    // "Message (2 unread messages)", not "Message2".
+    expect(screen.getByRole("button", { name: "Message (2 unread messages)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Messages (2 unread messages)" })).toBeTruthy();
+  });
+
+  it("isolates the figure, not the line, in Arabic, and labels care areas from the shared list", () => {
+    renderWithWork(<MyCare locale="ar" caseSummary={{ ...base, careCategory: "general-surgery" }} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
+                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} timeline={timeline} otherCases={[]}
+                   view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={vi.fn()} messagesPanel={null}/>, "ar");
+    const deposit = screen.getByRole("region", { name: "وديعة التنسيق" });
+    const figure = within(deposit).getByText(/500/);
+    expect(figure.tagName).toBe("BDI");
+    expect(figure.closest("[dir='ltr']")).toBe(figure);
+    expect(document.getElementById("case-heading")?.textContent).not.toMatch(/general/i);
+  });
+
   it("names the patient, and says whose care it is to a representative", () => {
     renderCare({ caseSummary: { ...base, patientName: "Maya Example" } });
     expect(document.getElementById("case-heading")?.textContent).toContain("Maya Example");

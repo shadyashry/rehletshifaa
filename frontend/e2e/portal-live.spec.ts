@@ -42,7 +42,7 @@ test("the team queue lists real submitted cases and offers exactly one ownership
   await expect(page.getByRole("button", { name: "Take ownership" }).first()).toBeVisible({ timeout: 20000 });
   // One ownership control per case row: the duplicate-action rule for this screen.
   const rows = await page.getByRole("button", { name: "Take ownership" }).count();
-  const opens = await page.getByRole("button", { name: "Open", exact: true }).count();
+  const opens = await page.getByRole("button", { name: /^Open(:| RS-)/ }).count();
   expect(rows).toBeGreaterThan(0);
   expect(opens).toBe(rows);
 });

@@ -17,9 +17,14 @@ import java.util.UUID;
 public final class WorkDtos {
     private WorkDtos() {}
 
-    /** An open action assigned to the signed-in staff member, with the context needed to act on it. */
+    /**
+     * An open action assigned to the signed-in staff member, with the context needed to act on it. The case's
+     * coordinator travels as both subject and name, as on the case list, so the portal can say "You" on the viewer's
+     * own case instead of printing their own name.
+     */
     public record WorkItemView(UUID id, UUID caseId, String caseNumber, String patientName, String caseStatus,
-                               String waitingOn, String careCategory, String coordinatorName, long documentCount,
+                               String waitingOn, String careCategory, String coordinatorSubject, String coordinatorName,
+                               long documentCount,
                                String type, String title, String context, String priority,
                                String status, boolean blocking, Instant dueAt, boolean overdue, Instant createdAt,
                                long version, WorkCopy copy) {}

@@ -14,10 +14,26 @@ const estimate = { versionId: "v1", status: "RELEASED", currency: "USD", validUn
 describe("PatientProposalDecision", () => {
   afterEach(cleanup);
 
-  it("keeps the deposit terms referenced by the acknowledgement on an estimate (F1)", () => {
-    render(<><span id="portal-deposit-terms" /><PatientProposalDecision locale="en" copy={en} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={vi.fn()} /></>);
-    expect(screen.getByRole("checkbox").getAttribute("aria-describedby")).toBe("portal-deposit-terms");
+  it("keeps the deposit terms referenced by the acknowledgement on an estimate (F1), in one short sentence", () => {
+    render(<PatientProposalDecision locale="en" copy={en} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={vi.fn()} />);
+    const described = document.getElementById(screen.getByRole("checkbox").getAttribute("aria-describedby")!);
+    expect(described?.textContent).toBe("The terms are under “Deposit, refunds and cancellation” above, pending legal review.");
     expect(screen.getByRole("button", { name: "Acknowledge estimate & continue" })).toHaveProperty("disabled", true);
+  });
+
+  it("says, in visible words, why the primary waits for the acknowledgement", () => {
+    render(<PatientProposalDecision locale="en" copy={en} caseId="c1" proposal={{ versionId: "v1", documentType: "PRELIMINARY_ESTIMATE" }} mutate={vi.fn()} />);
+    const primary = screen.getByRole("button", { name: "Acknowledge estimate & continue" });
+    const reason = document.getElementById(primary.getAttribute("aria-describedby")!);
+    expect(reason?.textContent).toBe(en.acknowledgeFirst);
+    expect(reason?.className).not.toContain("sr-only");
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.queryByText(en.acknowledgeFirst)).toBeNull();
+  });
+
+  it("explains that optional items are outside the total", () => {
+    render(<PatientProposal locale="en" copy={en} proposal={{ ...estimate, items: [...estimate.items, { id: "i2", description: "Remote monitoring", quantity: 1, unitPrice: 300, optional: true }] }} />);
+    expect(screen.getByText(en.optionalNote)).toBeTruthy();
   });
 
   it("asks a final-quote decision to accept", () => {

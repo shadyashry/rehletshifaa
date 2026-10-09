@@ -11,7 +11,7 @@ const shots = (name: string) => path.join("..", "docs", "ux-redesign", "screensh
  * staff view lives in the URL. Synthetic fixtures only.
  */
 const openFirstCase = async (page: Page, ar = false) => {
-  await page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first().click();
+  await page.getByRole("button", { name: ar ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first().click();
   await expect(page.locator("#case-heading")).toBeVisible();
 };
 const draftField = (page: Page) => page.locator("textarea:visible").first();

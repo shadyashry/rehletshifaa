@@ -56,7 +56,7 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
     <section id="current-action" aria-labelledby="current-action-title"
              className={`mt-4 rounded-lg border bg-white p-4 shadow-[0_1px_2px_rgba(28,51,58,0.04)] sm:p-5 ${waiting ? "border-line" : "border-brand-200"}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-brand-700 rtl:normal-case rtl:tracking-normal">{t.label}</p>
+        <p className="label-micro text-brand-700 rtl:normal-case rtl:tracking-normal">{t.label}</p>
         {action.dueAt && (
           <span className={`inline-flex items-center gap-1 text-[0.8125rem] ${action.overdue ? "font-bold text-alert-700" : "text-ink-500"}`}>
             {action.overdue ? <CircleAlert size={13} aria-hidden/> : <CalendarClock size={13} aria-hidden/>}

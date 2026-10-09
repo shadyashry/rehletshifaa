@@ -2,6 +2,7 @@ import type { RepresentativeOption } from "@/components/portal/RecordProposalDec
 import type { CaseActions } from "@/components/portal/CurrentAction";
 import type { PatientProposalState } from "@/components/portal/MyCare";
 import { intlLocale, type Locale } from "@/lib/i18n";
+import { formatMoney } from "@/lib/money";
 import type { PortalView as RoleKey } from "@/lib/access";
 
 /** Shapes and pure helpers shared by the portal's shell, queue and case pages. */
@@ -68,7 +69,8 @@ export function normalizeCases(rows:(CaseView|StaffCaseResponse)[]):CaseView[]{r
 // Display labels for currencies the doctor can view/quote in (EGP is the base).
 export const CURRENCY_LABELS:Record<string,{en:string;ar:string}>={USD:{en:"USD — US Dollar",ar:"USD — دولار أمريكي"},EUR:{en:"EUR — Euro",ar:"EUR — يورو"},EGP:{en:"EGP — Egyptian Pound",ar:"EGP — جنيه مصري"},AED:{en:"AED — UAE Dirham",ar:"AED — درهم إماراتي"},SAR:{en:"SAR — Saudi Riyal",ar:"SAR — ريال سعودي"},GBP:{en:"GBP — British Pound",ar:"GBP — جنيه إسترليني"},KWD:{en:"KWD — Kuwaiti Dinar",ar:"KWD — دينار كويتي"},QAR:{en:"QAR — Qatari Riyal",ar:"QAR — ريال قطري"},JOD:{en:"JOD — Jordanian Dinar",ar:"JOD — دينار أردني"}};
 
-export function money(amount:number,currency:string,locale:Locale){try{return new Intl.NumberFormat(intlLocale(locale),{style:"currency",currency}).format(amount);}catch{return `${amount.toLocaleString(intlLocale(locale))} ${currency}`;}}
+/** The shared money format (`lib/money.ts`), under the name the staff case page already uses. */
+export const money=formatMoney;
 
 export const STAFF_ROLES:string[]=["coordinator","doctor","operations","finance"];
 

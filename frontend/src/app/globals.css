@@ -117,6 +117,28 @@
   --color-alert-700: #8c2b28;
   --color-alert-800: #74201e;
 
+  /* Status tones (B1, approved 2026-10-09 as D2; docs/ux-redesign/token-proposals.md). Petrol & Paper values; danger
+     builds on the alert scale and info is today's petrol badge, so no new hue arrives. A tone is never the only cue:
+     every status shows an icon and a word, because under deuteranopia the tints are 1.6–2.3 ΔE apart. Borders are
+     decorative; marks (dots, fills) clear 3:1 and never carry text. */
+  --color-status-success-fg: #1b5f3d;
+  --color-status-success-surface: #e2f5ec;
+  --color-status-success-border: #bcdccc;
+  --color-status-success-mark: #3b9166;
+  --color-status-warning-fg: #8a5218;
+  --color-status-warning-surface: #fcf1e3;
+  --color-status-warning-border: #ecd0a8;
+  --color-status-danger-fg: var(--color-alert-800);
+  --color-status-danger-surface: var(--color-alert-50);
+  --color-status-danger-border: var(--color-alert-200);
+  --color-status-danger-solid: var(--color-alert-600);
+  --color-status-info-fg: var(--color-brand-800);
+  --color-status-info-surface: var(--color-brand-50);
+  --color-status-info-border: var(--color-brand-200);
+  --color-status-neutral-fg: var(--color-ink-500);
+  --color-status-neutral-surface: var(--color-surface-sage);
+  --color-status-neutral-border: var(--color-line-strong);
+
   /* The width at which every desktop navigation item, the language switch and the primary action fit on
      one line with room to spare (English needs ~1000px). Below it the compact menu stays in charge. */
   --breakpoint-nav: 68.75rem;
@@ -179,6 +201,21 @@
     --badge-bg: var(--color-brand-50);
     --badge-fg: var(--color-brand-800);
     --badge-border: var(--color-brand-200);
+    --badge-success-bg: var(--color-status-success-surface);
+    --badge-success-fg: var(--color-status-success-fg);
+    --badge-success-border: var(--color-status-success-border);
+    --badge-warning-bg: var(--color-status-warning-surface);
+    --badge-warning-fg: var(--color-status-warning-fg);
+    --badge-warning-border: var(--color-status-warning-border);
+    --badge-danger-bg: var(--color-status-danger-surface);
+    --badge-danger-fg: var(--color-status-danger-fg);
+    --badge-danger-border: var(--color-status-danger-border);
+    --badge-info-bg: var(--color-status-info-surface);
+    --badge-info-fg: var(--color-status-info-fg);
+    --badge-info-border: var(--color-status-info-border);
+    --badge-neutral-bg: var(--color-status-neutral-surface);
+    --badge-neutral-fg: var(--color-status-neutral-fg);
+    --badge-neutral-border: var(--color-status-neutral-border);
 
     --table-bg: var(--color-surface-default);
     --table-border: var(--color-line);
@@ -851,7 +888,15 @@
   .portal-shell .card { box-shadow: var(--shadow-card); }
   .portal-shell fieldset:disabled { opacity: .65; }
   .portal-shell h2, .portal-shell h3 { scroll-margin-top: 7rem; }
-  .status-badge { display: inline-flex; border: 1px solid var(--badge-border); border-radius: var(--badge-radius); padding: var(--badge-padding); background: var(--badge-bg); color: var(--badge-fg); font-size: var(--badge-font-size); font-weight: var(--badge-font-weight); }
+  .status-badge { display: inline-flex; align-items: center; gap: 0.25rem; border: 1px solid var(--badge-border); border-radius: var(--badge-radius); padding: var(--badge-padding); background: var(--badge-bg); color: var(--badge-fg); font-size: var(--badge-font-size); font-weight: var(--badge-font-weight); }
+  .status-badge[data-tone="success"] { --badge-bg: var(--badge-success-bg); --badge-fg: var(--badge-success-fg); --badge-border: var(--badge-success-border); }
+  .status-badge[data-tone="warning"] { --badge-bg: var(--badge-warning-bg); --badge-fg: var(--badge-warning-fg); --badge-border: var(--badge-warning-border); }
+  .status-badge[data-tone="danger"] { --badge-bg: var(--badge-danger-bg); --badge-fg: var(--badge-danger-fg); --badge-border: var(--badge-danger-border); }
+  .status-badge[data-tone="info"] { --badge-bg: var(--badge-info-bg); --badge-fg: var(--badge-info-fg); --badge-border: var(--badge-info-border); }
+  .status-badge[data-tone="neutral"] { --badge-bg: var(--badge-neutral-bg); --badge-fg: var(--badge-neutral-fg); --badge-border: var(--badge-neutral-border); }
+  /* A small uppercase label (section names, field names). Latin tracking and capitals never reach Arabic. */
+  .label-micro { font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  [dir="rtl"] .label-micro { letter-spacing: 0; text-transform: none; }
   .account-option { display: flex; align-items: center; gap: .75rem; width: 100%; min-height: 2.75rem; padding: .65rem .75rem; text-align: start; border-radius: .5rem; font-size: .9rem; }
   .account-option:hover { background: var(--color-brand-50); }
   .portal-account summary::-webkit-details-marker { display: none; }

@@ -37,7 +37,7 @@ const AccountLinkRequest=dynamic(()=>import("@/components/portal/AccountLinkRequ
 const Queue=dynamic(()=>import("@/components/portal/StaffQueue").then(m=>m.Queue));
 
 export function Portal({workCopy,...props}:{locale:Locale;proposalCopy:ProposalCopy;workCopy:WorkCopy}){
-  return <WorkCopyProvider copy={workCopy}><PortalView {...props}/></WorkCopyProvider>;
+  return <WorkCopyProvider locale={props.locale} copy={workCopy}><PortalView {...props}/></WorkCopyProvider>;
 }
 
 /** The queue state for an explicitly chosen staff view (a pick, a deep link or a history step). */

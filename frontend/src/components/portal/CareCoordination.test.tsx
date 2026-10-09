@@ -122,14 +122,14 @@ describe("Team queue", () => {
     expect(screen.getByText("Layla Hassan")).toBeVisible();
     expect(screen.queryByText("Karim Adel")).not.toBeInTheDocument();
     expect(screen.getByText(/Received/)).toBeVisible();
-    expect(screen.getByRole("button", { name: "Take ownership" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Transfer ownership" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Take ownership RS-1" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^Transfer ownership/ })).not.toBeInTheDocument();
 
     rerender(<CaseQueue {...props} lead scope="team" state={{ ...initialQueue, tab: "team" }} onTransfer={onTransfer} />);
     expect(screen.getByRole("tab", { name: "Owned by your team" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Karim Adel")).toBeVisible();
     expect(screen.queryByText("Mine")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Transfer ownership" }));
+    fireEvent.click(screen.getByRole("button", { name: "Transfer ownership RS-2" }));
     expect(onTransfer).toHaveBeenCalledWith(cases[1]);
 
     // My cases: only cases this coordinator owns, with no transfer shortcut.
@@ -137,7 +137,7 @@ describe("Team queue", () => {
     expect(screen.getByText("Cases you own as the responsible coordinator.")).toBeVisible();
     expect(screen.getByText("Mine")).toBeVisible();
     expect(screen.queryByText("Karim Adel")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Transfer ownership" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Transfer ownership/ })).not.toBeInTheDocument();
   });
 
   it("gives a coordinator who is not a lead no team-owned view", () => {

@@ -2,9 +2,10 @@
 
 import { useRef, useState } from "react";
 import { scrollIntoView } from "@/lib/scroll";
-import { FileText } from "lucide-react";
+import { Clock, FileText } from "lucide-react";
 
-import { intlLocale, type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
+import { formatMoney } from "@/lib/money";
 
 export type CatalogService = { id: string; serviceCode: string; serviceName: string; category?: string; priceEgp: number; active: boolean };
 export type FxRate = { currency: string; rate: number; rateDate: string; source: string };
@@ -25,8 +26,7 @@ const CURRENCY_LABELS: Record<string, string> = {
 };
 
 function money(amount: number, currency: string, locale: Locale) {
-  try { return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency, maximumFractionDigits: 0 }).format(amount); }
-  catch { return `${amount.toLocaleString(intlLocale(locale))} ${currency}`; }
+  return formatMoney(amount, currency, locale);
 }
 
 /**
@@ -141,9 +141,10 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
     <section aria-labelledby="clinical-review-title" className="card p-4 sm:p-5">
       <h3 id="clinical-review-title" className="text-[1.05rem] font-bold leading-6 text-brand-900">{t.title}</h3>
 
-      {/* Evidence first: composing a recommendation should never mean leaving the page to find a file. */}
-      <section aria-labelledby="review-documents" className="mt-4 rounded-lg border border-line bg-mist p-3">
-        <h4 id="review-documents" className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">
+      {/* Evidence first: composing a recommendation should never mean leaving the page to find a file. Sections inside
+          this card are separated by hairlines, never boxed again (no nested cards). */}
+      <section aria-labelledby="review-documents" className="mt-4 border-t border-line pt-3">
+        <h4 id="review-documents" className="label-micro text-ink-500">
           {t.documents}{documents.length > 0 && <span className="text-ink-400"> · {documents.length}</span>}
         </h4>
         {documents.length === 0
@@ -155,8 +156,8 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
                   <span className="min-w-0 flex-1 truncate text-[0.88rem] font-semibold text-ink-800">{doc.fileName}</span>
                   {doc.status === "CLEAN"
                     ? <span className="flex gap-3">
-                        <button type="button" className="link-cta text-[0.85rem]" onClick={() => viewDoc(doc.documentId)}>{t.preview}</button>
-                        <button type="button" className="link-cta text-[0.85rem]" onClick={() => downloadDoc(doc.documentId)}>{t.download}</button>
+                        <button type="button" className="link-cta text-[0.85rem]" onClick={() => viewDoc(doc.documentId)}>{t.preview}<span className="sr-only"> {doc.fileName}</span></button>
+                        <button type="button" className="link-cta text-[0.85rem]" onClick={() => downloadDoc(doc.documentId)}>{t.download}<span className="sr-only"> {doc.fileName}</span></button>
                       </span>
                     : <span className="text-[0.8rem] text-ink-500">{doc.status === "PENDING" || doc.status === "UPLOADED" ? t.scanning : t.unavailable}</span>}
                 </li>
@@ -179,7 +180,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
         {recommendationError && <p id="clinical-recommendation-error" role="alert" className="error-text mt-1">{recommendationError}</p>}
       </div>
 
-      <section aria-labelledby="recommended-services" className="mt-5 rounded-lg border border-line p-4">
+      <section aria-labelledby="recommended-services" className="mt-5 border-t border-line pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h4 id="recommended-services" className="text-[0.95rem] font-bold text-ink-900">{t.services}</h4>
@@ -223,10 +224,10 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
         {offList.length > 0 && (
           <ul className="mt-2 space-y-1">
             {offList.map((row, index) => (
-              <li key={`${row.description}-${index}`} className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+              <li key={`${row.description}-${index}`} className="flex items-center gap-3 rounded-lg border border-status-warning-border bg-status-warning-surface p-2.5">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.9rem] font-semibold text-ink-900">{row.description}</span>
-                  <span className="block text-[0.8125rem] font-bold text-amber-900">{t.needsFinance}</span>
+                  <span className="mt-0.5 flex items-center gap-1 text-[0.8125rem] font-bold text-status-warning-fg"><Clock size={13} strokeWidth={2.25} aria-hidden/>{t.needsFinance}</span>
                 </span>
                 <span className="flex-none whitespace-nowrap text-[0.9rem] font-bold text-ink-800">{money(row.amountEgp, BASE, locale)}</span>
                 <button type="button" className="flex-none text-[0.8rem] font-bold text-ink-500 hover:text-alert-700"
@@ -262,8 +263,8 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
       </div>
 
       {/* A last read-through before it leaves the consultant's hands — not another page, not another click. */}
-      <section aria-labelledby="recommendation-summary" className="mt-5 rounded-lg border border-brand-200 bg-brand-50 p-4">
-        <h4 id="recommendation-summary" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.summary}</h4>
+      <section aria-labelledby="recommendation-summary" className="mt-5 border-t border-line pt-4">
+        <h4 id="recommendation-summary" className="label-micro text-brand-700">{t.summary}</h4>
         <dl className="mt-3 grid gap-x-6 gap-y-3 text-[0.85rem] sm:grid-cols-2">
           <div className="sm:col-span-2">
             <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.recommendation}</dt>
@@ -290,7 +291,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
         </dl>
         {converted && <p className="mt-2 text-[0.8125rem] text-ink-500">{t.approxNote}</p>}
 
-        {error && <p role="alert" className="mt-3 rounded-lg border border-alert-200 bg-white px-3 py-2 text-[0.85rem] font-semibold text-alert-700">{error}</p>}
+        {error && <p role="alert" className="mt-3 rounded-lg bg-alert-50 px-3 py-2 text-[0.85rem] font-semibold text-alert-700">{error}</p>}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button type="button" className="btn-primary" disabled={busy} onClick={submit}>{t.submit}</button>

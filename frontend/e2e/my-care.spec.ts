@@ -23,7 +23,7 @@ test("lands on the current case with the deposit being arranged: one step, no fa
   const buttons = await page.getByRole("button").allTextContents();
   expect(buttons.filter(text => /continue|pay|check status|refresh|go to case|view progress/i.test(text))).toEqual([]);
   await expect(page.getByRole("button", { name: /^view proposal/i })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /^message(\s*\d+)?$/i })).toHaveCount(1); // the coordinator block's one control (with its unread badge)
+  await expect(page.getByRole("button", { name: /^message( \(\d+ unread messages?\))?$/i })).toHaveCount(1); // the coordinator block's one control (with its unread badge)
   const depositBlock = page.getByRole("region", { name: "Coordination deposit", exact: true });
   await expect(depositBlock).toContainText("$500");
   await expect(depositBlock).toContainText("Arranging");
@@ -33,7 +33,9 @@ test("lands on the current case with the deposit being arranged: one step, no fa
   await expect(page.getByRole("region", { name: "Your coordinator" })).toContainText("Sara Ahmed");
   // Header navigation is exactly three destinations.
   const nav = page.getByRole("navigation", { name: "My Care" }).first();
-  await expect(nav.getByRole("button")).toHaveText(["My Care", "Documents", "Messages1"]);
+  await expect(nav.getByRole("button")).toHaveText(["My Care", "Documents", /^Messages1/]);
+  // The badge is for the eye; the name says it in words ("Messages1" before Batch 2).
+  await expect(nav.getByRole("button", { name: "Messages (1 unread message)", exact: true })).toBeVisible();
   await page.screenshot({ path: "e2e/screenshots/my-care-deposit-1440.png", fullPage: true });
   for (const width of [1280, 1024, 768]) {
     await page.setViewportSize({ width, height: 900 });

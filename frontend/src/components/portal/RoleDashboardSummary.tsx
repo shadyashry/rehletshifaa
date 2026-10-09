@@ -3,7 +3,6 @@
 import { useId } from "react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import type { Locale } from "@/lib/i18n";
 import { plural } from "@/lib/portal-labels";
 
 type SummaryCase = { status: string; coordinatorSubject?: string; assignmentStatus?: string; overdueTaskCount?: number };
@@ -32,8 +31,8 @@ export function matchesKpi(item: SummaryCase, kpi: KpiFilter, role: string) {
  * that narrows the list below to those cases. When nothing is owed the line says so in words. While the queue loads it
  * shows no numbers at all, so a zero never flashes before the real count.
  */
-export function RoleDashboardSummary({ locale, role, cases, tasks, loading = false, selected = "", onSelect }: {
-  locale: Locale; role: string; cases: SummaryCase[]; tasks: SummaryTask[]; loading?: boolean;
+export function RoleDashboardSummary({ role, cases, tasks, loading = false, selected = "", onSelect }: {
+  role: string; cases: SummaryCase[]; tasks: SummaryTask[]; loading?: boolean;
   selected?: KpiFilter; onSelect?: (value: KpiFilter) => void;
 }) {
   const work = useWorkCopy();
@@ -53,15 +52,20 @@ export function RoleDashboardSummary({ locale, role, cases, tasks, loading = fal
   // Zero counts are left out — except the one that is filtering the list, so it can always be switched off again.
   const shown = (id: KpiFilter, count: number) => count > 0 || selected === id;
   const items: { id: KpiFilter; text: string; alert?: boolean }[] = [];
-  if (shown("action", needsAction)) items.push({ id: "action", text: plural(locale, needsAction, work.plural.needAction) });
-  if (shown("unowned", unowned)) items.push({ id: "unowned", text: plural(locale, unowned, role === "doctor" ? work.plural.newAssignments : work.plural.unownedCases) });
-  if (shown("overdue", overdue)) items.push({ id: "overdue", text: plural(locale, overdue, work.plural.overdueCases), alert: overdue > 0 });
+  if (shown("action", needsAction)) items.push({ id: "action", text: plural(work.locale, needsAction, work.plural.needAction) });
+  if (shown("unowned", unowned)) items.push({ id: "unowned", text: plural(work.locale, unowned, role === "doctor" ? work.plural.newAssignments : work.plural.unownedCases) });
+  if (shown("overdue", overdue)) items.push({ id: "overdue", text: plural(work.locale, overdue, work.plural.overdueCases), alert: overdue > 0 });
+
+  // The counts arrive after the list and change as work moves; the live line says them once, politely, in words. It is
+  // always rendered (empty while loading) so the first real counts are announced too.
+  const spoken = loading ? "" : items.length === 0 ? t.nothing : items.map(item => item.text).join(work.locale === "ar" ? "، " : ", ");
 
   return (
     <section aria-labelledby="dashboard-summary-title" className="mb-6 min-h-11">
       <h2 id="dashboard-summary-title" className="sr-only">{t.title}</h2>
+      <p role="status" className="sr-only">{spoken}</p>
       {loading ? null : items.length === 0 ? (
-        <p className="flex min-h-11 items-center text-[0.9375rem] text-ink-600">{t.nothing}</p>
+        <p aria-hidden className="flex min-h-11 items-center text-[0.9375rem] text-ink-600">{t.nothing}</p>
       ) : (
         <>
           <p id={hintId} className="sr-only">{t.hint}</p>

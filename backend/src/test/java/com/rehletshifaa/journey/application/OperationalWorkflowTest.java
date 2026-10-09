@@ -311,6 +311,8 @@ class OperationalWorkflowTest {
         assertThat(mine).extracting(WorkItemView::type).containsExactly("BLOCKING", "LATER", "UNDATED");
         assertThat(mine).extracting(WorkItemView::caseId).containsExactly(first, second, first);
         assertThat(mine).extracting(WorkItemView::coordinatorName).containsOnly("Coordinator One");
+        // The subject travels beside the name so the portal can say "You" on the viewer's own case.
+        assertThat(mine).extracting(WorkItemView::coordinatorSubject).containsOnly("coordinator-subject");
         assertThat(mine).extracting(WorkItemView::documentCount).containsOnly(0L);
         assertThat(mine.get(1).caseNumber()).isNotEqualTo(mine.get(0).caseNumber());
     }

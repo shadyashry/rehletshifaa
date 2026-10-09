@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Check, Languages, LayoutDashboard, LogOut, Settings, X, ExternalLink } from "lucide-react";
-import { intlLocale, type Locale } from "@/lib/i18n";
+import { formatCalendarDate } from "@/lib/dates";
+import type { Locale } from "@/lib/i18n";
 import { OIDC_AUTHORITY } from "@/lib/api";
 import { usePortalSlot } from "@/components/portal/portal-slot";
 
@@ -72,23 +73,23 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
       <div className="flex items-start justify-between gap-4"><h2 id="account-heading" className="title">{text.settings}</h2><button className="icon-button" aria-label={text.close} onClick={() => dialog.current?.close()}><X size={20}/></button></div>
       {patient && (
         <section aria-labelledby="profile-details" className="mt-5">
-          <h3 id="profile-details" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{text.details}</h3>
+          <h3 id="profile-details" className="label-micro text-ink-500">{text.details}</h3>
           {profileError ? <p role="alert" className="mt-2 text-sm text-alert-800">{profileError}</p> : !profile ? <p className="mt-2 text-sm text-ink-500">{text.loading}</p> : (
             <dl className="mt-2 grid gap-x-6 gap-y-2.5 text-[0.9rem] sm:grid-cols-2">
               {([
                 [text.givenName, profile.givenName], [text.familyName, profile.familyName], [text.preferredName, profile.preferredName],
-                [text.dob, profile.dateOfBirth ? new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(profile.dateOfBirth)) : null],
+                [text.dob, profile.dateOfBirth ? formatCalendarDate(profile.dateOfBirth, locale) : null],
                 [text.country, profile.country], [text.nationality, profile.nationality],
                 [text.preferredLanguage, profile.preferredLanguage === "ar" ? "العربية" : profile.preferredLanguage === "en" ? "English" : profile.preferredLanguage],
               ] as [string, string | null | undefined][]).filter(([, value]) => value).map(([label, value]) => (
-                <div key={label} className="min-w-0"><dt className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">{label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900">{value}</dd></div>
+                <div key={label} className="min-w-0"><dt className="label-micro text-ink-500">{label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900">{value}</dd></div>
               ))}
-              <div className="min-w-0"><dt className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">{text.email}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900" dir="ltr">{profile.email ?? text.notProvided}</dd>{profile.email && <dd className={`text-[0.8125rem] font-semibold ${profile.emailVerified ? "text-brand-700" : "text-ink-500"}`}>{profile.emailVerified ? text.verified : text.notVerified}</dd>}</div>
-              <div className="min-w-0"><dt className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-ink-500">{text.whatsapp}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900" dir="ltr">{profile.whatsappNumber ?? text.notProvided}</dd>{profile.whatsappNumber && <dd className={`text-[0.8125rem] font-semibold ${profile.phoneVerified ? "text-brand-700" : "text-ink-500"}`}>{profile.phoneVerified ? text.verified : text.notVerified}</dd>}</div>
+              <div className="min-w-0"><dt className="label-micro text-ink-500">{text.email}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900" dir="ltr">{profile.email ?? text.notProvided}</dd>{profile.email && <dd className={`text-[0.8125rem] font-semibold ${profile.emailVerified ? "text-brand-700" : "text-ink-500"}`}>{profile.emailVerified ? text.verified : text.notVerified}</dd>}</div>
+              <div className="min-w-0"><dt className="label-micro text-ink-500">{text.whatsapp}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900" dir="ltr">{profile.whatsappNumber ?? text.notProvided}</dd>{profile.whatsappNumber && <dd className={`text-[0.8125rem] font-semibold ${profile.phoneVerified ? "text-brand-700" : "text-ink-500"}`}>{profile.phoneVerified ? text.verified : text.notVerified}</dd>}</div>
             </dl>
           )}
           <p className="mt-3 text-[0.82rem] text-ink-500">{text.correction}</p>
-          <h3 className="mt-5 text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{text.preferencesTitle}</h3>
+          <h3 className="mt-5 label-micro text-ink-500">{text.preferencesTitle}</h3>
         </section>
       )}
       <form key={`${preferences.displayName}-${locale}`} className={`${patient ? "mt-3" : "mt-5"} space-y-5`} onSubmit={async event => {

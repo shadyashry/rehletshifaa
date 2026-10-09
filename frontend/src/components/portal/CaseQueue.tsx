@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight, Search, FolderOpen, Copy, Check, X, Files, ListTodo,
-  Hourglass, SlidersHorizontal, CircleAlert, Stethoscope, UserRound,
+  Hourglass, SlidersHorizontal, Stethoscope, UserRound,
 } from "lucide-react";
 
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
+import { StatusBadge, caseStatusTone } from "@/components/portal/StatusBadge";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { matchesKpi, type KpiFilter } from "@/components/portal/RoleDashboardSummary";
 import { intlLocale, type Locale } from "@/lib/i18n";
@@ -52,16 +53,15 @@ export function attentionRank(item: QueueCase, now = Date.now()) {
 /** The one-word reason a case is near the top, so the ordering is never a mystery. */
 function attentionChip(item: QueueCase, copy: WorkCopy["attention"], now = Date.now()) {
   const rank = attentionRank(item, now);
-  if (rank === 0) return { label: copy.overdueBlocking, tone: "bg-alert-50 text-alert-800" };
-  if (rank === 1) return { label: copy.high, tone: "bg-amber-50 text-amber-900" };
+  if (rank === 0) return { label: copy.overdueBlocking, tone: "danger" as const };
+  if (rank === 1) return { label: copy.high, tone: "warning" as const };
   if (rank === 2) return (item.overdueTaskCount ?? 0) > 0
-    ? { label: copy.overdue, tone: "bg-alert-50 text-alert-800" }
-    : { label: copy.dueSoon, tone: "bg-amber-50 text-amber-900" };
-  if (rank === 3) return { label: copy.patientResponded, tone: "bg-sky-50 text-sky-900" };
+    ? { label: copy.overdue, tone: "danger" as const }
+    : { label: copy.dueSoon, tone: "warning" as const };
+  if (rank === 3) return { label: copy.patientResponded, tone: "info" as const };
   return null;
 }
 
-function statusTone(status:string){return ["INFORMATION_REQUIRED","REVISION_REQUESTED","EXPIRED"].includes(status)?"border-amber-200 bg-amber-50 text-amber-900":["CANCELLED","DECLINED","CLINICALLY_NOT_SUITABLE"].includes(status)?"border-alert-200 bg-alert-50 text-alert-800":["CLOSED","DISCHARGED","FOLLOW_UP"].includes(status)?"border-line bg-mist text-ink-600":"border-brand-200 bg-brand-50 text-brand-800";}
 
 /**
  * The operational case list.
@@ -210,7 +210,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
 
     {/* Bulk actions exist only once something is selected. */}
     {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2">
-      <p className="text-[0.85rem] font-bold text-brand-900">{plural(locale,selectedCases.length,work.plural.selected)}</p>
+      <p className="text-[0.85rem] font-bold text-brand-900">{plural(work.locale,selectedCases.length,work.plural.selected)}</p>
       <div className="ms-auto flex flex-wrap gap-2">
         {canBulkClaim&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={async()=>{const failed:string[]=[];for(const item of selectedCases){const result=await onMutate(`/coordinator/cases/${item.id}/claim`);if(!result)failed.push(item.id);}
           setSelectedIds(new Set(failed));setBulkResult(failed.length?fillTemplate(text.bulkClaimResult,{done:count(selectedCases.length-failed.length),total:count(selectedCases.length)}):"");}}><Check size={14}/>{text.claim}</button>}
@@ -228,7 +228,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     <div id="queue-panel" role={tabs.length?"tabpanel":undefined} aria-labelledby={tabs.length?`queue-tab-${selected}`:undefined} tabIndex={tabs.length?0:undefined}>
       <div className="mb-2.5 flex items-center justify-between gap-3">
         {/* The empty state already says there is nothing here; the count would only repeat it. */}
-        <p role="status" className="text-[0.82rem] text-ink-500">{busy?text.loading:list.length?plural(locale,list.length,work.plural.cases):""}</p>
+        <p role="status" className="text-[0.82rem] text-ink-500">{busy?text.loading:list.length?plural(work.locale,list.length,work.plural.cases):""}</p>
         {selectable&&pageItems.length>0&&<label className="flex items-center gap-2 text-[0.8rem] font-semibold text-ink-600">
           <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={pageSelected}
                  onChange={event=>setSelectedIds(currentIds=>{const next=new Set(currentIds);for(const item of pageItems){if(event.target.checked)next.add(item.id);else next.delete(item.id);}return next;})}/>
@@ -243,29 +243,31 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             const pending=item.assignmentStatus==="PENDING"&&item.assignmentId;
             const claimable=coordinator&&!item.coordinatorSubject&&item.status==="RECEIVED";
             const transferable=!!onTransfer&&coordinator&&scope==="team"&&selected==="team"&&!!item.coordinatorSubject&&!terminal.has(item.status);
-            const overdue=(item.overdueTaskCount??0)>0;
             const attention=attentionChip(item,work.attention);
             const quick=async(path:string,body?:unknown)=>{await onMutate(path,body);};
+            // Every row repeats the same action words, so each button is also named by its case ("Open RS-…"); the
+            // visible word comes first, so the name still contains what is on screen.
+            const named=(action:string)=>`${action} ${item.caseNumber}`;
             // Only the number is isolated left-to-right, so "الحالة RS-…" still reads right-to-left in Arabic.
             const [titleBefore,titleAfter=""]=text.caseTitle.split("{number}");
             const title=item.patientName?<bdi>{item.patientName}</bdi>:<>{titleBefore}<bdi dir="ltr">{item.caseNumber}</bdi>{titleAfter}</>;
             const meta=<>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.8125rem] font-bold ${statusTone(item.status)}`}>{statusLabel(item.status)}</span>
+              <StatusBadge tone={caseStatusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>
               {item.waitingOn&&item.waitingOn!=="NONE"&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-600"><Hourglass size={12} className="text-brand-600" aria-hidden/>{text.waiting}: <strong className="font-semibold text-ink-800">{waitingLabel(item.waitingOn,work.waiting,{role,ownsCase:!!subject&&item.coordinatorSubject===subject})}</strong></span>}
-              {attention&&<span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.8125rem] font-bold ${attention.tone}`}>{overdue&&<CircleAlert size={12} aria-hidden/>}{attention.label}</span>}
+              {attention&&<StatusBadge tone={attention.tone}>{attention.label}</StatusBadge>}
             </>;
             const people=<>
               <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ink-600"><UserRound size={13} className="text-ink-400" aria-hidden/><bdi>{coordinatorLabel(item,subject,text)}</bdi></span>
               {item.doctorName&&<span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ink-600"><Stethoscope size={13} className="text-ink-400" aria-hidden/><bdi>{item.doctorName}</bdi></span>}
-              {(item.openTaskCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><ListTodo size={13} aria-hidden/>{plural(locale,item.openTaskCount??0,work.plural.openTasks)}</span>}
-              {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><Files size={13} aria-hidden/>{plural(locale,item.documentCount??0,work.plural.documents)}</span>}
+              {(item.openTaskCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><ListTodo size={13} aria-hidden/>{plural(work.locale,item.openTaskCount??0,work.plural.openTasks)}</span>}
+              {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><Files size={13} aria-hidden/>{plural(work.locale,item.documentCount??0,work.plural.documents)}</span>}
             </>;
             const actions=<>
-              {claimable&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
-              {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
-              {transferable&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
+              {claimable&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-label={named(text.claim)} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
+              {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-label={named(text.accept)} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
+              {transferable&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-haspopup="dialog" aria-label={named(text.transfer)} onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
               {/* Opening is the row's quiet default; only a business action (take ownership, accept) is filled. */}
-              <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>onOpen(item)}>{text.open}<ArrowRight size={14} aria-hidden className="rtl:rotate-180"/></button>
+              <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-label={named(text.open)} onClick={()=>onOpen(item)}>{text.open}<ArrowRight size={14} aria-hidden className="rtl:rotate-180"/></button>
             </>;
 
 

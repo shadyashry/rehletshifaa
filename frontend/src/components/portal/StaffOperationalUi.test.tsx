@@ -194,7 +194,7 @@ describe("RoleDashboardSummary", () => {
 
   it("reads as one line of counts, each a real toggle that filters", () => {
     const onSelect = vi.fn();
-    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={cases} tasks={[]} selected="" onSelect={onSelect}/>);
+    renderWithWork(<RoleDashboardSummary role="coordinator" cases={cases} tasks={[]} selected="" onSelect={onSelect}/>);
     expect(screen.getByRole("button", { name: "1 case needs action" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "1 case without a coordinator" })).toBeTruthy();
     const overdue = screen.getByRole("button", { name: "1 case overdue" });
@@ -204,14 +204,23 @@ describe("RoleDashboardSummary", () => {
   });
 
   it("leaves zero counts out and says so in words when nothing is owed", () => {
-    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={[{ status: "CLOSED", coordinatorSubject: "me" }]} tasks={[]}/>);
+    renderWithWork(<RoleDashboardSummary role="coordinator" cases={[{ status: "CLOSED", coordinatorSubject: "me" }]} tasks={[]}/>);
     expect(screen.queryByRole("button")).toBeNull();
-    expect(screen.getByText("No cases need action right now.")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("No cases need action right now.");
+  });
+
+  it("announces the counts politely when they arrive and when they change", () => {
+    const { rerender } = renderWithWork(<RoleDashboardSummary role="coordinator" cases={[]} tasks={[]} loading/>);
+    const live = screen.getByRole("status");
+    expect(live.textContent).toBe("");
+    rerender(<RoleDashboardSummary role="coordinator" cases={cases} tasks={[]}/>);
+    expect(screen.getByRole("status")).toBe(live);
+    expect(live.textContent).toBe("1 case needs action, 1 case without a coordinator, 1 case overdue");
   });
 
   it("keeps a pressed count visible at zero so its filter can be switched off", () => {
     const onSelect = vi.fn();
-    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={[]} tasks={[]} selected="overdue" onSelect={onSelect}/>);
+    renderWithWork(<RoleDashboardSummary role="coordinator" cases={[]} tasks={[]} selected="overdue" onSelect={onSelect}/>);
     const overdue = screen.getByRole("button", { name: "0 cases overdue" });
     expect(overdue.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(overdue);
@@ -219,19 +228,19 @@ describe("RoleDashboardSummary", () => {
   });
 
   it("shows no numbers while the queue loads", () => {
-    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={[]} tasks={[]} loading/>);
+    renderWithWork(<RoleDashboardSummary role="coordinator" cases={[]} tasks={[]} loading/>);
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.queryByText(/nothing needs action/i)).toBeNull();
   });
 
   it("counts in Arabic plural forms", () => {
-    renderWithWork(<RoleDashboardSummary locale="ar" role="coordinator" cases={cases} tasks={[]}/>, "ar");
+    renderWithWork(<RoleDashboardSummary role="coordinator" cases={cases} tasks={[]}/>, "ar");
     expect(screen.getByRole("button", { name: "حالة واحدة متأخرة" })).toBeTruthy();
   });
 
   it("clicking the active KPI clears it", () => {
     const onSelect = vi.fn();
-    renderWithWork(<RoleDashboardSummary locale="en" role="coordinator" cases={cases} tasks={[]} selected="overdue" onSelect={onSelect}/>);
+    renderWithWork(<RoleDashboardSummary role="coordinator" cases={cases} tasks={[]} selected="overdue" onSelect={onSelect}/>);
     const overdue = screen.getByRole("button", { name: /overdue/i });
     expect(overdue.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(overdue);
@@ -265,7 +274,9 @@ describe("CaseQueue", () => {
     expect(screen.getByText("RS-2026-000029")).toBeTruthy();
     expect(screen.getAllByText(/Waiting on:/).length).toBe(2);
     expect(screen.getByText("Overdue")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /^open$/i })).toHaveLength(2);
+    // The repeated "Open" names the case it opens.
+    expect(screen.getAllByRole("button", { name: /^open RS-2026-\d{6}$/i })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Open RS-2026-000029" })).toBeTruthy();
   });
 
   it("reports a partial bulk claim and keeps the cases that failed selected", async () => {
@@ -398,7 +409,7 @@ describe("consultant workspace", () => {
   });
 
   it("counts a consultant's new assignments from work items, not from cases", () => {
-    renderWithWork(<RoleDashboardSummary locale="en" role="doctor" cases={[]} tasks={[
+    renderWithWork(<RoleDashboardSummary role="doctor" cases={[]} tasks={[
       { overdue: false, status: "OPEN", type: "CONSULTANT_ASSIGNMENT" },
       { overdue: false, status: "OPEN", type: "CLINICAL_REVIEW" },
     ]} selected="" onSelect={vi.fn()}/>);

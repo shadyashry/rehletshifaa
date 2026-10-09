@@ -18,7 +18,7 @@ test("opening another case from a notification starts a fresh workspace", async 
   await page.goto("/en/portal");
 
   await staffView(page, /My cases/).click();
-  await page.getByRole("button", { name: "Open", exact: true }).first().click();
+  await page.getByRole("button", { name: /^Open(:| RS-)/ }).first().click();
   await expect(page.getByRole("heading", { name: "Maya Example" })).toBeVisible();
 
   // Leave per-case state behind in this workspace.

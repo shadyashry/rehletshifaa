@@ -5,6 +5,7 @@ import { Check, X } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
+import { StatusBadge } from "@/components/portal/StatusBadge";
 import { waitingLabel } from "@/lib/portal-labels";
 
 export type TimelineEvent = {
@@ -27,7 +28,7 @@ export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, o
 
   return (
     <section aria-labelledby="journey-pulse-title" className="card p-4">
-      <h2 id="journey-pulse-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">
+      <h2 id="journey-pulse-title" className="label-micro text-ink-500">
         {ar ? "الرحلة" : "Journey"}
       </h2>
 
@@ -35,14 +36,14 @@ export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, o
         {PHASES.map((phase, index) => {
           const done = index < currentIndex;
           const current = index === currentIndex;
-          const tone = done ? "text-ink-600" : current ? (blocked ? "text-amber-900" : "text-brand-900") : "text-ink-400";
+          const tone = done ? "text-ink-600" : current ? (blocked ? "text-status-warning-fg" : "text-brand-900") : "text-ink-400";
           return (
             <li key={phase.key} className="flex items-center gap-2.5">
               <span aria-hidden className="flex h-4 w-4 flex-none items-center justify-center">
                 {done
                   ? <span className="grid h-4 w-4 place-items-center rounded-full bg-brand-100 text-brand-700"><Check size={10} strokeWidth={3}/></span>
                   : current
-                    ? <span className={`h-3 w-3 rounded-full ring-4 ${blocked ? "bg-amber-500 ring-amber-100" : "bg-brand-600 ring-brand-100"}`}/>
+                    ? <span className={`h-3 w-3 rounded-full ring-4 ${blocked ? "bg-status-warning-fg ring-status-warning-surface" : "bg-brand-600 ring-brand-100"}`}/>
                     : <span className="h-2.5 w-2.5 rounded-full border border-line-strong bg-white"/>}
               </span>
               <span className={`text-[0.82rem] leading-6 ${current ? "font-bold" : "font-medium"} ${tone}`}>
@@ -54,9 +55,8 @@ export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, o
       </ol>
 
       {waitingOn && waitingOn !== "NONE" && (
-        <p className={`mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.8125rem] font-bold ${
-          blocked ? "border-amber-200 bg-amber-50 text-amber-900" : "border-brand-200 bg-brand-50 text-brand-800"}`}>
-          {work.waiting.label}: {waitingLabel(waitingOn, work.waiting, { role: viewerRole, ownsCase })}
+        <p className="mt-3">
+          <StatusBadge tone={blocked ? "warning" : "info"}>{work.waiting.label}: {waitingLabel(waitingOn, work.waiting, { role: viewerRole, ownsCase })}</StatusBadge>
         </p>
       )}
 
@@ -94,7 +94,7 @@ export function FullJourneyDialog({ locale, timeline, caseNumber, onClose }: {
         {groups.length === 0 && <p className="text-[0.9rem] text-ink-500">{ar ? "لا يوجد سجل بعد." : "No history yet."}</p>}
         {groups.map(group => (
           <section key={group.key} className="mb-5 last:mb-0">
-            <h3 className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500 rtl:normal-case rtl:tracking-normal">{group.label}</h3>
+            <h3 className="label-micro text-ink-500">{group.label}</h3>
             <ol className="relative mt-2.5 space-y-3.5 border-s border-line ps-4">
               {group.events.map(event => (
                 <li key={`${event.status}-${event.occurredAt}`} className="relative">

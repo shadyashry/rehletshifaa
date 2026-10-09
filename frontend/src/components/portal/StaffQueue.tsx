@@ -28,11 +28,11 @@ export function Queue({views,view:current,onSelectView,viewHref,clinic,loading,l
   const teamWaiting=views.find(item=>item.id==="team")?.count??0;
   const title=views.find(item=>item.id===view)?.label;
   return <>{staffView&&<StaffViewLinks locale={locale} label={work.nav.label} items={views} current={view as StaffViewId} clinic={clinic} onSelect={onSelectView} hrefFor={viewHref} variant="inline"/>}
-    {staffView&&<RoleDashboardSummary locale={locale} role={role??""} cases={cases} tasks={tasks} loading={loading} selected={queueState.kpi} onSelect={value=>changeQueue({...queueState,kpi:value,...(value?{view:value==="unowned"?(role==="coordinator"?"team":"work"):view==="work"?"mine":view,viewChosen:true,tab:value==="unowned"&&role==="coordinator"?"unowned":queueState.tab}:{}),page:1})}/>}
+    {staffView&&<RoleDashboardSummary role={role??""} cases={cases} tasks={tasks} loading={loading} selected={queueState.kpi} onSelect={value=>changeQueue({...queueState,kpi:value,...(value?{view:value==="unowned"?(role==="coordinator"?"team":"work"):view==="work"?"mine":view,viewChosen:true,tab:value==="unowned"&&role==="coordinator"?"unowned":queueState.tab}:{}),page:1})}/>}
     <div id="work-panel">
-      {!staffView&&tasks.length>0&&<MyWork locale={locale} role={role} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>}
+      {!staffView&&tasks.length>0&&<MyWork locale={locale} role={role} subject={mySubject} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>}
       {view==="work"
-        ? <MyWork locale={locale} role={role} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById} teamWaiting={teamWaiting} onTeamQueue={()=>onSelectView("team")}/>
+        ? <MyWork locale={locale} role={role} subject={mySubject} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById} teamWaiting={teamWaiting} onTeamQueue={()=>onSelectView("team")}/>
         : <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} scope={staffView?(view==="team"?"team":"mine"):"all"} title={staffView?title:undefined} onChange={changeQueue} onOpen={openCase} onMutate={mutate} onTransfer={role==="coordinator"&&coordinatorLead?item=>setTransferCase(item):undefined} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>careAreaLabel(value,work.careAreas)}/>}
     </div>
     {transferCase&&<CaseDrawer locale={locale} title={ar?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>setTransferCase(null)}><TransferOwnership locale={locale} caseId={transferCase.id} caseNumber={transferCase.caseNumber} currentOwner={transferCase.coordinatorSubject} currentOwnerName={transferCase.coordinatorName} mySubject={mySubject} staff={staff} busy={busy} mutate={mutate} onClose={()=>setTransferCase(null)}/></CaseDrawer>}

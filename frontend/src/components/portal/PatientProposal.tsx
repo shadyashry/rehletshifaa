@@ -6,6 +6,7 @@ import { useId, useRef, useState, type ReactNode } from "react";
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
 import { ARABIC_PENDING_NOTICE, ARABIC_TERMS_APPROVED, finalQuoteTerms } from "@/lib/commercial-terms";
 import { fillTemplate } from "@/lib/portal-labels";
+import { formatMoney } from "@/lib/money";
 import type { Dictionary } from "@/lib/dictionary";
 import { intlLocale, type Locale } from "@/lib/i18n";
 
@@ -45,15 +46,6 @@ const isolate = (name: string) => `\u2068${name}\u2069`;
 const fill = (template: string, values: Record<string, string | number>) =>
   template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
 
-/** Whole amounts without decimals, otherwise the currency's own precision (2 for USD, 3 for KWD, 0 for JPY). */
-function formatMoney(amount: number, currency: string, locale: Locale) {
-  try {
-    const digits = new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
-    return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency, minimumFractionDigits: Number.isInteger(amount) ? 0 : digits, maximumFractionDigits: digits }).format(amount);
-  } catch {
-    return `${amount.toLocaleString(intlLocale(locale))} ${currency}`;
-  }
-}
 
 /** Plain words for every status a patient can see; never the internal value. */
 export function patientProposalStatus(copy: ProposalCopy, status: string, quote: boolean) {
@@ -79,6 +71,8 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
     ? fill(copy.validUntil, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(proposal.validUntil)) })
     : null;
   const hasRecommendation = !!(recommendation?.treatment || recommendation?.risks);
+  const hasOptional = proposal.items.some((item) => item.optional);
+  const termsId = useId();
 
   return (
     <div className="space-y-6">
@@ -117,6 +111,8 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
             </li>
           ))}
         </ul>
+        {/* Priced but not in the total, and not something to tick here: say so, and who can add one. */}
+        {hasOptional && <p className="mt-2 max-w-[60ch] text-[0.875rem] leading-6 text-ink-600">{copy.optionalNote}</p>}
       </section>
 
       {hasRecommendation && (
@@ -165,7 +161,7 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
               </div>
             </div>
           ) : (
-            <CoordinationDepositTerms id="portal-deposit-terms" locale={locale} currency={proposal.currency} level={3} framed={false} />
+            <CoordinationDepositTerms id={termsId} locale={locale} currency={proposal.currency} level={3} framed={false} />
           )}
         </div>
       </details>
@@ -212,6 +208,7 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
   const noteHintId = useId();
   const noteErrorId = useId();
   const termsHintId = useId();
+  const termsRefId = useId();
   const declineTitleId = useId();
   const quote = proposal.documentType === "FINAL_TREATMENT_QUOTE";
   const assisted = locale === "ar" && !ARABIC_TERMS_APPROVED;
@@ -283,9 +280,10 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
           <p className="text-[0.9375rem] leading-6 text-ink-600">{quote ? copy.introQuote : copy.introEstimate}</p>
           <label className="flex items-start gap-3 text-[0.9375rem] leading-6 text-ink-800">
             <input type="checkbox" className="mt-1 h-5 w-5 flex-none" checked={acknowledged}
-              aria-describedby={quote ? undefined : "portal-deposit-terms"} onChange={(event) => setAcknowledged(event.target.checked)} />
+              aria-describedby={termsRefId} onChange={(event) => setAcknowledged(event.target.checked)} />
             {quote ? copy.acknowledgeQuote : copy.acknowledgeEstimate}
           </label>
+          <p id={termsRefId} className="sr-only">{fill(copy.termsReference, { terms: quote ? copy.termsQuote : copy.termsEstimate })}</p>
         </>
       )}
       <label className="block text-[0.9375rem] font-semibold text-ink-800">
@@ -306,7 +304,7 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
         )}
         <button type="button" className="btn-secondary" onClick={requestChanges}>{copy.requestChanges}</button>
       </div>
-      {!assisted && !acknowledged && <p id={termsHintId} className="sr-only">{quote ? copy.acknowledgeQuote : copy.acknowledgeEstimate}</p>}
+      {!assisted && !acknowledged && <p id={termsHintId} className="-mt-1 text-[0.875rem] text-ink-500">{copy.acknowledgeFirst}</p>}
       {/* Decline is quieter than going ahead, and asks again here rather than in a browser dialog. */}
       {confirmingDecline ? (
         <div role="group" aria-labelledby={declineTitleId} className="space-y-3 border-t border-line pt-4">

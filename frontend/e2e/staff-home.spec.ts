@@ -54,7 +54,7 @@ for (const locale of ["en", "ar"] as const) {
     await setupPortal(page, "COORDINATOR");
     await page.goto(`/${locale}/portal`);
     const ar = locale === "ar";
-    await page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first().click();
+    await page.getByRole("button", { name: ar ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first().click();
     await expect(page.getByRole("heading", { name: "Maya Example" })).toBeVisible();
     const panel = page.locator("#current-action");
     await expect(panel.getByRole("group", { name: ar ? "تعيين استشاري" : "Assign a Consultant" })).toBeVisible();

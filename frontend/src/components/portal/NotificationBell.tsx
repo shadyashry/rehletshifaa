@@ -25,7 +25,8 @@ type Api = <T,>(path: string, init?: RequestInit) => Promise<T>;
  * member to the case where the actual work lives. Rendered into the header slot beside the account avatar.
  */
 export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; api: Api; onOpenCase: (caseId: string) => void }) {
-  const wording = useWorkCopy().workCopy;
+  const work = useWorkCopy();
+  const wording = work.workCopy;
   const worded = (item: StaffNotification) => workCopyText(item.copy, wording) ?? { title: item.title, context: item.context };
   const ar = locale === "ar";
   const t = ar
@@ -107,7 +108,8 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
                 <div className="flex items-start gap-2">
                   {!item.read && <span aria-hidden className="mt-1.5 h-2 w-2 flex-none rounded-full bg-brand-600"/>}
                   <div className="min-w-0 flex-1">
-                    <p dir="auto" className="font-semibold leading-6 text-ink-900">{worded(item).title}</p>
+                    {/* Unread is the dot and the wash for the eye, and a word for everyone else. */}
+                    <p dir="auto" className="font-semibold leading-6 text-ink-900">{!item.read && <span className="sr-only">{work.unread}: </span>}<span>{worded(item).title}</span></p>
                     {worded(item).context && <p dir="auto" className="mt-0.5 text-sm leading-6 text-ink-600">{worded(item).context}</p>}
                     <p className="mt-1 text-[0.8125rem] text-ink-500">
                       {item.caseNumber && <span className="font-semibold text-brand-700">{item.caseNumber} · </span>}
@@ -116,7 +118,7 @@ export function NotificationBell({ locale, api, onOpenCase }: { locale: Locale; 
                     {item.caseId && (
                       <button type="button" className="link-cta mt-2 text-sm"
                               onClick={() => { setOpen(false); void markRead(item.id); onOpenCase(item.caseId!); }}>
-                        {t.open}
+                        {t.open}{item.caseNumber && <span className="sr-only"> {item.caseNumber}</span>}
                       </button>
                     )}
                   </div>

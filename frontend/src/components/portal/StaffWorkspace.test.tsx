@@ -32,6 +32,13 @@ describe("MyWork", () => {
     expect(onOpen).toHaveBeenCalledWith("c1");
   });
 
+  it("says You on the viewer's own case and names each repeated action by its work", () => {
+    renderWithWork(<MyWork locale="en" subject="me" items={[{ ...item, coordinatorSubject: "me", coordinatorName: "Sara Ahmed" }]} busy={false} onOpen={vi.fn()}/>);
+    expect(screen.getByText("You")).toBeTruthy();
+    expect(screen.queryByText("Sara Ahmed")).toBeNull();
+    expect(screen.getByRole("button", { name: /^Open ?: Review information provided by the patient, RS-10281$/ })).toBeTruthy();
+  });
+
   it("flags overdue work so it cannot be missed", () => {
     renderWithWork(<MyWork locale="en" items={[{ ...item, overdue: true, dueAt: new Date(Date.now() - 86400000).toISOString() }]} busy={false} onOpen={vi.fn()}/>);
     expect(screen.getByText("Overdue")).toBeTruthy();
@@ -74,8 +81,10 @@ describe("NotificationBell", () => {
     const bell = await screen.findByRole("button", { name: /notifications: 1 unread/i });
     fireEvent.click(bell);
     expect(await screen.findByText("Patient provided requested information")).toBeTruthy();
+    // Unread is said in words, not only by the dot and the wash; the repeated CTA names its case.
+    expect(screen.getByText("Unread:").className).toBe("sr-only");
 
-    fireEvent.click(screen.getByRole("button", { name: /^open case$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^open case RS-10281$/i }));
     // The CTA navigates to the work; marking read is an inbox action, never a completion.
     expect(onOpenCase).toHaveBeenCalledWith("c1");
     await waitFor(() => expect(api).toHaveBeenCalledWith("/notifications/read?id=n1", { method: "POST" }));

@@ -98,7 +98,7 @@ for (const locale of ["en", "ar"] as const) {
     const { writes } = await setupPortal(page, "COORDINATOR", { assistedDecision: true, representatives: true });
     await page.goto(`/${locale}/portal`);
     const ar = locale === "ar";
-    await page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first().click();
+    await page.getByRole("button", { name: ar ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first().click();
     const form = page.locator("#current-action").getByRole("group", { name: ar ? "تسجيل قرار المريض" : "Record the patient's decision" });
     await form.getByRole("radio", { name: ar ? "الإقرار بالتقدير" : "Acknowledge the estimate" }).check();
     await form.getByRole("radio", { name: ar ? "أحد ممثّلي المريض" : "One of their representatives" }).check();
@@ -116,7 +116,7 @@ for (const locale of ["en", "ar"] as const) {
     await setupPortal(page, "COORDINATOR", { assistedDecision: true });
     await page.goto(`/${locale}/portal`);
     const ar = locale === "ar";
-    await page.getByRole("button", { name: ar ? "فتح" : "Open", exact: true }).first().click();
+    await page.getByRole("button", { name: ar ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first().click();
     const panel = page.locator("#current-action");
     const form = panel.getByRole("group", { name: ar ? "تسجيل قرار المريض" : "Record the patient's decision" });
     await expect(form).toBeVisible();
