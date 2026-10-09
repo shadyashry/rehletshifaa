@@ -365,7 +365,6 @@ Open only because a named owner has not decided. Nothing here is worked until th
 | P3 | Two confirmation styles (Batch 1a review, Impeccable "modal as first thought" / consistent affordances): staff actions confirm in a `ConfirmDialog`, the patient drawer's Decline asks again in place. Decide one pattern. | Performance and code structure | Batch 1a review | `portal-ui.tsx`, `PatientProposal.tsx` | Owner design decision |
 | P2 | The deposit terms are badged "Pending legal review" but state concrete refund promises (F2 is open). This is a truthfulness tension for legal. | Portal re-critique | Re-critique A | `lib/commercial-terms.ts` | Legal F2 (refund terms) |
 | P2 | Activation's deposit-terms consent on `/ar` is unchanged, pending legal L2. | Arabic proposal decision — deferred review findings | Plan O1 | `ProfileActivation.tsx` | Legal L2 |
-| Owner decision | Whether sending a case or the Consultant review costs anything, and the words for it near "No commitment to start". The site is silent today; the Close re-critique (public A) raised it with the upload reassurance P1. Not invented. | Public site — pages and form | Close re-critique A | `messages/*.json` (home, form) | Owner (business) |
 | Known limitation (D1) | Journey-bound cases: a proposal decision does not complete the journey runtime's `REVIEW_PROPOSAL` action. A precondition for turning journey admission on. | Arabic proposal decision | AUTH | `JourneyService`, `ReviewProposalActionHandler` | Owner, before journey admission goes live |
 | Launch blocker | Approved Arabic deposit, refund and cancellation terms (`ARABIC_TERMS_APPROVED`), and the native Arabic review of all `portalWork`, proposal and public copy. | All | Legal, native review | `lib/commercial-terms.ts`, `messages/ar.json` | Legal L1–L5, native Arabic reviewer |
 
@@ -451,3 +450,9 @@ Every open P3 from the sections above, moved here at the close of the redesign e
 | P3 | Public minor: PageHero "mist" glow on Send my case; Track case uses off-family radii and shadows; 11px avatar initials and 11.2px diagram chips; 36px desktop language switch; footer notice ~110 characters per line; hero card accent border on a rounded card; duplicate headings on Care areas and /cardiology; the plastic-surgery icon reads as face ID; skeleton-bar mock on /consultants; the mobile care wheel is icons only; no Track case in the footer. | Close re-critique — public | Public A, B | public components | polish |
 | P3 | Phone helper text at 12px on Send my case; the phone code is not prefilled from the chosen country; track-case placeholders look like filled values. | Close re-critique — public | Public A | `CaseForm.tsx`, `TrackCaseLanding.tsx` | harden |
 | P3 | The remaining Consultant CV vocabulary (EBAC, FEBIC, Dr. med., EDiNR) and Latin monograms on Arabic pages; the "Checked against official sources" wording should be confirmed true for all 13 profiles. | Close re-critique — public | Public A | `lib/consultants.ts`, `lib/attached-consultants.ts` | clarify |
+
+## Decided at the Close
+
+| Decision | Item | By |
+|---|---|---|
+| The site does not state anything about fees (2026-10-09) | Whether sending a case or the Consultant review costs anything, raised by the Close re-critique (public A). "No commitment to start" stays as it is. | Owner |

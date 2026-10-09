@@ -376,10 +376,10 @@ Update at the end of every phase.
         public — a privacy and file-rules line at the upload (facts from PRODUCT.md only), a 14px secure note, a leave-first warning
         instead of storing medical details in the browser; one name each (Send my case, Track case, case number, coordinator) in
         sentence case; /cardiology lists lead with plain treatment names, CV sourcing notes stripped, a distinction that restates the
-        role hidden, the Arabic Latin join spaced. Waiting on the owner: whether sending a case or the review costs anything (Blocked)
+        role hidden, the Arabic Latin join spaced. Fees: the owner decided the site states nothing about them
   - [x] Decorative "01–06" numerals removed from Care areas; the a11y baseline is now empty
   - [x] Backlog: every open P3 moved to **Post-launch**; the critiques' P2/P3s added there; **Blocked on a decision or approval** lists
-        legal F2 and L2, the review-fee wording, the two confirmation styles, D1 and the Arabic terms / native review (launch blocker);
+        legal F2 and L2, the two confirmation styles, D1 and the Arabic terms / native review (launch blocker);
         the e2e coverage gap for Teams/People/governance accepted as post-launch (owner)
   - [x] verify: typecheck ok; lint 0 errors / 10 warnings; unit **377/377** (+6 Close tests, each failing on the old code);
         Playwright full suite **245 passed, 0 failed**, 38 skipped (a first run caught one stale
@@ -405,7 +405,7 @@ Update at the end of every phase.
 | 2026-10-09 | Owner: "merge pass 4 into codex/platform-control-plane and push" — `feat/ux-redesign-pass-4` (`23a1f77`) fast-forwarded and pushed to origin. | Owner |
 | 2026-10-09 | Owner: "go with your recommendations for D1–D4" (finish plan). **D1** journey-bound cases: a known limitation, because no admission policy is current and no case was ever admitted (dev DB); the fix is a precondition for turning journey admission on. **D2** B1 status tokens approved as proposed (`token-proposals.md`). **D3** price first stays; the recommendation-first suggestion is closed. **D4** the public site uses the four stages as on How it works, and a generic team introduction until real coordinator content exists. | Owner |
 | 2026-10-09 | Batch 3 (owner): **B3-1** the travel-package question leaves the intake (the coordinator sets it in the portal); **B3-2** coordinator introduction = role, Arabic and English, WhatsApp (no name, photo or hours); **B3-3** the routers are unnumbered and link to How it works. | Owner |
-| 2026-10-09 | Close (owner): fix the re-critique P1s as part of the close; accept the Teams/People/governance e2e coverage gap as post-launch. Open for the owner: whether sending a case or the Consultant review costs anything (Blocked list). | Owner |
+| 2026-10-09 | Close (owner): fix the re-critique P1s as part of the close; accept the Teams/People/governance e2e coverage gap as post-launch. Fees: the site states nothing about whether sending a case or the review costs anything. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -437,8 +437,8 @@ D1–D4 decided (see Decisions); Batch 1 merged, pushed and deployed (`f304421`)
 (`feat/ux-redesign-batch-1a`, worktree `vigilant-roentgen-29caab`) and Batch 1a is merged **together with Batch 2** (one merge,
 push and rebuild). **The redesign epic is at its finish line** (finish plan): Batches 0–3 and the Close are done on `feat/ux-redesign-batch-3`, not
 merged or pushed; re-critique scores are recorded above; every remaining item is on backlog.md's Post-launch list or Blocked on a
-named decision. Next: on the owner's word, one merge into `codex/platform-control-plane`, push and rebuild the stack. Open for the
-owner: the review-fee wording; legal L1–L5; the native Arabic review; the two confirmation styles.
+named decision. Next: the owner merges (one merge into `codex/platform-control-plane`, push and rebuild the stack. Open for the
+owner: legal L1–L5; the native Arabic review; the two confirmation styles.
 Baselines: unit 377/377, Playwright full suite green, lint 0 errors / 10 warnings, backend 620/0, a11y baseline empty.
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
