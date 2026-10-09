@@ -4,11 +4,11 @@
     "cardiology": "Cardiology",
     "consultants": "Consultants",
     "how": "How It Works",
-    "send": "Start my case",
+    "send": "Send my case",
     "language": "العربية",
     "languageAria": "Switch language to Arabic",
     "careAreas": "Care Areas",
-    "portal": "Check case status",
+    "portal": "Track case",
     "signIn": "Sign in",
     "signInHint": "For patients who already activated their account",
     "staff": "Staff sign in",
@@ -23,15 +23,15 @@
       "trigger": "My case",
       "heading": "Already started a case?",
       "signInBody": "For patients who already activated their account",
-      "statusBody": "With your Case ID and WhatsApp number"
+      "statusBody": "With your case number and WhatsApp number"
     },
     "coordinatorShort": "Coordinator"
   },
   "common": {
     "brand": "RehletShifaa",
     "tagline": "A clearer path to specialist care",
-    "send": "Start my case",
-    "whatsapp": "Talk to a Patient Coordinator",
+    "send": "Send my case",
+    "whatsapp": "Talk to a coordinator",
     "whatsappIntro": "Hello RehletShifaa, I would like help with a medical case.",
     "explore": "View all care areas",
     "profile": "View Consultant Profile",
@@ -52,7 +52,7 @@
     "eyebrow": "Specialist care in Egypt — one coordinator, every step of the way",
     "title": "Understand your treatment options before you travel",
     "intro": "Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.",
-    "primaryAction": "Start my case",
+    "primaryAction": "Send my case",
     "watchJourney": "See how it works",
     "reassurance": "No final diagnosis required.",
     "assurances": [
@@ -247,25 +247,25 @@
     ],
     "structuralTitle": "Structural heart & valve interventions",
     "structuralItems": [
-      "TAVI / TAVR",
-      "Percutaneous mitral commissurotomy",
-      "Mitral TEER",
-      "Tricuspid TEER",
-      "Transcatheter tricuspid valve replacement",
-      "Bicaval valve implantation"
+      "Aortic valve replacement through a catheter (TAVI / TAVR)",
+      "Opening a narrowed mitral valve with a balloon",
+      "Mitral valve repair through a catheter (TEER)",
+      "Tricuspid valve repair through a catheter (TEER)",
+      "Tricuspid valve replacement through a catheter",
+      "Valves in the two main veins for a severely leaking tricuspid valve (bicaval implantation)"
     ],
     "suitability": "Suitability for any procedure is determined only after Consultant review.",
     "rhythmTitle": "Heart rhythm & cardiac devices",
     "rhythmItems": [
       "Pacemaker",
-      "ICD",
-      "CRT-P",
-      "CRT-D"
+      "Implantable defibrillator (ICD)",
+      "Resynchronisation pacemaker (CRT-P)",
+      "Resynchronisation defibrillator (CRT-D)"
     ],
     "rhythmExamples": [
       "A doctor recommended a pacemaker",
-      "An ICD was recommended",
-      "CRT was suggested",
+      "An implantable defibrillator (ICD) was recommended",
+      "Resynchronisation therapy (CRT) was suggested",
       "A second opinion is needed before device implantation"
     ],
     "examples": "Send us your case if…",
@@ -322,7 +322,7 @@
   },
   "how": {
     "eyebrow": "From reports to follow-up",
-    "title": "Your Care Journey, Clearly Coordinated",
+    "title": "Your care journey, clearly coordinated",
     "intro": "From the medical information you already have to treatment and follow-up, RehletShifaa helps you understand each step and coordinates what comes next.",
     "preview": [
       "Understand your case",
@@ -533,7 +533,7 @@
       "submittedBy": "Submitted by"
     },
     "eyebrow": "A secure first step",
-    "title": "Send Your Medical Case",
+    "title": "Send your medical case",
     "intro": "You don't need to know which specialty you need. Send what you already have and we'll help guide the next step.",
     "name": "Given name(s)",
     "familyName": "Family name / surname",
@@ -543,19 +543,20 @@
     "dialCode": "Country code",
     "dialCodeChoose": "Choose the country code",
     "email": "Contact email",
-    "description": "Tell Us Briefly About Your Condition",
+    "description": "Tell us briefly about your condition",
     "optional": "optional",
-    "files": "Upload Medical Reports / Images",
-    "uploadHelp": "Don't have all your reports? That's okay. Send what you have and your Patient Coordinator will help with the rest.",
+    "files": "Upload medical reports or images",
+    "uploadHelp": "Don't have all your reports? That's okay. Send what you have and your coordinator will help with the rest.",
+    "uploadPrivacy": "Files go to private storage through short-lived links, are checked for viruses, and are opened only by the care team handling your case. PDF, JPG or PNG, up to 15 MB each.",
     "consent": "I consent to RehletShifaa processing the information I submit for the purpose of coordinating my medical case.",
-    "send": "Send My Case",
+    "send": "Send my case",
     "sending": "Sending securely…",
     "choose": "Choose files",
     "selected": "files selected",
-    "successTitle": "Your Case Has Been Received",
+    "successTitle": "Your case has been received",
     "whatsappCaseMessage": "Hello RehletShifaa, I have just sent my medical case. My case number is {caseNumber}.",
-    "successBody": "Thank you. A Patient Coordinator will help organize your case and guide you through the next steps.",
-    "caseNumber": "Case Number",
+    "successBody": "Thank you. Your coordinator will help organize your case and guide you through the next steps.",
+    "caseNumber": "Case number",
     "continue": "Continue on WhatsApp",
     "secureNote": "Secure transmission. Medical decisions remain consultant-led.",
     "errors": {
@@ -569,7 +570,7 @@
       "file": "Use PDF, JPG, JPEG or PNG files up to 15 MB each.",
       "server": "We couldn't send your case right now. Please try again or contact us on WhatsApp.",
       "upload": "We couldn't attach one of your files. Remove it and send your case, or try again — your details are saved.",
-      "submitAfterUpload": "Your details reached us but the case wasn't finished. Press Send My Case again — nothing will be duplicated."
+      "submitAfterUpload": "Your details reached us but the case wasn't finished. Press Send my case again — nothing will be duplicated."
     },
     "category": {
       "label": "Which care area is your case about?",
@@ -918,6 +919,7 @@
       "explainQuote": "The payment terms of this quote are not yet available in approved Arabic wording. Your coordinator will go through them with you in Arabic and record your decision.",
       "ask": "Ask {name} to go through the terms with me",
       "askFallback": "my coordinator",
+      "askShort": "Ask my coordinator",
       "nameFallback": "your coordinator",
       "requested": "Requested on {date}. You will hear from {name}.",
       "requestFailed": "Your request was not sent. Check your connection and try again.",

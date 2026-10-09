@@ -81,7 +81,7 @@ describe("Consultant routing", () => {
     fireEvent.click(screen.getByRole("radio", { name: /Transfer/ }));
     fireEvent.change(screen.getByLabelText("Clinical reason for the referral"), { target: { value: "Needs electrophysiology" } });
     await screen.findByRole("option", { name: /Dr A/ });
-    fireEvent.change(screen.getByLabelText("Suggested consultant (optional)"), { target: { value: "pr-a" } });
+    fireEvent.change(screen.getByLabelText("Suggested Consultant (optional)"), { target: { value: "pr-a" } });
     fireEvent.click(screen.getByRole("button", { name: "Send to the coordinator" }));
     expect(mutate).toHaveBeenCalledWith("/doctor/cases/case-1/referrals", {
       type: "TRANSFER", clinicalReason: "Needs electrophysiology", suggestedCareArea: null, suggestedCapability: null, suggestedPractitionerId: "pr-a",

@@ -57,6 +57,23 @@ test("Consultant pages never skip a heading level", async ({ page }) => {
   }
 });
 
+test("Close: a care-area page names treatments in plain words first, acronyms second", async ({ page }) => {
+  await page.goto("/en/cardiology");
+  await expect(page.getByText("Aortic valve replacement through a catheter (TAVI / TAVR)").first()).toBeVisible();
+  await expect(page.getByText(/^TAVI \/ TAVR$/)).toHaveCount(0);
+});
+
+test("Close: the upload says where files go and what is accepted, before any error", async ({ page }) => {
+  await page.goto("/en/send-my-case");
+  await page.getByLabel("Given name(s)").fill("Playwright");
+  await page.getByLabel(/^Family name \/ surname/).fill("Intake");
+  await page.getByRole("combobox", { name: /country of residence/i }).fill("Kenya");
+  await page.getByRole("listbox").getByRole("option", { name: /Kenya/ }).click();
+  await page.getByLabel("Phone number").fill("700000000");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText(/private storage.*checked for viruses.*PDF, JPG or PNG, up to 15 MB each/)).toBeVisible();
+});
+
 async function toReviewStep(page: Page) {
   await page.getByLabel("Given name(s)").fill("Playwright");
   await page.getByLabel(/^Family name \/ surname/).fill("Intake");

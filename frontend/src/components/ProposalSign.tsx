@@ -8,7 +8,7 @@ import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms"
 import { apiUrl } from "@/lib/api";
 import { ARABIC_TERMS_APPROVED, estimateTerms, exchangeRateStatement, finalQuoteTerms, generalDisclaimers, isForeignCurrency, LEGACY_PLACEHOLDER_TERMS } from "@/lib/commercial-terms";
 import { getDictionary } from "@/lib/dictionary";
-import { fillTemplate } from "@/lib/portal-labels";
+import { fillTemplate, plural } from "@/lib/portal-labels";
 import { formatMoney } from "@/lib/money";
 import { scrollIntoView } from "@/lib/scroll";
 
@@ -51,7 +51,6 @@ const copy = {
     includedLabel: "Included in this estimate", excludedLabel: "Not included",
     excludedFallback: "Services not listed in this estimate are not included, and would be discussed with you before being added.",
     rangeLabel: "Estimated range", totalLabel: "Estimated total", expectedLabel: "Expected", rangeSep: "to",
-    servicesCount: (n: number) => `${n} service${n === 1 ? "" : "s"}`,
     estimateBasis: `${estimateTerms.nonBinding} ${estimateTerms.mayChange}`,
     coordinationNote: estimateTerms.coordinationIncluded as string,
     servicesTotal: "Estimated total",
@@ -110,7 +109,6 @@ const copy = {
     includedLabel: "المشمول في هذا التقدير", excludedLabel: "غير المشمول",
     excludedFallback: "الخدمات غير المدرجة في هذا التقدير ليست مشمولة، وسيتم مناقشتها معك قبل إضافتها.",
     rangeLabel: "باقة الرعاية المنسّقة التقديرية", totalLabel: "باقة الرعاية المنسّقة التقديرية", expectedLabel: "المتوقع", rangeSep: "إلى",
-    servicesCount: (n: number) => `${n} خدمة`,
     estimateBasis: "هذا تقدير مبدئي غير ملزم، وليس سعرًا نهائيًا ولا ضمانًا للسعر. قد تتغيّر خطة علاجك ويرتفع سعرها أو ينخفض بعد أن يفحصك طبيبك المعالج حضوريًا.",
     coordinationNote: "يشمل سعر الباقة تنسيق الحالة وترتيبات مقدّمي الخدمة والجدولة وخدمات دعم المريض من رحلة شفاء.",
     servicesTotal: "إجمالي الخدمات التقديري",
@@ -324,7 +322,8 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const itemsTotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
   const expected = proposal?.totalExpected ?? itemsTotal;
   const hasRange = proposal?.totalMin != null && proposal?.totalMax != null && proposal.totalMin !== proposal.totalMax;
-  const rangeText = hasRange ? `${money(proposal?.totalMin)} ${t.rangeSep} ${money(proposal?.totalMax)}` : null;
+  // Each figure isolated on its own, so the separator word keeps the page's reading order in Arabic.
+  const rangeText = hasRange ? <><bdi dir="ltr">{money(proposal?.totalMin)}</bdi> {t.rangeSep} <bdi dir="ltr">{money(proposal?.totalMax)}</bdi></> : null;
   // Approved commercial wording exists in English only; Arabic keeps its current strings until the native review.
   const en = locale === "en";
   const docKind = isFinal ? "quote" : "estimate";
@@ -456,7 +455,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                         {group.rows.map((item) => (
                           <li key={item.id} className="flex items-baseline justify-between gap-6 border-b border-line py-3 last:border-0">
                             <span dir="auto" className="min-w-0 text-[0.95rem] leading-6 text-ink-800">{item.description}</span>
-                            <span className="flex-none whitespace-nowrap text-[0.95rem] font-bold tabular-nums text-ink-900">{money(item.quantity * item.unitPrice)}</span>
+                            <span className="flex-none whitespace-nowrap text-[0.95rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(item.quantity * item.unitPrice)}</bdi></span>
                           </li>
                         ))}
                       </ul>
@@ -466,12 +465,12 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                   <div className="mt-3 border-t-2 border-brand-200 pt-3">
                     <p className="flex items-baseline justify-between gap-6">
                       <span className="text-[0.95rem] font-bold text-ink-800">{isFinal ? t.finalPriceLabel : hasRange ? t.rangeLabel : t.servicesTotal}</span>
-                      <span className="whitespace-nowrap text-[1.05rem] font-bold tabular-nums text-brand-900">{rangeText ?? money(expected)}</span>
+                      <span className="whitespace-nowrap text-[1.05rem] font-bold tabular-nums text-brand-900">{rangeText ?? <bdi dir="ltr">{money(expected)}</bdi>}</span>
                     </p>
                     {hasRange && (
                       <p className="mt-1 flex items-baseline justify-between gap-6">
                         <span className="text-[0.9rem] text-ink-700">{t.expectedLabel}</span>
-                        <span className="whitespace-nowrap text-[0.95rem] font-bold tabular-nums text-ink-900">{money(expected)}</span>
+                        <span className="whitespace-nowrap text-[0.95rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(expected)}</bdi></span>
                       </p>
                     )}
                   </div>
@@ -600,45 +599,45 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
 
               {/* The commercial answer, kept beside the reading rather than buried under it. */}
               <aside aria-labelledby="summary-heading" className="order-first lg:order-none lg:sticky lg:top-6">
-                <div className="rounded-2xl border border-brand-200 bg-brand-50 p-5">
-                  <h2 id="summary-heading" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{isFinal ? t.quoteSummaryHeading : t.summaryHeading}</h2>
+                <div className="rounded-lg border border-line bg-white p-5">
+                  <h2 id="summary-heading" className="label-micro text-brand-700">{isFinal ? t.quoteSummaryHeading : t.summaryHeading}</h2>
                   <p className="mt-3 text-[0.85rem] font-semibold text-ink-700">{isFinal ? t.finalPriceLabel : hasRange ? t.rangeLabel : t.totalLabel}</p>
                   {hasRange ? (
                     <>
-                      <p className="mt-1 text-[1.5rem] font-bold leading-8 text-brand-900">{money(proposal.totalMin)} <span className="text-[0.9rem] font-normal text-ink-500">{t.rangeSep}</span> {money(proposal.totalMax)}</p>
-                      <p className="mt-1 text-[0.88rem] text-ink-700">{t.expectedLabel}: <strong>{money(expected)}</strong></p>
+                      <p className="mt-1 text-[1.5rem] font-bold leading-8 text-brand-900"><bdi dir="ltr">{money(proposal.totalMin)}</bdi> <span className="text-[0.9rem] font-normal text-ink-500">{t.rangeSep}</span> <bdi dir="ltr">{money(proposal.totalMax)}</bdi></p>
+                      <p className="mt-1 text-[0.88rem] text-ink-700">{t.expectedLabel}: <strong><bdi dir="ltr">{money(expected)}</bdi></strong></p>
                     </>
                   ) : (
-                    <p className="mt-1 text-[1.75rem] font-bold leading-9 text-brand-900">{money(expected)}</p>
+                    <p className="mt-1 text-[1.75rem] font-bold leading-9 text-brand-900"><bdi dir="ltr">{money(expected)}</bdi></p>
                   )}
                   {/* A final quote is never described with the estimate's "may change" basis. */}
                   {(!isFinal || en) && (
-                    <p className="mt-3 border-t border-brand-200 pt-3 text-[0.82rem] leading-5 text-ink-600">{isFinal ? finalQuoteTerms.basis : t.estimateBasis}</p>
+                    <p className="mt-3 border-t border-line pt-3 text-[0.8125rem] leading-5 text-ink-600">{isFinal ? finalQuoteTerms.basis : t.estimateBasis}</p>
                   )}
                   {showRate && (
-                    <p lang="en" dir="ltr" className="mt-2 text-start text-[0.78rem] leading-5 text-ink-600">{exchangeRateStatement(currency, docKind, rateDate)}</p>
+                    <p lang="en" dir="ltr" className="mt-2 text-start text-[0.8125rem] leading-5 text-ink-600">{exchangeRateStatement(currency, docKind, rateDate)}</p>
                   )}
                   <dl className="mt-3 space-y-1.5 text-[0.85rem]">
                     <div className="flex justify-between gap-4">
                       <dt className="text-ink-600">{t.servicesLabel}</dt>
-                      <dd className="font-semibold text-ink-800">{t.servicesCount(items.length)}</dd>
+                      <dd className="font-semibold text-ink-800">{plural(locale, items.length, getDictionary(locale).portalWork.plural.services)}</dd>
                     </div>
                     {proposal.validUntil && (
                       <div className="flex justify-between gap-4">
                         <dt className="text-ink-600">{t.validUntil}</dt>
-                        <dd className="font-semibold text-ink-800">{new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(proposal.validUntil))}</dd>
+                        <dd className="font-semibold text-ink-800">{new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(proposal.validUntil))}</dd>
                       </div>
                     )}
                   </dl>
                   {depositDue && (
-                    <div className="mt-4 rounded-xl bg-white p-3.5">
-                      <p className="text-[0.8rem] font-bold text-brand-800">{t.payNow}</p>
-                      <p className="mt-0.5 text-[1.15rem] font-bold text-ink-900">{money(proposal.depositDueDisplay)}</p>
-                      <p className="mt-1 text-[0.78rem] leading-5 text-ink-600">{t.payNowNote}</p>
+                    <div className="mt-4 border-t border-line pt-3">
+                      <p className="text-[0.8125rem] font-bold text-brand-800">{t.payNow}</p>
+                      <p className="mt-0.5 text-[1.15rem] font-bold text-ink-900"><bdi dir="ltr">{money(proposal.depositDueDisplay)}</bdi></p>
+                      <p className="mt-1 text-[0.8125rem] leading-5 text-ink-600">{t.payNowNote}</p>
                     </div>
                   )}
                   {isFinal && proposal.depositPaidDisplay != null && proposal.depositPaidDisplay > 0 && (
-                    <p className="mt-4 text-[0.85rem] text-ink-700">{t.alreadyPaid}: <strong>{money(proposal.depositPaidDisplay)}</strong></p>
+                    <p className="mt-4 text-[0.85rem] text-ink-700">{t.alreadyPaid}: <strong><bdi dir="ltr">{money(proposal.depositPaidDisplay)}</bdi></strong></p>
                   )}
                 </div>
               </aside>
@@ -646,20 +645,20 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
 
             {/* Carries the same two operations while the decision block is out of view; never a third choice. */}
             {!blocked && !decisionVisible && !(assisted && proposal.assistance?.requestedAt) && (
-              <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-2px_12px_rgba(28,51,58,0.08)] backdrop-blur">
-                <div className="container-site flex max-w-[1120px] flex-wrap items-center justify-between gap-3 px-0">
+              <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white px-4 py-3 shadow-[0_-2px_12px_rgba(28,51,58,0.08)]">
+                <div className="container-site flex max-w-[1120px] flex-col gap-2 px-0 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between min-[480px]:gap-3">
                   <div className="min-w-0">
-                    <p className="text-[1.05rem] font-bold leading-6 text-brand-900">{rangeText ?? money(expected)}</p>
-                    <p className="text-[0.75rem] text-ink-600">
+                    <p className="text-[1.05rem] font-bold leading-6 text-brand-900">{rangeText ?? <bdi dir="ltr">{money(expected)}</bdi>}</p>
+                    <p className="text-[0.8125rem] text-ink-600">
                       {isFinal ? t.finalPriceLabel : hasRange ? t.rangeLabel : t.totalLabel}
-                      {hasRange && <> · {t.expectedLabel} {money(expected)}</>}
+                      {hasRange && <> · {t.expectedLabel} <bdi dir="ltr">{money(expected)}</bdi></>}
                     </p>
                   </div>
-                  <div className="flex flex-1 flex-wrap items-center justify-end gap-3 sm:flex-none">
+                  <div className="flex items-center justify-end gap-3 min-[480px]:flex-none">
                     <button type="button" className="min-h-11 text-[0.9rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
                             disabled={busy} onClick={() => setDialog("REVISION_REQUESTED")}>{t.requestRevision}</button>
                     <button className="btn-primary min-h-11 flex-1 justify-center px-5 sm:flex-none" disabled={busy} onClick={assisted ? () => void requestAssistance() : submitPrimary}>
-                      {busy ? (assisted ? assistedCopy.sending : t.deciding) : assisted ? fillTemplate(assistedCopy.ask, { name: assistedCopy.askFallback }) : primaryLabel}
+                      {busy ? (assisted ? assistedCopy.sending : t.deciding) : assisted ? assistedCopy.askShort : primaryLabel}
                     </button>
                   </div>
                 </div>

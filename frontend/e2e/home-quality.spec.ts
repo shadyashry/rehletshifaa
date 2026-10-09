@@ -45,8 +45,8 @@ test("headings are hierarchical and the primary action is singular", async ({ pa
   expect(order[0]).toBe(1);
   order.slice(1).forEach((level, i) => expect(level - order[i]).toBeLessThanOrEqual(1));
 
-  // "Start my case" is the one conversion action; the header CTA plus hero plus closing panel, nothing else.
-  const starts = page.getByRole("link", { name: /^Start my case$/ });
+  // "Send my case" is the one conversion action; the header CTA plus hero plus closing panel, nothing else.
+  const starts = page.getByRole("link", { name: /^Send my case$/ });
   expect(await starts.count()).toBeLessThanOrEqual(3);
 });
 
@@ -63,7 +63,7 @@ test("the type scale stays within the agreed range at 1440", async ({ page }) =>
 test("keyboard users can reach the primary action with a visible focus ring", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/en");
-  const cta = page.getByRole("link", { name: /^Start my case$/ }).first();
+  const cta = page.getByRole("link", { name: /^Send my case$/ }).first();
   await cta.focus();
   await expect(cta).toBeFocused();
   const outline = await cta.evaluate((el) => {
@@ -106,7 +106,7 @@ test("the phone composition is deliberate: header, scale, and a connected journe
   await expect(video).not.toHaveAttribute("controls", "");
   const watch = page.locator("#how-it-works").getByRole("button", { name: /Play the film/ });
   await expect(watch).toBeVisible();
-  const journeyCta = page.locator("#how-it-works").getByRole("link", { name: /^Start my case$/ });
+  const journeyCta = page.locator("#how-it-works").getByRole("link", { name: /^Send my case$/ });
   await expect(journeyCta).toBeVisible();
   // The play control is keyboard-operable and hands over to the inline player's native controls.
   await watch.focus(); await page.keyboard.press("Enter");
@@ -147,7 +147,7 @@ test("the header switches to desktop navigation only when it fits on one line", 
   }
 });
 
-test("the homepage offers Sign in as a quiet entry, distinct from Check case status and Start my case", async ({ page }) => {
+test("the homepage offers Sign in as a quiet entry, distinct from Track case and Send my case", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/en");
   const header = page.locator("header");
@@ -160,12 +160,12 @@ test("the homepage offers Sign in as a quiet entry, distinct from Check case sta
   await expect(signIn).toBeVisible();
   await expect(signIn).toHaveAttribute("href", /\/en\/portal\?signin=1$/);
   // Three distinct destinations for three distinct situations.
-  await expect(header.getByRole("link", { name: /^Check case status/ })).toHaveAttribute("href", /\/en\/track-case$/);
+  await expect(header.getByRole("link", { name: /^Track case/ })).toHaveAttribute("href", /\/en\/track-case$/);
   await page.keyboard.press("Escape");
   await expect(myCase).toHaveAttribute("aria-expanded", "false");
   await expect(myCase).toBeFocused();
-  await expect(header.getByRole("link", { name: /^Start my case$/ })).toHaveAttribute("href", /\/en\/send-my-case$/);
-  await expect(header.getByRole("link", { name: "Talk to a Patient Coordinator" })).toHaveAttribute("href", /wa\.me|whatsapp/);
+  await expect(header.getByRole("link", { name: /^Send my case$/ })).toHaveAttribute("href", /\/en\/send-my-case$/);
+  await expect(header.getByRole("link", { name: "Talk to a coordinator" })).toHaveAttribute("href", /wa\.me|whatsapp/);
   await expect(header.getByRole("link", { name: /Switch language/ })).toBeVisible();
   expect(await header.locator("a.btn-primary:visible").count()).toBe(1);
 });
@@ -191,14 +191,14 @@ test("the Care Areas menu opens the atlas, is keyboard-operable and closes on Es
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
 });
 
-test("the mobile menu exposes Start my case, Sign in and Check case status with touch-sized targets", async ({ page }) => {
+test("the mobile menu exposes Send my case, Sign in and Track case with touch-sized targets", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/en");
   await page.locator("header summary").first().click();
   const menu = page.locator("header details[open]");
-  await expect(menu.getByRole("link", { name: /^Start my case$/ })).toBeVisible();
+  await expect(menu.getByRole("link", { name: /^Send my case$/ })).toBeVisible();
   const signIn = menu.getByRole("link", { name: /Sign in/ });
   await expect(signIn).toBeVisible();
   expect((await signIn.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  await expect(menu.getByRole("link", { name: /^Check case status$/ })).toBeVisible();
+  await expect(menu.getByRole("link", { name: /^Track case$/ })).toBeVisible();
 });

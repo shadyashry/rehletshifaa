@@ -210,6 +210,16 @@ describe("ProposalSign", () => {
     expect(sessionStorage.getItem("rs-proposal-grant:tok-1")).toBeNull(); // consumed on first use
   });
 
+  it("in Arabic, isolates each amount, counts services in Arabic plural forms and uses one long date style", async () => {
+    sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "handed-grant", expiresAt: "2099-01-01T00:00:00Z" }));
+    render(<ProposalSign locale="ar" token="tok-1" />);
+    const amounts = await screen.findAllByText(/8,200/);
+    // "$US 8,200" came from an un-isolated figure in a right-to-left line.
+    expect(amounts.every((el) => el.closest("bdi[dir='ltr']") !== null)).toBe(true);
+    expect(screen.getByText("3 خدمات")).toBeTruthy(); // not "3 خدمة"
+    expect(screen.queryByText(/^\d{4}\/\d{1,2}\/\d{1,2}$/)).toBeNull(); // no numeric date beside the long ones
+  });
+
   it("falls back to its own verification when the handed-over grant is no longer good", async () => {
     sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "stale-grant", expiresAt: "2099-01-01T00:00:00Z" }));
     const fetchMock = vi.fn(async (url: string) => {
@@ -264,7 +274,9 @@ describe("ProposalSign — approved pre-8C commercial copy", () => {
   it("presents a stored range with its expected figure, never the expected figure alone", async () => {
     await openDocument({ ...proposal, totalMin: 7800, totalExpected: 8200, totalMax: 9400 });
     expect(screen.getAllByText("Estimated range").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("$7,800 to $9,400").length).toBeGreaterThan(0);
+    expect(screen.getAllByText((_, el) => !!el && /^(P|SPAN)$/.test(el.tagName) && el.textContent === "$7,800 to $9,400").length).toBeGreaterThan(0);
+    // Each figure is isolated on its own, so in Arabic the separator word keeps the page's reading order.
+    expect(screen.getAllByText("$7,800").every((el) => el.tagName === "BDI" && el.getAttribute("dir") === "ltr")).toBe(true);
     const summaryBox = screen.getByLabelText("Estimate summary");
     expect(within(summaryBox).getByText(/Expected/).textContent).toContain("$8,200");
   });

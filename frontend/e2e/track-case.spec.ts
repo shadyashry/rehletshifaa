@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 /** Case tracking: input shaping and validation, the neutral success state, resend cooldown and honest failures. */
 test.describe("track case", () => {
-  test("formats the Case ID, validates both fields and sends the request the API expects", async ({ page }) => {
+  test("formats the case number, validates both fields and sends the request the API expects", async ({ page }) => {
     const bodies: unknown[] = [];
     await page.route("**/public/cases/recover", async (route) => {
       bodies.push(route.request().postDataJSON());
@@ -12,12 +12,12 @@ test.describe("track case", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Track your case securely" })).toBeVisible();
 
     await page.getByRole("button", { name: /Send my secure tracking link/ }).click();
-    await expect(page.getByText("Enter the Case ID in the format RS-2026-000123.")).toBeVisible();
-    await expect(page.getByLabel("Case ID")).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByText("Enter the case number in the format RS-2026-000123.")).toBeVisible();
+    await expect(page.getByLabel("Case number")).toHaveAttribute("aria-invalid", "true");
     expect(bodies).toHaveLength(0);
 
-    await page.getByLabel("Case ID").fill("rs 2026 000123");
-    await expect(page.getByLabel("Case ID")).toHaveValue("RS-2026-000123");
+    await page.getByLabel("Case number").fill("rs 2026 000123");
+    await expect(page.getByLabel("Case number")).toHaveValue("RS-2026-000123");
     await page.getByLabel("Registered WhatsApp number").fill("+20 100 123 4567");
     await page.getByRole("button", { name: /Send my secure tracking link/ }).click();
 
@@ -27,13 +27,13 @@ test.describe("track case", () => {
     await expect(page.getByText(/Requested for RS-2026-000123/)).toBeVisible();
     await expect(page.getByRole("button", { name: /Send again in \d+s/ })).toBeDisabled();
     await page.getByRole("button", { name: "Use different details" }).click();
-    await expect(page.getByLabel("Case ID")).toHaveValue("RS-2026-000123");
+    await expect(page.getByLabel("Case number")).toHaveValue("RS-2026-000123");
   });
 
   test("explains rate limiting instead of a generic error", async ({ page }) => {
     await page.route("**/public/cases/recover", (route) => route.fulfill({ status: 429, body: "{}" }));
     await page.goto("/en/track-case");
-    await page.getByLabel("Case ID").fill("RS-2026-000123");
+    await page.getByLabel("Case number").fill("RS-2026-000123");
     await page.getByLabel("Registered WhatsApp number").fill("+201001234567");
     await page.getByRole("button", { name: /Send my secure tracking link/ }).click();
     await expect(page.locator("main [role=alert]")).toContainText("Too many attempts");

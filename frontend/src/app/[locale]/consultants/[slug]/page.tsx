@@ -77,7 +77,7 @@ function Entry({ text, icon }: { text: string; icon: ReactNode }) {
  * the CV itself: overview, clinical focus drawn as a map around the specialty, highlights marked by kind, qualifications
  * as a dated timeline, appointments, standing and sources, separated by hairlines. The brand wash and the specialty's line
  * drawing wash the top of the page. The page carries no buttons of its own: one quiet line at the end says the patient
- * never has to choose, and the header keeps the single "Start my case". Other Consultants follow as a list of names.
+ * never has to choose, and the header keeps the single "Send my case". Other Consultants follow as a list of names.
  */
 export default async function ConsultantProfilePage({ params }: Props) {
   const { locale, slug } = await params;

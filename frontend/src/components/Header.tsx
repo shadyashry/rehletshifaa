@@ -18,10 +18,10 @@ import { PrimaryNav } from "./nav/PrimaryNav";
 /**
  * The public header. From the desktop breakpoint it is one floating glass bar, inset from the page edges
  * and held a few pixels below the top as you scroll:
- *   wordmark · [ Care Areas ▾ · Consultants · How It Works ] · coordinator · language · My case ▾ · Start my case
+ *   wordmark · [ Care Areas ▾ · Consultants · How It Works ] · coordinator · language · My case ▾ · Send my case
  * The destinations sit in one soft pill track (the current page lifted as a white pill); the utilities
  * collapse into compact controls — the coordinator chip (labelled from xl), the language switch, and
- * "My case", which groups the two existing-patient routes (Sign in, Check case status). "Start my case"
+ * "My case", which groups the two existing-patient routes (Sign in, Track case). "Send my case"
  * stays the one filled action. Below the breakpoint the full-width bar and compact menu carry everything.
  */
 export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
@@ -68,7 +68,7 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
           />
         </HideOnPortal>
 
-        {/* Right group, in ascending weight: coordinator · language · My case (outlined) · Start my case (the one primary action). */}
+        {/* Right group, in ascending weight: coordinator · language · My case (outlined) · Send my case (the one primary action). */}
         <HideOnPortal locale={locale}>
           <div className="hidden items-center gap-1.5 nav:flex">
             <a

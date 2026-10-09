@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Check, Languages, LayoutDashboard, LogOut, Settings, X, ExternalLink } from "lucide-react";
 import { formatCalendarDate } from "@/lib/dates";
+import { countryName } from "@/lib/countries";
 import type { Locale } from "@/lib/i18n";
 import { OIDC_AUTHORITY } from "@/lib/api";
 import { usePortalSlot } from "@/components/portal/portal-slot";
@@ -79,7 +80,7 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
               {([
                 [text.givenName, profile.givenName], [text.familyName, profile.familyName], [text.preferredName, profile.preferredName],
                 [text.dob, profile.dateOfBirth ? formatCalendarDate(profile.dateOfBirth, locale) : null],
-                [text.country, profile.country], [text.nationality, profile.nationality],
+                [text.country, countryName(profile.country, locale)], [text.nationality, countryName(profile.nationality, locale)],
                 [text.preferredLanguage, profile.preferredLanguage === "ar" ? "العربية" : profile.preferredLanguage === "en" ? "English" : profile.preferredLanguage],
               ] as [string, string | null | undefined][]).filter(([, value]) => value).map(([label, value]) => (
                 <div key={label} className="min-w-0"><dt className="label-micro text-ink-500">{label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-900">{value}</dd></div>

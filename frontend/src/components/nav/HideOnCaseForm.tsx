@@ -3,9 +3,10 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-// On the case form itself the header's "Start my case" would only link back to the page the patient is
-// already filling in, so it steps aside there.
+// "Send my case" steps aside where it would mislead: on the case form itself (it would only link back to the page being
+// filled in) and on a patient's own secure links (`/proposal/…`, `/status/…`), whose reader already has a case.
 export function HideOnCaseForm({ locale, children }: { locale: string; children: ReactNode }) {
-  const pathname = usePathname();
-  return pathname === `/${locale}/send-my-case` ? null : <>{children}</>;
+  const pathname = usePathname() ?? "";
+  const hidden = pathname === `/${locale}/send-my-case` || pathname.startsWith(`/${locale}/proposal/`) || pathname.startsWith(`/${locale}/status/`);
+  return hidden ? null : <>{children}</>;
 }

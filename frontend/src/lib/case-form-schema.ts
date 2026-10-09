@@ -10,7 +10,7 @@ export const RELATIONSHIPS = ["PARENT", "CHILD", "SPOUSE", "SIBLING", "RELATIVE"
 export type Relationship = (typeof RELATIONSHIPS)[number];
 
 /**
- * Send My Case: structured given/family names (never one "full name"); an explicit "who is this case for";
+ * Send my case: structured given/family names (never one "full name"); an explicit "who is this case for";
  * a representative's name + relationship when it is for someone else. Email stays optional here.
  */
 export function buildCaseSchema(messages: { name: string; familyName?: string; required: string; phone: string; consent: string; email?: string; representative?: string }) {

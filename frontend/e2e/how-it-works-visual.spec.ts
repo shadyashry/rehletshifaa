@@ -53,7 +53,7 @@ for (const shot of SHOTS.filter((s) => ["390", "768", "1440"].includes(s.name)))
 test("the journey is complete, ordered, conditional and shorter", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/en/how-it-works");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Your Care Journey/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Your care journey, clearly coordinated$/);
   const m = await page.evaluate(() => {
     const h3 = [...document.querySelectorAll("main ol > li > div > h3, main ol > li h3")].map((h) => h.textContent?.trim());
     const h2 = [...document.querySelectorAll("main h2")].map((h) => h.textContent?.trim());

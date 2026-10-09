@@ -362,6 +362,29 @@ Update at the end of every phase.
   - [x] verify: typecheck ok; lint 0 errors / 10 warnings; unit 371/371; Playwright full suite **243 passed, 0 failed**, 38 skipped
         (+10 `public-batch-3.spec.ts`, each failing on the pre-Batch-3 pages); a11y 20/20 at baseline. No backend change
 
+- [x] **Finish plan — Close** (same branch `feat/ux-redesign-batch-3`, 2026-10-09; owner: "run the close step", then "fix the P1s as part
+      of the close", and the coverage gap accepted as post-launch)
+  - [x] Re-critiques (Impeccable `critique`, dual-agent: an isolated design review and an isolated detector + browser-overlay run per
+        target, on the branch's production build): **portal 27/40** (trend 24 → 25 → 27), **public site 24/36 = 67%** (7 n/a; last
+        25/40 = 62.5%, not like-for-like). Snapshots in `.impeccable/critique/2026-10-09T14-11-*`. Detector: 0 CLI findings on both;
+        overlay findings were the documented paper surface and eyebrow, plus small items moved to Post-launch
+  - [x] The six P1s fixed before merge:
+        portal — Arabic money isolated on every surface (secure link, staff case), Arabic plural forms and one long date on the secure
+        link; the secure-link sticky bar stacks on phones with a short assisted label, no blur, an 8px hairline summary without the
+        nested card, 13px labels, and no "Send my case" in the header on `/proposal` and `/status`; staff-voice status words with the
+        proposal and work states (no raw RELEASED/OPEN), countries via `Intl.DisplayNames` (`countryName`), "Consultant" capitalised.
+        public — a privacy and file-rules line at the upload (facts from PRODUCT.md only), a 14px secure note, a leave-first warning
+        instead of storing medical details in the browser; one name each (Send my case, Track case, case number, coordinator) in
+        sentence case; /cardiology lists lead with plain treatment names, CV sourcing notes stripped, a distinction that restates the
+        role hidden, the Arabic Latin join spaced. Waiting on the owner: whether sending a case or the review costs anything (Blocked)
+  - [x] Decorative "01–06" numerals removed from Care areas; the a11y baseline is now empty
+  - [x] Backlog: every open P3 moved to **Post-launch**; the critiques' P2/P3s added there; **Blocked on a decision or approval** lists
+        legal F2 and L2, the review-fee wording, the two confirmation styles, D1 and the Arabic terms / native review (launch blocker);
+        the e2e coverage gap for Teams/People/governance accepted as post-launch (owner)
+  - [x] verify: typecheck ok; lint 0 errors / 10 warnings; unit **377/377** (+6 Close tests, each failing on the old code);
+        Playwright full suite **245 passed, 0 failed**, 38 skipped (a first run caught one stale
+        heading assertion after the sentence-case rename, updated); a11y 20/20 with an empty baseline
+
 ## Decisions
 
 | Date | Decision | By |
@@ -382,13 +405,14 @@ Update at the end of every phase.
 | 2026-10-09 | Owner: "merge pass 4 into codex/platform-control-plane and push" — `feat/ux-redesign-pass-4` (`23a1f77`) fast-forwarded and pushed to origin. | Owner |
 | 2026-10-09 | Owner: "go with your recommendations for D1–D4" (finish plan). **D1** journey-bound cases: a known limitation, because no admission policy is current and no case was ever admitted (dev DB); the fix is a precondition for turning journey admission on. **D2** B1 status tokens approved as proposed (`token-proposals.md`). **D3** price first stays; the recommendation-first suggestion is closed. **D4** the public site uses the four stages as on How it works, and a generic team introduction until real coordinator content exists. | Owner |
 | 2026-10-09 | Batch 3 (owner): **B3-1** the travel-package question leaves the intake (the coordinator sets it in the portal); **B3-2** coordinator introduction = role, Arabic and English, WhatsApp (no name, photo or hours); **B3-3** the routers are unnumbered and link to How it works. | Owner |
+| 2026-10-09 | Close (owner): fix the re-critique P1s as part of the close; accept the Teams/People/governance e2e coverage gap as post-launch. Open for the owner: whether sending a case or the Consultant review costs anything (Blocked list). | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
 
 | Page | Rules | Cause |
 |---|---|---|
-| `en/care-areas` | `color-contrast` | decorative body-system numerals "01–06" at `text-brand-600/40` (1.92:1 on paper), 6 nodes |
+| — | — | Empty since the Close step (2026-10-09): the decorative "01–06" numerals on Care areas were removed; no page has a known serious/critical violation |
 
 ## Scores
 
@@ -397,6 +421,8 @@ Update at the end of every phase.
 | Public site | `.impeccable/critique/2026-10-07T12-52-27Z__dev-rehletshifaa-com.md` | 25/40 |
 | Portal | `.impeccable/critique/2026-10-07T13-37-54Z__frontend-src-components-portal.md` | 24/40 |
 | Portal (re-critique, Phase 6) | `.impeccable/critique/2026-10-07T21-50-23Z__frontend-src-components-portal.md` | 25/40 |
+| Portal (finish-plan Close) | `.impeccable/critique/2026-10-09T14-11-06Z__frontend-src-components-portal.md` | 27/40 |
+| Public site (finish-plan Close) | `.impeccable/critique/2026-10-09T14-11-07Z__dev-rehletshifaa-com.md` | 24/36 (67%; heuristic 7 n/a) |
 
 ## Future (out of scope for this run)
 
@@ -409,10 +435,11 @@ Update at the end of every phase.
 D1–D4 decided (see Decisions); Batch 1 merged, pushed and deployed (`f304421`); Batch 1a (skill review fixes) done on
 `feat/ux-redesign-batch-1a` (`fc03f0b`), not merged or pushed. Owner: Batch 2 runs in a **new session on the same branch**
 (`feat/ux-redesign-batch-1a`, worktree `vigilant-roentgen-29caab`) and Batch 1a is merged **together with Batch 2** (one merge,
-push and rebuild). Batch 1a + Batch 2 are merged, pushed and deployed (`023731e`). Batch 3 (public site) is done on `feat/ux-redesign-batch-3`,
-not merged or pushed. Next: the finish plan's **Close** — one portal and one public-site re-critique (scores here), move every open
-P3 to a "Post-launch" section of backlog.md, the final STATUS entry; then one merge, push and rebuild on the owner's word.
-Baselines: unit 371/371, Playwright full suite 243 passed, lint 0 errors / 10 warnings, backend 620/0.
+push and rebuild). **The redesign epic is at its finish line** (finish plan): Batches 0–3 and the Close are done on `feat/ux-redesign-batch-3`, not
+merged or pushed; re-critique scores are recorded above; every remaining item is on backlog.md's Post-launch list or Blocked on a
+named decision. Next: on the owner's word, one merge into `codex/platform-control-plane`, push and rebuild the stack. Open for the
+owner: the review-fee wording; legal L1–L5; the native Arabic review; the two confirmation styles.
+Baselines: unit 377/377, Playwright full suite green, lint 0 errors / 10 warnings, backend 620/0, a11y baseline empty.
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
 tunnel stack runs `6cd977d` (role crash guard, portal lint and `refreshMe` fix; all merged and pushed). Next candidates: Control Center lint

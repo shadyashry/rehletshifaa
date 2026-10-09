@@ -1,3 +1,5 @@
+import { intlLocale, type Locale } from "@/lib/i18n";
+
 // ISO 3166-1 countries with their ITU calling codes. Flags are derived at render time from the ISO2
 // code (two regional-indicator symbols), so only name + iso2 + dial are stored here.
 export type Country = { name: string; iso2: string; dial: string };
@@ -211,4 +213,16 @@ export function flagEmoji(iso2: string): string {
 export function findCountry(nameOrIso: string): Country | undefined {
   const q = nameOrIso.trim().toLowerCase();
   return COUNTRIES.find(c => c.name.toLowerCase() === q || c.iso2.toLowerCase() === q);
+}
+
+/**
+ * A stored country (a name like "Kenya" or a code like "KE") as the reader's own word for it, "Kenya" / "كينيا".
+ * Unknown values are shown as given rather than hidden.
+ */
+export function countryName(value: string | null | undefined, locale: Locale): string {
+  if (!value) return "";
+  const iso2 = findCountry(value)?.iso2;
+  if (!iso2) return value;
+  try { return new Intl.DisplayNames([intlLocale(locale)], { type: "region" }).of(iso2) ?? value; }
+  catch { return value; }
 }

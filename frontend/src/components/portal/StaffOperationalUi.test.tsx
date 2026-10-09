@@ -62,7 +62,7 @@ describe("JourneyPulse", () => {
     render(<FullJourneyDialog locale="en" timeline={timeline} caseNumber="RS-10281" onClose={vi.fn()}/>);
     expect(screen.getByText("Intake")).toBeTruthy();
     expect(screen.getByText("Consultant")).toBeTruthy();
-    expect(screen.getByText("Under consultant review")).toBeTruthy();
+    expect(screen.getByText("Under Consultant review")).toBeTruthy();
     // The actor name is isolated, so a Latin name keeps its order beside an Arabic role label.
     const actor = screen.getByText("Dr. Yasmine");
     expect(actor.tagName).toBe("BDI");

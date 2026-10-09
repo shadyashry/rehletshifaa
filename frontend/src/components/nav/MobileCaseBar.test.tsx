@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-const bar = () => render(<MobileCaseBar locale="en" label="Start my case" note="No commitment to start" />);
+const bar = () => render(<MobileCaseBar locale="en" label="Send my case" note="No commitment to start" />);
 const scrollTo = (y: number) => act(() => { (window as { scrollY: number }).scrollY = y; fireEvent.scroll(window); });
 
 describe("MobileCaseBar — the phone's persistent case action", () => {
@@ -30,7 +30,7 @@ describe("MobileCaseBar — the phone's persistent case action", () => {
 
     scrollTo(900);
     expect(root).not.toHaveAttribute("inert");
-    expect(screen.getByRole("link", { name: /Start my case/ })).toHaveAttribute("href", "/en/send-my-case");
+    expect(screen.getByRole("link", { name: /Send my case/ })).toHaveAttribute("href", "/en/send-my-case");
     expect(document.documentElement.dataset.caseBar).toBe("on");
   });
 

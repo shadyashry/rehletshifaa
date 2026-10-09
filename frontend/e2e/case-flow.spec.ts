@@ -25,8 +25,8 @@ async function fillContactStep(page: Page, name: string) {
 
 test("patient submits a case through the wizard and receives a case number and status link", async ({ page }) => {
   await page.goto("/en");
-  await page.getByRole("link", { name: "Start my case" }).first().click();
-  await expect(page.getByRole("heading", { name: "Send Your Medical Case" })).toBeVisible();
+  await page.getByRole("link", { name: "Send my case" }).first().click();
+  await expect(page.getByRole("heading", { name: "Send your medical case" })).toBeVisible();
 
   const whatsappLinks = page.locator('a[href^="https://wa.me/"]');
   expect(await whatsappLinks.count()).toBeGreaterThan(0);
@@ -38,11 +38,11 @@ test("patient submits a case through the wizard and receives a case number and s
   await page.getByRole("button", { name: "Continue" }).click(); // step 2 is entirely optional
 
   await page.getByText("I consent to RehletShifaa").click();
-  const submit = page.getByRole("button", { name: "Send My Case" });
+  const submit = page.getByRole("button", { name: "Send my case" });
   await expect(submit).toBeEnabled();
   await submit.click();
 
-  await expect(page.getByRole("heading", { name: "Your Case Has Been Received" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your case has been received" })).toBeVisible();
   await expect(page.getByText(/^RS-\d{4}-\d{6}$/)).toBeVisible();
   // The status link is the patient's only way back into the case, so it must be offered here.
   await expect(page.getByRole("link", { name: "Track your case" })).toHaveAttribute("href", /\/en\/status\/[0-9a-f]{40,}/);
@@ -52,14 +52,14 @@ test("the wizard blocks an incomplete contact step instead of advancing", async 
   await page.goto("/en/send-my-case");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("Please enter the given name(s).")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Your Case Has Been Received" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Your case has been received" })).toHaveCount(0);
 });
 
 test("consent is required before the case can be sent", async ({ page }) => {
   await page.goto("/en/send-my-case");
   await fillContactStep(page, "Playwright Consent");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("button", { name: "Send My Case" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Send my case" })).toBeDisabled();
 });
 
 test("retrying after a failed submit continues the same case instead of creating a second one", async ({ page }) => {
@@ -77,12 +77,12 @@ test("retrying after a failed submit continues the same case instead of creating
   await fillContactStep(page, "Playwright Retry");
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByText("I consent to RehletShifaa").click();
-  await page.getByRole("button", { name: "Send My Case" }).click();
+  await page.getByRole("button", { name: "Send my case" }).click();
 
   // The patient is told the case is unfinished, not that everything failed.
-  await expect(page.locator(`[role="alert"]:not(#__next-route-announcer__)`)).toContainText("Press Send My Case again");
-  await page.getByRole("button", { name: "Send My Case" }).click();
-  await expect(page.getByRole("heading", { name: "Your Case Has Been Received" })).toBeVisible();
+  await expect(page.locator(`[role="alert"]:not(#__next-route-announcer__)`)).toContainText("Press Send my case again");
+  await page.getByRole("button", { name: "Send my case" }).click();
+  await expect(page.getByRole("heading", { name: "Your case has been received" })).toBeVisible();
 
   // The whole point: one case and one patient record, not two.
   expect(creates).toBe(1);
@@ -93,7 +93,7 @@ for (const width of [320, 375, 390, 768, 1024, 1440]) {
   test(`intake fits ${width}px with no horizontal overflow`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/en/send-my-case");
-    await expect(page.getByRole("heading", { name: "Send Your Medical Case" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Send your medical case" })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
@@ -125,8 +125,8 @@ test("a case for someone else records the representative separately and keeps em
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("Submitted by")).toBeVisible();
   await page.getByText("I consent to RehletShifaa").click();
-  await page.getByRole("button", { name: "Send My Case" }).click();
-  await expect(page.getByRole("heading", { name: "Your Case Has Been Received" })).toBeVisible();
+  await page.getByRole("button", { name: "Send my case" }).click();
+  await expect(page.getByRole("heading", { name: "Your case has been received" })).toBeVisible();
   expect(payload).toMatchObject({ caseFor: "SOMEONE_ELSE", givenName: "Layla", familyName: "Hassan", representative: { name: "Omar Hassan", relationship: "PARENT" }, email: null });
   expect(payload).not.toHaveProperty("fullName");
 });

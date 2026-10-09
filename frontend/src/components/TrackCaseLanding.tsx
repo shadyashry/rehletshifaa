@@ -16,24 +16,24 @@ const copy = {
   en: {
     eyebrow: "Private patient access",
     title: "Track your case securely",
-    intro: "Enter your Case ID and the WhatsApp number you used when you sent your case. We will send a fresh, private tracking link to that number.",
+    intro: "Enter your case number and the WhatsApp number you used when you sent your case. We will send a fresh, private tracking link to that number.",
     savedTitle: "Continue where you left off",
     savedBody: "This browser has the private tracking link from when you sent your case.",
     savedAction: "Open my saved link",
-    caseId: "Case ID",
+    caseId: "Case number",
     caseIdHint: "Format: RS-2026-000123",
-    caseIdInvalid: "Enter the Case ID in the format RS-2026-000123.",
+    caseIdInvalid: "Enter the case number in the format RS-2026-000123.",
     whatsapp: "Registered WhatsApp number",
     whatsappHint: "The number on your case, with the country code — for example +20 100 000 0000.",
     whatsappInvalid: "Enter a WhatsApp number with its country code, for example +20 100 000 0000.",
     send: "Send my secure tracking link",
     sending: "Sending securely…",
-    findId: "Where can I find my Case ID?",
+    findId: "Where can I find my case number?",
     findIdBody: "It is shown on the confirmation screen right after you send your case, and in the secure WhatsApp message from our team.",
     findIdExample: "Case received",
-    findIdExampleLabel: "Case ID",
+    findIdExampleLabel: "Case number",
     errorRate: "Too many attempts. For your security, please wait a few minutes and try again.",
-    errorInvalid: "Please check the Case ID and WhatsApp number and try again.",
+    errorInvalid: "Please check the case number and WhatsApp number and try again.",
     errorNetwork: "We couldn't reach our servers. Check your connection and try again.",
     sentTitle: "Check your WhatsApp",
     sentBody: "If these details match your case, a private tracking link is on its way to the WhatsApp number on your case.",
@@ -45,17 +45,17 @@ const copy = {
     different: "Use different details",
     howTitle: "How secure tracking works",
     how: [
-      { title: "Your details", body: "Case ID and the WhatsApp number on your case." },
+      { title: "Your details", body: "Your case number and the WhatsApp number on your case." },
       { title: "A private link", body: "Sent only to the number already stored on your case." },
       { title: "A 6-digit code", body: "A fresh code confirms it's you before anything is shown." },
       { title: "Your case status", body: "Where your case is, and what happens next." },
     ],
-    privacy: "For your privacy we never confirm whether a Case ID or number exists — the same message appears either way.",
+    privacy: "For your privacy we never confirm whether a case number or phone number exists — the same message appears either way.",
     accountTitle: "Already activated your account?",
     accountBody: "Once you have completed your profile and created a password, sign in instead — your case opens directly.",
     signIn: "Sign in to the secure portal",
     helpTitle: "Need help?",
-    helpBody: "A patient coordinator can help you find your Case ID or update your number.",
+    helpBody: "Your coordinator can help you find your case number or update your number.",
     contact: "Talk to a coordinator",
   },
   ar: {
@@ -136,7 +136,7 @@ export function formatCaseId(raw: string): string {
 type Failure = "rate" | "invalid" | "network";
 
 /**
- * Case tracking for patients who have not activated an account: they confirm the Case ID and the WhatsApp
+ * Case tracking for patients who have not activated an account: they confirm the case number and the WhatsApp
  * number on their case, and a fresh private status link is sent to that stored number. The API answers
  * the same way whether or not a case matches, so the success state never says more than that. Beside the
  * form, the four-step secure flow; a saved link on this browser is offered first; the patient can resend

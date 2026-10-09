@@ -28,17 +28,17 @@ export type Referral = {
 
 const L = {
   en: {
-    noneEligible: "No eligible consultant is available for this care area right now.", loading: "Loading eligible consultants…",
+    noneEligible: "No eligible Consultant is available for this care area right now.", loading: "Loading eligible Consultants…",
     reviewTime: (h: number) => `Usual review time ${h} h`, workload: (a: number, p: number) => `${a} active case${a === 1 ? "" : "s"}${p ? ` · ${p} offer${p === 1 ? "" : "s"} pending` : ""}`,
-    viaCapability: "Eligible through an approved capability", choose: "Eligible consultants", chooseHint: "Care area is only the first filter. Compare subspecialty, capabilities and workload, then choose.",
+    viaCapability: "Eligible through an approved capability", choose: "Eligible Consultants", chooseHint: "Care area is only the first filter. Compare subspecialty, capabilities and workload, then choose.",
     transfer: "Transfer", secondOpinion: "Second opinion", referralFrom: "Requested by", reason: "Clinical reason", suggested: "Suggested",
-    declinedBy: "The previous consultant declined", careArea: "Care area", note: "Note to the consultant (optional)", confirm: "Confirm handover",
+    declinedBy: "The previous Consultant declined", careArea: "Care area", note: "Note to the Consultant (optional)", confirm: "Confirm handover",
     decline: "Decline referral", declineNote: "Why this referral is not confirmed", sendDecline: "Decline", cancel: "Cancel", noOpen: "There is no referral waiting for you on this case.",
-    refer: "Refer this case", referHint: "Nothing is shared until the coordinator confirms and the receiving consultant accepts. A transfer ends your assignment only once it is accepted.",
-    type: "Referral type", transferHint: "Hand the case to another consultant.", secondHint: "Ask another consultant for a limited opinion; you stay the case's consultant.",
+    refer: "Refer this case", referHint: "Nothing is shared until the coordinator confirms and the receiving Consultant accepts. A transfer ends your assignment only once it is accepted.",
+    type: "Referral type", transferHint: "Hand the case to another Consultant.", secondHint: "Ask another Consultant for a limited opinion; you stay the case's Consultant.",
     clinicalReason: "Clinical reason for the referral", suggestArea: "Suggested care area (optional)", sameArea: "Same care area", suggestCapability: "Suggested capability or subspecialty (optional)",
-    suggestConsultant: "Suggested consultant (optional)", noSuggestion: "No specific consultant", send: "Send to the coordinator",
-    referrals: "Referrals", status: { AWAITING_COORDINATOR: "Waiting for the coordinator", AWAITING_CONSULTANT: "Offered to the receiving consultant", IN_PROGRESS: "Second opinion in progress", COMPLETED: "Completed", DECLINED_BY_COORDINATOR: "Not confirmed by the coordinator", WITHDRAWN: "Withdrawn" } as Record<string, string>,
+    suggestConsultant: "Suggested Consultant (optional)", noSuggestion: "No specific Consultant", send: "Send to the coordinator",
+    referrals: "Referrals", status: { AWAITING_COORDINATOR: "Waiting for the coordinator", AWAITING_CONSULTANT: "Offered to the receiving Consultant", IN_PROGRESS: "Second opinion in progress", COMPLETED: "Completed", DECLINED_BY_COORDINATOR: "Not confirmed by the coordinator", WITHDRAWN: "Withdrawn" } as Record<string, string>,
     to: "to", opinion: "Second opinion", yourOpinion: "Your second opinion", opinionHint: "Submitting ends your access to this case.", submitOpinion: "Submit second opinion", coordinatorNote: "Coordinator note",
   },
   ar: {

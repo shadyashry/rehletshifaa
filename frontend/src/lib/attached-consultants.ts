@@ -38,8 +38,8 @@ export const attachedConsultants: Record<Locale, readonly ConsultantProfile[]> =
     "Clinical and academic appointments reported in the December 2025 CV"
   ],
   "appointments": [
-    "Associate Professor of Vascular Surgery, Ain Shams University, since June 2023 (December 2025 CV)",
-    "Consultant of Vascular & Endovascular Surgery, Ain Shams University Hospitals, since October 2017 (December 2025 CV)"
+    "Associate Professor of Vascular Surgery, Ain Shams University, since June 2023",
+    "Consultant of Vascular & Endovascular Surgery, Ain Shams University Hospitals, since October 2017"
   ],
   "achievementBadges": [
     "MD in Vascular Surgery",
@@ -391,7 +391,7 @@ export const attachedConsultants: Record<Locale, readonly ConsultantProfile[]> =
       "sourceFile": "Mohammed Ali CV 2024.pdf",
       "name": "Dr Mohammed Ali Ibrahim Hussien",
       "specialty": "Spine & Orthopedic Surgery",
-      "role": "Associate Professor of Orthopedic and Spine Surgery, Ain Shams University (2024 CV)",
+      "role": "Associate Professor of Orthopedic and Spine Surgery, Ain Shams University",
       "summary": "Orthopedic and spine surgeon with doctoral research on complex spinal disorders, university teaching experience and an AO Spine fellowship in Munich.",
       "cardSummary": "Orthopedic and spine surgeon with doctoral research on complex spinal disorders, university teaching experience and an AO Spine fellowship in Munich.",
       "credentials": "PhD in Trauma & Orthopedics, Ain Shams University, 2017",
@@ -417,7 +417,7 @@ export const attachedConsultants: Record<Locale, readonly ConsultantProfile[]> =
         "ArabSpine Course Diploma modules 1 and 4 (course modules)"
       ],
       "appointments": [
-        "Associate Professor of Orthopedic and Spine Surgery, Ain Shams University (2024 CV)"
+        "Associate Professor of Orthopedic and Spine Surgery, Ain Shams University"
       ],
       "achievementBadges": [
         "PhD in Trauma & Orthopedics"
@@ -567,7 +567,7 @@ export const attachedConsultants: Record<Locale, readonly ConsultantProfile[]> =
   ],
   "focusAreas": [
     "توسيع الشرايين الطرفية وجراحات تحويل المسار",
-    "إصلاح تمدد الأورطي بالقسطرة، بما يشمل EVAR وTEVAR",
+    "إصلاح تمدد الأورطي بالقسطرة، بما يشمل EVAR و TEVAR",
     "أمراض الأوردة وعلاج الدوالي",
     "وصلات الغسيل الكلوي وتدخلات الأوردة"
   ],
@@ -599,7 +599,7 @@ export const attachedConsultants: Record<Locale, readonly ConsultantProfile[]> =
     "anchor": "جراحة الأوعية الدموية والقسطرة الطرفية",
     "areas": [
       "توسيع الشرايين الطرفية وجراحات تحويل المسار",
-      "إصلاح تمدد الأورطي بالقسطرة، بما يشمل EVAR وTEVAR",
+      "إصلاح تمدد الأورطي بالقسطرة، بما يشمل EVAR و TEVAR",
       "أمراض الأوردة وعلاج الدوالي",
       "وصلات الغسيل الكلوي وتدخلات الأوردة"
     ]

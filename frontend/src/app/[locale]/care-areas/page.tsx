@@ -88,7 +88,7 @@ export default async function CareAreas({ params }: Props) {
           </nav>
 
           <div className="mt-10 md:mt-12">
-            {systems.map((system, index) => {
+            {systems.map((system) => {
               const style = SYSTEM_STYLES[system.key];
               const people = system.areas.reduce((sum, area) => sum + area.consultants.length, 0);
               return (
@@ -99,12 +99,8 @@ export default async function CareAreas({ params }: Props) {
                   className="grid scroll-mt-24 gap-6 border-t border-border-subtle py-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12 lg:py-12"
                 >
                   <div className="lg:sticky lg:top-28 lg:self-start">
-                    <div className="flex items-center gap-4 lg:block">
-                      <p aria-hidden className="text-[2.5rem] font-semibold leading-none tracking-[-0.03em] text-brand-600/40 tabular-nums lg:text-[3.25rem]">
-                        {String(index + 1).padStart(2, "0")}
-                      </p>
-                      <span aria-hidden className={`h-[3px] w-10 rounded-full lg:mt-5 lg:block ${style.dot}`} />
-                    </div>
+                    {/* The system's colour rule is its mark; no "01–06" numerals, since the systems are not a sequence. */}
+                    <span aria-hidden className={`block h-[3px] w-10 rounded-full ${style.dot}`} />
                     <h3 id={`system-${system.key}-title`} className="mt-4 text-[1.375rem] font-semibold leading-tight tracking-[-0.015em] text-brand-900 rtl:leading-snug rtl:tracking-normal sm:text-[1.5rem]">
                       {system.title}
                     </h3>

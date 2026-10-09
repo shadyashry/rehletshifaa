@@ -48,9 +48,6 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 | Done (pass 2) | The toolbar shows 6+ controls before the first case. List/Cards and "Select page" have no bulk action to support them. | PC | `CaseQueue.tsx` | distill |
 | Done (pass 2) | The home lands on an empty "My work" tab while the cases sit one tab away. Land on the first tab that has work. | PC | `Portal.tsx`, `CaseQueue.tsx` | distill |
 | Done (pass 2) | The public marketing footer appears on staff screens. Replace it with a slim app footer (owner decision). | PC | `components/Footer.tsx`, portal layout | distill |
-| P3 | No keyboard shortcuts or saved views for coordinators. | PC | `CaseQueue.tsx` | shape |
-| P3 | The finance home is only an empty state plus one link. | PC | `Portal.tsx` | onboard |
-| P3 | On phones, coordinator rows put a lone checkbox above the case name. | PC | `CaseQueue.tsx` | adapt |
 
 ## Portal system drift
 
@@ -63,12 +60,7 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 | Done (Batch 2: Services & costs and the Consultant review's documents/services/summary are hairline sections inside their card) | Nested cards: the "Services & costs" table and the Consultant intake summary. | PC (detector) | `Portal.tsx`, `ClinicalReview.tsx` | distill |
 | Done (pass 3: 44px; Batch 2: named by sender and time) | "Mark read" buttons are 32px tall and don't say which message they apply to. | PC | `CaseMessages.tsx` | harden |
 | Done (Batch 2: styled as a heading) | An h2 on My Care ("other cases") is styled as an 11.5px uppercase label. | PC | `MyCare.tsx` | typeset |
-| P3 | The tab list wraps onto two rows on phones in Arabic (Consultant view). | PC | `Portal.tsx` | adapt |
-| P3 | Message timestamps use short US format. | PC | `CaseMessages.tsx` | clarify |
-| P3 | Currency is shown three ways ("$US 4,850.00", "4,850 US$", "$4,850"). | PC | `MyCare.tsx`, `Portal.tsx` | clarify |
-| P3 | Latin initials and country names appear on Arabic pages. | PC | `MyCare.tsx`, `Portal.tsx` | harden |
 | Done (pass 2) | Nothing on My Care shows a representative whose account this is. | PC | `MyCare.tsx`, `PatientNav.tsx` | shape |
-| P3 | Every portal view has the same page title, "RehletShifaa". | PC (detector) | `app/[locale]/portal/page.tsx` | harden |
 | Done | P0 My Care reload loop for linked patients. | PC | `AuthProvider.tsx`, `Portal.tsx`, `e2e/my-care.spec.ts` | harden (`6ea32d2`) |
 
 ## Public site — journey and cost model
@@ -93,13 +85,7 @@ Plan: `docs/ux-redesign/plans/staff-work-views.md`.
 | Done (Batch 3: `rtl:` gradient at 12%) | `PageHero` uses a radial gradient with a physical 88% position, which is not mirrored in RTL. | SC | `components/PageHero.tsx:22` | polish |
 | Done (Batch 3: 8px radii, pearl surface, no shadow, 44px remove, Intl file sizes; the flow copy is `form.flow` in the message files) | The CaseForm upload area uses `rounded-2xl`/`rounded-xl`, `bg-mist` and `shadow-sm`. Form copy is hard-coded in a `t` object instead of the message files. | SC | `components/CaseForm.tsx` | polish / clarify |
 | Done (Batch 3: heading and content reveals removed; the journey still fills as it is read) | Scroll-driven reveals hide about 47% of the home page until it is scrolled, and some reveals blur. | SC (detector) | `app/theme-petrol.css` | animate |
-| P3 | Title Case headings ("Send Your Medical Case", "Your Case Has Been Received"). | SC | `messages/*.json` | clarify |
-| P3 | Consultant cards: "Professional distinction" repeats the job title; the CV qualifiers are inconsistent; a Germany-based Consultant has no explanation. | SC | `lib/consultants.ts`, `lib/attached-consultants.ts` | clarify |
-| P3 | `CarePathways.tsx:58` "View all care areas" fires the `send_case_cta_clicked` analytics event. | SC | `components/home/CarePathways.tsx` | harden |
-| P3 | No Track case link in the footer. | SC | `components/Footer.tsx` | clarify |
-| P3 | 12px phone gutters, and text touches the viewport edge in 21 places. | SC (detector) | `app/globals.css` `.container-site` | adapt |
-| P3 | Every page logs a CSP error blocking the Cloudflare Insights beacon (site config). | SC | `next.config.ts` | — |
-| A11Y | `en/care-areas` `color-contrast`: the decorative body-system numerals "01–06" are 1.92:1 (`text-brand-600/40`). | A11Y | `app/[locale]/care-areas/page.tsx` | polish |
+| Done (Close step: the decorative numerals are gone; the a11y baseline is empty) | `en/care-areas` `color-contrast`: the decorative body-system numerals "01–06" are 1.92:1 (`text-brand-600/40`). | A11Y | `app/[locale]/care-areas/page.tsx` | polish |
 | Done | "Verified" claims removed (`adcf0d6`). WhatsApp prefills localised, "cardiac" dropped, Arabic eyebrow tracking fixed (`e01c663`). Representative dial code (`395c002`). Index-page CTA stacking (`6f123da`). AA placeholders (`7061d9c`). | SC | — | — |
 
 ## Portal — engineering, accessibility and RTL (Phase 4 reviews, 2026-10-07)
@@ -136,7 +122,6 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | Done (Batch 1: empty conversation line; no-one-to-assign line for Operations/Finance; referral care area keeps an unlisted value and asks to choose when none) | Missing empty states: an empty message thread; TeamAssignment with nobody in the role; a care-area select whose value is not among its options. | WG | `CaseMessages.tsx:20`, `CoordinatorActions.tsx:87`, `ConsultantRouting.tsx:126` | onboard |
 | Done (Batch 1: the step reads the latest submission from `GET /patient/cases/{id}/onboarding`, re-read after a submit; no backend change) | `PatientIdentityStep` always receives `identity={null}`, so the PENDING and REJECTED states never render. | WG | `Portal.tsx:362` | harden |
 | Done (Batch 1: busy + disabled while accepting; a network failure shows the error) | `WorkforceAdoptionPanel` accept has no busy state, so a double-click sends twice. | WG | `WorkforceAdoptionPanel.tsx:38` | harden |
-| P3 | Every action shows the generic "Saved successfully"; "Retry" only reloads the queue; the copy-link failure is silent; the completion note closes before its result is known. | WG | `Portal.tsx:184/212/681`, `CurrentAction.tsx:78` | clarify |
 
 ### Accessibility and semantics
 
@@ -152,7 +137,6 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | Done (Batch 2: `LockedSection` with `inert`) | The coordinator lock is `pointer-events-none opacity-50` only, so the release buttons stay keyboard-operable. | AU | `Portal.tsx:310` | harden |
 | Done (pass 2: the count line replaced the tiles; zero counts are omitted) | Zero-value dashboard tiles are `disabled` at 0.55 opacity (about 2.6:1). | AU | `RoleDashboardSummary.tsx:69` | polish |
 | Done (Batch 2: queue actions named "Open RS-…", My work "Open: title, case", document View/Preview/Download name the file, bell "Open case RS-…"; role switch already had a check icon + `aria-pressed`; inline `AccountLinkRequest` is a section; no-email is text, not a dead mailto) | Repeated "Open/View/Download" buttons with no item context. Role-switcher active state is shown by styling only. `role="dialog"` on the inline `AccountLinkRequest` card. A focusable "disabled" mailto. | WG | `MyWork.tsx:87`, `CaseQueue.tsx:256`, `Portal.tsx:208/682`, `AccountLinkRequest.tsx:84` | harden |
-| P3 | Popovers with `role="dialog"` don't move focus. The result-count live region re-announces on every keystroke. Smooth scroll ignores reduced motion. "✓/♥" glyphs are read aloud. No new-tab notice. | AU, WG | `CaseQueue.tsx:164/223`, `NotificationBell.tsx:79`, `Portal.tsx:194/336`, `PortalAccount.tsx:95` | harden |
 
 ### RTL, i18n and formatting
 
@@ -163,7 +147,6 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 | Done (Batch 2: My Care uses `careAreaLabel` with the shared atlas) | Care-area labels: two local maps cover 3 of 9 areas, disagree with each other, and fall back to English slugs on Arabic pages. Use one shared source. | AU, WG | `MyCare.tsx:349`, `Portal.tsx:763`, `MyWork.tsx:72` | clarify |
 | Done (Batch 2: `lib/money.ts` `formatMoney` everywhere — whole amounts without decimals, others at the currency's precision) | One total is formatted with 0 and 2 decimals in different places. Use one shared money formatter. | WG, AU | `Portal.tsx:517/717/760`, `MyCare.tsx`, `ClinicalReview.tsx` | clarify |
 | Done (Batch 2: `formatCalendarDate`, UTC; test west of UTC) | Date of birth is parsed as UTC midnight, so it shows the previous day west of UTC. | WG | `PortalAccount.tsx:67` | harden |
-| P3 | Dates without a year; raw FX rate and ISO date; hard-coded "KB/MB"; English "Bank" placeholder and English error fallbacks in the Arabic UI; the wrong-account case detected by an English regex; Arabic IME Enter not guarded. | WG, AU | `CaseQueue.tsx:286`, `Portal.tsx:665/727/764`, `PortalDirectories.tsx:10`, `AccountLinkRequest.tsx:68`, `RequestInformationDialog.tsx:132` | clarify |
 
 ### Design-system drift (beyond items above)
 
@@ -171,24 +154,17 @@ Severity mapping: CRITICAL → P0, HIGH → P1, MEDIUM → P2, LOW → P3. Items
 |---|---|---|---|---|
 | Done (Batch 2: B1 tokens in `@theme`, `--badge-{tone}-*`, one `StatusBadge` with the Control Center's icon per tone and one `caseStatusTone`) | Status, priority and attention chips and the journey "blocked" state use Tailwind amber, emerald, sky and stone colours with rounded-full pills. Map them to the status tokens (GATE 2) and the 8px badge. | AU | `Portal.tsx:768`, `CaseQueue.tsx:54-62`, `MyWork.tsx:64/103`, `JourneySnapshot.tsx:36-56` | colorize / polish |
 | Done (pass 2 sweep: no `sand-*` or `brand-50` fill left in `MyCare.tsx`) | The deposit panel uses `sand-50/200` (not remapped by petrol), and the current step fills with `brand-50`. Both break the Two Surfaces rule. | AU | `MyCare.tsx:94/146` | polish |
-| Partly done (pass 2: queue Open is secondary, My work has one filled lead item and quiet links; Claim/Accept on a queue row stay filled) — P3 | A filled petrol "Open" on every queue row and work card (up to 12 per page) breaks the One Action rule. | AU | `CaseQueue.tsx:256`, `MyWork.tsx:87` | quieter |
-| P3 | `PortalFrame` uses a gradient with a hard-coded `#fff`; old-palette `rgba(28,51,58)` shadows; `shadow-xl`/`rounded-2xl` popovers. | AU | `Portal.tsx:236`, `CurrentAction.tsx:43`, `PortalAccount.tsx:49`, `NotificationBell.tsx:80`, `CaseQueue.tsx:165` | polish |
 
 ### Performance and code structure
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
 | Done (pass 2) | `api` depends on the whole `user` object, so every silent token renewal re-runs the queue effect (clears the cases), refetches reference data, restarts polling, and wipes ConsultantRouting selections. Key on the subject and read the token from a ref. | RB | `Portal.tsx:109`, `ConsultantRouting.tsx:105` | harden |
-| Mostly done (pass 2: workspace + documents in parallel, no duplicate fetch from My work, refresh + reload in parallel; bulk claim stays sequential by design) | Serial waterfalls: `openCaseById` makes 3 round trips including a duplicate fetch; workspace and documents load sequentially; `mutate` runs refresh then openCase (4–5 trips per click); bulk claim does this N times. | RB, AU | `Portal.tsx:145/163/182-185`, `CaseQueue.tsx:215` | optimize |
+| Closed (Close step: what remains — bulk claim one case at a time — is by design) | Serial waterfalls: `openCaseById` makes 3 round trips including a duplicate fetch; workspace and documents load sequentially; `mutate` runs refresh then openCase (4–5 trips per click); bulk claim does this N times. | RB, AU | `Portal.tsx:145/163/182-185`, `CaseQueue.tsx:215` | optimize |
 | Done (pass 3 follow-up: shell, staff queue, staff case page and patient case page are separate modules, each loaded per role) | `Portal.tsx` is one 132 KB client module importing every role's UI. Split it into patient and staff modules by role and lazy-load dialogs and drawers. | RB, AU | `Portal.tsx:3`, `app/[locale]/portal/page.tsx` | optimize |
 | Done for the portal (pass 4: the 11 portal errors and the Portal `locale` deps warning are gone — role from a lazy `?role=` read, queue reset and queue view restored while rendering, case restore started just after the effect body, shared `usePortalSlot` (`useSyncExternalStore`), PortalAccount dialog state instead of a ref read, loader effects without synchronous resets, `validUntilInDays()` outside render; `CaseQueue.tsx:87` was already clean). Lint 24/12 → 13/11; the 13 left are Control Center, see the next row) | Lint `set-state-in-effect`, `refs` and `purity` errors (12 in scope), each with a concrete fix in the RB report: queue loading derived state, `?role=` lazy init, `Date.now()` in render, dialog ref read in render, a shared `usePortalSlot` hook, the view-mode lazy init, directory and adoption loaders. | RB | `Portal.tsx:108/114/168/173/666`, `PortalAccount.tsx:38/55`, `NotificationBell.tsx:34`, `CaseQueue.tsx:87`, `PortalDirectories.tsx:11`, `WorkforceAdoptionPanel.tsx:20` | harden |
-| P3 | Two confirmation styles (Batch 1a review, Impeccable "modal as first thought" / consistent affordances): staff actions confirm in a `ConfirmDialog`, the patient drawer's Decline asks again in place. Decide one pattern. | Batch 1a review | `portal-ui.tsx`, `PatientProposal.tsx` | — (design decision) |
-| P3 | `CaseWorkspace` context is one flat object; the composition skill's `{state, actions, meta}` interface pays off only with a second provider. | Batch 1a review | `StaffCaseView.tsx` | — |
-| P2 | Browser coverage gap (Batch 0): the e2e specs for access governance, credential reviews and "Staff & teams" tested screens removed in `19a970c` and were deleted (owner). The current Teams, People and governance pages have unit tests but no Playwright spec. | Batch 0 | `e2e/` | harden |
 | Done (Batch 1: lint 0 errors) | Control Center lint (13 errors, all `set-state-in-effect`): loaders that reset state synchronously in effects. Same fixes as the portal row above. | Lint (pass 4) | `ControlCenterOverview.tsx:64`, `ControlCenterShell.tsx:129/165`, `JourneyAdmissionPolicyPanel.tsx:61/64`, `JourneyDesigner.tsx:84`, `JourneyList.tsx:53`, `JourneyVersionWorkspace.tsx:67`, `MarginDeposit.tsx:42`, `catalog-admin.tsx:35/112/177/179` | harden |
-| Partly done (pass 4: patient/staff views split in pass 3; the staff case page's nine dialog/drawer flags are one `CaseOverlay` union; `CaseWorkspaceProvider` gives ProposalSummary, CoordinatorBrief, CaseActivity, ProposalSendForm, ProposalShareLinks, FinalAssessment, FinalQuoteActions, DepositCard, DeliveryCard and ProposalCard the locale, copy, role, case, busy, mutate, FX rates, catalogue and viewer. Left: `RoleActions` keeps explicit props because `AuthoritativeActions.test.tsx` renders it alone; the separate case modules (ClinicalReviewPanel, CaseMessages, CoordinatorActionForm, MoreActions, …) still take locale/busy/mutate as props; the Portal shell's own ~28 `useState` hooks are untouched) | Composition: 27 `useState` hooks in Portal, 26 props into `WorkspaceView`, 8 boolean dialog flags. Introduce a `CaseWorkspaceProvider`, split the patient and staff views, and use one dialog union state. | RB | `Portal.tsx:276/323`, `StaffCaseView.tsx` | — |
 | Done (pass 4: since the pass-3 split it no longer crashed but left an open case on an endless "Loading your workspace…", and a first-load `/me` failure left an empty page; the shell now derives a typed `caseRole` (no `!`) and shows one alert with Try again from `meFailed`) | `role={currentRole!}` can crash `WorkspaceView` when `/me` fails while a case is open. | RB | `Portal.tsx:216/285` | harden |
-| P3 | The hidden queue re-renders under the workspace; formatters are rebuilt on every render; polling continues in hidden tabs; both locales' copy ships to the client; dead code (`PatientStatusCard`, `PATIENT_JOURNEY` and `TaskActions` removed in pass 2; a no-op `Panel wide` and the MyCare timeline no-op remain). | RB, WG, AU | `Portal.tsx`, `NotificationBell.tsx:41`, `CaseMessages.tsx:29`, `MyCare.tsx:235` | distill |
 
 ## Patient proposal — deferred review findings (`/redesign-area` run 1, 2026-10-07)
 
@@ -227,15 +203,8 @@ The items below are deferred.
 | Done (Batch 2: `optionalNote` under the list) | Optional items are priced but excluded from the total and can't be selected, and nothing says so. | WG | `PatientProposal.tsx` | clarify |
 | Done (pass 2) | The Arabic blocked note asks the patient to switch to English but has no direct link to the same view in `/en`. | WG | `PatientProposal.tsx` | harden |
 | Done (Batch 2: `useId` for the terms; the checkbox is described by one short sentence naming the disclosure; tested) | The terms id `portal-deposit-terms` is hard-coded and shared across components, and the checkbox description reads the whole English terms block. Use `useId` and a short summary target, and test the real target. | RB, WG | `PatientProposal.tsx`, `CoordinationDepositTerms.tsx`, test | harden |
-| P3 | Fixed section ids and a region landmark per section; an unnamed fieldset group around the read-only document; an inline `mutate` wrapper (use `onDecided`); formatters rebuilt per item. | RB | `PatientProposal.tsx`, `Portal.tsx` | distill |
 | Done | Done in Phase 6 polish: the drawer header and Close stay pinned while the content scrolls. | PM | `Portal.tsx` `CaseDrawer` | adapt |
 | Done | Done in Phase 6 polish: the dialog is named by its h2 through `aria-labelledby`. | WG | `Portal.tsx` | harden |
-| P3 | A typed note is lost on Esc or close without a warning. | WG | `PatientProposal.tsx` | harden |
-| P3 | Decimals vary per amount within one document ("$4,850" beside "$120.50"). | WG | `PatientProposal.tsx` | clarify |
-| P3 | "Ready for your decision" (drawer) vs "Ready to review" (My Care card): use one phrase. Buttons mix "&" and "and". | WG | `messages/*.json`, `MyCare.tsx` | clarify |
-| P3 | The quote's `paymentTitle` is a bold `<p>`, not a heading. The three decision buttons wrap unevenly. | WG | `PatientProposal.tsx` | layout |
-| P3 | `CoordinationDepositTerms`: a 12px-radius card with `bg-white` inside the disclosure, one-off type sizes (0.82–0.95rem), and a small, low-contrast Arabic notice (0.82rem, ink-600). | WG, I18N | `components/CoordinationDepositTerms.tsx` | polish |
-| P3 | Arabic: masculine address throughout (use neutral phrasing where cheap); "عرض" alone is ambiguous (offer vs display); `{count}` is not formatted with Intl. All pending native review. | I18N | `messages/ar.json`, `PatientProposal.tsx` | clarify |
 
 ## Staff work views — deferred review findings (`/redesign-area` run 2, 2026-10-07)
 
@@ -263,19 +232,13 @@ The items below are deferred.
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
 | Done (pass 3) | **Backend follow-up.** Work-item titles and context are English text from the backend. Arabic now shows a per-type title, but the context stays English. Emit a title code plus parameters instead of prose. | I18N | backend `CaseActionService`, `JourneyService`, `PatientActionService`; `MyWork.tsx`, `CurrentAction.tsx` | harden |
-| Partly done (pass 3 follow-up: referrals, deposit/travel handoffs, coordinator routing, staff notifications and the waiting reason carry codes; journey-runtime action handlers keep their admin-defined node labels, which are content, not code) — P3 | Work still worded only in English: `ConsultantReferralService` (transfer / second-opinion offers and confirmations), `CaseHandoffService` (deposit, travel), `AssignmentEngine` (coordinator routing), the journey-runtime action handlers (node labels), staff notifications (`NotificationView`) and `waitingReason` ("Waiting for the patient: …"). Give each a `WorkCopy` code. | Pass 3 | backend services above; `NotificationBell.tsx`, `Portal.tsx` | harden |
 | Done (Batch 2: `WorkItemView.coordinatorSubject`; My Work uses `coordinatorLabel`) | `WorkItem` has no `coordinatorSubject`, so My Work still prints your own name where the queue says "You". This needs a field in the work API. | WG | backend work API, `MyWork.tsx` | harden |
 | Done (Batch 2: `WorkCopyProvider locale`, `useWorkCopy().locale`; plurals read it; the count line lost its `locale` prop) | The work-copy context carries no locale, so callers pair a `locale` prop with context copy (a mismatch is possible). Put the locale in the context value. | RB | `portal-copy.tsx`, `portal-labels.ts` | harden |
 | Done (pass 3: `intlLocale()`; the page counter and badge format through it) | Numbers rely on the engine's default numbering system for "ar". Pin one system (e.g. `-u-nu-latn`, per the Western-digits default) in `plural()`, dates and money. The page counter and filter badge are raw numbers. | I18N, RB | `portal-labels.ts`, `CaseQueue.tsx` | harden |
 | Done | Done in Phase 6 polish: pressed state has a petrol ring; toggle, Clear all and row/bulk/pager buttons are 44px. | PM | `CaseQueue.tsx` | polish |
 | Done (pass 3, same fix) | Search and sort fields have no focus outline (`.field:focus { outline: 0 }`, halo about 1.2:1). This is global and duplicates the patient-proposal item. | PM | `app/globals.css` | polish |
-| P3 | `categoryLabel` and `statusLabel` props are now partly redundant with the context. `waiting` and `priority` mix enum keys with UI keys (nest them). Build `buildWorkCopy(locale)` once for the page and the tests. Cache `Intl` objects. Use React 19 `use()`. Add a placeholder-parity test. | RB | `CaseQueue.tsx`, `portal-labels.ts`, `page.tsx`, `test-copy.tsx` | distill |
-| P3 | JourneyPulse and FullJourneyDialog still carry inline `ar ? …` strings (Journey, phases, View full journey), and the timeline note lacks `dir="auto"`. | RB, WG, I18N | `JourneySnapshot.tsx` | clarify |
 | Done | Done in Phase 6 polish: copy is announced, the chip remove names its value, the pager reads "Page {page} of {pages}", no zero count beside an empty state, no empty grid subtitle. | WG, RB | `CaseQueue.tsx`, `MyWork.tsx` | harden |
 | Done | Done in Phase 6 polish: the label is 13px (0.8125rem). | WG | `CurrentAction.tsx` | typeset |
-| P3 | Queue tab `tabIndex` follows a stale `focused` value after blur. Date chips show ISO dates. Country names stay in English. `FilterSelect` sorts by code, not by the localised label. | I18N | `CaseQueue.tsx` | harden |
-| P3 | Arabic wording (pending native review):<br>• "الشروط المالية" vs "الشروط التجارية";<br>• "تعيين قسم المالية";<br>• "تقديم الرأي الطبي الثاني" in `currentAction.work`;<br>• feminine priority adjectives;<br>• "تمّت تسوية الوديعة";<br>• the «إجراءات إضافية» label vs the "المزيد" button (also English "More actions" vs "More");<br>• "عملي" → "مهامي";<br>• the date-filter fragments;<br>• "حالة الطلب" → "وضع الحالة";<br>• consistent shadda on منسّق.<br>English: one term for "no coordinator yet". | I18N, WG | `messages/*.json`, `Portal.tsx` | clarify |
-| P3 | `ConsultantRouting`: "No eligible consultant is available…" is lowercase and still a dead end (see the P2 above). | WG (screenshot) | `ConsultantRouting.tsx` | clarify |
 
 ## Portal re-critique (Phase 6, 2026-10-08) — new and re-ranked items
 
@@ -289,8 +252,6 @@ Source: `.impeccable/critique/2026-10-07T21-50-23Z__frontend-src-components-port
 | Done (pass 2) | My Care is five boxed cards and never names the patient. A representative ("Care for: [name]") is invisible, and the avatar reads "ME". | Re-critique A | `MyCare.tsx`, `PatientNav.tsx` | layout |
 | Done (pass 2; phone sheet, unframed terms) | Proposal drawer: the sticky header and the embedded deposit-terms box count as nested surfaces. The open drawer has a 1px border with a wide shadow. On phones it is a centred modal, not a full-height sheet. | Re-critique B, A | `Portal.tsx` `CaseDrawer`, `CoordinationDepositTerms.tsx` | polish / adapt |
 | Closed (D3, 2026-10-09: price first stays) | The drawer leads with the price, and the label says "recommended services" even when there is no recommendation. Consider the Consultant's recommendation first ("understanding before commitment"). | Re-critique A | `PatientProposal.tsx` | shape |
-| P2 | The deposit terms are badged "Pending legal review" but state concrete refund promises (F2 is open). This is a truthfulness tension for legal. | Re-critique A | `lib/commercial-terms.ts` | — (legal) |
-| P3 | AR "العرض" (My Care) vs "مقترحك" (drawer); the estimate card says "your treating doctor" where the drawer says "Consultant"; no WhatsApp route in My Care; the coordinator lead isn't labelled as a lead. | Re-critique A | `MyCare.tsx`, `messages/*.json`, `Portal.tsx` | clarify |
 
 ## Staff home — deferred review findings (`/redesign-area` run 3, pass 2, 2026-10-08)
 
@@ -324,15 +285,7 @@ These were fixed in the run:
 | Done (pass 3: `intlLocale()` in the portal, secure links and activation; Arabic few/many test) | Pin Western digits (`-u-nu-latn`) in `plural()` and the nav count. This is the existing numbering-system item, and this run adds more call sites. Add an Arabic test for a few/many count. | I18N | `lib/portal-labels.ts`, `StaffNav.tsx` | harden |
 | Done (Batch 2: polite sr-only status with the counts in words) | The count line has no live region, so screen-reader users miss updates when counts arrive or change. | WG | `RoleDashboardSummary.tsx` | harden |
 | Done (pass 3: focus moves to the view's visible heading; also after My dashboard) | Picking a view from inside a case keeps focus on the header nav. Move it to the view's `<h2>`. | WG | `Portal.tsx` | harden |
-| P3 | A failed eligible-consultants load reads as "nobody eligible" with routing advice. Give it its own error state. | RB | `ConsultantRouting.tsx` | harden |
-| P3 | "Assign Consultant" is disabled with no reason until a Consultant is picked. Use an inline "Choose a Consultant" error, or a described-by hint. | WG | `CoordinatorActions.tsx` | harden |
 | Done (Batch 2) | Row actions in My work are all named "Open"/"Review assignment" (the title is only a description). Add the title as an sr-only part of the name. | WG | `MyWork.tsx` | clarify |
-| P3 | `{area}` is interpolated as plain text, so a Latin fallback name can't be wrapped in `<bdi>` on Arabic pages. | I18N | `CoordinatorActions.tsx` | adapt |
-| P3 | Memoise `staffViewItems` and pass the counts down instead of re-filtering in `RoleDashboardSummary`. | RB | `Portal.tsx`, `RoleDashboardSummary.tsx` | optimize |
-| P3 | `FooterSwitch` serialises both footers into every RSC payload. A portal route-group layout would avoid it. Acceptable for now. | RB | `app/[locale]/layout.tsx` | optimize |
-| P3 | The Arabic footer shows the Latin brand, and the "© {year} {brand}" order is fixed in code. Add an Arabic brand string and a copyright template. | I18N | `PortalFooter.tsx`, `messages/*.json` | clarify |
-| P3 | Arabic (pending native review): the spelling of "منسّق" vs "منسق" is mixed across portalWork. | I18N | `messages/ar.json` | clarify |
-| P3 | The "Current action" kicker above the panel heading (an Impeccable ban, pre-existing). | Impeccable | `CurrentAction.tsx` | typeset |
 
 ## Arabic proposal decision — deferred review findings (pass 2 build, 2026-10-08)
 
@@ -358,13 +311,7 @@ These were fixed in the build:
 | Done (pass 3, legal L3 still open) | "Representative" means the submitting contact (`case_submission_contacts.contact_role`), not an authorised `PATIENT_REPRESENTATIVE` link, and no representative id is stored. Now: exactly one in-force link is required and its subject is stored (V75). | AUTH | `ProposalAssistanceService` | harden |
 | Done (pass 3 follow-up: authorised representatives on the coordinator's workspace; one is named in the choice, several need a pick, none leaves only the patient) | The staff "Confirmed by → Representative" option shows even when the patient has no authorised representative (the server refuses), and with two representatives the record cannot name one (`REPRESENTATIVE_AMBIGUOUS`). Expose the authorised representatives on the workspace and let the coordinator pick. | Pass 3 | `RecordProposalDecision.tsx`, `ProposalAssistanceService` | harden |
 | Done (pass 3: the assisted path starts with the coordinator conversation) | Arabic secure link: the numbered "what happens next" list still starts with "acknowledge this estimate". | Build review | `ProposalSign.tsx` | clarify |
-| P2 | Activation's deposit-terms consent on `/ar` is unchanged, pending legal L2. | Plan O1 | `ProfileActivation.tsx` | — |
-| P3 | `englishHref` opens the English case without the proposal drawer. Add a deep link that opens it. | WG | `Portal.tsx` | harden |
 | Done (Batch 1: a skipped overlapping call resolves to `null`, a failure to `undefined`; failure messages check `=== undefined`) | Portal `mutate` returns `undefined` both for a failure and for a skipped overlapping call, so "failed" can show while the first request succeeds. | RB | `Portal.tsx` | harden |
-| P3 | Every `proposal(versionId)` read now also loads the assistance facts and a staff name. Compute them only where they are returned. | AUTH | `ProposalQueryService` | optimize |
-| P3 | The staff form's Note label doesn't say it becomes required for Request changes. The time field has no `min` (release time) on the client, though the server enforces it. | WG, RB | `RecordProposalDecision.tsx` | clarify |
-| P3 | The quiet links' resting underline uses `line-strong` (1.66:1). It is the cue beside near-identical text colours. Consider `decoration-current`. | PM | `PatientProposal.tsx`, `ProposalSign.tsx` | polish |
-| P3 | The "requested" line names no channel ("You will hear from …"). Interpolate the patient's actual contact channel once the backend exposes it. | I18N | `messages/*.json` | clarify |
 
 ## Pass 2 follow-ups — deferred review findings (autonomous run, 2026-10-08)
 
@@ -374,7 +321,6 @@ One independent read-only review ran over `a9eee09`…`ed57af3`. Fixed in `fix(p
 |---|---|---|---|---|
 | Done (pass 3) | "Care for …" uses an account-level rule (PATIENT_REPRESENTATIVE without PATIENT). A person with their own record who also acts for a relative sees the relative's case under the bare name. Now from `actions.viewer` per case. | Review | `Portal.tsx`, backend workspace view | harden |
 | Done (pass 3: unsent-text guard + in-page dialog on every exit, `beforeunload`) | Leaving the case ("My dashboard") still discards typed drafts. Add a dirty-form warning. | Plan | `Portal.tsx` | harden |
-| P3 | The overview and clinical tabs stay mounted, so a Consultant's referral and eligibility reads run on every case open. Mount the clinical tab on its first visit and keep it mounted afterwards. | Review | `Portal.tsx` | optimize |
 | Done (pass 3 follow-up) | A full patient/staff module split of `Portal.tsx` (role panels are lazy now). | RB | `Portal.tsx` | optimize |
 | Duplicate of the P3 under "Arabic proposal decision" | `mutate` returns the same value for a failure and for a call skipped while another runs. | RB | `Portal.tsx` | harden |
 
@@ -393,10 +339,6 @@ a text-arrow glyph; 36px View proposal and 32px View full journey; feminine Arab
 |---|---|---|---|---|
 | Done (pass 3 follow-up: `portalWork.plural.services`) | The services count is a raw template (`${services} خدمات`): wrong Arabic for 2 and 11+. Add `portalWork.plural.services`. | I18N | `Portal.tsx` | clarify |
 | Done (pass 3 follow-up: isolated name; timeline actor in `<bdi>`) | `t.handoff.replace("{name}", …)` puts a Latin Consultant name into Arabic without isolation; the timeline's `· {actorName}` likewise. | I18N | `Portal.tsx`, `JourneySnapshot.tsx` | adapt |
-| P3 | An action in the same panel rebaselines the whole panel (outermost form/section/dialog), so text typed beside a different successful action in that panel stops counting as unsent. Messages typed in the staff Messages drawer are still lost when the drawer closes (pre-existing). | Build | `LeaveCaseGuard.tsx`, `Portal.tsx` | harden |
-| P3 | Opening case B from inside case A (bell, My work, other cases) replaces the entry, so Back from B returns to the view, not to A. Intended for now. | RB | `Portal.tsx` | — |
-| P3 | `LeaveCaseDialog` opens on mount only; any future path that swaps the pending exit without an unmount would leave it closed. Key it per request if such a path appears. | RB | `LeaveCaseGuard.tsx` | harden |
-| P3 | Arabic: منسّق vs منسق mixed across portalWork; `PROPOSAL_TERMS_CALL` says «المقترح» where siblings say «العرض» and its context is masculine. Pending native review. | I18N | `messages/ar.json` | clarify |
 | Done (pass 3 follow-up: `portalWork.proposalVersion`, Intl unit file sizes) | A Latin "v{versionNumber}" in the Arabic proposal summary; `formatBytes` uses `toFixed` and English KB/MB. | I18N | `Portal.tsx` | clarify |
 
 ## Batch 2 — deferred review findings (2026-10-09)
@@ -406,13 +348,6 @@ audit/harden + the detector, 0 findings) reviewed the Batch 2 diff. No P0–P2. 
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P3 | The danger tone's icon is the Control Center's `XCircle`, which reads as "failed/cancelled" on an Overdue or Urgent badge. Consider an alert icon for danger in both `StatusBadge`s together. | Impeccable | `StatusBadge.tsx`, `cc-ui.tsx` | polish |
-| P3 | In the staff Messages drawer the thread's own "Secure messages" h2 repeats the drawer title. | WG | `CaseMessages.tsx`, `StaffCaseView.tsx` | distill |
-| P3 | If the case enters the Consultant phase while focus is inside the locked actions, `inert` drops focus to the page. | WG | `portal-ui.tsx` `LockedSection` | harden |
-| P3 | The Consultant review's "needs finance" rows are still bordered, tinted list items inside the card. | Impeccable | `ClinicalReview.tsx` | distill |
-| P3 | `CaseMessages` builds a date formatter per message; `UnreadCount` a number formatter per render. | RB | `CaseMessages.tsx`, `portal-ui.tsx` | optimize |
-| P3 | Seen in the Batch 2 screenshots, older than it: the staff proposal summary shows the raw status ("RELEASED") beside the version in both locales. | Impeccable | `StaffCaseView.tsx` `ProposalSummary` | clarify |
-| P3 | Web guidelines prefer a submit that stays enabled; the proposal primary stays disabled until the box is ticked (approved at GATE 3) and now says why in visible text. | WG | `PatientProposal.tsx` | — (design decision) |
 
 ## Batch 3 — deferred review findings (2026-10-09)
 
@@ -420,7 +355,99 @@ The four skills reviewed the Batch 3 diff (Impeccable detector: 0 findings). No 
 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
-| P3 | The travel section numbers its services 01–04 on a connector line, which reads as a fifth sequence; they are not steps. | Impeccable | `components/home/TravelServices.tsx` | distill |
-| P3 | Dead code: `SupportBand.tsx` and `home.steps` (an old five-step model) are never rendered. | RB | `components/home/SupportBand.tsx`, `messages/*.json` | distill |
-| P3 | The home journey heading "What happens after you send your case" sits above a first stage that includes sending it. | Impeccable | `messages/*.json` (`home.howTitle`) | clarify |
-| P3 | The new Arabic stage, coordinator and cost copy uses masculine second person like the rest of the site. Pending native review. | I18N | `messages/ar.json` | clarify |
+
+## Blocked on a decision or approval (Close, 2026-10-09)
+
+Open only because a named owner has not decided. Nothing here is worked until that decision exists.
+
+| Sev | Item | Area | Source | Files | Waiting on |
+|---|---|---|---|---|---|
+| P3 | Two confirmation styles (Batch 1a review, Impeccable "modal as first thought" / consistent affordances): staff actions confirm in a `ConfirmDialog`, the patient drawer's Decline asks again in place. Decide one pattern. | Performance and code structure | Batch 1a review | `portal-ui.tsx`, `PatientProposal.tsx` | Owner design decision |
+| P2 | The deposit terms are badged "Pending legal review" but state concrete refund promises (F2 is open). This is a truthfulness tension for legal. | Portal re-critique | Re-critique A | `lib/commercial-terms.ts` | Legal F2 (refund terms) |
+| P2 | Activation's deposit-terms consent on `/ar` is unchanged, pending legal L2. | Arabic proposal decision — deferred review findings | Plan O1 | `ProfileActivation.tsx` | Legal L2 |
+| Owner decision | Whether sending a case or the Consultant review costs anything, and the words for it near "No commitment to start". The site is silent today; the Close re-critique (public A) raised it with the upload reassurance P1. Not invented. | Public site — pages and form | Close re-critique A | `messages/*.json` (home, form) | Owner (business) |
+| Known limitation (D1) | Journey-bound cases: a proposal decision does not complete the journey runtime's `REVIEW_PROPOSAL` action. A precondition for turning journey admission on. | Arabic proposal decision | AUTH | `JourneyService`, `ReviewProposalActionHandler` | Owner, before journey admission goes live |
+| Launch blocker | Approved Arabic deposit, refund and cancellation terms (`ARABIC_TERMS_APPROVED`), and the native Arabic review of all `portalWork`, proposal and public copy. | All | Legal, native review | `lib/commercial-terms.ts`, `messages/ar.json` | Legal L1–L5, native Arabic reviewer |
+
+## Post-launch (Close, 2026-10-09)
+
+Every open P3 from the sections above, moved here at the close of the redesign epic (finish plan). They are worked after launch, not before. "Area" is the section the item came from.
+
+| Sev | Item | Area | Source | Files | Command |
+|---|---|---|---|---|---|
+| P3 | No keyboard shortcuts or saved views for coordinators. | Staff home and shell | PC | `CaseQueue.tsx` | shape |
+| P3 | The finance home is only an empty state plus one link. | Staff home and shell | PC | `Portal.tsx` | onboard |
+| P3 | On phones, coordinator rows put a lone checkbox above the case name. | Staff home and shell | PC | `CaseQueue.tsx` | adapt |
+| P3 | The tab list wraps onto two rows on phones in Arabic (Consultant view). | Portal system drift | PC | `Portal.tsx` | adapt |
+| P3 | Message timestamps use short US format. | Portal system drift | PC | `CaseMessages.tsx` | clarify |
+| P3 | Currency is shown three ways ("$US 4,850.00", "4,850 US$", "$4,850"). | Portal system drift | PC | `MyCare.tsx`, `Portal.tsx` | clarify |
+| P3 | Latin initials and country names appear on Arabic pages. | Portal system drift | PC | `MyCare.tsx`, `Portal.tsx` | harden |
+| P3 | Every portal view has the same page title, "RehletShifaa". | Portal system drift | PC (detector) | `app/[locale]/portal/page.tsx` | harden |
+| P3 | Title Case headings ("Send Your Medical Case", "Your Case Has Been Received"). | Public site — pages and form | SC | `messages/*.json` | clarify |
+| P3 | Consultant cards: "Professional distinction" repeats the job title; the CV qualifiers are inconsistent; a Germany-based Consultant has no explanation. | Public site — pages and form | SC | `lib/consultants.ts`, `lib/attached-consultants.ts` | clarify |
+| P3 | `CarePathways.tsx:58` "View all care areas" fires the `send_case_cta_clicked` analytics event. | Public site — pages and form | SC | `components/home/CarePathways.tsx` | harden |
+| P3 | No Track case link in the footer. | Public site — pages and form | SC | `components/Footer.tsx` | clarify |
+| P3 | 12px phone gutters, and text touches the viewport edge in 21 places. | Public site — pages and form | SC (detector) | `app/globals.css` `.container-site` | adapt |
+| P3 | Every page logs a CSP error blocking the Cloudflare Insights beacon (site config). | Public site — pages and form | SC | `next.config.ts` | — |
+| P3 | Every action shows the generic "Saved successfully"; "Retry" only reloads the queue; the copy-link failure is silent; the completion note closes before its result is known. | Feedback, focus and state | WG | `Portal.tsx:184/212/681`, `CurrentAction.tsx:78` | clarify |
+| P3 | Popovers with `role="dialog"` don't move focus. The result-count live region re-announces on every keystroke. Smooth scroll ignores reduced motion. "✓/♥" glyphs are read aloud. No new-tab notice. | Accessibility and semantics | AU, WG | `CaseQueue.tsx:164/223`, `NotificationBell.tsx:79`, `Portal.tsx:194/336`, `PortalAccount.tsx:95` | harden |
+| P3 | Dates without a year; raw FX rate and ISO date; hard-coded "KB/MB"; English "Bank" placeholder and English error fallbacks in the Arabic UI; the wrong-account case detected by an English regex; Arabic IME Enter not guarded. | RTL, i18n and formatting | WG, AU | `CaseQueue.tsx:286`, `Portal.tsx:665/727/764`, `PortalDirectories.tsx:10`, `AccountLinkRequest.tsx:68`, `RequestInformationDialog.tsx:132` | clarify |
+| P3 (rest of a partly-done item) | A filled petrol "Open" on every queue row and work card (up to 12 per page) breaks the One Action rule. | Design-system drift | AU | `CaseQueue.tsx:256`, `MyWork.tsx:87` | quieter |
+| P3 | `PortalFrame` uses a gradient with a hard-coded `#fff`; old-palette `rgba(28,51,58)` shadows; `shadow-xl`/`rounded-2xl` popovers. | Design-system drift | AU | `Portal.tsx:236`, `CurrentAction.tsx:43`, `PortalAccount.tsx:49`, `NotificationBell.tsx:80`, `CaseQueue.tsx:165` | polish |
+| P3 | `CaseWorkspace` context is one flat object; the composition skill's `{state, actions, meta}` interface pays off only with a second provider. | Performance and code structure | Batch 1a review | `StaffCaseView.tsx` | — |
+| P2 — accepted as post-launch (owner, 2026-10-09) | Browser coverage gap (Batch 0): the e2e specs for access governance, credential reviews and "Staff & teams" tested screens removed in `19a970c` and were deleted (owner). The current Teams, People and governance pages have unit tests but no Playwright spec. | Performance and code structure | Batch 0 | `e2e/` | harden |
+| P3 | The hidden queue re-renders under the workspace; formatters are rebuilt on every render; polling continues in hidden tabs; both locales' copy ships to the client; dead code (`PatientStatusCard`, `PATIENT_JOURNEY` and `TaskActions` removed in pass 2; a no-op `Panel wide` and the MyCare timeline no-op remain). | Performance and code structure | RB, WG, AU | `Portal.tsx`, `NotificationBell.tsx:41`, `CaseMessages.tsx:29`, `MyCare.tsx:235` | distill |
+| P3 | Fixed section ids and a region landmark per section; an unnamed fieldset group around the read-only document; an inline `mutate` wrapper (use `onDecided`); formatters rebuilt per item. | Patient proposal — deferred review findings | RB | `PatientProposal.tsx`, `Portal.tsx` | distill |
+| P3 | A typed note is lost on Esc or close without a warning. | Patient proposal — deferred review findings | WG | `PatientProposal.tsx` | harden |
+| P3 | Decimals vary per amount within one document ("$4,850" beside "$120.50"). | Patient proposal — deferred review findings | WG | `PatientProposal.tsx` | clarify |
+| P3 | "Ready for your decision" (drawer) vs "Ready to review" (My Care card): use one phrase. Buttons mix "&" and "and". | Patient proposal — deferred review findings | WG | `messages/*.json`, `MyCare.tsx` | clarify |
+| P3 | The quote's `paymentTitle` is a bold `<p>`, not a heading. The three decision buttons wrap unevenly. | Patient proposal — deferred review findings | WG | `PatientProposal.tsx` | layout |
+| P3 | `CoordinationDepositTerms`: a 12px-radius card with `bg-white` inside the disclosure, one-off type sizes (0.82–0.95rem), and a small, low-contrast Arabic notice (0.82rem, ink-600). | Patient proposal — deferred review findings | WG, I18N | `components/CoordinationDepositTerms.tsx` | polish |
+| P3 | Arabic: masculine address throughout (use neutral phrasing where cheap); "عرض" alone is ambiguous (offer vs display); `{count}` is not formatted with Intl. All pending native review. | Patient proposal — deferred review findings | I18N | `messages/ar.json`, `PatientProposal.tsx` | clarify |
+| P3 (rest of a partly-done item) | Work still worded only in English: `ConsultantReferralService` (transfer / second-opinion offers and confirmations), `CaseHandoffService` (deposit, travel), `AssignmentEngine` (coordinator routing), the journey-runtime action handlers (node labels), staff notifications (`NotificationView`) and `waitingReason` ("Waiting for the patient: …"). Give each a `WorkCopy` code. | Staff work views — deferred review findings | Pass 3 | backend services above; `NotificationBell.tsx`, `Portal.tsx` | harden |
+| P3 | `categoryLabel` and `statusLabel` props are now partly redundant with the context. `waiting` and `priority` mix enum keys with UI keys (nest them). Build `buildWorkCopy(locale)` once for the page and the tests. Cache `Intl` objects. Use React 19 `use()`. Add a placeholder-parity test. | Staff work views — deferred review findings | RB | `CaseQueue.tsx`, `portal-labels.ts`, `page.tsx`, `test-copy.tsx` | distill |
+| P3 | JourneyPulse and FullJourneyDialog still carry inline `ar ? …` strings (Journey, phases, View full journey), and the timeline note lacks `dir="auto"`. | Staff work views — deferred review findings | RB, WG, I18N | `JourneySnapshot.tsx` | clarify |
+| P3 | Queue tab `tabIndex` follows a stale `focused` value after blur. Date chips show ISO dates. Country names stay in English. `FilterSelect` sorts by code, not by the localised label. | Staff work views — deferred review findings | I18N | `CaseQueue.tsx` | harden |
+| P3 | Arabic wording (pending native review):<br>• "الشروط المالية" vs "الشروط التجارية";<br>• "تعيين قسم المالية";<br>• "تقديم الرأي الطبي الثاني" in `currentAction.work`;<br>• feminine priority adjectives;<br>• "تمّت تسوية الوديعة";<br>• the «إجراءات إضافية» label vs the "المزيد" button (also English "More actions" vs "More");<br>• "عملي" → "مهامي";<br>• the date-filter fragments;<br>• "حالة الطلب" → "وضع الحالة";<br>• consistent shadda on منسّق.<br>English: one term for "no coordinator yet". | Staff work views — deferred review findings | I18N, WG | `messages/*.json`, `Portal.tsx` | clarify |
+| P3 | `ConsultantRouting`: "No eligible consultant is available…" is lowercase and still a dead end (see the P2 above). | Staff work views — deferred review findings | WG (screenshot) | `ConsultantRouting.tsx` | clarify |
+| P3 | AR "العرض" (My Care) vs "مقترحك" (drawer); the estimate card says "your treating doctor" where the drawer says "Consultant"; no WhatsApp route in My Care; the coordinator lead isn't labelled as a lead. | Portal re-critique | Re-critique A | `MyCare.tsx`, `messages/*.json`, `Portal.tsx` | clarify |
+| P3 | A failed eligible-consultants load reads as "nobody eligible" with routing advice. Give it its own error state. | Staff home — deferred review findings | RB | `ConsultantRouting.tsx` | harden |
+| P3 | "Assign Consultant" is disabled with no reason until a Consultant is picked. Use an inline "Choose a Consultant" error, or a described-by hint. | Staff home — deferred review findings | WG | `CoordinatorActions.tsx` | harden |
+| P3 | `{area}` is interpolated as plain text, so a Latin fallback name can't be wrapped in `<bdi>` on Arabic pages. | Staff home — deferred review findings | I18N | `CoordinatorActions.tsx` | adapt |
+| P3 | Memoise `staffViewItems` and pass the counts down instead of re-filtering in `RoleDashboardSummary`. | Staff home — deferred review findings | RB | `Portal.tsx`, `RoleDashboardSummary.tsx` | optimize |
+| P3 | `FooterSwitch` serialises both footers into every RSC payload. A portal route-group layout would avoid it. Acceptable for now. | Staff home — deferred review findings | RB | `app/[locale]/layout.tsx` | optimize |
+| P3 | The Arabic footer shows the Latin brand, and the "© {year} {brand}" order is fixed in code. Add an Arabic brand string and a copyright template. | Staff home — deferred review findings | I18N | `PortalFooter.tsx`, `messages/*.json` | clarify |
+| P3 | Arabic (pending native review): the spelling of "منسّق" vs "منسق" is mixed across portalWork. | Staff home — deferred review findings | I18N | `messages/ar.json` | clarify |
+| P3 | The "Current action" kicker above the panel heading (an Impeccable ban, pre-existing). | Staff home — deferred review findings | Impeccable | `CurrentAction.tsx` | typeset |
+| P3 | `englishHref` opens the English case without the proposal drawer. Add a deep link that opens it. | Arabic proposal decision — deferred review findings | WG | `Portal.tsx` | harden |
+| P3 | Every `proposal(versionId)` read now also loads the assistance facts and a staff name. Compute them only where they are returned. | Arabic proposal decision — deferred review findings | AUTH | `ProposalQueryService` | optimize |
+| P3 | The staff form's Note label doesn't say it becomes required for Request changes. The time field has no `min` (release time) on the client, though the server enforces it. | Arabic proposal decision — deferred review findings | WG, RB | `RecordProposalDecision.tsx` | clarify |
+| P3 | The quiet links' resting underline uses `line-strong` (1.66:1). It is the cue beside near-identical text colours. Consider `decoration-current`. | Arabic proposal decision — deferred review findings | PM | `PatientProposal.tsx`, `ProposalSign.tsx` | polish |
+| P3 | The "requested" line names no channel ("You will hear from …"). Interpolate the patient's actual contact channel once the backend exposes it. | Arabic proposal decision — deferred review findings | I18N | `messages/*.json` | clarify |
+| P3 | The overview and clinical tabs stay mounted, so a Consultant's referral and eligibility reads run on every case open. Mount the clinical tab on its first visit and keep it mounted afterwards. | Pass 2 follow-ups — deferred review findings | Review | `Portal.tsx` | optimize |
+| P3 | An action in the same panel rebaselines the whole panel (outermost form/section/dialog), so text typed beside a different successful action in that panel stops counting as unsent. Messages typed in the staff Messages drawer are still lost when the drawer closes (pre-existing). | Portal P2s — deferred review findings | Build | `LeaveCaseGuard.tsx`, `Portal.tsx` | harden |
+| P3 | Opening case B from inside case A (bell, My work, other cases) replaces the entry, so Back from B returns to the view, not to A. Intended for now. | Portal P2s — deferred review findings | RB | `Portal.tsx` | — |
+| P3 | `LeaveCaseDialog` opens on mount only; any future path that swaps the pending exit without an unmount would leave it closed. Key it per request if such a path appears. | Portal P2s — deferred review findings | RB | `LeaveCaseGuard.tsx` | harden |
+| P3 | Arabic: منسّق vs منسق mixed across portalWork; `PROPOSAL_TERMS_CALL` says «المقترح» where siblings say «العرض» and its context is masculine. Pending native review. | Portal P2s — deferred review findings | I18N | `messages/ar.json` | clarify |
+| P3 | The danger tone's icon is the Control Center's `XCircle`, which reads as "failed/cancelled" on an Overdue or Urgent badge. Consider an alert icon for danger in both `StatusBadge`s together. | Batch 2 — deferred review findings | Impeccable | `StatusBadge.tsx`, `cc-ui.tsx` | polish |
+| P3 | In the staff Messages drawer the thread's own "Secure messages" h2 repeats the drawer title. | Batch 2 — deferred review findings | WG | `CaseMessages.tsx`, `StaffCaseView.tsx` | distill |
+| P3 | If the case enters the Consultant phase while focus is inside the locked actions, `inert` drops focus to the page. | Batch 2 — deferred review findings | WG | `portal-ui.tsx` `LockedSection` | harden |
+| P3 | The Consultant review's "needs finance" rows are still bordered, tinted list items inside the card. | Batch 2 — deferred review findings | Impeccable | `ClinicalReview.tsx` | distill |
+| P3 | `CaseMessages` builds a date formatter per message; `UnreadCount` a number formatter per render. | Batch 2 — deferred review findings | RB | `CaseMessages.tsx`, `portal-ui.tsx` | optimize |
+| P3 | Seen in the Batch 2 screenshots, older than it: the staff proposal summary shows the raw status ("RELEASED") beside the version in both locales. | Batch 2 — deferred review findings | Impeccable | `StaffCaseView.tsx` `ProposalSummary` | clarify |
+| P3 | Web guidelines prefer a submit that stays enabled; the proposal primary stays disabled until the box is ticked (approved at GATE 3) and now says why in visible text. | Batch 2 — deferred review findings | WG | `PatientProposal.tsx` | — (design decision) |
+| P3 | The travel section numbers its services 01–04 on a connector line, which reads as a fifth sequence; they are not steps. | Batch 3 — deferred review findings | Impeccable | `components/home/TravelServices.tsx` | distill |
+| P3 | Dead code: `SupportBand.tsx` and `home.steps` (an old five-step model) are never rendered. | Batch 3 — deferred review findings | RB | `components/home/SupportBand.tsx`, `messages/*.json` | distill |
+| P3 | The home journey heading "What happens after you send your case" sits above a first stage that includes sending it. | Batch 3 — deferred review findings | Impeccable | `messages/*.json` (`home.howTitle`) | clarify |
+| P3 | The new Arabic stage, coordinator and cost copy uses masculine second person like the rest of the site. Pending native review. | Batch 3 — deferred review findings | I18N | `messages/ar.json` | clarify |
+| P3 (rest of a partly-done item) | Composition: 27 `useState` hooks in Portal, 26 props into `WorkspaceView`, 8 boolean dialog flags. Introduce a `CaseWorkspaceProvider`, split the patient and staff views, and use one dialog union state. Left after pass 4: pass 4: patient/staff views split in pass 3; the staff case page's nine dialog/drawer flags are one `CaseOverlay` union; `CaseWorkspaceProvider` gives ProposalSummary, CoordinatorBrief, CaseActivity, ProposalSendForm, ProposalShareLinks, FinalAssessment, FinalQuoteActions, DepositCard, DeliveryCard and ProposalCard the locale, copy, role, case, busy, mutate, FX rates, catalogue and viewer. Left: `RoleActions` keeps explicit props because `AuthoritativeActions.test.tsx` renders it alone; the separate case modules (ClinicalReviewPanel, CaseMessages, CoordinatorActionForm, MoreActions, …) still take locale/busy/mutate as props; the Portal shell's own ~28 `useState` hooks are untouched | Performance and code structure | RB | `Portal.tsx:276/323`, `StaffCaseView.tsx` | — |
+| P2 | Staff case page: the H1 is the role, not the case; the waiting party is stated three times; a blocked state (no eligible Consultant) has advice but no action; header buttons are 40px. | Close re-critique — portal | Portal A | `StaffCaseView.tsx` | layout |
+| P2 | Queue for daily power use: the sort select reads as a filter (label is sr-only); copy-case-number feedback is not announced and failures are silent; no next-case route; "My dashboard" names no nav item. | Close re-critique — portal | Portal A | `CaseQueue.tsx`, `Portal.tsx` | polish |
+| P2 | An Arabic-first family lands in English: `/` always redirects to `/en`; on phones the language switch is inside the menu. | Close re-critique — public | Public A | `app/page.tsx`, `nav/MobileNav.tsx` | adapt |
+| P2 | Repeated "Send my case": three in `main` on the desktop home page (hero, journey, closing panel) and four on phones with the sticky bar, against the one-route rule. | Close re-critique — public | Public A, B | `home/*`, `JourneyFilm.tsx`, `CtaPanel`, `MobileCaseBar.tsx` | distill |
+| P2 | My Care offers only the in-portal message thread, while WhatsApp is the patient's working channel with the coordinator. | Close re-critique — portal | Portal A | `MyCare.tsx` | shape |
+| P3 | Portal visual layer stops short of the DESIGN.md signatures (coral eyebrow rule, file-tab top edge, numbered journey markers); the eyebrow tracking is 0.1em vs 0.12em in DESIGN.md. | Close re-critique — portal | Portal A, B | `MyCare.tsx`, `globals.css` `.label-micro` | polish |
+| P3 | Portal minor: My Care H1 repeats the nav tab; patient and staff journeys name the same stages differently; two language fields in the profile; numeric message timestamps; two unread-count styles; staff free text without `dir="auto"` in the Arabic brief; US-order date-time in the record-decision form; truncated profile values. | Close re-critique — portal | Portal A | portal components | polish |
+| P3 | Public minor: PageHero "mist" glow on Send my case; Track case uses off-family radii and shadows; 11px avatar initials and 11.2px diagram chips; 36px desktop language switch; footer notice ~110 characters per line; hero card accent border on a rounded card; duplicate headings on Care areas and /cardiology; the plastic-surgery icon reads as face ID; skeleton-bar mock on /consultants; the mobile care wheel is icons only; no Track case in the footer. | Close re-critique — public | Public A, B | public components | polish |
+| P3 | Phone helper text at 12px on Send my case; the phone code is not prefilled from the chosen country; track-case placeholders look like filled values. | Close re-critique — public | Public A | `CaseForm.tsx`, `TrackCaseLanding.tsx` | harden |
+| P3 | The remaining Consultant CV vocabulary (EBAC, FEBIC, Dr. med., EDiNR) and Latin monograms on Arabic pages; the "Checked against official sources" wording should be confirmed true for all 13 profiles. | Close re-critique — public | Public A | `lib/consultants.ts`, `lib/attached-consultants.ts` | clarify |

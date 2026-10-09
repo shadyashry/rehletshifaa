@@ -10,8 +10,8 @@ type Labels = { trigger: string; heading: string; signIn: string; signInBody: st
 
 /**
  * "My case": the two existing-patient destinations grouped behind one quiet control — Sign in (activated
- * account) and Check case status (Case ID + WhatsApp) — each with the one line that tells a patient which
- * is theirs. Outlined, never a second primary action beside "Start my case".
+ * account) and Track case (case number + WhatsApp) — each with the one line that tells a patient which
+ * is theirs. Outlined, never a second primary action beside "Send my case".
  */
 export function AccountMenu({ labels, signInHref, statusHref }: { labels: Labels; signInHref: string; statusHref: string }) {
   const panelId = useId();

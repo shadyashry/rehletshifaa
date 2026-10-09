@@ -14,7 +14,7 @@ const QUIET_ROUTES = /^\/[a-z]{2}\/(send-my-case|portal|proposal|activate|status
 const REVEAL_AFTER = 560;
 
 /**
- * Phones only: once the reader has scrolled past the opening screen, "Start my case" stays one thumb away at the
+ * Phones only: once the reader has scrolled past the opening screen, "Send my case" stays one thumb away at the
  * bottom of the screen, with the reassurance that starting commits to nothing. It steps aside when the footer is in
  * view (the page's end needs no second call) and on routes where the patient is already in a task. Respects the
  * home-indicator safe area; slides rather than pops, except for reduced motion.
