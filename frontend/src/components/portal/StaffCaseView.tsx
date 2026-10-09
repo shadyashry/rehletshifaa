@@ -1,7 +1,7 @@
 "use client";
 
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
-import { useState } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, MessageSquare, MoreHorizontal } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
@@ -33,12 +33,37 @@ const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatien
 export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];staff:StaffMember[];catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
 
 /**
+ * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
+ * `StaffCaseView` so the proposal, deposit, delivery and assessment pieces stop taking the same props one by one.
+ */
+type CaseWorkspace={locale:Locale;t:typeof copy.en;role:RoleKey;c:CaseView;busy:boolean;mutate:Mutate;fxRates:FxRate[];catalog:CatalogService[];mySubject?:string};
+const CaseWorkspaceContext=createContext<CaseWorkspace|null>(null);
+
+function CaseWorkspaceProvider({value,children}:{value:CaseWorkspace;children:ReactNode}){
+ return <CaseWorkspaceContext.Provider value={value}>{children}</CaseWorkspaceContext.Provider>;
+}
+
+function useCaseWorkspace():CaseWorkspace{
+ const workspace=useContext(CaseWorkspaceContext);
+ if(!workspace)throw new Error("useCaseWorkspace must be used inside CaseWorkspaceProvider");
+ return workspace;
+}
+
+/**
+ * The case page's drawers and dialogs. They are all modal (`showModal`), so nothing behind an open one can open another,
+ * and every "More actions" entry closes that drawer before opening its own; one value says which, if any, is open.
+ */
+type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"|"decline"|"recordResponse"|"recordDecision";
+
+/**
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
 export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
  const work=useWorkCopy();
- const c=value.caseSummary;const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
+ const c=value.caseSummary;
+ const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,mySubject]);
+ const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
  const doctorPhase=["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
  const doctorAssignment=value.assignments.find(a=>a.assigneeRole==="DOCTOR"&&!REFERRAL_ASSIGNMENTS.includes(a.assignmentType)&&(a.status==="PENDING"||a.status==="ACTIVE"));
@@ -71,8 +96,8 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
  const formCode=current.workType==="TRAVEL"?"ASSIGN_OPERATIONS":current.workType==="PROPOSAL_TERMS_CALL"?"RECORD_PROPOSAL_DECISION":REFERRAL_CONFIRM_WORK.includes(current.workType??"")?"CONFIRM_REFERRAL":current.code;
  const formAction=isCoordinator&&owned&&current.kind==="FOCUS"&&["ASSIGN_CONSULTANT","CONFIRM_REFERRAL","ASSIGN_OPERATIONS","ASSIGN_FINANCE"].includes(formCode)||(formCode==="RECORD_PROPOSAL_DECISION"&&isCoordinator&&owned&&!!value.proposal&&available.includes("RECORD_PROPOSAL_DECISION"));
  const proposalIsWork=isCoordinator&&owned&&(["PREPARE_PROPOSAL","RELEASE_PROPOSAL","WAIT_INTERNAL_APPROVAL","ASSIGN_FINANCE"].includes(current.code)||["PREPARE_PROPOSAL","PROPOSAL_REVISION"].includes(current.workType??"")||(!!approved&&!value.proposal)||c.status==="ARRIVAL_CONFIRMED");
- const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard locale={locale} t={t} proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm caseId={c.id} reviewId={approved.id} language={c.preferredLanguage} estimate={approved} fxRates={fxRates} locale={locale} t={t} busy={busy} onSend={sendProposal}/>}{isCoordinator&&share&&<ProposalShareLinks share={share} locale={locale} t={t}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} caseId={c.id} versionId={value.proposal.versionId} locale={locale} busy={busy} mutate={mutate} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions caseId={c.id} reviewId={approved?.id} proposal={value.proposal} gates={value.gates} fxRates={fxRates} locale={locale} busy={busy} mutate={mutate}/>}{value.deposit&&<DepositCard deposit={value.deposit} caseId={c.id} role={role} locale={locale} busy={busy} mutate={mutate}/>}{showActions&&<div className={dim?"pointer-events-none opacity-50":""}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} locale={locale} mutate={mutate}/></div>}</Panel>;
- const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={t.reviews}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="rounded-lg border border-line p-4"><strong>v{r.versionNumber} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 rounded-lg bg-brand-50 p-3"><p className="mb-2 text-[0.8125rem] font-bold uppercase tracking-wide text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-[0.8125rem] text-ink-600">{locale==="ar"?"عملة العرض":"Proposal currency"}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span>{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{locale==="ar"?"الأساس":"Base"} {money(e.estimatedCost,e.currency,locale)}</span>}</span></li>)}</ul></div>}</div>):<Empty/>}{isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&<FinalAssessment caseId={c.id} busy={busy} locale={locale} catalog={catalog} fxRates={fxRates} mutate={mutate}/>}</Panel>:null;
+ const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm estimate={approved} onSend={sendProposal}/>}{isCoordinator&&share&&<ProposalShareLinks share={share}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions reviewId={approved?.id} proposal={value.proposal} gates={value.gates}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}{showActions&&<div className={dim?"pointer-events-none opacity-50":""}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} locale={locale} mutate={mutate}/></div>}</Panel>;
+ const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={t.reviews}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="rounded-lg border border-line p-4"><strong>v{r.versionNumber} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 rounded-lg bg-brand-50 p-3"><p className="mb-2 text-[0.8125rem] font-bold uppercase tracking-wide text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-[0.8125rem] text-ink-600">{locale==="ar"?"عملة العرض":"Proposal currency"}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span>{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{locale==="ar"?"الأساس":"Base"} {money(e.estimatedCost,e.currency,locale)}</span>}</span></li>)}</ul></div>}</div>):<Empty/>}{isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&<FinalAssessment/>}</Panel>:null;
  // The consultant's clinical review is the page's primary work, not an appendix to the review history.
  const reviewDraft=isDoctor&&c.status==="CONSULTANT_REVIEW"?(value.clinicalReviews.find(r=>r.status==="DRAFT")??null):null;
  // A second-opinion consultant reads the case and gives an opinion; the clinical decision stays with the primary consultant.
@@ -84,14 +109,10 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   :null;
   // Everything needed to act sits above the fold; the rest of the case is one tab away.
   const [tab,setTab]=useState<"overview"|"clinical"|"documents"|"activity">("overview");
-  const [journeyOpen,setJourneyOpen]=useState(false);
-  const [messagesOpen,setMessagesOpen]=useState(false);
-  const [moreOpen,setMoreOpen]=useState(false);
-  const [adminOpen,setAdminOpen]=useState(false);
-  const [infoOpen,setInfoOpen]=useState(false);
-  const [proposalOpen,setProposalOpen]=useState(false);
-  const [declineOpen,setDeclineOpen]=useState(false);
-  const [recordOpen,setRecordOpen]=useState(false);const [recordDecisionOpen,setRecordDecisionOpen]=useState(false);
+  const [overlay,setOverlay]=useState<CaseOverlay|null>(null);
+  // A close only clears the overlay that asked for it, as the separate open flags did: a late close event from a drawer
+  // that was just replaced must not shut the one that replaced it.
+  const closeOverlay=(which:CaseOverlay)=>setOverlay(open=>open===which?null:open);
   const unreadMessages=value.messages.filter(m=>m.senderRole==="PATIENT"&&!m.read).length;
   const latestPatientMessage=[...value.messages].reverse().find(m=>m.senderRole==="PATIENT");
   const newestDocument=documents.length?documents[documents.length-1]:undefined;
@@ -99,7 +120,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   // overview panel that does not exist for them.
   const focusAction=()=>{setTab(isDoctor&&!workflowBlock?"clinical":"overview");requestAnimationFrame(()=>{const target=document.getElementById("case-actions")??document.getElementById("case-tab-panel");scrollIntoView(target,{behavior:"smooth",block:"center"});(target?.querySelector("button,select,input,textarea") as HTMLElement|null)?.focus();});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
-  const openMessages=()=>setMessagesOpen(true);
+  const openMessages=()=>setOverlay("messages");
   const caseTabs=[{id:"overview" as const,label:locale==="ar"?"نظرة عامة":"Overview",count:0},{id:"clinical" as const,label:locale==="ar"?"الملف السريري":"Clinical",count:0},{id:"documents" as const,label:locale==="ar"?"المستندات":"Documents",count:documents.length},{id:"activity" as const,label:locale==="ar"?"السجل":"Activity",count:0}];
   // Utilities live in one place each: the secure-link row owns "resend", the header owns messages, and the
   // "More" drawer owns everything else the backend listed for this state.
@@ -118,7 +139,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
    ...value.assignments.filter(a=>a.assigneeRole!=="COORDINATOR").map(a=>({label:a.assigneeRole==="DOCTOR"?(locale==="ar"?"الاستشاري":"Consultant"):a.assigneeRole==="OPERATIONS"?(locale==="ar"?"العمليات":"Operations"):a.assigneeRole==="FINANCE"?(locale==="ar"?"المالية":"Finance"):a.assigneeRole,name:a.assigneeName??(locale==="ar"?"عضو الفريق":"Team member"),pending:a.status==="PENDING"})),
   ];
 
-  return <div>
+  return <CaseWorkspaceProvider value={workspace}><div>
   <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm" aria-label={t.caseWorkspaceLabel}>
    <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-ink-350 bg-white px-3 text-[0.85rem] font-semibold text-brand-800 transition hover:border-brand-600 hover:bg-brand-50 hover:text-brand-700" onClick={back}><ArrowLeft size={16} aria-hidden className="rtl:-scale-x-100"/>{t.myDashboard}</button>
    <span className="text-ink-300" aria-hidden>/</span>
@@ -146,8 +167,8 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
      {!value.preview&&<button type="button" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" onClick={openMessages}>
       <MessageSquare size={16} aria-hidden/>{locale==="ar"?"الرسائل":"Messages"}{value.messages.length>0&&<span className={`rounded-full px-1.5 text-[0.8125rem] font-bold ${unreadMessages?"bg-brand-600 text-white":"bg-mist text-ink-600"}`}>{value.messages.length}</span>}
      </button>}
-     {showMore&&<button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" aria-haspopup="dialog" onClick={()=>setMoreOpen(true)}><MoreHorizontal size={16} aria-hidden/>{locale==="ar"?"المزيد":"More"}</button>}
-     {isCoordinator&&!owned&&canRebalance&&!value.preview&&<button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" aria-haspopup="dialog" onClick={()=>setAdminOpen(true)}>{locale==="ar"?"نقل الملكية":"Transfer ownership"}</button>}
+     {showMore&&<button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" aria-haspopup="dialog" onClick={()=>setOverlay("more")}><MoreHorizontal size={16} aria-hidden/>{locale==="ar"?"المزيد":"More"}</button>}
+     {isCoordinator&&!owned&&canRebalance&&!value.preview&&<button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" aria-haspopup="dialog" onClick={()=>setOverlay("transfer")}>{locale==="ar"?"نقل الملكية":"Transfer ownership"}</button>}
     </div>
    </div>
   </header>
@@ -156,7 +177,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
    response={current.workType==="REVIEW_PATIENT_RESPONSE"?{message:latestPatientMessage?.body,documentName:newestDocument?.fileName}:null}
    busy={busy} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    onAcceptAssignment={()=>{if(!myPending)return;void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:true}).then(result=>{if(result&&isDoctor)setTab("clinical");});}}
-   onDeclineAssignment={()=>setDeclineOpen(true)}
+   onDeclineAssignment={()=>setOverlay("decline")}
    form={formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref} proposal={value.proposal} representatives={value.representatives}/>:undefined}/>
 
   {isCoordinator&&<CaseBlockers locale={locale} blockers={actions.blockers} deposit={value.deposit}/>}
@@ -196,10 +217,10 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
        {workflowBlock}
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>
-         :(value.proposal||value.deposit)?<ProposalSummary locale={locale} proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} caseId={c.id} available={available} busy={busy} mutate={mutate} onView={()=>setProposalOpen(true)}/>:null)}
+         :(value.proposal||value.deposit)?<ProposalSummary proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} available={available} onView={()=>setOverlay("proposal")}/>:null)}
        {!isCoordinator&&!isDoctor&&(value.proposal||value.deposit)&&proposalPanel}
        {/* The case brief: the facts a coordinator decides ownership on, and the operational context once they own it. */}
-       {isCoordinator&&<CoordinatorBrief locale={locale} t={t} mySubject={mySubject} c={c} actions={actions} documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} consultantName={consultantOnCase} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
+       {isCoordinator&&<CoordinatorBrief actions={actions} documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} consultantName={consultantOnCase} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
       </div>
 
       {/* Kept mounted for the same reason: the clinical review and final assessment drafts. */}
@@ -215,12 +236,12 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
 
       {tab==="documents"&&(documentsPanel??<p className="text-sm text-ink-500">{locale==="ar"?"لم يتم رفع مستندات بعد.":"No documents uploaded yet."}</p>)}
 
-      {tab==="activity"&&<><CaseActivity locale={locale} tasks={value.tasks} timeline={value.timeline} onViewJourney={()=>setJourneyOpen(true)}/>{isCoordinator&&loadAssignmentHistory&&<div className="mt-5"><AssignmentHistory key={c.id} locale={locale} caseId={c.id} load={loadAssignmentHistory}/></div>}</>}
+      {tab==="activity"&&<><CaseActivity tasks={value.tasks} timeline={value.timeline} onViewJourney={()=>setOverlay("journey")}/>{isCoordinator&&loadAssignmentHistory&&<div className="mt-5"><AssignmentHistory key={c.id} locale={locale} caseId={c.id} load={loadAssignmentHistory}/></div>}</>}
      </div>
     </div>
 
     <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
-     <JourneyPulse locale={locale} stage={c.status} waitingOn={actions.waitingOn} viewerRole={role} ownsCase={!!mySubject&&c.coordinatorSubject===mySubject} onViewJourney={()=>setJourneyOpen(true)}/>
+     <JourneyPulse locale={locale} stage={c.status} waitingOn={actions.waitingOn} viewerRole={role} ownsCase={!!mySubject&&c.coordinatorSubject===mySubject} onViewJourney={()=>setOverlay("journey")}/>
      {!value.preview&&<section aria-labelledby="case-team-title" className="card p-4">
       <h2 id="case-team-title" className="text-[0.8125rem] font-bold uppercase tracking-[0.1em] text-ink-500">{locale==="ar"?"فريق الحالة":"Case team"}</h2>
       <dl className="mt-2 space-y-1.5 text-[0.82rem]">{team.map((member,i)=><div key={`${member.label}-${i}`} className="flex items-baseline justify-between gap-3"><dt className="text-ink-500">{member.label}</dt><dd className="text-end font-semibold text-ink-800">{member.name}{member.pending&&<span className="ms-1 text-[0.8125rem] font-semibold text-amber-800">{locale==="ar"?"· بانتظار القبول":"· pending"}</span>}</dd></div>)}</dl>
@@ -232,27 +253,27 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
    {isCoordinator&&!owned&&<p className="card mt-5 border border-brand-400 p-4 text-ink-600">{c.coordinatorSubject?t.ownedByOther:t.ownershipHint}</p>}
   </div>
 
-  {journeyOpen&&<FullJourneyDialog locale={locale} timeline={value.timeline} caseNumber={c.caseNumber} onClose={()=>setJourneyOpen(false)}/>}
-  {messagesOpen&&<CaseDrawer locale={locale} title={locale==="ar"?"الرسائل الآمنة":"Secure messages"} onClose={()=>setMessagesOpen(false)}><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={showActions} busy={busy} mutate={mutate}/></CaseDrawer>}
-  {moreOpen&&<CaseDrawer locale={locale} title={locale==="ar"?"إجراءات إضافية":"More actions"} onClose={()=>setMoreOpen(false)}>
+  {overlay==="journey"&&<FullJourneyDialog locale={locale} timeline={value.timeline} caseNumber={c.caseNumber} onClose={()=>closeOverlay("journey")}/>}
+  {overlay==="messages"&&<CaseDrawer locale={locale} title={locale==="ar"?"الرسائل الآمنة":"Secure messages"} onClose={()=>closeOverlay("messages")}><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={showActions} busy={busy} mutate={mutate}/></CaseDrawer>}
+  {overlay==="more"&&<CaseDrawer locale={locale} title={locale==="ar"?"إجراءات إضافية":"More actions"} onClose={()=>closeOverlay("more")}>
    <MoreActions locale={locale} caseId={c.id} available={moreAvailable} travelPackage={!!c.travelPackageRequested} version={c.version} busy={busy} mutate={mutate}
-    onRequestInformation={()=>{setMoreOpen(false);setInfoOpen(true);}} onRecordResponse={()=>{setMoreOpen(false);setRecordOpen(true);}}
-    onRecordDecision={value.proposal?()=>{setMoreOpen(false);setRecordDecisionOpen(true);}:undefined}
-    onAdministration={canRebalance?()=>{setMoreOpen(false);setAdminOpen(true);}:undefined}/>
+    onRequestInformation={()=>setOverlay("requestInfo")} onRecordResponse={()=>setOverlay("recordResponse")}
+    onRecordDecision={value.proposal?()=>setOverlay("recordDecision"):undefined}
+    onAdministration={canRebalance?()=>setOverlay("transfer"):undefined}/>
   </CaseDrawer>}
   {/* Recording a WhatsApp/phone answer opens its own dialog; the trigger is hidden and driven from More actions so the page carries one control per business action. */}
-  {isCoordinator&&owned&&available.includes("RECORD_PATIENT_RESPONSE")&&<RecordPatientResponse locale={locale} caseId={c.id} action={value.patientAction} mutate={mutate} open={recordOpen} onOpenChange={setRecordOpen} hideTrigger/>}
-  {recordDecisionOpen&&value.proposal&&<CaseDrawer locale={locale} title={work.recordDecision.title} onClose={()=>setRecordDecisionOpen(false)}>
-   <RecordProposalDecision key={value.proposal.versionId} locale={locale} caseId={c.id} proposal={value.proposal} representatives={value.representatives} busy={busy} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)setRecordDecisionOpen(false);return result;}}/>
+  {isCoordinator&&owned&&available.includes("RECORD_PATIENT_RESPONSE")&&<RecordPatientResponse locale={locale} caseId={c.id} action={value.patientAction} mutate={mutate} open={overlay==="recordResponse"} onOpenChange={open=>{if(open)setOverlay("recordResponse");else closeOverlay("recordResponse");}} hideTrigger/>}
+  {overlay==="recordDecision"&&value.proposal&&<CaseDrawer locale={locale} title={work.recordDecision.title} onClose={()=>closeOverlay("recordDecision")}>
+   <RecordProposalDecision key={value.proposal.versionId} locale={locale} caseId={c.id} proposal={value.proposal} representatives={value.representatives} busy={busy} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)closeOverlay("recordDecision");return result;}}/>
   </CaseDrawer>}
-  {proposalOpen&&<CaseDrawer locale={locale} title={t.proposal} onClose={()=>setProposalOpen(false)}>
-   <div className="space-y-4">{recommendationBlock}{value.proposal&&<ProposalCard locale={locale} t={t} proposal={value.proposal}/>}{value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} caseId={c.id} versionId={value.proposal.versionId} locale={locale} busy={busy} mutate={mutate} canResend={false}/>}{value.deposit&&<DepositCard deposit={value.deposit} caseId={c.id} role={role} locale={locale} busy={busy} mutate={mutate}/>}</div>
+  {overlay==="proposal"&&<CaseDrawer locale={locale} title={t.proposal} onClose={()=>closeOverlay("proposal")}>
+   <div className="space-y-4">{recommendationBlock}{value.proposal&&<ProposalCard proposal={value.proposal}/>}{value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={false}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}</div>
   </CaseDrawer>}
-  {adminOpen&&<CaseDrawer locale={locale} title={locale==="ar"?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>setAdminOpen(false)}><TransferOwnership locale={locale} caseId={c.id} caseNumber={c.caseNumber} currentOwner={c.coordinatorSubject} currentOwnerName={c.coordinatorName} mySubject={mySubject} staff={staff} busy={busy} mutate={mutate} onClose={()=>setAdminOpen(false)}/></CaseDrawer>}
-  {infoOpen&&<RequestInformationDialog locale={locale} caseIds={[c.id]} busy={busy} mutate={mutate} onClose={()=>setInfoOpen(false)}/>}
-  {declineOpen&&myPending&&<DeclineAssignmentDialog locale={locale} caseNumber={c.caseNumber} busy={busy} onClose={()=>setDeclineOpen(false)}
+  {overlay==="transfer"&&<CaseDrawer locale={locale} title={locale==="ar"?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>closeOverlay("transfer")}><TransferOwnership locale={locale} caseId={c.id} caseNumber={c.caseNumber} currentOwner={c.coordinatorSubject} currentOwnerName={c.coordinatorName} mySubject={mySubject} staff={staff} busy={busy} mutate={mutate} onClose={()=>closeOverlay("transfer")}/></CaseDrawer>}
+  {overlay==="requestInfo"&&<RequestInformationDialog locale={locale} caseIds={[c.id]} busy={busy} mutate={mutate} onClose={()=>closeOverlay("requestInfo")}/>}
+  {overlay==="decline"&&myPending&&<DeclineAssignmentDialog locale={locale} caseNumber={c.caseNumber} busy={busy} onClose={()=>closeOverlay("decline")}
    onConfirm={reason=>void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:false,reason})}/>}
- </div>;
+ </div></CaseWorkspaceProvider>;
 }
 
 /**
@@ -260,7 +281,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
  * in one line, with the full breakdown, delivery and deposit one click away. The secure link the patient
  * currently holds is shown compactly with its one utility — resend — only while resending is valid.
  */
-function ProposalSummary({locale,proposal,deposit,delivery,caseId,available,busy,mutate,onView}:{locale:Locale;proposal?:Proposal;deposit?:DepositView|null;delivery?:DeliveryStatus|null;caseId:string;available:string[];busy:boolean;mutate:Mutate;onView:()=>void}){const work=useWorkCopy();
+function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?:Proposal;deposit?:DepositView|null;delivery?:DeliveryStatus|null;available:string[];onView:()=>void}){const work=useWorkCopy();const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
  const ar=locale==="ar";
  const total=proposal?proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0):null;
  const services=proposal?.items.length??0;
@@ -299,8 +320,8 @@ function ProposalSummary({locale,proposal,deposit,delivery,caseId,available,busy
  * never the files or messages themselves); after ownership it is the compact operational summary the current
  * action sits above. It renders only real data: a fact with nothing behind it is left out, not filled in.
  */
-function CoordinatorBrief({locale,t,mySubject,c,actions,documents,preview,intakeSummary,consultantName,onClinical,onDocuments}:{locale:Locale;t:typeof copy.en;mySubject?:string;c:CaseView;actions:CaseActions;documents:CaseDocument[];preview:boolean;intakeSummary?:string;consultantName?:string|null;onClinical:()=>void;onDocuments:()=>void}){
- const work=useWorkCopy();
+function CoordinatorBrief({actions,documents,preview,intakeSummary,consultantName,onClinical,onDocuments}:{actions:CaseActions;documents:CaseDocument[];preview:boolean;intakeSummary?:string;consultantName?:string|null;onClinical:()=>void;onDocuments:()=>void}){
+ const work=useWorkCopy();const {locale,t,mySubject,c}=useCaseWorkspace();
  const ar=locale==="ar";
  const when=(iso:string)=>new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(iso));
  const facts:{label:string;value:string}[]=[
@@ -334,7 +355,8 @@ function CoordinatorBrief({locale,t,mySubject,c,actions,documents,preview,intake
 }
 
 /** History, not current work: every task and the recorded stage changes, out of the operational view. */
-function CaseActivity({locale,tasks,timeline,onViewJourney}:{locale:Locale;tasks:Task[];timeline:{status:string;occurredAt:string}[];onViewJourney:()=>void}){
+function CaseActivity({tasks,timeline,onViewJourney}:{tasks:Task[];timeline:{status:string;occurredAt:string}[];onViewJourney:()=>void}){
+ const {locale}=useCaseWorkspace();
  const ar=locale==="ar";
  const open=tasks.filter(task=>["OPEN","IN_PROGRESS"].includes(task.status));
  const done=tasks.filter(task=>!["OPEN","IN_PROGRESS"].includes(task.status));
@@ -356,7 +378,9 @@ function CaseActivity({locale,tasks,timeline,onViewJourney}:{locale:Locale;tasks
  </div>;
 }
 
-function ProposalSendForm({caseId,reviewId,language,estimate,locale,t,busy,onSend}:{caseId:string;reviewId:string;language:string;estimate?:Review;fxRates:FxRate[];locale:Locale;t:typeof copy.en;busy:boolean;onSend:(caseId:string,body:unknown)=>void}){
+function ProposalSendForm({estimate,onSend}:{estimate:Review;onSend:(caseId:string,body:unknown)=>void}){
+ const {locale,t,c:{id:caseId,preferredLanguage:language},busy}=useCaseWorkspace();
+ const reviewId=estimate.id;
  const estimates=estimate?.costEstimates??[];const[notes,setNotes]=useState("");
  // The consultant fixes the proposal currency when submitting the recommendation. The lines below are the
  // approved catalogue base in EGP; the server converts them and snapshots the rate at proposal creation,
@@ -383,7 +407,8 @@ function ProposalSendForm({caseId,reviewId,language,estimate,locale,t,busy,onSen
  </div>;
 }
 
-function ProposalShareLinks({share,locale,t}:{share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string};locale:Locale;t:typeof copy.en}){
+function ProposalShareLinks({share}:{share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}}){
+ const {locale,t}=useCaseWorkspace();
  const[copied,setCopied]=useState(false);
  const base=typeof window!=="undefined"?window.location.origin:SITE_URL;
  const link=`${base}/${locale}/proposal/${share.token}`;
@@ -394,7 +419,8 @@ function ProposalShareLinks({share,locale,t}:{share:{caseId:string;token:string;
  return <div className="mt-4 rounded-lg border border-brand-200 bg-brand-50 p-4"><p className="mb-3 text-sm font-bold text-brand-800">{t.linkReady}</p><p className="mb-3 break-all rounded-lg bg-white p-2 text-sm">{link}</p><div className="flex flex-wrap gap-2">{wa&&<a className="btn-primary" href={wa} target="_blank" rel="noopener noreferrer">{t.sendWhatsapp}</a>}<a className={`btn-secondary ${share.email?"":"pointer-events-none opacity-50"}`} href={mail}>{share.email?t.sendEmail:t.noPatientEmail}</a><button type="button" className="btn-secondary" onClick={doCopy}>{copied?t.copied:t.copyLink}</button></div></div>;
 }
 
-function FinalAssessment({caseId,busy,locale,catalog,fxRates,mutate}:{caseId:string;busy:boolean;locale:Locale;catalog:CatalogService[];fxRates:FxRate[];mutate:Mutate}){
+function FinalAssessment(){
+ const {locale,c:{id:caseId},busy,mutate,catalog,fxRates}=useCaseWorkspace();
  const[treatment,setTreatment]=useState("");const[risks,setRisks]=useState("");const[currency,setCurrency]=useState("EGP");const[costs,setCosts]=useState([{description:"",amount:""}]);const[selected,setSelected]=useState<Set<string>>(new Set());
  const g=locale==="ar"?{title:"الفحص السريري النهائي",intro:"سجّل تقييمك بعد فحص المريض. سيبني المنسق العرض النهائي من الخدمات المؤكدة.",treatment:"العلاج النهائي الموصى به",risks:"المخاطر والقيود",services:"خدماتك المعتمدة",manual:"خدمة غير مدرجة (تتطلب موافقة مالية)",currency:"عملة العرض",add:"إضافة خدمة",save:"حفظ التقييم النهائي",service:"الخدمة",amount:"المبلغ"}:{title:"Final in-person assessment",intro:"Record your assessment after examining the patient. The coordinator builds the final quote from the confirmed services.",treatment:"Final recommended treatment",risks:"Risks & limitations",services:"Your approved services",manual:"Service not on your list (needs finance approval)",currency:"Display currency",add:"Add a service",save:"Save final assessment",service:"Service",amount:"Amount"};
  const currencyOptions=["EGP",...fxRates.filter(f=>f.currency!=="EGP").map(f=>f.currency)];const rate=currency==="EGP"?1:(fxRates.find(f=>f.currency===currency)?.rate??1);
@@ -416,7 +442,8 @@ function FinalAssessment({caseId,busy,locale,catalog,fxRates,mutate}:{caseId:str
  </div>;
 }
 
-function FinalQuoteActions({caseId,reviewId,proposal,gates,fxRates,locale,busy,mutate}:{caseId:string;reviewId?:string;proposal?:Proposal;gates?:ProposalGates|null;fxRates:FxRate[];locale:Locale;busy:boolean;mutate:Mutate}){
+function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;proposal?:Proposal;gates?:ProposalGates|null}){
+ const {locale,c:{id:caseId},busy,mutate,fxRates}=useCaseWorkspace();
  const[currency,setCurrency]=useState("EGP");const[scope,setScope]=useState("");
  const g=locale==="ar"?{title:"العرض النهائي",createIntro:"أنشئ العرض النهائي من التقييم النهائي المعتمد. لا يتغيّر وضع الحالة.",currency:"عملة عرض المريض",scope:"سبب تغيّر النطاق مقارنةً بالتقدير المبدئي",create:"إنشاء العرض النهائي",release:"إرسال العرض النهائي للمريض",releaseHint:"يُرسل رابطًا آمنًا. تبقى الحالة عند «تأكيد الوصول».",needReview:"يجب أن يسجّل الطبيب تقييمًا نهائيًا معتمدًا أولًا.",financeWait:"بانتظار الموافقة المالية على الخدمات المُدخلة يدويًا."}:{title:"Final treatment quote",createIntro:"Create the final quote from the approved final assessment. The case status does not change.",currency:"Patient's quote currency",scope:"Why the scope changed vs the preliminary estimate",create:"Create final quote",release:"Send final quote to patient",releaseHint:"Sends a secure link. The case stays at arrival confirmed.",needReview:"The doctor must record an approved final assessment first.",financeWait:"Waiting for finance approval of the manually-priced services."};
  const currencyOptions=["EGP",...fxRates.filter(f=>f.currency!=="EGP").map(f=>f.currency)];
@@ -426,7 +453,8 @@ function FinalQuoteActions({caseId,reviewId,proposal,gates,fxRates,locale,busy,m
  return <div className="mt-4 rounded-lg border border-brand-200 p-4"><h4 className="font-bold text-brand-800">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.createIntro}</p>{!reviewId?<p className="mt-2 text-sm text-ink-500">{g.needReview}</p>:<><label className="mt-3 block text-sm font-bold">{g.currency}<select className="field mt-1 w-auto" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></label><label className="mt-3 block text-sm font-bold">{g.scope}<textarea className="field mt-1" rows={2} value={scope} onChange={e=>setScope(e.target.value)}/></label><button className="btn-primary mt-3" disabled={busy} onClick={()=>{const validUntil=new Date(Date.now()+14*86400000).toISOString();void mutate(`/coordinator/cases/${caseId}/final-quotes`,{clinicalReviewId:reviewId,currency,scopeChangeReason:scope||undefined,validUntil});}}>{g.create}</button></>}</div>;
 }
 
-function DepositCard({deposit,caseId,role,locale,busy,mutate}:{deposit:DepositView;caseId:string;role:RoleKey;locale:Locale;busy:boolean;mutate:Mutate}){
+function DepositCard({deposit}:{deposit:DepositView}){
+ const {locale,role,c:{id:caseId},busy,mutate}=useCaseWorkspace();
  const isFinance=role==="finance";
  const g=locale==="ar"?{title:"وديعة التنسيق والدفعات",total:"الإجمالي",paid:"المدفوع",balance:"المتبقي",record:"تسجيل دفعة",refund:"تسجيل استرداد",amount:"المبلغ (ج.م)",method:"الطريقة",reference:"مرجع المزوّد",reason:"سبب الاسترداد",note:"تسجيل دون اتصال فقط — يسجّل الدفعات المستلمة فعليًا؛ لا تُدخل بيانات بطاقة.",credited:"تُخصم من الرصيد النهائي",REQUESTED:"مطلوبة",PARTIALLY_PAID:"مدفوعة جزئيًا",PAID:"مدفوعة",CANCELLED:"ملغاة",REFUNDED:"مستردة"}:{title:"Coordination deposit & payments",total:"Total",paid:"Paid",balance:"Balance",record:"Record a payment",refund:"Record a refund",amount:"Amount (EGP)",method:"Method",reference:"Provider reference",reason:"Refund reason",note:"Offline record-only — records payments actually received; no card data is entered.",credited:"credited to final",REQUESTED:"Requested",PARTIALLY_PAID:"Partially paid",PAID:"Paid",CANCELLED:"Cancelled",REFUNDED:"Refunded"};
  const money=(n?:number)=>n==null?"—":new Intl.NumberFormat(intlLocale(locale),{style:"currency",currency:deposit.currency||"EGP"}).format(n);
@@ -453,7 +481,8 @@ function DepositCard({deposit,caseId,role,locale,busy,mutate}:{deposit:DepositVi
  </div>;
 }
 
-function DeliveryCard({delivery,caseId,versionId,locale,busy,mutate,canResend=true}:{delivery:DeliveryStatus;caseId:string;versionId:string;locale:Locale;busy:boolean;mutate:Mutate;canResend?:boolean}){
+function DeliveryCard({delivery,versionId,canResend=true}:{delivery:DeliveryStatus;versionId:string;canResend?:boolean}){
+ const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
  const g=locale==="ar"?{title:"حالة إرسال الرابط الآمن",channel:"القناة",to:"إلى",attempts:"المحاولات",resend:"إعادة إرسال الرابط",QUEUED:"في قائمة الإرسال",DELIVERED:"تم التسليم",RETRY:"إعادة المحاولة",FAILED:"فشل الإرسال",resendHint:"يُلغي الرابط ورمز التحقق السابقين ويُرسل رابطًا آمنًا جديدًا. لا يُنشئ عرضًا جديدًا ولا يغيّر حالة الطلب."}:{title:"Secure link delivery",channel:"Channel",to:"To",attempts:"Attempts",resend:"Resend link",QUEUED:"Queued",DELIVERED:"Delivered",RETRY:"Retrying",FAILED:"Failed",resendHint:"Revokes the previous link and code and sends a fresh secure link to the patient's verified contact. It does not create a new proposal or change the case."};
  const label=(g as Record<string,string>)[delivery.status]??delivery.status;
  const cls=delivery.status==="DELIVERED"?"bg-brand-50 text-brand-700":delivery.status==="FAILED"?"bg-alert-50 text-alert-700":"bg-mist text-ink-600";
@@ -463,6 +492,7 @@ function DeliveryCard({delivery,caseId,versionId,locale,busy,mutate,canResend=tr
   {canResend&&<p className="mt-2 text-[0.8125rem] text-ink-500">{g.resendHint}</p>}</div>;
 }
 
+/** Also rendered on its own (`AuthoritativeActions.test.tsx`), so it keeps explicit props rather than reading the case workspace. */
 export function RoleActions({role,t,c,proposal,gates,availableActions,locale,mutate}:{role:RoleKey;t:typeof copy.en;c:CaseView;proposal?:Proposal;gates?:ProposalGates|null;availableActions:string[];locale:Locale;mutate:Mutate}){
  const[operationsPlan,setOperationsPlan]=useState(proposal?.operationalPlan??"");
  const gl=locale==="ar"?{checklist:"متطلبات الإرسال",operations:"العمليات (باقة السفر)",finance:"الموافقة المالية",notReq:"غير مطلوب",waiting:"بانتظار",done:"مكتمل",releaseHint:"يُفعَّل الإرسال بعد اكتمال جميع المتطلبات."}:{checklist:"Release requirements",operations:"Operations (travel package)",finance:"Finance approval",notReq:"Not required",waiting:"Waiting",done:"Complete",releaseHint:"Release unlocks once every required step is complete."};
@@ -474,4 +504,4 @@ export function RoleActions({role,t,c,proposal,gates,availableActions,locale,mut
  return null;
 }
 
-function ProposalCard({locale,t,proposal}:{locale:Locale;t:typeof copy.en;proposal:Proposal}){const work=useWorkCopy();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-lg bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong>{new Intl.NumberFormat(intlLocale(locale),{style:"currency",currency:proposal.currency}).format(total)}</strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?(locale==="ar"?" (اختياري)":" (optional)"):""}</span><strong className="whitespace-nowrap">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{locale==="ar"?"صالح حتى":"Valid until"} {new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))}</p>}</div>}
+function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const {locale,t}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-lg bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong>{new Intl.NumberFormat(intlLocale(locale),{style:"currency",currency:proposal.currency}).format(total)}</strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?(locale==="ar"?" (اختياري)":" (optional)"):""}</span><strong className="whitespace-nowrap">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{locale==="ar"?"صالح حتى":"Valid until"} {new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))}</p>}</div>}

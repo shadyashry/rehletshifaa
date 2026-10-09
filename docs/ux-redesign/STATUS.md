@@ -190,6 +190,28 @@ Update at the end of every phase.
           care-coordination ×2, Control Center "Staff & teams") plus two cold-run timeouts (a11y how-it-works, my-care
           Arabic) that pass alone
 
+- [x] **Pass 4** (branch `feat/ux-redesign-pass-4` from `codex/platform-control-plane` @ `764535a`; backlog "Performance and
+      code structure" → Composition; structure only, no behaviour or copy change)
+  - [x] Staff case page overlays: the nine boolean flags in `StaffCaseView.tsx` (journey, messages, more, transfer, request
+        information, proposal, decline, record response, record decision) are one `CaseOverlay | null` state. No two can be
+        open at once: every overlay is a modal `<dialog>` (`showModal`), and each "More actions" entry already closed that
+        drawer before opening its own. `closeOverlay(which)` only clears the overlay that asked, as the separate flags did,
+        so a late `close` event from a replaced drawer cannot shut its successor. `recordOpen` was not dead: it is set from
+        More actions and cleared by `RecordPatientResponse` through `onOpenChange(false)` on cancel/Escape/save
+  - [x] `CaseWorkspaceProvider` (in `StaffCaseView.tsx`; same createContext/useContext idiom as `WorkCopyProvider`) carries
+        locale, `t`, role, the case summary, busy, mutate, FX rates, catalogue and the viewer's subject. ProposalSummary,
+        CoordinatorBrief, CaseActivity, ProposalSendForm, ProposalShareLinks, FinalAssessment, FinalQuoteActions,
+        DepositCard, DeliveryCard and ProposalCard read it instead of taking the same props one by one (ProposalSendForm's
+        unused `fxRates` prop is gone). `CaseViewProps` (what Portal passes) is unchanged; `PatientCaseView` does not use it.
+        `RoleActions` keeps explicit props because `AuthoritativeActions.test.tsx` renders it alone
+  - [x] verify: typecheck ok; lint 24/12 (= baseline); unit 348 pass, 11 `ProposalSign` (pre-existing); `next build` ok and
+        the portal shell chunk (47 KB, has "Sign in to open your case") contains no staff case strings (the provider error,
+        deposit, final assessment and transfer copy are only in the 118 KB staff case chunk); Playwright portal-ux, portal,
+        portal-p2-pass-3, portal-reliability, staff-home, arabic-proposal-decision, workspace-case-switch, care-coordination,
+        my-care, a11y: cold run 94 pass / 7 fail; rerun of the 7: 4 pass (cold timeouts: portal-ux ×2, portal-p2-pass-3,
+        workspace-case-switch), 3 = pre-existing (care-coordination "Coordination Setup" ×2, Control Center "Staff & teams");
+        warm rerun of portal-ux, portal-p2-pass-3 and workspace-case-switch: 38 pass, 1 = "Staff & teams"
+
 ## Decisions
 
 | Date | Decision | By |
@@ -229,6 +251,11 @@ Update at the end of every phase.
   PRODUCT.md voice and Petrol & Paper tokens.
 
 ## Next exact action
+
+Pass 4 (composition) is committed on `feat/ux-redesign-pass-4`, not merged or pushed; the owner decides when to merge it
+into `codex/platform-control-plane`. Next code-structure candidates from the same backlog section: the `role={currentRole!}`
+crash guard (P2) and the lint `set-state-in-effect`/`refs`/`purity` errors (P2, incl. `Date.now()` in
+`ProposalSendForm`). Earlier notes:
 
 Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08); the follow-up
 commit on `feat/ux-redesign-pass-3` is not merged or pushed yet. The tunnel stack runs `9e3b336` (V76); live checks must run from a network that
