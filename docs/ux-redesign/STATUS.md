@@ -229,6 +229,7 @@ Update at the end of every phase.
 | 2026-10-08 | GATE P2-2: `plans/staff-home.md` **approved**. S1: remove the queue List/Cards toggle. S2: the slim footer replaces the marketing footer on all `/portal` routes (patients included). S3: Arabic "مهامي" for My work (pending native sign-off). | Owner |
 | 2026-10-08 | Owner: "commit and merge all" — pass 2 (`d09a3ad`…) fast-forwarded into `codex/platform-control-plane`; no push. | Owner |
 | 2026-10-08 | Owner: "merge pass 3 into codex/platform-control-plane and push" — `feat/ux-redesign-pass-3` fast-forwarded and pushed to origin. | Owner |
+| 2026-10-09 | Owner: "merge pass 4 into codex/platform-control-plane and push" — `feat/ux-redesign-pass-4` (`23a1f77`) fast-forwarded and pushed to origin. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -252,8 +253,8 @@ Update at the end of every phase.
 
 ## Next exact action
 
-Pass 4 (composition) is committed on `feat/ux-redesign-pass-4`, not merged or pushed; the owner decides when to merge it
-into `codex/platform-control-plane`. Next code-structure candidates from the same backlog section: the `role={currentRole!}`
+Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
+tunnel stack was not rebuilt for it. Next code-structure candidates from the same backlog section: the `role={currentRole!}`
 crash guard (P2) and the lint `set-state-in-effect`/`refs`/`purity` errors (P2, incl. `Date.now()` in
 `ProposalSendForm`). Earlier notes:
 
