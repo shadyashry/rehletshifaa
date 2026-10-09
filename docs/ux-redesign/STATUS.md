@@ -242,6 +242,8 @@ Update at the end of every phase.
           specs (the 10 portal/patient specs + credential-reviews) 102 pass, 5 fail = pre-existing (care-coordination ×2,
           credential-reviews ×2, "Staff & teams"); new `portal-reliability` test (case stays on screen during a held `/me`
           re-read) fails on the old provider
+  - [x] Owner: "merge and push, then rebuild the stack" — `6cd977d` fast-forwarded into `codex/platform-control-plane` and
+        pushed; stack rebuilt (backend UP, localhost 3000/8081/8180, `https://dev.rehletshifaa.com/en` and `/en/portal` 200)
 
 ## Decisions
 
@@ -285,8 +287,7 @@ Update at the end of every phase.
 ## Next exact action
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
-tunnel stack runs `2aa23d8`, which includes the role crash guard (merged and pushed). The portal lint fixes and the
-`refreshMe` fix are committed on `feat/ux-redesign-pass-4`, not merged or pushed. Next candidates: Control Center lint
+tunnel stack runs `6cd977d` (role crash guard, portal lint and `refreshMe` fix; all merged and pushed). Next candidates: Control Center lint
 (13 errors, P2) and the `refresh` stale-result guard / shared `busy` flag (P2). Earlier notes:
 
 Pass 3 is complete and fast-forwarded into `codex/platform-control-plane`, pushed to origin (2026-10-08); the follow-up
