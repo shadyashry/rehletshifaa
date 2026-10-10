@@ -257,4 +257,19 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
                 c.waitingSince = case when c.waitingOn = :on then coalesce(c.waitingSince, cast(:now as Instant)) else cast(:now as Instant) end
             where c.id = :id""")
     int waitOn(@Param("id") UUID id, @Param("on") String on, @Param("reason") String reason, @Param("code") String code, @Param("now") Instant now);
+    /** A case a WhatsApp sender belongs to, and whether they are the patient or the person who submitted it. */
+    interface ChannelCase { UUID getCaseId(); String getSenderRole(); String getLanguage(); }
+
+    /**
+     * The cases, not in {@code excluded}, whose patient or submitter has these WhatsApp digits; most recently active first.
+     * The patient's own number wins over a submitter's when both match.
+     */
+    @Query("""
+            select c.id as caseId, c.preferredLanguage as language,
+                case when p.whatsappDigits = :digits then 'PATIENT' else 'PATIENT_REPRESENTATIVE' end as senderRole
+            from MedicalCase c join PatientProfile p on p.id = c.patientId
+                left join CaseSubmissionContact s on s.caseId = c.id
+            where c.status not in :excluded and (p.whatsappDigits = :digits or s.whatsappDigits = :digits)
+            order by c.updatedAt desc, c.id""")
+    java.util.List<ChannelCase> findChannelCases(@Param("digits") String digits, @Param("excluded") java.util.Collection<CaseStatus> excluded);
 }

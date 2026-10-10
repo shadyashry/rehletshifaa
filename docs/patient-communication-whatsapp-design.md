@@ -24,7 +24,7 @@ that system, so the design connects WhatsApp to the parts that exist instead of 
 | # | Finding (verified in code) | Consequence |
 |---|---|---|
 | F1 | `MetaWhatsAppChannel.deliver` sends **free text** for everything except 6-digit codes; the outbox renders **English only** (`NotificationOutboxProcessor.render`). | Outside the 24-hour window Meta rejects free text, so status links, "proposal ready", onboarding and secure-message nudges would fail for most patients. **Template sending is a prerequisite** (slice S0). |
-| F2 | The webhook path is `/api/v1/public/webhooks/whatsapp/meta`; the gateway budgets `/api/v1/public/` at 30/min per client IP. Meta delivers from a small set of its own IPs. | Busy periods would get 429s and Meta retries/drops. The webhook needs its own gateway location (signature-checked, generous budget). |
+| F2 | The webhook path `/api/v1/public/webhooks/` already had its own gateway location, but on the shared write budget (60/min per address, burst 30). Meta delivers every receipt and message from a few of its own addresses. | Corrected in S1: a dedicated `api_webhooks` zone (600/min, burst 200); the backend still rejects unsigned requests. |
 | F3 | Phone numbers are stored as entered (`patient_profiles.whatsapp_number`, `case_submission_contacts.whatsapp_number`); matching normalises ad hoc (`PublicCaseAccessService.normalizePhone`). | Inbound `wa_id` (digits, no `+`) cannot be matched by index. Add a normalised digits column. |
 | F4 | Patient-thread write right is `COORDINATOR, CASE_MESSAGE, CASE_ASSIGNED`; only `PRIMARY` coordinator assignments exist. | Tighten to an explicit replier scope (rule gap G5). |
 | F5 | `MedicalDocument` requires a case. | Files from intake conversations need staging until linked. |
@@ -221,7 +221,7 @@ Each slice ends green (`mvn -o -q test`, `pnpm typecheck`, focused e2e) and is i
 | Slice | Scope | Proves |
 |---|---|---|
 | **S0 Templates** | Template bindings, `MetaWhatsAppChannel` template sends, Arabic rendering, Meta template submission list | Patient notifications deliver outside the 24-hour window |
-| **S1 Inbound for case patients** | `whatsapp_inbound_events`, processor, `whatsapp_digits`, `SenderResolver`, case path into `PATIENT_COORDINATOR` with `channel`, media staging + scan, gateway location | A case patient's WhatsApp reaches the owner's thread exactly once; files are scanned |
+| **S1 Inbound for case patients** | `whatsapp_inbound_messages`, processor, `whatsapp_digits`, sender matching, case path into `PATIENT_COORDINATOR` with `channel`, files scanned into case documents, gateway budget | A case patient's WhatsApp reaches the owner's thread exactly once; files are scanned |
 | **S2 Reply rights + cover** | `replierOf`, `CASE_REPLIER`, `CASE_PATIENT_REPLY`, `reply_covers`, out-of-office UI | Two coordinators cannot both reply; cover hands over and back automatically |
 | **S3 Intake conversations** | Tables, `routeIntakeConversation`, schedule-derived duty, queue/claim/reassign, Conversations UI, window-aware composer | Every pre-case chat has one owner or sits in the queue |
 | **S4 Case hand-off** | `INTAKE_CONTINUITY`, linking, intro template, history and files carried over | The intake person becomes the case owner when eligible, otherwise introduces the new one |
@@ -233,6 +233,25 @@ change; duplicate and out-of-order webhooks (one message); processor crash mid-b
 expired media; outside-window error → template fallback; multi-case phone; representative's phone; closed-case return;
 offboarding re-route; working-time maths across the weekend and off hours; Arabic RTL on every new screen; a PostgreSQL
 mapping proof for the new entities.
+
+## 9a. S1 delivered (2026-10-10)
+
+- **Webhook:** `MetaWhatsAppWebhookService` stores each inbound message once (`whatsapp_inbound_messages`, unique provider
+  id; encrypted payload with the sender's WhatsApp profile name). Nothing else happens in the request.
+- **Processing:** `conversation.application.WhatsAppInboundProcessor` claims messages with a lease (SKIP LOCKED, as the
+  outbox does), matches the sender's digits to an open case (patient's own number first, then the submitter's; most
+  recently active case when several) and files the message into the case's `PATIENT_COORDINATOR` thread
+  (`channel=WHATSAPP`, sender `PATIENT` or `PATIENT_REPRESENTATIVE`, Arabic detected from the text). The primary
+  coordinator gets a portal notification (`PATIENT_WHATSAPP_MESSAGE`); a case still in the queue has no one to notify.
+- **Files:** images and documents are downloaded at once (`MetaWhatsAppMediaClient`), inspected, and sealed as case
+  documents (`DocumentService.fileFromChannel`, the upload rules for type, size and per-case limits). Voice notes, video,
+  stickers and contacts are noted, not kept (`attachment_status`). No scanner verdict retries the whole message.
+- **No open case:** the message is kept, encrypted, as `UNMATCHED` for S3; it is never dropped.
+- **Deviation from §3:** `conversation_media` staging is not needed until S3 (case files go straight to documents);
+  it arrives with intake conversations.
+- **Migration:** `V78__whatsapp_inbound_messages` (Java: DDL plus a digits backfill shared by PostgreSQL and H2).
+- **UI:** the message list marks "via WhatsApp" and says what happened to a file, in both languages.
+- **Proof:** `WhatsAppInboundProcessorTest` (9), webhook test, `CaseMessages.test.tsx`, `PostgresJpaMappingTest`.
 
 ## 10. Open items (do not block S0–S2)
 

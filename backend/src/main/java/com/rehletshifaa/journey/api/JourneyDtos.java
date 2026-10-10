@@ -106,7 +106,7 @@ public final class JourneyDtos {
                                         @Pattern(regexp="PARENT|CHILD|SPOUSE|SIBLING|RELATIVE|GUARDIAN|OTHER") String relationship) {}
     /** Adds the acting person and role so the journey reads as accountable history, not bare statuses. */
     public record TimelineEvent(String type,String label,Instant occurredAt,String status,String actorName,String actorRole,String note) {}
-    public record MessageView(UUID id,String threadType,String senderRole,String senderName,String direction,String body,String language,boolean internalOnly,boolean read,Instant createdAt) {}
+    public record MessageView(UUID id,String threadType,String senderRole,String senderName,String direction,String body,String language,boolean internalOnly,boolean read,Instant createdAt,String channel,UUID attachmentDocumentId,String attachmentStatus) {}
     public record TaskView(UUID id,UUID caseId,String type,String title,String description,String ownerSubject,String ownerRole,String visibilityScope,String priority,String status,boolean blocking,boolean overdue,Instant dueAt,long version) {}
     public record StaffDirectoryView(String subject,String name,String role) {}
     /** One responsibility record on a case (UX-7 Assignment history). assignedByKind: PERSON, ROUTING or SYSTEM; names only, never account identifiers. */

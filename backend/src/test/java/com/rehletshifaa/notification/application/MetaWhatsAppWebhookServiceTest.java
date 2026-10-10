@@ -14,11 +14,14 @@ import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class MetaWhatsAppWebhookServiceTest {
+    private final WhatsAppInboundStore inbound = mock(WhatsAppInboundStore.class);
     private final MetaWhatsAppWebhookService service = new MetaWhatsAppWebhookService(
-        mock(WhatsAppDeliveryEventRepository.class), mock(QueuedNotificationRepository.class), new ObjectMapper(), Clock.systemUTC(),
+        mock(WhatsAppDeliveryEventRepository.class), mock(QueuedNotificationRepository.class), inbound, new ObjectMapper(), Clock.systemUTC(),
         "test-app-secret", "test-verify-token");
 
     @Test void acceptsOnlyMatchingSubscriptionChallenge() {
@@ -38,4 +41,17 @@ class MetaWhatsAppWebhookServiceTest {
     }
 
     @Test void malformedSignedPayloadIsAClientErrorWithoutParserLeakage(){assertThatThrownBy(()->service.process("{".getBytes(StandardCharsets.UTF_8))).isInstanceOf(ApiException.class).hasMessage("The webhook payload is invalid");}
+
+    @Test void eachInboundMessageIsHandedToTheStoreWithTheSendersDigitsAndProfileName() {
+        String payload = """
+            {"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages","value":{
+              "contacts":[{"wa_id":"201001234567","profile":{"name":"Omar"}}],
+              "messages":[{"id":"wamid.A","from":"201001234567","timestamp":"1760000000","type":"text","text":{"body":"hi"}}]}}]}]}""";
+
+        service.process(payload.getBytes(StandardCharsets.UTF_8));
+
+        verify(inbound).record(eq("wamid.A"), eq("201001234567"), eq("text"),
+                argThat(json -> json.contains("\"profileName\":\"Omar\"") && json.contains("\"body\":\"hi\"")),
+                eq(java.time.Instant.ofEpochSecond(1760000000)));
+    }
 }

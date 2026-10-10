@@ -48,6 +48,30 @@ public class DocumentService {
         if(!result.clean()){document.scanFailed();documents.save(document);storage.delete(document.getObjectKey());throw new ApiException(422,"DOCUMENT_INSPECTION_FAILED","Uploaded document did not pass security inspection");}
         storage.markClean(document.getObjectKey());document.markClean();documents.save(document);return new ConfirmResponse(document.getId(),document.getStatus().name());
     }
+    /** A file that arrived on a patient channel (WhatsApp): the case document it became, or why there is none. */
+    public record ChannelFile(UUID documentId, String status) {}
+
+    /**
+     * Files bytes the server already holds as a document of the case. They are inspected before anything is stored,
+     * then sealed to a server-only key; type, size and the per-case limits are the upload rules. No verdict from the
+     * scanner throws {@link DocumentScanUnavailableException} so the caller retries; nothing is kept in between.
+     */
+    @Transactional public ChannelFile fileFromChannel(UUID caseId, byte[] content, String contentType, String originalFileName) {
+        String type = contentType == null ? "" : contentType.split(";")[0].trim().toLowerCase(Locale.ROOT);
+        if (!allowedTypes.contains(type)) return new ChannelFile(null, "UNSUPPORTED_TYPE");
+        if (content == null || content.length == 0 || content.length > maxBytes) return new ChannelFile(null, "TOO_LARGE");
+        try { validateQuota(caseId, content.length); } catch (ApiException e) { return new ChannelFile(null, "CASE_FILE_LIMIT"); }
+        var result = inspector.inspect(content, type);
+        if (result.retryable()) throw new DocumentScanUnavailableException(result.reasonCode());
+        if (!result.clean()) return new ChannelFile(null, "REJECTED");
+        UUID documentId = UUID.randomUUID(); LocalDate date = LocalDate.now(clock);
+        String objectKey = "medical/%d/%02d/%s".formatted(date.getYear(), date.getMonthValue(), UUID.randomUUID());
+        String original = sanitizeFileName(originalFileName == null || originalFileName.isBlank() ? "whatsapp" + extensionFor(type) : originalFileName);
+        var document = new MedicalDocument(documentId, cases.findById(caseId), objectKey, original, documentId + extensionFor(type), type, content.length, clock.instant());
+        storage.seal(objectKey, content, type); storage.markClean(objectKey);
+        document.quarantine(clock.instant()); document.markClean(); documents.save(document);
+        return new ChannelFile(documentId, "CLEAN");
+    }
     private void validate(String type,long bytes){ if(!allowedTypes.contains(type)) throw new ApiException(400,"UNSUPPORTED_FILE_TYPE","File type is not allowed"); if(bytes<=0 || bytes>maxBytes) throw new ApiException(400,"INVALID_FILE_SIZE","File size is outside the allowed range"); }
     private void validateQuota(UUID caseId,long requestedBytes){long count=documents.countByMedicalCaseIdAndStatusNot(caseId,DocumentStatus.REJECTED);long bytes=documents.totalBytesForCase(caseId,DocumentStatus.REJECTED);if(count>=maxFilesPerCase)throw new ApiException(409,"CASE_FILE_LIMIT_REACHED","The maximum number of documents for this case has been reached");if(bytes+requestedBytes>maxCaseBytes)throw new ApiException(409,"CASE_STORAGE_LIMIT_REACHED","The storage quota for this case has been reached");}
     private String extensionFor(String type){ return switch(type){case "application/pdf"->".pdf";case "image/png"->".png";case "image/jpeg"->".jpg";default->throw new ApiException(400,"UNSUPPORTED_FILE_TYPE","File type is not allowed");}; }

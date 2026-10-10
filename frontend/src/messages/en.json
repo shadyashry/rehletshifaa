@@ -1394,6 +1394,10 @@
           "title": "Patient asked for changes to the proposal",
           "context": "The patient asked for changes before continuing."
         },
+        "PATIENT_WHATSAPP_MESSAGE": {
+          "title": "New WhatsApp message from the patient",
+          "context": "The patient wrote on WhatsApp. Reply in the case's secure messages."
+        },
         "PATIENT_RESPONDED": {
           "title": "Review the information the patient provided",
           "context": "{patient} answered your information request."

@@ -1,8 +1,11 @@
 package com.rehletshifaa.casemanagement.domain;
 
+import com.rehletshifaa.shared.PhoneDigits;
 import com.rehletshifaa.shared.persistence.AssignedIdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -24,6 +27,7 @@ public class CaseSubmissionContact extends AssignedIdEntity {
     @Column(name = "relationship_to_patient", length = 40) private String relationshipToPatient;
     @Column(length = 254) private String email;
     @Column(name = "whatsapp_number", length = 32) private String whatsappNumber;
+    @Column(name = "whatsapp_digits", length = 20) private String whatsappDigits;
     @Column(name = "preferred_language", length = 8) private String preferredLanguage;
     @Column(name = "created_at", nullable = false) private Instant createdAt;
 
@@ -41,4 +45,8 @@ public class CaseSubmissionContact extends AssignedIdEntity {
     public String getContactRole() { return contactRole; }
     public String getWhatsappNumber() { return whatsappNumber; }
     public String getEmail() { return email; }
+
+    /** Keeps the digits an inbound WhatsApp {@code wa_id} is matched on in step with the number as entered. */
+    @PrePersist @PreUpdate
+    void syncWhatsappDigits() { whatsappDigits = PhoneDigits.of(whatsappNumber); }
 }

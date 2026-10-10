@@ -2,6 +2,8 @@ package com.rehletshifaa.notification.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.rehletshifaa.shared.PhoneDigits;
 import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,6 +30,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 public class MetaWhatsAppWebhookService {
     private final WhatsAppDeliveryEventRepository deliveryEvents;
     private final QueuedNotificationRepository messages;
+    private final WhatsAppInboundStore inbound;
     private final ObjectMapper json;
     private final Clock clock;
     private final byte[] appSecret;
@@ -36,6 +39,7 @@ public class MetaWhatsAppWebhookService {
     public MetaWhatsAppWebhookService(
         WhatsAppDeliveryEventRepository deliveryEvents,
         QueuedNotificationRepository messages,
+        WhatsAppInboundStore inbound,
         ObjectMapper json,
         Clock clock,
         @Value("${app.whatsapp.meta.app-secret}") String appSecret,
@@ -43,6 +47,7 @@ public class MetaWhatsAppWebhookService {
     ) {
         this.deliveryEvents = deliveryEvents;
         this.messages = messages;
+        this.inbound = inbound;
         this.json = json;
         this.clock = clock;
         this.appSecret = required(appSecret, "WHATSAPP_META_APP_SECRET").getBytes(StandardCharsets.UTF_8);
@@ -72,11 +77,38 @@ public class MetaWhatsAppWebhookService {
         try {
             JsonNode root = json.readTree(payload);
             for (JsonNode entry : root.path("entry"))
-                for (JsonNode change : entry.path("changes"))
+                for (JsonNode change : entry.path("changes")) {
                     processStatuses(change.path("value").path("statuses"), payload);
+                    recordMessages(change.path("value"));
+                }
         } catch (Exception e) {
             throw new ApiException(400,"INVALID_WEBHOOK_PAYLOAD","The webhook payload is invalid");
         }
+    }
+
+    /**
+     * Messages people sent to the business number: stored once each, encrypted, with the sender's WhatsApp profile name,
+     * and filed later from the inbound store. Nothing else happens inside the webhook request.
+     */
+    private void recordMessages(JsonNode value) {
+        JsonNode list = value.path("messages");
+        if (!list.isArray()) return;
+        for (JsonNode message : list) {
+            String id = message.path("id").asText();
+            String sender = PhoneDigits.of(message.path("from").asText());
+            if (id.isBlank() || sender == null) continue;
+            ObjectNode stored = json.createObjectNode();
+            stored.set("message", message);
+            stored.put("profileName", profileName(value.path("contacts"), message.path("from").asText()));
+            inbound.record(id, sender, message.path("type").asText("unknown"), stored.toString(), parseTimestamp(message.path("timestamp").asText()));
+        }
+    }
+
+    private static String profileName(JsonNode contacts, String waId) {
+        if (!contacts.isArray()) return null;
+        for (JsonNode contact : contacts)
+            if (waId.equals(contact.path("wa_id").asText())) return contact.path("profile").path("name").asText(null);
+        return null;
     }
 
     private void processStatuses(JsonNode statuses, byte[] payload) {

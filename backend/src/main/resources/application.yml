@@ -173,6 +173,9 @@ app:
     reminder-days: ${CREDENTIAL_REMINDER_DAYS:30,7,1}
   whatsapp:
     mode: ${WHATSAPP_MODE:noop}
+    inbound:
+      # How often stored inbound messages are filed into cases (WhatsAppInboundProcessor).
+      poll-milliseconds: ${WHATSAPP_INBOUND_POLL_MILLISECONDS:5000}
     webhook-url: ${WHATSAPP_WEBHOOK_URL:}
     token: ${WHATSAPP_TOKEN:}
     meta:

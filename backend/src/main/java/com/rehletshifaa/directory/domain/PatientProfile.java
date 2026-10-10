@@ -1,8 +1,11 @@
 package com.rehletshifaa.directory.domain;
 
+import com.rehletshifaa.shared.PhoneDigits;
 import com.rehletshifaa.shared.persistence.AssignedIdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -25,6 +28,7 @@ public class PatientProfile extends AssignedIdEntity {
     @Column(name = "external_subject") private String externalSubject;
     @Column(nullable = false, length = 80) private String country;
     @Column(name = "whatsapp_number", length = 32) private String whatsappNumber;
+    @Column(name = "whatsapp_digits", length = 20) private String whatsappDigits;
     @Column(length = 254) private String email;
     @Column(name = "preferred_language", nullable = false, length = 8) private String preferredLanguage;
     @Column(name = "time_zone", length = 80) private String timeZone;
@@ -191,4 +195,8 @@ public class PatientProfile extends AssignedIdEntity {
     public String getAccountStatus() { return accountStatus; }
     public UUID getMergedIntoPatientId() { return mergedIntoPatientId; }
     public boolean sameEmail(String other) { return Objects.equals(email, other); }
+
+    /** Keeps the digits an inbound WhatsApp {@code wa_id} is matched on in step with the number as entered. */
+    @PrePersist @PreUpdate
+    void syncWhatsappDigits() { whatsappDigits = PhoneDigits.of(whatsappNumber); }
 }

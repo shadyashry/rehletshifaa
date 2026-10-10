@@ -59,6 +59,8 @@ public class CaseWorkspaceQueryService {
             Role.PATIENT, Set.of("PATIENT_COORDINATOR"), Role.PATIENT_REPRESENTATIVE, Set.of("PATIENT_COORDINATOR"),
             Role.CONSULTANT, Set.of("COORDINATOR_DOCTOR"), Role.OPERATIONS, Set.of("COORDINATOR_OPERATIONS"), Role.FINANCE, Set.of("COORDINATOR_FINANCE"),
             Role.COORDINATOR, Set.of("PATIENT_COORDINATOR", "COORDINATOR_DOCTOR", "COORDINATOR_OPERATIONS", "COORDINATOR_FINANCE"));
+    private static final Set<Role> PATIENT_SIDE = Set.of(Role.PATIENT, Role.PATIENT_REPRESENTATIVE);
+    private static final Set<String> PATIENT_SIDE_ROLES = Set.of("PATIENT", "PATIENT_REPRESENTATIVE");
     private static final Set<String> DELIVERED_STATUSES = Set.of("RELEASED", "VIEWED", "ACCEPTED", "DECLINED", "REVISION_REQUESTED");
     private static final Set<String> CLOSED_TASK_STATUSES = Set.of("COMPLETED", "CANCELLED");
 
@@ -119,10 +121,13 @@ public class CaseWorkspaceQueryService {
         List<TimelineEvent> timeline = timelineRows.stream().map(r -> new TimelineEvent("STATUS", r.getToStatus(), r.getCreatedAt(), r.getToStatus(),
                 names.actor(r.getActorSubject(), r.getActorRole()), r.getActorRole(), r.getReason())).toList();
         List<MessageView> messageViews = messageRows.stream().map(m -> {
-            boolean mine = m.getSenderSubject().equals(actor.subject());
+            // A patient's own words are theirs whichever way they arrived (portal, secure link, WhatsApp).
+            boolean mine = m.getSenderSubject().equals(actor.subject())
+                    || (PATIENT_SIDE.contains(actor.role()) && PATIENT_SIDE_ROLES.contains(m.getSenderRole()));
             return new MessageView(m.getId(), m.getThreadType(), m.getSenderRole(), names.sender(m.getSenderSubject(), m.getSenderRole()),
                     mine ? "OUTBOUND" : "INBOUND", decrypt(m.getBody()), m.getLanguage(), Boolean.TRUE.equals(m.getInternalOnly()),
-                    mine || Boolean.TRUE.equals(m.getReadByReader()), m.getCreatedAt());
+                    mine || Boolean.TRUE.equals(m.getReadByReader()), m.getCreatedAt(),
+                    m.getChannel(), m.getAttachmentDocumentId(), m.getAttachmentStatus());
         }).toList();
         List<AssignmentView> assignmentViews = assignmentRows.stream().map(a -> new AssignmentView(a.getId(), a.getSubject(),
                 names.actor(a.getSubject(), a.getRole()), a.getRole(), a.getType(), a.getStatus(), a.getAssignedAt(), a.getVersion())).toList();
