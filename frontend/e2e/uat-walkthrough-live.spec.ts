@@ -104,6 +104,8 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
     preferredLanguage: "en", consent: true, turnstileToken: null, email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: false,
   }, 201);
   const caseId = created.body.caseId, caseNumber = created.body.caseNumber;
+  // The stack is shared: other runs mail the same mailboxes, so every "nothing else was sent" check is about this case.
+  const mailForCase = async (to: string, since: number) => (await mailTo(request, to, since)).filter(m => m.Subject.includes(caseNumber));
   await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200,{"X-Case-Grant":created.body.intakeGrant});
   // Locally the seeded policy gives only this login capacity, so routing is deterministic: the request is theirs at
   // once, and the notice reaches their own mailbox with the reference only, never patient facts.
@@ -112,7 +114,7 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   expect(routed.Text).not.toMatch(/Playwright|UAT Pass|Kenya/);
   // Nothing waits in the team queue, so the team mailbox is not told a new request is waiting there.
   await settle();
-  expect((await mailTo(request, TEAM_MAILBOX, started)).filter(m => m.Subject.includes(caseNumber) && /New care request/.test(m.Subject)),
+  expect((await mailForCase(TEAM_MAILBOX, started)).filter(m => /New care request/.test(m.Subject)),
     "routed on submit: no team-queue mail").toHaveLength(0);
 
   const workspace = async (s: Session = coordinator, prefix = "coordinator") => (await call<Workspace>(s, "GET", `/${prefix}/cases/${caseId}`, undefined, 200)).body;
@@ -138,9 +140,9 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   expect(consultantMail.Text).toContain("consultant workspace");
   expect(consultantMail.Text).not.toMatch(/coordinator/i);
   await settle();
-  expect((await mailTo(request, COORDINATOR_MAILBOX, assignedAt)).filter(m => /assignment/i.test(m.Subject)), "the coordinator gets no copy of the consultant's assignment").toHaveLength(0);
-  expect((await mailTo(request, TEAM_MAILBOX, assignedAt)).filter(m => /assignment/i.test(m.Subject))).toHaveLength(0);
-  expect((await mailTo(request, DOCTOR_MAILBOX, assignedAt)).filter(m => /New clinical assignment/.test(m.Subject)), "sent exactly once").toHaveLength(1);
+  expect((await mailForCase(COORDINATOR_MAILBOX, assignedAt)).filter(m => /assignment/i.test(m.Subject)), "the coordinator gets no copy of the consultant's assignment").toHaveLength(0);
+  expect((await mailForCase(TEAM_MAILBOX, assignedAt)).filter(m => /assignment/i.test(m.Subject))).toHaveLength(0);
+  expect((await mailForCase(DOCTOR_MAILBOX, assignedAt)).filter(m => /New clinical assignment/.test(m.Subject)), "sent exactly once").toHaveLength(1);
 
   // Priority derived, not defaulted; responsibility with the consultant; coordinator commands withdrawn.
   let ws = await workspace();
@@ -292,10 +294,10 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   expect(depositMail.To.map(t => t.Address)).toEqual([COORDINATOR_MAILBOX]);
   expect(depositMail.Text).toContain("coordination deposit");
   await settle();
-  const coordinatorSinceDecision = (await mailTo(request, COORDINATOR_MAILBOX, decidedAt));
+  const coordinatorSinceDecision = (await mailForCase(COORDINATOR_MAILBOX, decidedAt));
   expect(coordinatorSinceDecision, "one coordinator email for one piece of work").toHaveLength(1);
-  expect((await mailTo(request, TEAM_MAILBOX, decidedAt)).filter(m => /deposit/i.test(m.Subject)), "an owned case never falls back to the team mailbox").toHaveLength(0);
-  expect((await mailTo(request, COORDINATOR_MAILBOX, releasedAt)).filter(m => /Deposit received/.test(m.Subject)), "no 'deposit received' wording before any deposit").toHaveLength(0);
+  expect((await mailForCase(TEAM_MAILBOX, decidedAt)).filter(m => /deposit/i.test(m.Subject)), "an owned case never falls back to the team mailbox").toHaveLength(0);
+  expect((await mailForCase(COORDINATOR_MAILBOX, releasedAt)).filter(m => /Deposit received/.test(m.Subject)), "no 'deposit received' wording before any deposit").toHaveLength(0);
 
   // The coordinator page now says what is happening and whose move it is.
   await coordinator.page.goto(`/en/portal?case=${caseId}`);
