@@ -369,9 +369,12 @@ The §4.8 rule ("owner offboarded or deactivated → re-routed; covers revoked")
 - **Onboarding:** a new coordinator has no intake setting and does not take new conversations until a Care Coordination
   Manager decides. Control Center → WhatsApp conversations lists them first as "Not set up yet". The switch stays with
   `ROUTING_CONFIGURE`, not the System Administrator's people screen (separation of duties).
-- **Not changed:** cases are not re-routed automatically; a departing primary coordinator's cases stay behind the existing
-  `OPEN_CASE_ASSIGNMENTS` blocker for a lead or manager to reassign (an active cover keeps answering meanwhile).
-- **Proof:** `CoordinatorDepartureIntegrationTest` (6), `ConversationSetup.test.tsx` (3).
+- **Cases:** `coordination.CoordinatorDepartureService` re-routes every case the person owns through
+  `AssignmentEngine.releaseDepartedOwner` (case and routing locks; policy choice, else the queue with the manager alert),
+  moving their open coordinator work too; decision source `OWNER_LEFT_ROLE`, new owner told by
+  `CASE_OWNERSHIP_TRANSFERRED`. The same 15-minute sweep covers a scheduled role end. Restoring sign-in does not move
+  cases back: a temporary disable costs continuity, but no patient is left without someone able to reply.
+- **Proof:** `CoordinatorDepartureIntegrationTest` (6), `CoordinationIntegrationTest` (+4), `ConversationSetup.test.tsx` (3).
 
 All slices S0–S6 are delivered. Before go-live: Meta Business Verification and template approval (Arabic reviewed by a
 native speaker), `WHATSAPP_MODE=meta` with the production number, switch coordinators on for intake, a live end-to-end

@@ -136,6 +136,8 @@ public class CoordinationRepository {
     private UUID consultantOf(UUID caseId) {
         return assignments.findPrimaryConsultantIds(caseId, Limit.of(1)).stream().findFirst().orElse(null);
     }
+    public List<UUID> casesOwnedBy(String coordinator) { return assignments.findCasesOwnedByCoordinator(coordinator); }
+    public List<String> caseOwners() { return assignments.findActivePrimaryCoordinators(); }
     public String owner(UUID id) {
         return assignments.findActivePrimaryCoordinator(id, Limit.of(1)).stream().findFirst().orElse(null);
     }

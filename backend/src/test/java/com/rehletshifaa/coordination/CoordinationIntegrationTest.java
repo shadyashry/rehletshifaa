@@ -29,6 +29,8 @@ class CoordinationIntegrationTest {
     @Autowired CoordinationReadService reads;
     @Autowired JdbcTemplate jdbc;
     @Autowired CryptoService crypto;
+    @Autowired CoordinatorDepartureService departures;
+    @Autowired org.springframework.context.ApplicationEventPublisher events;
     UUID consultant, caseId, team;
     Instant past = Instant.now().minusSeconds(300), future = Instant.now().plusSeconds(86400);
 
@@ -448,6 +450,52 @@ class CoordinationIntegrationTest {
         assertThat(engine.routeCoordinatorWork(other)).isPresent();
         assertThat(repo.queued(other)).isFalse();
         assertThat(count("SELECT COUNT(DISTINCT command_key) FROM coordination_decisions WHERE case_id=?", other)).isEqualTo(2);
+    }
+
+    // ---- a case's Coordinator leaves the role ----
+
+    void leaves(String subject) {
+        jdbc.update("UPDATE workforce_people SET lifecycle_status='SIGNIN_DISABLED' WHERE subject=?", subject);
+        events.publishEvent(new com.rehletshifaa.workforce.application.WorkforceEvents.StaffAccessReduced(subject, "routing-manager", "Left"));
+    }
+
+    @Test void aCoordinatorWhoLeavesHandsTheirCasesAndOpenWorkToAnotherEligibleCoordinator() {
+        assertThat(command("AUTO", 0, null).selectedOwner()).isEqualTo("routing-a");
+        UUID work = task("COORDINATOR", "routing-a");
+
+        leaves("routing-a");
+
+        assertThat(repo.owner(caseId)).isEqualTo("routing-b");
+        assertThat(count("SELECT COUNT(*) FROM case_tasks WHERE id=? AND owner_subject='routing-b'", work)).isOne();
+        assertThat(repo.history(caseId)).filteredOn(d -> d.source().equals("OWNER_LEFT_ROLE")).singleElement().satisfies(d -> {
+            assertThat(d.previousOwner()).isEqualTo("routing-a");
+            assertThat(exclusions(d, "routing-a")).contains("NOT_AN_ACTIVE_COORDINATOR");
+        });
+        assertThat(count("SELECT COUNT(*) FROM staff_notifications WHERE recipient_subject='routing-b' AND event_type='CASE_OWNERSHIP_TRANSFERRED'")).isOne();
+    }
+
+    @Test void withNobodyElseEligibleTheCaseGoesToTheQueueForAManager() {
+        assertThat(command("AUTO", 0, null).selectedOwner()).isEqualTo("routing-a");
+        capacity("routing-b", 10, false);
+
+        leaves("routing-a");
+
+        assertThat(repo.owner(caseId)).isNull();
+        assertThat(repo.queued(caseId)).isTrue();
+    }
+
+    @Test void someoneWhoStillHoldsTheRoleKeepsTheirCases() {
+        assertThat(command("AUTO", 0, null).selectedOwner()).isEqualTo("routing-a");
+        events.publishEvent(new com.rehletshifaa.workforce.application.WorkforceEvents.StaffAccessReduced("routing-a", "routing-manager", "Other role removed"));
+        assertThat(repo.owner(caseId)).isEqualTo("routing-a");
+    }
+
+    @Test void aRoleThatEndedOnItsDateIsSweptLikeADeparture() {
+        assertThat(command("AUTO", 0, null).selectedOwner()).isEqualTo("routing-a");
+        jdbc.update("UPDATE workforce_role_assignments SET effective_to=? WHERE subject='routing-a' AND role_key='COORDINATOR'",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(5)));
+        departures.releaseDepartedOwners();
+        assertThat(repo.owner(caseId)).isEqualTo("routing-b");
     }
 
     Decision command(String action, long revision, String target) {

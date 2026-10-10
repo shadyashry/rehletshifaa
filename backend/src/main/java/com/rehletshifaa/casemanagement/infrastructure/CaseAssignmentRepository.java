@@ -80,6 +80,18 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
     java.util.Optional<String> findStatusFor(@Param("id") UUID id, @Param("caseId") UUID caseId, @Param("subject") String subject,
                                              @Param("role") String role);
 
+    /** Cases whose active primary coordinator is this person. */
+    @Query("""
+            select distinct a.caseId from CaseAssignment a
+            where a.assigneeSubject = :subject and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'""")
+    java.util.List<UUID> findCasesOwnedByCoordinator(@Param("subject") String subject);
+
+    /** Everyone who is the active primary coordinator of at least one case. */
+    @Query("""
+            select distinct a.assigneeSubject from CaseAssignment a
+            where a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'""")
+    java.util.List<String> findActivePrimaryCoordinators();
+
     /** The case's active primary coordinator, newest assignment first (pass {@code Limit.of(1)}). */
     @Query("""
             select a.assigneeSubject from CaseAssignment a

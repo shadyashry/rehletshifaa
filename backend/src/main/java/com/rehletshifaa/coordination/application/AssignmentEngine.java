@@ -174,6 +174,30 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
         return repo.ownerAssignmentId(caseId);
     }
 
+    /**
+     * The case's Coordinator left the role (sign-in disabled, offboarding, role ended): the case goes to another eligible
+     * coordinator by the routing policy, or to the coordination queue, with their open coordinator work. The departed
+     * person is never chosen again because eligibility excludes anyone who is not an active Coordinator.
+     */
+    @Transactional
+    public void releaseDepartedOwner(UUID caseId, String departed) {
+        repo.lockCase(caseId);
+        repo.lock();
+        CaseFacts c = repo.facts(caseId);
+        if (CLOSED.contains(c.status()) || !departed.equals(c.owner())) return;
+        Instant now = clock.instant();
+        Command command = new Command("owner-left:" + caseId + ":" + c.revision(), c.revision(), "AUTO", null, null, null, "OWNER_LEFT_ROLE");
+        Optional<Policy> policy = config.effectivePolicy(now);
+        if (policy.isEmpty()) {
+            persist(c, null, null, List.of(), new Selection(null, null, "NO_ROUTING_POLICY", List.of()), command, "SYSTEM", repo.encode(command), now);
+            return;
+        }
+        Policy p = policy.get();
+        Preference preference = config.effectivePreference(c.consultantId(), now);
+        List<Candidate> candidates = eligibility.evaluate(c, p, now);
+        persist(c, p, preference, candidates, choose(c, p, preference, candidates), command, "SYSTEM", repo.encode(command), now);
+    }
+
     /** A manager may reassign any case; a lead only a case whose owner, and whose new owner, they supervise. */
     private String authorizeReassignment(UUID caseId, String target) {
         if (authority.allowed(Permission.ROUTING_ASSIGN, Resource.platform())) return authority.require(Permission.ROUTING_ASSIGN).subject();
