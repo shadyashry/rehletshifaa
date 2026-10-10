@@ -5,8 +5,8 @@ import type { Mutate, StaffMember } from "@/components/portal/portal-model";
 import { ATTACHMENT } from "@/components/portal/CaseMessages";
 
 export type ConversationSummary={id:string;name?:string|null;phoneHint:string;language:string;ownerSubject?:string|null;ownerName?:string|null;lastInboundAt?:string|null;windowExpiresAt?:string|null;windowOpen:boolean};
-type ConversationMessage={id:string;direction:"IN"|"OUT";senderName?:string|null;kind:string;body:string;language:string;attachmentStatus?:string|null;mediaId?:string|null;fileName?:string|null;createdAt:string};
-type ConversationDetail={summary:ConversationSummary;status:string;messages:ConversationMessage[];coverName?:string|null;canReply:boolean;canClaim:boolean;canReassign:boolean;canClose:boolean};
+export type ConversationMessage={id:string;direction:"IN"|"OUT";senderName?:string|null;kind:string;body:string;language:string;attachmentStatus?:string|null;mediaId?:string|null;fileName?:string|null;createdAt:string};
+export type ConversationDetail={summary:ConversationSummary;status:string;messages:ConversationMessage[];coverName?:string|null;canReply:boolean;canClaim:boolean;canReassign:boolean;canClose:boolean};
 type Scope="mine"|"queue"|"team";
 type Fetch=<T,>(path:string)=>Promise<T>;
 

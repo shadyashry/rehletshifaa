@@ -17,7 +17,7 @@ created under the same template name.
 - **Languages:** `en` and `ar` (`app.whatsapp.meta.languages`).
 - Button text ≤ 25 characters; bodies do not start or end with a variable.
 
-## Bound now (S0, S3)
+## Bound now (S0, S3, S4)
 
 | Template | Outbox key | Button (en / ar) → route |
 |---|---|---|
@@ -30,6 +30,7 @@ created under the same template name.
 | `rs_deposit_settled` | `deposit-settled-patient` | none |
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
 | `rs_followup_window_closed` | `intake-followup` | none |
+| `rs_coordinator_intro` | `coordinator-intro` | none (1 body variable: the coordinator's name) |
 | `rs_code` (Authentication) | `case-access-code`, `proposal-access-code` | Copy code (Meta preset); set `WHATSAPP_META_AUTH_TEMPLATE` |
 
 Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (see `application.yml`).
@@ -68,6 +69,11 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 - en: Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation.
 - ar: لدى منسّقك في رحلة شفاء تحديث لك. ردّ على هذه الرسالة لمتابعة المحادثة.
 
+**`rs_coordinator_intro`** (S4: the case went to a different coordinator than the one on WhatsApp) — `{{1}}` the coordinator's name
+- en: Hello, {{1}} from RehletShifaa will be your coordinator from now on and will continue your conversation here.
+- ar: مرحباً، سيكون {{1}} من رحلة شفاء منسّقك من الآن وسيتابع محادثتك هنا.
+- Sample value for review: `Omar Ali` / `عمر علي`.
+
 **`rs_decision_recorded`** — `{{1}}` the decision in words, `{{2}}` who was spoken to, `{{3}}` the date
 (all filled by the backend in the template's language)
 - en: Your coordinator recorded your decision on your RehletShifaa proposal ({{1}}) after speaking with {{2}} on {{3}}. If this is not what was agreed, please contact your coordinator.
@@ -80,6 +86,5 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 | Template | Slice | en |
 |---|---|---|
 | `rs_out_of_hours` | S5 | Thank you for contacting RehletShifaa. Our coordinators are available Saturday to Thursday, 10:00–20:00 Cairo time, and will reply when we open. |
-| `rs_coordinator_intro` | S4 | Hello, {{1}} from RehletShifaa will be your coordinator from now on and will continue your conversation here. |
 
 Arabic for these is written when the slice starts, with the same native review.

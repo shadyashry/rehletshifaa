@@ -5,6 +5,8 @@ import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.application.Principal;
 import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.casemanagement.application.IntakeEvents;
+import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.conversation.domain.ConversationMedia;
 import com.rehletshifaa.conversation.domain.IntakeConversation;
 import com.rehletshifaa.conversation.domain.IntakeMessage;
@@ -25,6 +27,8 @@ import com.rehletshifaa.workforce.application.WorkforceDirectory;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -63,11 +67,15 @@ public class IntakeConversationService {
     private final CryptoService crypto;
     private final ObjectMapper json;
     private final Clock clock;
+    private final ConversationDirectory directory;
+    private final CaseAssignmentRepository assignments;
 
     public IntakeConversationService(IntakeConversationRepository conversations, IntakeMessageRepository messages, ConversationMediaRepository media,
                                      IntakeRoutingService routing, ReplyCoverService covers, WorkforceDirectory workforce, StaffWorkService work,
                                      NotificationOutbox outbox, DocumentService documents, Authority authority, AuditTrail auditTrail,
-                                     CryptoService crypto, ObjectMapper json, Clock clock) {
+                                     CryptoService crypto, ObjectMapper json, Clock clock, ConversationDirectory directory,
+                                     CaseAssignmentRepository assignments) {
+        this.directory = directory; this.assignments = assignments;
         this.conversations = conversations; this.messages = messages; this.media = media; this.routing = routing; this.covers = covers;
         this.workforce = workforce; this.work = work; this.outbox = outbox; this.documents = documents; this.authority = authority;
         this.auditTrail = auditTrail; this.crypto = crypto; this.json = json; this.clock = clock;
@@ -139,6 +147,59 @@ public class IntakeConversationService {
         return Optional.of(conversation.getId());
     }
 
+    // ---- hand-off to the case (S4) ----
+
+    /** After the submission's routing has run (it shares the transaction), so the case owner is known here. */
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void onCaseSubmitted(IntakeEvents.CaseSubmitted event) { linkToCase(event.caseId()); }
+
+    /**
+     * The person sent their case: their intake conversation is linked to it (and now continues in the case's secure
+     * thread), its staged files become case documents, and if routing gave the case to someone other than the intake
+     * owner, the new coordinator is introduced by name on WhatsApp.
+     */
+    @Transactional
+    public void linkToCase(UUID caseId) {
+        if (conversations.findFirstByLinkedCaseId(caseId).isPresent()) return;
+        var found = directory.conversationFor(caseId);
+        if (found.isEmpty()) return;
+        IntakeConversation c = conversations.lockById(found.get().getId()).orElseThrow(IntakeConversationService::notFound);
+        if ("LINKED".equals(c.getStatus())) return;
+        Instant now = clock.instant();
+        for (ConversationMedia file : media.findByConversationIdAndDocumentIdIsNull(c.getId())) {
+            UUID documentId = documents.adoptStaged(caseId, file.getObjectKey(), file.getContentType(), file.getSizeBytes(), file.getOriginalFileName());
+            if (documentId != null) { file.adopted(documentId); media.save(file); }
+        }
+        String intakeOwner = c.getOwnerSubject();
+        c.link(caseId, now);
+        conversations.saveAndFlush(c);
+        String caseOwner = assignments.findActivePrimaryCoordinator(caseId, Limit.of(1)).stream().findFirst().orElse(null);
+        if (caseOwner != null && !caseOwner.equals(intakeOwner)) {
+            String name = name(caseOwner);
+            if (name != null) {
+                UUID messageId = UUID.randomUUID();
+                outbox.enqueue("INTAKE_INTRO", "WHATSAPP", "+" + c.getWaDigits(), "coordinator-intro",
+                        EncryptedText.encode(crypto, json(Map.of("name", name, "lang", c.getLanguage()))), "intake-intro:" + caseId, now);
+                String shown = "ar".equals(c.getLanguage())
+                        ? "مرحباً، سيكون " + name + " من رحلة شفاء منسّقك من الآن وسيتابع محادثتك هنا."
+                        : "Hello, " + name + " from RehletShifaa will be your coordinator from now on and will continue your conversation here.";
+                messages.saveAndFlush(IntakeMessage.outbound(messageId, c.getId(), "SYSTEM", "TEMPLATE", EncryptedText.encode(crypto, shown), c.getLanguage(), now));
+            }
+        }
+        auditTrail.event("INTAKE_CONVERSATION_LINKED").actor("SYSTEM", "ROUTING_ENGINE").caseId(caseId).entity("IntakeConversation", c.getId())
+                .action("LINK").reason(caseOwner != null && caseOwner.equals(intakeOwner) ? "INTAKE_OWNER_KEPT" : "HANDED_OFF").record();
+    }
+
+    /** The intake conversation that became this case, read-only, for whoever may read the case. */
+    @Transactional(readOnly = true)
+    public ConversationDetail historyForCase(UUID caseId) {
+        authority.authorize(Permission.CASE_READ, Resource.ofCase(caseId));
+        IntakeConversation c = conversations.findFirstByLinkedCaseId(caseId)
+                .orElseThrow(() -> new ApiException(404, "NO_LINKED_CONVERSATION", "This case has no earlier WhatsApp conversation"));
+        Instant now = clock.instant();
+        return new ConversationDetail(summary(c, now), c.getStatus(), thread(c.getId()), null, false, false, false, false);
+    }
+
     /** Tells whoever answers the conversation now (the owner, or their cover instead). */
     private void notifyOwner(IntakeConversation c, String event, String title, String context, String key) {
         String replier = covers.activeCoverOf(c.getOwnerSubject()).map(cover -> cover.getCoverSubject()).orElse(c.getOwnerSubject());
@@ -178,13 +239,7 @@ public class IntakeConversationService {
         Resource resource = Resource.ofConversation(id, c.getOwnerSubject());
         authority.authorize(Permission.CONVERSATION_READ, resource);
         Instant now = clock.instant();
-        Map<UUID, ConversationMedia> files = new java.util.HashMap<>();
-        List<ConversationMessage> thread = messages.findByConversationIdOrderByCreatedAt(id).stream().map(m -> {
-            ConversationMedia file = m.getMediaId() == null ? null : files.computeIfAbsent(m.getMediaId(), k -> media.findById(k).orElse(null));
-            return new ConversationMessage(m.getId(), m.getDirection(), m.getSenderSubject() == null ? null : name(m.getSenderSubject()), m.getKind(),
-                    EncryptedText.decode(crypto, m.getBody()), m.getLanguage(), m.getAttachmentStatus(), m.getMediaId(),
-                    file == null ? null : file.getOriginalFileName(), m.getCreatedAt());
-        }).toList();
+        List<ConversationMessage> thread = thread(id);
         String coverName = c.getOwnerSubject() == null ? null : covers.activeCoverOf(c.getOwnerSubject()).map(x -> name(x.getCoverSubject())).orElse(null);
         boolean open = c.isOpen();
         return new ConversationDetail(summary(c, now), c.getStatus(), thread, coverName,
@@ -294,6 +349,16 @@ public class IntakeConversationService {
         if (!authority.allowed(Permission.CONVERSATION_REPLY, Resource.ofConversation(id, c.getOwnerSubject())))
             throw new ApiException(403, "CONVERSATION_REPLY_NOT_YOURS", "Only the conversation's coordinator, or their cover while they are away, can reply");
         return c;
+    }
+
+    private List<ConversationMessage> thread(UUID id) {
+        Map<UUID, ConversationMedia> files = new java.util.HashMap<>();
+        return messages.findByConversationIdOrderByCreatedAt(id).stream().map(m -> {
+            ConversationMedia file = m.getMediaId() == null ? null : files.computeIfAbsent(m.getMediaId(), k -> media.findById(k).orElse(null));
+            String sender = m.getSenderSubject() == null || "SYSTEM".equals(m.getSenderSubject()) ? null : name(m.getSenderSubject());
+            return new ConversationMessage(m.getId(), m.getDirection(), sender, m.getKind(), EncryptedText.decode(crypto, m.getBody()), m.getLanguage(),
+                    m.getAttachmentStatus(), m.getMediaId(), file == null ? null : file.getOriginalFileName(), m.getCreatedAt());
+        }).toList();
     }
 
     private ConversationSummary summary(IntakeConversation c, Instant now) {

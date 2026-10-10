@@ -56,6 +56,9 @@ public class IntakeConversation extends AssignedIdEntity {
 
     public void reopen() { status = "OPEN"; closedAt = null; closedReason = null; revision++; }
 
+    /** The person sent their case: the conversation continues in the case's secure thread. */
+    public void link(UUID caseId, Instant now) { status = "LINKED"; linkedCaseId = caseId; closedAt = micros(now); closedReason = "CASE_SUBMITTED"; revision++; }
+
     public void close(String reason, Instant now) { status = "CLOSED"; closedReason = reason; closedAt = micros(now); revision++; }
 
     public boolean windowOpen(Instant now) { return windowExpiresAt != null && now.isBefore(windowExpiresAt); }

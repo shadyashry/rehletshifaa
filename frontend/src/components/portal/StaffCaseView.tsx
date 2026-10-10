@@ -9,6 +9,8 @@ import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CoordinatorActionForm, MoreActions } from "@/components/portal/CoordinatorActions";
 import { RecordProposalDecision } from "@/components/portal/RecordProposalDecision";
 import { CaseMessages } from "@/components/portal/CaseMessages";
+import { IntakeHistory } from "@/components/portal/IntakeHistory";
+import type { ConversationDetail } from "@/components/portal/ConversationsView";
 import type { ProposalCopy } from "@/components/portal/PatientProposal";
 import { JourneyPulse, FullJourneyDialog } from "@/components/portal/JourneySnapshot";
 import { CurrentActionPanel, type CaseActions } from "@/components/portal/CurrentAction";
@@ -32,7 +34,7 @@ const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAss
 const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnership").then(m=>m.TransferOwnership));
 const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatientResponse").then(m=>m.RecordPatientResponse));
 
-export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
+export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
 
 /**
  * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
@@ -64,7 +66,7 @@ type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
-export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
+export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
  const work=useWorkCopy();
  const c=value.caseSummary;
  const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,mySubject]);
@@ -260,7 +262,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   </div>
 
   {overlay==="journey"&&<FullJourneyDialog locale={locale} timeline={value.timeline} caseNumber={c.caseNumber} onClose={()=>closeOverlay("journey")}/>}
-  {overlay==="messages"&&<CaseDrawer locale={locale} title={locale==="ar"?"الرسائل الآمنة":"Secure messages"} onClose={()=>closeOverlay("messages")}><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={showActions} patientReply={value.patientReply} busy={busy} mutate={mutate}/></CaseDrawer>}
+  {overlay==="messages"&&<CaseDrawer locale={locale} title={locale==="ar"?"الرسائل الآمنة":"Secure messages"} onClose={()=>closeOverlay("messages")}><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={showActions} patientReply={value.patientReply} busy={busy} mutate={mutate}/>{isCoordinator&&loadIntakeHistory&&<IntakeHistory locale={locale} caseId={c.id} load={loadIntakeHistory}/>}</CaseDrawer>}
   {overlay==="more"&&<CaseDrawer locale={locale} title={locale==="ar"?"إجراءات إضافية":"More actions"} onClose={()=>closeOverlay("more")}>
    <MoreActions locale={locale} caseId={c.id} available={moreAvailable} travelPackage={!!c.travelPackageRequested} version={c.version} busy={busy} mutate={mutate}
     onRequestInformation={()=>setOverlay("requestInfo")} onRecordResponse={()=>setOverlay("recordResponse")}

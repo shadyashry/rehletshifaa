@@ -21,6 +21,9 @@ public interface IntakeConversationRepository extends BaseRepository<IntakeConve
 
     long countByOwnerSubjectAndStatus(String ownerSubject, String status);
 
+    /** The conversation that became this case, if any. */
+    java.util.Optional<IntakeConversation> findFirstByLinkedCaseId(UUID caseId);
+
     @Query("select c from IntakeConversation c where c.status = 'OPEN' and c.ownerSubject in :owners order by c.lastInboundAt desc")
     List<IntakeConversation> findOpenOwnedBy(@Param("owners") Collection<String> owners);
 

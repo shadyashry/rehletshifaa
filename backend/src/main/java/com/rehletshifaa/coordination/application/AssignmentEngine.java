@@ -46,11 +46,12 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
     private final WorkforceDirectory workforce;
     private final GovernanceAuditLog audit;
     private final StaffWorkService work;
+    private final IntakeContinuity intake;
     private final Clock clock;
 
     public AssignmentEngine(CoordinationRepository repo, CoordinationConfigurationService config, CoordinatorEligibilityService eligibility,
                             CoordinatorScoringService scoring, Authority authority, WorkforceDirectory workforce, GovernanceAuditLog audit,
-                            StaffWorkService work, Clock clock, MedicalCaseRepository cases) { this.cases = cases;
+                            StaffWorkService work, Clock clock, MedicalCaseRepository cases, IntakeContinuity intake) { this.cases = cases; this.intake = intake;
         this.repo = repo; this.config = config; this.eligibility = eligibility; this.scoring = scoring; this.authority = authority;
         this.workforce = workforce; this.audit = audit; this.work = work; this.clock = clock;
     }
@@ -280,6 +281,13 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
     }
 
     private Selection choose(CaseFacts c, Policy p, Preference preference, List<Candidate> candidates) {
+        // The coordinator already talking to this person on WhatsApp keeps them, when eligible for the case (R7).
+        if (c.owner() == null) {
+            Optional<String> intakeOwner = intake.intakeOwnerForCase(c.id());
+            if (intakeOwner.isPresent()) for (Candidate x : candidates)
+                if (x.subject().equals(intakeOwner.get()) && x.exclusions().isEmpty() && !x.teams().isEmpty())
+                    return new Selection(x.subject(), x.teams().getFirst(), "INTAKE_CONTINUITY", scoring.score(candidates, p.configuration()));
+        }
         Map<UUID, UUID> fallbacks = new HashMap<>();
         repo.teams().forEach(t -> { if (t.fallbackTeam() != null) fallbacks.put(t.id(), t.fallbackTeam()); });
         return scoring.select(c, p, preference, candidates, fallbacks);
@@ -288,6 +296,7 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
     private static String explain(Selection s) {
         return switch (s.path()) {
             case "CONTINUITY" -> "Existing eligible care coordinator retained for continuity.";
+            case "INTAKE_CONTINUITY" -> "The coordinator already talking with this person on WhatsApp is eligible and has capacity.";
             case "PREFERRED_COORDINATOR" -> "Consultant's preferred coordinator is eligible and has capacity.";
             case "NO_ELIGIBLE_COORDINATOR" -> "Nobody is eligible. Work is in the coordination queue for manager review.";
             case "NO_ROUTING_POLICY" -> "No routing policy is effective. Work is in the coordination queue until a manager configures routing.";

@@ -93,6 +93,19 @@ public class DocumentService {
         return new StagedFile(objectKey, "CLEAN", type, content.length, name);
     }
 
+    /**
+     * Makes a staged file (already inspected and sealed) a document of the case it now belongs to. Same object, no copy.
+     * The per-case limits still apply: a file over them stays with the conversation only (null).
+     */
+    @Transactional public UUID adoptStaged(UUID caseId, String objectKey, String contentType, long sizeBytes, String fileName) {
+        try { validateQuota(caseId, sizeBytes); } catch (ApiException e) { return null; }
+        UUID documentId = UUID.randomUUID();
+        var document = new MedicalDocument(documentId, cases.findById(caseId), objectKey, sanitizeFileName(fileName), documentId + extensionFor(contentType),
+                contentType, sizeBytes, clock.instant());
+        document.quarantine(clock.instant()); document.markClean(); documents.save(document);
+        return documentId;
+    }
+
     /** A short-lived link to view a staged file; the caller has already authorized the reader. */
     public SecureDocumentLink viewStaged(String objectKey, String fileName) {
         var link = storage.presignView(objectKey, fileName);

@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface ConversationMediaRepository extends BaseRepository<ConversationMedia, UUID> {
     Optional<ConversationMedia> findByIdAndConversationId(UUID id, UUID conversationId);
+    java.util.List<ConversationMedia> findByConversationIdAndDocumentIdIsNull(UUID conversationId);
 }

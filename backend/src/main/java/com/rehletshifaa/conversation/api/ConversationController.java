@@ -24,6 +24,8 @@ public class ConversationController {
 
     @GetMapping public List<ConversationSummary> list(@RequestParam(required = false) String scope) { return conversations.list(scope); }
     @GetMapping("/{id}") public ConversationDetail detail(@PathVariable UUID id) { return conversations.detail(id); }
+    /** The WhatsApp conversation a case started from, read-only (404 when it has none). */
+    @GetMapping("/by-case/{caseId}") public ConversationDetail forCase(@PathVariable UUID caseId) { return conversations.historyForCase(caseId); }
     @PostMapping("/{id}/messages") public Map<String, Object> reply(@PathVariable UUID id, @RequestBody ReplyRequest x) {
         return Map.of("id", conversations.reply(id, x.body()), "status", "SENT");
     }

@@ -20,6 +20,7 @@ public class ConversationMedia extends AssignedIdEntity {
     @Column(name = "content_type", nullable = false, length = 100) private String contentType;
     @Column(name = "size_bytes", nullable = false) private long sizeBytes;
     @Column(name = "created_at", nullable = false) private Instant createdAt;
+    @Column(name = "document_id") private UUID documentId;
 
     protected ConversationMedia() {}
 
@@ -29,7 +30,11 @@ public class ConversationMedia extends AssignedIdEntity {
         this.contentType = contentType; this.sizeBytes = sizeBytes; this.createdAt = micros(now);
     }
 
+    /** The case document this file became when the conversation was linked to a case. */
+    public void adopted(UUID documentId) { this.documentId = documentId; }
+
     public UUID getConversationId() { return conversationId; }
+    public UUID getDocumentId() { return documentId; }
     public String getObjectKey() { return objectKey; }
     public String getOriginalFileName() { return originalFileName; }
     public String getContentType() { return contentType; }

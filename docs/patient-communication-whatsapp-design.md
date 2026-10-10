@@ -297,6 +297,23 @@ mapping proof for the new entities.
 - **Proof:** `IntakeConversationIntegrationTest` (8), `WorkingScheduleTest` (3), inbound processor tests (10),
   `ConversationsView.test.tsx` (4), PostgreSQL proof.
 
+## 9d. S4 delivered (2026-10-10)
+
+- **Continuity:** `AssignmentEngine` tries `INTAKE_CONTINUITY` first for an unowned case: the owner of the person's open
+  (or recently closed) intake conversation — matched on the patient's number, then the submitter's — when they are
+  eligible for the case. Otherwise routing is unchanged. Port `coordination.IntakeContinuity`, implemented by
+  `ConversationDirectory`.
+- **Hand-off:** on `CaseSubmitted` (`BEFORE_COMMIT`, so after the submission's routing) the conversation becomes
+  `LINKED` to the case; its staged files become case documents (same sealed object, `DocumentService.adoptStaged`,
+  per-case limits apply; `conversation_media.document_id`, V81). If the case owner differs from the intake owner, the
+  `rs_coordinator_intro` template introduces them by name and the intro is kept in the conversation history. Later
+  WhatsApp messages from the person reach the case thread (S1).
+- **History:** `GET /api/v1/coordinator/conversations/by-case/{caseId}` (case readers; 404 when none), shown read-only
+  as "WhatsApp before the case" in the case's messages drawer.
+- **Not covered:** a case submitted while nobody owns it (queue) gets no intro; whoever claims the case continues in
+  the case thread.
+- **Proof:** `CaseHandOffIntegrationTest` (4), `IntakeHistory.test.tsx` (2), PostgreSQL proof.
+
 ## 10. Open items (do not block S0–S2)
 
 From the rule set §7: Meta pricing from 1 Oct 2026; Egypt PDPL licensing and consent wording (needed before S3 goes
