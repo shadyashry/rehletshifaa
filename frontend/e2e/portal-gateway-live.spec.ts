@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
 import { API } from "./env";
+import { STEP_UP_USERS, requestStepUp, submitKeycloakSignIn } from "./live-auth";
 
 /**
  * Representative portal journeys against the real stack, through the real path:
@@ -51,17 +52,17 @@ function expectCleanNetwork(net: Network) {
 }
 
 async function signIn(page: Page, user = USERNAME, locale = "en") {
+  if (STEP_UP_USERS.has(user)) await requestStepUp(page);
   await page.goto(`/${locale}/portal`);
   await page.getByRole("button", { name: /Sign in securely|تسجيل الدخول/ }).click();
   await page.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });
-  await page.locator("#username").fill(user);
-  await page.locator("#password").fill(PASSWORDS[user] ?? PASSWORD!);
-  await page.locator("#kc-login").click();
+  await submitKeycloakSignIn(page, user, PASSWORDS[user] ?? PASSWORD!);
   await page.waitForURL(new RegExp(`/${locale}/portal`), { timeout: 30000 });
 }
 
 async function openCase(page: Page, caseNumber: string, locale = "en") {
-  await page.getByRole("tab", { name: locale === "ar" ? /حالاتي/ : /My cases/ }).click();
+  // The staff views are links in the "Your work" navigation (not tabs) since the role-aware staff home.
+  await page.getByRole("navigation", { name: locale === "ar" ? "أقسام العمل" : "Your work" }).getByRole("link", { name: locale === "ar" ? /حالاتي/ : /My cases/ }).click();
   const row = page.locator("li", { hasText: caseNumber }).first();
   await expect(row).toBeVisible({ timeout: 20000 });
   await row.getByRole("button", { name: locale === "ar" ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first().click();
@@ -149,7 +150,7 @@ test("coordinator: an unactivated profile is the current action, with resend as 
   await openCase(page, CASE_2!);
   const action = page.locator("#current-action");
   await expect(action.getByRole("heading")).toHaveText(/Waiting for the patient to activate their profile/);
-  await expect(page.getByText("Profile activation")).toBeVisible();
+  await expect(page.getByText("Profile activation", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Resend link", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: /Prepare proposal|Assign/ })).toHaveCount(0);
   await page.screenshot({ path: path.join(shots, "coordinator-case-profile-1440.png"), fullPage: true });

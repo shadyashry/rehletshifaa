@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 
 import { API, OIDC_AUTHORITY } from "./env";
+import { STEP_UP_USERS, requestStepUp, submitKeycloakSignIn } from "./live-auth";
 
 /**
  * Post-activation landing over the real stack: a synthetic patient acknowledges their estimate through the
@@ -24,12 +25,12 @@ type Session = { request: APIRequestContext; subject: string; token: string };
 async function signIn(browser: Browser, user: string): Promise<Session> {
   const context = await browser.newContext();
   const page = await context.newPage();
+  // A consultant's clinical decision and Finance settling a deposit are step-up actions: sign in at LoA 2.
+  if (STEP_UP_USERS.has(user)) await requestStepUp(page);
   await page.goto("/en/portal");
   await page.getByRole("button", { name: /Sign in securely/ }).click();
   await page.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });
-  await page.locator("#username").fill(user);
-  await page.locator("#password").fill(PASSWORDS[user]!);
-  await page.locator("#kc-login").click();
+  await submitKeycloakSignIn(page, user, PASSWORDS[user]!);
   await page.waitForURL(/\/en\/portal/, { timeout: 30000 });
   const stored = await page.evaluate(key => sessionStorage.getItem(key), `oidc.user:${OIDC_AUTHORITY}:rehletshifaa-web`);
   const token = stored ? (JSON.parse(stored) as { access_token?: string }).access_token : undefined;
@@ -152,7 +153,7 @@ test("activation → password → sign-in lands on My Care for the current case;
   const deposit = ws.deposit!;
   expect(deposit.status).toBe("REQUESTED");
   expect(deposit.currency).toBe("USD");
-  const depositBlock = patient.getByRole("region", { name: "Deposit", exact: true });
+  const depositBlock = patient.getByRole("region", { name: "Coordination deposit", exact: true });
   await expect(depositBlock).toContainText("Arranging");
   await expect(depositBlock).toContainText(new Intl.NumberFormat("en", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(deposit.totalDisplay));
   await expect(depositBlock.getByRole("button")).toHaveCount(0);
@@ -166,7 +167,7 @@ test("activation → password → sign-in lands on My Care for the current case;
   // --- Finance confirms the deposit: the page moves on by itself ------------------------------------------
   await call(finance, "POST", `/finance/cases/${caseId}/deposits/${deposit.id}/payments`, { amountEgp: deposit.totalEgp, method: "BANK", providerReference: `landing-${stamp}`, idempotencyKey: `landing-${caseId}` }, 200);
   await patient.reload();
-  await expect(patient.getByRole("region", { name: "Deposit", exact: true })).toContainText("Deposit received", { timeout: 30000 });
+  await expect(patient.getByRole("region", { name: "Coordination deposit", exact: true })).toContainText("Deposit received", { timeout: 30000 });
   await expect(patient.getByText(/Arranging|Deposit arrangements/)).toHaveCount(0);
   await expect(patient.getByRole("heading", { name: "We are arranging your treatment" })).toBeVisible();
   await patient.screenshot({ path: "e2e/screenshots/my-care-live-deposit-received-1440.png", fullPage: true });

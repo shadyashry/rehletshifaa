@@ -1,6 +1,7 @@
-import { expect, test, type APIRequestContext, type Browser } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 
 import { API, OIDC_AUTHORITY } from "./env";
+import { STEP_UP_USERS, requestStepUp, submitKeycloakSignIn } from "./live-auth";
 
 /**
  * The gate into TRAVEL_COORDINATION, proven over HTTP through the real path
@@ -40,12 +41,12 @@ type Session = { request: APIRequestContext; subject: string; token: string };
 async function signIn(browser: Browser, user: string): Promise<Session> {
   const context = await browser.newContext();
   const page = await context.newPage();
+  // A consultant's clinical decision and Finance settling a deposit are step-up actions: sign in at LoA 2.
+  if (STEP_UP_USERS.has(user)) await requestStepUp(page);
   await page.goto("/en/portal");
   await page.getByRole("button", { name: /Sign in securely/ }).click();
   await page.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });
-  await page.locator("#username").fill(user);
-  await page.locator("#password").fill(PASSWORDS[user]!);
-  await page.locator("#kc-login").click();
+  await submitKeycloakSignIn(page, user, PASSWORDS[user]!);
   await page.waitForURL(/\/en\/portal/, { timeout: 30000 });
   const stored = await page.evaluate(key => sessionStorage.getItem(key), `oidc.user:${OIDC_AUTHORITY}:rehletshifaa-web`);
   const token = stored ? (JSON.parse(stored) as { access_token?: string }).access_token : undefined;
@@ -197,9 +198,29 @@ test("operations may draft before the gate, cannot advance the journey, and the 
   await call(null, "POST", `/public/onboarding/${onboardingToken}/request-access`, { channel: "EMAIL" }, 200);
   const activationCode = await latestMail(request, "Your RehletShifaa verification code", activationOtpAt, email, /verification code is (\d{6})/);
   const activationGrant = (await call<{ grant: string }>(null, "POST", `/public/onboarding/${onboardingToken}/verify`, { code: activationCode }, 200)).body.grant;
+  const setupAt = Date.now() - 5000;
   await call(null, "POST", `/public/onboarding/${onboardingToken}/activate`, { grant: activationGrant, profile: {
     givenName: "Playwright", familyName: "Ops Gate", email, phone: whatsapp, mobileOwner: "PATIENT", dateOfBirth: "1990-01-01", nationality: "KE", countryOfResidence: "KE", preferredLanguage: "en", sex: "MALE",
     consents: ["PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS"] } }, 200);
+  // The account is active once the patient has set a password through the identity provider's email and signed in.
+  const setupLink = await latestMail(request, "Finish setting up your RehletShifaa account", setupAt, email, /(https?:\/\/[^\s"<>]+login-actions\/action-token[^\s"<>]*)/);
+  const patient: Page = await browser.newPage();
+  await patient.goto(setupLink.replace(/&amp;/g, "&"));
+  await patient.getByRole("link", { name: /Continue/ }).click();
+  const password = `OpsGate-${stamp}-Aa1!`;
+  await patient.locator("#password-new").fill(password);
+  await patient.locator("#password-confirm").fill(password);
+  await patient.locator("input[type=submit], button[type=submit]").first().click();
+  await expect(patient.getByText(/Your account is ready/).first()).toBeVisible({ timeout: 30000 });
+  await patient.getByRole("link", { name: /Continue to my case/ }).click();
+  await patient.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });
+  await patient.locator("#username").fill(email);
+  await patient.locator("#password").fill(password);
+  await patient.locator("#kc-login").click();
+  await patient.waitForURL(new RegExp(`/en/portal\\?case=${caseId}`), { timeout: 30000 });
+  await expect(patient.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible({ timeout: 30000 });
+  await patient.close();
+
   ws = await workspace();
   expect(ws.caseSummary.status, "the profile alone does not open the gate").toBe("ACCEPTED");
   expect(ws.actions.currentAction.workType).toBe("DEPOSIT_ARRANGEMENT");

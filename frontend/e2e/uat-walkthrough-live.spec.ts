@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 
 import { API, OIDC_AUTHORITY } from "./env";
+import { STEP_UP_USERS, requestStepUp, submitKeycloakSignIn } from "./live-auth";
 
 /**
  * UAT defect-correction walkthrough over the real stack (Cloudflare -> gateway -> backend, real Keycloak,
@@ -27,12 +28,12 @@ type Session = { request: APIRequestContext; subject: string; token: string; pag
 async function signIn(browser: Browser, user: string): Promise<Session> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
+  // A consultant's clinical decision and Finance settling a deposit are step-up actions: sign in at LoA 2.
+  if (STEP_UP_USERS.has(user)) await requestStepUp(page);
   await page.goto("/en/portal");
   await page.getByRole("button", { name: /Sign in securely/ }).click();
   await page.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });
-  await page.locator("#username").fill(user);
-  await page.locator("#password").fill(PASSWORDS[user]!);
-  await page.locator("#kc-login").click();
+  await submitKeycloakSignIn(page, user, PASSWORDS[user]!);
   await page.waitForURL(/\/en\/portal/, { timeout: 30000 });
   const stored = await page.evaluate(key => sessionStorage.getItem(key), `oidc.user:${OIDC_AUTHORITY}:rehletshifaa-web`);
   const token = stored ? (JSON.parse(stored) as { access_token?: string }).access_token : undefined;
@@ -203,7 +204,8 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   for (const line of review.costEstimates) { expect(line.currency).toBe("EGP"); expect(line.quotedCurrency).toBe("USD"); expect(line.quotedCost).toBeGreaterThan(0); }
   await coordinator.page.goto(`/en/portal?case=${caseId}`);
   await expect(coordinator.page.getByText("Patient's quote currency")).toBeVisible();
-  await expect(coordinator.page.getByText("USD — US Dollar")).toBeVisible();
+  // The quote-currency chip in the proposal form (the consultant's estimate repeats the currency below it).
+  await expect(coordinator.page.locator("#case-actions").getByText("USD — US Dollar")).toBeVisible();
   const totalRow = coordinator.page.locator("li", { hasText: /^Total/ }).first();
   await expect(totalRow).toContainText("$");
   await idle(coordinator.page);
