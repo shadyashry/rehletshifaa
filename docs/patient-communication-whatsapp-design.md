@@ -341,9 +341,12 @@ mapping proof for the new entities.
   handler), which opens the business number with the first message in the page's language; the post-submission link
   adds `?case=RS-…` (validated) so the first message names the case. Verified on a dev server (302s in en/ar).
 - **Proof:** `ConversationSetup.test.tsx` (3), `route.test.ts` (2), `links.test.ts`, e2e `case-flow.spec.ts` updated.
-- **Found, not changed:** the staff case view's "share on WhatsApp" opens `wa.me` to the patient's own number from the
-  coordinator's phone (`StaffCaseView.tsx`), outside the platform and its one-voice rule (R1, R2). Recommendation: replace
-  it with the platform send (secure link template) or remove it.
+- **Closed after S6:** the staff case view's "share on WhatsApp" (`wa.me` to the patient's own number from the
+  coordinator's phone, plus `mailto:` and copy-link) was unreachable (`Portal` only ever cleared its `share` state) and is
+  removed. The only staff path to send a secure link is the platform resend (proposal / profile link), which re-issues it
+  through the outbox as the `proposal-ready` / `final-quote-ready` / activation template. That resend now follows the
+  reply rule (R2): `JourneyService` checks `CASE_PATIENT_REPLY` under the case lock (`PATIENT_REPLY_NOT_YOURS`), and
+  `CaseActionService` offers `RESEND_*` only while the owner holds it, so a covered owner no longer sees it.
 
 All slices S0–S6 are delivered. Before go-live: Meta Business Verification and template approval (Arabic reviewed by a
 native speaker), `WHATSAPP_MODE=meta` with the production number, switch coordinators on for intake, a live end-to-end

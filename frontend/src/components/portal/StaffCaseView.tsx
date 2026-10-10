@@ -22,7 +22,6 @@ import { AssignmentHistory, type AssignmentHistoryEntry } from "@/components/por
 import { StatusBadge } from "@/components/portal/StatusBadge";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import type { PortalView as RoleKey } from "@/lib/access";
-import { SITE_URL } from "@/lib/api";
 import { scrollIntoView } from "@/lib/scroll";
 import { countryName } from "@/lib/countries";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
@@ -34,7 +33,7 @@ const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAss
 const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnership").then(m=>m.TransferOwnership));
 const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatientResponse").then(m=>m.RecordPatientResponse));
 
-export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}|null;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
+export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
 
 /**
  * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
@@ -66,7 +65,7 @@ type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
-export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,share,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
+export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
  const work=useWorkCopy();
  const c=value.caseSummary;
  const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,mySubject]);
@@ -103,7 +102,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
  const formCode=current.workType==="TRAVEL"?"ASSIGN_OPERATIONS":current.workType==="PROPOSAL_TERMS_CALL"?"RECORD_PROPOSAL_DECISION":REFERRAL_CONFIRM_WORK.includes(current.workType??"")?"CONFIRM_REFERRAL":current.code;
  const formAction=isCoordinator&&owned&&current.kind==="FOCUS"&&["ASSIGN_CONSULTANT","CONFIRM_REFERRAL","ASSIGN_OPERATIONS","ASSIGN_FINANCE"].includes(formCode)||(formCode==="RECORD_PROPOSAL_DECISION"&&isCoordinator&&owned&&!!value.proposal&&available.includes("RECORD_PROPOSAL_DECISION"));
  const proposalIsWork=isCoordinator&&owned&&(["PREPARE_PROPOSAL","RELEASE_PROPOSAL","WAIT_INTERNAL_APPROVAL","ASSIGN_FINANCE"].includes(current.code)||["PREPARE_PROPOSAL","PROPOSAL_REVISION"].includes(current.workType??"")||(!!approved&&!value.proposal)||c.status==="ARRIVAL_CONFIRMED");
- const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm estimate={approved} onSend={sendProposal}/>}{isCoordinator&&share&&<ProposalShareLinks share={share}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions reviewId={approved?.id} proposal={value.proposal} gates={value.gates}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}{showActions&&<LockedSection locked={dim}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} locale={locale} mutate={mutate}/></LockedSection>}</Panel>;
+ const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm estimate={approved} onSend={sendProposal}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions reviewId={approved?.id} proposal={value.proposal} gates={value.gates}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}{showActions&&<LockedSection locked={dim}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} locale={locale} mutate={mutate}/></LockedSection>}</Panel>;
  const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={t.reviews}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="rounded-lg border border-line p-4"><strong>v{r.versionNumber} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 rounded-lg bg-brand-50 p-3"><p className="mb-2 label-micro text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-[0.8125rem] text-ink-600">{locale==="ar"?"عملة العرض":"Proposal currency"}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span>{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{locale==="ar"?"الأساس":"Base"} <bdi dir="ltr">{money(e.estimatedCost,e.currency,locale)}</bdi></span>}</span></li>)}</ul></div>}</div>):<Empty/>}{isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&<FinalAssessment/>}</Panel>:null;
  // The consultant's clinical review is the page's primary work, not an appendix to the review history.
  const reviewDraft=isDoctor&&c.status==="CONSULTANT_REVIEW"?(value.clinicalReviews.find(r=>r.status==="DRAFT")??null):null;
@@ -417,18 +416,6 @@ function ProposalSendForm({estimate,onSend}:{estimate:Review;onSend:(caseId:stri
   <div><label className="block"><span className="title text-base">{labels.coordination}</span><span className="mt-1 block text-sm text-ink-500">{labels.coordinationHint}</span><textarea className="field mt-2 min-h-24" maxLength={20000} value={notes} onChange={e=>setNotes(e.target.value)}/></label></div>
   <button type="button" disabled={busy||!items.length||rateUnavailable} className="btn-primary w-full justify-center py-3 text-base sm:w-auto" onClick={send}>{t.createProposal}</button>
  </div>;
-}
-
-function ProposalShareLinks({share}:{share:{caseId:string;token:string;whatsapp?:string;email?:string;caseNumber?:string}}){
- const {locale,t}=useCaseWorkspace();
- const[copied,setCopied]=useState(false);
- const base=typeof window!=="undefined"?window.location.origin:SITE_URL;
- const link=`${base}/${locale}/proposal/${share.token}`;
- const msg=`RehletShifaa — your treatment proposal${share.caseNumber?` (${share.caseNumber})`:""}: ${link}`;
- const wa=share.whatsapp?`https://wa.me/${share.whatsapp.replace(/[^0-9]/g,"")}?text=${encodeURIComponent(msg)}`:undefined;
- const mail=`mailto:${share.email??""}?subject=${encodeURIComponent("Your RehletShifaa proposal")}&body=${encodeURIComponent(msg)}`;
- const doCopy=()=>{void navigator.clipboard?.writeText(link).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);});};
- return <div className="mt-4 rounded-lg border border-brand-200 bg-brand-50 p-4"><p className="mb-3 text-sm font-bold text-brand-800">{t.linkReady}</p><p className="mb-3 break-all rounded-lg bg-white p-2 text-sm">{link}</p><div className="flex flex-wrap gap-2">{wa&&<a className="btn-primary" href={wa} target="_blank" rel="noopener noreferrer">{t.sendWhatsapp}</a>}{share.email?<a className="btn-secondary" href={mail}>{t.sendEmail}</a>:<span className="inline-flex min-h-11 items-center text-[0.875rem] text-ink-500">{t.noPatientEmail}</span>}<button type="button" className="btn-secondary" onClick={doCopy}>{copied?t.copied:t.copyLink}</button></div></div>;
 }
 
 function FinalAssessment(){

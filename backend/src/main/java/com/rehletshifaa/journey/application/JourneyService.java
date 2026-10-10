@@ -382,7 +382,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
      * profile is still unactivated, which is exactly when the page offers it.
      */
     @Transactional public IdResponse resendOnboardingLink(UUID caseId){
-        var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));
+        var actor=authorizePatientWrite(caseId);
         requireOneOfStates(caseId,Set.of("ACCEPTED","TRAVEL_COORDINATION"));
         if(readiness.compute(caseId).accountActivated())throw new ApiException(409,"PROFILE_ALREADY_ACTIVATED","The patient has already activated their profile");
         publicCases.reissueOnboardingLink(caseId,caseView(caseId).preferredLanguage());
@@ -728,8 +728,18 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         Contact contact=proposalContact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination=channel.equals("WHATSAPP")?contact.whatsapp():contact.email();
         if(hasText(destination))notificationOutbox.enqueueOnce(notificationType, channel, destination, templateKey, intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+lang+"\"}"), idemKey, now);
     }
+    /**
+     * A re-issued secure link is a WhatsApp/email message to the patient from the business number, so it follows the
+     * reply rule: only the case's primary coordinator, or their active cover instead of them. Checked under the case
+     * row lock, as a reply is, so it never interleaves with a reassignment or a cover change.
+     */
+    private Actor authorizePatientWrite(UUID caseId){
+        Resource resource=Resource.ofCase(caseId);cases.lockById(caseId);
+        if(!authority.allowed(Permission.CASE_PATIENT_REPLY,resource))throw new ApiException(403,"PATIENT_REPLY_NOT_YOURS","Only the case's coordinator, or their cover while they are away, can send to the patient");
+        return authority.authorize(Permission.CASE_PATIENT_REPLY,resource);
+    }
     @Transactional public IdResponse resendProposalLink(UUID caseId,UUID versionId){
-        var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));ensureProposalBelongs(caseId,versionId);
+        var actor=authorizePatientWrite(caseId);ensureProposalBelongs(caseId,versionId);
         ProposalView view=proposal(versionId);if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"NOT_RESENDABLE","Only a released document can be resent");
         Instant now=clock.instant();
         // Revoke the current OTP challenges for this case's live links, then mint a fresh secure token.

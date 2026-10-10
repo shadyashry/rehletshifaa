@@ -103,6 +103,24 @@ class ReplyCoverIntegrationTest {
         journey.message(caseId, new MessageRequest("COORDINATOR_DOCTOR", "Internal note", "en", true));
     }
 
+    @Test void reissuingASecureLinkFollowsTheReplyRule() {
+        UUID anyVersion = UUID.randomUUID();
+        for (String s : new String[]{OTHER, LEAD}) {
+            as(s, Role.COORDINATOR);
+            assertThat(code(() -> journey.resendProposalLink(caseId, anyVersion))).as(s).isEqualTo("PATIENT_REPLY_NOT_YOURS");
+            assertThat(code(() -> journey.resendOnboardingLink(caseId))).as(s).isEqualTo("PATIENT_REPLY_NOT_YOURS");
+        }
+
+        as(OWNER, Role.COORDINATOR);
+        covers.create(coverNow(null, COVER));
+        em.flush();
+        assertThat(code(() -> journey.resendProposalLink(caseId, anyVersion))).isEqualTo("PATIENT_REPLY_NOT_YOURS");
+        // The cover passes the reply rule; what stops them here is only that this case has nothing to resend.
+        as(COVER, Role.COORDINATOR);
+        assertThat(code(() -> journey.resendProposalLink(caseId, anyVersion))).isNotNull().isNotEqualTo("PATIENT_REPLY_NOT_YOURS");
+        assertThat(code(() -> journey.resendOnboardingLink(caseId))).isNotNull().isNotEqualTo("PATIENT_REPLY_NOT_YOURS");
+    }
+
     @Test void revokingHandsTheConversationBackAtOnce() {
         as(OWNER, Role.COORDINATOR);
         var created = covers.create(coverNow(null, COVER));

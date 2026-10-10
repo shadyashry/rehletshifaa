@@ -1,6 +1,9 @@
 package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.authority.application.Actor;
+import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
+import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.journey.api.WorkDtos.PatientActionView;
@@ -62,12 +65,13 @@ public class CaseActionService {
     private final StaffWorkService work;
     private final PatientActionQueryService patientActions;
     private final ProposalAccessService proposals;
+    private final Authority authority;
     private final Clock clock;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
-                             StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Clock clock) {
+                             StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock) {
         this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
-        this.patientActions = patientActions; this.proposals = proposals; this.clock = clock;
+        this.patientActions = patientActions; this.proposals = proposals; this.authority = authority; this.clock = clock;
     }
 
     // ---------------- the contract the page renders ----------------
@@ -96,7 +100,8 @@ public class CaseActionService {
         boolean coordinator = actor.role() == Role.COORDINATOR;
         boolean owned = coordinator && actor.subject().equals(f.coordinatorSubject());
         CurrentActionView current = currentAction(caseId, f, proposal, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
-        List<String> available = coordinator && owned ? availableActions(f, proposal, patientAction, blockers)
+        List<String> available = coordinator && owned ? availableActions(f, proposal, patientAction, blockers,
+                authority.allowed(Permission.CASE_PATIENT_REPLY, Resource.ofCase(caseId)))
                 : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of();
         return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), current, blockers, available, "STAFF", waitingReason.code());
     }
@@ -219,20 +224,21 @@ public class CaseActionService {
 
     /**
      * Optional, state-valid operations for the owning coordinator. Utilities and exceptions only — the
-     * next workflow step is the current action, never an entry here.
+     * next workflow step is the current action, never an entry here. Re-sending a secure link messages the patient, so
+     * it is offered only while the owner is the one voice to the patient (not while a reply cover answers for them).
      */
-    private List<String> availableActions(Facts f, Proposal p, PatientActionView patientAction, List<BlockerView> blockers) {
+    private List<String> availableActions(Facts f, Proposal p, PatientActionView patientAction, List<BlockerView> blockers, boolean sendsToPatient) {
         List<String> actions = new ArrayList<>();
         String s = f.status();
         if (patientAction != null) {
             if (patientAction.items().stream().anyMatch(i -> !i.completed())) actions.add("RECORD_PATIENT_RESPONSE");
         } else if (!TERMINAL.contains(s) && !CONSULTANT_OWNED.contains(s)) actions.add("REQUEST_INFORMATION");
         if (p != null && Set.of("RELEASED", "VIEWED").contains(p.status())) {
-            actions.add("RESEND_PROPOSAL_LINK");
+            if (sendsToPatient) actions.add("RESEND_PROPOSAL_LINK");
             // A patient who decided on a call (the Arabic assisted path) has their decision recorded by the owner.
             actions.add("RECORD_PROPOSAL_DECISION");
         }
-        if (blockers.stream().anyMatch(b -> "PROFILE_NOT_ACTIVATED".equals(b.code()))) actions.add("RESEND_ONBOARDING_LINK");
+        if (sendsToPatient && blockers.stream().anyMatch(b -> "PROFILE_NOT_ACTIVATED".equals(b.code()))) actions.add("RESEND_ONBOARDING_LINK");
         if (CONSULTANT_ASSIGNABLE.contains(s)) actions.add("ASSIGN_CONSULTANT");
         if (operationsAssignable(f, blockers)) actions.add("ASSIGN_OPERATIONS");
         if ("PROPOSAL_PREPARATION".equals(s) && p != null && p.requiresFinance() && !p.financeDone()) actions.add("ASSIGN_FINANCE");
