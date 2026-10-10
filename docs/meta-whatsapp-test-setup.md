@@ -43,11 +43,15 @@ The callback must be updated when the Cloudflare quick-tunnel hostname changes.
 
 - Meta's temporary token and test sender are not production credentials.
 - A test recipient must first be registered in the Meta dashboard.
-- Free-form link notifications are normally allowed only in the customer-service conversation
-  window and need an approved utility template for business-initiated production delivery.
-- When `WHATSAPP_META_AUTH_TEMPLATE` is set, six-digit OTP notifications use that approved
-  authentication template. Its body and URL-button parameters must both accept the code. If it is
-  unset, the test adapter sends text, which works only inside an open conversation window.
+- Outbox notifications are sent only as approved templates (`app.whatsapp.meta.templates`, catalogue in
+  [whatsapp-message-templates.md](whatsapp-message-templates.md)); free text is never sent, because Meta
+  rejects it outside the 24-hour customer-service window. A key with no bound template is parked at once
+  as `WHATSAPP_TEMPLATE_NOT_BOUND`.
+- One-time codes (`case-access-code`, `proposal-access-code`) use `WHATSAPP_META_AUTH_TEMPLATE`. Its body and
+  URL-button parameters must both accept the code. If it is unset, codes are parked as
+  `WHATSAPP_TEMPLATE_NOT_BOUND`.
+- For a test number, create the templates in that number's WhatsApp Business Account with the URL button
+  base set to the environment's site (e.g. `https://dev.rehletshifaa.com/{{1}}`).
 - The outbox `DELIVERED` state means Meta accepted the API request. Later Meta receipts are stored in
   `provider_delivery_status` as `SENT`, `DELIVERED`, `READ`, or `FAILED`.
 - No webhook payload, phone number, message body, OTP, access token, or app secret is persisted in

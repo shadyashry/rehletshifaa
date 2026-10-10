@@ -27,6 +27,7 @@ class NotificationOutboxProcessorTest {
     SimpleMeterRegistry metrics;
     AtomicInteger sends;
     RuntimeException providerError;
+    OutgoingNotification delivered;
     NotificationOutboxProcessor processor;
     CryptoService crypto;
 
@@ -35,12 +36,17 @@ class NotificationOutboxProcessorTest {
         metrics = new SimpleMeterRegistry();
         sends = new AtomicInteger();
         providerError = null;
+        delivered = null;
         NotificationChannelPort channel = new NotificationChannelPort() {
             public boolean supports(String channel) { return "EMAIL".equals(channel); }
             public String deliver(String destination, String subject, String body, String key) {
                 sends.incrementAndGet();
                 if (providerError != null) throw providerError;
                 return "provider-ref";
+            }
+            public String deliver(OutgoingNotification notification) {
+                delivered = notification;
+                return NotificationChannelPort.super.deliver(notification);
             }
         };
         crypto = new CryptoService("notification-test-key");
@@ -131,5 +137,47 @@ class NotificationOutboxProcessorTest {
 
         verify(store).recordFailure(message.id(), 1, 1, "TEMPLATE_FAILURE");
         assertThat(sends).hasValue(0);
+    }
+
+    NotificationOutboxStore.OutboxMessage claimedWith(String template, String data) {
+        var message = new NotificationOutboxStore.OutboxMessage(UUID.randomUUID(), "EMAIL", "p@example.test", template,
+                "enc:" + crypto.encrypt(data), 1, 5, "key-2", NOW.plusSeconds(NotificationOutboxStore.LEASE_SECONDS));
+        when(store.claim(anyInt())).thenReturn(List.of(message));
+        return message;
+    }
+
+    @Test void aFinalQuoteNoticeIsDeliveredWithItsLanguageAndLinkPath() {
+        var message = claimedWith("final-quote-ready", "{\"token\":\"tok123\",\"lang\":\"ar\"}");
+        when(store.recordDelivered(any(), anyInt(), anyString())).thenReturn(true);
+
+        processor.dispatch();
+
+        verify(store).recordDelivered(message.id(), 1, "provider-ref");
+        assertThat(delivered.templateKey()).isEqualTo("final-quote-ready");
+        assertThat(delivered.language()).isEqualTo("ar");
+        assertThat(delivered.linkPath()).isEqualTo("ar/proposal/tok123");
+        assertThat(delivered.body()).contains("http://localhost:3000/ar/proposal/tok123");
+    }
+
+    @Test void aRecordedDecisionCarriesItsWordsAsTemplateParameters() {
+        claimedWith("proposal-decision-recorded",
+                "{\"decision\":\"ACCEPTED\",\"confirmedBy\":\"REPRESENTATIVE\",\"date\":\"2026-10-08\",\"lang\":\"en\"}");
+        when(store.recordDelivered(any(), anyInt(), anyString())).thenReturn(true);
+
+        processor.dispatch();
+
+        assertThat(delivered.parameters()).containsExactly("you accepted the final quote", "your representative", "8 October 2026");
+        assertThat(delivered.linkPath()).isNull();
+    }
+
+    @Test void aChannelThatCanNeverDeliverParksTheMessageAtOnce() {
+        var message = claimed();
+        providerError = new UndeliverableNotificationException("WHATSAPP_TEMPLATE_NOT_BOUND", "no template");
+        when(store.recordFailure(any(), anyInt(), anyInt(), anyString())).thenReturn(true);
+
+        processor.dispatch();
+
+        verify(store).recordFailure(message.id(), 1, 1, "WHATSAPP_TEMPLATE_NOT_BOUND");
+        assertThat(count("dead_letter")).isEqualTo(1);
     }
 }

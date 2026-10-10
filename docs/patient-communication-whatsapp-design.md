@@ -164,7 +164,14 @@ is audited (`CONVERSATION_*`, `REPLY_COVER_*` codes).
 
 The outbox keeps one rendering point; for `WHATSAPP` it resolves a **template binding** instead of free text:
 `templateKey → (Meta template name, category, parameters, URL-button suffix)` per language (`en`, `ar`), configured
-next to `app.whatsapp.meta.*`. Email keeps today's text (and gains Arabic in the same step).
+next to `app.whatsapp.meta.*`. Email keeps today's text; Arabic email bodies are a follow-up (they need the same
+native review as the Arabic templates).
+
+**S0 delivered (2026-10-10):** `OutgoingNotification` carries language, body parameters and link path from the single
+render step; `MetaWhatsAppChannel` sends bound templates only (codes via the authentication template) and parks an
+unbound key at once (`WHATSAPP_TEMPLATE_NOT_BOUND`); bindings in `app.whatsapp.meta.templates` / `languages`.
+Also fixed: `final-quote-ready` had no renderer, so every final-quote notice was dead-lettered as
+`TEMPLATE_FAILURE`. Submission pack: [whatsapp-message-templates.md](whatsapp-message-templates.md).
 
 | Template (en + ar) | Category | Replaces / used by |
 |---|---|---|
@@ -172,6 +179,8 @@ next to `app.whatsapp.meta.*`. Email keeps today's text (and gains Arabic in the
 | `rs_secure_message` | Utility | `secure-message` |
 | `rs_patient_action` | Utility | `patient-action-link` |
 | `rs_proposal_ready` | Utility | `proposal-ready` |
+| `rs_final_quote_ready` | Utility | `final-quote-ready` |
+| `rs_decision_recorded` | Utility | `proposal-decision-recorded` |
 | `rs_onboarding` | Utility | `onboarding-activation` |
 | `rs_deposit_settled` | Utility | `deposit-settled-patient` |
 | `rs_account_link` | Utility | `account-link-continue` |

@@ -184,6 +184,20 @@ app:
       app-secret: ${WHATSAPP_META_APP_SECRET:}
       authentication-template: ${WHATSAPP_META_AUTH_TEMPLATE:}
       authentication-template-language: ${WHATSAPP_META_AUTH_TEMPLATE_LANGUAGE:en_US}
+      # Approved Meta templates per outbox key (docs/whatsapp-message-templates.md). Each is registered in both
+      # languages below; link templates carry a URL button whose dynamic suffix is <lang>/<route>/<token>.
+      templates:
+        case-status-link: ${WHATSAPP_TEMPLATE_CASE_RECEIVED:rs_case_received}
+        secure-message: ${WHATSAPP_TEMPLATE_SECURE_MESSAGE:rs_secure_message}
+        patient-action-link: ${WHATSAPP_TEMPLATE_PATIENT_ACTION:rs_patient_action}
+        proposal-ready: ${WHATSAPP_TEMPLATE_PROPOSAL_READY:rs_proposal_ready}
+        final-quote-ready: ${WHATSAPP_TEMPLATE_FINAL_QUOTE_READY:rs_final_quote_ready}
+        onboarding-activation: ${WHATSAPP_TEMPLATE_ONBOARDING:rs_onboarding}
+        deposit-settled-patient: ${WHATSAPP_TEMPLATE_DEPOSIT_SETTLED:rs_deposit_settled}
+        proposal-decision-recorded: ${WHATSAPP_TEMPLATE_DECISION_RECORDED:rs_decision_recorded}
+      languages:
+        en: ${WHATSAPP_TEMPLATE_LANGUAGE_EN:en}
+        ar: ${WHATSAPP_TEMPLATE_LANGUAGE_AR:ar}
   turnstile:
     enabled: ${TURNSTILE_ENABLED:false}
     secret: ${TURNSTILE_SECRET:}
