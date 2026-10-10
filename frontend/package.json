@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:agentic": "e2e run"
   },
   "dependencies": {
     "@hookform/resolvers": "5.2.2",
@@ -24,7 +25,9 @@
     "zod": "4.1.5"
   },
   "devDependencies": {
+    "@ai-sdk/anthropic": "4.0.78",
     "@axe-core/playwright": "4.13.0",
+    "@e2e-dev/web": "0.14.0",
     "@playwright/test": "1.55.0",
     "@tailwindcss/postcss": "4.1.13",
     "@testing-library/jest-dom": "6.8.0",
@@ -33,9 +36,12 @@
     "@types/react": "19.1.12",
     "@types/react-dom": "19.1.9",
     "@vitejs/plugin-react": "5.0.2",
+    "ai": "7.0.137",
+    "e2e": "0.19.0",
     "eslint": "9.35.0",
     "eslint-config-next": "16.3.3",
     "jsdom": "26.1.0",
+    "playwright-core": "1.55.0",
     "tailwindcss": "4.1.13",
     "typescript": "5.9.2",
     "vite": "7.1.3",

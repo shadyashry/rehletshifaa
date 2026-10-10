@@ -6,6 +6,7 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+.e2e/
 target/
 build/
 .m2/
