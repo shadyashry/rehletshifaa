@@ -1,6 +1,6 @@
 # Patient communication: WhatsApp and the one-coordinator rule
 
-Status: **rules agreed, design not started** (owner decisions 2026-10-10).
+Status: **recommendations from the research (2026-10-10); design in progress** — [design](patient-communication-whatsapp-design.md).
 Evidence: [research report](research/reports/WhatsApp%20patient%20coordinator%20routing.md) and its
 [notes](research/research_notes/WhatsApp%20patient%20coordinator%20routing/).
 
@@ -12,21 +12,24 @@ input to the design; it does not describe an implementation.
 **At any moment, exactly one person may answer a given patient conversation, and every patient conversation that
 needs an answer has that person (or is in a queue someone is accountable for).**
 
-## 2. Owner decisions (2026-10-10)
+## 2. Recommendations (from the research)
 
-| # | Decision |
-|---|---|
-| D1 | **One business WhatsApp number**, on Meta's WhatsApp Cloud API, connected **directly** (no BSP; a BSP only if Meta verification or onboarding is blocked). The same number sends notifications and receives patient messages. It is never used in the WhatsApp Business app; coexistence is not used. |
-| D2 | **Build, no stopgap tool.** No third-party shared inbox. If launch comes before the build, launch with the case form and call-back only and switch WhatsApp on when the build ships. The advertised number must not go live while inbound messages are not ingested. |
-| D3 | **Secure messaging is the conversation of record** for every patient who has a case. WhatsApp is the doorbell: inbound WhatsApp from a case patient is copied into the case's secure thread; replies go as secure messages with a WhatsApp nudge carrying the secure link. |
-| D4 | **Free-text WhatsApp replies only before a case exists** (intake conversations). Once a case exists, no free-text content goes to WhatsApp. |
-| D5 | **What may go on WhatsApp:** greetings, scheduling, logistics, reminders, "your proposal is ready", links into the portal. **Portal only:** diagnoses, consultant opinions, proposals, prices. Files a patient sends on WhatsApp are accepted, stored in our storage, virus-scanned and attached to the case. Coordinators never give medical opinions. |
-| D6 | **Every coordinator may take intake conversations**, switched on per coordinator, while the team is small (no separate intake team for now). |
-| D7 | **The intake owner is the preferred case owner** when the case is submitted, if still eligible. |
-| D8 | **Short absences use temporary cover; long absences use reassignment.** Never two voices at once. |
-| D9 | **Leads and managers do not reply directly.** They cover or reassign first, so there is always one voice. |
-| D10 | **Service levels:** working hours Saturday–Thursday 10:00–20:00 Africa/Cairo; public promise "a coordinator replies within 2 working hours"; internal first-response target 30 minutes, escalation to the lead at 60 minutes; bilingual out-of-hours auto-reply. |
-| D11 | **Timers:** a silent intake conversation closes after 72 hours; a person who returns within 30 days goes back to the same intake owner. |
+Each recommendation follows what the research found working elsewhere, adapted to what this platform already has. It
+reuses existing practice and existing platform parts; nothing here is new invention.
+
+| # | Recommendation | Precedent |
+|---|---|---|
+| R1 | **One business WhatsApp number on Meta's WhatsApp Cloud API**, connected directly. The same number sends notifications and receives patient messages. Never used in the WhatsApp Business app; no coexistence. | Every hospital and facilitator studied publishes one official number per brand or region (Acibadem, Cleveland Clinic Abu Dhabi, Bookimed, Vaidam). The Business app cannot assign chats and Meta's Sep 2026 policy bars healthcare messaging on it; coexistence lets phone replies bypass the backend. |
+| R2 | **Shared inbox in front, the platform's case as the system of record.** The platform already is the CRM (case ownership, routing, secure messaging), so it plays that part; no second inbox product. Launch WhatsApp only once inbound messages are ingested. | Bumrungrad: one inbox for LINE/WhatsApp/Messenger, each chat tied to a Salesforce case as "single source of truth". Inbox tools only discourage collisions; the hard one-voice guarantee needs the backend to send. |
+| R3 | **Secure messaging is the conversation of record once a case exists**; WhatsApp is the doorbell (nudge + secure link). | Hospitals keep clinical exchange in portals and forms (Mayo, Johns Hopkins, Charité publish no WhatsApp); NHS/HSE/HIPAA guidance restricts patient data on consumer messaging. |
+| R4 | **Free-text WhatsApp only before a case exists** (intake conversations). | Facilitators use WhatsApp for first contact and qualification, then a case process (Bookimed, Flymedi, Vaidam). |
+| R5 | **WhatsApp carries logistics, scheduling, reminders and links; diagnoses, opinions, proposals and prices stay in the portal.** Files sent on WhatsApp are kept, stored in our storage and scanned. | As R3; Meta's healthcare rules and Egypt PDPL treat health data as sensitive. |
+| R6 | **Coordinators take intake conversations by language**, switched on per coordinator. | Bumrungrad routes by detected language to Thai/English/Japanese/Arabic teams; Anadolu has per-language lines; Bangkok Hospital an Arabic centre. |
+| R7 | **The intake person is preferred as case owner**, and introduces any new owner by name. | Positive reviews name one coordinator; handover is accepted when introduced by name (Flymedi, Bookimed). |
+| R8 | **Short absences: temporary cover. Long absences: reassignment.** One voice at a time. | Infobip "sticky agent" and Twilio known-agent routing fall back to another agent on timeout; Zendesk keeps reopened tickets with the original agent. |
+| R9 | **Leads and managers supervise, cover or reassign; they do not reply alongside the owner.** | respond.io "Restrict Contact Visibility" (agents see their own contacts); single point of contact promised by Cleveland Clinic Abu Dhabi. |
+| R10 | **Service levels:** Sat–Thu 10:00–20:00 Africa/Cairo; public promise "a coordinator replies within 2 working hours"; internal first response 30 minutes, lead alert at 60; bilingual out-of-hours auto-reply. | Industry promises cluster at "within 24 hours"; Bookimed shows a typical-response label; Hospitals Co Egypt runs Sat–Thu hours. |
+| R11 | **Timers:** a silent intake conversation closes after 72 hours; a person returning within 30 days goes back to the same intake owner. | Infobip sticky-agent look-back windows (30/60 days); inbox tools auto-close idle chats. |
 
 ## 3. Current platform state (verified in code, 2026-10-10)
 
@@ -103,22 +106,22 @@ needs an answer has that person (or is in a queue someone is accountable for).**
 
 | Setting | Meaning |
 |---|---|
-| `intakeEligible` | Takes intake conversations (D6). |
+| `intakeEligible` | Takes intake conversations (R6). |
 | `maxOpenIntakeConversations` | Intake limit, separate from the case limit. |
 | `workingSchedule` | Weekly hours + time zone. "On duty" is derived from it instead of a manual switch. |
-| `outOfOffice` (from, to) + `coverCoordinator` | Automatic temporary cover (D8). |
+| `outOfOffice` (from, to) + `coverCoordinator` | Automatic temporary cover (R8). |
 
 ### Routing policy (extends `PolicyConfig`)
 
 | Setting | Agreed value |
 |---|---|
 | `intakeTeamsByLanguage` | `ar` → Arabic intake team, `en` → English intake team, plus a fallback |
-| `preferIntakeOwnerAsCaseOwner` | `true` (D7) |
-| `businessHours` | Sat–Thu 10:00–20:00, `Africa/Cairo` (D10) |
-| `firstResponseMinutes` | 30 (D10) |
-| `escalationMinutes` | 60 (D10) |
-| `intakeIdleCloseHours` | 72 (D11) |
-| `intakeReturnDays` | 30 (D11) |
+| `preferIntakeOwnerAsCaseOwner` | `true` (R7) |
+| `businessHours` | Sat–Thu 10:00–20:00, `Africa/Cairo` (R10) |
+| `firstResponseMinutes` | 30 (R10) |
+| `escalationMinutes` | 60 (R10) |
+| `intakeIdleCloseHours` | 72 (R11) |
+| `intakeReturnDays` | 30 (R11) |
 
 Policy changes follow the existing versioned, effective-dated policy model.
 
@@ -127,8 +130,8 @@ Policy changes follow the existing versioned, effective-dated policy model.
 | Setting | Value |
 |---|---|
 | Templates (en + ar, utility category) | out-of-hours auto-reply; new secure message; your coordinator is {name}; 24-hour window closed follow-up |
-| `directRepliesBeforeCase` | `true` (D4) |
-| `directRepliesWithCase` | `false` (D4) |
+| `directRepliesBeforeCase` | `true` (R4) |
+| `directRepliesWithCase` | `false` (R4) |
 
 ### Permissions
 
