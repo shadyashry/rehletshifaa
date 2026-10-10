@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional
 class PostActivationLandingTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
+    @Autowired StaffWorkQueryService staffWork;
     @Autowired PatientAccountService accounts; @Autowired PaymentService payment;
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
@@ -198,6 +199,7 @@ class PostActivationLandingTest {
         com.rehletshifaa.authority.TestPrincipals.signIn("account-without-patient-record");
         assertThat(accounts.session().accountStatus()).isEqualTo("NOT_PROVISIONED");
         assertThat(journey.patientCases()).isEmpty();
+        assertThat(staffWork.myWork()).isEmpty();
     }
 
     // ---- Profile & Security: account facts only, owner only ----

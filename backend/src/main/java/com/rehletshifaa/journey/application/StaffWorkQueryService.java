@@ -2,6 +2,7 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.application.Principal;
+import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
@@ -56,9 +57,16 @@ public class StaffWorkQueryService {
         this.people = people; this.notifications = notifications; this.crypto = crypto; this.clock = clock;
     }
 
-    /** Work assigned to me right now, most urgent first, with the context needed to act. */
+    /**
+     * Work assigned to me right now, most urgent first, with the context needed to act. A signed-in account not bound
+     * to a patient record yet holds no work: an empty list, not a refusal.
+     */
     @Transactional(readOnly = true)
     public List<WorkItemView> myWork() {
+        if (!authority.allowed(Permission.TASK_WORK, Resource.platform())) {
+            authority.authorize(Permission.ACCOUNT_BINDING);
+            return List.of();
+        }
         var actor = authority.authorize(Permission.TASK_WORK);
         List<OpenWorkRow> rows = tasks.findOpenWorkOf(actor.subject());
         if (rows.isEmpty()) return List.of();
