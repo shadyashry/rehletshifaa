@@ -153,7 +153,8 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   expect(cancel.status).toBe(409);
   await coordinator.page.goto(`/en/portal?case=${caseId}`);
   await expect(coordinator.page.getByText(/Actions are locked until the clinical recommendation is ready/)).toBeVisible();
-  await expect(coordinator.page.getByText("Waiting on: the Consultant")).toBeVisible();
+  // Scoped to this case's journey: the case list beside it can hold other synthetic cases waiting on a consultant.
+  await expect(coordinator.page.getByLabel("Journey").getByText("Waiting on: the Consultant")).toBeVisible();
   await idle(coordinator.page);
   await coordinator.page.screenshot({ path: shots("overview-consultant-phase-1440"), fullPage: true });
   await coordinator.page.getByRole("button", { name: /^More$/ }).click();
