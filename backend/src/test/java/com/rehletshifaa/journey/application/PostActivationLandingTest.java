@@ -194,6 +194,12 @@ class PostActivationLandingTest {
         assertThat(jdbc.queryForObject("SELECT account_status FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("ACTIVE");
     }
 
+    @Test void aSignedInAccountWithNoPatientRecordHasNoCasesRatherThanARefusal() {
+        com.rehletshifaa.authority.TestPrincipals.signIn("account-without-patient-record");
+        assertThat(accounts.session().accountStatus()).isEqualTo("NOT_PROVISIONED");
+        assertThat(journey.patientCases()).isEmpty();
+    }
+
     // ---- Profile & Security: account facts only, owner only ----
 
     @Test void theProfileCarriesAccountFactsAndNothingFromTheCase() throws Exception {

@@ -186,7 +186,7 @@ test("patient: dashboard, case and the public proposal route through the gateway
   const net = watchNetwork(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, "patient");
-  await expect(page.getByRole("heading", { name: "Patient" })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible({ timeout: 20000 });
   const open = page.getByRole("button", { name: /^Open(:| RS-)/ }).first();
   if (await open.count()) {
     await open.click();

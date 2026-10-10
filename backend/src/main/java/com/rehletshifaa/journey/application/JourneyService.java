@@ -125,7 +125,8 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     @Transactional(readOnly=true) public CustomerReadiness customerReadiness(UUID caseId){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));return readiness.compute(caseId);}
     @Transactional(readOnly=true) public DepositView depositView(UUID caseId){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));return payment.depositForCase(caseId);}
 
-    public List<CaseView> patientCases(){var actor=authority.authorize(Permission.PATIENT_SELF_SERVICE);return caseQueries.patientCases(actor.subject(),clock.instant()).stream().map(JourneyCaseQueryService::forPatient).toList();}
+    /** The signed-in person's own cases. An account not bound to a patient record yet (and representing nobody) has none: an empty list, not a refusal. */
+    public List<CaseView> patientCases(){if(!authority.allowed(Permission.PATIENT_SELF_SERVICE,Resource.platform())){authority.authorize(Permission.ACCOUNT_BINDING);return List.of();}var actor=authority.authorize(Permission.PATIENT_SELF_SERVICE);return caseQueries.patientCases(actor.subject(),clock.instant()).stream().map(JourneyCaseQueryService::forPatient).toList();}
     public List<CaseView> coordinatorQueue(){
         var actor=authority.authorize(Permission.COORDINATION_QUEUE);
         Set<String> visible=new HashSet<>();visible.add(actor.subject());
