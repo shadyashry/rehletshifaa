@@ -98,7 +98,7 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
     }
     /**
      * Routing configuration a claim needs (Control Center → Coordination): the coordination team serves every care area
-     * in English and Arabic, both seeded coordinators are on duty with capacity, and one routing policy sends every care
+     * in English and Arabic, the QA coordinator is on duty with capacity, and one routing policy sends every care
      * area to that team. Without an effective policy a claim is refused (ROUTING_POLICY_MISSING), so a fresh local
      * database could not run the live journeys. Idempotent, and a policy already published in the Control Center wins.
      */
@@ -106,10 +106,11 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         jdbc.sql("INSERT INTO coordination_team_profiles(team_id,care_areas,languages,updated_by,updated_at,revision) SELECT ?,'','en,ar','local-demo-seeder',?,0 "
                 +"WHERE NOT EXISTS(SELECT 1 FROM coordination_team_profiles WHERE team_id=?)")
             .params(COORDINATION_TEAM,timestamp(now),COORDINATION_TEAM).update();
-        for(String subject:new String[]{COORDINATOR_SUBJECT,SECOND_COORDINATOR_SUBJECT})
-            jdbc.sql("INSERT INTO coordinator_capacity(subject,maximum,on_duty,languages,care_areas,updated_by,updated_at,revision) SELECT ?,100,TRUE,'en,ar','','local-demo-seeder',?,0 "
-                    +"WHERE NOT EXISTS(SELECT 1 FROM coordinator_capacity WHERE subject=?)")
-                .params(subject,timestamp(now),subject).update();
+        // Capacity for the QA coordinator only, so intake routing is deterministic: every new case goes to the login the
+        // live journeys sign in as. The second coordinator gets capacity in the Control Center when a test needs two.
+        jdbc.sql("INSERT INTO coordinator_capacity(subject,maximum,on_duty,languages,care_areas,updated_by,updated_at,revision) SELECT ?,100,TRUE,'en,ar','','local-demo-seeder',?,0 "
+                +"WHERE NOT EXISTS(SELECT 1 FROM coordinator_capacity WHERE subject=?)")
+            .params(COORDINATOR_SUBJECT,timestamp(now),COORDINATOR_SUBJECT).update();
         if(jdbc.sql("SELECT COUNT(*) FROM coordination_policy_versions").query(Long.class).single()==0){
             String configuration="""
                     {"capacityWeight":80,"languageWeight":20,"requireOnDuty":true,"mandatoryLanguage":true,

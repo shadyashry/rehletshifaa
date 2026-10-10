@@ -85,7 +85,12 @@ test("activation → password → sign-in lands on My Care for the current case;
   const caseId = created.body.caseId, caseNumber = created.body.caseNumber;
   await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200,{"X-Case-Grant":created.body.intakeGrant});
   const workspace = async (s: Session = coordinator, prefix = "coordinator") => (await call<Workspace>(s, "GET", `/${prefix}/cases/${caseId}`, undefined, 200)).body;
-  await call(coordinator, "POST", `/coordinator/cases/${caseId}/claim`, undefined, 200);
+  // Intake is routed to an eligible coordinator on submit (locally, the seeded policy gives only this login capacity);
+  // a claim is only the fallback for a case left waiting in the team queue.
+  const owner = (await call<{ caseSummary: { id: string; coordinatorSubject?: string } }[]>(coordinator, "GET", "/coordinator/cases", undefined, 200))
+    .body.find(c => c.caseSummary.id === caseId)?.caseSummary.coordinatorSubject;
+  if (owner) expect(owner, "routed to the signed-in coordinator").toBe(coordinator.subject);
+  else await call(coordinator, "POST", `/coordinator/cases/${caseId}/claim`, undefined, 200);
   const assignment = await call<{ id: string }>(coordinator, "POST", `/coordinator/cases/${caseId}/assignments`, { assigneeSubject: doctor.subject, assigneeRole: "DOCTOR", assignmentType: "PRIMARY", pod: null, reason: "Clinical review" }, 200);
   await call(doctor, "POST", `/doctor/cases/${caseId}/assignments/${assignment.body.id}`, { accept: true }, 200);
   const catalog = (await call<{ id: string; serviceName: string; priceEgp: number; active: boolean }[]>(doctor, "GET", "/doctor/catalog", undefined, 200)).body.filter(s => s.active);

@@ -4,7 +4,7 @@ import { API, OIDC_AUTHORITY } from "./env";
 
 /**
  * UAT defect-correction walkthrough over the real stack (Cloudflare -> gateway -> backend, real Keycloak,
- * Mailpit as the mail sink): a new case -> team queue -> ownership -> consultant assignment -> clinical
+ * Mailpit as the mail sink): a new case -> routed to a coordinator -> consultant assignment -> clinical
  * recommendation in USD -> proposal preparation -> release -> Check Case Status -> "Review proposal"
  * (no second code) -> acknowledgement -> the coordinator's next work. At every transition the
  * notification that left the building is checked in Mailpit: recipient, subject wording, case reference,
@@ -98,40 +98,34 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   // Screens are captured settled: the workspace busy line must be gone.
   const idle = async (p: Page) => { await expect(p.getByText("Loading your workspace…")).toHaveCount(0); };
 
-  // --- 1. Intake: the request lands in the team queue and the team mailbox, not in anyone's inbox ----------
+  // --- 1. Intake: the routing policy hands the request to an eligible coordinator on submit ------------------
   const created = await call<{ caseId: string; caseNumber: string; intakeGrant: string }>(null, "POST", "/cases", {
     caseFor: "MYSELF", givenName: "Playwright", familyName: "UAT Pass", country: "Kenya", whatsappNumber: whatsapp, conditionDescription: "Synthetic case for the UAT defect-correction walkthrough.",
     preferredLanguage: "en", consent: true, turnstileToken: null, email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: false,
   }, 201);
   const caseId = created.body.caseId, caseNumber = created.body.caseNumber;
   await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200,{"X-Case-Grant":created.body.intakeGrant});
-  const newCase = await expectMail(request, TEAM_MAILBOX, started, new RegExp(`New care request for case ${caseNumber}`));
-  expect(newCase.Text).toContain("waiting in the coordination team queue");
-  expect(newCase.Text).not.toMatch(/Playwright|UAT Pass|Kenya/); // reference only, never patient facts
+  // Locally the seeded policy gives only this login capacity, so routing is deterministic: the request is theirs at
+  // once, and the notice reaches their own mailbox with the reference only, never patient facts.
+  const routed = await expectMail(request, COORDINATOR_MAILBOX, started, new RegExp(`Coordinator action for case ${caseNumber}: Care coordination assigned`));
+  expect(routed.To.map(t => t.Address)).toEqual([COORDINATOR_MAILBOX]);
+  expect(routed.Text).not.toMatch(/Playwright|UAT Pass|Kenya/);
 
   const workspace = async (s: Session = coordinator, prefix = "coordinator") => (await call<Workspace>(s, "GET", `/${prefix}/cases/${caseId}`, undefined, 200)).body;
   const cards = (await call<{ caseSummary: { id: string; coordinatorSubject?: string }; highPriorityCount: number }[]>(coordinator, "GET", "/coordinator/cases", undefined, 200)).body;
   const card = cards.find(c => c.caseSummary.id === caseId)!;
-  expect(card.caseSummary.coordinatorSubject ?? null).toBeNull();
+  expect(card.caseSummary.coordinatorSubject, "routed to the coordinator on submit").toBe(coordinator.subject);
   expect(card.highPriorityCount, "a new request is not HIGH for being new").toBe(0);
 
-  // The coordinator's dashboard shows the request as shared work, and the intake brief before ownership.
-  await coordinator.page.goto("/en/portal");
-  const teamTab = coordinator.page.getByRole("navigation", { name: "Your work" }).getByRole("link", { name: /Team queue/ });
-  await expect(teamTab).toContainText(/\d/);
-  await teamTab.click();
-  await coordinator.page.getByRole("tab", { name: /Needs an owner/ }).click();
-  await idle(coordinator.page);
-  await coordinator.page.screenshot({ path: shots("team-queue-1440"), fullPage: true });
+  // The coordinator opens the request as their own case: the case brief, not the unowned intake brief.
   await coordinator.page.goto(`/en/portal?case=${caseId}`);
-  await expect(coordinator.page.getByRole("heading", { name: "Intake brief" })).toBeVisible();
-  await expect(coordinator.page.getByText("No coordinator yet — in the team queue")).toBeVisible();
+  await expect(coordinator.page.getByRole("heading", { name: "Case brief" })).toBeVisible();
+  await expect(coordinator.page.getByText("No coordinator yet — in the team queue")).toHaveCount(0);
   await expect(coordinator.page.getByText(/High priority/)).toHaveCount(0);
   await idle(coordinator.page);
-  await coordinator.page.screenshot({ path: shots("overview-unowned-1440"), fullPage: true });
+  await coordinator.page.screenshot({ path: shots("overview-routed-1440"), fullPage: true });
 
-  // --- 2. Ownership, then the consultant assignment: the consultant's email, the consultant's words -------
-  await call(coordinator, "POST", `/coordinator/cases/${caseId}/claim`, undefined, 200);
+  // --- 2. The consultant assignment: the consultant's email, the consultant's words --------------------------
   const assignedAt = Date.now() - 5000;
   const assignment = await call<{ id: string }>(coordinator, "POST", `/coordinator/cases/${caseId}/assignments`,
     { assigneeSubject: doctor.subject, assigneeRole: "DOCTOR", assignmentType: "PRIMARY", pod: null, reason: "Clinical review" }, 200);

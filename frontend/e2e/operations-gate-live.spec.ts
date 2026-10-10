@@ -111,7 +111,12 @@ test("operations may draft before the gate, cannot advance the journey, and the 
   await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200,{"X-Case-Grant":created.body.intakeGrant});
   const workspace = async (s: Session = coordinator, prefix = "coordinator") => (await call<Workspace>(s, "GET", `/${prefix}/cases/${caseId}`, undefined, 200)).body;
 
-  await call(coordinator, "POST", `/coordinator/cases/${caseId}/claim`, undefined, 200);
+  // Intake is routed to an eligible coordinator on submit (locally, the seeded policy gives only this login capacity);
+  // a claim is only the fallback for a case left waiting in the team queue.
+  const owner = (await call<{ caseSummary: { id: string; coordinatorSubject?: string } }[]>(coordinator, "GET", "/coordinator/cases", undefined, 200))
+    .body.find(c => c.caseSummary.id === caseId)?.caseSummary.coordinatorSubject;
+  if (owner) expect(owner, "routed to the signed-in coordinator").toBe(coordinator.subject);
+  else await call(coordinator, "POST", `/coordinator/cases/${caseId}/claim`, undefined, 200);
   expect((await workspace()).caseSummary.status).toBe("INTAKE_REVIEW");
   await call(coordinator, "PUT", `/coordinator/cases/${caseId}/travel-package`, { requested: true }, 200);
 
