@@ -42,6 +42,8 @@ services:
       # Behind the gateway the connection address is nginx; the gateway sets X-Forwarded-For to the client
       # it resolved from Cloudflare, so the backend's own write budget is per real client too.
       RATE_LIMIT_TRUST_PROXY: 'true'
+      # Writes per client per minute; raise it in .env for a UAT round where testers share one office IP.
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
       APP_PUBLIC_BASE_URL: https://api-dev.rehletshifaa.com
       APP_WEB_BASE_URL: https://dev.rehletshifaa.com
       OPENAPI_ENABLED: 'true'
