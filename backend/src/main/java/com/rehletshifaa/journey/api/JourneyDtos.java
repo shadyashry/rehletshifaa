@@ -130,7 +130,12 @@ public final class JourneyDtos {
     // Secure-delivery status of the latest released proposal notification (masked; no raw contact or token).
     public record DeliveryStatus(String status,String channel,String destinationMasked,int attempts,Instant deliveredAt,Instant nextAttemptAt) {}
     /** {@code patientAction} is the open request to the patient, so staff can see and record exactly what was asked. */
-    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions,PatientProposalState patientProposal,List<RepresentativeOption> representatives) {}
+    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions,PatientProposalState patientProposal,List<RepresentativeOption> representatives,PatientReplyView patientReply) {}
+    /**
+     * Who answers the patient on this case, for the viewer: {@code canReply} is the one-voice rule (the primary coordinator,
+     * or their active cover instead of them); {@code coverName}/{@code coverEndsAt} are set while someone covers the owner.
+     */
+    public record PatientReplyView(boolean canReply,String ownerName,String coverName,Instant coverEndsAt,boolean viewerIsCover) {}
     /**
      * The ONE answer to "can the patient see a proposal right now, and which one?" — shared by the signed-in
      * patient case page and the secure Check Case Status link. {@code state}: NONE, PREPARING, READY, ACCEPTED,

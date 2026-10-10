@@ -3,6 +3,7 @@ package com.rehletshifaa.journey.application;
 import com.rehletshifaa.authority.application.CaseRelationships;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
+import com.rehletshifaa.journey.infrastructure.ReplyCoverRepository;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
@@ -20,10 +21,12 @@ public class JourneyCaseRelationships implements CaseRelationships {
     private static final Set<String> OFFERED_OR_ACTIVE = Set.of("PENDING", "ACTIVE");
     private final CaseAssignmentRepository assignments;
     private final MedicalCaseRepository cases;
+    private final ReplyCoverRepository covers;
     private final Clock clock;
 
-    public JourneyCaseRelationships(CaseAssignmentRepository assignments, MedicalCaseRepository cases, Clock clock) {
+    public JourneyCaseRelationships(CaseAssignmentRepository assignments, MedicalCaseRepository cases, ReplyCoverRepository covers, Clock clock) {
         this.assignments = assignments;
+        this.covers = covers;
         this.cases = cases;
         this.clock = clock;
     }
@@ -43,6 +46,11 @@ public class JourneyCaseRelationships implements CaseRelationships {
     @Override
     public Optional<String> primaryCoordinator(UUID caseId) {
         return assignments.findActivePrimaryCoordinator(caseId, Limit.of(1)).stream().findFirst();
+    }
+
+    @Override
+    public Optional<String> activeCover(String coordinator) {
+        return covers.findActive(coordinator, micros(clock.instant()), Limit.of(1)).stream().findFirst().map(c -> c.getCoverSubject());
     }
 
     @Override

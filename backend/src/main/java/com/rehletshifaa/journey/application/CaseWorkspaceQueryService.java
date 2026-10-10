@@ -14,6 +14,7 @@ import com.rehletshifaa.journey.api.JourneyDtos.AssignmentView;
 import com.rehletshifaa.journey.api.JourneyDtos.CaseActionsView;
 import com.rehletshifaa.journey.api.JourneyDtos.CaseView;
 import com.rehletshifaa.journey.api.JourneyDtos.CaseWorkspace;
+import com.rehletshifaa.journey.api.JourneyDtos.PatientReplyView;
 import com.rehletshifaa.journey.api.JourneyDtos.ClinicalReviewView;
 import com.rehletshifaa.journey.api.JourneyDtos.CostEstimateItem;
 import com.rehletshifaa.journey.api.JourneyDtos.DeliveryStatus;
@@ -29,6 +30,7 @@ import com.rehletshifaa.journey.infrastructure.ClinicalReviewVersionRepository;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.shared.crypto.EncryptedText;
 import com.rehletshifaa.shared.currency.CurrencyService;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
 import java.math.RoundingMode;
@@ -65,6 +67,7 @@ public class CaseWorkspaceQueryService {
     private static final Set<String> CLOSED_TASK_STATUSES = Set.of("COMPLETED", "CANCELLED");
 
     private final Authority authority;
+    private final ReplyCoverService replyCovers;
     private final CaseActionService caseActions;
     private final JourneyCaseQueryService caseQueries;
     private final ProposalQueryService proposals;
@@ -88,7 +91,9 @@ public class CaseWorkspaceQueryService {
                                      CaseTaskRepository tasks, CaseMessageRepository messages, CaseAssignmentRepository assignments,
                                      ClinicalReviewVersionRepository reviews, ClinicalReviewCostEstimateRepository estimates,
                                      DepositQueryService deposits, PatientActionQueryService patientActions, ProposalAccessService proposalAccess,
-                                     CurrencyService currency, CryptoService crypto, PortalPreferenceRepository preferences, Clock clock) {
+                                     CurrencyService currency, CryptoService crypto, PortalPreferenceRepository preferences, Clock clock,
+                                     ReplyCoverService replyCovers) {
+        this.replyCovers = replyCovers;
         this.authority = authority; this.caseActions = caseActions; this.caseQueries = caseQueries; this.proposals = proposals;
         this.cases = cases; this.statusHistory = statusHistory; this.tasks = tasks; this.messages = messages; this.assignments = assignments;
         this.reviews = reviews; this.estimates = estimates; this.deposits = deposits; this.patientActions = patientActions;
@@ -138,7 +143,18 @@ public class CaseWorkspaceQueryService {
         DeliveryStatus delivery = latest != null && DELIVERED_STATUSES.contains(latest.status()) ? proposals.deliveryStatus(latest.versionId()) : null;
         return new CaseWorkspace(summary, timeline, taskViews, messageViews, assignmentViews, reviewViews, latest, proposals.gates(caseId, latest),
                 delivery, deposits.depositForCase(caseId), cases.findConditionDescription(caseId).orElse(null), patientActions.openAction(caseId),
-                actions, proposalAccess.state(caseId), actor.role() == Role.COORDINATOR ? representatives(caseId) : List.of());
+                actions, proposalAccess.state(caseId), actor.role() == Role.COORDINATOR ? representatives(caseId) : List.of(),
+                patientActor ? null : patientReply(caseId, actor));
+    }
+
+    /** Who answers the patient now, as the staff viewer needs it: whether they may, and who covers the owner until when. */
+    private PatientReplyView patientReply(UUID caseId, Actor actor) {
+        String owner = assignments.findActivePrimaryCoordinator(caseId, Limit.of(1)).stream().findFirst().orElse(null);
+        if (owner == null) return new PatientReplyView(false, null, null, null, false);
+        var cover = replyCovers.activeCoverOf(owner);
+        return new PatientReplyView(authority.allowed(Permission.CASE_PATIENT_REPLY, Resource.ofCase(caseId)), replyCovers.name(owner),
+                cover.map(c -> replyCovers.name(c.getCoverSubject())).orElse(null), cover.map(c -> c.getEndsAt()).orElse(null),
+                cover.map(c -> c.getCoverSubject().equals(actor.subject())).orElse(false));
     }
 
     /**

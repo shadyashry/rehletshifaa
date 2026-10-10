@@ -31,4 +31,20 @@ describe("CaseMessages — WhatsApp messages", () => {
     expect(screen.getByText("عبر واتساب")).toBeTruthy();
     expect(screen.getByText("تعذّر استلام هذا المرفق. يُرجى إرساله مرة أخرى.")).toBeTruthy();
   });
+
+  it("lets only the patient's current voice reply, and says who covers", () => {
+    const covered = { canReply: false, ownerName: "Sara Ahmed", coverName: "Omar Ali", coverEndsAt: "2026-10-12T16:00:00Z", viewerIsCover: false };
+    renderWithWork(<CaseMessages locale="en" role="coordinator" caseId="c1" canSend busy={false} mutate={vi.fn()} patientReply={covered} messages={[]}/>);
+
+    expect(screen.queryByRole("button", { name: "Send message" })).toBeNull();
+    expect(screen.getByRole("note").textContent).toContain("Omar Ali is covering for Sara Ahmed");
+  });
+
+  it("lets the cover reply and tells them they are covering", () => {
+    const covering = { canReply: true, ownerName: "Sara Ahmed", coverName: "Omar Ali", coverEndsAt: "2026-10-12T16:00:00Z", viewerIsCover: true };
+    renderWithWork(<CaseMessages locale="en" role="coordinator" caseId="c1" canSend={false} busy={false} mutate={vi.fn()} patientReply={covering} messages={[]}/>);
+
+    expect(screen.getByRole("button", { name: "Send message" })).toBeTruthy();
+    expect(screen.getByRole("note").textContent).toContain("You are covering for Sara Ahmed");
+  });
 });

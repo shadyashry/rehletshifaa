@@ -222,7 +222,7 @@ Each slice ends green (`mvn -o -q test`, `pnpm typecheck`, focused e2e) and is i
 |---|---|---|
 | **S0 Templates** | Template bindings, `MetaWhatsAppChannel` template sends, Arabic rendering, Meta template submission list | Patient notifications deliver outside the 24-hour window |
 | **S1 Inbound for case patients** | `whatsapp_inbound_messages`, processor, `whatsapp_digits`, sender matching, case path into `PATIENT_COORDINATOR` with `channel`, files scanned into case documents, gateway budget | A case patient's WhatsApp reaches the owner's thread exactly once; files are scanned |
-| **S2 Reply rights + cover** | `replierOf`, `CASE_REPLIER`, `CASE_PATIENT_REPLY`, `reply_covers`, out-of-office UI | Two coordinators cannot both reply; cover hands over and back automatically |
+| **S2 Reply rights + cover** | `CASE_REPLIER`/`CASE_COVERING`, `CASE_PATIENT_REPLY`, `reply_covers`, out-of-office UI | Two coordinators cannot both reply; cover hands over and back automatically |
 | **S3 Intake conversations** | Tables, `routeIntakeConversation`, schedule-derived duty, queue/claim/reassign, Conversations UI, window-aware composer | Every pre-case chat has one owner or sits in the queue |
 | **S4 Case hand-off** | `INTAKE_CONTINUITY`, linking, intro template, history and files carried over | The intake person becomes the case owner when eligible, otherwise introduces the new one |
 | **S5 Timers + out of hours** | `reply_obligations`, working-time calculator, job, escalations, auto-reply | Reminder at 30 working minutes, lead alert at 60; one auto-reply per off-hours period |
@@ -252,6 +252,25 @@ mapping proof for the new entities.
 - **Migration:** `V78__whatsapp_inbound_messages` (Java: DDL plus a digits backfill shared by PostgreSQL and H2).
 - **UI:** the message list marks "via WhatsApp" and says what happened to a file, in both languages.
 - **Proof:** `WhatsAppInboundProcessorTest` (9), webhook test, `CaseMessages.test.tsx`, `PostgresJpaMappingTest`.
+
+## 9b. S2 delivered (2026-10-10)
+
+- **One voice on the patient thread:** new scope `CASE_REPLIER` (the case's primary coordinator, or their active cover
+  instead of them) and permission `CASE_PATIENT_REPLY`. `JourneyService.message` requires it for staff posts to
+  `PATIENT_COORDINATOR`, locks the case row (the lock reassignment takes) and re-checks under it; a refused owner gets
+  `PATIENT_REPLY_NOT_YOURS`. Internal threads keep `CASE_MESSAGE`/`CASE_ASSIGNED`. Leads and managers have no reply grant.
+- **Covers:** `reply_covers` (V79), `ReplyCoverService`, `/api/v1/coordinator/reply-covers` (list, create, revoke).
+  Set by the owner (`SELF`), their lead (`SUPERVISED`) or a Care Coordination Manager (`PLATFORM`). At most 30 days;
+  no overlap for the owner; no chains (the cover may not be away, the owner may not be covering someone). Overlapping
+  rows created concurrently still resolve to the earliest created, so there is always exactly one replier. The cover is
+  notified (`REPLY_COVER_ASSIGNED`).
+- **Cover's view:** `CASE_READ` under new scope `CASE_COVERING`; the covered owner's cases join the cover's case list;
+  the workspace carries `patientReply` (can I reply, who covers until when), shown above the patient thread.
+- **UI:** "Out of office" panel under My work (coordinators set their own cover and end covers they may manage).
+  Leads and managers set covers for others through the same API; their Control Center screen comes with S6.
+- **Limits by design in S2:** a cover answers the patient; other case actions (requests, proposal steps) stay with the
+  owner. Covers per person, not per case.
+- **Proof:** `ReplyCoverIntegrationTest` (7), `CaseMessages.test.tsx` (4), `ReplyCoverPanel.test.tsx` (3), PostgreSQL proof.
 
 ## 10. Open items (do not block S0–S2)
 

@@ -17,6 +17,8 @@ public interface CaseRelationships {
 
     /** The active primary coordinator of the case, if any. */
     Optional<String> primaryCoordinator(UUID caseId);
+    /** Who replies to this coordinator's patients instead of them right now, if anyone (their active reply cover). */
+    Optional<String> activeCover(String coordinator);
 
     /** The case is in intake and no primary coordinator holds it. */
     boolean unclaimedIntake(UUID caseId);

@@ -12,6 +12,13 @@ public enum Scope {
     CASE_OFFERED,
     /** The principal is the case's active primary coordinator. */
     CASE_OWNER,
+    /**
+     * The principal answers the case's patient now: its primary coordinator, or that coordinator's active reply cover
+     * instead of them. Exactly one person at a time.
+     */
+    CASE_REPLIER,
+    /** The principal is the active reply cover of the case's primary coordinator. */
+    CASE_COVERING,
     /** The case is in intake and no primary coordinator holds it. */
     CASE_UNCLAIMED,
     /** A live assignee of the case (or the affected subject) is in a team the principal leads, or reports to them. */

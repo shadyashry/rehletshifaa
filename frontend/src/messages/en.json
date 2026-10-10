@@ -1394,6 +1394,10 @@
           "title": "Patient asked for changes to the proposal",
           "context": "The patient asked for changes before continuing."
         },
+        "REPLY_COVER_ASSIGNED": {
+          "title": "You are covering {owner}’s patient conversations",
+          "context": "Their cases appear in your case list while the cover lasts; only you can reply to their patients meanwhile."
+        },
         "PATIENT_WHATSAPP_MESSAGE": {
           "title": "New WhatsApp message from the patient",
           "context": "The patient wrote on WhatsApp. Reply in the case's secure messages."

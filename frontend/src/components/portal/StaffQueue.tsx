@@ -6,6 +6,7 @@ import { RoleDashboardSummary } from "@/components/portal/RoleDashboardSummary";
 import { CaseQueue, type QueueState } from "@/components/portal/CaseQueue";
 import { StaffViewLinks, type StaffViewId, type StaffViewItem } from "@/components/portal/StaffNav";
 import { MyWork, type WorkItem } from "@/components/portal/MyWork";
+import { ReplyCoverPanel, type ReplyCover } from "@/components/portal/ReplyCoverPanel";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { careAreaLabel } from "@/lib/portal-labels";
 import type { Locale } from "@/lib/i18n";
@@ -19,7 +20,7 @@ const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnershi
  * The operational dashboard: work first, then the cases I own, then what the team has available.
  * Ownership ("Take ownership") belongs to the team queue; My Cases is accountability, not a task list.
  */
-export function Queue({views,view:current,onSelectView,viewHref,clinic,loading,locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],openCase,openCaseById,mutate,queueState,changeQueue}:{views:StaffViewItem[];view:StaffViewId;onSelectView:(id:StaffViewId)=>void;viewHref?:(id:StaffViewId)=>string;clinic:{href:string;label:string}|null;loading:boolean;locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;staff?:StaffMember[];openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
+export function Queue({views,view:current,onSelectView,viewHref,clinic,loading,locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],replyCovers=[],openCase,openCaseById,mutate,queueState,changeQueue}:{views:StaffViewItem[];view:StaffViewId;onSelectView:(id:StaffViewId)=>void;viewHref?:(id:StaffViewId)=>string;clinic:{href:string;label:string}|null;loading:boolean;locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;staff?:StaffMember[];replyCovers?:ReplyCover[];openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
  const work=useWorkCopy();
   const ar=locale==="ar";
   const staffView=role!=="patient";
@@ -32,7 +33,7 @@ export function Queue({views,view:current,onSelectView,viewHref,clinic,loading,l
     <div id="work-panel">
       {!staffView&&tasks.length>0&&<MyWork locale={locale} role={role} subject={mySubject} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById}/>}
       {view==="work"
-        ? <MyWork locale={locale} role={role} subject={mySubject} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById} teamWaiting={teamWaiting} onTeamQueue={()=>onSelectView("team")}/>
+        ? <><MyWork locale={locale} role={role} subject={mySubject} items={tasks as unknown as WorkItem[]} busy={busy} onOpen={openCaseById} teamWaiting={teamWaiting} onTeamQueue={()=>onSelectView("team")}/>{role==="coordinator"&&<ReplyCoverPanel locale={locale} mySubject={mySubject} covers={replyCovers} staff={staff} busy={busy} mutate={mutate}/>}</>
         : <CaseQueue locale={locale} role={role??""} cases={cases} subject={mySubject} lead={coordinatorLead} busy={busy} state={queueState} scope={staffView?(view==="team"?"team":"mine"):"all"} title={staffView?title:undefined} onChange={changeQueue} onOpen={openCase} onMutate={mutate} onTransfer={role==="coordinator"&&coordinatorLead?item=>setTransferCase(item):undefined} statusLabel={value=>statusLabel(value,locale)} categoryLabel={value=>careAreaLabel(value,work.careAreas)}/>}
     </div>
     {transferCase&&<CaseDrawer locale={locale} title={ar?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>setTransferCase(null)}><TransferOwnership locale={locale} caseId={transferCase.id} caseNumber={transferCase.caseNumber} currentOwner={transferCase.coordinatorSubject} currentOwnerName={transferCase.coordinatorName} mySubject={mySubject} staff={staff} busy={busy} mutate={mutate} onClose={()=>setTransferCase(null)}/></CaseDrawer>}

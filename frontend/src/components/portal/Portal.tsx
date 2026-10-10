@@ -26,6 +26,7 @@ import type { Locale } from "@/lib/i18n";
 import { holds, leadsTeam, opensControlCenter, portalViews, type PortalView as RoleKey } from "@/lib/access";
 import { useRouter } from "next/navigation";
 import { apiFetchAs } from "@/lib/api";
+import type { ReplyCover } from "@/components/portal/ReplyCoverPanel";
 import { type CaseView, type StaffCaseResponse, type CatalogService, type FxRate, type CaseDocument, type VerifiedDoctor, type DoctorProfile, type StaffProfile, type CareCategory, type StaffMember, type Task, type Workspace, type MutationResult, refreshAfterRejectedAction, normalizeCases, STAFF_ROLES, terminalStatuses, roleLabel } from "@/components/portal/portal-model";
 import { copy, FeedbackContext } from "@/components/portal/portal-ui";
 
@@ -120,7 +121,8 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   // Busy counts the operations in flight, so one finishing cannot clear it while another still runs. A refresh answers
   // only if it is still the latest one for this role: an older one, or one from before a role switch, is dropped.
   const refreshing=useRef(0);
-  const refresh=useCallback(async(managedBusy=false)=>{if(!currentRole||["admin","identity"].includes(currentRole))return;const request=++refreshing.current;if(!managedBusy)setBusyCount(n=>n+1);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);if(request!==refreshing.current)return;setCases(normalizeCases(nextCases));setMyTasks(nextTasks);}catch(e){if(request===refreshing.current)setError(e instanceof Error?e.message:t.error);}finally{if(!managedBusy)setBusyCount(n=>n-1);}},[currentRole,api,t.error]);
+  const[replyCovers,setReplyCovers]=useState<ReplyCover[]>([]);
+  const refresh=useCallback(async(managedBusy=false)=>{if(!currentRole||["admin","identity"].includes(currentRole))return;const request=++refreshing.current;if(!managedBusy)setBusyCount(n=>n+1);setError("");try{const includeTasks=["coordinator","doctor","operations","finance","patient"].includes(currentRole);const[nextCases,nextTasks]=await Promise.all([api<(CaseView|StaffCaseResponse)[]>(`/${currentRole}/cases`),includeTasks?api<Task[]>("/work/mine"):Promise.resolve([])]);if(request!==refreshing.current)return;setCases(normalizeCases(nextCases));setMyTasks(nextTasks);if(currentRole==="coordinator")void api<ReplyCover[]>("/coordinator/reply-covers").then(rows=>{if(request===refreshing.current)setReplyCovers(rows);},()=>setReplyCovers([]));}catch(e){if(request===refreshing.current)setError(e instanceof Error?e.message:t.error);}finally{if(!managedBusy)setBusyCount(n=>n-1);}},[currentRole,api,t.error]);
   const loadAssignmentHistory=useCallback((caseId:string)=>api<AssignmentHistoryEntry[]>(`/coordinator/cases/${caseId}/assignment-history`),[api]);
   useEffect(()=>{if(!signedInSubject)return;void api<Preferences>("/account/preferences").then(setPreferences).catch(()=>{});},[signedInSubject,api]);
   // The queue belongs to one person in one role. When either changes, the previous list is cleared and marked loading while
@@ -318,7 +320,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)
         : null}
-    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div id="staff-view" hidden={!!workspace}><Queue viewHref={viewHref} views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} clinic={clinicLink} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff??[]} openCase={openCase} mutate={mutate}/></div>}
+    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div id="staff-view" hidden={!!workspace}><Queue viewHref={viewHref} views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} clinic={clinicLink} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff??[]} replyCovers={replyCovers} openCase={openCase} mutate={mutate}/></div>}
 
     {currentRole==="finance"&&!workspace&&holds(me,"COMMERCIAL_POLICY_READ")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
   </PortalFrame></FeedbackContext.Provider>;

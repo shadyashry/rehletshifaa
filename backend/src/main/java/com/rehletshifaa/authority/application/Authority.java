@@ -139,6 +139,10 @@ public class Authority {
             case CASE_OFFERED -> isCase(resource) && role.caseAssignmentRole() != null
                     && cases.assigned(resource.id(), subject, role.caseAssignmentRole(), true);
             case CASE_OWNER -> isCase(resource) && cases.primaryCoordinator(resource.id()).filter(subject::equals).isPresent();
+            case CASE_REPLIER -> isCase(resource) && cases.primaryCoordinator(resource.id())
+                    .map(owner -> cases.activeCover(owner).orElse(owner)).filter(subject::equals).isPresent();
+            case CASE_COVERING -> isCase(resource) && cases.primaryCoordinator(resource.id())
+                    .flatMap(cases::activeCover).filter(subject::equals).isPresent();
             case CASE_UNCLAIMED -> isCase(resource) && cases.unclaimedIntake(resource.id());
             case OWN_PATIENT -> isCase(resource) && cases.ownPatientCase(resource.id(), subject);
             case SUPERVISED -> supervised(subject, role, resource);
