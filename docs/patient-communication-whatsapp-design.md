@@ -346,7 +346,8 @@ mapping proof for the new entities.
   removed. The only staff path to send a secure link is the platform resend (proposal / profile link), which re-issues it
   through the outbox as the `proposal-ready` / `final-quote-ready` / activation template. That resend now follows the
   reply rule (R2): `JourneyService` checks `CASE_PATIENT_REPLY` under the case lock (`PATIENT_REPLY_NOT_YOURS`), and
-  `CaseActionService` offers `RESEND_*` only while the owner holds it, so a covered owner no longer sees it.
+  `CaseActionService` offers `RESEND_*` to whoever holds it — the owner, or their active cover instead of them (the
+  cover gets only these, not the owner's case utilities) — so a covered owner no longer sees it and the cover does.
 
 All slices S0–S6 are delivered. Before go-live: Meta Business Verification and template approval (Arabic reviewed by a
 native speaker), `WHATSAPP_MODE=meta` with the production number, switch coordinators on for intake, a live end-to-end
