@@ -26,6 +26,7 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
     public LocalDemoDataSeeder(JdbcClient jdbc,Clock clock,com.rehletshifaa.shared.crypto.CryptoService crypto){this.jdbc=jdbc;this.clock=clock;this.crypto=crypto;}
     @Override public void run(ApplicationArguments args){Instant now=clock.instant();
         seedWorkforce(now);
+        seedCoordinationRouting(now);
         // One verified consultant per care category. The cardiology consultant reuses the
         // seeded doctor login (DOCTOR_SUBJECT) so the accept/review flow can be demonstrated.
         seedConsultant(DOCTOR_SUBJECT,"Dr Ahmed Alashry","General and Interventional Cardiology","Interventional cardiology","cardiology",now);
@@ -93,6 +94,28 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
                 .params(line,SECOND_COORDINATOR_SUBJECT,COORDINATOR_SUBJECT,timestamp(now)).update();
             jdbc.sql("INSERT INTO workforce_current_managers(function_key,staff_subject,manager_subject,reporting_line_id) VALUES('CARE_COORDINATION',?,?,?)")
                 .params(SECOND_COORDINATOR_SUBJECT,COORDINATOR_SUBJECT,line).update();
+        }
+    }
+    /**
+     * Routing configuration a claim needs (Control Center → Coordination): the coordination team serves every care area
+     * in English and Arabic, both seeded coordinators are on duty with capacity, and one routing policy sends every care
+     * area to that team. Without an effective policy a claim is refused (ROUTING_POLICY_MISSING), so a fresh local
+     * database could not run the live journeys. Idempotent, and a policy already published in the Control Center wins.
+     */
+    private void seedCoordinationRouting(Instant now){
+        jdbc.sql("INSERT INTO coordination_team_profiles(team_id,care_areas,languages,updated_by,updated_at,revision) SELECT ?,'','en,ar','local-demo-seeder',?,0 "
+                +"WHERE NOT EXISTS(SELECT 1 FROM coordination_team_profiles WHERE team_id=?)")
+            .params(COORDINATION_TEAM,timestamp(now),COORDINATION_TEAM).update();
+        for(String subject:new String[]{COORDINATOR_SUBJECT,SECOND_COORDINATOR_SUBJECT})
+            jdbc.sql("INSERT INTO coordinator_capacity(subject,maximum,on_duty,languages,care_areas,updated_by,updated_at,revision) SELECT ?,100,TRUE,'en,ar','','local-demo-seeder',?,0 "
+                    +"WHERE NOT EXISTS(SELECT 1 FROM coordinator_capacity WHERE subject=?)")
+                .params(subject,timestamp(now),subject).update();
+        if(jdbc.sql("SELECT COUNT(*) FROM coordination_policy_versions").query(Long.class).single()==0){
+            String configuration="""
+                    {"capacityWeight":80,"languageWeight":20,"requireOnDuty":true,"mandatoryLanguage":true,
+                     "careAreaTeams":{},"defaultTeam":"%s","fallbackTeam":null,"queueHours":24}""".formatted(COORDINATION_TEAM);
+            jdbc.sql("INSERT INTO coordination_policy_versions(id,version_number,effective_from,configuration,created_by,created_at) VALUES(?,1,?,?,'local-demo-seeder',?)")
+                .params(UUID.randomUUID(),timestamp(now),configuration,timestamp(now)).update();
         }
     }
     private void seedTeamRelation(UUID team,String subject,Instant now,boolean lead){

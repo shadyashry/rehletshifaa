@@ -21,17 +21,21 @@ export function TrackedLink({
   target?: string;
   onClick?: () => void;
 }) {
+  const handleClick = () => {
+    track(event);
+    onClick?.();
+  };
+  // A link that opens a new tab gains nothing from client navigation, and a Next <Link> would prefetch it: for a
+  // route handler that redirects off-site (the /{locale}/whatsapp entry) that prefetch never settles.
+  if (target === "_blank") {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className} onClick={handleClick}>
+        {children}
+      </a>
+    );
+  }
   return (
-    <Link
-      href={href}
-      target={target}
-      rel={target === "_blank" ? "noreferrer" : undefined}
-      className={className}
-      onClick={() => {
-        track(event);
-        onClick?.();
-      }}
-    >
+    <Link href={href} target={target} className={className} onClick={handleClick}>
       {children}
     </Link>
   );
