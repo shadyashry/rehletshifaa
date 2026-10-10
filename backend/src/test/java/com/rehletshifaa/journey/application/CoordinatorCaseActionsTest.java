@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.*;
 class CoordinatorCaseActionsTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired PatientActivationService activation; @Autowired PaymentService payment; @Autowired CaseActionService caseActions;
+    @Autowired ReplyCoverService covers;
     @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff; @Autowired StaffWorkService work;
     @Autowired PatientAccountService account; @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort;
     @org.junit.jupiter.api.BeforeEach void resetIdentity() { ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).reset(); }
@@ -332,6 +333,30 @@ class CoordinatorCaseActionsTest {
     }
 
     // ================= helpers =================
+    /** Re-sending the secure link messages the patient, so it moves with who answers them: the owner, or their cover instead. */
+    @Test void theSecureLinkResendFollowsWhoAnswersThePatient() throws Exception {
+        var rec = recommended();
+        var proposal = createProposal(rec);
+        journey.releaseProposal(rec.caseId(), proposal.versionId()); em.flush();
+        assertThat(journey.workspace(rec.caseId()).actions().availableActions()).contains("RESEND_PROPOSAL_LINK", "RECORD_PROPOSAL_DECISION");
+
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "cover-subject", "COORDINATOR", crypto.encrypt("Cover One"));
+        var cover = covers.create(new ReplyCoverService.NewReplyCover(null, "cover-subject", Instant.now(), Instant.now().plusSeconds(86400), "Annual leave"));
+        em.flush();
+        assertThat(journey.workspace(rec.caseId()).actions().availableActions()).as("the covered owner reads only")
+                .doesNotContain("RESEND_PROPOSAL_LINK").contains("RECORD_PROPOSAL_DECISION");
+
+        authenticate("cover-subject", Role.COORDINATOR);
+        assertThat(journey.workspace(rec.caseId()).actions().availableActions()).as("the cover answers the patient, not runs the case")
+                .contains("RESEND_PROPOSAL_LINK").doesNotContain("RECORD_PROPOSAL_DECISION", "REQUEST_INFORMATION", "SET_TRAVEL_PACKAGE");
+        journey.resendProposalLink(rec.caseId(), proposal.versionId()); em.flush();
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='PROPOSAL_LINK_RESENT' AND actor_subject='cover-subject'", rec.caseId())).isEqualTo(1);
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        covers.revoke(cover.id()); em.flush();
+        assertThat(journey.workspace(rec.caseId()).actions().availableActions()).contains("RESEND_PROPOSAL_LINK");
+    }
+
     private record Ctx(UUID caseId, UUID versionId, String token, String caseNumber) {}
     private record Recommended(UUID caseId, UUID reviewId) {}
 

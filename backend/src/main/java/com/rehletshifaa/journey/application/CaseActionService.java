@@ -100,9 +100,12 @@ public class CaseActionService {
         boolean coordinator = actor.role() == Role.COORDINATOR;
         boolean owned = coordinator && actor.subject().equals(f.coordinatorSubject());
         CurrentActionView current = currentAction(caseId, f, proposal, actor, coordinator, owned, mine, patientAction, blockers, patientBlocked);
-        List<String> available = coordinator && owned ? availableActions(f, proposal, patientAction, blockers,
-                authority.allowed(Permission.CASE_PATIENT_REPLY, Resource.ofCase(caseId)))
-                : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of();
+        // Whoever is the one voice to the patient now (the owner, or their active cover instead of them) may re-send a link.
+        List<String> sends = coordinator && authority.allowed(Permission.CASE_PATIENT_REPLY, Resource.ofCase(caseId))
+                ? patientSendActions(proposal, blockers) : List.of();
+        List<String> available = new ArrayList<>(owned ? availableActions(f, proposal, patientAction, blockers)
+                : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of());
+        available.addAll(sends);
         return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), current, blockers, available, "STAFF", waitingReason.code());
     }
 
@@ -224,27 +227,36 @@ public class CaseActionService {
 
     /**
      * Optional, state-valid operations for the owning coordinator. Utilities and exceptions only — the
-     * next workflow step is the current action, never an entry here. Re-sending a secure link messages the patient, so
-     * it is offered only while the owner is the one voice to the patient (not while a reply cover answers for them).
+     * next workflow step is the current action, never an entry here. Re-sending a secure link is not among them: it
+     * follows who answers the patient, not who owns the case ({@link #patientSendActions}).
      */
-    private List<String> availableActions(Facts f, Proposal p, PatientActionView patientAction, List<BlockerView> blockers, boolean sendsToPatient) {
+    private List<String> availableActions(Facts f, Proposal p, PatientActionView patientAction, List<BlockerView> blockers) {
         List<String> actions = new ArrayList<>();
         String s = f.status();
         if (patientAction != null) {
             if (patientAction.items().stream().anyMatch(i -> !i.completed())) actions.add("RECORD_PATIENT_RESPONSE");
         } else if (!TERMINAL.contains(s) && !CONSULTANT_OWNED.contains(s)) actions.add("REQUEST_INFORMATION");
         if (p != null && Set.of("RELEASED", "VIEWED").contains(p.status())) {
-            if (sendsToPatient) actions.add("RESEND_PROPOSAL_LINK");
             // A patient who decided on a call (the Arabic assisted path) has their decision recorded by the owner.
             actions.add("RECORD_PROPOSAL_DECISION");
         }
-        if (sendsToPatient && blockers.stream().anyMatch(b -> "PROFILE_NOT_ACTIVATED".equals(b.code()))) actions.add("RESEND_ONBOARDING_LINK");
         if (CONSULTANT_ASSIGNABLE.contains(s)) actions.add("ASSIGN_CONSULTANT");
         if (operationsAssignable(f, blockers)) actions.add("ASSIGN_OPERATIONS");
         if ("PROPOSAL_PREPARATION".equals(s) && p != null && p.requiresFinance() && !p.financeDone()) actions.add("ASSIGN_FINANCE");
         if ("INFORMATION_REQUIRED".equals(s)) actions.add("MOVE_TO_INTAKE_REVIEW");
         if (!TRAVEL_PACKAGE_LOCKED.contains(s)) actions.add("SET_TRAVEL_PACKAGE");
         if (CONSULTANT_ASSIGNABLE.contains(s)) actions.add("CANCEL_CASE");
+        return actions;
+    }
+
+    /**
+     * Re-sending a secure link messages the patient from the business number, so it belongs to the case's one voice:
+     * the owner, or their active reply cover while the owner only reads. Valid while there is a link worth re-sending.
+     */
+    private static List<String> patientSendActions(Proposal p, List<BlockerView> blockers) {
+        List<String> actions = new ArrayList<>();
+        if (p != null && Set.of("RELEASED", "VIEWED").contains(p.status())) actions.add("RESEND_PROPOSAL_LINK");
+        if (blockers.stream().anyMatch(b -> "PROFILE_NOT_ACTIVATED".equals(b.code()))) actions.add("RESEND_ONBOARDING_LINK");
         return actions;
     }
 
