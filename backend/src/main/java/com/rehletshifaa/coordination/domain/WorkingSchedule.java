@@ -1,10 +1,14 @@
 package com.rehletshifaa.coordination.domain;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -53,5 +57,48 @@ public final class WorkingSchedule {
         for (LocalTime[] w : days.getOrDefault(local.getDayOfWeek().minus(1), List.of()))
             if (!w[1].isAfter(w[0]) && time.isBefore(w[1])) return true;
         return false;
+    }
+
+    /**
+     * The instant {@code amount} of working time after {@code from}: time outside the windows does not count, so a start
+     * out of hours begins counting at the next opening. Looks at most four weeks ahead.
+     */
+    public Instant plusWorkingTime(Instant from, Duration amount, ZoneId zone) {
+        long remaining = amount.toNanos();
+        for (Instant[] window : windows(from, zone)) {
+            if (!window[1].isAfter(from)) continue;
+            Instant start = window[0].isBefore(from) ? from : window[0];
+            long available = Duration.between(start, window[1]).toNanos();
+            if (remaining <= available) return start.plusNanos(remaining);
+            remaining -= available;
+        }
+        throw new IllegalStateException("No working time in the next four weeks");
+    }
+
+    /** Whether any working time lies in {@code (from, to]}: a working moment came between the two instants. */
+    public boolean workedBetween(Instant from, Instant to, ZoneId zone) {
+        for (Instant[] window : windows(from, zone)) {
+            if (window[0].isAfter(to)) return false;
+            if (window[1].isAfter(from) && window[0].isBefore(to)) return true;
+        }
+        return false;
+    }
+
+    /** The working windows as instants, from the day before {@code from} for four weeks, in order. */
+    private List<Instant[]> windows(Instant from, ZoneId zone) {
+        LocalDate first = from.atZone(zone).toLocalDate().minusDays(1);
+        List<Instant[]> result = new ArrayList<>();
+        for (int i = 0; i < 29; i++) {
+            LocalDate date = first.plusDays(i);
+            for (LocalTime[] w : days.getOrDefault(date.getDayOfWeek(), List.of())) {
+                Instant start = date.atTime(w[0]).atZone(zone).toInstant();
+                Instant end = w[1] == LocalTime.MAX ? date.plusDays(1).atStartOfDay(zone).toInstant()
+                        : !w[1].isAfter(w[0]) ? date.plusDays(1).atTime(w[1]).atZone(zone).toInstant()
+                        : date.atTime(w[1]).atZone(zone).toInstant();
+                result.add(new Instant[]{start, end});
+            }
+        }
+        result.sort(Comparator.comparing(w -> w[0]));
+        return result;
     }
 }

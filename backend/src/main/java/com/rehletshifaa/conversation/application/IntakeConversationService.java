@@ -69,13 +69,14 @@ public class IntakeConversationService {
     private final Clock clock;
     private final ConversationDirectory directory;
     private final CaseAssignmentRepository assignments;
+    private final ReplyTimerService timers;
 
     public IntakeConversationService(IntakeConversationRepository conversations, IntakeMessageRepository messages, ConversationMediaRepository media,
                                      IntakeRoutingService routing, ReplyCoverService covers, WorkforceDirectory workforce, StaffWorkService work,
                                      NotificationOutbox outbox, DocumentService documents, Authority authority, AuditTrail auditTrail,
                                      CryptoService crypto, ObjectMapper json, Clock clock, ConversationDirectory directory,
-                                     CaseAssignmentRepository assignments) {
-        this.directory = directory; this.assignments = assignments;
+                                     CaseAssignmentRepository assignments, ReplyTimerService timers) {
+        this.directory = directory; this.assignments = assignments; this.timers = timers;
         this.conversations = conversations; this.messages = messages; this.media = media; this.routing = routing; this.covers = covers;
         this.workforce = workforce; this.work = work; this.outbox = outbox; this.documents = documents; this.authority = authority;
         this.auditTrail = auditTrail; this.crypto = crypto; this.json = json; this.clock = clock;
@@ -143,6 +144,8 @@ public class IntakeConversationService {
             notifyOwner(conversation, "INTAKE_MESSAGE", "New WhatsApp message", "A person you are talking to wrote again on WhatsApp.",
                     "intake-message:" + providerMessageId);
         }
+        timers.awaiting(ReplyTimerService.INTAKE, conversation.getId(), sentAt);
+        autoReplyOutOfHours(conversation, now);
         auditTrail.event("INTAKE_MESSAGE_RECEIVED").actor("WHATSAPP", "PROSPECT").entity("IntakeConversation", conversation.getId()).action("RECEIVE").record();
         return Optional.of(conversation.getId());
     }
@@ -186,6 +189,7 @@ public class IntakeConversationService {
                 messages.saveAndFlush(IntakeMessage.outbound(messageId, c.getId(), "SYSTEM", "TEMPLATE", EncryptedText.encode(crypto, shown), c.getLanguage(), now));
             }
         }
+        timers.answered(ReplyTimerService.INTAKE, c.getId()); // from here the case thread's timer applies
         auditTrail.event("INTAKE_CONVERSATION_LINKED").actor("SYSTEM", "ROUTING_ENGINE").caseId(caseId).entity("IntakeConversation", c.getId())
                 .action("LINK").reason(caseOwner != null && caseOwner.equals(intakeOwner) ? "INTAKE_OWNER_KEPT" : "HANDED_OFF").record();
     }
@@ -198,6 +202,25 @@ public class IntakeConversationService {
                 .orElseThrow(() -> new ApiException(404, "NO_LINKED_CONVERSATION", "This case has no earlier WhatsApp conversation"));
         Instant now = clock.instant();
         return new ConversationDetail(summary(c, now), c.getStatus(), thread(c.getId()), null, false, false, false, false);
+    }
+
+    /**
+     * Outside working hours the person is told when the team is back: once per closed period (again only after the team
+     * has worked since the last auto-reply).
+     */
+    private void autoReplyOutOfHours(IntakeConversation c, Instant now) {
+        var levels = timers.levels();
+        if (levels.working(now)) return;
+        if (c.getLastAutoReplyAt() != null && !levels.hours().workedBetween(c.getLastAutoReplyAt(), now, levels.zone())) return;
+        UUID messageId = UUID.randomUUID();
+        outbox.enqueue("INTAKE_OUT_OF_HOURS", "WHATSAPP", "+" + c.getWaDigits(), "out-of-hours",
+                EncryptedText.encode(crypto, json(Map.of("lang", c.getLanguage()))), "intake-out-of-hours:" + messageId, now);
+        String shown = "ar".equals(c.getLanguage())
+                ? "شكراً لتواصلك مع رحلة شفاء. منسّقونا متاحون من السبت إلى الخميس، من 10:00 إلى 20:00 بتوقيت القاهرة، وسيردّون عليك عند بدء العمل."
+                : "Thank you for contacting RehletShifaa. Our coordinators are available Saturday to Thursday, 10:00–20:00 Cairo time, and will reply when we open.";
+        messages.saveAndFlush(IntakeMessage.outbound(messageId, c.getId(), "SYSTEM", "TEMPLATE", EncryptedText.encode(crypto, shown), c.getLanguage(), now));
+        c.autoReplied(now);
+        conversations.saveAndFlush(c);
     }
 
     /** Tells whoever answers the conversation now (the owner, or their cover instead). */
@@ -265,6 +288,7 @@ public class IntakeConversationService {
         messages.saveAndFlush(IntakeMessage.outbound(messageId, id, me, "TEXT", EncryptedText.encode(crypto, body), c.getLanguage(), now));
         c.outbound(now);
         conversations.saveAndFlush(c);
+        timers.answered(ReplyTimerService.INTAKE, id);
         auditTrail.event("INTAKE_REPLY_SENT").actor(me, "COORDINATOR").entity("IntakeConversation", id).action("REPLY").record();
         return messageId;
     }
@@ -288,6 +312,7 @@ public class IntakeConversationService {
         messages.saveAndFlush(IntakeMessage.outbound(messageId, id, me, "TEMPLATE", EncryptedText.encode(crypto, shown), c.getLanguage(), now));
         c.outbound(now);
         conversations.saveAndFlush(c);
+        timers.answered(ReplyTimerService.INTAKE, id);
         auditTrail.event("INTAKE_FOLLOW_UP_SENT").actor(me, "COORDINATOR").entity("IntakeConversation", id).action("FOLLOW_UP").record();
         return messageId;
     }
@@ -330,6 +355,7 @@ public class IntakeConversationService {
         if (!authority.allowed(Permission.CONVERSATION_REPLY, resource)) authority.authorize(Permission.CONVERSATION_REASSIGN, resource);
         c.close(reason, clock.instant());
         conversations.saveAndFlush(c);
+        timers.answered(ReplyTimerService.INTAKE, id);
         auditTrail.event("INTAKE_CONVERSATION_CLOSED").actor(Principal.current().subject(), "COORDINATOR").entity("IntakeConversation", id)
                 .action("CLOSE").reason(reason).record();
     }

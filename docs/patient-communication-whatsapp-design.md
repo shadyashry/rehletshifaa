@@ -225,7 +225,7 @@ Each slice ends green (`mvn -o -q test`, `pnpm typecheck`, focused e2e) and is i
 | **S2 Reply rights + cover** | `CASE_REPLIER`/`CASE_COVERING`, `CASE_PATIENT_REPLY`, `reply_covers`, out-of-office UI | Two coordinators cannot both reply; cover hands over and back automatically |
 | **S3 Intake conversations** | Tables, intake routing, schedule-derived duty, queue/claim/reassign, Conversations UI, window-aware composer | Every pre-case chat has one owner or sits in the queue |
 | **S4 Case hand-off** | `INTAKE_CONTINUITY`, linking, intro template, history and files carried over | The intake person becomes the case owner when eligible, otherwise introduces the new one |
-| **S5 Timers + out of hours** | `reply_obligations`, working-time calculator, job, escalations, auto-reply | Reminder at 30 working minutes, lead alert at 60; one auto-reply per off-hours period |
+| **S5 Timers + out of hours** | `reply_obligations`, `conversation_settings`, working-time calculator, job, escalations, auto-reply, idle close | Reminder at 30 working minutes, lead alert at 60; one auto-reply per off-hours period |
 | **S6 Configuration + entry point** | Control Center fields, policy fields, `/{locale}/whatsapp` redirect, copy | Everything configurable without code; both languages |
 
 **Tests that must exist:** concurrent send by owner and non-owner (one refused); send racing a reassignment or cover
@@ -313,6 +313,24 @@ mapping proof for the new entities.
 - **Not covered:** a case submitted while nobody owns it (queue) gets no intro; whoever claims the case continues in
   the case thread.
 - **Proof:** `CaseHandOffIntegrationTest` (4), `IntakeHistory.test.tsx` (2), PostgreSQL proof.
+
+## 9e. S5 delivered (2026-10-10)
+
+- **Service levels** (V82 `conversation_settings`, one row; default Sat–Thu 10:00–20:00 Africa/Cairo, reminder 30,
+  escalation 60 working minutes, idle close 72 hours), manager API `/api/v1/admin/coordination/conversation-settings`.
+  Kept out of the routing policy record so case routing is untouched.
+- **Reply timers** (`reply_obligations`, one per conversation): a patient message starts waiting (the first unanswered
+  message counts); `WorkingSchedule.plusWorkingTime` puts the reminder and escalation on working time. Case thread:
+  journey publishes `PatientConversationEvents` (WhatsApp or portal message from the patient; a staff answer in the
+  patient thread). Intake: receive starts, reply/follow-up/close/link stop.
+- **Dispatch** (`ReplyTimerService`, every minute, SKIP LOCKED): reminder to the replier (owner or active cover);
+  escalation to the owner's leads (`WorkforceDirectory.leadsOf`: team leads and direct manager), or to the Care
+  Coordination Managers when nobody owns it or nobody leads the owner. Each fires once per waiting period.
+- **Out of hours:** the first intake message in a closed period gets `rs_out_of_hours` once; again only after the team has
+  worked since (`workedBetween`). Case patients get no auto-reply.
+- **Idle close:** open intake conversations silent for `idle_close_hours` close as `IDLE` (every 15 minutes); a returning
+  person reopens them (S3).
+- **Proof:** `ReplyTimerIntegrationTest` (7), `WorkingScheduleTest` (5).
 
 ## 10. Open items (do not block S0–S2)
 

@@ -78,4 +78,12 @@ public class WorkforceDirectory {
         subjects.remove(lead);
         return subjects;
     }
+
+    /** Who supervises this person in the function: leads of their current teams and their direct manager (the reverse of {@link #supervised}). */
+    public Set<String> leadsOf(String member, String function) {
+        Set<String> subjects = new HashSet<>(leads.findLeadsOf(member, function, micros(clock.instant())));
+        subjects.addAll(currentManagers.findManagersOf(member, function));
+        subjects.remove(member);
+        return subjects;
+    }
 }

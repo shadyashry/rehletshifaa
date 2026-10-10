@@ -39,6 +39,7 @@ class IntakeConversationIntegrationTest {
     @Autowired EntityManager em;
 
     @BeforeEach void coordinators() {
+        jdbc.update("UPDATE conversation_settings SET business_hours=?", "{\"MONDAY\":[\"00:00-24:00\"],\"TUESDAY\":[\"00:00-24:00\"],\"WEDNESDAY\":[\"00:00-24:00\"],\"THURSDAY\":[\"00:00-24:00\"],\"FRIDAY\":[\"00:00-24:00\"],\"SATURDAY\":[\"00:00-24:00\"],\"SUNDAY\":[\"00:00-24:00\"]}"); // always working: no out-of-hours auto-reply
         for (String s : new String[]{EN, AR, OTHER, LEAD}) {
             WorkforceTestData.staff(jdbc, s, "COORDINATOR", crypto.encrypt(s.toUpperCase()));
             CoordinationTestData.eligibleCoordinator(jdbc, s);

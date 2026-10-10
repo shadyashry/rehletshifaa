@@ -200,6 +200,7 @@ app:
         proposal-decision-recorded: ${WHATSAPP_TEMPLATE_DECISION_RECORDED:rs_decision_recorded}
         intake-followup: ${WHATSAPP_TEMPLATE_FOLLOWUP:rs_followup_window_closed}
         coordinator-intro: ${WHATSAPP_TEMPLATE_COORDINATOR_INTRO:rs_coordinator_intro}
+        out-of-hours: ${WHATSAPP_TEMPLATE_OUT_OF_HOURS:rs_out_of_hours}
       languages:
         en: ${WHATSAPP_TEMPLATE_LANGUAGE_EN:en}
         ar: ${WHATSAPP_TEMPLATE_LANGUAGE_AR:ar}

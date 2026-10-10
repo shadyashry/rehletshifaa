@@ -1407,6 +1407,14 @@
           "title": "New WhatsApp message",
           "context": "A person you are talking to wrote again on WhatsApp. Reply in Conversations."
         },
+        "REPLY_REMINDER": {
+          "title": "A patient is waiting for your reply",
+          "context": "Someone wrote and has not had an answer yet."
+        },
+        "REPLY_ESCALATED": {
+          "title": "A patient has waited too long for a reply",
+          "context": "{coordinator} has not answered yet. Cover or reassign the conversation."
+        },
         "PATIENT_WHATSAPP_MESSAGE": {
           "title": "New WhatsApp message from the patient",
           "context": "The patient wrote on WhatsApp. Reply in the case's secure messages."

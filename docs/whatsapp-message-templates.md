@@ -17,7 +17,7 @@ created under the same template name.
 - **Languages:** `en` and `ar` (`app.whatsapp.meta.languages`).
 - Button text ≤ 25 characters; bodies do not start or end with a variable.
 
-## Bound now (S0, S3, S4)
+## Bound now (S0, S3–S5)
 
 | Template | Outbox key | Button (en / ar) → route |
 |---|---|---|
@@ -31,6 +31,7 @@ created under the same template name.
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
 | `rs_followup_window_closed` | `intake-followup` | none |
 | `rs_coordinator_intro` | `coordinator-intro` | none (1 body variable: the coordinator's name) |
+| `rs_out_of_hours` | `out-of-hours` | none |
 | `rs_code` (Authentication) | `case-access-code`, `proposal-access-code` | Copy code (Meta preset); set `WHATSAPP_META_AUTH_TEMPLATE` |
 
 Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (see `application.yml`).
@@ -74,17 +75,14 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 - ar: مرحباً، سيكون {{1}} من رحلة شفاء منسّقك من الآن وسيتابع محادثتك هنا.
 - Sample value for review: `Omar Ali` / `عمر علي`.
 
+**`rs_out_of_hours`** (S5: first message in a closed period from someone without a case; once per closed period)
+- en: Thank you for contacting RehletShifaa. Our coordinators are available Saturday to Thursday, 10:00–20:00 Cairo time, and will reply when we open.
+- ar: شكراً لتواصلك مع رحلة شفاء. منسّقونا متاحون من السبت إلى الخميس، من 10:00 إلى 20:00 بتوقيت القاهرة، وسيردّون عليك عند بدء العمل.
+- The hours are written into the template: change the template if the team's hours change.
+
 **`rs_decision_recorded`** — `{{1}}` the decision in words, `{{2}}` who was spoken to, `{{3}}` the date
 (all filled by the backend in the template's language)
 - en: Your coordinator recorded your decision on your RehletShifaa proposal ({{1}}) after speaking with {{2}} on {{3}}. If this is not what was agreed, please contact your coordinator.
 - ar: سُجّل قرارك بشأن مقترح رحلة شفاء ({{1}}) بعد التحدث {{2}} في {{3}}. إن لم يكن هذا ما اتُّفق عليه، يُرجى التواصل مع منسّقك.
 - Sample values for review: en `you accepted the final quote` / `you` / `8 October 2026`;
   ar `قبول العرض النهائي` / `معك` / `8 أكتوبر 2026`.
-
-## Later slices (drafts, not bound yet)
-
-| Template | Slice | en |
-|---|---|---|
-| `rs_out_of_hours` | S5 | Thank you for contacting RehletShifaa. Our coordinators are available Saturday to Thursday, 10:00–20:00 Cairo time, and will reply when we open. |
-
-Arabic for these is written when the slice starts, with the same native review.

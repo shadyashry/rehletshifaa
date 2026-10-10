@@ -32,6 +32,7 @@ public class IntakeConversation extends AssignedIdEntity {
     @Column(name = "linked_case_id") private UUID linkedCaseId;
     @Column(name = "closed_at") private Instant closedAt;
     @Column(name = "closed_reason", length = 40) private String closedReason;
+    @Column(name = "last_auto_reply_at") private Instant lastAutoReplyAt;
     @Column(nullable = false) private long revision;
 
     protected IntakeConversation() {}
@@ -51,6 +52,10 @@ public class IntakeConversation extends AssignedIdEntity {
     }
 
     public void outbound(Instant now) { lastOutboundAt = micros(now); revision++; }
+
+    /** The out-of-hours auto-reply went out; it is sent once per closed period. */
+    public void autoReplied(Instant now) { lastAutoReplyAt = micros(now); revision++; }
+    public Instant getLastAutoReplyAt() { return lastAutoReplyAt; }
 
     public void assign(String owner) { this.ownerSubject = owner; revision++; }
 

@@ -43,6 +43,16 @@ public interface WorkforceLeadDesignationRepository extends BaseRepository<Workf
                 and m.status = 'ACTIVE' and m.effectiveFrom <= :at and (m.effectiveTo is null or m.effectiveTo > :at)""")
     List<String> findSupervisedMembers(@Param("lead") String lead, @Param("function") String function, @Param("at") Instant at);
 
+    /** The reverse of {@link #findSupervisedMembers}: the current leads of the member's active teams of the function. */
+    @Query("""
+            select distinct l.subject from WorkforceLeadDesignation l
+                join WorkforceTeam t on t.id = l.teamId
+                join WorkforceTeamMembership m on m.teamId = t.id
+            where m.subject = :member and l.status = 'ACTIVE' and l.effectiveFrom <= :at and (l.effectiveTo is null or l.effectiveTo > :at)
+                and t.status = 'ACTIVE' and t.functionKey = :function
+                and m.status = 'ACTIVE' and m.effectiveFrom <= :at and (m.effectiveTo is null or m.effectiveTo > :at)""")
+    List<String> findLeadsOf(@Param("member") String member, @Param("function") String function, @Param("at") Instant at);
+
     /** STF-08: active teams the subject solely leads (by designation status) that still have other active members. */
     @Query("""
             select count(t) from WorkforceTeam t join WorkforceLeadDesignation l on l.teamId = t.id

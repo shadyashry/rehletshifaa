@@ -11,6 +11,7 @@ import com.rehletshifaa.shared.PhoneDigits;
 import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.shared.crypto.EncryptedText;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,9 +38,12 @@ public class PatientChannelService {
     private final StaffWorkService work;
     private final CryptoService crypto;
     private final AuditTrail auditTrail;
+    private final ApplicationEventPublisher events;
 
     public PatientChannelService(MedicalCaseRepository cases, CaseMessageRepository messages, CaseAssignmentRepository assignments,
-                                 DocumentService documents, StaffWorkService work, CryptoService crypto, AuditTrail auditTrail) {
+                                 DocumentService documents, StaffWorkService work, CryptoService crypto, AuditTrail auditTrail,
+                                 ApplicationEventPublisher events) {
+        this.events = events;
         this.cases = cases; this.messages = messages; this.assignments = assignments; this.documents = documents;
         this.work = work; this.crypto = crypto; this.auditTrail = auditTrail;
     }
@@ -92,6 +96,7 @@ public class PatientChannelService {
                 WorkCopy.of("PATIENT_WHATSAPP_MESSAGE"));
         auditTrail.event("CASE_MESSAGE_RECEIVED").actor("WHATSAPP", target.senderRole()).caseId(target.caseId())
                 .entity("CaseMessage", id.toString()).action("RECEIVE").record();
+        events.publishEvent(new PatientConversationEvents.PatientWrote(target.caseId(), sentAt));
         return Optional.of(id);
     }
 

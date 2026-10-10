@@ -36,4 +36,18 @@ class WorkingScheduleTest {
         assertThatThrownBy(() -> WorkingSchedule.of(Map.of("FUNDAY", List.of("10:00-20:00")))).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> WorkingSchedule.of(Map.of("MONDAY", List.of("10-20")))).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test void workingTimeSkipsClosedHoursAndDays() {
+        var week = WorkingSchedule.of(Map.of("THURSDAY", List.of("10:00-20:00"), "SATURDAY", List.of("10:00-20:00")));
+        // Thursday 19:50 + 30 working minutes: 10 on Thursday, Friday off, 20 on Saturday.
+        assertThat(week.plusWorkingTime(cairo("2026-10-08T19:50"), java.time.Duration.ofMinutes(30), CAIRO)).isEqualTo(cairo("2026-10-10T10:20"));
+        // Starting before opening counts from the opening.
+        assertThat(week.plusWorkingTime(cairo("2026-10-10T08:00"), java.time.Duration.ofMinutes(30), CAIRO)).isEqualTo(cairo("2026-10-10T10:30"));
+    }
+
+    @Test void workedBetweenSeesAnyWorkingMoment() {
+        var week = WorkingSchedule.of(Map.of("SATURDAY", List.of("10:00-20:00")));
+        assertThat(week.workedBetween(cairo("2026-10-09T12:00"), cairo("2026-10-09T23:00"), CAIRO)).isFalse();
+        assertThat(week.workedBetween(cairo("2026-10-09T12:00"), cairo("2026-10-10T21:00"), CAIRO)).isTrue();
+    }
 }

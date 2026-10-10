@@ -21,6 +21,9 @@ public interface WorkforceCurrentManagerRepository extends BaseRepository<Workfo
     @Query("select c.staffSubject from WorkforceCurrentManager c where c.managerSubject = :manager and c.functionKey = :function")
     List<String> findDirectReports(@Param("manager") String manager, @Param("function") String function);
 
+    @Query("select c.managerSubject from WorkforceCurrentManager c where c.staffSubject = :staff and c.functionKey = :function")
+    List<String> findManagersOf(@Param("staff") String staff, @Param("function") String function);
+
     boolean existsByFunctionKeyAndManagerSubject(String functionKey, String managerSubject);
 
     long countByManagerSubject(String managerSubject);
