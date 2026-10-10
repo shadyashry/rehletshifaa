@@ -100,8 +100,9 @@ test("leaving a case from My dashboard hands the focus to the view's heading", a
 test("Back returns to the landing view even though its URL named no view", async ({ page }) => {
   await setupPortal(page, "COORDINATOR_LEAD");
   await page.goto("/en/portal");
-  // Landing picks the first view with work once the queue has loaded.
-  await expect(page.locator("#staff-view h2.title")).toBeVisible();
+  // Landing picks the first view with work once the queue has loaded. The view's own heading comes first (the
+  // coordinator home also carries the Out of office panel below it).
+  await expect(page.locator("#staff-view h2.title").first()).toBeVisible();
   await page.waitForLoadState("networkidle");
   const landed = await page.getByRole("navigation", { name: "Your work" }).locator('[aria-current="page"]').textContent();
   const other = landed?.includes("Team queue") ? /My work/ : /Team queue/;
