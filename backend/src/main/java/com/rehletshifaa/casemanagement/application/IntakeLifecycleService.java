@@ -127,9 +127,16 @@ public class IntakeLifecycleService {
         String submitterWhatsapp=contacts.findByCaseId(medicalCase.getId()).map(CaseSubmissionContact::getWhatsappNumber)
                 .orElseThrow(()->new IllegalStateException("Case "+medicalCase.getId()+" has no submission contact"));
         notificationOutbox.enqueueOnce("CASE_STATUS_LINK", "WHATSAPP", submitterWhatsapp, "case-status-link", payload, "case-status:"+linkId, now);
-        notificationOutbox.enqueueOnce("NEW_CASE", "EMAIL", coordinatorEmail, "new-case-received", encryptedJson("{\"case\":\""+medicalCase.getCaseNumber()+"\"}"), "case-submitted:"+medicalCase.getId(), now);
         audit("CASE_SUBMITTED","guest","GUEST",medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"SUBMIT","SUCCESS",null,now);
         return linkToken;
+    }
+
+    /**
+     * Tells the coordination team mailbox that a submitted case is waiting in the team queue. Called by admission only
+     * when no Coordinator took ownership on submit; a routed case is announced to its Coordinator instead. One mail per case.
+     */
+    @Transactional public void announceQueuedIntake(UUID caseId, String caseNumber) {
+        notificationOutbox.enqueueOnce("NEW_CASE", "EMAIL", coordinatorEmail, "new-case-received", encryptedJson("{\"case\":\""+caseNumber+"\"}"), "case-submitted:"+caseId, clock.instant());
     }
 
     public String hash(String token){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((pepper+":"+token).getBytes(StandardCharsets.UTF_8)));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}

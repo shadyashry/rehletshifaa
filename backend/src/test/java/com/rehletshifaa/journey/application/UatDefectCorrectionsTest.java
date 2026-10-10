@@ -312,6 +312,21 @@ class UatDefectCorrectionsTest {
         assertThat(journey.coordinatorQueue().stream().filter(c -> c.id().equals(created.caseId())).findFirst().orElseThrow().coordinatorSubject()).isNull();
     }
 
+    @Test void aNewCaseRoutedToACoordinatorOnSubmitMailsTheCoordinatorNotTheTeamQueue() throws Exception {
+        seedCoordinatorProfile();
+        setStaffEmail("coordinator-subject", "coordinator.r@local.test");
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        var created = cases.create(new CreateCaseRequest("Routed", "Patient", "Kenya", "+254700000530", "Reports", "en", true, null, "uat-r@local.test", "Africa/Nairobi", "cardiology"));
+        cases.submit(created.caseId()); em.flush(); em.clear();
+        assertThat(com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")).isTrue();
+        // Nothing waits in the team queue, so the team mailbox hears nothing; the routed Coordinator gets one work mail.
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key=?", "case-submitted:" + created.caseId())).isZero();
+        var coordinatorMail = jdbc.queryForList("SELECT idempotency_key FROM notification_outbox WHERE destination=? AND template_key='coordinator-work-assigned'",
+                String.class, "coordinator.r@local.test");
+        assertThat(coordinatorMail).hasSize(1);
+        assertThat(outboxRow(coordinatorMail.getFirst()).data().get("case")).isEqualTo(created.caseNumber());
+    }
+
     @Test void acknowledgingAnEstimateNotifiesTheCoordinatorOnlyThroughRealDepositWork() throws Exception {
         UUID caseId = ownedCase("+254700000515", "uat-l@local.test");
         setStaffEmail("coordinator-subject", "coordinator.l@local.test");

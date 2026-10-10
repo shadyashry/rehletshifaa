@@ -2,6 +2,7 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.casemanagement.application.CaseStatusLog;
 import com.rehletshifaa.casemanagement.application.IntakeEvents;
+import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
 import com.rehletshifaa.casemanagement.domain.CaseStatus;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.domain.JourneyAdmission.Authority;
@@ -59,6 +60,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 @Service
 public class JourneyProductionIntakeService {
     private final CaseStatusLog statusLog;
+    private final IntakeLifecycleService intake;
     private final MedicalCaseRepository cases;
     private static final Logger log = LoggerFactory.getLogger(JourneyProductionIntakeService.class);
 
@@ -79,7 +81,8 @@ public class JourneyProductionIntakeService {
             com.rehletshifaa.journey.infrastructure.JourneyDefinitionStore definitions,
             JourneyDeploymentStore deployments, JourneyCaseBindingStore bindings, JourneyCaseAdmissionStore admissions,
             ObjectProvider<JourneyRuntimePort> runtimes, JourneyProjectionService projections, GovernanceAuditLog audit,
-            CoordinatorRoutingPort routing, PlatformTransactionManager transactions, MeterRegistry meters, Clock clock, MedicalCaseRepository cases, CaseStatusLog statusLog) { this.statusLog = statusLog; this.cases = cases;
+            CoordinatorRoutingPort routing, PlatformTransactionManager transactions, MeterRegistry meters, Clock clock, MedicalCaseRepository cases, CaseStatusLog statusLog,
+            IntakeLifecycleService intake) { this.statusLog = statusLog; this.cases = cases; this.intake = intake;
         this.policies=policies; this.definitions=definitions; this.deployments = deployments; this.bindings = bindings;
         this.admissions = admissions; this.runtimes = runtimes; this.projections = projections; this.audit = audit; this.routing = routing;
         this.separate = new TransactionTemplate(transactions);
@@ -122,8 +125,10 @@ public class JourneyProductionIntakeService {
         if (!decision.journey()) {
             record(caseId, decision);
             // A standard intake routed to an eligible Coordinator starts intake review, exactly as a claim does; with nobody
-            // eligible (or no routing policy) it stays RECEIVED with a queue item for the Care Coordination Manager.
-            routing.routeCoordinationIntake(caseId).ifPresent(owner -> startIntakeReview(caseId, owner, evaluatedAt));
+            // eligible (or no routing policy) it stays RECEIVED with a queue item for the Care Coordination Manager, and only
+            // then is the team mailbox told the case is waiting in the queue (the routed Coordinator gets their own work mail).
+            routing.routeCoordinationIntake(caseId).ifPresentOrElse(owner -> startIntakeReview(caseId, owner, evaluatedAt),
+                    () -> announceQueued(caseId));
             audit.record("SYSTEM", caseId.toString(), "COORDINATION_ADMISSION_SELECTED", "SUCCESS", evidence(decision));
             count(decision);
             return;
@@ -141,6 +146,7 @@ public class JourneyProductionIntakeService {
             audit.record("SYSTEM", caseId.toString(), "JOURNEY_CASE_BOUND", "SUCCESS", "version=" + version.id() + "; mode=PRODUCTION");
             audit.record("SYSTEM", caseId.toString(), "JOURNEY_CASE_STARTED", "SUCCESS", "version=" + version.id());
             projections.syncAsSystem(caseId);
+            announceQueued(caseId); // Journey-admitted intake keeps the team announcement it always had
         } catch (RuntimeException e) {
             String category = e instanceof DuplicateKeyException ? "BINDING_CONFLICT" : "RUNTIME_START_FAILED";
             log.warn("Journey admission of case {} failed ({}); submission rolled back", caseId, category, e);
@@ -149,6 +155,10 @@ public class JourneyProductionIntakeService {
         }
         count(decision);
         meters.counter("journey.runtime.start", "outcome", "success").increment();
+    }
+
+    private void announceQueued(UUID caseId) {
+        intake.announceQueuedIntake(caseId, cases.findCaseNumber(caseId).orElseThrow());
     }
 
     private void record(UUID caseId, Decision d) {

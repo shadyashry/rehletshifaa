@@ -110,6 +110,10 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   const routed = await expectMail(request, COORDINATOR_MAILBOX, started, new RegExp(`Coordinator action for case ${caseNumber}: Care coordination assigned`));
   expect(routed.To.map(t => t.Address)).toEqual([COORDINATOR_MAILBOX]);
   expect(routed.Text).not.toMatch(/Playwright|UAT Pass|Kenya/);
+  // Nothing waits in the team queue, so the team mailbox is not told a new request is waiting there.
+  await settle();
+  expect((await mailTo(request, TEAM_MAILBOX, started)).filter(m => m.Subject.includes(caseNumber) && /New care request/.test(m.Subject)),
+    "routed on submit: no team-queue mail").toHaveLength(0);
 
   const workspace = async (s: Session = coordinator, prefix = "coordinator") => (await call<Workspace>(s, "GET", `/${prefix}/cases/${caseId}`, undefined, 200)).body;
   const cards = (await call<{ caseSummary: { id: string; coordinatorSubject?: string }; highPriorityCount: number }[]>(coordinator, "GET", "/coordinator/cases", undefined, 200)).body;
