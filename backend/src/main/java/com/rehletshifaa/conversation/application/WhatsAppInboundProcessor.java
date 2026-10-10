@@ -20,9 +20,9 @@ import org.springframework.stereotype.Service;
 import java.util.Set;
 
 /**
- * Files inbound WhatsApp messages (S1 of docs/patient-communication-whatsapp-design.md). A sender with an open case gets
- * the message, and any file, in that case's patient thread; a sender with none is left UNMATCHED for an intake
- * conversation. Media is fetched now, while Meta still has it. A scanner with no verdict, or any other transient
+ * Files inbound WhatsApp messages (S1/S3 of docs/patient-communication-whatsapp-design.md). A sender with an open case
+ * gets the message, and any file, in that case's patient thread; a sender with none gets it in their intake
+ * conversation, which routing gives an owner or leaves in the intake queue. Media is fetched now, while Meta still has it. A scanner with no verdict, or any other transient
  * failure, retries the whole message later; a redelivery is never filed twice.
  */
 @Service
@@ -35,14 +35,15 @@ public class WhatsAppInboundProcessor {
 
     private final WhatsAppInboundStore store;
     private final PatientChannelService channel;
+    private final IntakeConversationService intake;
     private final ObjectProvider<WhatsAppMediaPort> media;
     private final ObjectMapper json;
     private final long maxBytes;
     private volatile boolean stopping;
 
-    public WhatsAppInboundProcessor(WhatsAppInboundStore store, PatientChannelService channel, ObjectProvider<WhatsAppMediaPort> media,
-                                    ObjectMapper json, @Value("${app.storage.max-bytes}") long maxBytes) {
-        this.store = store; this.channel = channel; this.media = media; this.json = json; this.maxBytes = maxBytes;
+    public WhatsAppInboundProcessor(WhatsAppInboundStore store, PatientChannelService channel, IntakeConversationService intake,
+                                    ObjectProvider<WhatsAppMediaPort> media, ObjectMapper json, @Value("${app.storage.max-bytes}") long maxBytes) {
+        this.store = store; this.channel = channel; this.intake = intake; this.media = media; this.json = json; this.maxBytes = maxBytes;
     }
 
     @EventListener(ContextClosedEvent.class) void stop() { stopping = true; }
@@ -59,7 +60,6 @@ public class WhatsAppInboundProcessor {
     void handle(InboundMessage message) {
         try {
             var target = channel.caseFor(message.senderDigits());
-            if (target.isEmpty()) { store.unmatched(message); return; }
             Parsed parsed = parse(message);
             if (parsed.ignored()) { store.processed(message, null, "IGNORED_" + parsed.type().toUpperCase()); return; }
             InboundFile file = null;
@@ -75,6 +75,12 @@ public class WhatsAppInboundProcessor {
                     catch (WhatsAppMediaPort.MediaTooLargeException e) { attachmentStatus = "TOO_LARGE"; }
                 }
             }
+            if (target.isEmpty()) {
+                var conversation = intake.receive(message.providerMessageId(), message.senderDigits(), parsed.profileName(), parsed.text(), attachmentStatus,
+                        file == null ? null : new IntakeConversationService.InboundFile(file.content(), file.contentType(), file.fileName()), message.sentAt());
+                store.processed(message, null, conversation.isPresent() ? "INTAKE" : "ALREADY_FILED");
+                return;
+            }
             var filed = channel.fileWhatsAppMessage(target.get(), message.providerMessageId(), parsed.text(), attachmentStatus, file, message.sentAt());
             store.processed(message, target.get().caseId(), filed.isPresent() ? "FILED" : "ALREADY_FILED");
         } catch (DocumentScanUnavailableException e) {
@@ -86,13 +92,22 @@ public class WhatsAppInboundProcessor {
     }
 
     /** What the thread shows: text (or caption), a file to fetch, or why a kind of content is not kept. */
-    record Parsed(String type, String text, String mediaId, String mimeType, String fileName, String attachmentStatus, boolean ignored) {}
+    record Parsed(String type, String text, String mediaId, String mimeType, String fileName, String attachmentStatus, boolean ignored, String profileName) {
+        Parsed(String type, String text, String mediaId, String mimeType, String fileName, String attachmentStatus, boolean ignored) {
+            this(type, text, mediaId, mimeType, fileName, attachmentStatus, ignored, null);
+        }
+        Parsed named(String name) { return new Parsed(type, text, mediaId, mimeType, fileName, attachmentStatus, ignored, name); }
+    }
 
     Parsed parse(InboundMessage message) {
-        JsonNode m;
-        try { m = json.readTree(message.payload()).path("message"); }
+        JsonNode root;
+        try { root = json.readTree(message.payload()); }
         catch (Exception e) { throw new IllegalStateException("Stored inbound message is unreadable", e); }
-        String type = m.path("type").asText(message.messageType());
+        return parseMessage(root.path("message"), message.messageType()).named(root.path("profileName").asText(null));
+    }
+
+    private Parsed parseMessage(JsonNode m, String storedType) {
+        String type = m.path("type").asText(storedType);
         return switch (type) {
             case "text" -> new Parsed(type, m.path("text").path("body").asText(""), null, null, null, null, false);
             case "button" -> new Parsed(type, m.path("button").path("text").asText(""), null, null, null, null, false);

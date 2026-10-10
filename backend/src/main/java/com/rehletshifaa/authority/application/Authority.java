@@ -31,13 +31,15 @@ public class Authority {
     private static final Duration STEP_UP = Duration.ofMinutes(10);
     private final EffectiveRoleStore roles;
     private final CaseRelationships cases;
+    private final ConversationRelationships conversations;
     private final WorkforceDirectory workforce;
     private final Clock clock;
     private final AuthenticationStrength authenticationStrength;
     private final GovernanceAuditLog audit;
 
-    public Authority(EffectiveRoleStore roles, CaseRelationships cases, WorkforceDirectory workforce, Clock clock,
+    public Authority(EffectiveRoleStore roles, CaseRelationships cases, ConversationRelationships conversations, WorkforceDirectory workforce, Clock clock,
             AuthenticationStrength authenticationStrength, GovernanceAuditLog audit) {
+        this.conversations = conversations;
         this.roles = roles;
         this.cases = cases;
         this.workforce = workforce;
@@ -143,6 +145,9 @@ public class Authority {
                     .map(owner -> cases.activeCover(owner).orElse(owner)).filter(subject::equals).isPresent();
             case CASE_COVERING -> isCase(resource) && cases.primaryCoordinator(resource.id())
                     .flatMap(cases::activeCover).filter(subject::equals).isPresent();
+            case CONVERSATION_REPLIER -> isConversation(resource) && conversations.conversationOwner(resource.id())
+                    .map(owner -> cases.activeCover(owner).orElse(owner)).filter(subject::equals).isPresent();
+            case CONVERSATION_UNCLAIMED -> isConversation(resource) && conversations.unclaimedConversation(resource.id());
             case CASE_UNCLAIMED -> isCase(resource) && cases.unclaimedIntake(resource.id());
             case OWN_PATIENT -> isCase(resource) && cases.ownPatientCase(resource.id(), subject);
             case SUPERVISED -> supervised(subject, role, resource);
@@ -159,6 +164,10 @@ public class Authority {
         if (resource.subject() != null) return team.contains(resource.subject());
         return isCase(resource) && role.caseAssignmentRole() != null
                 && cases.activeAssignees(resource.id(), role.caseAssignmentRole()).stream().anyMatch(team::contains);
+    }
+
+    private static boolean isConversation(Resource resource) {
+        return resource.kind() == Resource.Kind.CONVERSATION && resource.id() != null;
     }
 
     private static boolean isCase(Resource resource) {

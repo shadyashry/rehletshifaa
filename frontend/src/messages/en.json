@@ -1252,6 +1252,7 @@
       "work": "My work",
       "mine": "My cases",
       "team": "Team queue",
+      "conversations": "Conversations",
       "clinic": "Virtual Clinic",
       "workingAs": "Working as"
     },
@@ -1397,6 +1398,14 @@
         "REPLY_COVER_ASSIGNED": {
           "title": "You are covering {owner}’s patient conversations",
           "context": "Their cases appear in your case list while the cover lasts; only you can reply to their patients meanwhile."
+        },
+        "INTAKE_CONVERSATION_ASSIGNED": {
+          "title": "New WhatsApp conversation",
+          "context": "Someone without a case wrote on WhatsApp. Reply in Conversations."
+        },
+        "INTAKE_MESSAGE": {
+          "title": "New WhatsApp message",
+          "context": "A person you are talking to wrote again on WhatsApp. Reply in Conversations."
         },
         "PATIENT_WHATSAPP_MESSAGE": {
           "title": "New WhatsApp message from the patient",

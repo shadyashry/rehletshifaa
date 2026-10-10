@@ -29,6 +29,11 @@ import java.util.Set;
 public class MetaWhatsAppChannel implements NotificationChannelPort {
     /** One-time codes use the authentication template: Meta fixes its text and its copy-code button. */
     static final Set<String> CODE_TEMPLATES = Set.of("case-access-code", "proposal-access-code");
+    /**
+     * A coordinator's reply in an intake conversation: free text, which Meta accepts only inside the 24-hour window
+     * after the person's last message. The sender checks the window; outside it they send a template instead.
+     */
+    static final String CONVERSATION_TEXT = "conversation-text";
 
     private final RestClient client;
     private final ObjectMapper json;
@@ -70,7 +75,10 @@ public class MetaWhatsAppChannel implements NotificationChannelPort {
     public String deliver(OutgoingNotification notification) {
         String to = notification.destination() == null ? "" : notification.destination().replaceAll("\\D", "");
         if (to.isBlank()) throw new IllegalArgumentException("WhatsApp destination is invalid");
-        Map<String, Object> payload = CODE_TEMPLATES.contains(notification.templateKey())
+        Map<String, Object> payload = CONVERSATION_TEXT.equals(notification.templateKey())
+                ? Map.of("messaging_product", "whatsapp", "recipient_type", "individual", "to", to, "type", "text",
+                        "text", Map.of("preview_url", false, "body", notification.body()))
+                : CODE_TEMPLATES.contains(notification.templateKey())
                 ? authenticationPayload(to, notification)
                 : templatePayload(to, notification);
         try {

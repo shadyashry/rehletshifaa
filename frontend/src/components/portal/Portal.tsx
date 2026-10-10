@@ -320,7 +320,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)
         : null}
-    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div id="staff-view" hidden={!!workspace}><Queue viewHref={viewHref} views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} clinic={clinicLink} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff??[]} replyCovers={replyCovers} openCase={openCase} mutate={mutate}/></div>}
+    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div id="staff-view" hidden={!!workspace}><Queue viewHref={viewHref} views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} clinic={clinicLink} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff??[]} replyCovers={replyCovers} openCase={openCase} mutate={mutate} fetchJson={api}/></div>}
 
     {currentRole==="finance"&&!workspace&&holds(me,"COMMERCIAL_POLICY_READ")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
   </PortalFrame></FeedbackContext.Provider>;
@@ -341,8 +341,8 @@ function PortalFrame({title,subtitle,children}:{title:string;subtitle:string;chi
 /** The staff views in order with the counts that decide where the home lands. My cases shows no count: it is accountability, not a to-do. */
 function staffViewItems(role:string,cases:CaseView[],tasks:Task[],subject:string|undefined,nav:WorkCopy["nav"]){
   const coordinator=role==="coordinator";
-  const counts:Record<StaffViewId,number>={work:tasks.length,mine:cases.filter(item=>!terminalStatuses.has(item.status)&&(!coordinator||ownershipTab(item,subject)==="mine")).length,team:coordinator?cases.filter(item=>matchesKpi(item,"unowned","coordinator")).length:0};
-  const items:StaffViewItem[]=[{id:"work",label:nav.work,count:counts.work},{id:"mine",label:nav.mine},...(coordinator?[{id:"team" as const,label:nav.team,count:counts.team}]:[])];
+  const counts:Record<StaffViewId,number>={work:tasks.length,mine:cases.filter(item=>!terminalStatuses.has(item.status)&&(!coordinator||ownershipTab(item,subject)==="mine")).length,team:coordinator?cases.filter(item=>matchesKpi(item,"unowned","coordinator")).length:0,conversations:0};
+  const items:StaffViewItem[]=[{id:"work",label:nav.work,count:counts.work},{id:"mine",label:nav.mine},...(coordinator?[{id:"team" as const,label:nav.team,count:counts.team},{id:"conversations" as const,label:nav.conversations}]:[])];
   return {items,counts};
 }
 

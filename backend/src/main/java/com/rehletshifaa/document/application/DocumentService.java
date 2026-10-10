@@ -72,6 +72,35 @@ public class DocumentService {
         document.quarantine(clock.instant()); document.markClean(); documents.save(document);
         return new ChannelFile(documentId, "CLEAN");
     }
+    /** A file held for a conversation that has no case yet: its server-only key, or why it was not kept. */
+    public record StagedFile(String objectKey, String status, String contentType, long sizeBytes, String fileName) {}
+
+    /**
+     * Inspects and seals a file that arrived before there is a case (an intake conversation). Same type, size and
+     * inspection rules as {@link #fileFromChannel}; no case quota applies until it becomes a case document.
+     */
+    public StagedFile stageChannelFile(byte[] content, String contentType, String originalFileName) {
+        String type = contentType == null ? "" : contentType.split(";")[0].trim().toLowerCase(Locale.ROOT);
+        if (!allowedTypes.contains(type)) return new StagedFile(null, "UNSUPPORTED_TYPE", type, 0, null);
+        if (content == null || content.length == 0 || content.length > maxBytes) return new StagedFile(null, "TOO_LARGE", type, 0, null);
+        var result = inspector.inspect(content, type);
+        if (result.retryable()) throw new DocumentScanUnavailableException(result.reasonCode());
+        if (!result.clean()) return new StagedFile(null, "REJECTED", type, 0, null);
+        LocalDate date = LocalDate.now(clock);
+        String objectKey = "conversation/%d/%02d/%s".formatted(date.getYear(), date.getMonthValue(), UUID.randomUUID());
+        storage.seal(objectKey, content, type); storage.markClean(objectKey);
+        String name = sanitizeFileName(originalFileName == null || originalFileName.isBlank() ? "whatsapp" + extensionFor(type) : originalFileName);
+        return new StagedFile(objectKey, "CLEAN", type, content.length, name);
+    }
+
+    /** A short-lived link to view a staged file; the caller has already authorized the reader. */
+    public SecureDocumentLink viewStaged(String objectKey, String fileName) {
+        var link = storage.presignView(objectKey, fileName);
+        return new SecureDocumentLink(link.url(), link.expiresInSeconds());
+    }
+
+    public record SecureDocumentLink(String url, long expiresInSeconds) {}
+
     private void validate(String type,long bytes){ if(!allowedTypes.contains(type)) throw new ApiException(400,"UNSUPPORTED_FILE_TYPE","File type is not allowed"); if(bytes<=0 || bytes>maxBytes) throw new ApiException(400,"INVALID_FILE_SIZE","File size is outside the allowed range"); }
     private void validateQuota(UUID caseId,long requestedBytes){long count=documents.countByMedicalCaseIdAndStatusNot(caseId,DocumentStatus.REJECTED);long bytes=documents.totalBytesForCase(caseId,DocumentStatus.REJECTED);if(count>=maxFilesPerCase)throw new ApiException(409,"CASE_FILE_LIMIT_REACHED","The maximum number of documents for this case has been reached");if(bytes+requestedBytes>maxCaseBytes)throw new ApiException(409,"CASE_STORAGE_LIMIT_REACHED","The storage quota for this case has been reached");}
     private String extensionFor(String type){ return switch(type){case "application/pdf"->".pdf";case "image/png"->".png";case "image/jpeg"->".jpg";default->throw new ApiException(400,"UNSUPPORTED_FILE_TYPE","File type is not allowed");}; }

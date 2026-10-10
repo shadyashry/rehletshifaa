@@ -6,7 +6,7 @@ import type { PatientReply } from "@/components/portal/portal-model";
 
 type Message={id:string;threadType?:string;senderRole:string;senderName?:string;direction:string;body:string;createdAt:string;read:boolean;channel?:string;attachmentStatus?:string|null};
 // What happened to a file sent on WhatsApp. Read by the patient and the care team alike, so it is worded for both.
-const ATTACHMENT:Record<string,{en:string;ar:string}>={
+export const ATTACHMENT:Record<string,{en:string;ar:string}>={
   CLEAN:{en:"Attachment saved to the case documents.",ar:"حُفظ المرفق في مستندات الحالة."},
   UNSUPPORTED_TYPE:{en:"This attachment type is not kept. Please send files as PDF, JPG or PNG.",ar:"لا يُحفظ هذا النوع من المرفقات. يُرجى إرسال الملفات بصيغة PDF أو JPG أو PNG."},
   UNSUPPORTED_CONTENT:{en:"This message type cannot be shown here.",ar:"لا يمكن عرض هذا النوع من الرسائل هنا."},

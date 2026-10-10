@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 
-export type StaffViewId = "work" | "mine" | "team";
-export const isStaffViewId = (value: string | null | undefined): value is StaffViewId => value === "work" || value === "mine" || value === "team";
+export type StaffViewId = "work" | "mine" | "team" | "conversations";
+export const isStaffViewId = (value: string | null | undefined): value is StaffViewId => value === "work" || value === "mine" || value === "team" || value === "conversations";
 export type StaffViewItem = { id: StaffViewId; label: string; count?: number };
 
 /**

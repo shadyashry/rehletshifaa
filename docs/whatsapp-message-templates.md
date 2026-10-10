@@ -17,7 +17,7 @@ created under the same template name.
 - **Languages:** `en` and `ar` (`app.whatsapp.meta.languages`).
 - Button text ≤ 25 characters; bodies do not start or end with a variable.
 
-## Bound now (S0)
+## Bound now (S0, S3)
 
 | Template | Outbox key | Button (en / ar) → route |
 |---|---|---|
@@ -29,6 +29,7 @@ created under the same template name.
 | `rs_onboarding` | `onboarding-activation` | Complete my profile / إكمال ملفي → `activate` |
 | `rs_deposit_settled` | `deposit-settled-patient` | none |
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
+| `rs_followup_window_closed` | `intake-followup` | none |
 | `rs_code` (Authentication) | `case-access-code`, `proposal-access-code` | Copy code (Meta preset); set `WHATSAPP_META_AUTH_TEMPLATE` |
 
 Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (see `application.yml`).
@@ -63,6 +64,10 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 - en: We have received your coordination deposit. Your RehletShifaa coordinator is starting the next stage of your treatment journey and will contact you shortly.
 - ar: استلمنا دفعة التنسيق الخاصة بك. يبدأ منسّقك في رحلة شفاء المرحلة التالية من رحلتك العلاجية وسيتواصل معك قريباً.
 
+**`rs_followup_window_closed`** (S3: sent once after WhatsApp's 24-hour window has closed)
+- en: Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation.
+- ar: لدى منسّقك في رحلة شفاء تحديث لك. ردّ على هذه الرسالة لمتابعة المحادثة.
+
 **`rs_decision_recorded`** — `{{1}}` the decision in words, `{{2}}` who was spoken to, `{{3}}` the date
 (all filled by the backend in the template's language)
 - en: Your coordinator recorded your decision on your RehletShifaa proposal ({{1}}) after speaking with {{2}} on {{3}}. If this is not what was agreed, please contact your coordinator.
@@ -76,6 +81,5 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 |---|---|---|
 | `rs_out_of_hours` | S5 | Thank you for contacting RehletShifaa. Our coordinators are available Saturday to Thursday, 10:00–20:00 Cairo time, and will reply when we open. |
 | `rs_coordinator_intro` | S4 | Hello, {{1}} from RehletShifaa will be your coordinator from now on and will continue your conversation here. |
-| `rs_followup_window_closed` | S3 | Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation. |
 
 Arabic for these is written when the slice starts, with the same native review.

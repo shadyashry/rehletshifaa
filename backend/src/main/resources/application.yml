@@ -198,6 +198,7 @@ app:
         onboarding-activation: ${WHATSAPP_TEMPLATE_ONBOARDING:rs_onboarding}
         deposit-settled-patient: ${WHATSAPP_TEMPLATE_DEPOSIT_SETTLED:rs_deposit_settled}
         proposal-decision-recorded: ${WHATSAPP_TEMPLATE_DECISION_RECORDED:rs_decision_recorded}
+        intake-followup: ${WHATSAPP_TEMPLATE_FOLLOWUP:rs_followup_window_closed}
       languages:
         en: ${WHATSAPP_TEMPLATE_LANGUAGE_EN:en}
         ar: ${WHATSAPP_TEMPLATE_LANGUAGE_AR:ar}

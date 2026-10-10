@@ -19,6 +19,10 @@ public enum Scope {
     CASE_REPLIER,
     /** The principal is the active reply cover of the case's primary coordinator. */
     CASE_COVERING,
+    /** The principal answers this intake conversation now: its owner, or the owner's active reply cover instead of them. */
+    CONVERSATION_REPLIER,
+    /** The intake conversation is open and unowned (in the intake queue). */
+    CONVERSATION_UNCLAIMED,
     /** The case is in intake and no primary coordinator holds it. */
     CASE_UNCLAIMED,
     /** A live assignee of the case (or the affected subject) is in a team the principal leads, or reports to them. */

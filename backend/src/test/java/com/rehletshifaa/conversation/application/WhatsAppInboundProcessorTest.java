@@ -96,14 +96,15 @@ class WhatsAppInboundProcessorTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM case_messages WHERE external_message_id='wamid.dup'", Integer.class)).isEqualTo(1);
     }
 
-    @Test void aSenderWithNoOpenCaseIsKeptForIntake() {
+    @Test void aSenderWithNoOpenCaseStartsAnIntakeConversation() {
         receiveText("wamid.unknown", "254799999999", "Can you help me?");
 
         processor.dispatch();
 
         var row = inbound("wamid.unknown");
-        assertThat(row.get("status")).isEqualTo("UNMATCHED");
-        assertThat((String) row.get("payload")).startsWith("enc:");
+        assertThat(row.get("status")).isEqualTo("PROCESSED");
+        assertThat(row.get("outcome")).isEqualTo("INTAKE");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM intake_messages WHERE external_message_id='wamid.unknown'", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM case_messages WHERE external_message_id='wamid.unknown'", Integer.class)).isZero();
     }
 
@@ -185,5 +186,21 @@ class WhatsAppInboundProcessorTest {
 
         assertThat(inbound("wamid.react").get("outcome")).isEqualTo("IGNORED_REACTION");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM case_messages WHERE external_message_id='wamid.react'", Integer.class)).isZero();
+    }
+
+    @Test void aFileFromSomeoneWithoutACaseIsInspectedAndStagedForTheirConversation() {
+        byte[] pdf = "%PDF-1.4 test".getBytes(StandardCharsets.US_ASCII);
+        when(media.fetch(eq("media-9"), anyLong())).thenReturn(new WhatsAppMediaPort.Media(pdf, "application/pdf", pdf.length));
+        when(inspector.inspect(any(), anyString())).thenReturn(new InspectionResult(true, null));
+        receive("wamid.stage", "254799999998", "{\"id\":\"wamid.stage\",\"from\":\"254799999998\",\"type\":\"document\","
+                + "\"document\":{\"id\":\"media-9\",\"mime_type\":\"application/pdf\",\"filename\":\"report.pdf\"}}");
+
+        processor.dispatch();
+
+        var m = jdbc.queryForMap("SELECT * FROM intake_messages WHERE external_message_id='wamid.stage'");
+        assertThat(m.get("attachment_status")).isEqualTo("CLEAN");
+        var file = jdbc.queryForMap("SELECT * FROM conversation_media WHERE id=?", m.get("media_id"));
+        assertThat(file.get("original_file_name")).isEqualTo("report.pdf");
+        assertThat((String) file.get("object_key")).startsWith("conversation/");
     }
 }

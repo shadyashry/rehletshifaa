@@ -7,7 +7,8 @@ package com.rehletshifaa.authority.domain;
 public enum Permission {
     // cases and work
     WORK_QUEUE_VIEW(false), COORDINATION_QUEUE(false), COORDINATION_CASE_SUMMARY(false), ROUTING_READ(false), ROUTING_CONFIGURE(true), ROUTING_ASSIGN(false), ASSIGNMENT_RESPOND(false), CASE_INTAKE(false), CASE_READ(false), CASE_COORDINATE(false), CASE_REASSIGN_COORDINATOR(false),
-    CASE_MESSAGE(false), CASE_PATIENT_REPLY(false), REPLY_COVER_MANAGE(false), TASK_CREATE(false), TASK_WORK(false), TASK_SUPERVISE(false), REFERRAL_DECIDE(false),
+    CASE_MESSAGE(false), CASE_PATIENT_REPLY(false), REPLY_COVER_MANAGE(false),
+    CONVERSATION_READ(false), CONVERSATION_REPLY(false), CONVERSATION_CLAIM(false), CONVERSATION_REASSIGN(false), TASK_CREATE(false), TASK_WORK(false), TASK_SUPERVISE(false), REFERRAL_DECIDE(false),
     // a patient's proposal decision, recorded by the owning coordinator after an assisted conversation (Arabic terms path)
     PROPOSAL_DECISION_RECORD(true),
     // clinical and fulfilment

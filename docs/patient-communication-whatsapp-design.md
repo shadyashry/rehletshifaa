@@ -223,7 +223,7 @@ Each slice ends green (`mvn -o -q test`, `pnpm typecheck`, focused e2e) and is i
 | **S0 Templates** | Template bindings, `MetaWhatsAppChannel` template sends, Arabic rendering, Meta template submission list | Patient notifications deliver outside the 24-hour window |
 | **S1 Inbound for case patients** | `whatsapp_inbound_messages`, processor, `whatsapp_digits`, sender matching, case path into `PATIENT_COORDINATOR` with `channel`, files scanned into case documents, gateway budget | A case patient's WhatsApp reaches the owner's thread exactly once; files are scanned |
 | **S2 Reply rights + cover** | `CASE_REPLIER`/`CASE_COVERING`, `CASE_PATIENT_REPLY`, `reply_covers`, out-of-office UI | Two coordinators cannot both reply; cover hands over and back automatically |
-| **S3 Intake conversations** | Tables, `routeIntakeConversation`, schedule-derived duty, queue/claim/reassign, Conversations UI, window-aware composer | Every pre-case chat has one owner or sits in the queue |
+| **S3 Intake conversations** | Tables, intake routing, schedule-derived duty, queue/claim/reassign, Conversations UI, window-aware composer | Every pre-case chat has one owner or sits in the queue |
 | **S4 Case hand-off** | `INTAKE_CONTINUITY`, linking, intro template, history and files carried over | The intake person becomes the case owner when eligible, otherwise introduces the new one |
 | **S5 Timers + out of hours** | `reply_obligations`, working-time calculator, job, escalations, auto-reply | Reminder at 30 working minutes, lead alert at 60; one auto-reply per off-hours period |
 | **S6 Configuration + entry point** | Control Center fields, policy fields, `/{locale}/whatsapp` redirect, copy | Everything configurable without code; both languages |
@@ -271,6 +271,31 @@ mapping proof for the new entities.
 - **Limits by design in S2:** a cover answers the patient; other case actions (requests, proposal steps) stay with the
   owner. Covers per person, not per case.
 - **Proof:** `ReplyCoverIntegrationTest` (7), `CaseMessages.test.tsx` (4), `ReplyCoverPanel.test.tsx` (3), PostgreSQL proof.
+
+## 9c. S3 delivered (2026-10-10)
+
+- **Intake conversations** (`conversation` module, V80): a sender with no open case gets an `intake_conversations` row
+  (one per sender; a conversation closed within 30 days reopens), their messages in `intake_messages`, files inspected
+  and staged in `conversation_media` (`DocumentService.stageChannelFile`). Messages kept `UNMATCHED` in S1 are re-filed.
+- **Routing** (`coordination.IntakeRoutingService`, same routing lock, policy weights and scorer): coordinators with
+  `coordinator_intake_settings.intake_eligible`, under `max_intake`, on duty and inside their working schedule
+  (`WorkingSchedule`, per-day windows in a time zone), not away under a reply cover, and speaking the person's language
+  (their capacity languages; Arabic detected from the text). A returning person's previous owner wins when eligible.
+  Nobody eligible: the intake queue, claimable by any intake-eligible coordinator under their limit.
+- **One voice:** scopes `CONVERSATION_REPLIER` (owner, or their active cover) and `CONVERSATION_UNCLAIMED`; permissions
+  `CONVERSATION_READ/REPLY/CLAIM/REASSIGN`; leads reassign within their team, managers anywhere; every send, claim and
+  reassignment locks the conversation row and re-checks under it.
+- **Sending:** free text inside the 24-hour window (outbox key `conversation-text`, the only free-text send); after it,
+  one follow-up template (`intake-followup` → `rs_followup_window_closed`) until the person writes again.
+- **API:** `/api/v1/coordinator/conversations` (list mine/queue/team/all, detail, reply, follow-up, claim, reassign,
+  close, view file); `/api/v1/admin/coordination/intake-settings` (manager).
+- **UI:** a "Conversations" staff view for coordinators: list by scope, thread, window-aware composer with a case-form
+  link, take, hand over, close (en/ar).
+- **Deviations from §3–§5:** language routing uses each coordinator's capacity languages instead of a separate
+  `intakeTeamsByLanguage` policy field; routing decisions for intake are audited but not added to
+  `coordination_decisions`; idle auto-close moves to S5 with the timers.
+- **Proof:** `IntakeConversationIntegrationTest` (8), `WorkingScheduleTest` (3), inbound processor tests (10),
+  `ConversationsView.test.tsx` (4), PostgreSQL proof.
 
 ## 10. Open items (do not block S0–S2)
 
