@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { whatsappHref } from "./links";
+import { whatsappEntry, whatsappHref } from "./links";
 
 const originalNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
@@ -17,5 +17,12 @@ describe("whatsappHref", () => {
   it("falls back to the configured app number", () => {
     delete process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
     expect(whatsappHref()).toBe("https://wa.me/201010447898");
+  });
+});
+
+describe("whatsappEntry", () => {
+  it("goes through the first-party route, with the case number when known", () => {
+    expect(whatsappEntry("ar")).toBe("/ar/whatsapp");
+    expect(whatsappEntry("en", "RS-2026-000123")).toBe("/en/whatsapp?case=RS-2026-000123");
   });
 });

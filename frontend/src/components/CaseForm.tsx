@@ -6,7 +6,7 @@ import type { Dictionary } from "@/lib/dictionary";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { buildCaseSchema, filesAreValid, RELATIONSHIPS, type Relationship } from "@/lib/case-form-schema";
 import { track } from "@/lib/analytics";
-import { whatsappHref } from "@/lib/links";
+import { whatsappEntry } from "@/lib/links";
 import { COUNTRIES, flagEmoji, type Country } from "@/lib/countries";
 import { apiUrl, apiFetchAs } from "@/lib/api";
 import { ADDITIONAL_CARE_AREAS, additionalCareAreas } from "@/lib/additional-care-areas";
@@ -243,9 +243,8 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   }
 
   if (caseNumber) {
-    const message = d.form.whatsappCaseMessage.replace("{caseNumber}", caseNumber);
     const statusHref = statusToken ? `/${locale}/status/${statusToken}` : undefined;
-    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{isPatient && session?.linked ? t.successReturning : d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><div className="mt-7 flex flex-wrap gap-3">{isPatient && session?.linked ? <a className="btn-primary" href={`/${locale}/portal`}>{t.goToPortal}</a> : statusHref && <a className="btn-primary" href={statusHref}>{ar ? "متابعة حالة الطلب" : "Track your case"}</a>}<a className="btn-secondary" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappHref(message)}>{d.form.continue}</a></div></section>;
+    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{isPatient && session?.linked ? t.successReturning : d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><div className="mt-7 flex flex-wrap gap-3">{isPatient && session?.linked ? <a className="btn-primary" href={`/${locale}/portal`}>{t.goToPortal}</a> : statusHref && <a className="btn-primary" href={statusHref}>{ar ? "متابعة حالة الطلب" : "Track your case"}</a>}<a className="btn-secondary" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappEntry(locale, caseNumber)}>{d.form.continue}</a></div></section>;
   }
 
   // ---- Returning, signed-in patient: saved details reused, only the new case is entered ----

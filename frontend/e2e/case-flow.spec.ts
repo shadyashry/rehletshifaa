@@ -28,11 +28,12 @@ test("patient submits a case through the wizard and receives a case number and s
   await page.getByRole("link", { name: "Send my case" }).first().click();
   await expect(page.getByRole("heading", { name: "Send your medical case" })).toBeVisible();
 
-  const whatsappLinks = page.locator('a[href^="https://wa.me/"]');
+  // Every WhatsApp link goes through the first-party entry, which opens the business number with an English first message.
+  const whatsappLinks = page.locator('a[href^="/en/whatsapp"]');
   expect(await whatsappLinks.count()).toBeGreaterThan(0);
-  for (const link of await whatsappLinks.all()) {
-    await expect(link).toHaveAttribute("href", /^https:\/\/wa\.me\/201010447898(?:\?|$)/);
-  }
+  const entry = await page.request.get("/en/whatsapp", { maxRedirects: 0 });
+  expect(entry.status()).toBe(302);
+  expect(entry.headers()["location"]).toMatch(/^https:\/\/wa\.me\/201010447898\?text=Hello%20RehletShifaa/);
 
   await fillContactStep(page, "Playwright Intake");
   await page.getByRole("button", { name: "Continue" }).click(); // step 2 is entirely optional

@@ -9,7 +9,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 
 import { JourneyLine } from "@/components/home/JourneyConnector";
 import type { Locale } from "@/lib/i18n";
-import { whatsappHref } from "@/lib/links";
+import { whatsappEntry } from "@/lib/links";
 import { apiUrl } from "@/lib/api";
 
 const copy = {
@@ -410,7 +410,7 @@ export function TrackCaseLanding({ locale }: { locale: Locale }) {
             <div className="rounded-[18px] border border-border-card bg-surface-default p-5 sm:p-6">
               <p className="flex items-center gap-2 text-[1rem] font-semibold text-brand-900"><MessageCircle size={17} aria-hidden="true" className="text-brand-600" />{t.helpTitle}</p>
               <p className="mt-1.5 text-[0.875rem] leading-6 text-ink-600">{t.helpBody}</p>
-              <a href={whatsappHref()} target="_blank" rel="noopener noreferrer" className="link-cta mt-2 text-[0.9375rem]">
+              <a href={whatsappEntry(locale)} target="_blank" rel="noopener noreferrer" className="link-cta mt-2 text-[0.9375rem]">
                 {t.contact}
                 <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
               </a>

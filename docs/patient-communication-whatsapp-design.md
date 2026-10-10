@@ -1,6 +1,6 @@
 # Patient communication on WhatsApp — design
 
-Status: **design draft, 2026-10-10.** Input: [rule set and recommendations](patient-communication-whatsapp-routing.md)
+Status: **S0–S6 delivered (2026-10-10); live verification pending.** Input: [rule set and recommendations](patient-communication-whatsapp-routing.md)
 (R1–R11, §4 stages, §5 configuration, §6 acceptance criteria). Evidence: [research](research/reports/WhatsApp%20patient%20coordinator%20routing.md).
 
 ## 0. Approach: reuse, don't reinvent
@@ -331,6 +331,23 @@ mapping proof for the new entities.
 - **Idle close:** open intake conversations silent for `idle_close_hours` close as `IDLE` (every 15 minutes); a returning
   person reopens them (S3).
 - **Proof:** `ReplyTimerIntegrationTest` (7), `WorkingScheduleTest` (5).
+
+## 9f. S6 delivered (2026-10-10)
+
+- **Control Center → Coordination → WhatsApp conversations:** working hours and reply times (view; edit with
+  `ROUTING_CONFIGURE`, reason required), who takes new conversations (per coordinator: on/off, limit, personal working
+  week and time zone), and covers for anyone (add, end; `REPLY_COVER_MANAGE`). One window per day in the editor.
+- **Entry link:** every "talk to a coordinator" link on the public site now goes to `/{locale}/whatsapp` (route
+  handler), which opens the business number with the first message in the page's language; the post-submission link
+  adds `?case=RS-…` (validated) so the first message names the case. Verified on a dev server (302s in en/ar).
+- **Proof:** `ConversationSetup.test.tsx` (3), `route.test.ts` (2), `links.test.ts`, e2e `case-flow.spec.ts` updated.
+- **Found, not changed:** the staff case view's "share on WhatsApp" opens `wa.me` to the patient's own number from the
+  coordinator's phone (`StaffCaseView.tsx`), outside the platform and its one-voice rule (R1, R2). Recommendation: replace
+  it with the platform send (secure link template) or remove it.
+
+All slices S0–S6 are delivered. Before go-live: Meta Business Verification and template approval (Arabic reviewed by a
+native speaker), `WHATSAPP_MODE=meta` with the production number, switch coordinators on for intake, a live end-to-end
+run on the tunnel stack, and the open items below.
 
 ## 10. Open items (do not block S0–S2)
 

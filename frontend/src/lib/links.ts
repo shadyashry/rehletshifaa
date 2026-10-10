@@ -38,6 +38,11 @@ export function legalNav(locale: Locale, d: Dictionary): readonly NavItem[] {
   ];
 }
 
+/** The site's link to talk to a coordinator on WhatsApp: a first-party route that adds the page's language (and case number). */
+export function whatsappEntry(locale: Locale, caseNumber?: string): string {
+  return caseNumber ? `/${locale}/whatsapp?case=${encodeURIComponent(caseNumber)}` : `/${locale}/whatsapp`;
+}
+
 export function whatsappHref(message?: string): string {
   const configured = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? WHATSAPP_FALLBACK;
   const number = configured.replace(/\D/g, "") || WHATSAPP_FALLBACK;

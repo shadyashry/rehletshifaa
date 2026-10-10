@@ -4,7 +4,7 @@ import Link from "next/link";
 import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
-import { localeHref, primaryNav, whatsappHref } from "@/lib/links";
+import { localeHref, primaryNav, whatsappEntry } from "@/lib/links";
 import { Logo } from "./Logo";
 import { TrackedLink } from "./TrackedLink";
 import { AccountMenu } from "./nav/AccountMenu";
@@ -29,7 +29,7 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
   const status = rest[rest.length - 1];
   const destinations = rest.slice(0, -1);
   const navLabel = locale === "ar" ? "التنقل الرئيسي" : "Primary navigation";
-  const whatsapp = whatsappHref(d.common.whatsappIntro);
+  const whatsapp = whatsappEntry(locale);
 
   const atlas = careAreaAtlas(locale, d);
   const systems: MenuSystem[] = careAtlasSystems(atlas, d).map((system) => ({

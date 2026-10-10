@@ -15,8 +15,9 @@ import { ClinicianPreferences } from "./ClinicianPreferences";
 import { RoutingRules } from "./RoutingRules";
 import { CoordinationAdvanced } from "./CoordinationAdvanced";
 import { ManagedCoordinationCases } from "./ManagedCoordinationCases";
+import { ConversationSetup } from "./ConversationSetup";
 
-export type CoordinationSection = "cases" | "teams" | "preferences" | "rules" | "advanced";
+export type CoordinationSection = "cases" | "teams" | "conversations" | "preferences" | "rules" | "advanced";
 
 /** What every section receives: scoped reads, the caller's capabilities, and names for people and teams. */
 export type CoordinationContext = {
@@ -69,6 +70,7 @@ export function CareCoordinationWorkspace({ locale, initialSection }: { locale: 
   const sections = useMemo(() => ([
     { key: "cases" as const, label: locale === "ar" ? "الحالات المُدارة" : "Managed cases", visible: canSummarize },
     { key: "teams" as const, label: t.sections.teams, visible: canRead },
+    { key: "conversations" as const, label: locale === "ar" ? "محادثات واتساب" : "WhatsApp conversations", visible: canRead },
     { key: "preferences" as const, label: t.sections.preferences, visible: canRead },
     { key: "rules" as const, label: t.sections.rules, visible: canRead },
     { key: "advanced" as const, label: t.sections.advanced, visible: canRead },
@@ -95,6 +97,7 @@ export function CareCoordinationWorkspace({ locale, initialSection }: { locale: 
     <TabPanel id={active}>
       {active === "cases" && <ManagedCoordinationCases locale={locale} api={api} />}
       {active === "teams" && <CoordinationTeamsPeople {...context} />}
+      {active === "conversations" && <ConversationSetup {...context} />}
       {active === "preferences" && <ClinicianPreferences {...context} />}
       {active === "rules" && <RoutingRules {...context} />}
       {active === "advanced" && <CoordinationAdvanced {...context} overview={overview} />}
