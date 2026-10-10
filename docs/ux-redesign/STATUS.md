@@ -384,6 +384,12 @@ Update at the end of every phase.
   - [x] verify: typecheck ok; lint 0 errors / 10 warnings; unit **377/377** (+6 Close tests, each failing on the old code);
         Playwright full suite **245 passed, 0 failed**, 38 skipped (a first run caught one stale
         heading assertion after the sentence-case rename, updated); a11y 20/20 with an empty baseline
+  - [x] Owner: "merge, push and deployment done" (2026-10-09) — `f4b6886` (Batch 3 + Close) fast-forwarded into
+        `codex/platform-control-plane`, pushed and deployed by the owner; checked after: local = origin = `f4b6886`, frontend and
+        backend rebuilt, backend UP; localhost 3000/8081/8180 and `https://dev.rehletshifaa.com` `/en`, `/ar`, `/en/how-it-works`,
+        `/en/cardiology`, `/en/send-my-case`, `/en/portal`, api-dev health all 200; the live pages serve "Send my case" / «أرسل حالتي»
+        (no "Start my case"), the four stages, "9 care areas across 6 body systems", "How the cost is settled" and the plain
+        treatment names. **The redesign epic is complete.**
 
 ## Decisions
 
@@ -435,10 +441,10 @@ Update at the end of every phase.
 D1–D4 decided (see Decisions); Batch 1 merged, pushed and deployed (`f304421`); Batch 1a (skill review fixes) done on
 `feat/ux-redesign-batch-1a` (`fc03f0b`), not merged or pushed. Owner: Batch 2 runs in a **new session on the same branch**
 (`feat/ux-redesign-batch-1a`, worktree `vigilant-roentgen-29caab`) and Batch 1a is merged **together with Batch 2** (one merge,
-push and rebuild). **The redesign epic is at its finish line** (finish plan): Batches 0–3 and the Close are done on `feat/ux-redesign-batch-3`, not
-merged or pushed; re-critique scores are recorded above; every remaining item is on backlog.md's Post-launch list or Blocked on a
-named decision. Next: the owner fast-forwards `codex/platform-control-plane` to this branch (one merge), pushes and rebuilds the stack. Open for the
-owner: legal L1–L5; the native Arabic review; the two confirmation styles.
+push and rebuild). **The redesign epic is complete** (finish plan): Batches 0–3 and the Close are merged into `codex/platform-control-plane`
+(`f4b6886`), pushed and deployed (2026-10-09); re-critique scores are recorded above; every remaining item is on backlog.md's
+Post-launch list or Blocked on a named decision. Open for the owner: legal L1–L5 (Arabic terms are a launch blocker); the native
+Arabic review; the two confirmation styles.
 Baselines: unit 377/377, Playwright full suite green, lint 0 errors / 10 warnings, backend 620/0, a11y baseline empty.
 
 Pass 4 (composition, `23a1f77`) is fast-forwarded into `codex/platform-control-plane` and pushed (owner, 2026-10-09); the
