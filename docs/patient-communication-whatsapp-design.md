@@ -349,6 +349,30 @@ mapping proof for the new entities.
   `CaseActionService` offers `RESEND_*` to whoever holds it — the owner, or their active cover instead of them (the
   cover gets only these, not the owner's case utilities) — so a covered owner no longer sees it and the cover does.
 
+## 9g. Coordinator onboarding and departure (2026-10-10)
+
+The §4.8 rule ("owner offboarded or deactivated → re-routed; covers revoked") was not wired in S0–S6. Now:
+
+- **One event:** `WorkforceEvents.StaffAccessReduced`, published in the same transaction by `StaffLifecycleService.disable`,
+  `startOffboarding` and an immediate `WorkforceRoleAssignmentService.revoke`. Listeners re-check
+  `WorkforceDirectory.holds(subject, COORDINATOR)` and do nothing while the person still holds the role.
+- **Intake conversations:** `IntakeConversationService.on(StaffAccessReduced)` locks each open conversation the person owns
+  and sends it back through intake routing (new owner notified) or to the queue; audited `INTAKE_CONVERSATION_RELEASED`.
+  The reply timer keeps running for whoever answers next. A role that ends on a scheduled date raises no event:
+  `releaseDepartedOwners` (every 15 minutes) does the same for owners who no longer hold the role.
+- **Covers:** `ReplyCoverService.on(StaffAccessReduced)` revokes every live cover (current or future) the person holds as
+  the cover and tells the owner (`REPLY_COVER_ENDED`). Fail-safe: `ReplyCoverRepository.findActive` ignores a cover who
+  is no longer an active Coordinator, so the owner answers again even before any clean-up.
+- **Offboarding blockers:** `OPEN_INTAKE_CONVERSATIONS` and `REPLY_COVERS` (not yet over, as owner or cover) in
+  `StaffLifecycleStore.offboardingBlockers`, contributed through the `workforce.HandoverCheck` port so platform access
+  still does not depend on the case modules (ACG-06).
+- **Onboarding:** a new coordinator has no intake setting and does not take new conversations until a Care Coordination
+  Manager decides. Control Center → WhatsApp conversations lists them first as "Not set up yet". The switch stays with
+  `ROUTING_CONFIGURE`, not the System Administrator's people screen (separation of duties).
+- **Not changed:** cases are not re-routed automatically; a departing primary coordinator's cases stay behind the existing
+  `OPEN_CASE_ASSIGNMENTS` blocker for a lead or manager to reassign (an active cover keeps answering meanwhile).
+- **Proof:** `CoordinatorDepartureIntegrationTest` (6), `ConversationSetup.test.tsx` (3).
+
 All slices S0–S6 are delivered. Before go-live: Meta Business Verification and template approval (Arabic reviewed by a
 native speaker), `WHATSAPP_MODE=meta` with the production number, switch coordinators on for intake, a live end-to-end
 run on the tunnel stack, and the open items below.

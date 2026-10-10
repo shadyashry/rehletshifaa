@@ -24,7 +24,11 @@ import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.shared.crypto.EncryptedText;
 import com.rehletshifaa.workforce.application.WorkforceDirectory;
+import com.rehletshifaa.workforce.application.HandoverCheck;
+import com.rehletshifaa.workforce.application.WorkforceEvents;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Limit;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
@@ -47,9 +51,10 @@ import java.util.UUID;
  * it. Every send locks the conversation row and re-checks the right under it, as claims and reassignments do.
  */
 @Service
-public class IntakeConversationService {
+public class IntakeConversationService implements HandoverCheck {
     /** A person who writes again within this time continues their previous conversation, with the same owner if possible. */
     static final Duration RETURN_WINDOW = Duration.ofDays(30);
+    private static final String COORDINATOR = "COORDINATOR";
     static final int MAX_REPLY_LENGTH = 4096;
     static final Set<String> CLOSE_REASONS = Set.of("RESOLVED", "NOT_A_PATIENT", "NO_RESPONSE", "SPAM");
 
@@ -344,6 +349,45 @@ public class IntakeConversationService {
         notifyOwner(c, "INTAKE_CONVERSATION_ASSIGNED", "New WhatsApp conversation", "A WhatsApp conversation was handed to you. Reply in Conversations.",
                 "intake-reassigned:" + id + ":" + c.getOwnerSubject() + ":" + clock.instant().toEpochMilli());
         auditTrail.event("INTAKE_CONVERSATION_REASSIGNED").actor(me, "COORDINATION").entity("IntakeConversation", id).action("REASSIGN").reason(reason.trim()).record();
+    }
+
+    /**
+     * An owner who loses the Coordinator role (sign-in disabled, offboarding, role removed) gives up their open
+     * conversations at once: each goes back through intake routing, or waits in the queue. The reply timer keeps running,
+     * now for whoever answers next. Runs in the caller's transaction.
+     */
+    @EventListener
+    @Transactional
+    public void on(WorkforceEvents.StaffAccessReduced event) {
+        if (workforce.holds(event.subject(), COORDINATOR)) return;
+        for (IntakeConversation row : conversations.findOpenOwnedBy(List.of(event.subject()))) {
+            IntakeConversation c = conversations.lockById(row.getId()).orElseThrow();
+            if (!c.isOpen() || !event.subject().equals(c.getOwnerSubject())) continue;
+            c.assign(null);
+            routing.chooseOwner(c.getLanguage(), null).ifPresent(c::assign);
+            conversations.saveAndFlush(c);
+            if (c.getOwnerSubject() != null)
+                notifyOwner(c, "INTAKE_CONVERSATION_ASSIGNED", "New WhatsApp conversation", "A WhatsApp conversation was handed to you. Reply in Conversations.",
+                        "intake-released:" + c.getId() + ":" + c.getOwnerSubject() + ":" + clock.instant().toEpochMilli());
+            auditTrail.event("INTAKE_CONVERSATION_RELEASED").actor(event.actor(), "WORKFORCE").entity("IntakeConversation", c.getId())
+                    .action("REASSIGN").reason(c.getOwnerSubject() == null ? "OWNER_LEFT_ROLE_QUEUED" : "OWNER_LEFT_ROLE_REROUTED").record();
+        }
+    }
+
+    /** Offboarding waits until the person owns no open WhatsApp conversation. */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Pending> pending(String subject) {
+        long open = conversations.countByOwnerSubjectAndStatus(subject, "OPEN");
+        return open == 0 ? List.of() : List.of(new Pending("OPEN_INTAKE_CONVERSATIONS", open, "WhatsApp conversations still owned; hand them over in Conversations"));
+    }
+
+    /** A role that ends on a scheduled date raises no event; this sweep releases those owners' conversations the same way. */
+    @Scheduled(fixedDelayString = "${app.conversations.idle-poll-milliseconds:900000}")
+    @Transactional
+    public void releaseDepartedOwners() {
+        for (String owner : conversations.findOpenOwners())
+            if (!workforce.holds(owner, COORDINATOR)) on(new WorkforceEvents.StaffAccessReduced(owner, "SYSTEM", "ROLE_ENDED"));
     }
 
     @Transactional

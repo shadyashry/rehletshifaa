@@ -7,6 +7,8 @@ import com.rehletshifaa.access.platform.infrastructure.PlatformAccessRepository;
 import com.rehletshifaa.access.platform.infrastructure.WorkforceRoleAssignmentStore;
 import com.rehletshifaa.access.platform.infrastructure.WorkforceRoleAssignmentStore.RoleAssignment;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.workforce.application.WorkforceEvents.StaffAccessReduced;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,15 +34,17 @@ public class WorkforceRoleAssignmentService {
     private final PlatformAccessRepository access;
     private final Authority authority;
     private final GovernanceAuditLog audit;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public WorkforceRoleAssignmentService(WorkforceRoleAssignmentStore store, PlatformAccessRepository access,
-            Authority authority, GovernanceAuditLog audit, Clock clock) {
+            Authority authority, GovernanceAuditLog audit, ApplicationEventPublisher events, Clock clock) {
         this.store = store;
         this.access = access;
         this.authority = authority;
 
         this.audit = audit;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -110,6 +114,7 @@ public class WorkforceRoleAssignmentService {
         store.revoke(assignment, removalAt, actor, reason, now);
         audit.record(actor, assignment.id().toString(), "WORKFORCE_ROLE_REVOKED", "SUCCESS",
                 "subject=" + assignment.subject() + "; role=" + assignment.role() + "; at=" + removalAt, reason);
+        if (!removalAt.isAfter(now)) events.publishEvent(new StaffAccessReduced(assignment.subject(), actor, reason));
         return store.forUpdate(id);
     }
 

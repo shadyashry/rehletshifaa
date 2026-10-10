@@ -35,7 +35,10 @@ describe("ConversationSetup", () => {
 
     expect(await screen.findByText("30 working minutes")).toBeTruthy();
     expect(screen.getByText("Saturday 10:00-20:00 · Sunday 10:00-20:00")).toBeTruthy();
-    expect(screen.getByText("Does not take new conversations")).toBeTruthy();
+    expect(screen.getByText("Not set up yet")).toBeTruthy();
+    expect(screen.getByText("New coordinator: decide whether they take new WhatsApp conversations.")).toBeTruthy();
+    const cards = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(cards.indexOf("Sara Ahmed")).toBeLessThan(cards.indexOf("Omar Ali")); // not set up comes first
     expect(screen.getByText("Up to 8 open at once")).toBeTruthy();
     expect(screen.getByText("Omar Ali answers Sara Ahmed’s patients")).toBeTruthy();
   });

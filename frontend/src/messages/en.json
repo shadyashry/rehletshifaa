@@ -1399,6 +1399,10 @@
           "title": "You are covering {owner}’s patient conversations",
           "context": "Their cases appear in your case list while the cover lasts; only you can reply to their patients meanwhile."
         },
+        "REPLY_COVER_ENDED": {
+          "title": "Your patients’ conversations are back with you",
+          "context": "{cover} can no longer cover you, so you answer your patients again."
+        },
         "INTAKE_CONVERSATION_ASSIGNED": {
           "title": "New WhatsApp conversation",
           "context": "Someone without a case wrote on WhatsApp. Reply in Conversations."

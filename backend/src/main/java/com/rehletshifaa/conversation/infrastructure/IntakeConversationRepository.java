@@ -27,6 +27,9 @@ public interface IntakeConversationRepository extends BaseRepository<IntakeConve
     @Query("select c from IntakeConversation c where c.status = 'OPEN' and c.ownerSubject in :owners order by c.lastInboundAt desc")
     List<IntakeConversation> findOpenOwnedBy(@Param("owners") Collection<String> owners);
 
+    @Query("select distinct c.ownerSubject from IntakeConversation c where c.status = 'OPEN' and c.ownerSubject is not null")
+    List<String> findOpenOwners();
+
     @Query("select c from IntakeConversation c where c.status = 'OPEN' and c.ownerSubject is null order by c.lastInboundAt")
     List<IntakeConversation> findQueue();
 

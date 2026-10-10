@@ -24,7 +24,7 @@ const copy = {
     minutes: (n: number) => `${n} working minutes`, hoursN: (n: number) => `${n} hours`, edit: "Edit", closed: "Closed",
     intakeTitle: "Who answers new WhatsApp conversations",
     intakeIntro: "People who write before sending a case go to a coordinator switched on here, who speaks their language, is on shift and has room. Nobody available: the conversation waits in the queue.",
-    on: "Takes new conversations", off: "Does not take new conversations", limit: (n: number) => `Up to ${n} open at once`, alwaysOn: "No personal schedule: follows on duty only",
+    on: "Takes new conversations", off: "Does not take new conversations", unset: "Not set up yet", unsetHint: "New coordinator: decide whether they take new WhatsApp conversations.", limit: (n: number) => `Up to ${n} open at once`, alwaysOn: "No personal schedule: follows on duty only",
     intakeEdit: "Edit", eligible: "Takes new WhatsApp conversations", maxIntake: "Open conversations at once", schedule: "Personal working week", scheduleHint: "Leave every day off to follow on-duty status only.",
     works: "Works", from: "From", to: "Until",
     coversTitle: "Covers", coversIntro: "While a coordinator is away, one colleague answers their patients; the coordinator can still read. Up to 30 days; reassign cases for longer absences.",
@@ -39,7 +39,7 @@ const copy = {
     minutes: (n: number) => `${n} دقيقة عمل`, hoursN: (n: number) => `${n} ساعة`, edit: "تعديل", closed: "مغلق",
     intakeTitle: "من يردّ على محادثات واتساب الجديدة",
     intakeIntro: "من يكتب قبل إرسال حالته يُوجَّه إلى منسّق مُفعَّل هنا، يتحدث لغته، في مناوبته ولديه متسع. إن لم يتوفر أحد تنتظر المحادثة في قائمة الانتظار.",
-    on: "يستقبل المحادثات الجديدة", off: "لا يستقبل المحادثات الجديدة", limit: (n: number) => `حتى ${n} محادثة مفتوحة في الوقت نفسه`, alwaysOn: "بلا جدول شخصي: يتبع حالة المناوبة فقط",
+    on: "يستقبل المحادثات الجديدة", off: "لا يستقبل المحادثات الجديدة", unset: "لم يُضبط بعد", unsetHint: "منسّق جديد: حدّد ما إذا كان سيستقبل محادثات واتساب الجديدة.", limit: (n: number) => `حتى ${n} محادثة مفتوحة في الوقت نفسه`, alwaysOn: "بلا جدول شخصي: يتبع حالة المناوبة فقط",
     intakeEdit: "تعديل", eligible: "يستقبل محادثات واتساب الجديدة", maxIntake: "عدد المحادثات المفتوحة في الوقت نفسه", schedule: "أسبوع العمل الشخصي", scheduleHint: "اترك كل الأيام عطلة ليتبع حالة المناوبة فقط.",
     works: "يعمل", from: "من", to: "حتى",
     coversTitle: "التغطية", coversIntro: "أثناء غياب المنسّق يردّ زميل واحد على مرضاه، ويبقى المنسّق قادراً على القراءة. حتى 30 يوماً؛ أعد إسناد الحالات للغياب الأطول.",
@@ -85,8 +85,10 @@ export function ConversationSetup(ctx: CoordinationContext) {
   useEffect(() => { void load(); }, [load]);
   const done = async (message: string) => { setDialog(null); setNotice(message); await load(); };
 
-  const coordinators = people.filter((p) => p.account === "ACTIVE");
   const settingOf = (subject: string) => intake.find((s) => s.subject === subject);
+  // New coordinators have no intake setting yet; they come first so onboarding them is not missed.
+  const coordinators = people.filter((p) => p.account === "ACTIVE")
+    .sort((a, b) => Number(Boolean(settingOf(a.subject))) - Number(Boolean(settingOf(b.subject))));
   const revoke = async (id: string) => { setNotice(""); try { await api(`/coordinator/reply-covers/${id}/revoke`, { method: "POST" }); await done(t.ended); } catch (e) { setError(e); } };
 
   return <>
@@ -106,7 +108,9 @@ export function ConversationSetup(ctx: CoordinationContext) {
           const name = person.name ?? cc.unnamed;
           return <li className="cc-card" key={person.subject}>
             <h3><bdi>{name}</bdi></h3>
-            <p><StatusBadge tone={s?.intakeEligible ? "success" : "neutral"}>{s?.intakeEligible ? t.on : t.off}</StatusBadge></p>
+            <p>{s ? <StatusBadge tone={s.intakeEligible ? "success" : "neutral"}>{s.intakeEligible ? t.on : t.off}</StatusBadge>
+              : <StatusBadge tone="warning">{t.unset}</StatusBadge>}</p>
+            {!s && <p className="cc-meta">{t.unsetHint}</p>}
             {s?.intakeEligible && <p className="cc-meta">{t.limit(s.maxIntake)}</p>}
             {s?.intakeEligible && <p className="cc-meta">{Object.keys(s.schedule ?? {}).length ? `${weekSummary(s.schedule, locale, t.closed)} (${s.timeZone ?? "Africa/Cairo"})` : t.alwaysOn}</p>}
             {configure && <div className="cc-step-actions"><button type="button" className="cc-secondary" onClick={() => { setNotice(""); setDialog({ kind: "intake", subject: person.subject, name }); }}>{t.intakeEdit}</button></div>}

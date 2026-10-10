@@ -9,6 +9,7 @@ import com.rehletshifaa.directory.infrastructure.PracticeManagerRepository;
 import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
 import com.rehletshifaa.identity.operations.IdentityOperationRepository;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.workforce.application.HandoverCheck;
 import com.rehletshifaa.workforce.domain.WorkforceInvitation;
 import com.rehletshifaa.workforce.domain.WorkforcePerson;
 import com.rehletshifaa.workforce.domain.WorkforceRoleAssignment;
@@ -58,6 +59,7 @@ public class StaffLifecycleStore {
     private final ConsultantCurrentOwnerRepository currentOwners;
     private final CaseAssignmentRepository caseAssignments;
     private final CaseTaskRepository caseTasks;
+    private final List<HandoverCheck> handoverChecks;
 
     public StaffLifecycleStore(WorkforcePersonRepository people, AccessSubjectRepository accessSubjects, WorkforceInvitationRepository invitations,
                                WorkforceRoleAssignmentRepository assignments, WorkforceTeamMembershipRepository memberships,
@@ -67,13 +69,15 @@ public class StaffLifecycleStore {
                                PrivilegedAccessChangeRequestRepository changeRequests, PlatformOwnerPointerRepository ownerPointer,
                                PlatformOwnerRelationshipRepository ownerRelationships, PractitionerProfileRepository practitioners,
                                PracticeManagerRepository practiceManagers, ConsultantCurrentOwnerRepository currentOwners,
-                               CaseAssignmentRepository caseAssignments, CaseTaskRepository caseTasks) {
+                               CaseAssignmentRepository caseAssignments, CaseTaskRepository caseTasks,
+                               List<HandoverCheck> handoverChecks) {
         this.people = people; this.accessSubjects = accessSubjects; this.invitations = invitations; this.assignments = assignments;
         this.memberships = memberships; this.leads = leads; this.reportingLines = reportingLines; this.currentManagers = currentManagers;
         this.staffing = staffing; this.identityOperations = identityOperations; this.platformAssignments = platformAssignments;
         this.changeRequests = changeRequests; this.ownerPointer = ownerPointer; this.ownerRelationships = ownerRelationships;
         this.practitioners = practitioners; this.practiceManagers = practiceManagers; this.currentOwners = currentOwners;
         this.caseAssignments = caseAssignments; this.caseTasks = caseTasks;
+        this.handoverChecks = handoverChecks;
     }
 
     public record Person(String subject, String displayNameEncrypted, String emailEncrypted, String locale,
@@ -204,6 +208,8 @@ public class StaffLifecycleStore {
         add(blockers, "OPEN_CASE_ASSIGNMENTS", "Case assignments still pending or active",
                 caseAssignments.countByAssigneeSubjectAndStatusIn(subject, List.of("PENDING", "ACTIVE")));
         add(blockers, "OPEN_WORK_ITEMS", "Tasks still open or in progress", caseTasks.countByOwnerSubjectAndStatusIn(subject, List.of("OPEN", "IN_PROGRESS")));
+        for (HandoverCheck check : handoverChecks)
+            for (HandoverCheck.Pending p : check.pending(subject)) add(blockers, p.code(), p.detail(), p.count());
         add(blockers, "PRIVILEGED_ROLE", "System Administrator assignment still active; remove it through a change request",
                 platformAssignments.countBySubjectAndStatus(subject, "ACTIVE"));
         add(blockers, "PENDING_PRIVILEGED_REQUESTS", "Privileged change requests awaiting a decision", changeRequests.countPendingInvolving(subject));

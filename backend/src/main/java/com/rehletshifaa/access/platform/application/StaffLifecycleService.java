@@ -14,6 +14,7 @@ import com.rehletshifaa.identity.IdentityProvisioningPort;
 import com.rehletshifaa.identity.operations.IdentityOperationRequested;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
+import com.rehletshifaa.workforce.application.WorkforceEvents.StaffAccessReduced;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -249,6 +250,7 @@ public class StaffLifecycleService {
         governance.assertAdministratorInvariant();
         queueState(subject, false, actor, reason);
         audit.record(actor, subject, "STAFF_SIGNIN_DISABLED", "SUCCESS", "lifecycle=SIGNIN_DISABLED", reason);
+        events.publishEvent(new StaffAccessReduced(subject, actor, reason));
         return view(store.personForUpdate(subject), now);
     }
 
@@ -284,6 +286,7 @@ public class StaffLifecycleService {
         governance.assertAdministratorInvariant();
         queueState(subject, false, actor, reason);
         audit.record(actor, subject, "STAFF_OFFBOARDING_STARTED", "SUCCESS", "lifecycle=OFFBOARDING", reason);
+        events.publishEvent(new StaffAccessReduced(subject, actor, reason));
         return new Offboarding(subject, "OFFBOARDING", store.offboardingBlockers(subject));
     }
 

@@ -10,6 +10,9 @@ import com.rehletshifaa.journey.infrastructure.ReplyCoverRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.workforce.application.WorkforceDirectory;
+import com.rehletshifaa.workforce.application.HandoverCheck;
+import com.rehletshifaa.workforce.application.WorkforceEvents;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +35,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  * may not be covering someone else, during the period.
  */
 @Service
-public class ReplyCoverService {
+public class ReplyCoverService implements HandoverCheck {
     static final Duration MAX_PERIOD = Duration.ofDays(30);
     /** A cover "from now" typed a moment ago is still accepted. */
     static final Duration START_TOLERANCE = Duration.ofMinutes(5);
@@ -117,6 +120,38 @@ public class ReplyCoverService {
         covers.saveAndFlush(cover);
         auditTrail.event("REPLY_COVER_REVOKED").actor(me, "COORDINATION").entity("ReplyCover", id.toString()).action("REVOKE").record();
         return view(cover, now);
+    }
+
+    /**
+     * A cover who loses the Coordinator role (sign-in disabled, offboarding, role removed) stops covering at once, now
+     * and in future periods, so the owner answers their patients again and is told so. Runs in the caller's transaction.
+     */
+    @EventListener
+    @Transactional
+    public void on(WorkforceEvents.StaffAccessReduced event) {
+        if (workforce.holds(event.subject(), COORDINATOR)) return;
+        Instant now = micros(clock.instant());
+        for (ReplyCover row : covers.findLiveByCover(event.subject(), now)) {
+            ReplyCover cover = covers.lockById(row.getId()).orElseThrow();
+            if (cover.getRevokedAt() != null) continue;
+            boolean wasActive = !cover.getStartsAt().isAfter(now);
+            cover.revoke(event.actor(), now);
+            covers.saveAndFlush(cover);
+            if (wasActive && workforce.holds(cover.getOwnerSubject(), COORDINATOR))
+                work.notifyStaff(cover.getOwnerSubject(), null, null, "REPLY_COVER_ENDED", "Your patients’ conversations are back with you",
+                        "Your cover can no longer reply, so you answer your patients again.", "reply-cover-ended:" + cover.getId(), true,
+                        WorkCopy.of("REPLY_COVER_ENDED", "cover", name(cover.getCoverSubject())));
+            auditTrail.event("REPLY_COVER_REVOKED").actor(event.actor(), "WORKFORCE").entity("ReplyCover", cover.getId().toString())
+                    .action("REVOKE").reason("COVER_LEFT_ROLE").record();
+        }
+    }
+
+    /** Offboarding waits until no cover still names the person, as the one away or the one covering. */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Pending> pending(String subject) {
+        long live = covers.countLiveInvolving(subject, micros(clock.instant()));
+        return live == 0 ? List.of() : List.of(new Pending("REPLY_COVERS", live, "Reply covers not yet over, as the person away or the one covering; end them first"));
     }
 
     /** Who answers this coordinator's patients right now, and until when, when someone covers them. */
