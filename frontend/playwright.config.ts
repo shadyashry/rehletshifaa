@@ -10,7 +10,7 @@ const port = new URL(baseURL).port || "3100";
 const devServer = process.env.PLAYWRIGHT_DEV_SERVER === "true";
 export default defineConfig({
   testDir: "./e2e",
-  // The release-candidate QA pack runs only under playwright.qa.config.ts (it imports other specs, which this run
+  // The cross-browser QA pack runs only under playwright.qa.config.ts (it imports other specs, which this run
   // would refuse to load).
   testIgnore: "qa/**",
   // Half the cores (the default) is 11 browsers on a 22-thread laptop that also runs the Docker stack; even six left a

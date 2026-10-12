@@ -26,19 +26,24 @@ activation link and OTP is read from Mailpit.
 
 All sign in at **https://dev.rehletshifaa.com/en/portal**. Username or email both work.
 
-| Username | Email | Name | Realm roles | What this account is for | Lands on |
+Roles below are **platform** roles granted in the database (Control Center › Access); Keycloak carries no roles.
+
+| Username | Email | Name | Platform roles | What this account is for | Lands on |
 |---|---|---|---|---|---|
 | `patient` | patient@local.test | Nour Hassan | PATIENT | Signed-in patient view: My Care, proposal, deposit status, messages, documents | My Care (`/en/portal`) |
-| `coordinator` | coordinator@local.test | Layla Hassan | COORDINATOR, COORDINATOR_LEAD | Coordination lead: Team queue, take/transfer case ownership, assign consultant, prepare/release proposals, final quotes, Coordination Setup | Staff Portal (`/en/portal`) |
+| `coordinator` | coordinator@local.test | Layla Hassan | COORDINATOR (lead of "Coordination team", manager of `coordinator2`) | Coordination lead: Team queue, take/transfer case ownership, assign consultant, prepare/release proposals, final quotes, Coordination Setup | Staff Portal (`/en/portal`) |
 | `coordinator2` | coordinator2@local.test | Omar Nasser | COORDINATOR | Second coordinator — transfer target, "Owned by my team" queue, OPS-1 notification check | Staff Portal |
-| `doctor` | doctor@local.test | Ahmed AlAshry | DOCTOR | Consultant: clinical review + cost estimate, final in-person assessment, procedure consent, treatment / discharge | Staff Portal (consultant work) |
+| `doctor` | doctor@local.test | Ahmed AlAshry | CONSULTANT | Consultant: clinical review + cost estimate, final in-person assessment, procedure consent, treatment / discharge | Staff Portal (consultant work) |
 | `operations` | operations@local.test | Mariam Soliman | OPERATIONS | Travel package before release (when travel is requested), travel coordination, arrival | Staff Portal |
 | `finance` | finance@local.test | Youssef Adel | FINANCE | Approve manually priced proposals, record deposit payments and refunds (offline, record-only) | Staff Portal |
-| `credential-admin` | credential-admin@local.test | Maya Farid | CREDENTIALING_ADMIN, SYSTEM_ADMIN | Control Center: providers, clinicians, credential reviews, commercial setup, Care Journeys, access governance | Control Center (`/en/portal/control-center`) |
+| `credential-admin` | credential-admin@local.test | Maya Farid | CREDENTIAL_VERIFIER, SYSTEM_ADMINISTRATOR | Control Center: people, teams, access governance, consultants and credential reviews | Control Center (`/en/portal/control-center`) |
 | `service-account-staff-identity-admin` | — | — | — | Backend service account (client `staff-identity-admin`). **Not a login.** | — |
 
-Other roles that exist in the realm but have no seeded user: PATIENT_REPRESENTATIVE, OPERATIONS_LEAD, FINANCE_LEAD, AUDITOR,
-PATIENT_IDENTITY_REVIEWER. Assign them in the Keycloak admin console (or via Control Center › Access) to a test user if needed.
+Seeded **invited** accounts (no password, no MFA; re-send the invitation from the Control Center and finish setup from
+Mailpit): `patient-identity-reviewer`, `care-manager`, `operations-manager`, `finance-manager`, `credentialing-manager`,
+`consultant-operations-manager`, `support-manager`, `support-officer`, `journey-manager`, `journey-approver`,
+`compliance-auditor`, `coordinator-scope`, `care-manager-scope` (all `@local.test`). Full role catalogue and
+boundaries: [qa-test-protocol.md §2](../qa-test-protocol.md#2-roles--test-accounts).
 
 **Accounts created during testing** (patients who activate, invited provider clinicians / practice managers) set their own
 password through the Keycloak email link in Mailpit. Their passwords are never stored in the repo and cannot be looked up.
@@ -73,27 +78,25 @@ End-to-end specs read the same seeded passwords from environment variables: `POR
 
 Which gates apply (operations, finance, deposit, consent) depends on the case: see `docs/end-to-end-workflows.md`.
 
-## 4. Control Center and admin URLs (`credential-admin` unless noted)
+## 4. Control Center and admin URLs
 
-Base: `https://dev.rehletshifaa.com/en/portal/control-center`
+Base: `https://dev.rehletshifaa.com/en/portal/control-center`. Each page is gated by a platform permission; a "no access"
+page is the role gate, not a fault. `credential-admin` (SYSTEM_ADMINISTRATOR + CREDENTIAL_VERIFIER) reaches the workforce,
+access and consultant pages; commercial pages need FINANCE_MANAGER, coordination setup CARE_COORDINATION_MANAGER, Care
+Journeys the journey roles.
 
 | Area | Path |
 |---|---|
 | Home | `/` |
-| Providers (organizations) · new onboarding | `/providers` · `/providers/onboarding/new` · `/providers/{id}` |
-| Clinicians (directory, direct, setup) | `/providers/clinicians` · `/providers/clinicians/new` · `/providers/clinicians/direct/{id}` · `/providers/clinicians/{orgId}/{practitionerId}/setup` |
-| Organization team | `/providers/{id}/consultants` · `/associate-doctors` · `/assistants` · `/practice-managers` |
-| Credential reviews | `/credentials` · `/credentials/{organizationId}/{revisionId}` |
-| Identity checks | `/identity-checks` |
-| Commercial: price lists, availability, exchange rates, margin & deposit | `/commercial` · `/commercial/prices` · `/commercial/pricing` · `/commercial/availability` · `/commercial/exchange-rates` · `/commercial/margin-deposit` |
-| Care coordination setup | `/coordination` · `/coordination/{orgId}` |
+| People, teams, staffing requests, ownership | `/people` · `/teams` · `/staffing-requests` · `/ownership` |
+| Administrators, service accounts, recertification, audit | `/administrators` · `/service-accounts` · `/recertification` · `/audit` |
+| Workforce identity reviews, account support | `/workforce-identity-reviews` · `/account-support` |
+| Consultants (directory, new, detail incl. credentials) | `/consultants` · `/consultants/new` · `/consultants/{id}` |
+| Patient identity checks | `/identity-checks` |
+| Commercial: price lists, exchange rates, margin & deposit | `/commercial` · `/commercial/prices` · `/commercial/exchange-rates` · `/commercial/margin-deposit` |
+| Care coordination setup (routing, intake, conversation settings) | `/coordination` |
 | Care Journeys (production intake is OFF) | `/journeys` · `/journeys/{definitionId}` · `/journeys/{definitionId}/versions/{versionId}` |
-| Access governance | `/access` · `/access/users` · `/access/roles` · `/access/permissions` · `/access/effective` · `/access/audit` |
-| Team | `/team` |
-| Provider Workspace (invited practice members) | `https://dev.rehletshifaa.com/en/portal/practice` |
-
-Some pages are gated by role or capability (for example margin/deposit policies need a finance lead role; prices and schedules
-are managed by the clinician's Practice Manager). If a page says you have no access, that is the role gate, not a fault.
+| Consultant virtual clinic (consultant, practice managers) | `https://dev.rehletshifaa.com/en/portal/virtual-clinic` |
 
 ## 5. Public pages
 

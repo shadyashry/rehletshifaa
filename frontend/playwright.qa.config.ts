@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Release-candidate QA suite: runs ONLY against the live tunnel stack (no dev server). All three URLs must
+ * Cross-browser QA suite: runs ONLY against the live tunnel stack (no dev server). All three URLs must
  * match how the frontend container was built. Chromium runs the full suite; Firefox and WebKit run the
  * critical patient path only (Start My Case → proposal → activation → sign-in → My Care → deposit).
  *
@@ -18,7 +18,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: [["list"], ["json", { outputFile: "../docs/qa/release-candidate/evidence/playwright-report.json" }]],
+  reporter: [["list"], ["json", { outputFile: "playwright-report/qa-crossbrowser.json" }]],
   use: { baseURL, trace: "retain-on-failure", screenshot: "only-on-failure", actionTimeout: 20000, navigationTimeout: 45000 },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
