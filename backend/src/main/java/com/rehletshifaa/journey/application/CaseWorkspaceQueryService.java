@@ -138,7 +138,7 @@ public class CaseWorkspaceQueryService {
                 names.actor(a.getSubject(), a.getRole()), a.getRole(), a.getType(), a.getStatus(), a.getAssignedAt(), a.getVersion())).toList();
 
         List<ClinicalReviewView> reviewViews = clinicalReviews(caseId);
-        if (patientActor) reviewViews = reviewViews.stream().filter(r -> "APPROVED".equals(r.status())).toList();
+        if (patientActor) reviewViews = reviewViews.stream().filter(r -> "APPROVED".equals(r.status())).map(CaseWorkspaceQueryService::forPatient).toList();
         ProposalView latest = proposals.latest(caseId, patientActor);
         DeliveryStatus delivery = latest != null && DELIVERED_STATUSES.contains(latest.status()) ? proposals.deliveryStatus(latest.versionId()) : null;
         return new CaseWorkspace(summary, timeline, taskViews, messageViews, assignmentViews, reviewViews, latest, proposals.gates(caseId, latest),
@@ -178,6 +178,13 @@ public class CaseWorkspaceQueryService {
         return new TaskView(t.getId(), t.getCaseId(), t.getTaskType(), decrypt(t.getTitle()), decrypt(t.getDescription()), t.getOwnerSubject(),
                 t.getOwnerRole(), t.getVisibilityScope(), t.getPriority(), t.getStatus(), Boolean.TRUE.equals(t.getBlocking()),
                 due != null && due.isBefore(clock.instant()) && !CLOSED_TASK_STATUSES.contains(t.getStatus()), due, t.getVersion());
+    }
+
+    /** The patient's copy of a review: the recommendation without its estimate lines, which carry the provider's price
+     *  (the patient sees only the inclusive package on the proposal). */
+    private static ClinicalReviewView forPatient(ClinicalReviewView r) {
+        return new ClinicalReviewView(r.id(), r.versionNumber(), r.status(), r.suitability(), r.recommendedTreatment(),
+                r.risksAndLimitations(), r.createdAt(), List.of(), r.proposalCurrency(), r.quoteRate(), r.quoteRateDate(), r.quoteRateSource());
     }
 
     /** The case's clinical reviews, newest first, each with its estimate lines quoted in the recommendation's currency. */

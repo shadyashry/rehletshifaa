@@ -157,6 +157,31 @@ class SecureJourneyCorrectionsTest {
             .isInstanceOf(ApiException.class).hasMessageContaining("verify");
     }
 
+    // SEC-10: written from the protocol (docs/qa-test-protocol.md §7), not from the code. Every patient-facing payload, on
+    // the secure links and in the signed-in portal, is serialized as the API would send it and searched for the internal
+    // commercial terms by name and by value.
+    @Test void noPatientPayloadCarriesProviderCostMarginProfitOrFinanceReasons() throws Exception {
+        var ctx=releasedProposal();
+        Map<String,Object> payloads=new LinkedHashMap<>();
+        payloads.put("proposal summary",journey.publicProposalSummary(ctx.token));
+        payloads.put("proposal view",journey.viewProposal(ctx.token,ctx.grant));
+        publicCases.requestAccess(ctx.statusToken); em.flush();
+        var statusGrant=publicCases.verify(ctx.statusToken,caseAccessCode(ctx.statusToken,"+254700000021"));
+        payloads.put("status view",publicCases.view(ctx.statusToken,statusGrant.grant()));
+        journey.decideProposalPublic(ctx.token,ctx.grant,new PublicProposalDecisionRequest(ctx.grant,"ACKNOWLEDGED",null,true)); em.flush();
+
+        jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",ctx.caseId);
+        authenticate("patient-subject",Role.PATIENT);
+        payloads.put("my cases",journey.patientCases());
+        payloads.put("my case",journey.workspace(ctx.caseId));
+        payloads.put("my deposit",journey.depositView(ctx.caseId));
+        payloads.put("my readiness",journey.customerReadiness(ctx.caseId));
+
+        List<String> leaks=new ArrayList<>();
+        payloads.forEach((name,payload)->collectCommercialLeaks(name,json.valueToTree(payload),leaks));
+        assertThat(leaks).isEmpty();
+    }
+
     @Test void wrongOtpIsRejectedAndLockedAfterMaxAttempts() throws Exception {
         var ctx=releaseProposalWithoutPatientAccount();
         journey.requestProposalAccess(ctx.token); em.flush();
@@ -867,10 +892,34 @@ class SecureJourneyCorrectionsTest {
         journey.requestProposalAccess(token,"WHATSAPP");
         String code=proposalAccessCode(ctx.caseId);
         String grant=journey.verifyProposalAccess(token,code).grant();
-        return new ProposalCtx(ctx.caseId,versionId,token,grant);
+        return new ProposalCtx(ctx.caseId,versionId,token,grant,ctx.token);
     }
 
-    private record ProposalCtx(UUID caseId,UUID versionId,String token,String grant){}
+    private record ProposalCtx(UUID caseId,UUID versionId,String token,String grant,String statusToken){}
+
+    // Fixture numbers (releasedProposal): provider net 390,000 EGP; 12% margin = 46,800 EGP; at 0.02 USD per EGP these
+    // are 7,800 and 936 USD. A margin rate of 0.12 is the policy rate.
+    private static final java.util.regex.Pattern COMMERCIAL_KEY=java.util.regex.Pattern.compile(
+        "(?i).*(margin|profit|providernet|netcost|net_?egp|financereason|commercialpolicy|policyrate).*");
+    private static final List<BigDecimal> COMMERCIAL_VALUES=List.of(
+        new BigDecimal("390000"),new BigDecimal("46800"),new BigDecimal("7800"),new BigDecimal("936"),new BigDecimal("0.12"));
+
+    private void collectCommercialLeaks(String path,com.fasterxml.jackson.databind.JsonNode node,List<String> leaks){
+        if(node.isObject()) node.properties().forEach(e->{
+            if(COMMERCIAL_KEY.matcher(e.getKey()).matches()&&!e.getValue().isNull()) leaks.add(path+"."+e.getKey()+"="+e.getValue());
+            collectCommercialLeaks(path+"."+e.getKey(),e.getValue(),leaks);
+        });
+        else if(node.isArray()) for(int i=0;i<node.size();i++) collectCommercialLeaks(path+"["+i+"]",node.get(i),leaks);
+        else if(isCommercialValue(node)) leaks.add(path+"="+node);
+    }
+
+    private boolean isCommercialValue(com.fasterxml.jackson.databind.JsonNode node){
+        BigDecimal value;
+        if(node.isNumber()) value=node.decimalValue();
+        else if(node.isTextual()&&node.asText().matches("-?\\d+(\\.\\d+)?")) value=new BigDecimal(node.asText());
+        else return false;
+        return COMMERCIAL_VALUES.stream().anyMatch(v->v.compareTo(value)==0);
+    }
 
     private UUID approvedReview(UUID caseId){
         return jdbc.queryForObject("SELECT id FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'",UUID.class,caseId);
@@ -977,7 +1026,7 @@ class SecureJourneyCorrectionsTest {
 
     private Ctx assignedDoctorCase() throws Exception {
         var created=cases.create(new CreateCaseRequest("Doc", "Patient","Kenya","+254700000021","Reports","en",true,null,null,null,"cardiology"));
-        cases.submit(created.caseId()); em.flush(); em.clear();
+        var submitted=cases.submit(created.caseId()); em.flush(); em.clear();
         authenticate("coordinator-subject",Role.COORDINATOR);
         com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
         if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, created.caseId(), "coordinator-subject")) journey.claimCoordinatorCase(created.caseId(),"pod");
@@ -986,7 +1035,7 @@ class SecureJourneyCorrectionsTest {
         seedDoctor();
         var a=journey.assign(created.caseId(),new AssignmentRequest("doctor-subject","DOCTOR","PRIMARY","pod","review"));
         authenticate("doctor-subject",Role.CONSULTANT);journey.acceptDoctorAssignment(created.caseId(),a.id(), new AssignmentDecisionRequest(true,null));
-        return new Ctx(created.caseId(),null,null,created.caseNumber());
+        return new Ctx(created.caseId(),null,submitted.statusToken(),created.caseNumber()); // token = the case's status link
     }
 
     private void seedDoctor(){UUID id=UUID.randomUUID();jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",id,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),id,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());}

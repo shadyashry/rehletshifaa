@@ -384,8 +384,87 @@ class JourneyServiceIntegrationTest {
         assertThat(reviewTasks).isEqualTo(1);
     }
 
+    // UC-12: the clinical end of the journey. Written from the protocol (docs/qa-test-protocol.md UC-12), not from the code.
+    @Test void dischargeNeedsACleanDocumentOfThisCaseAndFollowUpOnlyComesAfterDischarge()throws Exception{
+        UUID caseId=arriveWithDoctor("Discharge Patient","+254700000091","dc@local.test");
+        UUID otherCase=cases.create(new CreateCaseRequest("Other","Patient","Kenya","+254700000092","Reports","en",true,null,"dc2@local.test","Africa/Nairobi","cardiology")).caseId();
+        authenticate("doctor-subject",Role.CONSULTANT);
+        journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("The treating doctor explained the procedure, risks and alternatives; I consent.","en","v1",null,null,"Provider consent ref #124"));
+        Instant start=Instant.now().minusSeconds(3600);
+        journey.treatment(caseId,new TreatmentRequest("Cairo Heart",null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        assertThat(caseStatus(caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
+
+        var followUp=new FollowUpRequest(null,null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest for a week");
+        assertThatThrownBy(()->journey.followUp(caseId,followUp)).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
+
+        UUID unscanned=document(caseId,"PENDING");
+        UUID quarantined=document(caseId,"QUARANTINED");
+        UUID otherCasesClean=document(otherCase,"CLEAN");
+        for(UUID notUsable:Arrays.asList(null,unscanned,quarantined,otherCasesClean))
+            assertThatThrownBy(()->journey.treatment(caseId,discharge(start,notUsable)))
+                .as("discharge with document %s",notUsable).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
+        assertThat(caseStatus(caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
+
+        var discharged=journey.treatment(caseId,discharge(start,document(caseId,"CLEAN")));
+        assertThat(caseStatus(caseId)).isEqualTo("DISCHARGED");
+
+        journey.followUp(caseId,new FollowUpRequest(discharged.id(),null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest for a week"));
+        assertThat(caseStatus(caseId)).isEqualTo("FOLLOW_UP");
+    }
+
+    @Test void treatmentNeedsTheAcceptedFinalQuoteAsWellAsProcedureConsent()throws Exception{
+        var fq=finalQuoteAfterArrival("Quote Patient","+254700000093","fq3@local.test");
+        authenticate("coordinator-subject",Role.COORDINATOR);
+        journey.releaseFinalQuote(fq.caseId(),fq.versionId());
+        authenticate("doctor-subject",Role.CONSULTANT);
+        journey.captureProcedureConsent(fq.caseId(),new ProcedureConsentRequest("The treating doctor explained the procedure, risks and alternatives; I consent.","en","v1",null,null,"Provider consent ref #125"));
+        var episode=new TreatmentRequest("Cairo Heart",null,Instant.now(),null,"IN_PROGRESS","Consultation",null,null,null,false,null);
+        assertThatThrownBy(()->journey.treatment(fq.caseId(),episode)).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
+        assertThat(caseStatus(fq.caseId())).isEqualTo("ARRIVAL_CONFIRMED");
+
+        authenticate("patient-subject",Role.PATIENT);
+        journey.decideProposal(fq.caseId(),fq.versionId(),new ProposalDecisionRequest("ACCEPTED",List.of(),"Accepted final plan"));
+        authenticate("doctor-subject",Role.CONSULTANT);
+        journey.treatment(fq.caseId(),episode);
+        assertThat(caseStatus(fq.caseId())).isEqualTo("TREATMENT_IN_PROGRESS");
+    }
+
+    private TreatmentRequest discharge(Instant start,UUID documentId){
+        return new TreatmentRequest("Cairo Heart",null,start,Instant.now(),"COMPLETED","Angioplasty","Angioplasty",null,null,true,documentId);
+    }
+
+    private UUID document(UUID caseId,String status){
+        UUID id=UUID.randomUUID();
+        jdbc.update("INSERT INTO medical_documents(id,case_id,object_key,original_file_name,safe_file_name,content_type,size_bytes,status,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            id,caseId,"cases/"+caseId+"/"+id,"discharge.pdf","discharge.pdf","application/pdf",2048L,status,Instant.now());
+        return id;
+    }
+
+    private String caseStatus(UUID caseId){return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?",String.class,caseId);}
+
     @Test void finalQuoteStaysAtArrivalConfirmedAndReducesWithScope()throws Exception{
-        var created=cases.create(new CreateCaseRequest("Final", "Patient","Kenya","+254700000090","Cardiac reports","en",true,null,"fq2@local.test","Africa/Nairobi","cardiology"));
+        var fq=finalQuoteAfterArrival("Final","+254700000090","fq2@local.test");
+        var pv=jdbc.queryForMap("SELECT document_type,patient_total_expected_egp,margin_amount_egp,margin_rate FROM proposal_versions WHERE id=?",fq.versionId());
+        assertThat(pv.get("document_type")).isEqualTo("FINAL_TREATMENT_QUOTE");
+        assertThat(new BigDecimal(pv.get("patient_total_expected_egp").toString())).isEqualByComparingTo("11200.00"); // 10000 * 1.12 (< 16800 preliminary)
+        assertThat(new BigDecimal(pv.get("margin_amount_egp").toString())).isEqualByComparingTo("1200.00");           // < 1800 preliminary
+        assertThat(new BigDecimal(pv.get("margin_rate").toString())).isEqualByComparingTo("0.1200");                  // reused locked rate
+        // #13: releasing the final quote does not move the macro case.
+        authenticate("coordinator-subject",Role.COORDINATOR);
+        var released=journey.releaseFinalQuote(fq.caseId(),fq.versionId());
+        assertThat(released.status()).isEqualTo("RELEASED");
+        assertThat(journey.workspace(fq.caseId()).caseSummary().status()).isEqualTo("ARRIVAL_CONFIRMED");
+        // #14: the patient's final decision does not move the macro case.
+        authenticate("patient-subject",Role.PATIENT);
+        journey.decideProposal(fq.caseId(),fq.versionId(),new ProposalDecisionRequest("ACCEPTED",List.of(),"Accepted final plan"));
+        assertThat(journey.workspace(fq.caseId()).caseSummary().status()).isEqualTo("ARRIVAL_CONFIRMED");
+    }
+
+    private record FinalQuote(UUID caseId,UUID versionId){}
+
+    /** A preliminary for two catalog services, arrival, then a final assessment and final quote (created, not released) for one. */
+    private FinalQuote finalQuoteAfterArrival(String firstName,String phone,String email)throws Exception{
+        var created=cases.create(new CreateCaseRequest(firstName, "Patient","Kenya",phone,"Cardiac reports","en",true,null,email,"Africa/Nairobi","cardiology"));
         cases.submit(created.caseId());entityManager.flush();entityManager.clear();
         jdbc.update("UPDATE patient_profiles SET external_subject=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)","patient-subject",created.caseId());
         authenticate("coordinator-subject",Role.COORDINATOR);com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
@@ -413,19 +492,7 @@ class JourneyServiceIntegrationTest {
         var finalReview=journey.saveFinalAssessment(created.caseId(),new FinalAssessmentRequest("Single procedure confirmed","Standard risks",List.of(new CostEstimateItem("Consultation",new BigDecimal("10000.00"),"EGP",svc1))));
         authenticate("coordinator-subject",Role.COORDINATOR);
         var fq=journey.createFinalQuote(created.caseId(),new FinalQuoteRequest(finalReview.id(),"EGP","Second procedure no longer indicated after examination","Excl","Deposit","Refund","Consent",Instant.now().plusSeconds(86400),null));
-        var pv=jdbc.queryForMap("SELECT document_type,patient_total_expected_egp,margin_amount_egp,margin_rate FROM proposal_versions WHERE id=?",fq.versionId());
-        assertThat(pv.get("document_type")).isEqualTo("FINAL_TREATMENT_QUOTE");
-        assertThat(new BigDecimal(pv.get("patient_total_expected_egp").toString())).isEqualByComparingTo("11200.00"); // 10000 * 1.12 (< 16800 preliminary)
-        assertThat(new BigDecimal(pv.get("margin_amount_egp").toString())).isEqualByComparingTo("1200.00");           // < 1800 preliminary
-        assertThat(new BigDecimal(pv.get("margin_rate").toString())).isEqualByComparingTo("0.1200");                  // reused locked rate
-        // #13: releasing the final quote does not move the macro case.
-        fq=journey.releaseFinalQuote(created.caseId(),fq.versionId());
-        assertThat(fq.status()).isEqualTo("RELEASED");
-        assertThat(journey.workspace(created.caseId()).caseSummary().status()).isEqualTo("ARRIVAL_CONFIRMED");
-        // #14: the patient's final decision does not move the macro case.
-        authenticate("patient-subject",Role.PATIENT);
-        journey.decideProposal(created.caseId(),fq.versionId(),new ProposalDecisionRequest("ACCEPTED",List.of(),"Accepted final plan"));
-        assertThat(journey.workspace(created.caseId()).caseSummary().status()).isEqualTo("ARRIVAL_CONFIRMED");
+        return new FinalQuote(created.caseId(),fq.versionId());
     }
 
     private void authenticate(String subject, Role... roles) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, roles); }
