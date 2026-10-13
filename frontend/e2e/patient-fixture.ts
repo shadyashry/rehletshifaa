@@ -20,9 +20,10 @@ export type Scenario = "deposit-arranging" | "deposit-paid" | "proposal-ready" |
 
 /** `viewer` is the backend's per-case relation; `roles` the account's. They differ for someone who is a patient and also acts for a relative. */
 /** `identity`: the case's current step is identity verification, and this is the latest submission (none when null). */
-export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: string[]; identity?: { status: string; rejectionReason?: string } | null };
+/** `multipleCases`: the account also represents a relative (Omar, whose case waits on them — the session opens it) and has a closed case of its own. */
+export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: string[]; identity?: { status: string; rejectionReason?: string } | null; multipleCases?: boolean };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity }: PatientOptions = {}) {
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
       profile: { sub: "patient-1", name: "Maya Example", email: "maya@example.test", roles: ["PATIENT"] }, expires_at: Math.floor(Date.now() / 1000) + 3600 }));
@@ -47,6 +48,20 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     patientProposal: ready ? { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: null }
       : { state: "ACCEPTED", action: "VIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: stamp },
   };
+  // A relative's case waiting on the account (information requested) and a closed case of the account's own.
+  const relative = { ...summary, id: "case-2", caseNumber: "RS-2026-000094", status: "INFORMATION_REQUIRED", patientName: "Omar Example", careCategory: "orthopedics",
+    coordinatorName: "Layla Hassan", doctorName: null, waitingOn: "PATIENT", updatedAt: "2026-09-13T09:00:00Z", viewer: "REPRESENTATIVE" };
+  const closed = { ...summary, id: "case-3", caseNumber: "RS-2025-000412", status: "CLOSED", careCategory: "general-surgery", waitingOn: null, updatedAt: "2025-11-02T09:00:00Z", viewer: "SELF" };
+  const relativeWorkspace = {
+    caseSummary: relative, timeline: [], tasks: [], assignments: [], clinicalReviews: [], gates: null, delivery: null, proposal: null, deposit: null, patientProposal: null,
+    messages: [{ id: "m2", threadType: "PATIENT_COORDINATOR", senderRole: "COORDINATOR", senderName: "Layla Hassan", direction: "INBOUND", body: "Could you send Omar's latest knee X-ray?", createdAt: "2026-09-13T09:00:00Z", internalOnly: false, read: false }],
+    actions: { journeyStage: "INFORMATION_REQUIRED", waitingOn: "PATIENT", blockers: [], currentAction: { code: "PROVIDE_INFORMATION", kind: "FOCUS" }, availableActions: ["MESSAGE_COORDINATOR"], viewer: "REPRESENTATIVE" },
+    patientAction: { taskId: "t2", title: "Information required", message: "Please send Omar's latest knee X-ray and the report that came with it.", blocking: true, dueAt: "2026-09-30T09:00:00Z",
+      items: [{ id: "i2", kind: "DOCUMENT", code: "XRAY", label: "Knee X-ray (last 6 months)", required: true, completed: false }] },
+  };
+  const closedWorkspace = { ...workspace, caseSummary: closed, deposit: null, proposal: null, patientProposal: null, messages: [],
+    actions: { journeyStage: "CLOSED", waitingOn: null, blockers: [], currentAction: { code: "NONE", kind: "NONE" }, availableActions: ["MESSAGE_COORDINATOR"], viewer: "SELF" } };
+  const caseList = multipleCases ? [relative, { ...caseSummary, viewer: "SELF" }, closed] : [caseSummary];
   const writes: { path: string; body: unknown }[] = [];
   // Counted from the browser side so a request storm shows up even when every call is answered: a linked patient's
   // session registration refreshes /me once; repeating it is the reload loop this suite must catch.
@@ -63,11 +78,13 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204 });
     if (request.method() !== "GET") writes.push({ path: api, body: request.postDataJSON() });
     if (api === "/account/preferences") return reply({ displayName: null, locale: "en" });
-    if (api === "/patient/account/session") return reply({ linked: true, currentCaseId: scenario === "no-case" ? null : "case-1", accountStatus: "ACTIVE", pendingLinkRequests: 0 });
+    if (api === "/patient/account/session") return reply({ linked: true, currentCaseId: scenario === "no-case" ? null : multipleCases ? "case-2" : "case-1", accountStatus: "ACTIVE", pendingLinkRequests: 0 });
     if (api === "/patient/account/profile") return reply({ givenName: "Maya", familyName: "Example", displayName: "Maya Example", preferredName: null, dateOfBirth: "1990-04-02", country: "Kenya", nationality: "KE", preferredLanguage: "en", email: "maya@example.test", emailVerified: true, whatsappNumber: "+254700000081", phoneVerified: true, accountStatus: "ACTIVE" });
     if (api === "/work/mine") return reply([]);
     if (api === "/clinics/mine") return reply([]);
-    if (api === "/patient/cases") return reply(scenario === "no-case" ? [] : [caseSummary]);
+    if (api === "/patient/cases") return reply(scenario === "no-case" ? [] : caseList);
+    if (multipleCases && api === "/patient/cases/case-2") return reply(relativeWorkspace);
+    if (multipleCases && api === "/patient/cases/case-3") return reply(closedWorkspace);
     if (api === "/patient/cases/case-1") return reply(workspace);
     if (api === "/patient/cases/case-1/onboarding") return reply({ identity: identity ?? null });
     if (api === "/patient/cases/case-1/proposals/v1/decision") return reply({ ...proposal, status: "ACCEPTED" });

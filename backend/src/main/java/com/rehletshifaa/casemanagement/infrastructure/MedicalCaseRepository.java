@@ -104,6 +104,10 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select count(c) > 0 from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id and p.externalSubject = :subject")
     boolean isPatientsOwnCase(@Param("id") UUID id, @Param("subject") String subject);
 
+    /** The cases on the identity's own patient record — the rest of their case list belongs to people they represent. */
+    @Query("select c.id from MedicalCase c join PatientProfile p on p.id = c.patientId where p.externalSubject = :subject")
+    java.util.List<UUID> findOwnPatientCaseIds(@Param("subject") String subject);
+
     interface AuthorisedRepresentativeRow { UUID getId(); String getSubject(); String getRelationship(); Instant getSince(); }
 
     /** Who may act for the case's patient at {@code now}: unrevoked representative links in force, oldest first. */

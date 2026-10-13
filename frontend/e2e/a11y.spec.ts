@@ -51,6 +51,7 @@ const PORTAL: Target[] = [
   { name: "portal-coordinator", path: "/portal", prepare: page => setupPortal(page, "COORDINATOR"), ready: page => expect(page.locator("#work-panel")).toBeVisible() },
   { name: "portal-doctor", path: "/portal", prepare: page => setupPortal(page, "DOCTOR"), ready: page => expect(page.locator("#work-panel")).toBeVisible() },
   { name: "my-care", path: "/portal", prepare: page => setupPatient(page, "deposit-arranging"), ready: page => expect(page.locator("#current-step-title")).toBeVisible() },
+  { name: "my-care-cases", path: "/portal", prepare: page => setupPatient(page, "deposit-arranging", { multipleCases: true, roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] }), ready: page => expect(page.locator("#your-cases-title")).toBeVisible() },
 ];
 
 for (const locale of ["en", "ar"] as const) {

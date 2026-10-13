@@ -6,7 +6,7 @@ import { formatMoney } from "@/lib/money";
 import type { PortalView as RoleKey } from "@/lib/access";
 
 /** Shapes and pure helpers shared by the portal's shell, queue and case pages. */
-export type CaseView={id:string;caseNumber:string;waitingOn?:string|null;waitingReason?:string|null;status:string;patientName:string;country:string;preferredLanguage:string;careCategory?:string;createdAt:string;updatedAt:string;version:number;coordinatorSubject?:string;doctorSubject?:string;coordinatorName?:string;doctorName?:string;travelPackageRequested?:boolean;assignmentId?:string;assignmentStatus?:string;openTaskCount?:number;overdueTaskCount?:number;documentCount?:number};
+export type CaseView={id:string;caseNumber:string;waitingOn?:string|null;waitingReason?:string|null;status:string;patientName:string;country:string;preferredLanguage:string;careCategory?:string;createdAt:string;updatedAt:string;version:number;coordinatorSubject?:string;doctorSubject?:string;coordinatorName?:string;doctorName?:string;travelPackageRequested?:boolean;assignmentId?:string;assignmentStatus?:string;openTaskCount?:number;overdueTaskCount?:number;documentCount?:number;/** Patient case list only: SELF for the account's own case, REPRESENTATIVE for a relative's. */viewer?:string|null};
 
 export type StaffCaseResponse={caseSummary:CaseView;assignmentId?:string;assignmentStatus?:string;openTaskCount:number;overdueTaskCount:number;documentCount:number};
 

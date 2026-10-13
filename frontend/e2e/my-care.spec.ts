@@ -67,16 +67,83 @@ test("on a phone the current step comes before everything else, and nothing over
   await noOverflow(page);
   const order = await page.evaluate(() => {
     const top = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().top ?? Infinity;
-    return { step: top("#current-step-title"), deposit: top("#deposit-title"), journey: top("[aria-label='Your care journey']"), proposal: top("#proposal-title"), coordinator: top("#coordinator-title") };
+    return { step: top("#current-step-title"), deposit: top("#deposit-title"), journey: top("#journey-title"), proposal: top("#proposal-title"), coordinator: top("#coordinator-title") };
   });
+  // The deposit lives inside the current step; the coordinator follows it, before the journey and the estimate.
   expect(order.step).toBeLessThan(order.deposit);
-  expect(order.deposit).toBeLessThan(order.journey);
+  expect(order.deposit).toBeLessThan(order.coordinator);
+  expect(order.coordinator).toBeLessThan(order.journey);
   expect(order.journey).toBeLessThan(order.proposal);
-  expect(order.proposal).toBeLessThan(order.coordinator);
   // The current step is on the first screen.
   expect(order.step).toBeLessThan(844);
   await page.screenshot({ path: "e2e/screenshots/my-care-deposit-390.png", fullPage: true });
 });
+
+test("the deposit is stated once, inside the step it is about, and the coral reading hairline stays off the app page", async ({ page }) => {
+  await setupPatient(page, "deposit-arranging");
+  await page.goto("/en/portal");
+  const step = page.getByRole("region", { name: "Deposit arrangements" });
+  await expect(step.getByRole("region", { name: "Coordination deposit", exact: true })).toContainText("$500");
+  await expect(page.getByText("$500")).toHaveCount(1);
+  await expect(page.locator(".card.file-tab")).toHaveCount(1);
+  const hairline = await page.evaluate(() => getComputedStyle(document.querySelector(".site-header")!, "::after").content);
+  expect(["none", "normal"]).toContain(hairline);
+});
+
+test("several cases: the one waiting on the patient opens first, grouped by person, and switching moves to the other file", async ({ page }) => {
+  await setupPatient(page, "deposit-arranging", { multipleCases: true, roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
+  await page.goto("/en/portal");
+  const switcher = page.getByRole("region", { name: "Your cases" });
+  await expect(switcher).toBeVisible();
+  // The session named Omar's case (it waits on the account): it is open, marked, and says so in words.
+  await expect(page).toHaveURL(/case=case-2/);
+  await expect(page.getByRole("heading", { name: "We need something from you" })).toBeVisible();
+  const omar = switcher.getByRole("link", { name: /RS-2026-000094/ });
+  await expect(omar).toHaveAttribute("aria-current", "page");
+  await expect(omar).toContainText("Needs you");
+  await expect(switcher.getByRole("heading", { name: "Your care", exact: true })).toBeVisible();
+  await expect(switcher.getByRole("heading", { name: /Care for ⁨?Omar Example/ })).toBeVisible();
+  await expect(page.locator("#case-heading")).toContainText(/Care for ⁨?Omar Example/);
+  // Past cases are folded away; a new case is the account holder's own.
+  await expect(switcher.getByRole("link", { name: /RS-2025-000412/ })).toBeHidden();
+  await expect(switcher.getByRole("link", { name: "Send a new case" })).toHaveCount(1);
+  await page.screenshot({ path: "../docs/ux-redesign/screenshots/my-care/my-care-cases-en-1440.png", fullPage: true });
+  // Switching replaces the file in place and moves focus to its heading.
+  await switcher.getByRole("link", { name: /RS-2026-000081/ }).click();
+  await expect(page).toHaveURL(/case=case-1/);
+  await expect(page.getByRole("heading", { name: "Deposit arrangements" })).toBeVisible();
+  await expect(page.locator("#case-heading")).toBeFocused();
+  await expect(page.getByRole("region", { name: "Your cases" }).getByRole("link", { name: /RS-2026-000081/ })).toHaveAttribute("aria-current", "page");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await noOverflow(page);
+  await page.screenshot({ path: "../docs/ux-redesign/screenshots/my-care/my-care-cases-switched-en-390.png", fullPage: true });
+});
+
+test("several cases in Arabic: the switcher row scrolls on a phone without the page overflowing", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setupPatient(page, "deposit-arranging", { multipleCases: true, roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
+  await page.goto("/ar/portal");
+  const switcher = page.getByRole("region", { name: "حالاتك" });
+  await expect(switcher.getByRole("link", { name: /RS-2026-000094/ })).toHaveAttribute("aria-current", "page");
+  await expect(switcher.getByRole("heading", { name: /رعاية ⁨?Omar Example/ })).toBeVisible();
+  await noOverflow(page);
+  await page.screenshot({ path: "../docs/ux-redesign/screenshots/my-care/my-care-cases-ar-390.png", fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: "../docs/ux-redesign/screenshots/my-care/my-care-cases-ar-1440.png", fullPage: true });
+});
+
+for (const locale of ["en", "ar"] as const) {
+  for (const width of [375, 390, 768, 1024, 1440]) {
+    test(`one case, deposit being arranged, holds at ${width}px (${locale})`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await setupPatient(page, "deposit-arranging");
+      await page.goto(`/${locale}/portal`);
+      await expect(page.locator("#current-step-title")).toBeVisible();
+      await noOverflow(page);
+      if (width === 390 || width === 1440) await page.screenshot({ path: `../docs/ux-redesign/screenshots/my-care/my-care-${locale}-${width}.png`, fullPage: true });
+    });
+  }
+}
 
 test("deposit confirmed: success state, no stale arrangement step", async ({ page }) => {
   await setupPatient(page, "deposit-paid");
@@ -134,7 +201,7 @@ test("Arabic is right-to-left with the same single-action discipline", async ({ 
   await expect(page.getByRole("heading", { level: 1, name: "رعايتي" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "ترتيبات الوديعة" })).toBeVisible();
   await expect(page.getByText("لا يلزم منك أي إجراء الآن.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /عرض العرض/ })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /الاطلاع على العرض/ })).toHaveCount(1);
   await noOverflow(page);
   await page.screenshot({ path: "e2e/screenshots/my-care-deposit-ar-390.png", fullPage: true });
   await page.setViewportSize({ width: 1440, height: 900 });

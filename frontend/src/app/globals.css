@@ -904,6 +904,31 @@
   .account-dialog::backdrop { background: var(--dialog-backdrop); }
   .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: .5rem; }
   .icon-button:hover { background: var(--color-brand-50); }
+  /* My Care: the file's tab — a petrol top edge on the one card that matters now, and on the open case in the switcher. */
+  .card.file-tab { border-block-start: 2px solid var(--color-brand-600); }
+  /* Every case card keeps a 2px top edge so the open one does not sit lower than its neighbours; only its colour changes. */
+  .case-card { border-block-start-width: 2px; }
+  .case-card[aria-current="page"], .case-card[aria-current="page"]:hover { border-block-start-color: var(--color-brand-600); }
+  /* Your cases: a scroll-snapping row on phones (the next card peeks in), a wrapping row from 640px. */
+  .case-row { display: flex; gap: .75rem; margin: -.5rem; padding: .5rem; overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: inline mandatory; scroll-padding-inline: .5rem; }
+  .case-row-item { flex: none; width: min(16.5rem, 78vw); scroll-snap-align: start; }
+  .case-card { transition: border-color .18s ease, box-shadow .18s ease; }
+  .case-card:hover { border-color: var(--color-line-strong); box-shadow: var(--shadow-raised); }
+  /* The care journey: numbered markers joined by a connector that fills as the case moves; down the page on phones. */
+  .care-journey .journey-step { position: relative; display: flex; align-items: flex-start; gap: .875rem; padding-block-end: 1.125rem; }
+  .care-journey .journey-step:last-child { padding-block-end: 0; }
+  .care-journey .journey-step > span:last-child { padding-block-start: .3rem; }
+  .care-journey .journey-link { position: absolute; inset-block: 2.375rem .25rem; inset-inline-start: calc(1rem - 1px); width: 2px; background: var(--color-line-strong); }
+  .care-journey .journey-link[data-reached] { background: var(--color-brand-400); }
+  @media (min-width: 640px) {
+    .case-row { flex-wrap: wrap; overflow: visible; }
+    .case-row-item { width: 16.5rem; }
+  }
+  @media (min-width: 768px) {
+    .care-journey .journey-step { flex-direction: column; align-items: center; gap: .625rem; padding-block-end: 0; padding-inline: .25rem; text-align: center; }
+    .care-journey .journey-step > span:last-child { padding-block-start: 0; }
+    .care-journey .journey-link { inset-block: calc(1rem - 1px) auto; inset-inline: calc(50% + 1.375rem) calc(-50% + 1.375rem); width: auto; height: 2px; }
+  }
 }
 @media (max-width: 640px) {
   .portal-shell { padding-top: 1.5rem; }

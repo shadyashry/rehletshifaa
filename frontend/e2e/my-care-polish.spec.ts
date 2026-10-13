@@ -13,9 +13,9 @@ for (const locale of ["en", "ar"] as const) {
       await setupPatient(page, "deposit-arranging");
       await page.goto(`/${locale}/portal`);
       await expect(page.locator("#case-heading")).toContainText("Maya Example");
-      // Only the current step is a card; the other blocks are hairline sections on paper.
-      await expect(page.locator("#case-heading")).not.toHaveClass(/\bcard\b/);
-      await expect(page.locator("section.card")).toHaveCount(1);
+      // One white card per subject on paper; only the current step carries the file's petrol tab edge.
+      await expect(page.locator(".card.file-tab")).toHaveCount(1);
+      await expect(page.locator(".card.file-tab")).toHaveAttribute("aria-labelledby", "current-step-title");
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await page.screenshot({ path: shots(`my-care-${locale}-${width}`), fullPage: true });
     });

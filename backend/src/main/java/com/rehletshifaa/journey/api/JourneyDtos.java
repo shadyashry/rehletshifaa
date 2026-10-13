@@ -61,8 +61,11 @@ public final class JourneyDtos {
         public PractitionerRequest(String legalName,String displayName,String externalSubject,String registrationNumber,String specialty,String subspecialty,String qualifications,String appointments,String hospitalPrivileges,String languages,String approvedProcedures,String indemnityReference,String contractStatus,String availabilityStatus,Integer expectedReviewHours,String practitionerType,String careCategory){this(legalName,displayName,externalSubject,registrationNumber,specialty,subspecialty,qualifications,appointments,hospitalPrivileges,languages,approvedProcedures,indemnityReference,contractStatus,availabilityStatus,expectedReviewHours,practitionerType,careCategory,null,"en");}
     }
     public record CredentialRequest(@NotBlank @Size(max=80)String credentialType,@NotBlank @Size(max=160)String referenceNumber,@NotBlank @Size(max=500)String source,UUID evidenceDocumentId,Instant issuedAt,Instant expiresAt) {}
-    /** {@code waitingOn} answers "who must act next", which is deliberately not the same as the stage. */
-    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason) {}
+    /**
+     * {@code waitingOn} answers "who must act next", which is deliberately not the same as the stage. {@code viewer} is set
+     * only on the patient's own case list: SELF for their own case, REPRESENTATIVE for a relative's (null for staff).
+     */
+    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason,String viewer) {}
     /**
      * Operational signals for a case card. All derived read-only from open work items — the case itself
      * carries no priority or attention status, so nothing here is persisted for the UI's benefit.

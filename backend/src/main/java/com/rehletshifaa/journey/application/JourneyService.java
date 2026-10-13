@@ -126,7 +126,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     @Transactional(readOnly=true) public DepositView depositView(UUID caseId){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));return payment.depositForCase(caseId);}
 
     /** The signed-in person's own cases. An account not bound to a patient record yet (and representing nobody) has none: an empty list, not a refusal. */
-    public List<CaseView> patientCases(){if(!authority.allowed(Permission.PATIENT_SELF_SERVICE,Resource.platform())){authority.authorize(Permission.ACCOUNT_BINDING);return List.of();}var actor=authority.authorize(Permission.PATIENT_SELF_SERVICE);return caseQueries.patientCases(actor.subject(),clock.instant()).stream().map(JourneyCaseQueryService::forPatient).toList();}
+    public List<CaseView> patientCases(){if(!authority.allowed(Permission.PATIENT_SELF_SERVICE,Resource.platform())){authority.authorize(Permission.ACCOUNT_BINDING);return List.of();}var actor=authority.authorize(Permission.PATIENT_SELF_SERVICE);return caseQueries.patientCases(actor.subject(),clock.instant());}
     public List<CaseView> coordinatorQueue(){
         var actor=authority.authorize(Permission.COORDINATION_QUEUE);
         Set<String> visible=new HashSet<>();visible.add(actor.subject());
@@ -137,7 +137,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     }
     // Pre-ownership triage exposes the patient name and routing facts (name requested visible from intake),
     // but still withholds coordinator/doctor assignment identity until ownership is taken.
-    private CaseView routingSummary(CaseView view){return new CaseView(view.id(),view.caseNumber(),view.status(),view.patientName(),view.country(),view.preferredLanguage(),view.careCategory(),view.createdAt(),view.updatedAt(),view.version(),null,null,null,null,view.travelPackageRequested(),view.waitingOn(),view.waitingReason());}
+    private CaseView routingSummary(CaseView view){return new CaseView(view.id(),view.caseNumber(),view.status(),view.patientName(),view.country(),view.preferredLanguage(),view.careCategory(),view.createdAt(),view.updatedAt(),view.version(),null,null,null,null,view.travelPackageRequested(),view.waitingOn(),view.waitingReason(),null);}
     @Transactional public IntakePreview intakePreview(UUID caseId){
         var actor=authority.authorize(Permission.COORDINATION_QUEUE);
         // Only this explicit read-only preview permits pre-ownership intake review.

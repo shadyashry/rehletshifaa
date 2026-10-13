@@ -784,3 +784,30 @@
 :root[data-brand-theme="petrol"] .promise-panel > div:first-child > span[aria-hidden] > span:not(:first-child) {
   box-shadow: inset 0 0 0 1px var(--color-brand-300), 0 0 0 2px var(--paper);
 }
+
+/* My Care's journey: reached steps filled Deep Petrol with a halo, the current one in the coral ring, the rest outlined
+   and waiting (the numeral stays petrol or ink: the coral never carries text). */
+:root[data-brand-theme="petrol"] .care-journey .journey-marker[data-state="reached"] {
+  background: var(--color-brand-700);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px var(--color-brand-100);
+}
+:root[data-brand-theme="petrol"] .care-journey .journey-marker[data-state="current"] {
+  color: var(--color-brand-700);
+  box-shadow: inset 0 0 0 2px var(--color-coral), 0 0 0 2px var(--color-brand-600);
+}
+:root[data-brand-theme="petrol"] .care-journey .journey-marker[data-state="upcoming"] {
+  color: var(--color-ink-500);
+  box-shadow: inset 0 0 0 1px var(--color-ink-350);
+}
+
+/* A plus sign has nowhere to lean: only arrows take the link hover nudge. */
+:root[data-brand-theme="petrol"] .link-cta:hover svg.lucide-plus,
+:root[data-brand-theme="petrol"][dir] .link-cta:hover svg.lucide-plus {
+  translate: none;
+}
+
+/* The coral reading hairline measures long reading pages; on the portal's app pages it is only a stray line. */
+:root[data-brand-theme="petrol"]:has(.portal-shell) .site-header::after {
+  content: none;
+}

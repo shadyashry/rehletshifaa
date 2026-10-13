@@ -7,6 +7,7 @@ import type { CaseActions } from "@/components/portal/CurrentAction";
 import { FeedbackContext, CaseDrawer } from "@/components/portal/portal-ui";
 import type { CaseViewProps } from "@/components/portal/StaffCaseView";
 import type { Locale } from "@/lib/i18n";
+import { localeHref } from "@/lib/links";
 import type { Mutate } from "@/components/portal/portal-model";
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
@@ -28,9 +29,14 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
   const actions:CaseActions=value.actions??{journeyStage:c.status,waitingOn:c.waitingOn,currentAction:{code:"NONE",kind:"NONE"},blockers:[],availableActions:[]};
    const proposalReady=value.patientProposal?.action==="REVIEW_PROPOSAL";
    const unread=value.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length;
+   // The switcher lists every case the account can open; this one comes from the workspace when the list has not caught up.
+   // The workspace is fresher than the list for the open case; the list keeps its per-case relation (viewer).
+   const allCases=otherCases.some(other=>other.id===c.id)?otherCases.map(other=>other.id===c.id?{...other,...c,viewer:other.viewer}:other):[c,...otherCases];
+   // "Send a new case" is the account holder's own: offered once the account has a case of its own (sending for someone else is not built yet).
+   const sendsOwnCase=allCases.length>1?allCases.some(other=>(other.id===c.id?actions.viewer:other.viewer)!=="REPRESENTATIVE"):actions.viewer!=="REPRESENTATIVE";
    return <div>
-    <MyCare locale={locale} representative={actions.viewer==="REPRESENTATIVE"} caseSummary={c} actions={actions} patientAction={value.patientAction} patientProposal={value.patientProposal} proposal={value.proposal??null} deposit={value.deposit??null}
-     documents={documents} unreadMessages={unread} timeline={value.timeline} otherCases={otherCases.filter(other=>other.id!==c.id)} view={careView} onView={view=>onCareView?.(view)}
+    <MyCare locale={locale} caseSummary={c} actions={actions} patientAction={value.patientAction} patientProposal={value.patientProposal} proposal={value.proposal??null} deposit={value.deposit??null}
+     documents={documents} unreadMessages={unread} cases={allCases} newCaseHref={sendsOwnCase?localeHref(locale,"send-my-case"):null} view={careView} onView={view=>onCareView?.(view)}
      onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)}
      identityStep={actions.currentAction.code==="VERIFY_IDENTITY"?<IdentityStep key={c.id} locale={locale} caseId={c.id} busy={busy} mutate={mutate} load={load}/>:undefined}
      messagesPanel={<div aria-busy={busy||undefined} className="min-w-0"><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={true} busy={busy} mutate={mutate}/></div>}/>

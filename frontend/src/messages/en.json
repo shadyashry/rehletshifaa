@@ -1247,6 +1247,199 @@
     "patient": {
       "careFor": "Care for {name}"
     },
+    "myCare": {
+      "nav": {
+        "label": "My Care",
+        "care": "My Care",
+        "documents": "Documents",
+        "messages": "Messages"
+      },
+      "cases": {
+        "title": "Your cases",
+        "yourCare": "Your care",
+        "careFor": "Care for {name}",
+        "past": "Past cases",
+        "needsYou": "Needs you",
+        "sendNew": "Send a new case",
+        "pastStatus": {
+          "DECLINED": "Proposal declined",
+          "CLINICALLY_NOT_SUITABLE": "Not suitable for treatment here",
+          "CLOSED": "Closed",
+          "CANCELLED": "Closed"
+        },
+        "someoneElse": "Someone you care for"
+      },
+      "header": {
+        "caseNumber": "Case number"
+      },
+      "step": {
+        "eyebrow": "Current step",
+        "next": "What happens next",
+        "noAction": "No action is required from you right now.",
+        "reviewProposal": "Review proposal",
+        "replyInMessages": "Reply in Messages",
+        "requested": "What we need from you",
+        "provided": "provided",
+        "requestedBy": "Requested by your coordinator",
+        "replyBy": "Please reply by"
+      },
+      "steps": {
+        "PROVIDE_INFORMATION": {
+          "title": "We need something from you",
+          "body": "Your coordinator has asked for information or a document so your case can continue.",
+          "next": "Reply here, or use the secure link we sent you to upload documents. Your coordinator then reviews it and continues."
+        },
+        "REVIEW_PROPOSAL": {
+          "title": "Your proposal is ready to review",
+          "body": "Your treatment plan and its estimated cost are ready. Take the time you need — nothing happens until you decide.",
+          "next": "If you accept, we start arranging your care."
+        },
+        "COMPLETE_PROFILE": {
+          "title": "A few details are still needed",
+          "body": "Before we can arrange your care, the steps below need to be completed. Use the secure link we sent you, or message your coordinator.",
+          "next": "Once they are done, your coordinator continues."
+        },
+        "VERIFY_IDENTITY": {
+          "title": "Identity verification",
+          "body": "Because travel support is part of your care, we need to verify your identity before arrangements are confirmed. Only the minimum is stored, encrypted.",
+          "next": "Our team reviews it and your coordinator continues."
+        },
+        "WAIT_CASE_RECEIVED": {
+          "title": "We have your case",
+          "body": "Your case has been received and is waiting for a coordinator to look at it.",
+          "next": "A coordinator will check what you sent and tell you if anything is missing."
+        },
+        "WAIT_COORDINATOR_REVIEW": {
+          "title": "Your coordinator is reviewing your case",
+          "body": "Your coordinator is going through what you sent and preparing it for a Consultant.",
+          "next": "Your case will be sent to a Consultant in the right specialty."
+        },
+        "WAIT_CONSULTANT_REVIEW": {
+          "title": "A Consultant is reviewing your case",
+          "body": "A Consultant is going through your reports and history now.",
+          "next": "You will receive a recommendation and an initial cost estimate."
+        },
+        "WAIT_PROPOSAL_REVISION": {
+          "title": "We are preparing a revised proposal",
+          "body": "Your coordinator is updating the proposal with the changes you asked for.",
+          "next": "You will receive a new secure link to review it."
+        },
+        "WAIT_PROPOSAL_EXPIRED": {
+          "title": "We are preparing an updated proposal",
+          "body": "Your previous estimate expired. Your coordinator is preparing an updated one.",
+          "next": "You will receive a new secure link to review it."
+        },
+        "WAIT_PROPOSAL": {
+          "title": "We are preparing your proposal",
+          "body": "Your coordinator is putting together the treatment plan and its estimated cost.",
+          "next": "You will receive the proposal to review in your own time."
+        },
+        "WAIT_DEPOSIT_ARRANGEMENT": {
+          "title": "Deposit arrangements",
+          "body": "You acknowledged your preliminary estimate. We are arranging the coordination deposit details and will send you the payment instructions.",
+          "next": "Once the deposit is received, your coordinator starts arranging your treatment."
+        },
+        "WAIT_COORDINATION": {
+          "title": "We are arranging your treatment",
+          "body": "Your coordinator is organising your appointments and, where agreed, the practical side of your trip.",
+          "next": "You will receive your dates and arrival details."
+        },
+        "WAIT_TREATMENT": {
+          "title": "Your arrival is confirmed",
+          "body": "Everything is set for your arrival.",
+          "next": "Your treatment begins as planned."
+        },
+        "IN_TREATMENT": {
+          "title": "Your treatment is under way",
+          "body": "Your care team is with you throughout your treatment.",
+          "next": "After discharge we stay in contact for follow-up."
+        },
+        "FOLLOW_UP": {
+          "title": "You are in follow-up",
+          "body": "Your treatment is complete and we stay in contact while you recover."
+        },
+        "DECLINED": {
+          "title": "You declined the proposal",
+          "body": "Your case is closed for now. Your coordinator remains available if anything changes."
+        },
+        "CLINICALLY_NOT_SUITABLE": {
+          "title": "This case is not clinically suitable for treatment with us",
+          "body": "The Consultant reviewed your case and advised against treatment here. Your coordinator can explain what this means."
+        },
+        "CLOSED": {
+          "title": "This case is closed",
+          "body": "If you would like to look at your options again, contact your coordinator."
+        },
+        "NONE": {
+          "title": "You're all set for now",
+          "body": "Our team is handling the next step and will keep you updated."
+        }
+      },
+      "deposit": {
+        "title": "Coordination deposit",
+        "received": "Received",
+        "status": {
+          "REQUESTED": "Arranging",
+          "PARTIALLY_PAID": "Partly received",
+          "PAID": "Deposit received",
+          "WAIVED": "Waived",
+          "REFUNDED": "Refunded",
+          "CANCELLED": "Cancelled"
+        },
+        "note": {
+          "REQUESTED": "Your coordinator will send you the payment instructions.",
+          "PARTIALLY_PAID": "Your coordinator will confirm the remaining amount.",
+          "PAID": "Thank you — it will be deducted from the price in your final treatment plan and quote.",
+          "WAIVED": "No deposit is needed for your case.",
+          "REFUNDED": "The deposit has been returned to you."
+        }
+      },
+      "journey": {
+        "title": "Your care journey",
+        "done": "done",
+        "current": "current",
+        "step": "Step {number} of {total}",
+        "phases": [
+          "Case received",
+          "Coordinator review",
+          "Consultant review",
+          "Your proposal",
+          "Coordination deposit",
+          "Treatment",
+          "Follow-up"
+        ]
+      },
+      "estimate": {
+        "proposal": "Your proposal",
+        "updated": "Updated version",
+        "view": "View proposal",
+        "documentType": {
+          "PRELIMINARY_ESTIMATE": "Preliminary care estimate",
+          "FINAL_TREATMENT_QUOTE": "Final treatment plan and quote"
+        },
+        "basis": "This is a preliminary, non-binding estimate, not a final price or a price guarantee. Your treatment and its price may increase or decrease after your treating doctor examines you in person.",
+        "status": {
+          "READY": "Ready to review",
+          "ACCEPTED": "Acknowledged",
+          "DECLINED": "Declined",
+          "EXPIRED": "Expired"
+        }
+      },
+      "people": {
+        "title": "Your coordinator",
+        "coordinatorRole": "Your point of contact throughout your care journey.",
+        "pending": "Your coordinator will introduce themselves shortly.",
+        "notAssigned": "Not assigned yet",
+        "message": "Message",
+        "whatsapp": "Messages here and on WhatsApp reach the same person.",
+        "consultant": "Your Consultant"
+      },
+      "documents": {
+        "title": "Documents you shared",
+        "hint": "The documents attached to this case. To add one, use the secure link your coordinator sends you.",
+        "empty": "You have not shared any documents yet."
+      }
+    },
     "nav": {
       "label": "Your work",
       "work": "My work",

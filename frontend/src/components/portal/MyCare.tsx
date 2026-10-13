@@ -1,27 +1,30 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Check, FileText, MessageSquareText, UserRound } from "lucide-react";
+import { useEffect, useMemo, type ReactNode } from "react";
+import { ArrowRight, Check, FileText, MessageCircle, MessageSquareText, Plus, UserRound } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { useWorkCopy } from "@/components/portal/portal-copy";
+import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { careAreaLabel, fillTemplate } from "@/lib/portal-labels";
 import { UnreadCount } from "@/components/portal/portal-ui";
+import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
+import { CareAreaMark, CaseSwitcher, phaseIndex, takeArrivalFocus } from "@/components/portal/CaseSwitcher";
 import { formatMoney } from "@/lib/money";
 import type { CaseActions } from "@/components/portal/CurrentAction";
 /** The backend's one answer to "may the patient see a proposal, and which one" — rendered, never re-derived from the stage. */
 export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null };
 
 /**
- * The patient's care journey, case-centric: what is happening now, whether they must do anything, what
- * happens next, and the people and money facts that support it — nothing more. Every state on this page
- * is rendered from the backend's resolution (current action, patient proposal, deposit); the page never
- * derives an action from the stage, the proposal or the deposit on its own, and it offers at most one
- * primary action at a time.
+ * The patient's open file, case-centric: which case this is (and the others one tap away), what is happening now and
+ * whether they must do anything, who looks after them, and the money facts that support it — nothing more. Every state
+ * on this page is rendered from the backend's resolution (current action, patient proposal, deposit); the page never
+ * derives an action from the stage, the proposal or the deposit on its own, and it offers at most one primary action.
  */
 export type CaseSummary = {
   id: string; caseNumber: string; status: string; patientName?: string | null; careCategory?: string; coordinatorName?: string | null;
   doctorName?: string | null; waitingOn?: string | null; updatedAt: string; createdAt?: string;
+  /** The account's relation to this case, from the backend's case list: its own case, or a relative's it represents. */
+  viewer?: string | null;
 };
 export type PatientActionItem = { id: string; kind: string; code: string; label: string; required: boolean; completed: boolean };
 export type PatientAction = { taskId: string; title: string; message?: string | null; blocking: boolean; dueAt?: string | null; items: PatientActionItem[] };
@@ -30,68 +33,87 @@ export type DepositSummaryData = { status: string; currency: string; totalDispla
 export type CaseDocument = { documentId: string; fileName: string; status: string; createdAt: string };
 export type CareView = "care" | "documents" | "messages";
 
-export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, timeline, otherCases, view, onView, onOpenCase, onOpenProposal, identityStep, messagesPanel, representative = false }: {
+type StepText = { title: string; body: string; next?: string };
+/** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. */
+const MONEY_STEPS = new Set(["WAIT_DEPOSIT_ARRANGEMENT", "PAY_DEPOSIT"]);
+
+export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, messagesPanel, newCaseHref = null }: {
   locale: Locale; caseSummary: CaseSummary; actions: CaseActions; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
   proposal?: ProposalSummaryData | null; deposit?: DepositSummaryData | null; documents: CaseDocument[]; unreadMessages: number;
-  timeline: { status: string; occurredAt: string }[]; otherCases: CaseSummary[]; view: CareView; onView: (view: CareView) => void;
+  /** Every case the account can open, this one included; the switcher shows from two. */
+  cases: CaseSummary[]; view: CareView; onView: (view: CareView) => void;
   onOpenCase: (id: string) => void; onOpenProposal: () => void; identityStep?: ReactNode; messagesPanel: ReactNode;
-  /** The signed-in account acts for the patient (a representative), so the page says whose care this is. */
-  representative?: boolean;
+  /** Where the account holder sends a new case of their own; null when it is not theirs to send from here. */
+  newCaseHref?: string | null;
 }) {
-  const ar = locale === "ar";
   const work = useWorkCopy();
-  const t = copy(ar);
+  const t = work.myCare;
   const c = caseSummary;
   const code = actions.currentAction.code;
-  const step = stepCopy(code, ar, { patientAction, proposalState: patientProposal?.state ?? null, status: c.status });
-  const phase = phaseIndex(c.status);
+  const step = stepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status });
+  const body = code === "PROVIDE_INFORMATION" ? patientAction?.message?.trim() || step.body : step.body;
+  // A case closed or cancelled says nothing about how far it got, so its journey shows no step as reached or current.
+  const phase = c.status === "CLOSED" || c.status === "CANCELLED" ? -1 : phaseIndex(c.status);
+  // The account acts for the patient on this case (per case, from the backend), so the page says whose care this is.
+  const representative = actions.viewer === "REPRESENTATIVE";
   const canMessage = actions.availableActions.includes("MESSAGE_COORDINATOR");
-  const money = (n: number, currency: string) => formatMoney(n, currency, locale);
+  const dateFormat = useMemo(() => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }), [locale]);
+  const date = (iso: string) => dateFormat.format(new Date(iso));
   const proposalTotal = proposal ? proposal.items.filter(i => !i.optional).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0) : null;
   const showProposal = !!patientProposal && ["READY", "ACCEPTED", "DECLINED", "EXPIRED"].includes(patientProposal.state) && !!proposal;
   const showDeposit = !!deposit && deposit.status !== "CANCELLED";
+  const depositInStep = showDeposit && MONEY_STEPS.has(code);
+  const focus = actions.currentAction.kind === "FOCUS";
+  const showSwitcher = cases.length > 1;
+
+  // Arriving from the case switcher: the card that was pressed is gone, so the new case's heading takes focus.
+  useEffect(() => { if (takeArrivalFocus(c.id)) document.getElementById("case-heading")?.focus(); }, [c.id]);
 
   return (
-    <div className="mx-auto max-w-[77.5rem]">
+    <div className="mx-auto max-w-[75rem]">
       {/* Small screens: the same three destinations the header carries on wider ones. */}
-      <nav aria-label={t.navLabel} className="mb-4 flex gap-1 border-b border-line-strong md:hidden">
+      <nav aria-label={t.nav.label} className="mb-5 flex gap-1 border-b border-line-strong md:hidden">
         {(["care", "documents", "messages"] as const).map(id => (
           <button key={id} type="button" aria-current={view === id ? "page" : undefined}
-                  className={`-mb-px border-b-2 px-3 py-2.5 text-[0.9rem] font-bold transition ${view === id ? "border-brand-600 text-brand-800" : "border-transparent text-ink-500 hover:text-ink-800"}`}
+                  className={`-mb-px min-h-11 border-b-2 px-3 py-2.5 text-[0.9375rem] font-bold transition ${view === id ? "border-brand-600 text-brand-800" : "border-transparent text-ink-500 hover:text-ink-800"}`}
                   onClick={() => onView(id)}>
             {t.nav[id]}{id === "messages" && unreadMessages > 0 && <UnreadCount count={unreadMessages}/>}
           </button>
         ))}
       </nav>
 
-      {/* Case header: who and what, compactly — no identifiers beyond the reference the patient already knows. */}
-      <header id="case-heading" tabIndex={-1} className="border-b border-line pb-4 outline-none">
-        {c.patientName && (
-          <p className="text-[1.15rem] font-bold leading-7 text-brand-900">
-            {representative ? fillTemplate(work.patient.careFor, { name: `\u2068${c.patientName}\u2069` }) : <bdi>{c.patientName}</bdi>}
+      {showSwitcher && <CaseSwitcher cases={cases} currentId={c.id} phases={t.journey.phases} onOpenCase={onOpenCase} newCaseHref={newCaseHref}/>}
+
+      {/* Case header: whose file this is and which case — no greeting, no identifiers beyond the reference they know. */}
+      <header className="flex items-center gap-4 rounded-lg border border-line bg-white px-5 py-4 sm:px-6 sm:py-5">
+        <CareAreaMark slug={c.careCategory} size="lg"/>
+        <div className="min-w-0">
+          {/* The case's heading, and where focus lands when the case or the view changes. */}
+          <h2 id="case-heading" tabIndex={-1} className="headline scroll-mt-28 break-words rounded-sm text-brand-900 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600">
+            {!c.patientName ? <bdi dir="ltr">{c.caseNumber}</bdi>
+              : representative ? fillTemplate(work.patient.careFor, { name: `⁨${c.patientName}⁩` }) : <bdi>{c.patientName}</bdi>}
+          </h2>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[0.9375rem] leading-6">
+            {/* Without a name, the heading already is the case number. */}
+            {c.patientName && <><span className="sr-only">{t.header.caseNumber}: </span>
+            <bdi dir="ltr" className="font-semibold text-brand-700 tabular-nums">{c.caseNumber}</bdi></>}
+            {c.patientName && c.careCategory && <span aria-hidden className="text-ink-350">·</span>}
+            {c.careCategory && <span className="text-ink-600">{careAreaLabel(c.careCategory, work.careAreas)}</span>}
           </p>
-        )}
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-[0.95rem] font-bold text-brand-700" dir="ltr">{c.caseNumber}</span>
-          {c.careCategory && <><span aria-hidden className="text-ink-300">·</span><span className="text-[0.95rem] text-ink-700">{careAreaLabel(c.careCategory, work.careAreas)}</span></>}
         </div>
-        <dl className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-[0.9rem]">
-          <div className="flex items-baseline gap-1.5"><dt className="text-ink-500">{t.coordinator}</dt><dd className="font-semibold text-ink-900">{c.coordinatorName ?? t.notAssigned}</dd></div>
-          {c.doctorName && <div className="flex items-baseline gap-1.5"><dt className="text-ink-500">{t.consultant}</dt><dd className="font-semibold text-ink-900">{c.doctorName}</dd></div>}
-        </dl>
       </header>
 
       {view === "documents" && (
         <section aria-labelledby="documents-title" className="card mt-5 p-5 sm:p-6">
-          <h2 id="documents-title" className="text-[1.05rem] font-bold text-brand-900">{t.documentsTitle}</h2>
-          <p className="mt-1 text-[0.9rem] text-ink-600">{t.documentsHint}</p>
-          {documents.length === 0 ? <p className="mt-4 text-[0.95rem] text-ink-500">{t.noDocuments}</p>
+          <h2 id="documents-title" className="text-[1.0625rem] font-bold text-brand-900">{t.documents.title}</h2>
+          <p className="mt-1 text-[0.9375rem] text-ink-600">{t.documents.hint}</p>
+          {documents.length === 0 ? <p className="mt-4 text-[0.9375rem] text-ink-500">{t.documents.empty}</p>
             : <ul className="mt-4 divide-y divide-line">
                 {documents.map(doc => (
                   <li key={doc.documentId} className="flex items-center gap-3 py-3">
                     <FileText size={17} aria-hidden className="flex-none text-brand-600"/>
-                    <span className="min-w-0 flex-1 truncate font-semibold text-ink-800">{doc.fileName}</span>
-                    <span className="text-[0.8rem] text-ink-500">{new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(doc.createdAt))}</span>
+                    <span className="min-w-0 flex-1 truncate font-semibold text-ink-800" dir="auto">{doc.fileName}</span>
+                    <span className="text-[0.8125rem] text-ink-500">{date(doc.createdAt)}</span>
                   </li>
                 ))}
               </ul>}
@@ -101,89 +123,106 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
       {view === "messages" && <div className="mt-5">{messagesPanel}</div>}
 
       {view === "care" && (
-        <div className="mt-5 flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,8fr)_minmax(0,4fr)] lg:items-start lg:gap-x-6 lg:gap-y-5">
-          {/* CURRENT STEP — the strongest element on the page. */}
-          <section aria-labelledby="current-step-title" className="card border-brand-200 p-5 sm:p-6 lg:col-start-1 lg:row-start-1">
-            <p className="label-micro text-brand-700">{t.currentStep}</p>
-            <h2 id="current-step-title" className="mt-1.5 text-[1.35rem] font-bold leading-8 text-brand-900 sm:text-[1.5rem]">{step.title}</h2>
-            <p className="mt-2 max-w-2xl text-[0.98rem] leading-7 text-ink-700">{step.body}</p>
+        <div className="mt-5 flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,8fr)_minmax(0,4fr)] lg:items-start lg:gap-6">
+          {/* CURRENT STEP — the focal card: the file's petrol tab edge, one primary action or a clear "nothing needed". */}
+          <section aria-labelledby="current-step-title" className="card file-tab p-5 sm:p-7 lg:col-start-1 lg:row-start-1">
+            <p className="eyebrow">{t.step.eyebrow}</p>
+            <h2 id="current-step-title" className="statement mt-2.5 text-brand-900">{step.title}</h2>
+            <p className="mt-3 max-w-[65ch] text-ink-600" dir="auto">{body}</p>
 
             {code === "PROVIDE_INFORMATION" && patientAction && (c.coordinatorName || patientAction.dueAt) && (
-              <p className="mt-2 text-[0.88rem] text-ink-600">
-                {c.coordinatorName && <>{t.requestedBy} <bdi className="font-semibold text-ink-800">{c.coordinatorName}</bdi></>}
+              <p className="mt-2 text-[0.875rem] text-ink-600">
+                {c.coordinatorName && <>{t.step.requestedBy} <bdi className="font-semibold text-ink-800">{c.coordinatorName}</bdi></>}
                 {c.coordinatorName && patientAction.dueAt && " · "}
-                {patientAction.dueAt && <>{t.replyBy} {new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(patientAction.dueAt))}</>}
+                {patientAction.dueAt && <>{t.step.replyBy} {date(patientAction.dueAt)}</>}
               </p>
             )}
             {code === "PROVIDE_INFORMATION" && patientAction && patientAction.items.length > 0 && (
-              <ul className="mt-3 space-y-1.5" aria-label={t.requested}>
+              <ul className="mt-4 space-y-2" aria-label={t.step.requested}>
                 {patientAction.items.map(item => (
-                  <li key={item.id} className="flex items-center gap-2 text-[0.92rem] text-ink-800">
-                    <span aria-hidden className={`grid h-5 w-5 flex-none place-items-center rounded-full ${item.completed ? "bg-brand-600 text-white" : "border border-brand-300 bg-white"}`}>{item.completed && <Check size={12} strokeWidth={3}/>}</span>
-                    <span className={item.completed ? "text-ink-500 line-through" : ""}>{item.label}</span>
-                    {item.completed && <span className="sr-only">({t.provided})</span>}
+                  <li key={item.id} className="flex items-center gap-2.5 text-[0.9375rem] text-ink-800">
+                    <span aria-hidden className={`grid h-5 w-5 flex-none place-items-center rounded-full ${item.completed ? "bg-brand-600 text-white" : "border border-ink-350 bg-white"}`}>{item.completed && <Check size={12} strokeWidth={3}/>}</span>
+                    <span className={item.completed ? "text-ink-500 line-through" : ""} dir="auto">{item.label}</span>
+                    {item.completed && <span className="sr-only">({t.step.provided})</span>}
                   </li>
                 ))}
               </ul>
             )}
             {code === "COMPLETE_PROFILE" && actions.blockers.length > 0 && (
-              <ul className="mt-3 list-disc space-y-1 ps-5 text-[0.92rem] text-ink-800">
-                {actions.blockers.map(b => <li key={b.code}>{ar ? b.labelAr : b.labelEn}</li>)}
+              <ul className="mt-4 list-disc space-y-1 ps-5 text-[0.9375rem] text-ink-800">
+                {actions.blockers.map(b => <li key={b.code}>{locale === "ar" ? b.labelAr : b.labelEn}</li>)}
               </ul>
             )}
 
-            {/* Exactly one primary action, and only when the backend says the patient owes something. */}
-            {actions.currentAction.kind === "FOCUS" && code === "REVIEW_PROPOSAL" && (
-              <button type="button" className="btn-primary mt-5" onClick={onOpenProposal}>{t.reviewProposal}</button>
-            )}
-            {actions.currentAction.kind === "FOCUS" && code === "PROVIDE_INFORMATION" && (
-              <button type="button" className="btn-primary mt-5" onClick={() => onView("messages")}>{t.replyInMessages}</button>
-            )}
-            {code === "VERIFY_IDENTITY" && identityStep && <div className="mt-5">{identityStep}</div>}
+            {/* The money this step is about, inside the step: one place for the amount, on the facts panel. */}
+            {depositInStep && deposit && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 rounded-md bg-mist p-4 sm:p-5"/>}
 
-            {actions.currentAction.kind !== "FOCUS" && (
-              <p className="mt-4 flex items-center gap-2 text-[0.95rem] font-semibold text-brand-800" role="status">
-                <Check size={16} strokeWidth={3} aria-hidden className="flex-none"/>{t.noAction}
+            {/* Exactly one primary action, and only when the backend says the patient owes something. */}
+            {focus && code === "REVIEW_PROPOSAL" && (
+              <button type="button" className="btn-primary mt-6" onClick={onOpenProposal}>{t.step.reviewProposal}</button>
+            )}
+            {focus && code === "PROVIDE_INFORMATION" && (
+              <button type="button" className="btn-primary mt-6" onClick={() => onView("messages")}>{t.step.replyInMessages}</button>
+            )}
+            {code === "VERIFY_IDENTITY" && identityStep && <div className="mt-6">{identityStep}</div>}
+
+            {!focus && (
+              <p className="mt-5 flex items-center gap-2.5 text-[0.9375rem] font-semibold text-brand-800" role="status">
+                <span aria-hidden className="grid h-6 w-6 flex-none place-items-center rounded-full bg-brand-100 text-brand-700"><Check size={14} strokeWidth={3}/></span>
+                {t.step.noAction}
               </p>
             )}
             {step.next && (
-              <p className="mt-4 border-t border-line pt-3 text-[0.9rem] leading-6 text-ink-600">
-                <span className="font-bold text-ink-800">{t.next}:</span> {step.next}
-              </p>
+              <div className="mt-5 border-t border-line pt-4 text-[0.9375rem] leading-7">
+                <p className="font-semibold text-ink-800">{t.step.next}</p>
+                <p className="text-ink-600">{step.next}</p>
+              </div>
             )}
           </section>
 
-          {/* DEPOSIT — the one place the amount lives. Truthful to the offline model: arranged by our side. */}
-          {showDeposit && deposit && (
-            <section aria-labelledby="deposit-title" className="border-t border-line pt-4 lg:col-start-2 lg:row-start-1 lg:border-t-0 lg:pt-1">
-              <h2 id="deposit-title" className="label-micro text-ink-500">{t.deposit}</h2>
-              <p className="mt-1.5 text-[1.5rem] font-bold leading-8 text-brand-900 tabular-nums"><bdi dir="ltr">{deposit.totalDisplay != null ? money(deposit.totalDisplay, deposit.currency) : "—"}</bdi></p>
-              <p className="mt-1 flex items-center gap-1.5 text-[0.92rem] font-semibold text-ink-800">
-                {deposit.status === "PAID" && <Check size={15} strokeWidth={3} aria-hidden className="text-brand-700"/>}
-                {t.depositStatus[deposit.status] ?? deposit.status}
+          {/* COORDINATOR — the relationship that is the product: near the top, a person, one way to reach them. */}
+          <section aria-labelledby="coordinator-title" className="card p-5 sm:p-6 lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-start">
+            <h2 id="coordinator-title" className="eyebrow">{t.people.title}</h2>
+            <div className="mt-4 flex items-center gap-3.5">
+              <Monogram name={c.coordinatorName} lead/>
+              <div className="min-w-0">
+                <p className="break-words text-[1.0625rem] font-semibold leading-6 text-brand-900">{c.coordinatorName ? <bdi>{c.coordinatorName}</bdi> : t.people.notAssigned}</p>
+                <p className="text-[0.875rem] leading-6 text-ink-600">{c.coordinatorName ? t.people.coordinatorRole : t.people.pending}</p>
+              </div>
+            </div>
+            {canMessage && (
+              <button type="button" className="btn-secondary mt-5 w-full justify-center gap-2" onClick={() => onView("messages")}>
+                <MessageSquareText size={16} aria-hidden/>{t.people.message}{unreadMessages > 0 && <UnreadCount count={unreadMessages}/>}
+              </button>
+            )}
+            {c.coordinatorName && canMessage && (
+              <p className="mt-3 flex items-start gap-2 text-[0.8125rem] leading-5 text-ink-500">
+                <MessageCircle size={15} aria-hidden className="mt-0.5 flex-none"/>{t.people.whatsapp}
               </p>
-              {deposit.status === "PARTIALLY_PAID" && deposit.paidDisplay != null && (
-                <p className="mt-1 text-[0.85rem] text-ink-600">{t.received} <bdi dir="ltr">{money(deposit.paidDisplay, deposit.currency)}</bdi></p>
-              )}
-              <p className="mt-2 text-[0.85rem] leading-6 text-ink-600">{t.depositNote[deposit.status] ?? ""}</p>
-            </section>
-          )}
+            )}
+            {c.doctorName && (
+              <div className="mt-5 flex items-center gap-3.5 border-t border-line pt-4">
+                <Monogram name={c.doctorName}/>
+                <div className="min-w-0">
+                  <p className="text-[0.8125rem] leading-5 text-ink-500">{t.people.consultant}</p>
+                  <p className="break-words font-semibold leading-6 text-ink-800"><bdi>{c.doctorName}</bdi></p>
+                </div>
+              </div>
+            )}
+          </section>
 
-          {/* JOURNEY — orientation only; nothing here is a control. */}
-          <section aria-label={t.journey} className="border-t border-line pt-4 lg:col-start-1 lg:row-start-2">
-            <ol className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:gap-0">
-              {t.phases.map((label, index) => {
-                const done = index < phase, now = index === phase;
+          {/* JOURNEY — orientation only; nothing here is a control. The markers fill as the case moves. */}
+          <section aria-labelledby="journey-title" className="card care-journey p-5 sm:p-6 lg:col-start-1 lg:row-start-2">
+            <h2 id="journey-title" className="eyebrow">{t.journey.title}</h2>
+            <ol className="mt-5 grid md:grid-cols-7">
+              {t.journey.phases.map((label, index) => {
+                const state = index < phase ? "reached" : index === phase ? "current" : "upcoming";
                 return (
-                  <li key={label} className="flex items-start gap-2.5 sm:flex-1 sm:flex-col sm:items-center sm:gap-2 sm:text-center" aria-current={now ? "step" : undefined}>
-                    <span aria-hidden className="relative flex h-5 w-5 flex-none items-center justify-center sm:w-full">
-                      <span className="absolute inset-x-0 top-1/2 hidden h-px -translate-y-1/2 bg-line sm:block"/>
-                      <span className={`relative z-10 grid h-5 w-5 place-items-center rounded-full ${done ? "bg-brand-100 text-brand-700" : now ? "bg-brand-600 text-white" : "border border-line-strong bg-white"}`}>
-                        {done ? <Check size={11} strokeWidth={3}/> : now ? <span className="h-1.5 w-1.5 rounded-full bg-white"/> : null}
-                      </span>
-                    </span>
-                    <span className={`text-[0.8rem] leading-5 ${now ? "font-bold text-brand-900" : done ? "font-medium text-ink-600" : "font-medium text-ink-400"}`}>
-                      {label}{done && <span className="sr-only"> ({t.done})</span>}{now && <span className="sr-only"> ({t.current})</span>}
+                  <li key={label} className="journey-step" aria-current={state === "current" ? "step" : undefined}>
+                    {index < t.journey.phases.length - 1 && <span aria-hidden className="journey-link" data-reached={index < phase || undefined}/>}
+                    <span aria-hidden className="journey-marker relative z-10 flex-none" data-state={state}>{index + 1}</span>
+                    <span className={`text-[0.875rem] leading-5 ${state === "current" ? "font-semibold text-brand-900" : "text-ink-600"}`}>
+                      {label}{state === "reached" && <span className="sr-only"> ({t.journey.done})</span>}{state === "current" && <span className="sr-only"> ({t.journey.current})</span>}
                     </span>
                   </li>
                 );
@@ -191,169 +230,103 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
             </ol>
           </section>
 
-          {/* PROPOSAL — a summary and one action; the document itself opens on demand. */}
+          {/* ESTIMATE — the document's summary and, once settled, one way to open it. */}
           {showProposal && proposal && patientProposal && (
-            <section aria-labelledby="proposal-title" className="border-t border-line pt-4 lg:col-start-1 lg:row-start-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 id="proposal-title" className="label-micro text-ink-500">{t.documentType[proposal.documentType ?? ""] ?? t.proposal}</h2>
-                  {proposalTotal != null && <p className="mt-1.5 text-[1.5rem] font-bold leading-8 text-brand-900 tabular-nums"><bdi dir="ltr">{money(proposalTotal, proposal.currency)}</bdi></p>}
-                  <p className="mt-1 text-[0.92rem] font-semibold text-ink-800">{t.proposalStatus[patientProposal.state] ?? patientProposal.state}{proposal.versionNumber > 1 && <span className="font-normal text-ink-500"> · {t.updated}</span>}</p>
-                  {proposal.documentType === "PRELIMINARY_ESTIMATE" && <p className="mt-1 max-w-md text-[0.85rem] leading-6 text-ink-600">{t.estimateBasis}</p>}
-                </div>
-                {/* One control for one outcome: reviewing is already the current step's action, so only the settled document gets a link here. */}
-                {patientProposal.action === "VIEW_PROPOSAL" && (
-                  <button type="button" className="link-cta text-[0.92rem]" onClick={onOpenProposal}>{t.viewProposal} <span aria-hidden>{ar ? "←" : "→"}</span></button>
-                )}
+            <section aria-labelledby="proposal-title" className="card p-5 sm:p-6 lg:col-start-1 lg:row-start-3">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <h2 id="proposal-title" className="eyebrow">{(t.estimate.documentType as Record<string, string>)[proposal.documentType ?? ""] ?? t.estimate.proposal}</h2>
+                <StatusBadge tone={proposalTone(patientProposal.state)}>{(t.estimate.status as Record<string, string>)[patientProposal.state] ?? patientProposal.state}</StatusBadge>
               </div>
+              {proposalTotal != null && <p className="statement mt-3 text-brand-900 tabular-nums"><bdi dir="ltr">{formatMoney(proposalTotal, proposal.currency, locale)}</bdi></p>}
+              {proposal.versionNumber > 1 && <p className="mt-1 text-[0.875rem] text-ink-500">{t.estimate.updated}</p>}
+              {proposal.documentType === "PRELIMINARY_ESTIMATE" && <p className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-ink-600">{t.estimate.basis}</p>}
+              {showDeposit && !depositInStep && deposit && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 border-t border-line pt-4"/>}
+              {/* One control for one outcome: reviewing is already the current step's action, so only the settled document gets a link here. */}
+              {patientProposal.action === "VIEW_PROPOSAL" && (
+                <button type="button" className="link-cta mt-4 inline-flex min-h-11 items-center gap-1.5 text-[0.9375rem]" onClick={onOpenProposal}>
+                  {t.estimate.view}<ArrowRight size={16} aria-hidden className="rtl:-scale-x-100"/>
+                </button>
+              )}
             </section>
           )}
+          {showDeposit && !depositInStep && !showProposal && deposit && (
+            <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={2} className="card p-5 sm:p-6 lg:col-start-1 lg:row-start-3"/>
+          )}
 
-          {/* COORDINATOR — the human contact, compact, with the one supported communication action. */}
-          <section aria-labelledby="coordinator-title" className="border-t border-line pt-4 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:self-start">
-            <h2 id="coordinator-title" className="label-micro text-ink-500">{t.yourCoordinator}</h2>
-            <div className="mt-2 flex items-center gap-3">
-              <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand-100 text-brand-700"><UserRound size={20}/></span>
-              <div className="min-w-0">
-                <p className="truncate text-[1rem] font-bold text-brand-900">{c.coordinatorName ?? t.notAssigned}</p>
-                <p className="text-[0.85rem] leading-5 text-ink-600">{c.coordinatorName ? t.coordinatorHint : t.coordinatorPending}</p>
-              </div>
-            </div>
-            {canMessage && (
-              <button type="button" className="btn-secondary mt-4 w-full justify-center gap-2" onClick={() => onView("messages")}>
-                <MessageSquareText size={16} aria-hidden/>{t.message}{unreadMessages > 0 && <UnreadCount count={unreadMessages}/>}
-              </button>
-            )}
-          </section>
-
-          {otherCases.length > 0 && (
-            <section aria-labelledby="other-cases-title" className="lg:col-start-1 lg:row-start-4">
-              <h2 id="other-cases-title" className="text-[1.05rem] font-bold text-brand-900">{t.otherCases}</h2>
-              <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-white">
-                {otherCases.map(other => (
-                  <li key={other.id}>
-                    <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-3 text-start hover:bg-mist/70" onClick={() => onOpenCase(other.id)}>
-                      <span><span className="font-semibold text-brand-700" dir="ltr">{other.caseNumber}</span>{other.careCategory && <span className="text-ink-600"> · {careAreaLabel(other.careCategory, work.careAreas)}</span>}</span>
-                      <span className="text-[0.8rem] text-ink-500">{t.phases[phaseIndex(other.status)]}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
+          {!showSwitcher && newCaseHref && (
+            <p className="lg:col-start-1">
+              <a href={newCaseHref} className="link-cta inline-flex min-h-11 items-center gap-2 text-[0.9375rem]"><Plus size={16} aria-hidden/>{t.cases.sendNew}</a>
+            </p>
           )}
         </div>
       )}
-
-      {timeline.length === 0 && null}
     </div>
   );
 }
 
-// ---------- copy ----------
-
-function copy(ar: boolean) {
-  return ar ? {
-    navLabel: "رعايتي", nav: { care: "رعايتي", documents: "المستندات", messages: "الرسائل" },
-    coordinator: "المنسق", consultant: "الاستشاري", notAssigned: "لم يُسند بعد",
-    currentStep: "الخطوة الحالية", next: "الخطوة التالية", noAction: "لا يلزم منك أي إجراء الآن.",
-    reviewProposal: "مراجعة العرض", replyInMessages: "الرد في الرسائل", requested: "المطلوب منك", provided: "تم تقديمه",
-    deposit: "وديعة التنسيق", received: "المستلم", requestedBy: "طلبه منسقك", replyBy: "يُرجى الرد قبل",
-    depositStatus: { REQUESTED: "قيد الترتيب", PARTIALLY_PAID: "استُلم جزئيًا", PAID: "تم استلام الوديعة", WAIVED: "معفاة", REFUNDED: "مستردة", CANCELLED: "ملغاة" } as Record<string, string>,
-    depositNote: { REQUESTED: "سيرسل لك منسقك تعليمات الدفع.", PARTIALLY_PAID: "سيؤكد منسقك المبلغ المتبقي.", PAID: "شكرًا لك — تُحتسب من رصيدك النهائي.", WAIVED: "لا يلزم دفع وديعة لهذه الحالة.", REFUNDED: "أُعيدت الوديعة إليك." } as Record<string, string>,
-    journey: "مسار رعايتك", done: "مكتمل", current: "الحالية",
-    phases: ["استلمنا حالتك", "مراجعة المنسق", "مراجعة الاستشاري", "عرضك", "وديعة التنسيق", "العلاج", "المتابعة"],
-    proposal: "عرضك", updated: "نسخة محدّثة", viewProposal: "عرض العرض",
-    documentType: { PRELIMINARY_ESTIMATE: "تقدير مبدئي للرعاية", FINAL_TREATMENT_QUOTE: "خطة العلاج والعرض النهائي" } as Record<string, string>,
-    estimateBasis: "هذا تقدير مبدئي غير ملزم، وليس سعرًا نهائيًا ولا ضمانًا للسعر. قد تتغيّر خطة علاجك ويرتفع سعرها أو ينخفض بعد أن يفحصك طبيبك المعالج حضوريًا.",
-    proposalStatus: { READY: "جاهز للمراجعة", ACCEPTED: "تم الإقرار به", DECLINED: "مرفوض", EXPIRED: "منتهي الصلاحية" } as Record<string, string>,
-    yourCoordinator: "منسقك", coordinatorHint: "جهة تواصلك طوال رحلة رعايتك.", coordinatorPending: "سيُعرّفك منسقك بنفسه قريبًا.", message: "مراسلة",
-    documentsTitle: "المستندات التي شاركتها", documentsHint: "المستندات المرفقة بهذه الحالة. لإضافة مستند، استخدم الرابط الآمن الذي يرسله لك منسقك.", noDocuments: "لم تشارك أي مستندات بعد.",
-    otherCases: "حالاتك الأخرى",
-  } : {
-    navLabel: "My Care", nav: { care: "My Care", documents: "Documents", messages: "Messages" },
-    coordinator: "Coordinator", consultant: "Consultant", notAssigned: "Not assigned yet",
-    currentStep: "Current step", next: "Next", noAction: "No action is required from you right now.",
-    reviewProposal: "Review proposal", replyInMessages: "Reply in Messages", requested: "What we need from you", provided: "provided",
-    deposit: "Coordination deposit", received: "Received", requestedBy: "Requested by your coordinator", replyBy: "Please reply by",
-    depositStatus: { REQUESTED: "Arranging", PARTIALLY_PAID: "Partly received", PAID: "Deposit received", WAIVED: "Waived", REFUNDED: "Refunded", CANCELLED: "Cancelled" } as Record<string, string>,
-    depositNote: { REQUESTED: "Your coordinator will send you the payment instructions.", PARTIALLY_PAID: "Your coordinator will confirm the remaining amount.", PAID: "Thank you — it will be deducted from the price in your final treatment plan and quote.", WAIVED: "No deposit is needed for your case.", REFUNDED: "The deposit has been returned to you." } as Record<string, string>,
-    journey: "Your care journey", done: "done", current: "current",
-    phases: ["Case received", "Coordinator review", "Consultant review", "Your proposal", "Coordination deposit", "Treatment", "Follow-up"],
-    proposal: "Your proposal", updated: "Updated version", viewProposal: "View proposal",
-    documentType: { PRELIMINARY_ESTIMATE: "Preliminary care estimate", FINAL_TREATMENT_QUOTE: "Final treatment plan and quote" } as Record<string, string>,
-    estimateBasis: "This is a preliminary, non-binding estimate, not a final price or a price guarantee. Your treatment and its price may increase or decrease after your treating doctor examines you in person.",
-    proposalStatus: { READY: "Ready to review", ACCEPTED: "Acknowledged", DECLINED: "Declined", EXPIRED: "Expired" } as Record<string, string>,
-    yourCoordinator: "Your coordinator", coordinatorHint: "Your point of contact throughout your care journey.", coordinatorPending: "Your coordinator will introduce themselves shortly.", message: "Message",
-    documentsTitle: "Documents you shared", documentsHint: "The documents attached to this case. To add one, use the secure link your coordinator sends you.", noDocuments: "You have not shared any documents yet.",
-    otherCases: "Your other cases",
-  };
+/** The deposit as authoritative money in a truthful, offline state: amount, status in words, and what happens next. */
+function DepositFacts({ deposit, locale, copy, level, className }: { deposit: DepositSummaryData; locale: Locale; copy: LocalizedWorkCopy["myCare"]["deposit"]; level: 2 | 3; className: string }) {
+  const Heading = level === 2 ? "h2" : "h3";
+  const status = copy.status as Record<string, string>, note = copy.note as Record<string, string>;
+  return (
+    <section aria-labelledby="deposit-title" className={className}>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <Heading id="deposit-title" className={level === 2 ? "eyebrow" : "label-micro text-ink-500"}>{copy.title}</Heading>
+        <StatusBadge tone={depositTone(deposit.status)}>{status[deposit.status] ?? deposit.status}</StatusBadge>
+      </div>
+      <p className="statement mt-2 text-brand-900 tabular-nums"><bdi dir="ltr">{deposit.totalDisplay != null ? formatMoney(deposit.totalDisplay, deposit.currency, locale) : "—"}</bdi></p>
+      {deposit.status === "PARTIALLY_PAID" && deposit.paidDisplay != null && (
+        <p className="mt-1 text-[0.875rem] text-ink-600">{copy.received} <bdi dir="ltr" className="tabular-nums">{formatMoney(deposit.paidDisplay, deposit.currency, locale)}</bdi></p>
+      )}
+      {note[deposit.status] && <p className="mt-1.5 text-[0.875rem] leading-6 text-ink-600">{note[deposit.status]}</p>}
+    </section>
+  );
 }
 
 /**
- * The current step in the patient's words, keyed by the backend's action code. Copy only — which code
- * applies is never decided here.
+ * A person's initials on a circle: the coordinator's filled in Deep Petrol (the lead), anyone else's outlined. Titles
+ * ("Dr", "د.") and the Arabic article are skipped so the initials are the name's own.
  */
-function stepCopy(code: string, ar: boolean, ctx: { patientAction?: PatientAction | null; proposalState: string | null; status: string }) {
-  const pick = (en: [string, string, string?], arr: [string, string, string?]) => { const [title, body, next] = ar ? arr : en; return { title, body, next }; };
-  switch (code) {
-    case "PROVIDE_INFORMATION": return {
-      title: ar ? "نحتاج منك معلومة" : "We need something from you",
-      body: ctx.patientAction?.message?.trim() || (ar ? "طلب منسقك معلومة أو مستندًا لمتابعة حالتك." : "Your coordinator has asked for information or a document so your case can continue."),
-      next: ar ? "أرسل ردك هنا، أو استخدم الرابط الآمن الذي وصلك لرفع المستندات. بعدها يراجعه منسقك ويكمل." : "Reply here, or use the secure link we sent you to upload documents. Your coordinator then reviews it and continues.",
-    };
-    case "REVIEW_PROPOSAL": return pick(
-      ["Your proposal is ready to review", "Your treatment plan and its estimated cost are ready. Take the time you need — nothing happens until you decide.", "If you accept, we start arranging your care."],
-      ["عرضك جاهز للمراجعة", "خطة علاجك وتكلفتها التقديرية جاهزة. خذ وقتك — لن يحدث شيء قبل أن تقرر.", "إذا وافقت، نبدأ ترتيب رعايتك."]);
-    case "COMPLETE_PROFILE": return pick(
-      ["A few details are still needed", "Before we can arrange your care, the steps below need to be completed. Use the secure link we sent you, or message your coordinator.", "Once they are done, your coordinator continues."],
-      ["ما زالت بعض البيانات مطلوبة", "قبل أن نرتب رعايتك، يلزم إكمال الخطوات أدناه. استخدم الرابط الآمن الذي أرسلناه لك، أو راسل منسقك.", "فور اكتمالها، يتابع منسقك."]);
-    case "VERIFY_IDENTITY": return pick(
-      ["Identity verification", "Because travel support is part of your care, we need to verify your identity before arrangements are confirmed. Only the minimum is stored, encrypted.", "Our team reviews it and your coordinator continues."],
-      ["التحقق من الهوية", "لأن دعم السفر جزء من رعايتك، نحتاج إلى التحقق من هويتك قبل تأكيد الترتيبات. نُخزّن الحد الأدنى فقط ومشفّرًا.", "يراجعه فريقنا ويتابع منسقك."]);
-    case "WAIT_COORDINATOR_REVIEW": return ctx.status === "RECEIVED" ? pick(
-      ["We have your case", "Your case has been received and is waiting for a coordinator to look at it.", "A coordinator will check what you sent and tell you if anything is missing."],
-      ["استلمنا حالتك", "تم استلام حالتك وهي بانتظار مراجعة أحد المنسقين.", "سيتحقق المنسق مما أرسلته ويخبرك إن كان ينقص شيء."]) : pick(
-      ["Your coordinator is reviewing your case", "Your coordinator is going through what you sent and preparing it for a Consultant.", "Your case will be sent to a Consultant in the right specialty."],
-      ["منسقك يراجع حالتك", "يطّلع منسقك على ما أرسلته ويجهّزه لعرضه على استشاري.", "ستُرسل حالتك إلى استشاري في التخصص المناسب."]);
-    case "WAIT_CONSULTANT_REVIEW": return pick(
-      ["A Consultant is reviewing your case", "A Consultant is going through your reports and history now.", "You will receive a recommendation and an initial cost estimate."],
-      ["استشاري يراجع حالتك", "يطّلع الاستشاري الآن على تقاريرك وتاريخك الطبي.", "ستصلك التوصية مع تقدير أولي للتكلفة."]);
-    case "WAIT_PROPOSAL": return ctx.proposalState === "REVISION_REQUESTED" ? pick(
-      ["We are preparing a revised proposal", "Your coordinator is updating the proposal with the changes you asked for.", "You will receive a new secure link to review it."],
-      ["نجهّز عرضًا معدّلًا", "يحدّث منسقك العرض بالتعديلات التي طلبتها.", "ستصلك رابط آمن جديد لمراجعته."]) : ctx.proposalState === "EXPIRED" ? pick(
-      ["We are preparing an updated proposal", "Your previous estimate expired. Your coordinator is preparing an updated one.", "You will receive a new secure link to review it."],
-      ["نجهّز عرضًا محدّثًا", "انتهت صلاحية تقديرك السابق، ويجهّز منسقك عرضًا محدّثًا.", "ستصلك رابط آمن جديد لمراجعته."]) : pick(
-      ["We are preparing your proposal", "Your coordinator is putting together the treatment plan and its estimated cost.", "You will receive the proposal to review in your own time."],
-      ["نجهّز عرضك", "يجمع منسقك خطة العلاج وتكلفتها التقديرية.", "ستصلك خطة العلاج لتراجعها في وقتك."]);
-    case "WAIT_DEPOSIT_ARRANGEMENT": return pick(
-      ["Deposit arrangements", "You acknowledged your preliminary estimate. We are arranging the coordination deposit details and will send you the payment instructions.", "Once the deposit is received, your coordinator starts arranging your treatment."],
-      ["ترتيبات الوديعة", "تم الإقرار بتقديرك المبدئي. نرتّب تفاصيل وديعة التنسيق وسنرسل لك تعليمات الدفع.", "بعد تأكيد الوديعة، يبدأ منسقك ترتيب علاجك."]);
-    case "WAIT_COORDINATION": return pick(
-      ["We are arranging your treatment", "Your coordinator is organising your appointments and, where agreed, the practical side of your trip.", "You will receive your dates and arrival details."],
-      ["نرتّب علاجك", "ينظّم منسقك مواعيدك، وحيثما اتُّفق، الجوانب العملية لرحلتك.", "ستصلك المواعيد وتفاصيل الوصول."]);
-    case "WAIT_TREATMENT": return pick(
-      ["Your arrival is confirmed", "Everything is set for your arrival.", "Your treatment begins as planned."],
-      ["تم تأكيد وصولك", "كل شيء جاهز لوصولك.", "يبدأ علاجك حسب الخطة."]);
-    case "IN_TREATMENT": return pick(
-      ["Your treatment is under way", "Your care team is with you throughout your treatment.", "After discharge we stay in contact for follow-up."],
-      ["علاجك جارٍ", "فريق الرعاية معك طوال فترة العلاج.", "بعد الخروج نبقى على تواصل للمتابعة."]);
-    case "FOLLOW_UP": return pick(
-      ["You are in follow-up", "Your treatment is complete and we stay in contact while you recover."],
-      ["أنت في مرحلة المتابعة", "اكتمل علاجك ونبقى على تواصل معك أثناء تعافيك."]);
-    default: {
-      if (ctx.status === "DECLINED") return pick(["You declined the proposal", "Your case is closed for now. Your coordinator remains available if anything changes."], ["لم توافق على العرض", "حالتك مغلقة حاليًا. يبقى منسقك متاحًا إن تغيّر شيء."]);
-      if (ctx.status === "CLINICALLY_NOT_SUITABLE") return pick(["This case is not clinically suitable for treatment with us", "The Consultant reviewed your case and advised against treatment here. Your coordinator can explain what this means."], ["هذه الحالة غير مناسبة سريريًا للعلاج لدينا", "راجع الاستشاري حالتك ولم ينصح بالعلاج لدينا. يمكن لمنسقك أن يشرح لك ما يعنيه ذلك."]);
-      if (ctx.status === "CLOSED" || ctx.status === "CANCELLED") return pick(["This case is closed", "If you would like to look at your options again, contact your coordinator."], ["هذه الحالة مغلقة", "إذا رغبت في مراجعة خياراتك مجددًا، تواصل مع منسقك."]);
-      return pick(["You're all set for now", "Our team is handling the next step and will keep you updated."], ["كل شيء على ما يرام الآن", "فريقنا يتولى الخطوة التالية وسيوافيك بالمستجدات."]);
-    }
-  }
+function Monogram({ name, lead = false }: { name?: string | null; lead?: boolean }) {
+  const letters = name ? initials(name) : "";
+  const look = lead ? "h-12 w-12 bg-brand-700 text-white" : "h-10 w-10 border border-brand-300 bg-white text-brand-700";
+  return (
+    <span aria-hidden className={`grid flex-none place-items-center rounded-full text-[0.9375rem] font-semibold tracking-normal ${look}`}>
+      {letters || <UserRound size={lead ? 20 : 18}/>}
+    </span>
+  );
 }
 
-/** Patient-facing phases; internal statuses are mapped into them and never shown. */
-const PHASES = [
-  ["DRAFT", "RECEIVED"], ["INTAKE_REVIEW", "INFORMATION_REQUIRED", "READY_FOR_CONSULTANT"],
-  ["CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW", "CLINICAL_RECOMMENDATION_READY", "CLINICALLY_NOT_SUITABLE"],
-  ["PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL", "REVISION_REQUESTED", "PATIENT_DECISION", "DECLINED", "EXPIRED"],
-  ["ACCEPTED"], ["TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS"], ["DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED"],
-];
-export function phaseIndex(status: string) { const found = PHASES.findIndex(group => group.includes(status)); return found < 0 ? 0 : found; }
+const TITLES = /^(dr\.?|prof\.?|mr\.?|mrs\.?|ms\.?|د\.?|أ\.د\.?|الدكتور|الدكتورة|الأستاذ|الأستاذة)$/i;
+function initials(name: string) {
+  const words = name.trim().split(/\s+/).filter(word => word && !TITLES.test(word));
+  // Two Arabic letters side by side join into what reads as a word, so an Arabic name shows its first letter only.
+  const arabic = /\p{Script=Arabic}/u.test(words[0] ?? "");
+  const picked = words.length > 1 && !arabic ? [words[0], words[words.length - 1]] : words.slice(0, 1);
+  return picked.map(word => Array.from(word.length > 3 && word.startsWith("ال") ? word.slice(2) : word)[0] ?? "").join("").toLocaleUpperCase();
+}
+
+function proposalTone(state: string): StatusTone {
+  return state === "ACCEPTED" ? "success" : state === "DECLINED" ? "danger" : state === "EXPIRED" ? "warning" : "info";
+}
+function depositTone(status: string): StatusTone {
+  return status === "PAID" || status === "WAIVED" ? "success" : status === "REFUNDED" || status === "CANCELLED" ? "neutral" : "info";
+}
+
+/**
+ * The current step in the patient's words, keyed by the backend's action code (and, where one code reads two ways, the
+ * stage or proposal state the backend also sent). Copy only — which code applies is never decided here.
+ */
+function stepText(code: string, steps: LocalizedWorkCopy["myCare"]["steps"], ctx: { proposalState: string | null; status: string }): StepText {
+  const s = steps as Record<string, StepText>;
+  switch (code) {
+    case "WAIT_COORDINATOR_REVIEW": return ctx.status === "RECEIVED" ? s.WAIT_CASE_RECEIVED : s.WAIT_COORDINATOR_REVIEW;
+    case "WAIT_PROPOSAL": return ctx.proposalState === "REVISION_REQUESTED" ? s.WAIT_PROPOSAL_REVISION : ctx.proposalState === "EXPIRED" ? s.WAIT_PROPOSAL_EXPIRED : s.WAIT_PROPOSAL;
+    case "PROVIDE_INFORMATION": case "REVIEW_PROPOSAL": case "COMPLETE_PROFILE": case "VERIFY_IDENTITY": case "WAIT_CONSULTANT_REVIEW":
+    case "WAIT_DEPOSIT_ARRANGEMENT": case "WAIT_COORDINATION": case "WAIT_TREATMENT": case "IN_TREATMENT": case "FOLLOW_UP": return s[code];
+    default:
+      if (ctx.status === "DECLINED" || ctx.status === "CLINICALLY_NOT_SUITABLE") return s[ctx.status];
+      if (ctx.status === "CLOSED" || ctx.status === "CANCELLED") return s.CLOSED;
+      return s.NONE;
+  }
+}

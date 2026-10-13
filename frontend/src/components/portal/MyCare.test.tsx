@@ -14,7 +14,6 @@ const base = {
   id: "c1", caseNumber: "RS-2026-000081", status: "ACCEPTED", careCategory: "cardiology", coordinatorName: "Sara Ahmed",
   doctorName: "Dr Ahmed Alashry", waitingOn: "STAFF", updatedAt: "2026-09-12T09:00:00Z",
 };
-const timeline = [{ status: "RECEIVED", occurredAt: "2026-09-08T09:00:00Z" }, { status: "ACCEPTED", occurredAt: "2026-09-12T09:00:00Z" }];
 const wait = (code: string, waitingOn = "STAFF"): CaseActions => ({ journeyStage: base.status, waitingOn, blockers: [], currentAction: { code, kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] });
 const focus = (code: string, extra: Partial<CaseActions["currentAction"]> = {}): CaseActions => ({ journeyStage: base.status, waitingOn: "PATIENT", blockers: [], currentAction: { code, kind: "FOCUS", ...extra }, availableActions: ["MESSAGE_COORDINATOR"] });
 const proposal = { versionNumber: 1, status: "ACCEPTED", currency: "USD", items: [{ quantity: 1, unitPrice: 4850, optional: false }] };
@@ -23,7 +22,7 @@ const accepted = { state: "ACCEPTED", action: "VIEW_PROPOSAL" as const, versionI
 function renderCare(overrides: Partial<Parameters<typeof MyCare>[0]> = {}) {
   const onView = vi.fn(), onOpenProposal = vi.fn(), onOpenCase = vi.fn();
   renderWithWork(<MyCare locale="en" caseSummary={base} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
-                 deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} timeline={timeline} otherCases={[]}
+                 deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} cases={[base]}
                  view="care" onView={onView} onOpenCase={onOpenCase} onOpenProposal={onOpenProposal} messagesPanel={<p>messages panel</p>} {...overrides}/>);
   return { onView, onOpenProposal, onOpenCase };
 }
@@ -32,9 +31,12 @@ describe("MyCare", () => {
   afterEach(cleanup);
 
   it("names its sections as headings and says unread messages in words", () => {
-    renderCare({ unreadMessages: 2, otherCases: [{ ...base, id: "c2", caseNumber: "RS-2026-000082" }] });
-    for (const name of ["Coordination deposit", "Your proposal", "Your coordinator", "Your other cases"])
+    renderCare({ unreadMessages: 2, cases: [base, { ...base, id: "c2", caseNumber: "RS-2026-000082" }] });
+    for (const name of ["Your cases", "Your proposal", "Your coordinator", "Your care journey"])
       expect(screen.getByRole("heading", { level: 2, name })).toBeTruthy();
+    // The deposit is part of the current step (a sub-heading inside it), not a second section saying the same thing.
+    const step = screen.getByRole("region", { name: "Deposit arrangements" });
+    expect(within(step).getByRole("heading", { level: 3, name: "Coordination deposit" })).toBeTruthy();
     // "Message (2 unread messages)", not "Message2".
     expect(screen.getByRole("button", { name: "Message (2 unread messages)" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Messages (2 unread messages)" })).toBeTruthy();
@@ -42,7 +44,7 @@ describe("MyCare", () => {
 
   it("isolates the figure, not the line, in Arabic, and labels care areas from the shared list", () => {
     renderWithWork(<MyCare locale="ar" caseSummary={{ ...base, careCategory: "general-surgery" }} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
-                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} timeline={timeline} otherCases={[]}
+                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} cases={[base]}
                    view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={vi.fn()} messagesPanel={null}/>, "ar");
     const deposit = screen.getByRole("region", { name: "وديعة التنسيق" });
     const figure = within(deposit).getByText(/500/);
@@ -55,7 +57,7 @@ describe("MyCare", () => {
     renderCare({ caseSummary: { ...base, patientName: "Maya Example" } });
     expect(document.getElementById("case-heading")?.textContent).toContain("Maya Example");
     cleanup();
-    renderCare({ caseSummary: { ...base, patientName: "Maya Example" }, representative: true });
+    renderCare({ caseSummary: { ...base, patientName: "Maya Example" }, actions: { ...wait("WAIT_DEPOSIT_ARRANGEMENT"), viewer: "REPRESENTATIVE" } });
     expect(document.getElementById("case-heading")?.textContent).toMatch(/Care for .*Maya Example/);
   });
 
@@ -174,8 +176,10 @@ describe("MyCare", () => {
 
   it("puts the current step before everything else on the page, and the journey is orientation only", () => {
     renderCare();
+    // The case's own heading names whose file this is; the current step is the first section after it.
     const headings = screen.getAllByRole("heading").map(h => h.textContent);
-    expect(headings[0]).toBe("Deposit arrangements");
+    expect(headings[0]).toBe("RS-2026-000081");
+    expect(headings[1]).toBe("Deposit arrangements");
     const journey = screen.getByRole("list");
     expect(within(journey).queryByRole("button")).toBeNull();
     const steps = within(journey).getAllByRole("listitem").map(li => li.getAttribute("aria-current"));
@@ -197,21 +201,70 @@ describe("MyCare", () => {
   it("reads right-to-left with Arabic copy for the same state", () => {
     const onOpenProposal = vi.fn();
     renderWithWork(<MyCare locale="ar" caseSummary={base} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
-                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} timeline={timeline} otherCases={[]}
-                   view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={onOpenProposal} messagesPanel={null}/>);
+                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} cases={[base]}
+                   view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={onOpenProposal} messagesPanel={null}/>, "ar");
     expect(screen.getByRole("heading", { name: "ترتيبات الوديعة" })).toBeTruthy();
     expect(screen.getByText("لا يلزم منك أي إجراء الآن.")).toBeTruthy();
     expect(screen.getByText("قيد الترتيب")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /عرض العرض/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /الاطلاع على العرض/ })).toHaveLength(1);
     expect(screen.getByRole("button", { name: /مراسلة/ })).toBeTruthy();
   });
 
-  it("lists other cases compactly, only when there are any", () => {
-    const { onOpenCase } = renderCare({ otherCases: [{ ...base, id: "c2", caseNumber: "RS-2026-000090", status: "CLOSED" }] });
-    fireEvent.click(screen.getByRole("button", { name: /RS-2026-000090/ }));
+  it("a closed case shows no step of its journey as reached or current", () => {
+    renderCare({ caseSummary: { ...base, status: "CLOSED" }, actions: wait("NONE"), deposit: null, patientProposal: null, proposal: null });
+    const journey = screen.getByRole("region", { name: "Your care journey" });
+    expect(within(journey).getAllByRole("listitem").map(li => li.getAttribute("aria-current"))).toEqual([null, null, null, null, null, null, null]);
+    expect(within(journey).queryByText(/(done)/)).toBeNull();
+  });
+
+  it("shows the case switcher only from two cases, marks the open one and switches in place", () => {
+    const { onOpenCase } = renderCare({ cases: [base, { ...base, id: "c2", caseNumber: "RS-2026-000090", careCategory: "orthopedics", status: "INTAKE_REVIEW", waitingOn: "PATIENT" }] });
+    const switcher = screen.getByRole("region", { name: "Your cases" });
+    const current = within(switcher).getByRole("link", { name: /RS-2026-000081/ });
+    expect(current.getAttribute("aria-current")).toBe("page");
+    const other = within(switcher).getByRole("link", { name: /RS-2026-000090/ });
+    expect(other.textContent).toContain("Orthopedics");
+    expect(other.textContent).toContain("Coordinator review");
+    // Waiting on the patient, from the backend's waitingOn — said in words on that case's card only.
+    expect(within(other).getByText("Needs you")).toBeTruthy();
+    expect(within(current).queryByText("Needs you")).toBeNull();
+    fireEvent.click(other);
     expect(onOpenCase).toHaveBeenCalledWith("c2");
+    fireEvent.click(current);
+    expect(onOpenCase).toHaveBeenCalledTimes(1); // the open case does not reload itself
     cleanup();
     renderCare();
-    expect(screen.queryByText(/Your other cases/)).toBeNull();
+    expect(screen.queryByRole("region", { name: "Your cases" })).toBeNull();
+  });
+
+  it("groups cases by whose care they are, from the backend's relation, and folds past cases away", () => {
+    renderCare({ cases: [{ ...base, viewer: "SELF", patientName: "Maya Example" },
+      { ...base, id: "c2", caseNumber: "RS-2026-000090", viewer: "REPRESENTATIVE", patientName: "Omar Example" },
+      { ...base, id: "c3", caseNumber: "RS-2026-000070", viewer: "SELF", patientName: "Maya Example", status: "CLOSED" }], newCaseHref: "/en/send-my-case" });
+    const switcher = screen.getByRole("region", { name: "Your cases" });
+    expect(within(switcher).getByRole("heading", { level: 3, name: "Your care" })).toBeTruthy();
+    expect(within(switcher).getByRole("heading", { level: 3, name: /Care for ⁨?Omar Example/ })).toBeTruthy();
+    const past = switcher.querySelector("details");
+    expect(past?.open).toBe(false);
+    expect(past?.textContent).toContain("RS-2026-000070");
+    expect(past?.textContent).toContain("Closed");
+    // A new case is the account holder's own; one entry, in their own group.
+    expect(within(switcher).getAllByRole("link", { name: "Send a new case" })).toHaveLength(1);
+  });
+
+  it("with one case, a quiet way to send a new one closes the page — only when it is the account's to send", () => {
+    renderCare({ newCaseHref: "/en/send-my-case" });
+    expect(screen.getByRole("link", { name: "Send a new case" }).getAttribute("href")).toBe("/en/send-my-case");
+    cleanup();
+    renderCare();
+    expect(screen.queryByRole("link", { name: "Send a new case" })).toBeNull();
+  });
+
+  it("puts the coordinator first among people: initials on the lead monogram, the Consultant second", () => {
+    renderCare({ caseSummary: { ...base, doctorName: "Dr Ahmed Alashry" } });
+    const coordinator = screen.getByRole("region", { name: "Your coordinator" });
+    expect(coordinator.textContent).toContain("SA");
+    expect(coordinator.textContent).toContain("Your Consultant");
+    expect(coordinator.textContent).toContain("AA"); // the title is skipped
   });
 });

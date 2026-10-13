@@ -87,7 +87,7 @@ for (const locale of ["en", "ar"] as const) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await setupPatient(page, "proposal-recorded");
     await page.goto(`/${locale}/portal`);
-    await page.getByRole("button", { name: locale === "ar" ? /عرض العرض/ : /View proposal/ }).first().click();
+    await page.getByRole("button", { name: locale === "ar" ? /الاطلاع على العرض/ : /View proposal/ }).first().click();
     await expect(page.getByRole("dialog")).toContainText(locale === "ar" ? "سُجّل هذا القرار بواسطة" : "Recorded by");
     await expect(page.getByRole("dialog")).toContainText(locale === "ar" ? "مكالمة واتساب" : "WhatsApp call with you");
     await page.screenshot({ path: shots(`my-care-recorded-${locale}-1440`), fullPage: true });

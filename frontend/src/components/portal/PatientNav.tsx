@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import type { Locale } from "@/lib/i18n";
 import type { CareView } from "@/components/portal/MyCare";
+import { useWorkCopy } from "@/components/portal/portal-copy";
 import { UnreadCount } from "@/components/portal/portal-ui";
 
 /**
@@ -12,20 +12,19 @@ import { UnreadCount } from "@/components/portal/portal-ui";
  * menu on wider screens. Nothing else is offered until the product genuinely needs it; My Care itself
  * repeats the three as a tab bar on small screens.
  */
-export function PatientNav({ locale, view, unread, onView }: { locale: Locale; view: CareView; unread: number; onView: (view: CareView) => void }) {
-  const ar = locale === "ar";
+export function PatientNav({ view, unread, onView }: { view: CareView; unread: number; onView: (view: CareView) => void }) {
+  const t = useWorkCopy().myCare.nav;
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   // The header slot exists only in the browser; binding it once after mount is the same pattern PortalAccount uses.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setSlot(document.getElementById("portal-nav-slot")); }, []);
-  const items: { id: CareView; label: string }[] = [
-    { id: "care", label: ar ? "رعايتي" : "My Care" }, { id: "documents", label: ar ? "المستندات" : "Documents" }, { id: "messages", label: ar ? "الرسائل" : "Messages" },
-  ];
+  const items = (["care", "documents", "messages"] as const).map(id => ({ id, label: t[id] }));
+  // The header's pill track: resting pills in Body Ink; the current one rises to a white pill with a hairline ring.
   const nav = (
-    <nav aria-label={ar ? "رعايتي" : "My Care"} className="hidden items-center gap-1 md:flex">
+    <nav aria-label={t.label} className="hidden items-center gap-1 rounded-lg bg-mist p-1 md:flex">
       {items.map(item => (
         <button key={item.id} type="button" aria-current={view === item.id ? "page" : undefined}
-                className={`rounded-lg px-3 py-2 text-[0.9rem] font-semibold transition ${view === item.id ? "bg-brand-50 text-brand-800" : "text-ink-600 hover:bg-mist hover:text-brand-800"}`}
+                className={`min-h-11 rounded-md px-3.5 py-2 text-[0.9375rem] font-medium transition ${view === item.id ? "bg-white text-brand-900 ring-1 ring-ink-350" : "text-ink-600 hover:text-brand-800"}`}
                 onClick={() => onView(item.id)}>
           {item.label}
           {item.id === "messages" && unread > 0 && <UnreadCount count={unread}/>}

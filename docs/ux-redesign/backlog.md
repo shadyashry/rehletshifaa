@@ -356,6 +356,28 @@ The four skills reviewed the Batch 3 diff (Impeccable detector: 0 findings). No 
 | Sev | Item | Source | Files | Command |
 |---|---|---|---|---|
 
+## My Care + multiple cases — deferred review findings (`/redesign-area`, 2026-10-13)
+
+Plan: `plans/patient-my-care.md`. Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max checklist) plus
+the Impeccable detector (0 findings). Both HIGHs (focus ring clipped in the phone case row; Arabic deposit-paid note not
+matching the English payment wording) and the cheap MEDIUM/LOWs were fixed in the same pass. Open:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| MEDIUM | Represented people are grouped by patient name (the patient case list carries no person id): two relatives with the same name would share a group. Add a stable per-person key to the patient case list if it matters. | React review, web guidelines | `CaseSwitcher.tsx` `byPerson`; backend `JourneyCaseQueryService.patientCases` | backend + /impeccable harden |
+| MEDIUM | Case switches (and view changes) use `history.replaceState`, so Back leaves My Care instead of returning to the previous case. Push on switcher opens and reopen from `popstate`. | web guidelines | `Portal.tsx` `openCase` / popstate handler | /impeccable harden |
+| MEDIUM | My Care / Documents / Messages are buttons, not links: no new-tab or copyable link although the view is in the URL (`?view=`). | web guidelines | `PatientNav.tsx`, `MyCare.tsx` phone tab bar | /impeccable harden |
+| LOW | Switcher card href is `?case=…` only; a modified-click new tab drops `role`/`view`. | React review | `CaseSwitcher.tsx` | /impeccable polish |
+| LOW | No pending cue on the pressed case card while the next case loads (the page-level "Loading" status shows). | React review | `CaseSwitcher.tsx` | /impeccable polish |
+| LOW | Unknown proposal/deposit states fall back to the raw enum; add a translated generic label. | RTL/i18n | `MyCare.tsx` | /impeccable clarify |
+| LOW | Past-case count and journey numerals print raw digits; format with `Intl.NumberFormat(intlLocale())` so they follow the digit decision after the native review. | RTL/i18n | `CaseSwitcher.tsx`, `MyCare.tsx` | /impeccable harden |
+| LOW | The current journey step is named twice for screen readers (`aria-current="step"` + sr-only "(current)"); `role="status"` on the static "No action" line is not an async update. Both pre-date this pass. | web guidelines | `MyCare.tsx` | /impeccable audit |
+| LOW | Journey connectors are decorative (filled 2.46:1, unfilled 1.66:1 on white); progress is carried by the markers. Either accept and say so in DESIGN.md or darken the filled connector. | Pro Max | `globals.css` `.journey-link` | owner / DESIGN.md |
+| LOW | `:root:has(.portal-shell)` hides the reading hairline; an attribute set by the portal layout would be cheaper. | web guidelines | `theme-petrol.css` | /impeccable optimize |
+| LOW | Coordinator languages (plan item 4) and the reply-cover name are not on the patient API; the card omits them until the API exposes them. | plan gap | backend patient workspace | backend follow-up |
+| LOW | "Send a new case for someone else" from My Care (owner decision 1a): needs a representative on `NewCaseForPatientRequest`. | plan | backend `PatientAccountService.startNewCase` | backend follow-up |
+| LOW | Pre-existing: Arabic amounts render as "500 US$" inside the LTR isolate (`formatMoney` ar). | screenshot review | `lib/money.ts` | /impeccable clarify |
+
 ## Blocked on a decision or approval (Close, 2026-10-09)
 
 Open only because a named owner has not decided. Nothing here is worked until that decision exists.

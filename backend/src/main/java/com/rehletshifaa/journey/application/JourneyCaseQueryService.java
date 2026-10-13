@@ -54,8 +54,16 @@ public class JourneyCaseQueryService {
         this.practitioners = practitioners; this.people = people; this.crypto = crypto;
     }
 
-    /** The cases of the patient the subject is, or represents; latest change first. */
-    List<CaseView> patientCases(String subject, Instant now) { return withAssignments(cases.findPatientCaseRows(subject, micros(now))); }
+    /**
+     * The cases of the patient the subject is, or represents; latest change first. Each says whose it is from the subject's
+     * side, per case: one person can be the patient on their own case and a representative on a relative's.
+     */
+    List<CaseView> patientCases(String subject, Instant now) {
+        List<CaseView> views = withAssignments(cases.findPatientCaseRows(subject, micros(now)));
+        if (views.isEmpty()) return views;
+        Set<UUID> own = new HashSet<>(cases.findOwnPatientCaseIds(subject));
+        return views.stream().map(view -> forPatient(view, own.contains(view.id()) ? "SELF" : "REPRESENTATIVE")).toList();
+    }
 
     /** Unowned submitted cases plus the cases the subjects coordinate; latest change first. */
     List<CaseView> coordinatorQueue(Set<String> subjects) { return withAssignments(cases.findCoordinatorQueueRows(subjects)); }
@@ -71,10 +79,12 @@ public class JourneyCaseQueryService {
     }
 
     /** The patient sees the people on their case by name only: staff identity subjects are internal identifiers. */
-    static CaseView forPatient(CaseView view) {
+    static CaseView forPatient(CaseView view) { return forPatient(view, view.viewer()); }
+
+    private static CaseView forPatient(CaseView view, String viewer) {
         return new CaseView(view.id(), view.caseNumber(), view.status(), view.patientName(), view.country(), view.preferredLanguage(),
                 view.careCategory(), view.createdAt(), view.updatedAt(), view.version(), null, null, view.coordinatorName(), view.doctorName(),
-                view.travelPackageRequested(), view.waitingOn(), view.waitingReason());
+                view.travelPackageRequested(), view.waitingOn(), view.waitingReason(), viewer);
     }
 
     /**
@@ -193,7 +203,7 @@ public class JourneyCaseQueryService {
             return new CaseView(row.getId(), row.getCaseNumber(), row.getStatus().name(), row.getPatientName(), row.getCountry(),
                     row.getPreferredLanguage(), row.getCareCategory(), row.getCreatedAt(), row.getUpdatedAt(), row.getVersion(), coordinator,
                     activeDoctors.get(row.getId()), names.staff(coordinator), names.consultant(namedDoctors.get(row.getId())),
-                    Boolean.TRUE.equals(row.getTravelPackageRequested()), row.getWaitingOn(), row.getWaitingReason());
+                    Boolean.TRUE.equals(row.getTravelPackageRequested()), row.getWaitingOn(), row.getWaitingReason(), null);
         }).toList();
     }
 }

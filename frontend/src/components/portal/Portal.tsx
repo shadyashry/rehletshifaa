@@ -298,10 +298,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const descriptions:Record<RoleKey,string>=locale==="ar"?{coordinator:"راجع الحالات ونسّق الخطوة التالية للرعاية.",doctor:"راجع الحالات المسندة إليك وسجّل قراراتك السريرية.",operations:"تابع الترتيبات والإجراءات المطلوبة منك.",finance:"راجع المدفوعات والموافقات المطلوبة.",patient:"تابع رعايتك وتعرّف على الخطوة التالية."}:{coordinator:"Review cases and coordinate the next step in care.",doctor:"Review assigned cases and record your clinical decisions.",operations:"Manage your assigned care and travel arrangements.",finance:"Review payments and commercial approvals that need your attention.",patient:"Follow your care and see what happens next."};
   const inWorkspace=!!workspace&&!!caseRole;
   const isPatientRole=currentRole==="patient";
-  return <FeedbackContext.Provider value={{notice,error,clear:clearFeedback,clearNotice}}><PortalFrame title={isPatientRole?(locale==="ar"?"رعايتي":"My Care"):currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
+  return <FeedbackContext.Provider value={{notice,error,clear:clearFeedback,clearNotice}}><PortalFrame paper={isPatientRole} title={isPatientRole?work.myCare.nav.care:currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>workspace&&workspace.caseSummary.id!==caseId?guardLeave(()=>void openCaseById(caseId)):void openCaseById(caseId)}/>}
     {staffViews&&<StaffNav locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView} hrefFor={viewHref}/>}
-    {isPatientRole&&workspace&&<PatientNav locale={locale} view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
+    {isPatientRole&&workspace&&<PatientNav view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
     <PortalAccount locale={locale} name={displayName} email={profile.email} role={currentRole?roleLabel(currentRole,locale):""} api={api} signOut={signOut} preferences={preferences} onSaved={value=>{setPreferences(value);setNotice(t.success);}} patient={isPatientRole} controlCenter={controlCenter}
       roles={available.length>1?{label:work.nav.workingAs,current:currentRole,options:available.map(role=>({key:role,label:roleLabel(role,locale)})),onSelect:key=>switchRole(key as RoleKey)}:null}/>
     {/* A patient-side account that also manages a clinic keeps its one way in; staff reach it from the navigation. */}
@@ -338,7 +338,8 @@ function PatientNoCase({locale}:{locale:Locale}){
  </section>;
 }
 
-function PortalFrame({title,subtitle,children}:{title:string;subtitle:string;children?:React.ReactNode}){return <section className="portal-shell bg-[linear-gradient(180deg,var(--color-mist)_0%,#fff_32rem)]"><div className="container-site"><h1 className="headline">{title}</h1>{subtitle&&<p className="mt-2 max-w-3xl text-sm text-ink-600">{subtitle}</p>}<div className="mt-6">{children}</div></div></section>}
+/** `paper`: the patient's file sits on paper throughout, so its white cards read as cards (the Two Surfaces rule). */
+function PortalFrame({title,subtitle,paper=false,children}:{title:string;subtitle:string;paper?:boolean;children?:React.ReactNode}){return <section className={`portal-shell ${paper?"bg-mist":"bg-[linear-gradient(180deg,var(--color-mist)_0%,#fff_32rem)]"}`}><div className="container-site"><h1 className="headline">{title}</h1>{subtitle&&<p className="mt-2 max-w-3xl text-sm text-ink-600">{subtitle}</p>}<div className="mt-6">{children}</div></div></section>}
 
 /** The staff views in order with the counts that decide where the home lands. My cases shows no count: it is accountability, not a to-do. */
 function staffViewItems(role:string,cases:CaseView[],tasks:Task[],subject:string|undefined,nav:WorkCopy["nav"]){

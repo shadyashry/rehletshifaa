@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.rehletshifaa.journey.api.JourneyDtos.CaseView;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * Who is looking at this case, per case: the patient themselves, someone who represents them, or staff. The portal says
@@ -51,6 +53,23 @@ class CaseViewerRelationTest {
         authenticate("viewer-both", Role.PATIENT, Role.PATIENT_REPRESENTATIVE);
         assertThat(journey.workspace(own).actions().viewer()).isEqualTo("SELF");
         assertThat(journey.workspace(relative).actions().viewer()).isEqualTo("REPRESENTATIVE");
+    }
+
+    @Test void theCaseListSaysPerCaseWhoseCaseItIs() throws Exception {
+        UUID own = submittedCase("+254700000906", "viewer-f@local.test");
+        UUID relative = submittedCase("+254700000907", "viewer-g@local.test");
+        linkPatient(own, "viewer-list");
+        represent(relative, "viewer-list", null, null);
+        authenticate("viewer-list", Role.PATIENT, Role.PATIENT_REPRESENTATIVE);
+        assertThat(journey.patientCases()).extracting(CaseView::id, CaseView::viewer)
+                .containsExactlyInAnyOrder(tuple(own, "SELF"), tuple(relative, "REPRESENTATIVE"));
+    }
+
+    @Test void staffCaseListsCarryNoViewerRelation() throws Exception {
+        UUID caseId = submittedCase("+254700000908", "viewer-h@local.test");
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        assertThat(journey.coordinatorQueue()).filteredOn(view -> view.id().equals(caseId)).extracting(CaseView::viewer).containsOnlyNulls();
     }
 
     @Test void staffSeeTheCaseAsStaff() throws Exception {

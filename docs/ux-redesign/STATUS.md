@@ -437,6 +437,17 @@ Update at the end of every phase.
 
 ## Next exact action
 
+**My Care + multiple cases** (`plans/patient-my-care.md`, owner-approved 2026-10-13) built by `/redesign-area` on
+`feat/ux-redesign-my-care` (worktree `ux-my-care`), **not committed — awaiting owner approval**. Delivered: case switcher
+(`CaseSwitcher.tsx`: grouped by person, "Needs you", past cases folded, "Send a new case" for the account's own), case header
+band with the care-area mark, current step as the one file-tab card with the deposit inside it, coordinator card with
+monograms, numbered journey that fills, estimate card, paper canvas, header pills per DESIGN.md, coral reading hairline off
+portal pages; all My Care copy moved to `portalWork.myCare` (en + ar). Backend (decision 2): `CaseView.viewer`
+(SELF/REPRESENTATIVE) on `GET /patient/cases` + `CaseViewerRelationTest` (+2). Verify: typecheck ok; lint 0 errors / 9
+warnings; unit 402/402; backend 700 run / 0 failures; Playwright My Care + polish + a11y (en+ar, new `my-care-cases`
+route) + Arabic decision 91/91. Screenshots: `screenshots/my-care/`. Deferred findings: backlog "My Care + multiple
+cases". Next: owner review, then commit; then the next pass (proposal drawer, secure links, profile completion).
+
 **Finish plan:** [`plans/finish-plan.md`](plans/finish-plan.md) (2026-10-09). Batch 0 merged, pushed and deployed (`7441dbf`);
 D1–D4 decided (see Decisions); Batch 1 merged, pushed and deployed (`f304421`); Batch 1a (skill review fixes) done on
 `feat/ux-redesign-batch-1a` (`fc03f0b`), not merged or pushed. Owner: Batch 2 runs in a **new session on the same branch**
