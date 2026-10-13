@@ -114,6 +114,31 @@ sources: `docs/ux-redesign/backlog.md`, section "My Care + multiple cases".
 | G-16 | The signed-in "send a case" path has no human check, so a script with a stolen session is held back only by the per-account limits. | Run the same invisible Turnstile check as the public form on the signed-in path. | Low — fix plan |
 | G-13 | All new Arabic copy (My Care, the switcher, "for someone else") awaits the native review, as does the earlier Arabic. | Part of the pending native Arabic review. | Medium (launch) |
 
+## Walk continuation (2026-10-13, after the My Care deploy `bea21d8`)
+
+| # | Finding | Proposed fix | Severity |
+|---|---|---|---|
+| W-1 | Case 2 (consultation only): the coordination deposit is SAR 214.40 against an estimated total of SAR 280.15 — the deposit is 77% of the care being estimated. A fixed deposit can approach or exceed a small estimate. | Business rule: cap the deposit at a share of the estimate (or waive it under a threshold); decide in the commercial policy. | Medium (business) |
+| W-2 | Arabic proposal shows the catalogue item name in English ("Diagnostic cardiology consultation") and the exchange-rate note in English ("Amounts in SAR are converted…"). | Arabic names on catalogue items; the FX note in both message files. | Medium |
+| W-3 | On a narrow screen the proposal repeats its actions: "طلب تعديلات" and "اطلب من منسّقي" appear in the page and again in the sticky bottom bar. | Part of G-1 (proposal redesign): one action location per screen size. | Low |
+| W-4 | Arabic assisted path works: the request is confirmed on the page ("أُرسل الطلب في 13 أكتوبر 2026") and the coordinator is emailed "Go through the proposal terms with the patient in Arabic". | Keep. | — |
+| W-5 | While the patient's Arabic-terms request waits on the coordinator, the case header still reads "بانتظار: المريض" (waiting on: the patient). | Same root as #3 / #13: derive "waiting on" from the current action. | Medium |
+| W-6 | **Security re-check loses the work.** Recording the patient's decision triggered the step-up sign-in; afterwards the portal said "the change you were making was not saved — please do it again" and the whole form (decision, channel, confirmation) was empty. | Ask for the re-check before the form is filled (when opening a decision-recording action), or keep the form and resubmit after the re-check. | Medium |
+| W-7 | After the re-done save, the stale "not saved — please do it again" notice stayed on screen beside "تم الحفظ بنجاح" (saved successfully). | Clear the re-check notice on the next successful action. | Low |
+| W-8 | The WhatsApp message "Complete your RehletShifaa profile" to an **Arabic** patient is in **English**, and says "Your treatment proposal has been **accepted**" when the patient acknowledged a preliminary estimate. | Localise the template (EN + AR) and use the acknowledged-estimate wording. | High (copy truth) |
+| W-9 | Coordinator emails read "Case for case RS-2026-…". | Fix the template text. | Low |
+| W-10 | The patient enters two one-time codes within an hour on the same number (secure proposal link, then profile activation). | Product decision: accept, or let a recently verified link session carry into activation. | Low (decision) |
+| W-11 | Opening the account-setup link in a browser where another account is signed in ends on Keycloak's English-only page "You are already authenticated as different user … Please sign out first" with no way forward. Realistic on a shared family phone. | Theme the page (EN + AR) with a "sign out and continue" action, or sign the other session out before the action token runs. | Medium |
+| W-12 | The Arabic profile form shows country names in English ("Saudi Arabia") and the search only matches English, although Profile & Security shows the same country in Arabic. | Use the Arabic country names (and search) in the country picker. | Medium |
+| W-13 | The profile step says "we don't need your passport or ID now", then the first My Care step (travel requested) asks for the passport/ID number. | Align the copy with the case: say identity is checked next when travel support is requested. | Medium |
+| W-14 | Identity verification asks again for date of birth and nationality, entered two minutes earlier in the profile. | Prefill from the profile; ask only for the document details. | Medium |
+| W-15 | The phone menu still lists "متابعة حالتك" (Track your case) for a signed-in patient. | Hide Track case in the menu when signed in (as the header now does). | Low |
+| W-16 | **Dead end (new copy).** Sending a case for someone else without a verified number shows "verify your WhatsApp number and email in Profile & Security", but Profile & Security is read-only ("to correct these details, message your coordinator"; WhatsApp "not provided"). | Point the message to the coordinator (EN + AR); self-service verification later. | Medium |
+| W-17 | Works: Arabic setup email; profile prefilled and aware the case was sent by a relative; My Care for the patient matches the step-5 checklist (header band, file-tab step card, coordinator card with monograms, journey, estimate with the deposit inside it); signed-in header shows "رعايتي" and no Sign in; the someone-else refusal creates no case. | Keep. | — |
+| W-18 | Case switcher cards cut long Arabic care-area names ("الجراحة العامة وجراحات ا…"). | Use the catalogue short name on the cards (e.g. "الجراحة العامة"), full name in the case header. | Low |
+| W-19 | **Browser Back from My Care lands on the sign-in callback** (`/auth/callback?code=…`, already used) and shows an English-only error: "Sign-in could not be completed. Please return to the portal and try again." — for an Arabic patient after an ordinary Back. | Replace the callback entry in history after sign-in (`location.replace`); with G-5 (push history on case switches) Back then returns to the previous case. Localise the callback error. | High |
+| W-20 | Works: two own cases → "حالاتك" switcher with both cards, no "Needs you" (nothing waits on the patient), no person groups, newest case opened; switching updates `?case=`, moves focus to the case heading and the open-case mark; the deposit step shows the deposit inside the step. | Keep. | — |
+
 ## Navigation and dashboards (Owner)
 
 | # | Finding | Proposed fix | Severity |
@@ -184,10 +209,11 @@ Severity: Medium (several block screen-reader users from completing the form).
 ## Still to walk
 
 1. ~~Coordinator: release case 1; case 2 → transfer to `coordinator`, care area → Cardiology, travel package on, assign consultant.~~ Done.
-2. Consultant: case 2 catalogue-only recommendation.
-3. Coordinator: case 2 proposal → expect Operations required, Finance not (journey check 15-ops).
-4. Operations: travel plan before release; then coordinator releases.
+2. ~~Consultant: case 2 catalogue-only recommendation.~~ Done (diagnostic cardiology consultation, SAR 250.13 consultant cost; work item completed).
+3. ~~Coordinator: case 2 proposal → expect Operations required, Finance not (journey check 15-ops).~~ Done (proposal prepared; Operations Mariam Soliman on the case team).
+4. ~~Operations: travel plan before release; then coordinator releases.~~ Done (case 2 released: waiting for the patient's decision).
 5. Patient: secure link + OTP (Mailpit) → view → acknowledge (English) / Arabic coordinator-recorded path; profile completion; deposit; My Care; SEC-10 visual check.
+   **Progress 2026-10-13 (stopped here):** RS-2026-000002 Arabic secure link + code → assisted Arabic decision recorded by the coordinator → profile (`qa-case2-patient@local.test`) → account → My Care: done. Two-case patient (`qa-cardio@local.test`, RS-2026-000001 + 000003) switcher: done. **Next:** coordinator records RS-2026-000001 deposit received → patient sees "Deposit received"; optional identity submission (owner types the document number); then step 6. Findings W-1…W-20 above.
    Checks added for the My Care redesign and the MC-1 follow-up (`0d743b2`, `ff39128`; needs the stack rebuilt from
    `codex/platform-control-plane` after the fast-forward). Synthetic data only.
    - [ ] Activation lands in My Care on the case waiting on the patient (else the newest); paper background, no coral line under the header.
