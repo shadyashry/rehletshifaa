@@ -41,13 +41,16 @@ export default async function LocaleLayout({
         <script dangerouslySetInnerHTML={{ __html: BRAND_THEME_BOOT }} />
       </head>
       <body>
-        <HideInControlCenter>
-          <a href="#main" className="skip-link">
-            {d.common.skip}
-          </a>
-          <Header locale={locale} d={d} />
-        </HideInControlCenter>
-        <AuthProvider><SiteMain>{children}</SiteMain></AuthProvider>
+        {/* One sign-in state for the header and the page: a signed-in person is never offered "Sign in". */}
+        <AuthProvider>
+          <HideInControlCenter>
+            <a href="#main" className="skip-link">
+              {d.common.skip}
+            </a>
+            <Header locale={locale} d={d} />
+          </HideInControlCenter>
+          <SiteMain>{children}</SiteMain>
+        </AuthProvider>
         <HideInControlCenter>
           <FooterSwitch portal={<PortalFooter locale={locale} d={d} />}>
             <Footer locale={locale} d={d} />

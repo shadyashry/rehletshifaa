@@ -375,9 +375,10 @@ matching the English payment wording) and the cheap MEDIUM/LOWs were fixed in th
 | LOW | Journey connectors are decorative (filled 2.46:1, unfilled 1.66:1 on white); progress is carried by the markers. Either accept and say so in DESIGN.md or darken the filled connector. | Pro Max | `globals.css` `.journey-link` | owner / DESIGN.md |
 | LOW | `:root:has(.portal-shell)` hides the reading hairline; an attribute set by the portal layout would be cheaper. | web guidelines | `theme-petrol.css` | /impeccable optimize |
 | LOW | Coordinator languages (plan item 4) and the reply-cover name are not on the patient API; the card omits them until the API exposes them. | plan gap | backend patient workspace | backend follow-up |
-| LOW | "Send a new case for someone else" from My Care (owner decision 1a): needs a representative on `NewCaseForPatientRequest`. | plan | backend `PatientAccountService.startNewCase` | backend follow-up |
-| LOW | Signed-in patients still see the public header links ("activated their account" entry points) — from journey finding MC-1. | journey findings MC-1 | `Header.tsx` | /impeccable distill |
 | LOW | Pre-existing: Arabic amounts render as "500 US$" inside the LTR isolate (`formatMoney` ar). | screenshot review | `lib/money.ts` | /impeccable clarify |
+
+Closed in the MC-1 follow-up: "send a new case for someone else" (signed-in form; new person with the account as representative; draft and daily caps; merge now revokes grants held on the pending record) and the signed-in header (My Care link instead of Sign in / Track case).
+Open from that follow-up: the intake consent text is first-person ("my medical case") also when a representative sends the case — legal wording decision; choosing a person the account already represents (instead of a new record) needs a person id on the patient case list.
 
 ## Blocked on a decision or approval (Close, 2026-10-09)
 

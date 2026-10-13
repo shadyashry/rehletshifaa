@@ -232,9 +232,45 @@ public class PatientAccountService {
         var actor = authority.authorize(Permission.PATIENT_SELF_SERVICE);
         if (!actor.has(Role.PATIENT)) throw new ApiException(403, "PERMISSION_NOT_HELD", "Only the patient can start their own case");
         Account a = findBySubject(actor.subject()).orElseThrow(() -> new ApiException(409, "PATIENT_NOT_LINKED", "Your account is not linked to a patient profile yet"));
+        if (request.forSomeoneElse()) return startCaseForSomeoneElse(actor.subject(), request);
         if (!"ACTIVE".equals(a.getAccountStatus())) markActive(a.getPatientId(), clock.instant(), false);
         var created = caseService.createForExistingPatient(a.getPatientId(), request);
         audit(created.caseId(), "CASE_STARTED_BY_RETURNING_PATIENT", a.getPatientId(), "New case created for the existing canonical patient");
+        return created;
+    }
+
+    /**
+     * A signed-in patient sends a case for someone in their care. The person gets a NEW patient record (never matched to
+     * an existing one by name or number), the account holder is the submitting representative with their own saved
+     * contact details, and — because the account holder is authenticated and is the one who submitted it — they act for
+     * the person straight away, as they would after confirming an intake link request "for someone else".
+     */
+    private com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseResponse startCaseForSomeoneElse(String subject, com.rehletshifaa.casemanagement.api.CaseDtos.NewCaseForPatientRequest request) {
+        var person = request.someoneElse();
+        if (person == null || person.relationship() == null || person.relationship().isBlank())
+            throw new ApiException(400, "SOMEONE_ELSE_REQUIRED", "Tell us who this case is for and your relationship to them");
+        var me = patients.findOwnProfile(subject).orElseThrow(() -> new ApiException(409, "PATIENT_NOT_LINKED", "Your account is not linked to a patient profile yet"));
+        // The account holder's saved number is the case's contact (as for their own next case); it is their own account's
+        // number, so a status link sent there reaches the person who sent the case.
+        if (me.getPhone() == null) throw new ApiException(409, "MOBILE_REQUIRED", "Add a WhatsApp number to your profile before sending a case");
+        // This path has no CAPTCHA: an account keeps at most a few unsent drafts for others and a daily number of new people.
+        Instant now = clock.instant();
+        if (cases.countDraftCasesRepresentedBy(subject) >= MAX_OPEN_DRAFTS_FOR_OTHERS)
+            throw new ApiException(409, "TOO_MANY_DRAFT_CASES", "Finish or wait on the cases you have already started before sending another");
+        if (representatives.countByRepresentativeSubjectAndCreatedAtAfter(subject, now.minus(java.time.Duration.ofDays(1))) >= MAX_PEOPLE_PER_DAY)
+            throw new ApiException(429, "TOO_MANY_CASES_FOR_OTHERS", "You have sent several cases for other people today; please try again tomorrow or message your coordinator");
+        String relationship = person.relationship().trim().toUpperCase(Locale.ROOT);
+        var intakeRequest = new com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest("SOMEONE_ELSE", person.givenName(), person.familyName(), person.singleLegalName(),
+                new com.rehletshifaa.casemanagement.api.CaseDtos.RepresentativeContact(PatientNames.display(me.getGivenName(), me.getFamilyName()), relationship),
+                person.country(), me.getPhone(), request.conditionDescription(), "ar".equals(me.getLanguage()) ? "ar" : "en", true, null,
+                me.getEmailVerifiedAt() != null ? me.getEmail() : null, null, request.careArea(), request.travelPackageRequested());
+        var created = caseService.create(intakeRequest, subject);
+        UUID patientId = cases.findById(created.caseId()).orElseThrow().getPatientId();
+        // The grant is safe only on a person this request just created: never on an existing record.
+        if (cases.countByPatientId(patientId) != 1 || representatives.existsByPatientId(patientId))
+            throw new IllegalStateException("A case for someone else must create a new patient " + patientId);
+        representatives.saveAndFlush(new PatientRepresentative(patientId, subject, relationship, "VIEW,MESSAGE,COORDINATE", now, null, now));
+        audit(created.caseId(), "CASE_STARTED_FOR_SOMEONE_ELSE", patientId, "Signed-in account sent a case for someone in their care (" + relationship + ") and acts for them");
         return created;
     }
 
@@ -255,7 +291,10 @@ public class PatientAccountService {
             var s = cases.findSubmissionAddress(event.caseId()).orElse(null);
             if (s == null || s.getEmail() == null || s.getPatientId() == null) return;
             String normalized = normalizeEmail(s.getEmail());
-            if (identity.findByEmail(normalized).isEmpty()) return;
+            var owner = identity.findByEmail(normalized);
+            if (owner.isEmpty()) return;
+            // The address's account already acts for this patient (it sent the case while signed in): nothing to ask.
+            if (representatives.existsByPatientIdAndRepresentativeSubjectAndRevokedAtIsNull(s.getPatientId(), owner.get().subject())) return;
             issueLinkRequest(s.getPatientId(), event.caseId(), normalized, "INTAKE", s.getLanguage(), clock.instant());
         } catch (RuntimeException e) {
             log.warn("Existing-account check skipped for case {}: {}", event.caseId(), e.getClass().getSimpleName());
@@ -339,6 +378,9 @@ public class PatientAccountService {
     }
 
     /** Fold the pending patient {@code from} into the canonical {@code into}. Every patient-scoped row moves. */
+    private static final int MAX_OPEN_DRAFTS_FOR_OTHERS = 3;
+    private static final int MAX_PEOPLE_PER_DAY = 10;
+
     private void mergePatient(UUID from, UUID into, Instant now) {
         cases.moveToPatient(from, into);
         contacts.moveToPatient(from, into);
@@ -346,8 +388,12 @@ public class PatientAccountService {
         consentRecords.moveToPatient(from, into);
         onboardings.moveToPatient(from, into);
         identityVerifications.moveToPatient(from, into);
+        // Whoever acted for the pending record (for example the person who sent its case) never inherits the surviving
+        // owner's other cases: their grants arrive revoked; the owner or their coordinator can authorise them again.
+        int revoked = representatives.revokeAll(from, now);
         representatives.deleteDuplicatesOf(from, into);
         representatives.moveAll(from, into);
+        if (revoked > 0) audit(null, "PATIENT_REPRESENTATIVES_REVOKED_ON_MERGE", into, revoked + " representative grant(s) of the merged pending patient revoked");
         linkRequests.moveToSurvivor(from, into);
         changeProfile(from, p -> { p.mergeInto(into, now); return true; });
         // The canonical patient keeps its own name; a WhatsApp number the pending patient supplied is only

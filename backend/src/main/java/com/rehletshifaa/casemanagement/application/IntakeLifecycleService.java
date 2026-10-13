@@ -72,15 +72,18 @@ public class IntakeLifecycleService {
      * draft may still be receiving document uploads, and we must not start an expiry clock before the case is
      * actually submitted.
      */
-    @Transactional public void createFoundation(MedicalCase medicalCase, CreateCaseRequest request) {
+    @Transactional public void createFoundation(MedicalCase medicalCase, CreateCaseRequest request) { createFoundation(medicalCase, request, null); }
+    /** {@code submittedBy}: the signed-in account that sent the case, recorded as the consent's capturer and the actor. */
+    @Transactional public void createFoundation(MedicalCase medicalCase, CreateCaseRequest request, String submittedBy) {
         Instant now=clock.instant(); UUID patientId=medicalCase.getPatientId();
+        String actor=submittedBy==null?"guest":submittedBy, actorRole=submittedBy==null?"GUEST":"PATIENT_REPRESENTATIVE";
         String displayName=PatientNames.display(request.givenName(),request.familyName());
         boolean self=!request.forSomeoneElse();
         var rep=request.representative();
         contacts.saveAndFlush(new CaseSubmissionContact(medicalCase.getId(),patientId,self?"PATIENT":"REPRESENTATIVE",self?displayName:PatientNames.clean(rep==null?null:rep.name()), self?null:(rep==null?null:rep.relationship()),blankToNull(request.email()),request.whatsappNumber().trim(),request.preferredLanguage(),now));
         String consentText="ar".equals(request.preferredLanguage()) ? "أوافق على معالجة المعلومات التي أقدمها لغرض تنسيق حالتي الطبية." : "I consent to processing the information I submit for the purpose of coordinating my medical case.";
-        consents.saveAndFlush(new ConsentRecord(UUID.randomUUID(),patientId,medicalCase.getId(),new ConsentRecord.Terms("DATA_PROCESSING","intake-v1",request.preferredLanguage(),consentText,"Medical case coordination","Submitted case data"),"WEB","guest",now));
-        audit("CASE_INTAKE_CREATED","guest","GUEST",medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"CREATE","SUCCESS",null,now);
+        consents.saveAndFlush(new ConsentRecord(UUID.randomUUID(),patientId,medicalCase.getId(),new ConsentRecord.Terms("DATA_PROCESSING","intake-v1",request.preferredLanguage(),consentText,"Medical case coordination","Submitted case data"),"WEB",actor,now));
+        audit("CASE_INTAKE_CREATED",actor,actorRole,medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"CREATE","SUCCESS",null,now);
     }
 
     /**

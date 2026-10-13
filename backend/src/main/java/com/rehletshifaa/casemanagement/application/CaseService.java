@@ -24,13 +24,15 @@ public class CaseService {
      * Create the draft case together with its canonical patient and submission contact. The patient's name and
      * channels live on patient_profiles and the submission contact, never on the case row.
      */
-    @Transactional public CreateCaseResponse create(CreateCaseRequest request) {
+    @Transactional public CreateCaseResponse create(CreateCaseRequest request) { return create(request, null); }
+    /** {@code submittedBy}: the signed-in account that sent the case (null for the public, anonymous form). */
+    @Transactional public CreateCaseResponse create(CreateCaseRequest request, String submittedBy) {
         validateNames(request); requireManagedCareArea(request.careArea());
         Instant now = clock.instant();
         UUID patientId = intake.registerPatient(request);
         var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), patientId, request.country(), request.conditionDescription(), request.preferredLanguage(), request.careArea(), now);
         if (Boolean.TRUE.equals(request.travelPackageRequested())) medicalCase.setTravelPackageRequested(true);
-        cases.saveAndFlush(medicalCase); intake.createFoundation(medicalCase,request);
+        cases.saveAndFlush(medicalCase); intake.createFoundation(medicalCase,request,submittedBy);
         return new CreateCaseResponse(medicalCase.getId(), medicalCase.getCaseNumber(), medicalCase.getStatus().name(),intakeGrants.issue(medicalCase.getId()));
     }
     /**

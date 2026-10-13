@@ -82,6 +82,9 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (api === "/patient/account/profile") return reply({ givenName: "Maya", familyName: "Example", displayName: "Maya Example", preferredName: null, dateOfBirth: "1990-04-02", country: "Kenya", nationality: "KE", preferredLanguage: "en", email: "maya@example.test", emailVerified: true, whatsappNumber: "+254700000081", phoneVerified: true, accountStatus: "ACTIVE" });
     if (api === "/work/mine") return reply([]);
     if (api === "/clinics/mine") return reply([]);
+    // A new case from the signed-in form: a draft, then the intake submit with its grant (synthetic).
+    if (api === "/patient/cases" && request.method() === "POST") return reply({ caseId: "case-new", caseNumber: "RS-2026-000120", status: "DRAFT", intakeGrant: "synthetic-grant" });
+    if (api === "/cases/case-new/submit") return reply({ caseNumber: "RS-2026-000120", status: "RECEIVED", statusToken: null });
     if (api === "/patient/cases") return reply(scenario === "no-case" ? [] : caseList);
     if (multipleCases && api === "/patient/cases/case-2") return reply(relativeWorkspace);
     if (multipleCases && api === "/patient/cases/case-3") return reply(closedWorkspace);

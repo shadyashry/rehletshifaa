@@ -265,6 +265,25 @@ class PatientIdentityAndAccountTest {
         assertThat(count("SELECT count(*) FROM patient_representatives WHERE patient_id=?", existing)).isZero();
     }
 
+    @Test void whoeverActedForThePendingRecordDoesNotInheritTheOwnersOtherCasesOnMerge() throws Exception {
+        String subject = identity.seedActiveAccount("ahmed26@local.test");
+        UUID existing = seedLinkedPatient(subject, "Ahmed", "Hassan", "ahmed26@local.test");
+        var created = cases.create(new CreateCaseRequest("Ahmed", "Hassan", "Egypt", "+201000000026", "Reports", "en", true, null, "ahmed26@local.test", null));
+        cases.submit(created.caseId()); em.flush();
+        UUID pending = patientId(created.caseId());
+        // Someone acts for the pending record (as the person who sent its case for them would).
+        Instant at = Instant.now().minusSeconds(60);
+        jdbc.update("INSERT INTO patient_representatives(id,patient_id,representative_subject,relationship,permissions,effective_from,expires_at,revoked_at,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(), pending, "sender-26", "CHILD", "VIEW,MESSAGE,COORDINATE", at, null, null, at);
+        String token = linkToken(pending);
+        authenticateWithEmail(subject, "ahmed26@local.test", Role.PATIENT);
+        account.resolveLinkRequest(token, new AccountLinkResolution("SAME_PATIENT", null)); em.flush();
+        assertThat(patientId(created.caseId())).isEqualTo(existing);
+        // The grant moved with the record, but revoked: it reaches none of the owner's cases.
+        assertThat(count("SELECT count(*) FROM patient_representatives WHERE patient_id=? AND representative_subject='sender-26' AND revoked_at IS NULL", existing)).isZero();
+        assertThat(count("SELECT count(*) FROM patient_representatives WHERE patient_id=? AND representative_subject='sender-26' AND revoked_at IS NOT NULL", existing)).isEqualTo(1);
+    }
+
     @Test void theAccountOwnerResolvesAsRepresentativeAndThePatientStaysSeparate() throws Exception {
         String subject = identity.seedActiveAccount("omar23@local.test");
         UUID omar = seedLinkedPatient(subject, "Omar", "Hassan", "omar23@local.test");
@@ -364,6 +383,64 @@ class PatientIdentityAndAccountTest {
         assertThat(identity.setupMails()).hasSize(mails); // no new account setup
         assertThat(jdbc.queryForObject("SELECT contact_role FROM case_submission_contacts WHERE case_id=?", String.class, next.caseId())).isEqualTo("PATIENT");
         assertThat(journey.patientCases()).extracting(CaseView::caseNumber).contains(ctx.caseNumber, next.caseNumber());
+    }
+
+    @Test void aSignedInPatientSendsACaseForSomeoneElseAndActsForThem() throws Exception {
+        var ctx = accepted(request("Link", "Patient", "+254700000032", null));
+        String g = grant(ctx);
+        activation.activate(ctx.token, g, profile("Link", "Patient", "rel32@local.test", "+254700000032", "PATIENT")); em.flush();
+        String subject = subjectOf(ctx.caseId);
+        finishSetup(subject);
+        int patients = count("SELECT count(*) FROM patient_profiles");
+        int linkMails = count("SELECT count(*) FROM notification_outbox WHERE notification_type='ACCOUNT_LINK' AND destination=?", "rel32@local.test");
+
+        authenticate(subject, Role.PATIENT);
+        var next = account.startNewCase(new NewCaseForPatientRequest("Father's knee", "orthopedics", false, true, "SOMEONE_ELSE",
+                new SomeoneElse("Omar", "Relative", false, "Kenya", "PARENT"))); em.flush();
+        // A new person, never the account holder's own record, with none of the account holder's channels on it.
+        UUID relative = patientId(next.caseId());
+        assertThat(relative).isNotEqualTo(patientId(ctx.caseId));
+        assertThat(count("SELECT count(*) FROM patient_profiles")).isEqualTo(patients + 1);
+        assertThat(count("SELECT count(*) FROM patient_profiles WHERE id=? AND (whatsapp_number IS NOT NULL OR email IS NOT NULL OR external_subject IS NOT NULL)", relative)).isZero();
+        // The account holder submitted it as the person's representative, reachable on their own saved number.
+        assertThat(jdbc.queryForObject("SELECT contact_role FROM case_submission_contacts WHERE case_id=?", String.class, next.caseId())).isEqualTo("REPRESENTATIVE");
+        assertThat(jdbc.queryForObject("SELECT relationship_to_patient FROM case_submission_contacts WHERE case_id=?", String.class, next.caseId())).isEqualTo("PARENT");
+        assertThat(count("SELECT count(*) FROM patient_representatives WHERE patient_id=? AND representative_subject=? AND revoked_at IS NULL", relative, subject)).isEqualTo(1);
+        // The consent was given by the signed-in account, not an anonymous guest; the account holder's own record is untouched.
+        assertThat(jdbc.queryForObject("SELECT captured_by FROM consent_records WHERE case_id=?", String.class, next.caseId())).isEqualTo(subject);
+        // Both cases are on the account's list, each with its own relation.
+        assertThat(journey.patientCases()).extracting(CaseView::id, CaseView::viewer)
+                .contains(tuple(ctx.caseId, "SELF"), tuple(next.caseId(), "REPRESENTATIVE"));
+        // Submitting does not ask the account holder "is this case for you?" about a case they sent themselves.
+        cases.submit(next.caseId()); em.flush();
+        assertThat(count("SELECT count(*) FROM patient_account_link_requests WHERE patient_id=?", relative)).isZero();
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='ACCOUNT_LINK' AND destination=?", "rel32@local.test")).isEqualTo(linkMails);
+    }
+
+    @Test void anAccountKeepsOnlyAFewUnsentCasesForOthers() throws Exception {
+        var ctx = accepted(request("Link", "Patient", "+254700000034", null));
+        String g = grant(ctx);
+        activation.activate(ctx.token, g, profile("Link", "Patient", "rel34@local.test", "+254700000034", "PATIENT")); em.flush();
+        String subject = subjectOf(ctx.caseId);
+        finishSetup(subject);
+        authenticate(subject, Role.PATIENT);
+        for (int i = 0; i < 3; i++) {
+            account.startNewCase(new NewCaseForPatientRequest("Draft " + i, null, false, true, "SOMEONE_ELSE", new SomeoneElse("Relative", "Number" + "abc".charAt(i), false, "Kenya", "SIBLING")));
+            em.flush();
+        }
+        assertThatThrownBy(() -> account.startNewCase(new NewCaseForPatientRequest("One too many", null, false, true, "SOMEONE_ELSE", new SomeoneElse("Relative", "Four", false, "Kenya", "SIBLING"))))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("TOO_MANY_DRAFT_CASES"));
+    }
+
+    @Test void sendingForSomeoneElseNeedsWhoAndTheRelationship() throws Exception {
+        var ctx = accepted(request("Link", "Patient", "+254700000033", null));
+        String g = grant(ctx);
+        activation.activate(ctx.token, g, profile("Link", "Patient", "rel33@local.test", "+254700000033", "PATIENT")); em.flush();
+        String subject = subjectOf(ctx.caseId);
+        finishSetup(subject);
+        authenticate(subject, Role.PATIENT);
+        assertThatThrownBy(() -> account.startNewCase(new NewCaseForPatientRequest("Missing person", null, false, true, "SOMEONE_ELSE", null)))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("SOMEONE_ELSE_REQUIRED"));
     }
 
     @Test void aPendingSetupIsResumedNeverDuplicated() throws Exception {

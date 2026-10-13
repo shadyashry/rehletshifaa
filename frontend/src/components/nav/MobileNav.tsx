@@ -7,6 +7,8 @@ import { MessageCircle, Menu, UserRound, X } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 import { localeHref, type NavItem } from "@/lib/links";
+import { useAuth } from "@/components/AuthProvider";
+import { portalLabel } from "./portal-label";
 import { TrackedLink } from "@/components/TrackedLink";
 import { LocaleSwitch } from "./LocaleSwitch";
 
@@ -20,6 +22,8 @@ type MobileNavProps = {
     send: string;
     signIn: string;
     signInHint: string;
+    myCare: string;
+    portal: string;
     language: string;
     languageAria: string;
   };
@@ -33,6 +37,7 @@ type MobileNavProps = {
  * and whenever a link inside it is followed.
  */
 export function MobileNav({ locale, items, labels, contact }: MobileNavProps) {
+  const { user, roles } = useAuth();
   const panelId = useId();
   const pathname = usePathname();
   const detailsRef = useRef<HTMLDetailsElement>(null);
@@ -75,14 +80,15 @@ export function MobileNav({ locale, items, labels, contact }: MobileNavProps) {
             >
               {labels.send}
             </TrackedLink>
+            {/* Signed in: straight back to their care, never "Sign in" again. */}
             <Link
-              href={localeHref(locale, "portal") + "?signin=1"}
+              href={user ? localeHref(locale, "portal") : localeHref(locale, "portal") + "?signin=1"}
               onClick={close}
-              title={labels.signInHint}
+              title={user ? undefined : labels.signInHint}
               className="btn-outline w-full min-h-12"
             >
               <UserRound size={17} strokeWidth={1.9} aria-hidden="true" />
-              {labels.signIn}
+              {user ? portalLabel(roles, labels) : labels.signIn}
             </Link>
           </div>
           <nav aria-label={labels.nav} className="grid gap-1 border-t border-line pt-2">

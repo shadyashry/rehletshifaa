@@ -23,7 +23,9 @@
       "trigger": "My case",
       "heading": "Already started a case?",
       "signInBody": "For patients who already activated their account",
-      "statusBody": "With your case number and WhatsApp number"
+      "statusBody": "With your case number and WhatsApp number",
+      "myCare": "My Care",
+      "portal": "Portal"
     },
     "coordinatorShort": "Coordinator"
   },
@@ -529,6 +531,8 @@
       "goToPortal": "Go to my case",
       "startNew": "Send my new case",
       "successReturning": "Your new case has been added to your profile.",
+      "someoneElseSignedIn": "You will follow this case in My Care as their representative. We will reach you on your saved contact details.",
+      "aboutThisCase": "About this case",
       "forName": "Patient",
       "submittedBy": "Submitted by"
     },

@@ -87,6 +87,7 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
             <LocaleSwitch locale={locale} label={d.nav.language} ariaLabel={d.nav.languageAria} className="h-11 rounded-full px-3!" />
             <AccountMenu
               signInHref={localeHref(locale, "portal") + "?signin=1"}
+              portalHref={localeHref(locale, "portal")}
               statusHref={status.href}
               labels={{ ...d.nav.account, signIn: d.nav.signIn, status: status.label }}
             />
@@ -113,6 +114,8 @@ export function Header({ locale, d }: { locale: Locale; d: Dictionary }) {
               send: d.nav.send,
               signIn: d.nav.signIn,
               signInHint: d.nav.signInHint,
+              myCare: d.nav.account.myCare,
+              portal: d.nav.account.portal,
               language: d.nav.language,
               languageAria: d.nav.languageAria,
             }}

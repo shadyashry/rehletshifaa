@@ -43,12 +43,30 @@ public final class CaseDtos {
         @NotBlank @Pattern(regexp="PARENT|CHILD|SPOUSE|SIBLING|RELATIVE|GUARDIAN|OTHER") String relationship
     ) {}
 
-    /** A signed-in patient's next case: only case information, never identity — that comes from the canonical patient. */
+    /**
+     * A signed-in patient's next case. For themselves (the default): only case information, never identity — that comes
+     * from the canonical patient. For someone else ({@code caseFor=SOMEONE_ELSE}): the person's name and country and the
+     * account holder's relationship to them; the account holder's own saved details are the contact.
+     */
     public record NewCaseForPatientRequest(
         @Size(max=2000) String conditionDescription,
         @Size(max=80) String careArea,
         Boolean travelPackageRequested,
-        @AssertTrue Boolean consent
+        @AssertTrue Boolean consent,
+        @Pattern(regexp="MYSELF|SOMEONE_ELSE") String caseFor,
+        @Valid SomeoneElse someoneElse
+    ) {
+        public NewCaseForPatientRequest(String conditionDescription,String careArea,Boolean travelPackageRequested,Boolean consent){this(conditionDescription,careArea,travelPackageRequested,consent,null,null);}
+        public boolean forSomeoneElse(){return "SOMEONE_ELSE".equals(caseFor);}
+    }
+
+    /** The person a signed-in account sends a case for, and how the account holder is related to them. */
+    public record SomeoneElse(
+        @NotBlank @Size(min=1,max=80) String givenName,
+        @Size(max=80) String familyName,
+        Boolean singleLegalName,
+        @NotBlank @Size(min=2,max=80) String country,
+        @NotBlank @Pattern(regexp="PARENT|CHILD|SPOUSE|SIBLING|RELATIVE|GUARDIAN|OTHER") String relationship
     ) {}
 
     /** Opaque short-lived bearer used only to finish this anonymous draft intake. */

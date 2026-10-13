@@ -4,18 +4,28 @@ import { ChevronDown, ClipboardCheck, LogIn, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useId } from "react";
 
+import { useAuth } from "@/components/AuthProvider";
+import { portalLabel } from "./portal-label";
 import { useDisclosure } from "./useDisclosure";
 
-type Labels = { trigger: string; heading: string; signIn: string; signInBody: string; status: string; statusBody: string };
+type Labels = { trigger: string; heading: string; signIn: string; signInBody: string; status: string; statusBody: string; myCare: string; portal: string };
 
 /**
  * "My case": the two existing-patient destinations grouped behind one quiet control — Sign in (activated
  * account) and Track case (case number + WhatsApp) — each with the one line that tells a patient which
- * is theirs. Outlined, never a second primary action beside "Send my case".
+ * is theirs. Outlined, never a second primary action beside "Send my case". Someone already signed in is offered
+ * neither: one link straight back to their care (or, for staff, the portal).
  */
-export function AccountMenu({ labels, signInHref, statusHref }: { labels: Labels; signInHref: string; statusHref: string }) {
+export function AccountMenu({ labels, signInHref, statusHref, portalHref }: { labels: Labels; signInHref: string; statusHref: string; portalHref: string }) {
   const panelId = useId();
   const { open, rootProps, triggerProps } = useDisclosure();
+  const { user, roles } = useAuth();
+  if (user) return (
+    <Link href={portalHref} className="btn-outline gap-2">
+      <UserRound size={16} strokeWidth={1.9} aria-hidden="true" />
+      {portalLabel(roles, labels)}
+    </Link>
+  );
   const row = "group flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-surface-pearl focus-visible:bg-surface-pearl";
   const well = "grid h-9 w-9 flex-none place-items-center rounded-lg bg-surface-clinical text-brand-700 ring-1 ring-border-clinical";
 

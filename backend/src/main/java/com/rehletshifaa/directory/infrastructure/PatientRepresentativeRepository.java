@@ -48,4 +48,14 @@ public interface PatientRepresentativeRepository extends BaseRepository<PatientR
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update PatientRepresentative r set r.patientId = :into where r.patientId = :from")
     int moveAll(@Param("from") UUID from, @Param("into") UUID into);
+
+    /** Merge: every grant still in force on the pending patient is revoked before it moves. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update PatientRepresentative r set r.revokedAt = :now where r.patientId = :from and r.revokedAt is null")
+    int revokeAll(@Param("from") UUID from, @Param("now") Instant now);
+
+    boolean existsByPatientId(UUID patientId);
+
+    /** New people an account has started acting for since {@code after} (the daily cap on cases sent for others). */
+    long countByRepresentativeSubjectAndCreatedAtAfter(String representativeSubject, Instant after);
 }

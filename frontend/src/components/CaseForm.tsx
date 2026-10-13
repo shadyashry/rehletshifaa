@@ -45,6 +45,8 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   // Survives a failed attempt so pressing send again continues the same case instead of starting a
   // new one. Refs, not state: retry correctness must not depend on a re-render happening first.
   const draftCase = useRef<CreateCaseResponse | null>(null);
+  /** The request a signed-in draft was created from: a draft is only reused for the same person. */
+  const draftBody = useRef<string | null>(null);
   const uploaded = useRef(new Set<string>());
   // Stored but not yet confirmed (e.g. the malware scanner was briefly unavailable): a retry confirms that
   // same upload. A fresh presign would leave the first one pending, which blocks the draft from submitting.
@@ -220,20 +222,30 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     finally { setBusy(false); }
   }
 
-  /** Returning patient: only the case is new. The server links it to the same canonical patient. */
+  /**
+   * Returning patient: only the case is new. For themselves, the server links it to the same canonical patient; for
+   * someone else, it records that person (name and country only) with the account holder as their representative,
+   * reachable on their own saved details.
+   */
   async function submitReturning(event: React.FormEvent) {
     event.preventDefault();
     if (!user) return;
-    setTouched({ consent: true, files: true }); setErrors({});
-    if (!values.consent || !filesAreValid(files)) { setErrors({ ...(values.consent ? {} : { consent: d.form.errors.consent }), ...(filesAreValid(files) ? {} : { files: d.form.errors.file }) }); return; }
+    const personValid = !someoneElse || (valid.givenName && valid.familyName && valid.country && valid.representativeRelationship);
+    setTouched({ consent: true, files: true, ...(someoneElse ? { givenName: true, familyName: true, country: true, representativeRelationship: true } : {}) }); setErrors({});
+    if (!personValid || !values.consent || !filesAreValid(files)) { setErrors({ ...(values.consent ? {} : { consent: d.form.errors.consent }), ...(filesAreValid(files) ? {} : { files: d.form.errors.file }) }); return; }
+    const body = JSON.stringify({
+      conditionDescription: describedCase(values.conditionDescription.trim()), careArea: careArea || null, consent: true, caseFor: values.caseFor,
+      someoneElse: someoneElse ? { givenName: values.givenName.trim(), familyName: values.familyName.trim() || null, singleLegalName: values.singleLegalName, country: country?.name ?? "", relationship: values.representativeRelationship } : null,
+    });
     setBusy(true);
     try {
-      let created = draftCase.current;
+      // A draft from an earlier attempt is reused only while it is for the same person; otherwise a new one is started.
+      let created = draftBody.current === body ? draftCase.current : null;
       if (!created) {
-        const response = await apiFetchAs(user.access_token, "/patient/cases", { method: "POST", body: JSON.stringify({ conditionDescription: describedCase(values.conditionDescription.trim()), careArea: careArea || null, consent: true }) });
+        const response = await apiFetchAs(user.access_token, "/patient/cases", { method: "POST", body });
         if (!response.ok) throw new SubmitFailure("server");
         created = await response.json() as CreateCaseResponse;
-        draftCase.current = created;
+        draftCase.current = created; draftBody.current = body;
       }
       const submitted = await uploadAndSubmit(created);
       draftCase.current = null; uploaded.current.clear(); unconfirmed.current.clear();
@@ -256,8 +268,14 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
         <p className="mt-2 text-sm leading-6 text-ink-600">{t.savedDetails}</p>
       </div>
       <div className="p-6 md:p-9">
-        <fieldset className="min-w-0 border-0 p-0">
-          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{ar ? "عن حالتك الجديدة" : "About your new case"}</legend>
+        {whoForField()}
+        {someoneElse && <>
+          <p className="mt-3 text-sm leading-6 text-ink-600">{t.someoneElseSignedIn}</p>
+          {patientFields()}
+          <div className="mt-6 sm:max-w-[50%] sm:pe-3">{relationshipField()}</div>
+        </>}
+        <fieldset className="mt-8 min-w-0 border-0 p-0">
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.aboutThisCase : (ar ? "عن حالتك الجديدة" : "About your new case")}</legend>
           {caseFields()}
         </fieldset>
         {consentField()}
@@ -269,6 +287,56 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   }
 
   // Plain render helpers (not components): a component defined inside render remounts on every keystroke.
+  function whoForField() {
+    return <>
+        <fieldset className="min-w-0 border-0 p-0">
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{t.whoTitle}</legend>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t.whoTitle}>
+            {([["MYSELF", t.myself, t.myselfHelp, UserRound], ["SOMEONE_ELSE", t.someoneElse, t.someoneElseHelp, Users]] as const).map(([key, label, help, Icon]) => {
+              const selected = values.caseFor === key;
+              return <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${selected ? "border-brand-600 bg-brand-50 shadow-[0_0_0_3px_var(--color-brand-100)]" : "border-line bg-white hover:border-brand-300"}`}>
+                <input type="radio" name="caseFor" className="sr-only" value={key} checked={selected} onChange={() => update("caseFor", key)} />
+                <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-lg ${selected ? "bg-brand-600 text-white" : "bg-mist text-brand-700"}`} aria-hidden><Icon size={20} /></span>
+                <span className="min-w-0"><strong className="block text-ink-900">{label}</strong><span className="mt-0.5 block text-sm leading-5 text-ink-500">{help}</span></span>
+                {selected && <Check size={18} className="ms-auto flex-none text-brand-600" aria-hidden />}
+              </label>;
+            })}
+          </div>
+        </fieldset>
+    </>;
+  }
+  function patientFields() {
+    return <>
+        <fieldset className="mt-8 min-w-0 border-0 p-0">
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.patientSection : t.patientSectionSelf}</legend>
+          <p className="mt-1 text-sm text-ink-500">{t.namesHelp}</p>
+          <div className="mt-4 grid gap-6 sm:grid-cols-2">
+            <Field label={d.form.name} required requiredMark={t.requiredMark} valid={valid.givenName && !!values.givenName} error={fieldError("givenName")}>
+              <input className={`field ${fieldError("givenName") ? "field-error" : ""}`} autoComplete={someoneElse ? "off" : "given-name"} value={values.givenName} onChange={e => update("givenName", e.target.value)} onBlur={() => touch("givenName")} />
+            </Field>
+            <Field label={values.singleLegalName ? `${d.form.familyName} (${d.form.optional})` : d.form.familyName} required={!values.singleLegalName} requiredMark={t.requiredMark} valid={valid.familyName && !!values.familyName} error={fieldError("familyName")}>
+              <input className={`field ${fieldError("familyName") ? "field-error" : ""}`} autoComplete={someoneElse ? "off" : "family-name"} value={values.familyName} onChange={e => update("familyName", e.target.value)} onBlur={() => touch("familyName")} />
+            </Field>
+          </div>
+          <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-ink-600"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={values.singleLegalName} onChange={e => update("singleLegalName", e.target.checked)} />{t.singleName}</label>
+          <div className="mt-6">
+            <Field label={t.countryLabel} required requiredMark={t.requiredMark} valid={valid.country} error={fieldError("country")}>
+              <CountrySelect locale={locale} value={country} placeholder={t.countryPlaceholder} emptyLabel={t.countryEmpty} clearLabel={t.clearCountry} invalid={!!fieldError("country")} onBlur={() => touch("country")} onChange={c => { begin(); setCountry(c); touch("country"); }} />
+            </Field>
+          </div>
+        </fieldset>
+    </>;
+  }
+  function relationshipField() {
+    return <>
+            <Field label={t.repRelationship} required requiredMark={t.requiredMark} valid={valid.representativeRelationship && !!values.representativeRelationship} error={fieldError("representativeRelationship")}>
+              <select className={`field ${fieldError("representativeRelationship") ? "field-error" : ""}`} value={values.representativeRelationship} onChange={e => { update("representativeRelationship", e.target.value as Relationship | ""); touch("representativeRelationship"); }}>
+                <option value="">{t.selectOption}</option>
+                {RELATIONSHIPS.map(r => <option key={r} value={r}>{t.relationships[r]}</option>)}
+              </select>
+            </Field>
+    </>;
+  }
   function caseFields() {
     return <>
       <div className="mt-4"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} <span className="font-normal text-ink-400">({d.form.optional})</span></span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option>{additionalCareAreas(locale).map(area => <option key={area.slug} value={area.slug}>{area.title}</option>)}</select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
@@ -297,41 +365,11 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       {/* Section 1 — who the case is for, the patient's name, and how to reach the submitter */}
       {step===1&&<div className="min-w-0">
         {/* Quiet existing-account entry: never a competing CTA, never a registration prompt. */}
-        {!authLoading && !isPatient && <p className="mb-5 rounded-xl bg-mist px-4 py-3 text-sm text-ink-600">{t.haveAccount} <a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/portal?signin=1&returnTo=${encodeURIComponent(`/${locale}/send-my-case`)}`}>{t.signInSaved}</a></p>}
+        {!authLoading && !user && <p className="mb-5 rounded-xl bg-mist px-4 py-3 text-sm text-ink-600">{t.haveAccount} <a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/portal?signin=1&returnTo=${encodeURIComponent(`/${locale}/send-my-case`)}`}>{t.signInSaved}</a></p>}
 
-        <fieldset className="min-w-0 border-0 p-0">
-          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{t.whoTitle}</legend>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t.whoTitle}>
-            {([["MYSELF", t.myself, t.myselfHelp, UserRound], ["SOMEONE_ELSE", t.someoneElse, t.someoneElseHelp, Users]] as const).map(([key, label, help, Icon]) => {
-              const selected = values.caseFor === key;
-              return <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${selected ? "border-brand-600 bg-brand-50 shadow-[0_0_0_3px_var(--color-brand-100)]" : "border-line bg-white hover:border-brand-300"}`}>
-                <input type="radio" name="caseFor" className="sr-only" value={key} checked={selected} onChange={() => update("caseFor", key)} />
-                <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-lg ${selected ? "bg-brand-600 text-white" : "bg-mist text-brand-700"}`} aria-hidden><Icon size={20} /></span>
-                <span className="min-w-0"><strong className="block text-ink-900">{label}</strong><span className="mt-0.5 block text-sm leading-5 text-ink-500">{help}</span></span>
-                {selected && <Check size={18} className="ms-auto flex-none text-brand-600" aria-hidden />}
-              </label>;
-            })}
-          </div>
-        </fieldset>
+        {whoForField()}
 
-        <fieldset className="mt-8 min-w-0 border-0 p-0">
-          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.patientSection : t.patientSectionSelf}</legend>
-          <p className="mt-1 text-sm text-ink-500">{t.namesHelp}</p>
-          <div className="mt-4 grid gap-6 sm:grid-cols-2">
-            <Field label={d.form.name} required requiredMark={t.requiredMark} valid={valid.givenName && !!values.givenName} error={fieldError("givenName")}>
-              <input className={`field ${fieldError("givenName") ? "field-error" : ""}`} autoComplete={someoneElse ? "off" : "given-name"} value={values.givenName} onChange={e => update("givenName", e.target.value)} onBlur={() => touch("givenName")} />
-            </Field>
-            <Field label={values.singleLegalName ? `${d.form.familyName} (${d.form.optional})` : d.form.familyName} required={!values.singleLegalName} requiredMark={t.requiredMark} valid={valid.familyName && !!values.familyName} error={fieldError("familyName")}>
-              <input className={`field ${fieldError("familyName") ? "field-error" : ""}`} autoComplete={someoneElse ? "off" : "family-name"} value={values.familyName} onChange={e => update("familyName", e.target.value)} onBlur={() => touch("familyName")} />
-            </Field>
-          </div>
-          <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-ink-600"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={values.singleLegalName} onChange={e => update("singleLegalName", e.target.checked)} />{t.singleName}</label>
-          <div className="mt-6">
-            <Field label={t.countryLabel} required requiredMark={t.requiredMark} valid={valid.country} error={fieldError("country")}>
-              <CountrySelect locale={locale} value={country} placeholder={t.countryPlaceholder} emptyLabel={t.countryEmpty} clearLabel={t.clearCountry} invalid={!!fieldError("country")} onBlur={() => touch("country")} onChange={c => { begin(); setCountry(c); touch("country"); }} />
-            </Field>
-          </div>
-        </fieldset>
+        {patientFields()}
 
         {someoneElse && <fieldset className="mt-8 min-w-0 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
           <legend className="px-1 text-sm font-bold uppercase tracking-wide text-accent-700">{t.repSection}</legend>
@@ -339,12 +377,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
             <Field label={t.repName} required requiredMark={t.requiredMark} valid={valid.representativeName && !!values.representativeName} error={fieldError("representativeName")}>
               <input className={`field ${fieldError("representativeName") ? "field-error" : ""}`} autoComplete="name" value={values.representativeName} onChange={e => update("representativeName", e.target.value)} onBlur={() => touch("representativeName")} />
             </Field>
-            <Field label={t.repRelationship} required requiredMark={t.requiredMark} valid={valid.representativeRelationship && !!values.representativeRelationship} error={fieldError("representativeRelationship")}>
-              <select className={`field ${fieldError("representativeRelationship") ? "field-error" : ""}`} value={values.representativeRelationship} onChange={e => { update("representativeRelationship", e.target.value as Relationship | ""); touch("representativeRelationship"); }}>
-                <option value="">{t.selectOption}</option>
-                {RELATIONSHIPS.map(r => <option key={r} value={r}>{t.relationships[r]}</option>)}
-              </select>
-            </Field>
+            {relationshipField()}
           </div>
         </fieldset>}
 
