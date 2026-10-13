@@ -73,6 +73,14 @@ Finance open-deposit list is unpaginated (C2); a case page read still re-derives
 | W-31 | A dev-only inbound WhatsApp simulator (disabled in production) or seeded synthetic conversations, so Conversations and the coordinator routing (R1–R11, S0–S6) can be walked. |
 | — | Invited accounts (`patient-identity-reviewer` and others): document the activation route for walks. |
 
+**Done — `899de3a` (2026-10-13).** W-31 dev inbound WhatsApp simulator (`/dev/whatsapp/inbound`, local only, off the
+gateway); W-34 second Consultant login `doctor-orthopedics`; W-51 `keycloak-sync` one-shot partial import; MFA-1/W-29 and
+the invited-account activation route (Forgot password → Mailpit → authenticator) documented in
+`test-accounts-and-e2e-journey.md`. Not done here: W-52 (seed state needs the invitation model — A7); W-40 passkey
+registration in browsers without `prompt()` (A2); recording a credential (needs the administrator passkey — next walk,
+in Chrome). Live checks for the next walk: `docker logs rehletshifaa-keycloak-sync-1` shows the counts; activate
+`doctor-orthopedics`; inject one inbound message and see it in Conversations.
+
 ### W0 — Finish the walk (owner signs in)
 
 Deposit end to end on RS-2026-000001 and on a catalogue-only case (after B3); the patient sees "Deposit received";
