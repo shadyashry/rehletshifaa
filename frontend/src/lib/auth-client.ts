@@ -25,3 +25,12 @@ export function authManager() {
   });
   return manager;
 }
+
+const SIGN_IN_LOCALE = "rs:sign-in-locale";
+/** The portal language a sign-in started from, so the callback can answer in it (QA W-19). Per tab, like the OIDC state. */
+export function rememberSignInLocale(locale: "en" | "ar") {
+  try { window.sessionStorage.setItem(SIGN_IN_LOCALE, locale); } catch { /* storage unavailable: the browser language decides */ }
+}
+export function signInLocale(): "en" | "ar" | null {
+  try { const value = window.sessionStorage.getItem(SIGN_IN_LOCALE); return value === "ar" || value === "en" ? value : null; } catch { return null; }
+}

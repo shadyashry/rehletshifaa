@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "oidc-client-ts";
-import { authManager } from "@/lib/auth-client";
+import { authManager, rememberSignInLocale } from "@/lib/auth-client";
 import { apiFetchAs } from "@/lib/api";
 import { reauthenticationAcr, type Me } from "@/lib/access";
 
@@ -50,7 +50,7 @@ export function AuthProvider({children}:{children:React.ReactNode}){
   const meRef=useRef(me);
   useEffect(()=>{meRef.current=me;},[me]);
   // returnTo defaults to the current page; callers that arrive via a one-shot flag (?signin=1, ?continue=1) strip it first so a cancelled sign-in cannot loop.
-  const signIn=useCallback(async(reauthenticate=false,returnTo?:string)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,...(reauthenticate?{acr_values:reauthenticationAcr(meRef.current)}:{})},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[]);
+  const signIn=useCallback(async(reauthenticate=false,returnTo?:string)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";rememberSignInLocale(locale);return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,...(reauthenticate?{acr_values:reauthenticationAcr(meRef.current)}:{})},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[]);
   const signOut=useCallback(async()=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";await authManager().signoutRedirect({post_logout_redirect_uri:`${window.location.origin}/${locale}/portal`});},[]);
   const value=useMemo(()=>({user,me,roles:me?.roles??[],loading:loading||meLoading,meFailed,activationIssue,refreshMe,signIn,signOut}),[user,me,loading,meLoading,meFailed,activationIssue,refreshMe,signIn,signOut]);
   return <Context.Provider value={value}>{children}</Context.Provider>;

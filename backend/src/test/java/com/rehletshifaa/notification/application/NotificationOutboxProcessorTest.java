@@ -159,6 +159,49 @@ class NotificationOutboxProcessorTest {
         assertThat(delivered.body()).contains("http://localhost:3000/ar/proposal/tok123");
     }
 
+    /** Renders one message and returns what the channel received. */
+    OutgoingNotification render(String template, String json) {
+        claimedWith(template, json);
+        when(store.recordDelivered(any(), anyInt(), anyString())).thenReturn(true);
+        processor.dispatch();
+        return delivered;
+    }
+
+    static boolean arabic(String text) { return text.codePoints().anyMatch(c -> c >= 0x0600 && c <= 0x06FF); }
+
+    /** QA W-8, #29, W-42: an Arabic patient reads every message in Arabic, an English one in English — email or simulator. */
+    @Test void everyPatientMessageIsWrittenInThePatientsLanguage() {
+        String[][] templates = {
+                {"case-status-link", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"patient-action-link", "{\"token\":\"t1\",\"lang\":\"%s\"}"},
+                {"secure-message", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"proposal-ready", "{\"token\":\"t1\",\"lang\":\"%s\"}"},
+                {"final-quote-ready", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"onboarding-activation", "{\"token\":\"t1\",\"lang\":\"%s\"}"},
+                {"account-link-continue", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"deposit-settled-patient", "{\"lang\":\"%s\"}"},
+                {"out-of-hours", "{\"lang\":\"%s\"}"}, {"intake-followup", "{\"lang\":\"%s\"}"},
+                {"coordinator-intro", "{\"name\":\"Layla\",\"lang\":\"%s\"}"}, {"case-access-code", "{\"code\":\"123456\",\"lang\":\"%s\"}"}};
+        for (String[] t : templates) {
+            var ar = render(t[0], t[1].formatted("ar"));
+            assertThat(arabic(ar.subject()) && arabic(ar.body())).as(t[0] + " in Arabic").isTrue();
+            assertThat(ar.language()).as(t[0]).isEqualTo("ar");
+            var en = render(t[0], t[1].formatted("en"));
+            assertThat(arabic(en.subject()) || arabic(en.body())).as(t[0] + " in English").isFalse();
+        }
+    }
+
+    /** QA W-8: the patient acknowledged a preliminary estimate; nothing was accepted. */
+    @Test void theProfileCompletionMessageSaysAcknowledgedNotAccepted() {
+        assertThat(render("onboarding-activation", "{\"token\":\"t1\",\"lang\":\"en\"}").body())
+                .contains("You acknowledged your preliminary estimate").doesNotContain("accepted");
+        assertThat(render("onboarding-activation", "{\"token\":\"t1\",\"lang\":\"ar\"}").body())
+                .contains("أقررتَ بتقديرك المبدئي").contains("http://localhost:3000/ar/activate/t1");
+    }
+
+    /** QA W-9: the coordinator's work email names the case once. */
+    @Test void theCoordinatorWorkEmailNamesTheCaseOnce() {
+        String body = render("coordinator-work-assigned", "{\"title\":\"Arrange the deposit\",\"case\":\"RS-2026-000002\"}").body();
+        assertThat(body).startsWith("Case RS-2026-000002 needs you as its coordinator").doesNotContain("Case for case");
+        assertThat(render("coordinator-work-assigned", "{\"title\":\"Arrange the deposit\"}").body()).startsWith("A case needs you");
+    }
+
     @Test void aRecordedDecisionCarriesItsWordsAsTemplateParameters() {
         claimedWith("proposal-decision-recorded",
                 "{\"decision\":\"ACCEPTED\",\"confirmedBy\":\"REPRESENTATIVE\",\"date\":\"2026-10-08\",\"lang\":\"en\"}");

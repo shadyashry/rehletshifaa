@@ -575,7 +575,7 @@
       "server": "We couldn't send your case right now. Please try again or contact us on WhatsApp.",
       "upload": "We couldn't attach one of your files. Remove it and send your case, or try again — your details are saved.",
       "submitAfterUpload": "Your details reached us but the case wasn't finished. Press Send my case again — nothing will be duplicated.",
-      "verifiedContactRequired": "To send a case for someone else, first verify your WhatsApp number and email address in Profile & Security.",
+      "verifiedContactRequired": "To send a case for someone else, your WhatsApp number and email address must be confirmed first. Message your coordinator and they will confirm them with you.",
       "forOthersLimit": "You have sent several cases for other people recently. Please try again later, or message your coordinator."
     },
     "category": {
