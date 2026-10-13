@@ -58,17 +58,35 @@ export function plural(locale: Locale, count: number, forms: PluralForms) {
   return fillTemplate(forms[category] ?? forms.other, { count: new Intl.NumberFormat(intlLocale(locale)).format(count) });
 }
 
+/** The viewer's resolved current action, when the page has one: who owes the move follows from it (QA #13, W-5). */
+export type ActionHint = { code: string; kind: string };
+/** Kinds where the viewer themselves must act now. */
+const ACTING = new Set(["FOCUS", "COMPLETE", "CLAIM", "ACCEPT"]);
+/** Waiting actions that say on whom the case waits, more precisely than the stored responsibility. */
+const WAITS_ON: Record<string, string> = {
+  WAIT_INTERNAL_APPROVAL: "INTERNAL_APPROVAL", WAIT_OPERATIONS: "OPERATIONS", WAIT_CONSULTANT: "CONSULTANT", WAIT_PAYMENT: "PAYMENT",
+  WAIT_PATIENT_DECISION: "PATIENT", WAIT_PATIENT_INFORMATION: "PATIENT", WAIT_PATIENT_READINESS: "PATIENT",
+};
+const NOT_VALUES = ["label", "you", "other", "CARE_TEAM"];
+
 /**
- * Who owes the next move, from the viewer's side and never as the raw value. "You" only when it is really this person:
- * the assigned Consultant, the patient themselves, or the coordinator who owns the case (a coordinator browsing the
- * team queue, or operations and finance, read "our team"). An unknown value reads "another party".
+ * Who owes the next move, from the viewer's side and never as the raw value. With the viewer's current action it is the
+ * action that answers: "you" when they must act, otherwise whom their wait is on (internal sign-off, Operations, …), and
+ * never "you" while they wait. Without one, "you" only when it is really this person: the assigned Consultant, the patient
+ * themselves, the coordinator who owns the case, or whoever holds the work item ({@code holdsWork}). Our own team reads
+ * "the care team" to a Consultant (QA #11). An unknown value reads "another party".
  */
-export function waitingLabel(value: string, copy: WorkCopy["waiting"], viewer: { role?: string; ownsCase?: boolean } = {}) {
-  const mine = (value === "CONSULTANT" && viewer.role === "doctor") || (value === "PATIENT" && viewer.role === "patient")
-    || (value === "STAFF" && viewer.role === "coordinator" && !!viewer.ownsCase);
+export function waitingLabel(value: string, copy: WorkCopy["waiting"],
+                             viewer: { role?: string; ownsCase?: boolean; holdsWork?: boolean; action?: ActionHint | null } = {}) {
+  const action = viewer.action;
+  if (action && ACTING.has(action.kind)) return copy.you;
+  const key = (action && WAITS_ON[action.code]) || value;
+  const mine = !action && ((value === "CONSULTANT" && viewer.role === "doctor") || (value === "PATIENT" && viewer.role === "patient")
+    || (value === "STAFF" && ((viewer.role === "coordinator" && !!viewer.ownsCase) || !!viewer.holdsWork)));
   if (mine) return copy.you;
+  if (key === "STAFF" && viewer.role === "doctor") return copy.CARE_TEAM;
   const known = copy as Record<string, string>;
-  return Object.hasOwn(known, value) && !["label", "you", "other"].includes(value) ? known[value] : copy.other;
+  return Object.hasOwn(known, key) && !NOT_VALUES.includes(key) ? known[key] : copy.other;
 }
 
 /** Where an arrow, Home or End key moves focus in a tablist, following the reading direction; -1 when it does not. */

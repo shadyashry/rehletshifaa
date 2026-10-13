@@ -129,6 +129,19 @@ describe("CurrentActionPanel", () => {
     expect(screen.getByRole("button", { name: /payment instructions sent/i })).toBeTruthy();
   });
 
+  it("words the pre-release travel-package step as planning, never as a settled deposit (QA #25, #27)", () => {
+    renderWithWork(<CurrentActionPanel locale="en" role="coordinator" onFocusAction={vi.fn()} action={{ code: "ASSIGN_OPERATIONS_PLAN", kind: "FOCUS" }}/>);
+    expect(screen.getByRole("heading", { name: "Plan the travel package with Operations" })).toBeTruthy();
+    expect(screen.queryByText(/deposit is settled/i)).toBeNull();
+    cleanup();
+    renderWithWork(<CurrentActionPanel locale="en" role="operations" onFocusAction={vi.fn()} action={{ code: "PREPARE_TRAVEL_PACKAGE", kind: "FOCUS" }}/>);
+    expect(screen.getByRole("heading", { name: "Plan the travel package" })).toBeTruthy();
+    expect(screen.queryByText(/confirm it once every requirement is met/i)).toBeNull();
+    cleanup();
+    renderWithWork(<CurrentActionPanel locale="ar" role="coordinator" onFocusAction={vi.fn()} action={{ code: "ASSIGN_OPERATIONS_PLAN", kind: "FOCUS" }}/>, "ar");
+    expect(screen.getByRole("heading", { name: "خطّط لباقة السفر مع فريق العمليات" })).toBeTruthy();
+  });
+
   it("asks Finance to record the deposit in English and Arabic (QA W-24)", () => {
     const action: CurrentActionView = { code: "WORK_ITEM", kind: "FOCUS", workItemId: "w3", workItemVersion: 0, workType: "DEPOSIT_RECORD", title: "Record the deposit",
       copy: { code: "DEPOSIT_RECORD", params: {} } };

@@ -85,7 +85,7 @@ class JourneyServiceIntegrationTest {
         var operationsAssignment=journey.assign(created.caseId(),new AssignmentRequest("operations-subject","OPERATIONS","PRIMARY","cardiac-pod","Travel and hospital planning"));
         var financeAssignment=journey.assign(created.caseId(),new AssignmentRequest("finance-subject","FINANCE","PRIMARY","cardiac-pod","Commercial approval"));
         authenticate("operations-subject",Role.OPERATIONS);journey.decideAssignment(created.caseId(),operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.authority.domain.Role.OPERATIONS);
-        assertThat(journey.workspace(created.caseId()).actions().availableActions()).contains("UPDATE_TRAVEL_PLAN");
+        assertThat(journey.workspace(created.caseId()).actions().availableActions()).contains("PREPARE_TRAVEL_PACKAGE");
         authenticate("finance-subject",Role.FINANCE);journey.decideAssignment(created.caseId(),financeAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.authority.domain.Role.FINANCE);
         // Direct POST cannot bypass the same current business preconditions that kept the action absent.
         assertThat(journey.workspace(created.caseId()).actions().availableActions()).doesNotContain("APPROVE_COMMERCIAL_TERMS");

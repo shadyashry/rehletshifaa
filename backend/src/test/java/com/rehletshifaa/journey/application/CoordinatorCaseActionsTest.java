@@ -99,6 +99,24 @@ class CoordinatorCaseActionsTest {
         assertThat(current.code()).isEqualTo("WORK_ITEM");
     }
 
+    /** QA #25/#27: before release the travel-package step is its own action — never the after-deposit "treatment coordination". */
+    @Test void beforeReleaseATravelPackageAsksForTheOperationsPlanNotTreatmentCoordination() throws Exception {
+        var ctx = recommended();
+        raw("UPDATE medical_cases SET travel_package_requested=TRUE WHERE id=?", ctx.caseId());
+        createProposal(ctx); em.flush();
+        CaseActionsView coordinator = journey.workspace(ctx.caseId()).actions();
+        assertThat(coordinator.currentAction().code()).isEqualTo("ASSIGN_OPERATIONS_PLAN");
+        assertThat(coordinator.availableActions()).contains("ASSIGN_OPERATIONS");
+
+        var assignment = journey.assign(ctx.caseId(), new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", null, "Travel package")); em.flush();
+        assertThat(journey.workspace(ctx.caseId()).actions().currentAction().code()).isEqualTo("WAIT_INTERNAL_APPROVAL");
+        authenticate("operations-subject", Role.OPERATIONS);
+        journey.decideAssignment(ctx.caseId(), assignment.id(), new AssignmentDecisionRequest(true, null), Role.OPERATIONS); em.flush();
+        CaseActionsView operations = journey.workspace(ctx.caseId()).actions();
+        assertThat(operations.currentAction().code()).isEqualTo("PREPARE_TRAVEL_PACKAGE");
+        assertThat(operations.availableActions()).containsExactly("PREPARE_TRAVEL_PACKAGE");
+    }
+
     @Test void anAcknowledgedProposalNeverShowsPrepareProposalEvenFromStaleData() throws Exception {
         var ctx = acknowledged();
         // Data from before the fix: an item that was never closed when the proposal was created.

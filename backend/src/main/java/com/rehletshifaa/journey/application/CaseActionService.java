@@ -200,8 +200,10 @@ public class CaseActionService {
         if (actor.role() == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
         if (actor.role() == Role.OPERATIONS) {
             if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
+            // Before release Operations prices and plans the travel package for the proposal (QA #27); arranging travel
+            // and arrival (UPDATE_TRAVEL_PLAN) only starts once the deposit is settled.
             if ("PROPOSAL_PREPARATION".equals(s) && f.travelPackage() && proposal != null && !proposal.operationsDone()
-                    && "CLINICALLY_APPROVED".equals(proposal.status())) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
+                    && "CLINICALLY_APPROVED".equals(proposal.status())) return simple("PREPARE_TRAVEL_PACKAGE", "FOCUS");
         }
         if (actor.role() == Role.FINANCE && "PROPOSAL_PREPARATION".equals(s) && proposal != null && proposal.requiresFinance()
                 && !proposal.financeDone() && (!f.travelPackage() || proposal.operationsDone())
@@ -219,7 +221,8 @@ public class CaseActionService {
         if (p == null) return simple("PREPARE_PROPOSAL", "FOCUS");
         boolean opsNeeded = f.travelPackage() && !p.finalQuote() && !p.operationsDone();
         boolean finNeeded = p.requiresFinance() && !p.financeDone();
-        if (opsNeeded && !f.hasAssignment("OPERATIONS")) return simple("ASSIGN_OPERATIONS", "FOCUS");
+        // Not ASSIGN_OPERATIONS: that is treatment coordination after the deposit, and its copy says so (QA #25).
+        if (opsNeeded && !f.hasAssignment("OPERATIONS")) return simple("ASSIGN_OPERATIONS_PLAN", "FOCUS");
         if (finNeeded && !f.hasAssignment("FINANCE")) return simple("ASSIGN_FINANCE", "FOCUS");
         if (opsNeeded || finNeeded) return simple("WAIT_INTERNAL_APPROVAL", "WAIT");
         return simple("RELEASE_PROPOSAL", "FOCUS");
@@ -348,6 +351,9 @@ public class CaseActionService {
         String fallback = StaffWorkService.stageDefault(status);
         // Open coordinator work means our team owes the next move, unless the stage says the ball is elsewhere.
         if (Set.of("STAFF", "PAYMENT", "TRAVEL_TEAM", "NONE").contains(fallback) && work.hasOpenWork(caseId, "COORDINATOR")) fallback = "STAFF";
+        // While the patient decides, open coordinator work means the patient asked us something (the Arabic terms call):
+        // the ball is ours until it is done (QA W-5). A patient action still outranks it below.
+        if ("PATIENT_DECISION".equals(status) && work.hasOpenWork(caseId, "COORDINATOR")) fallback = "STAFF";
         WaitingReason reason = patientStep.map(b -> WaitingReason.patientStep(b.code(), "Waiting for the patient: " + b.labelEn().toLowerCase(Locale.ROOT)))
                 .orElse("PAYMENT".equals(fallback) ? WaitingReason.of("DEPOSIT_PENDING", "Waiting for the coordination deposit")
                         : mine != null && "STAFF".equals(fallback) ? WaitingReason.work(mine.copy() == null ? null : mine.copy().code(), mine.title()) : null);

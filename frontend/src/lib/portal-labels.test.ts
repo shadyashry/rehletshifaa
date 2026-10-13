@@ -52,6 +52,25 @@ describe("portal labels", () => {
     expect(waitingLabel("label", w)).toBe("another party");
   });
 
+  it("follows the viewer's current action, so the header never contradicts it (QA #13, W-5, #11)", () => {
+    const w = en.portalWork.waiting;
+    const owner = { role: "coordinator", ownsCase: true };
+    // #13: the owner waits for Finance — the stored value is our team, but the owner is not the one being waited on.
+    expect(waitingLabel("STAFF", w, { ...owner, action: { code: "WAIT_INTERNAL_APPROVAL", kind: "WAIT" } })).toBe("internal sign-off");
+    expect(waitingLabel("TRAVEL_TEAM", w, { ...owner, action: { code: "WAIT_OPERATIONS", kind: "WAIT" } })).toBe("Operations");
+    // W-5: the coordinator owes the Arabic terms call while the stage still reads "patient decision".
+    expect(waitingLabel("PATIENT", w, { ...owner, action: { code: "WORK_ITEM", kind: "FOCUS" } })).toBe("you");
+    expect(waitingLabel("PATIENT", w, { ...owner, action: { code: "WAIT_PATIENT_DECISION", kind: "WAIT" } })).toBe("the patient");
+    // Nothing for this viewer: never "you", whatever the stored value.
+    expect(waitingLabel("STAFF", w, { ...owner, action: { code: "NONE", kind: "NONE" } })).toBe("our team");
+    // A work item in My work is the viewer's own.
+    expect(waitingLabel("STAFF", w, { role: "finance", holdsWork: true })).toBe("you");
+    // #11: a Consultant reads our side as the care team.
+    expect(waitingLabel("STAFF", w, { role: "doctor" })).toBe("the care team");
+    expect(waitingLabel("STAFF", ar.portalWork.waiting, { role: "doctor" })).toBe("فريق الرعاية");
+    expect(waitingLabel("CARE_TEAM", w)).toBe("another party");
+  });
+
   it("moves tab focus with the reading direction", () => {
     expect(tabKeyTarget("ArrowRight", 0, 3, false)).toBe(1);
     expect(tabKeyTarget("ArrowLeft", 0, 3, true)).toBe(1);

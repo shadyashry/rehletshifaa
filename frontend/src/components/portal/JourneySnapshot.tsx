@@ -6,7 +6,7 @@ import { Check, X } from "lucide-react";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge } from "@/components/portal/StatusBadge";
-import { waitingLabel } from "@/lib/portal-labels";
+import { waitingLabel, type ActionHint } from "@/lib/portal-labels";
 
 export type TimelineEvent = {
   type: string; label: string; occurredAt: string; status: string;
@@ -18,8 +18,8 @@ export type TimelineEvent = {
  * about. Deliberately holds no owner, assignee, next action or history — those live where they belong,
  * so the pulse never competes with the current action or repeats it.
  */
-export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, onViewJourney }: {
-  locale: Locale; stage: string; waitingOn?: string | null; viewerRole?: string; ownsCase?: boolean; onViewJourney: () => void;
+export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, action, onViewJourney }: {
+  locale: Locale; stage: string; waitingOn?: string | null; viewerRole?: string; ownsCase?: boolean; action?: ActionHint | null; onViewJourney: () => void;
 }) {
   const work = useWorkCopy();
   const ar = locale === "ar";
@@ -56,7 +56,7 @@ export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, o
 
       {waitingOn && waitingOn !== "NONE" && (
         <p className="mt-3">
-          <StatusBadge tone={blocked ? "warning" : "info"}>{work.waiting.label}: {waitingLabel(waitingOn, work.waiting, { role: viewerRole, ownsCase })}</StatusBadge>
+          <StatusBadge tone={blocked ? "warning" : "info"}>{work.waiting.label}: {waitingLabel(waitingOn, work.waiting, { role: viewerRole, ownsCase, action })}</StatusBadge>
         </p>
       )}
 
@@ -164,7 +164,7 @@ const STAGES: Record<string, { en: string; ar: string }> = {
   CLINICAL_RECOMMENDATION_READY: { en: "Clinical recommendation ready", ar: "التوصية السريرية جاهزة" },
   CLINICALLY_NOT_SUITABLE: { en: "Not clinically suitable", ar: "غير مناسبة سريريًا" },
   PROPOSAL_PREPARATION: { en: "Preparing proposal", ar: "تجهيز العرض" },
-  PROPOSAL_INTERNAL_APPROVAL: { en: "Internal approval", ar: "الاعتماد الداخلي" },
+  PROPOSAL_INTERNAL_APPROVAL: { en: "Ready to release", ar: "جاهز للإرسال" },
   REVISION_REQUESTED: { en: "Revision requested", ar: "طلب تعديل" },
   PATIENT_DECISION: { en: "With the patient", ar: "لدى المريض" },
   ACCEPTED: { en: "Proposal accepted", ar: "تم قبول العرض" },

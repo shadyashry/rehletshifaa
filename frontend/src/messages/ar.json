@@ -979,6 +979,9 @@
       "PAYMENT": "الدفع",
       "EXTERNAL": "جهة خارجية",
       "NONE": "لا أحد",
+      "INTERNAL_APPROVAL": "الاعتماد الداخلي",
+      "OPERATIONS": "فريق العمليات",
+      "CARE_TEAM": "فريق الرعاية",
       "other": "جهة أخرى"
     },
     "priority": {
@@ -1085,6 +1088,8 @@
         "PREPARE_PROPOSAL": "تجهيز العرض",
         "RELEASE_PROPOSAL": "مراجعة وإصدار",
         "ASSIGN_OPERATIONS": "تعيين فريق العمليات",
+        "ASSIGN_OPERATIONS_PLAN": "تعيين فريق العمليات",
+        "PREPARE_TRAVEL_PACKAGE": "خطّط لباقة السفر",
         "ASSIGN_FINANCE": "تعيين المالية",
         "RECORD_CLINICAL_DECISION": "تسجيل القرار السريري",
         "UPDATE_TRAVEL_PLAN": "استكمال الترتيبات",
@@ -1146,6 +1151,14 @@
         "ASSIGN_OPERATIONS": {
           "title": "ابدأ تنسيق العلاج",
           "body": "تم تسوية الوديعة. عيّن فريق العمليات لترتيب السفر والوصول."
+        },
+        "ASSIGN_OPERATIONS_PLAN": {
+          "title": "خطّط لباقة السفر مع فريق العمليات",
+          "body": "طلب المريض باقة سفر. عيّن فريق العمليات لتخطيطها وتسعيرها قبل إرسال العرض."
+        },
+        "PREPARE_TRAVEL_PACKAGE": {
+          "title": "خطّط لباقة السفر",
+          "body": "صِف باقة السفر للعرض قبل إرساله. تُرتَّب الحجوزات والوصول بعد استلام وديعة المريض فقط."
         },
         "ASSIGN_FINANCE": {
           "title": "يلزم اعتماد المالية للشروط التجارية",

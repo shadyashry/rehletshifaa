@@ -979,6 +979,9 @@
       "PAYMENT": "payment",
       "EXTERNAL": "an external party",
       "NONE": "nobody",
+      "INTERNAL_APPROVAL": "internal sign-off",
+      "OPERATIONS": "Operations",
+      "CARE_TEAM": "the care team",
       "other": "another party"
     },
     "priority": {
@@ -1061,6 +1064,8 @@
         "PREPARE_PROPOSAL": "Prepare proposal",
         "RELEASE_PROPOSAL": "Review & release",
         "ASSIGN_OPERATIONS": "Assign Operations",
+        "ASSIGN_OPERATIONS_PLAN": "Assign Operations",
+        "PREPARE_TRAVEL_PACKAGE": "Plan the travel package",
         "ASSIGN_FINANCE": "Assign Finance",
         "RECORD_CLINICAL_DECISION": "Record clinical decision",
         "UPDATE_TRAVEL_PLAN": "Complete arrangements",
@@ -1122,6 +1127,14 @@
         "ASSIGN_OPERATIONS": {
           "title": "Start treatment coordination",
           "body": "The deposit is settled. Assign Operations to arrange travel and arrival."
+        },
+        "ASSIGN_OPERATIONS_PLAN": {
+          "title": "Plan the travel package with Operations",
+          "body": "The patient asked for a travel package. Assign Operations to plan and price it before the proposal is released."
+        },
+        "PREPARE_TRAVEL_PACKAGE": {
+          "title": "Plan the travel package",
+          "body": "Describe the travel package for the proposal before it is released. Bookings and arrival are arranged only after the patient's deposit."
         },
         "ASSIGN_FINANCE": {
           "title": "Finance must approve the commercial terms",

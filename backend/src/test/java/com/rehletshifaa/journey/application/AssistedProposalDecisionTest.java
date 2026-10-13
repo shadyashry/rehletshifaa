@@ -54,6 +54,9 @@ class AssistedProposalDecisionTest {
         // The patient's own page says the request was made, after a reload.
         assertThat(journey.workspace(caseId).proposal().assistance().requestedAt()).isEqualTo(first.requestedAt());
         assertThat(count("SELECT count(*) FROM proposal_decisions WHERE proposal_version_id=?", versionId)).isZero();
+        // QA W-5: the patient asked us for the call, so the case waits on our team, not on the patient.
+        assertThat(journey.workspace(caseId).actions().waitingOn()).isEqualTo("STAFF");
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, caseId)).isEqualTo("STAFF");
     }
 
     @Test void theOwningCoordinatorRecordsAnAcknowledgementWithTheSameEffectAsThePatients() throws Exception {
@@ -184,8 +187,9 @@ class AssistedProposalDecisionTest {
         var current = actions.currentAction();
         assertThat(current.workType()).isEqualTo(ProposalAssistanceService.WORK_TYPE);
         assertThat(current.copy()).isEqualTo(item.copy());
-        // The stage still waits on the patient's decision, so the reason is the patient default — now as a code too.
-        assertThat(actions.waitingReasonCode()).isEqualTo("DEFAULT_PATIENT");
+        // The patient asked us for the call, so the case waits on the coordinator's work, worded by its code (QA W-5).
+        assertThat(actions.waitingOn()).isEqualTo("STAFF");
+        assertThat(actions.waitingReasonCode()).isEqualTo("WORK:PROPOSAL_TERMS_CALL");
         var notice = staffWork.myNotifications().items().stream().filter(n -> caseId.equals(n.caseId()) && "PROPOSAL_ASSISTANCE_REQUESTED".equals(n.eventType())).findFirst().orElseThrow();
         assertThat(notice.copy()).isEqualTo(item.copy());
     }

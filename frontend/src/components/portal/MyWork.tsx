@@ -87,7 +87,7 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
                         <CalendarClock size={13} aria-hidden/>{t.due}: {new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short" }).format(new Date(item.dueAt))}
                       </span>
                     )}
-                    {item.waitingOn && item.waitingOn !== "NONE" && <span>{work.waiting.label}: {waitingLabel(item.waitingOn, work.waiting, { role })}</span>}
+                    {item.waitingOn && item.waitingOn !== "NONE" && <span>{work.waiting.label}: {waitingLabel(item.waitingOn, work.waiting, { role, holdsWork: true })}</span>}
                   </p>
                 </div>
                 <button type="button"
