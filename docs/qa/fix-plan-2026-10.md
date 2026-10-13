@@ -26,6 +26,7 @@ Housekeeping: B1 and B2 read "Fixed, **not committed**" in the findings; both ar
 
 | Order | Batch | Theme | Size | Blocked by |
 |---|---|---|---|---|
+| 0 | **B3** | Blocker: deposits on catalogue-only cases cannot be recorded | ½ session | — (security review of the authorization change) |
 | 1 | **A0** | Quick, high-impact truth fixes | ½ session | — |
 | 2 | **A1** | The next action tells the truth | 1 session | — |
 | 3 | **A2** | Sign-in, security re-check and browser history | 1 session | D1 (owner) for one item |
@@ -36,12 +37,21 @@ Housekeeping: B1 and B2 read "Fixed, **not committed**" in the findings; both ar
 | 8 | **B1** | Notifications and Arabic copy | 1 session | — |
 | 9 | **B2** | Accessible names | ½ session | — |
 | 10 | **C1** | Patient proposal, status link and profile redesign | 2 sessions (plan + build) | shape plan approval |
+| 10b | **C2** | Finance workspace redesign (owner: complete revamp) | 2–3 sessions (critique + plan + build) | A4 + B3 logic first; shape plan approval |
 | 11 | **R1** | Travel services priced by Operations | design + 3–4 sessions | R1 decisions |
 | — | **Blocked** | Legal, business and native-review items | — | see register |
 
 ---
 
 ## Phase A — logic and truth
+
+### B3 — Blocker: Finance cannot reach deposits on catalogue-only cases (first, next session)
+
+W-25 → B3: Finance is assignable only while the proposal is prepared, so a catalogue-only case never has Finance and
+its deposit cannot be recorded in the product (Finance gets 403 on the case). Fix: a Finance work item "Record the
+deposit" when payment instructions are sent (with W-24), and `CASE_READ` for Finance on cases with an open deposit (as
+B1 did for offered cases); test that a catalogue-only case can be paid end to end; independent security review of the
+authorization change.
 
 ### A0 — Quick, high-impact truth fixes (½ session)
 
@@ -113,6 +123,8 @@ Verify: backend invariant test over all stages; dashboard Playwright specs; full
 | #8 | "Approved catalogue price" excludes off-list items. |
 | #20 | One "Approve commercial terms" action. |
 | W-1 | **Business decision first:** cap the deposit at a share of the estimate, or waive under a threshold — then implement in the commercial policy. |
+| W-21 / W-22 | Deposit copy from the actual flow (the coordinator sends instructions; Finance records the receipt); readiness wording per deposit state. |
+| DEP-1 | **Agreed 2026-10-13:** keep Finance confirming offline payments (no payment source exists), made smoother: the patient uploads proof of transfer from My Care; Finance gets a work item to verify and record it; the patient sees "Payment received" once confirmed. |
 
 *Pending walk evidence:* the deposit-recording step (walk step 5) may add items here.
 
@@ -176,6 +188,15 @@ location per screen size), the secure status link, profile completion. Includes 
 G-12 and the W-10/#31 decision (two codes in an hour). Starts with a shape plan in `docs/ux-redesign/plans/` for owner
 approval, as My Care did.
 
+### C2 — Finance workspace redesign (owner: complete UI/UX revamp)
+
+F-UX-1: the owner asked for a complete revamp of the Finance screens, not piecemeal fixes. Runs through
+`/redesign-area` with an Impeccable critique of the current Finance dashboard, case view (commercial approval, deposit
+and payments, refunds) and the Control Center Finance pages (exchange rates, margin & deposit policy), then a shape plan
+for owner approval. The logic it depends on lands first in A4 and B3 (Finance work items, EGP amount due, fixed payment
+methods, manual-line visibility, one approve action, deposits reachable on every case). Pass-specific: the Control
+Center still renders the legacy base theme and converges to Petrol & Paper here.
+
 ## Phase D — new feature
 
 ### R1 — Travel services priced by Operations
@@ -194,6 +215,7 @@ margin on travel, Finance approval of travel prices, fixed price vs range, compa
 | G-3 | Legal: representative consent wording | consent variant |
 | G-13 | Native Arabic review | launch |
 | W-1 | Business: deposit cap/waiver rule | A4 |
+| DEP-2 | Business: online deposit payment through a payment provider (hosted checkout/link, automatic receipt by provider confirmation; Finance handles exceptions) — provider, fees, currencies, refunds, legal terms. If approved: its own batch after A4. | new batch |
 | R1 decisions | Business | R1 batch |
 | D1 | Owner: authenticator at sign-in for staff | one item in A2 |
 | #15 | Owner: sub-steps vs separate stages | A5 |
