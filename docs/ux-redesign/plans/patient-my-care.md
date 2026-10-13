@@ -1,6 +1,6 @@
 # Shape plan — My Care (patient home) and multiple cases
 
-Status: **draft for approval** (not approved). Scope: owner findings P-UX-1 and MC-1 from
+Status: **approved by the owner, 2026-10-13** (with decisions 1a and 2 below). Scope: owner findings P-UX-1 and MC-1 from
 `docs/qa/journey-findings-2026-10-13.md`. No code yet. Next pass (separate plan): the proposal drawer, secure status
 link, secure proposal link and profile completion, reusing the pieces defined here.
 
@@ -128,10 +128,10 @@ The portal header drops the coral reading-progress hairline on app pages (it bel
 1. **"Send a new case for someone else" from My Care.** Today a signed-in patient's new-case form has no
    "someone else" option (`NewCaseForPatientRequest` carries no representative). Options: (a) this pass shows only
    "Send a new case" (for me) and records the "someone else" path as a backend follow-up; (b) extend the request
-   first. Recommendation: (a), so the redesign is not blocked.
+   first. **Owner decision: (a).** This pass shows "Send a new case" (for me); "for someone else" is a backend follow-up.
 2. **Grouping by person** needs to know, per case in the list, whether the account is the patient or a
-   representative. `CaseView` carries `patientName` but not the viewer's relation; the builder may add it to the
-   patient case list (small backend change) rather than infer it from names. Confirm it is in scope.
+   representative. `CaseView` carries `patientName` but not the viewer's relation. **Owner decision: in scope** — add the
+   viewer's relation to the patient case list (small backend change, with a test) rather than infer it from names.
 3. **No new tokens are expected.** If the builder needs one (e.g. a status-badge variant for "Needs you"), it is
    proposed in `docs/ux-redesign/token-proposals.md` first, not invented.
 4. Arabic copy remains subject to the pending native review.
