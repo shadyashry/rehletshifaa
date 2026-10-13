@@ -56,6 +56,14 @@ case page, which Finance cannot open on such a case (403). Fix: when the coordin
 create a Finance work item "Record the deposit" (closes W-24); give Finance `CASE_READ` on cases with an open deposit (as
 B1 did for offered cases); test that a catalogue-only case is paid end to end; independent security review.
 
+**Done — `0778a3e` on `fix/b3-finance-deposit-access` (from `7d36005`; not pushed, awaiting the owner).** The security review
+narrowed the read: Finance gets `CASE_DEPOSIT_READ` (payment view only, audited), not `CASE_READ`, while the case is
+ACCEPTED with an open deposit; W-24 (the Finance work item) is closed here. Follow-ups from the review, slotted into
+later batches: `recordReceipt`/`recordRefund`/`waiveDeposit` are platform-wide `PAYMENT_RECORD` with no open-deposit or
+case-stage check (A4); an ownerless `DEPOSIT_RECORD` item cannot be cancelled, and an owned one stays with a stale Finance
+assignee (A3); the journey runtime's work completion would trust `CASE_READ` alone if enabled (A2 security re-check); the
+Finance open-deposit list is unpaginated (C2); a case page read still re-derives work and waiting-on (pre-existing).
+
 ### T1 — Test readiness (½–1 session)
 
 | ID | Fix |
@@ -83,7 +91,7 @@ actions (record a credential, approval decision) to settle W-37. New findings ar
 | W-8 (+#29) | Profile-completion WhatsApp template in the patient's language; "acknowledged your preliminary estimate", not "accepted"; check every patient template for language (`NotificationOutboxProcessor`). High. |
 | W-16 | "Verify first" refusal points to the coordinator (EN + AR). |
 | W-9 | Coordinator email "Case for case RS-…". |
-| B1/B2 | Correct their status in the findings (committed and pushed: `b06ae3f`, `9e1e6c8`). |
+| B1/B2 | ~~Correct their status in the findings (committed and pushed: `b06ae3f`, `9e1e6c8`).~~ Done in the B3 session. |
 
 ### A1 — The next action tells the truth (1 session)
 
@@ -123,7 +131,7 @@ Root cause: second factors enrolled ad hoc and asked only at submit time; the po
 | #3 | Routing at submission creates the coordinator's work item. |
 | #3b | Finance approval creates "Release the proposal". |
 | #18 | "At a glance" uses the same source as My work (all roles). |
-| W-24 | Finance work item for a deposit (with B3). |
+| W-24 | Finance work item for a deposit — **done with B3** (`0778a3e`). |
 | — | Invariant test: every waiting stage has exactly one open work item for whoever it waits on; header agrees. |
 | 3-UX | Then rename tabs ("To do" / "My cases") with counts; validate with one coordinator. |
 
@@ -283,5 +291,7 @@ Already decided: G-2 (option C), G-8 (layered limits, done), DEP (keep Finance c
 ## Next exact action
 
 1. Owner approves this plan (order, batch boundaries) and answers what the decision register needs before each batch.
-2. Next session: **B3**, then **T1**, then **W0** (owner signs in) — so the walk is complete before the logic batches.
+2. ~~B3~~ done (`0778a3e`, awaiting the owner's merge and push). Next session: **T1**, then **W0** (owner signs in) — so the
+   walk is complete before the logic batches. W0 adds: Finance records the deposit on RS-2026-000002 (catalogue-only)
+   from My work, and on RS-2026-000001.
 3. Then A0 → A1 → A2 → … one batch per session, each committed when green.
