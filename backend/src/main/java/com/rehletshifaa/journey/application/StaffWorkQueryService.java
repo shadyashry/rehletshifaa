@@ -81,6 +81,7 @@ public class StaffWorkQueryService {
         Set<StaffWorkService.Pool> pools = actor.roles().stream().map(role -> StaffWorkService.poolOf(role.caseAssignmentRole()))
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         for (StaffWorkService.Pool pool : pools) rows.addAll(tasks.findOpenPoolWork(pool.role(), pool.type()));
+        rows.removeIf(row -> CaseActionService.parked(row.getTaskType(), row.getWaitingOn()));
         if (rows.isEmpty()) return List.of();
         if (!pools.isEmpty()) rows.sort(QUEUE_ORDER);
         Set<UUID> caseIds = rows.stream().map(OpenWorkRow::getCaseId).collect(Collectors.toSet());

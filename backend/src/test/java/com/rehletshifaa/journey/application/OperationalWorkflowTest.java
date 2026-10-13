@@ -391,7 +391,9 @@ class OperationalWorkflowTest {
         UUID caseId = ownedCase();
         authenticate("coordinator-subject", Role.COORDINATOR);
         var card = journey.coordinatorCaseCards().stream().filter(c -> c.caseSummary().id().equals(caseId)).findFirst().orElseThrow();
-        assertThat(card.openTaskCount()).isZero();
+        // Its one open item is the owner's intake review (QA A3, #3): ordinary work, no urgency signal.
+        assertThat(card.openTaskCount()).isEqualTo(1);
+        assertThat(card.myWorkCount()).isEqualTo(1);
         assertThat(card.blockingOverdueCount()).isZero();
         assertThat(card.highPriorityCount()).isZero();
         assertThat(card.nextDueAt()).isNull();

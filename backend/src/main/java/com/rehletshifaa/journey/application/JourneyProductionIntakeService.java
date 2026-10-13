@@ -73,6 +73,7 @@ public class JourneyProductionIntakeService {
     private final JourneyProjectionService projections;
     private final GovernanceAuditLog audit;
     private final CoordinatorRoutingPort routing;
+    private final StaffWorkService work;
     private final TransactionTemplate separate;
     private final MeterRegistry meters;
     private final Clock clock;
@@ -82,7 +83,7 @@ public class JourneyProductionIntakeService {
             JourneyDeploymentStore deployments, JourneyCaseBindingStore bindings, JourneyCaseAdmissionStore admissions,
             ObjectProvider<JourneyRuntimePort> runtimes, JourneyProjectionService projections, GovernanceAuditLog audit,
             CoordinatorRoutingPort routing, PlatformTransactionManager transactions, MeterRegistry meters, Clock clock, MedicalCaseRepository cases, CaseStatusLog statusLog,
-            IntakeLifecycleService intake) { this.statusLog = statusLog; this.cases = cases; this.intake = intake;
+            IntakeLifecycleService intake, StaffWorkService work) { this.statusLog = statusLog; this.cases = cases; this.intake = intake; this.work = work;
         this.policies=policies; this.definitions=definitions; this.deployments = deployments; this.bindings = bindings;
         this.admissions = admissions; this.runtimes = runtimes; this.projections = projections; this.audit = audit; this.routing = routing;
         this.separate = new TransactionTemplate(transactions);
@@ -98,8 +99,10 @@ public class JourneyProductionIntakeService {
     }
 
     private void startIntakeReview(UUID caseId, String owner, Instant at) {
-        if (cases.moveStatus(caseId, CaseStatus.RECEIVED, CaseStatus.INTAKE_REVIEW, micros(at)) == 1)
+        if (cases.moveStatus(caseId, CaseStatus.RECEIVED, CaseStatus.INTAKE_REVIEW, micros(at)) == 1) {
             statusLog.record(caseId, "RECEIVED", "INTAKE_REVIEW", "ROUTING_ENGINE", "SYSTEM", "Routed to eligible Coordinator " + owner, at);
+            work.changed(caseId); // the routed Coordinator's intake review is in their My work (QA #3)
+        }
     }
 
     /** New-case-only: a case already admitted or bound (any mode) is never re-evaluated — authority never switches. */

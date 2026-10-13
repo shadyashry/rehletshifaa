@@ -295,7 +295,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
             storedCost=priceEgp;storedCurrency=com.rehletshifaa.shared.currency.CurrencyService.BASE;requiresFinance=false;
         }
         costEstimates.saveAndFlush(new ClinicalReviewCostEstimate(reviewId,item.serviceDescription().trim(),storedCost,storedCurrency,order++,catalogId,priceEgp,requiresFinance));}}
-    @Transactional public CaseView setTravelPackage(UUID caseId,boolean requested){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));String status=state(caseId).status();if(Set.of("PATIENT_DECISION","ACCEPTED","DECLINED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED","TREATMENT_IN_PROGRESS","DISCHARGED","FOLLOW_UP","CLOSED","CANCELLED").contains(status))throw new ApiException(409,"TRAVEL_PACKAGE_LOCKED","The travel package choice can only be changed before the proposal is sent to the patient");cases.requestTravelPackage(caseId,requested,micros(clock.instant()));audit("CASE_TRAVEL_PACKAGE_SET",actor,caseId,"MedicalCase",caseId.toString(),"UPDATE","SUCCESS",requested?"requested":"not-requested");return caseView(caseId);}
+    @Transactional public CaseView setTravelPackage(UUID caseId,boolean requested){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));String status=state(caseId).status();if(Set.of("PATIENT_DECISION","ACCEPTED","DECLINED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED","TREATMENT_IN_PROGRESS","DISCHARGED","FOLLOW_UP","CLOSED","CANCELLED").contains(status))throw new ApiException(409,"TRAVEL_PACKAGE_LOCKED","The travel package choice can only be changed before the proposal is sent to the patient");cases.requestTravelPackage(caseId,requested,micros(clock.instant()));audit("CASE_TRAVEL_PACKAGE_SET",actor,caseId,"MedicalCase",caseId.toString(),"UPDATE","SUCCESS",requested?"requested":"not-requested");work.changed(caseId);return caseView(caseId);}
     @Transactional public IdResponse acceptDoctorAssignment(UUID caseId,UUID assignmentId,AssignmentDecisionRequest request){return decideAssignment(caseId,assignmentId,request,Role.CONSULTANT);}
 
     /**
@@ -364,8 +364,16 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     @Transactional public IdResponse completeTask(UUID caseId,UUID taskId,CompleteTaskRequest request){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));int changed=tasks.completeOwned(taskId,caseId,request.expectedVersion(),actor.subject(),"enc:"+crypto.encrypt(request.evidence()),micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_COMPLETED",actor,caseId,"CaseTask",taskId.toString(),"COMPLETE","SUCCESS",null);
         // "Payment instructions sent": the deposit becomes Finance's to record.
         if(tasks.findById(taskId).map(t->CaseHandoffService.DEPOSIT_WORK.equals(t.getTaskType())).orElse(false))events.publishEvent(new CaseEvents.DepositInstructionsSent(caseId));
+        work.changed(caseId);
         return new IdResponse(taskId,"COMPLETED");}
-    @Transactional public IdResponse cancelTask(UUID caseId,UUID taskId,CancelTaskRequest request){var actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,taskOwner(caseId,taskId)));int changed=tasks.cancel(taskId,caseId,request.expectedVersion(),request.reason(),micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_CANCELLED",actor,caseId,"CaseTask",taskId.toString(),"CANCEL","SUCCESS",request.reason());return new IdResponse(taskId,"CANCELLED");}
+    /**
+     * A supervisor of the task's owner cancels it. Pool work (Finance's deposit to record) is never cancelled: the stage owes
+     * it until the deposit is recorded or waived, which closes it; a supervisor releases or reassigns it instead (QA A3).
+     */
+    @Transactional public IdResponse cancelTask(UUID caseId,UUID taskId,CancelTaskRequest request){
+        var pooled=openPoolTask(caseId,taskId);
+        if(pooled.isPresent()){authorizePoolTask(caseId,pooled.get());throw new ApiException(409,"POOL_WORK_NOT_CANCELLABLE","This work closes when the deposit is recorded or waived; release it to the team or reassign it instead");}
+        var actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,taskOwner(caseId,taskId)));int changed=tasks.cancel(taskId,caseId,request.expectedVersion(),request.reason(),micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_CANCELLED",actor,caseId,"CaseTask",taskId.toString(),"CANCEL","SUCCESS",request.reason());work.changed(caseId);return new IdResponse(taskId,"CANCELLED");}
 
     // ---- Patient action requests (structured "we need something from you") ----
     /**
@@ -413,7 +421,56 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         patientActions.request(caseId,new InformationRequestCommand(text,List.of(),true,null,language),actor.subject(),actor.label());
         publicCases.issueInformationLink(caseId,language);
     }
-    @Transactional public IdResponse reassignTask(UUID caseId,UUID taskId,ReassignTaskRequest request){var actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,taskOwner(caseId,taskId)));if(!authority.allowed(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,request.ownerSubject())))throw new ApiException(403,"OUT_OF_SCOPE","Reassign work only to a member of a team you lead");validateTaskOwner(caseId,request.ownerSubject(),request.ownerRole());int changed=tasks.reassign(taskId,caseId,request.expectedVersion(),request.ownerSubject(),request.ownerRole(),"PATIENT".equals(request.ownerRole())?"PATIENT_ACTION":"INTERNAL",micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_REASSIGNED",actor,caseId,"CaseTask",taskId.toString(),"REASSIGN","SUCCESS",null);return new IdResponse(taskId,"OPEN");}
+    @Transactional public IdResponse reassignTask(UUID caseId,UUID taskId,ReassignTaskRequest request){
+        var pooled=openPoolTask(caseId,taskId);if(pooled.isPresent())return reassignPoolTask(caseId,pooled.get(),request);
+        var actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,taskOwner(caseId,taskId)));if(!authority.allowed(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,request.ownerSubject())))throw new ApiException(403,"OUT_OF_SCOPE","Reassign work only to a member of a team you lead");validateTaskOwner(caseId,request.ownerSubject(),request.ownerRole());int changed=tasks.reassign(taskId,caseId,request.expectedVersion(),request.ownerSubject(),request.ownerRole(),"PATIENT".equals(request.ownerRole())?"PATIENT_ACTION":"INTERNAL",micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_REASSIGNED",actor,caseId,"CaseTask",taskId.toString(),"REASSIGN","SUCCESS",null);work.changed(caseId);return new IdResponse(taskId,"OPEN");}
+
+    /**
+     * Who may hear anything about pool work beyond "not found": a supervisor of its owner, or for an unowned item a holder of
+     * its role (it is in their queue). Checked before any pool-specific answer, so the answers reveal nothing to anyone else.
+     */
+    private void authorizePoolTask(UUID caseId,com.rehletshifaa.casemanagement.domain.CaseTask task){
+        if(task.getOwnerSubject()!=null){authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,task.getOwnerSubject()));return;}
+        if(authority.authorize(Permission.TASK_WORK).roles().stream().noneMatch(r->task.getOwnerRole().equals(r.caseAssignmentRole())))
+            throw new ApiException(404,"TASK_NOT_FOUND","Task was not found");
+    }
+
+    /** An open task of the case that is a role's pool work ({@link StaffWorkService#poolOf}), owned or not. */
+    private Optional<com.rehletshifaa.casemanagement.domain.CaseTask> openPoolTask(UUID caseId,UUID taskId){
+        return tasks.findById(taskId).filter(t->caseId.equals(t.getCaseId())&&Set.of("OPEN","IN_PROGRESS").contains(t.getStatus())
+            &&StaffWorkService.isPoolWork(t.getOwnerRole(),t.getTaskType()));
+    }
+
+    /**
+     * Pool work (Finance's deposit to record) moves only within its function, while the case is still at the deposit stage
+     * (QA A3, B3 follow-up). No owner in the request releases it to the pool: a supervisor of its owner may. A named owner
+     * takes it: they must hold the pool's role and be supervised by the caller, who for an unowned item must hold that role
+     * themselves (it is in their queue) and otherwise supervise its owner too. Audited either way.
+     */
+    private IdResponse reassignPoolTask(UUID caseId,com.rehletshifaa.casemanagement.domain.CaseTask task,ReassignTaskRequest request){
+        String poolRole=task.getOwnerRole(),owner=task.getOwnerSubject(),target=hasText(request.ownerSubject())?request.ownerSubject().trim():null;
+        // Decided on the owner read here: a change since then (another move bumps the version) is a conflict, never a pass.
+        if(task.getVersion()!=request.expectedVersion())throw taskConflict();
+        Actor actor;
+        if(target==null){
+            authorizePoolTask(caseId,task);
+            if(owner==null)throw new ApiException(409,"TASK_ALREADY_IN_POOL","This work is already with the team");
+            actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,owner));
+        }else{
+            actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,target));
+            if(!poolRole.equals(request.ownerRole()))throw new ApiException(400,"INVALID_TASK_OWNER","This work stays with its team");
+            if(owner==null?actor.roles().stream().noneMatch(r->poolRole.equals(r.caseAssignmentRole())):!authority.allowed(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,owner)))
+                throw new ApiException(403,"OUT_OF_SCOPE","Reassign work only within a team you lead");
+            if(!workforceDirectory.holds(target,poolRole))throw new ApiException(409,"STAFF_NOT_ELIGIBLE","Select an active member of the team");
+        }
+        if(!"ACCEPTED".equals(state(caseId).status()))throw new ApiException(409,"CASE_STATE_CONFLICT","This work is no longer owed at the case's current stage");
+        int changed=tasks.reassign(task.getId(),caseId,request.expectedVersion(),target,poolRole,"INTERNAL",micros(clock.instant()));
+        if(changed!=1)throw taskConflict();
+        audit(target==null?"CASE_TASK_RELEASED_TO_POOL":"CASE_TASK_REASSIGNED",actor,caseId,"CaseTask",task.getId().toString(),target==null?"RELEASE":"REASSIGN","SUCCESS",
+            "from="+(owner==null?"pool":owner)+"; to="+(target==null?"pool":target));
+        work.changed(caseId);
+        return new IdResponse(task.getId(),"OPEN");
+    }
 
     @Transactional public IdResponse saveClinicalReview(UUID caseId,ClinicalReviewRequest request){var actor=authority.authorize(Permission.CLINICAL_REVIEW,Resource.ofCase(caseId));requireState(caseId,"CONSULTANT_REVIEW");UUID practitionerId=practitionerId(actor.subject());int version=clinicalReviews.nextVersionNumber(caseId);UUID id=UUID.randomUUID();clinicalReviews.supersedeDrafts(caseId);clinicalReviews.saveAndFlush(ClinicalReviewVersion.draft(id,caseId,practitionerId,version,new ClinicalReviewVersion.Content(request.caseSummary(),request.suitability(),request.missingInformation(),request.recommendedInvestigations(),request.recommendedTreatment(),request.alternatives(),request.risksAndLimitations(),request.expectedSequence(),request.expectedDuration(),request.followUpRecommendation()),requireIssuableCurrency(request.proposalCurrency()),actor.subject(),clock.instant()));
         // A draft keeps the services picked so far, at authoritative catalogue prices. It deliberately does
@@ -607,7 +664,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     private void auditPublic(String type,UUID caseId,String entityId,String action){auditTrail.event(type).actor("SECURE_LINK", "PATIENT").caseId(caseId).entity("ProposalVersion", entityId).action(action).record();}
     private record Contact(String caseNumber,String whatsapp,String email,String language){}
     private record ShareToken(UUID shareId,UUID versionId,UUID caseId,Instant consumedAt,Instant revokedAt,Instant expiresAt){}
-    @Transactional public ProposalView completeOperations(UUID caseId,UUID versionId,String plan){var actor=authority.authorize(Permission.OPERATIONS_FULFIL,Resource.ofCase(caseId));requireState(caseId,"PROPOSAL_PREPARATION");if(!travelRequested(caseId))throw new ApiException(409,"OPERATIONS_NOT_REQUIRED","Operations is only engaged when the patient requested a travel package");ensureProposalBelongs(caseId,versionId);int changed=proposalVersions.completeOperations(versionId,plan,actor.subject(),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal is not ready for operations");audit("PROPOSAL_OPERATIONS_COMPLETED",actor,caseId,"ProposalVersion",versionId.toString(),"COMPLETE_OPERATIONS","SUCCESS",null);return proposal(versionId);}
+    @Transactional public ProposalView completeOperations(UUID caseId,UUID versionId,String plan){var actor=authority.authorize(Permission.OPERATIONS_FULFIL,Resource.ofCase(caseId));requireState(caseId,"PROPOSAL_PREPARATION");if(!travelRequested(caseId))throw new ApiException(409,"OPERATIONS_NOT_REQUIRED","Operations is only engaged when the patient requested a travel package");ensureProposalBelongs(caseId,versionId);int changed=proposalVersions.completeOperations(versionId,plan,actor.subject(),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal is not ready for operations");audit("PROPOSAL_OPERATIONS_COMPLETED",actor,caseId,"ProposalVersion",versionId.toString(),"COMPLETE_OPERATIONS","SUCCESS",null);work.changed(caseId);return proposal(versionId);}
     @Transactional public ProposalView approveFinance(UUID caseId,UUID versionId){var actor=authority.authorize(Permission.FINANCE_SETTLE,Resource.ofCase(caseId));boolean finalQuote=isFinalQuote(versionId);requireOneOfStates(caseId,finalQuote?Set.of("ARRIVAL_CONFIRMED"):Set.of("PROPOSAL_PREPARATION"));ensureProposalBelongs(caseId,versionId);if(!requiresFinanceApproval(versionId))throw new ApiException(409,"FINANCE_NOT_REQUIRED","This proposal contains only pre-approved catalog services and does not need finance approval");if(!finalQuote&&travelRequested(caseId)&&!operationsCompleted(versionId))throw new ApiException(409,"OPERATIONS_REQUIRED_FIRST","Operations must complete the travel package before finance approval");int changed=proposalVersions.approveFinance(versionId,actor.subject(),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal is not ready for finance approval");if(!finalQuote)transitionWithoutVersion(caseId,"PROPOSAL_INTERNAL_APPROVAL","Commercial proposal approved",actor);audit("PROPOSAL_FINANCE_APPROVED",actor,caseId,"ProposalVersion",versionId.toString(),"APPROVE_FINANCE","SUCCESS",null);return proposal(versionId);}
     private boolean travelRequested(UUID caseId){return proposalQueries.travelRequested(caseId);}
     private boolean requiresFinanceApproval(UUID versionId){return proposalQueries.requiresFinanceApproval(versionId);}

@@ -8,9 +8,6 @@ import { plural } from "@/lib/portal-labels";
 type SummaryCase = { status: string; coordinatorSubject?: string; assignmentStatus?: string; overdueTaskCount?: number; myWorkCount?: number };
 type SummaryTask = { overdue: boolean; status: string; type?: string };
 
-const doctorAction = new Set(["CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW", "ARRIVAL_CONFIRMED"]);
-const coordinatorAction = new Set(["RECEIVED", "INFORMATION_REQUIRED", "CLINICAL_RECOMMENDATION_READY", "PROPOSAL_PREPARATION", "REVISION_REQUESTED"]);
-
 /** The count a summary item filters by. "" is the unfiltered baseline (every case in the view). */
 export type KpiFilter = "" | "action" | "unowned" | "overdue";
 
@@ -21,11 +18,9 @@ export function matchesKpi(item: SummaryCase, kpi: KpiFilter, role: string) {
   if (kpi === "unowned") return role === "coordinator"
     ? !item.coordinatorSubject && item.status === "RECEIVED"
     : item.assignmentStatus === "PENDING";
-  return role === "doctor" ? doctorAction.has(item.status)
-    : role === "coordinator" ? coordinatorAction.has(item.status)
-    // Finance also owes the cases with its work on them (a deposit to record), assigned or not.
-    : role === "finance" ? item.assignmentStatus === "PENDING" || (item.myWorkCount ?? 0) > 0
-    : item.assignmentStatus === "PENDING";
+  // One source with My work (QA #18): a case needs action when work in My work is on it, for every role. The backend
+  // counts it per case (theirs, or their role's pool); stage and assignment are never a second rule here.
+  return (item.myWorkCount ?? 0) > 0;
 }
 
 /**

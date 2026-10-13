@@ -32,6 +32,19 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
     java.util.List<UUID> findOpenInternalOfType(@Param("caseId") UUID caseId, @Param("type") String type,
                                                 org.springframework.data.domain.Limit limit);
 
+    boolean existsByCaseIdAndOwnerSubjectAndVisibilityScopeAndStatusInAndTaskTypeNotIn(UUID caseId, String ownerSubject, String visibilityScope,
+                                                                                     java.util.Collection<String> statuses,
+                                                                                     java.util.Collection<String> taskTypes);
+
+    interface TypeOwnerRow { String getTaskType(); String getOwnerSubject(); }
+
+    /** The open internal items of these types on the case, newest first, with their owners. */
+    @Query("""
+            select t.taskType as taskType, t.ownerSubject as ownerSubject from CaseTask t
+            where t.caseId = :caseId and t.taskType in :types and t.visibilityScope = 'INTERNAL' and t.status in ('OPEN', 'IN_PROGRESS')
+            order by t.createdAt desc""")
+    java.util.List<TypeOwnerRow> findOpenInternalOfTypes(@Param("caseId") UUID caseId, @Param("types") java.util.Collection<String> types);
+
     /** The newest open patient action of a type on the case (pass {@code Limit.of(1)}). */
     @Query("""
             select t.id from CaseTask t
@@ -272,6 +285,22 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
             where t.id = :id and t.caseId = :caseId and t.version = :version and t.status in ('OPEN', 'IN_PROGRESS')""")
     int reassign(@Param("id") UUID id, @Param("caseId") UUID caseId, @Param("version") long version, @Param("owner") String owner,
                  @Param("role") String role, @Param("visibility") String visibility, @Param("now") Instant now);
+
+    java.util.List<CaseTask> findByOwnerSubjectAndOwnerRoleAndTaskTypeAndStatusIn(String ownerSubject, String ownerRole, String taskType,
+                                                                                java.util.Collection<String> statuses);
+
+    /** The people who own open work of this role and type. */
+    @Query("""
+            select distinct t.ownerSubject from CaseTask t where t.ownerRole = :role and t.taskType = :type and t.ownerSubject is not null
+                and t.status in ('OPEN', 'IN_PROGRESS')""")
+    java.util.List<String> findOwnersOfOpen(@Param("role") String role, @Param("type") String type);
+
+    /** The open item goes back to its role's pool, if this person still owns it; it starts again as OPEN. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update CaseTask t set t.ownerSubject = null, t.status = 'OPEN', t.startedAt = null, t.updatedAt = :now, t.version = t.version + 1
+            where t.id = :id and t.ownerSubject = :owner and t.status in ('OPEN', 'IN_PROGRESS')""")
+    int releaseToPool(@Param("id") UUID id, @Param("owner") String owner, @Param("now") Instant now);
 
     /** An existing work item is re-raised: it keeps its owner, or takes this one if it had none. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

@@ -49,6 +49,12 @@ public class CaseActionQueryService {
         }
 
         boolean hasAssignment(String role) { return openAssignments.stream().anyMatch(a -> a.role().equals(role)); }
+
+        /** The person who accepted the newest live assignment of a role (Finance, Operations), or null. */
+        String activeAssignee(String role) {
+            return openAssignments.stream().filter(a -> a.role().equals(role) && "ACTIVE".equals(a.status())).map(Assignment::subject)
+                    .findFirst().orElse(null);
+        }
     }
 
     record WorkItem(UUID id, String type, String title, String context, Instant dueAt, long version, com.rehletshifaa.journey.api.WorkDtos.WorkCopy copy) {}

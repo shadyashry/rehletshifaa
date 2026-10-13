@@ -118,6 +118,7 @@ public class JourneyCaseQueryService {
         List<CaseTaskRepository.OpenWorkRow> myWork = new ArrayList<>(tasks.findOpenWorkOf(subject));
         StaffWorkService.Pool pool = StaffWorkService.poolOf(assignmentRole);
         if (pool != null) myWork.addAll(tasks.findOpenPoolWork(pool.role(), pool.type()));
+        myWork.removeIf(row -> CaseActionService.parked(row.getTaskType(), row.getWaitingOn())); // the same queue as My work
         Map<UUID, Long> mine = myWork.stream().collect(Collectors.groupingBy(CaseTaskRepository.OpenWorkRow::getCaseId, Collectors.counting()));
         return views.stream().map(view -> {
             var assignment = held.get(view.id());

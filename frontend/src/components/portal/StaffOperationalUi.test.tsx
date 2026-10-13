@@ -215,7 +215,7 @@ describe("RoleDashboardSummary", () => {
   afterEach(cleanup);
   const cases = [
     { status: "RECEIVED", overdueTaskCount: 0 },
-    { status: "INTAKE_REVIEW", coordinatorSubject: "me", overdueTaskCount: 2 },
+    { status: "INTAKE_REVIEW", coordinatorSubject: "me", overdueTaskCount: 2, myWorkCount: 1 },
     { status: "CLOSED", coordinatorSubject: "me" },
   ];
 
@@ -230,10 +230,23 @@ describe("RoleDashboardSummary", () => {
     expect(onSelect).toHaveBeenCalledWith("overdue");
   });
 
+  it("counts exactly the cases with work in My work, for every role, whatever their stage (QA #18)", () => {
+    const work = [
+      { status: "PROPOSAL_INTERNAL_APPROVAL", coordinatorSubject: "me", myWorkCount: 1 },
+      { status: "PROPOSAL_PREPARATION", coordinatorSubject: "me", myWorkCount: 0 },
+      { status: "RECEIVED" },
+    ];
+    renderWithWork(<RoleDashboardSummary role="coordinator" cases={work} tasks={[]}/>);
+    expect(screen.getByRole("button", { name: "1 case needs action" })).toBeTruthy();
+    cleanup();
+    renderWithWork(<RoleDashboardSummary role="doctor" cases={[{ status: "ARRIVAL_CONFIRMED", myWorkCount: 0 }, { status: "CONSULTANT_REVIEW", myWorkCount: 1 }]} tasks={[]}/>);
+    expect(screen.getByRole("button", { name: "1 case needs action" })).toBeTruthy();
+  });
+
   it("counts a Finance case with Finance work on it as needing action, assigned or not (QA B3)", () => {
     renderWithWork(<RoleDashboardSummary role="finance" tasks={[]} cases={[
       { status: "ACCEPTED", myWorkCount: 1 },
-      { status: "PROPOSAL_PREPARATION", assignmentStatus: "PENDING" },
+      { status: "PROPOSAL_PREPARATION", assignmentStatus: "PENDING", myWorkCount: 1 },
       { status: "ACCEPTED", assignmentStatus: "ACTIVE", myWorkCount: 0 },
     ]}/>);
     expect(screen.getByRole("button", { name: "2 cases need action" })).toBeTruthy();
@@ -302,6 +315,20 @@ describe("CaseQueue", () => {
     onMutate: vi.fn(() => Promise.resolve({})), statusLabel: (v: string) => v.replaceAll("_", " ").toLowerCase(),
     categoryLabel: (v: string) => v,
   };
+
+  it("tells Finance its list also holds the cases with a deposit to record, not only its assignments (QA W-44)", () => {
+    renderWithWork(<CaseQueue {...props} role="finance"/>);
+    expect(screen.getByText("Cases you are on, or with a deposit to record.")).toBeTruthy();
+    cleanup();
+    renderWithWork(<MyWork locale="en" role="finance" items={[]} busy={false} onOpen={vi.fn()}/>);
+    expect(screen.getByText("Work for you or your team, most urgent first.")).toBeTruthy();
+    cleanup();
+    renderWithWork(<MyWork locale="ar" role="finance" items={[]} busy={false} onOpen={vi.fn()}/>, "ar");
+    expect(screen.getByText("العمل المسند إليك أو إلى فريقك، الأكثر إلحاحًا أولًا.")).toBeTruthy();
+    cleanup();
+    renderWithWork(<MyWork locale="en" role="coordinator" items={[]} busy={false} onOpen={vi.fn()}/>);
+    expect(screen.getByText("Work assigned to you personally, most urgent first.")).toBeTruthy();
+  });
 
   it("is one scannable list carrying stage, waiting-on, people and a quiet open action per row", () => {
     renderWithWork(<CaseQueue {...props}/>);

@@ -141,7 +141,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     {infoDialog&&<RequestInformationDialog locale={locale} caseIds={selectedCases.map(item=>item.id)} busy={busy} mutate={onMutate as (path:string,body?:unknown,method?:string)=>Promise<unknown>} onClose={()=>setInfoDialog(false)} onDone={clearSelection}
       onPartial={failed=>{setSelectedIds(new Set(failed));}}/>}
 
-    {scope!=="all"&&<p className="-mt-2 text-[0.85rem] text-ink-600">{scope==="team"?(selected==="team"?text.teamHint:text.unownedHint):coordinator?text.mineHint:text.assignedHint}</p>}
+    {scope!=="all"&&<p className="-mt-2 text-[0.85rem] text-ink-600">{scope==="team"?(selected==="team"?text.teamHint:text.unownedHint):coordinator?text.mineHint:role==="finance"?text.assignedHintFinance:text.assignedHint}</p>}
     {tabs.length>0&&<div role="tablist" aria-label={text.title} className="flex flex-wrap gap-1 border-b border-line-strong">
       {tabs.map((tab,index)=><button key={tab.id} id={`queue-tab-${tab.id}`} role="tab" aria-controls="queue-panel" aria-selected={selected===tab.id}
         tabIndex={(focused??selected)===tab.id?0:-1} type="button"

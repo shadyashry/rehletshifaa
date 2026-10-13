@@ -15,6 +15,7 @@ import com.rehletshifaa.workforce.infrastructure.WorkforcePersonRepository;
 import com.rehletshifaa.workforce.infrastructure.WorkforceRoleAssignmentRepository;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,15 +70,17 @@ public class StaffWorkService {
     private final CryptoService crypto;
     private final Clock clock;
     private final String teamMailbox;
+    private final ApplicationEventPublisher events;
 
     public StaffWorkService(IntakeLifecycleService intake, CryptoService crypto, Clock clock,
                             @Value("${app.mail.coordinator}") String teamMailbox, AuditTrail auditTrail,
                             NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseTaskRepository tasks,
                             StaffNotificationRepository notifications, WorkforcePersonRepository people,
-                            WorkforceRoleAssignmentRepository roleAssignments, PractitionerProfileRepository practitioners) {
+                            WorkforceRoleAssignmentRepository roleAssignments, PractitionerProfileRepository practitioners,
+                            ApplicationEventPublisher events) {
         this.notifications = notifications; this.tasks = tasks; this.cases = cases; this.notificationOutbox = notificationOutbox;
         this.auditTrail = auditTrail; this.people = people; this.roleAssignments = roleAssignments; this.practitioners = practitioners;
-        this.intake = intake; this.crypto = crypto; this.clock = clock; this.teamMailbox = teamMailbox;
+        this.intake = intake; this.crypto = crypto; this.clock = clock; this.teamMailbox = teamMailbox; this.events = events;
     }
 
     // ---------------- work items ----------------
@@ -90,14 +93,22 @@ public class StaffWorkService {
      * identical work. Returns the existing item's id in that case.
      */
     @Transactional
-    public UUID openWorkItem(NewWorkItem item) {
+    public UUID openWorkItem(NewWorkItem item) { return openWorkItem(item, true); }
+
+    /**
+     * As {@link #openWorkItem(NewWorkItem)}; {@code tell} false opens the item silently (no notification, no email), for
+     * work its owner just took on themselves or was already told about by the event that caused it.
+     */
+    @Transactional
+    public UUID openWorkItem(NewWorkItem item, boolean tell) {
         Instant now = clock.instant();
         UUID existing = tasks.findOpenInternalOfType(item.caseId(), item.type(), Limit.of(1)).stream().findFirst().orElse(null);
         if (existing != null) {
             // Keep the owner accurate when work comes back to a different (or newly resolved) coordinator.
             if (item.ownerSubject() != null)
                 tasks.adoptOwner(existing, item.ownerSubject(), micros(now));
-            notify(item, existing, now);
+            if (tell) notify(item, existing, now);
+            changed(item.caseId());
             return existing;
         }
         UUID id = UUID.randomUUID();
@@ -105,7 +116,8 @@ public class StaffWorkService {
         if (item.copy() != null) task.withCopy(item.copy().code(), encrypt(writeParams(item.copy().params())));
         tasks.saveAndFlush(task);
         audit(item.caseId(), "CASE_WORK_ITEM_OPENED", id, item.type());
-        notify(item, id, now);
+        if (tell) notify(item, id, now);
+        changed(item.caseId());
         return id;
     }
 
@@ -114,10 +126,22 @@ public class StaffWorkService {
      * Used when an assignment is decided or reassigned so a stale item can never linger in someone's queue.
      */
     @Transactional
-    public int closeWorkItems(UUID caseId, String type, String reason) {
+    public int closeWorkItems(UUID caseId, String type, String reason) { return closeWorkItems(caseId, type, reason, true); }
+
+    /** As above; {@code announce} false for a read-time repair, which must never set the stage's steps moving. */
+    @Transactional
+    public int closeWorkItems(UUID caseId, String type, String reason, boolean announce) {
         Instant now = clock.instant();
-        return tasks.completeOpenOfType(caseId, type, encrypt(reason), micros(now));
+        int closed = tasks.completeOpenOfType(caseId, type, encrypt(reason), micros(now));
+        if (closed > 0 && announce) changed(caseId);
+        return closed;
     }
+
+    /**
+     * Work or responsibility on the case just moved, so the stage's own steps follow ({@link CaseActionService#syncStageWork}).
+     * Synchronous, inside the caller's transaction; a read-time correction never raises it.
+     */
+    public void changed(UUID caseId) { events.publishEvent(new CaseEvents.WorkChanged(caseId)); }
 
     /** Work due within this window is escalated: it needs attention today, not in the normal queue order. */
     private static final Duration DUE_SOON = Duration.ofHours(24);
@@ -259,7 +283,7 @@ public class StaffWorkService {
         String resolved = resolveWaitingOn(caseId, fallback, patientOwed);
         String current = cases.findWaitingOn(caseId).orElse(null);
         if (resolved.equals(current)) return resolved;
-        setWaitingOn(caseId, resolved, reason != null ? reason : defaultReason(resolved));
+        writeWaitingOn(caseId, resolved, reason != null ? reason : defaultReason(resolved));
         return resolved;
     }
 
@@ -291,6 +315,55 @@ public class StaffWorkService {
     /** The work pool a case-assignment role reads besides its own items, or null when the role's work is always personal. */
     public static Pool poolOf(String assignmentRole) { return assignmentRole == null ? null : POOLS.get(assignmentRole); }
 
+    /** True when work of this owner role and type is a role's pool work (owned or not): it moves only within that team. */
+    public static boolean isPoolWork(String ownerRole, String type) {
+        Pool pool = poolOf(ownerRole);
+        return pool != null && pool.type().equals(type);
+    }
+
+    /**
+     * Pool work owned by someone who no longer holds the pool's role goes back to the pool, so it never waits on a person
+     * who cannot do it (QA A3, B3 follow-up: a Finance member who left still owned deposits to record). Audited per item.
+     *
+     * @return how many items were released
+     */
+    @Transactional
+    public int releasePoolWorkOf(String subject, String role) {
+        Pool pool = poolOf(role);
+        if (pool == null) return 0;
+        Instant now = clock.instant();
+        int released = 0;
+        for (CaseTask task : tasks.findByOwnerSubjectAndOwnerRoleAndTaskTypeAndStatusIn(subject, pool.role(), pool.type(), OPEN)) {
+            if (tasks.releaseToPool(task.getId(), subject, micros(now)) != 1) continue;
+            released++;
+            auditTrail.event("CASE_TASK_RELEASED_TO_POOL").actor("SYSTEM", "SYSTEM").caseId(task.getCaseId()).entity("CaseTask", task.getId())
+                    .action("RELEASE").reason("from=" + subject + "; to=pool; owner no longer holds " + pool.role()).record();
+            changed(task.getCaseId());
+        }
+        return released;
+    }
+
+    /** Who owns open pool work of a role now (for the sweep that releases it from people who left the role). */
+    @Transactional(readOnly = true)
+    public java.util.List<String> poolWorkOwners(String role) {
+        Pool pool = poolOf(role);
+        return pool == null ? java.util.List.of() : tasks.findOwnersOfOpen(pool.role(), pool.type());
+    }
+
+    /** Who owns each open internal item of these types on the case, by type (null: unowned). */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, String> openWorkOwners(UUID caseId, java.util.Collection<String> types) {
+        java.util.Map<String, String> owners = new java.util.HashMap<>();
+        for (var row : tasks.findOpenInternalOfTypes(caseId, types)) owners.putIfAbsent(row.getTaskType(), row.getOwnerSubject());
+        return owners;
+    }
+
+    /** True when the person owns open internal work on the case other than the given types. */
+    @Transactional(readOnly = true)
+    public boolean hasOtherOpenWork(UUID caseId, String owner, java.util.Collection<String> exceptTypes) {
+        return tasks.existsByCaseIdAndOwnerSubjectAndVisibilityScopeAndStatusInAndTaskTypeNotIn(caseId, owner, "INTERNAL", OPEN, exceptTypes);
+    }
+
     /** True when an open internal work item is owned by the given staff role on this case. */
     @Transactional(readOnly = true)
     public boolean hasOpenWork(UUID caseId, String ownerRole) {
@@ -312,6 +385,11 @@ public class StaffWorkService {
      */
     @Transactional
     public void setWaitingOn(UUID caseId, String actor, WaitingReason reason) {
+        writeWaitingOn(caseId, actor, reason);
+        changed(caseId);
+    }
+
+    private void writeWaitingOn(UUID caseId, String actor, WaitingReason reason) {
         if (!WAITING.contains(actor)) throw new ApiException(400, "INVALID_WAITING_ACTOR", "Unsupported responsibility value");
         WaitingReason why = reason == null ? WaitingReason.text(null) : reason;
         // Keep waiting_since as the moment responsibility actually moved, not the last time it was re-stated.

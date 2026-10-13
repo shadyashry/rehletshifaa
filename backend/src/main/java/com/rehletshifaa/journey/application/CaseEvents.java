@@ -23,4 +23,10 @@ public final class CaseEvents {
 
     /** A step only the patient could complete (profile, contact, consents, onboarding) just changed. */
     public record PatientReadinessChanged(UUID caseId) {}
+
+    /**
+     * Work, an assignment, the proposal's sign-offs or who has the ball changed on the case: the stage's own steps are
+     * re-derived ({@link CaseActionService#syncStageWork}) so every step someone owes is in their My work (QA A3).
+     */
+    public record WorkChanged(UUID caseId) {}
 }

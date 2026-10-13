@@ -44,6 +44,7 @@ class CoordinatorCaseActionsTest {
     @Autowired ReplyCoverService covers; @Autowired StaffWorkQueryService staffWork;
     @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff; @Autowired StaffWorkService work;
     @Autowired PatientAccountService account; @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort;
+    @Autowired PoolWorkDepartureService departures;
     @org.junit.jupiter.api.BeforeEach void resetIdentity() { ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).reset(); }
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
 
@@ -327,6 +328,174 @@ class CoordinatorCaseActionsTest {
         assertThat(journey.workspace(ctx.caseId).actions().currentAction().workType()).isEqualTo("DEPOSIT_RECORD");
     }
 
+    // ---------- one source: work items, "At a glance" and "waiting on" (QA A3) ----------
+
+    /** QA #3: a case routed to a Coordinator at submission is their work — My work, At a glance, current action — not only "waiting on: you". */
+    @Test void aCaseRoutedAtSubmissionIsItsCoordinatorsWork() throws Exception {
+        UUID caseId = submittedAndRouted();
+        assertOneSource(caseId, "routed at submission", coordinator("ASSIGN_CONSULTANT"));
+        // The routing decision already told them; the step adds no second notification.
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE case_id=? AND event_type='STAGE_STEP_DUE'", caseId)).isZero();
+
+        UUID catalogue = seedDoctorWithCatalog();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "cardiac-pod", "Clinical review")); em.flush();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='ASSIGN_CONSULTANT' AND status='OPEN'", caseId)).as("done once a consultant is offered").isZero();
+        assertThat(catalogue).isNotNull();
+    }
+
+    /**
+     * QA A3 invariant (with #3, #3b, #18 and A1's header = brief = action), walked from submission to treatment coordination
+     * on a case Finance must approve: every stage that waits on someone has exactly one open work item, theirs.
+     */
+    @Test void everyWaitingStageHasExactlyOneOpenWorkItemForWhoeverItWaitsOn() throws Exception {
+        UUID caseId = submittedAndRouted();
+        Party doctor = new Party("doctor-subject", Role.CONSULTANT, null), finance = new Party("finance-subject", Role.FINANCE, null),
+                operations = new Party("operations-subject", Role.OPERATIONS, null);
+        assertOneSource(caseId, "intake review", coordinator("ASSIGN_CONSULTANT"));
+
+        UUID catalogue = seedDoctorWithCatalog();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        var offer = journey.assign(caseId, new AssignmentRequest("doctor-subject", "DOCTOR", "PRIMARY", "cardiac-pod", "Clinical review"));
+        assertOneSource(caseId, "consultant offered", new Party("doctor-subject", Role.CONSULTANT, "ACCEPT_ASSIGNMENT"), COORDINATOR_WAITING);
+
+        authenticate("doctor-subject", Role.CONSULTANT);
+        journey.acceptDoctorAssignment(caseId, offer.id(), new AssignmentDecisionRequest(true, null));
+        assertOneSource(caseId, "clinical review", new Party("doctor-subject", Role.CONSULTANT, "CLINICAL_REVIEW"), COORDINATOR_WAITING);
+
+        authenticate("doctor-subject", Role.CONSULTANT);
+        journey.reviewDecision(caseId, new ReviewDecisionRequest("ACCEPT", "Recommended intervention", "Standard risks",
+                List.of(new CostEstimateItem("Diagnostic cardiology consultation", new BigDecimal("3500.00"), "EGP", catalogue))));
+        assertOneSource(caseId, "recommendation ready", coordinator("PREPARE_PROPOSAL"), doctor);
+
+        // A manually priced service: Finance must approve before release.
+        UUID reviewId = jdbc.queryForObject("SELECT id FROM clinical_review_versions WHERE case_id=? AND status='APPROVED'", UUID.class, caseId);
+        raw("UPDATE clinical_review_cost_estimates SET catalog_service_id=NULL,requires_finance_approval=TRUE WHERE clinical_review_id=?", reviewId);
+        ProposalView proposal = createProposal(new Recommended(caseId, reviewId));
+        assertOneSource(caseId, "Finance to assign", coordinator("ASSIGN_FINANCE"));
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        var financeOffer = journey.assign(caseId, new AssignmentRequest("finance-subject", "FINANCE", "PRIMARY", null, "Approve terms"));
+        assertOneSource(caseId, "Finance offered", new Party("finance-subject", Role.FINANCE, "ACCEPT_ASSIGNMENT"), COORDINATOR_WAITING);
+
+        authenticate("finance-subject", Role.FINANCE);
+        journey.decideAssignment(caseId, financeOffer.id(), new AssignmentDecisionRequest(true, null), Role.FINANCE);
+        assertOneSource(caseId, "Finance approval", new Party("finance-subject", Role.FINANCE, "APPROVE_COMMERCIAL_TERMS"), COORDINATOR_WAITING);
+
+        // QA #3b: Finance's approval hands the release to the coordinator, who is told.
+        authenticate("finance-subject", Role.FINANCE);
+        journey.approveFinance(caseId, proposal.versionId());
+        assertOneSource(caseId, "ready to release", coordinator("RELEASE_PROPOSAL"), finance);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='STAGE_STEP_DUE'", "coordinator-subject")).isEqualTo(1);
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        journey.releaseProposal(caseId, proposal.versionId()); em.flush();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND visibility_scope='INTERNAL' AND status='OPEN'", caseId)).isZero();
+        assertWaitsOnPatient(caseId, "patient decision", COORDINATOR_WAITING, finance);
+
+        Ctx ctx = acknowledge(caseId, proposal.versionId());
+        assertWaitsOnPatient(caseId, "profile to activate", COORDINATOR_WAITING, finance);
+
+        activation.activate(ctx.token(), grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(caseId);
+        assertOneSource(caseId, "deposit to arrange", coordinator("DEPOSIT_ARRANGEMENT"), finance);
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        CurrentActionView arrange = journey.workspace(caseId).actions().currentAction();
+        journey.completeTask(caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent", arrange.workItemVersion()));
+        assertOneSource(caseId, "deposit to record", new Party("finance-subject", Role.FINANCE, "DEPOSIT_RECORD"), COORDINATOR_WAITING);
+
+        settleDeposit(ctx); em.flush();
+        assertThat(status(caseId)).isEqualTo("TRAVEL_COORDINATION");
+        assertOneSource(caseId, "treatment coordination", coordinator("TRAVEL"), finance);
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        var operationsOffer = journey.assign(caseId, new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", null, "Travel and arrival"));
+        assertOneSource(caseId, "Operations offered", new Party("operations-subject", Role.OPERATIONS, "ACCEPT_ASSIGNMENT"), COORDINATOR_WAITING);
+
+        authenticate("operations-subject", Role.OPERATIONS);
+        journey.decideAssignment(caseId, operationsOffer.id(), new AssignmentDecisionRequest(true, null), Role.OPERATIONS);
+        assertOneSource(caseId, "travel and arrival", new Party("operations-subject", Role.OPERATIONS, "UPDATE_TRAVEL_PLAN"), COORDINATOR_WAITING, finance);
+        assertThat(operations).isNotNull();
+    }
+
+    /** QA A3: before release a travel package passes the step from the coordinator to Operations and back, one item at a time. */
+    @Test void aTravelPackageHandsThePreReleaseStepToOperationsAndBack() throws Exception {
+        var ctx = recommended();
+        raw("UPDATE medical_cases SET travel_package_requested=TRUE WHERE id=?", ctx.caseId());
+        ProposalView proposal = createProposal(ctx);
+        assertOneSource(ctx.caseId(), "travel package to plan", coordinator("ASSIGN_OPERATIONS_PLAN"));
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        var offer = journey.assign(ctx.caseId(), new AssignmentRequest("operations-subject", "OPERATIONS", "PRIMARY", null, "Travel package"));
+        authenticate("operations-subject", Role.OPERATIONS);
+        journey.decideAssignment(ctx.caseId(), offer.id(), new AssignmentDecisionRequest(true, null), Role.OPERATIONS);
+        assertOneSource(ctx.caseId(), "Operations plans the package", new Party("operations-subject", Role.OPERATIONS, "PREPARE_TRAVEL_PACKAGE"), COORDINATOR_WAITING);
+
+        authenticate("operations-subject", Role.OPERATIONS);
+        journey.completeOperations(ctx.caseId(), proposal.versionId(), "Flights, hotel and transfers");
+        assertOneSource(ctx.caseId(), "ready to release", coordinator("RELEASE_PROPOSAL"), new Party("operations-subject", Role.OPERATIONS, null));
+    }
+
+    /**
+     * B3 follow-ups (QA A3): the deposit to record never waits on someone who left Finance, moves only within the Finance
+     * team (a lead releases it to the pool or hands it to a member), and nobody cancels it while the deposit is open.
+     */
+    @Test void theDepositToRecordMovesOnlyWithinFinanceAndIsNeverCancelledWhileTheDepositIsOpen() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                UUID.randomUUID(), ctx.caseId, "finance-subject", "FINANCE", "PRIMARY", "ACTIVE", "Commercial terms", "coordinator-subject", Instant.now(), Instant.now());
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-lead", "FINANCE", crypto.encrypt("Finance Lead"));
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-two", "FINANCE", crypto.encrypt("Finance Two"));
+        com.rehletshifaa.workforce.WorkforceTestData.leadTeam(jdbc, "FINANCE", "finance-lead", "finance-subject", "finance-two");
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        CurrentActionView arrange = journey.workspace(ctx.caseId).actions().currentAction();
+        journey.completeTask(ctx.caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent", arrange.workItemVersion())); em.flush();
+        UUID item = jdbc.queryForObject("SELECT id FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD'", UUID.class, ctx.caseId);
+
+        // Not even the lead cancels it: recording or waiving the deposit closes it.
+        authenticate("finance-lead", Role.FINANCE);
+        assertThat(catchThrowableOfType(() -> journey.cancelTask(ctx.caseId, item, new CancelTaskRequest("Not needed", taskVersion(item))), ApiException.class).code())
+                .isEqualTo("POOL_WORK_NOT_CANCELLABLE");
+        // Someone who does not lead its owner cannot release it.
+        authenticate("finance-two", Role.FINANCE);
+        assertThat(catchThrowableOfType(() -> journey.reassignTask(ctx.caseId, item, new ReassignTaskRequest(null, "FINANCE", taskVersion(item))), ApiException.class).status()).isEqualTo(403);
+
+        // The lead releases it to the Finance pool: every Finance holder now has it; audited.
+        authenticate("finance-lead", Role.FINANCE);
+        journey.reassignTask(ctx.caseId, item, new ReassignTaskRequest(null, "FINANCE", taskVersion(item))); em.flush();
+        assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE id=?", String.class, item)).isNull();
+        assertThat(count("SELECT count(*) FROM audit_events WHERE event_type='CASE_TASK_RELEASED_TO_POOL' AND case_id=?", ctx.caseId)).isEqualTo(1);
+        authenticate("finance-two", Role.FINANCE);
+        assertThat(staffWork.myWork()).anyMatch(w -> w.id().equals(item));
+        // From the pool, a member cannot hand it to someone else; the lead hands it to a member of their team, and only within Finance.
+        assertThat(catchThrowableOfType(() -> journey.reassignTask(ctx.caseId, item, new ReassignTaskRequest("finance-subject", "FINANCE", taskVersion(item))), ApiException.class).status()).isEqualTo(403);
+        authenticate("finance-lead", Role.FINANCE);
+        assertThat(catchThrowableOfType(() -> journey.reassignTask(ctx.caseId, item, new ReassignTaskRequest("finance-two", "COORDINATOR", taskVersion(item))), ApiException.class).code()).isEqualTo("INVALID_TASK_OWNER");
+        journey.reassignTask(ctx.caseId, item, new ReassignTaskRequest("finance-two", "FINANCE", taskVersion(item))); em.flush();
+        assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE id=?", String.class, item)).isEqualTo("finance-two");
+
+        // finance-two leaves Finance: their deposit to record goes back to the pool, audited.
+        raw("UPDATE workforce_role_assignments SET status='REVOKED', revoked_at=?, revoked_by='TEST', revoke_reason='Left' WHERE subject=? AND role_key='FINANCE'", Instant.now(), "finance-two");
+        departures.on(new com.rehletshifaa.workforce.application.WorkforceEvents.StaffAccessReduced("finance-two", "TEST", "ROLE_ENDED")); em.flush();
+        assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE id=?", String.class, item)).isNull();
+        assertThat(count("SELECT count(*) FROM audit_events WHERE event_type='CASE_TASK_RELEASED_TO_POOL' AND case_id=?", ctx.caseId)).isEqualTo(2);
+    }
+
+    /** B3 follow-up (QA A3): the Finance person on the case gets the deposit to record only while they still hold the role. */
+    @Test void theDepositToRecordSkipsAFinanceAssigneeWhoLeftTheRole() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                UUID.randomUUID(), ctx.caseId, "finance-subject", "FINANCE", "PRIMARY", "ACTIVE", "Commercial terms", "coordinator-subject", Instant.now(), Instant.now());
+        raw("UPDATE workforce_role_assignments SET status='REVOKED', revoked_at=?, revoked_by='TEST', revoke_reason='Left' WHERE subject=? AND role_key='FINANCE'", Instant.now(), "finance-subject");
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        CurrentActionView arrange = journey.workspace(ctx.caseId).actions().currentAction();
+        journey.completeTask(ctx.caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent", arrange.workItemVersion())); em.flush();
+        assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD'", String.class, ctx.caseId))
+                .as("the Finance pool, not someone who left").isNull();
+    }
+
     /** QA W-8/#29 (A0 live check): the one-time code reaches an Arabic patient in Arabic — the message carries the case's language. */
     @Test void anArabicPatientsAccessCodeIsQueuedInArabic() throws Exception {
         var ctx = acknowledged();
@@ -510,16 +679,88 @@ class CoordinatorCaseActionsTest {
         var rec = recommended();
         var proposal = createProposal(rec);
         proposal = journey.releaseProposal(rec.caseId(), proposal.versionId()); em.flush();
-        String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, "proposal-ready:" + proposal.versionId()));
+        return acknowledge(rec.caseId(), proposal.versionId());
+    }
+
+    /** The patient acknowledges the released estimate through its secure link. */
+    private Ctx acknowledge(UUID caseId, UUID versionId) throws Exception {
+        String stored = payload(jdbc.queryForObject("SELECT template_data FROM notification_outbox WHERE idempotency_key=?", String.class, "proposal-ready:" + versionId));
         String token = json.readValue(stored, new TypeReference<Map<String, String>>() {}).get("token");
         SecurityContextHolder.clearContext();
         journey.requestProposalAccess(token, "WHATSAPP"); em.flush();
         var g = journey.verifyProposalAccess(token, proposalCode(token, "WHATSAPP"));
         journey.decideProposalPublic(token, g.grant(), new PublicProposalDecisionRequest(g.grant(), "ACKNOWLEDGED", null, true));
         em.flush(); SecurityContextHolder.clearContext();
-        String caseNumber = jdbc.queryForObject("SELECT case_number FROM medical_cases WHERE id=?", String.class, rec.caseId());
-        return new Ctx(rec.caseId(), proposal.versionId(), onboardingTokenFor(rec.caseId()), caseNumber);
+        String caseNumber = jdbc.queryForObject("SELECT case_number FROM medical_cases WHERE id=?", String.class, caseId);
+        return new Ctx(caseId, versionId, onboardingTokenFor(caseId), caseNumber);
     }
+
+    /** A new case submitted while a routing policy holds an eligible Coordinator: routing assigns it at submission. */
+    private UUID submittedAndRouted() {
+        seedStaff();
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        var created = cases.create(new CreateCaseRequest("Case", "Patient", "Kenya", "+254700000020", "Cardiac reports", "en", true, null, "link@local.test", "Africa/Nairobi", "cardiology"));
+        cases.submit(created.caseId()); em.flush(); em.clear();
+        assertThat(status(created.caseId())).as("routed at submission").isEqualTo("INTAKE_REVIEW");
+        return created.caseId();
+    }
+
+    /** Who a stage waits on, and the step their current action names (its code, or the work item's type). */
+    private record Party(String subject, Role role, String step) {}
+    private static Party coordinator(String step) { return new Party("coordinator-subject", Role.COORDINATOR, step); }
+    private static final Party COORDINATOR_WAITING = coordinator(null);
+
+    /**
+     * QA A3, one source: the stage waits on exactly one open work item, the party's; it is in their My work and counted on
+     * their case card ("At a glance"); their current action is that step; the case header's "waiting on" agrees (A1: the
+     * header reads "you" from the current action, so the stored responsibility must name the party's side); and everyone
+     * else on the case is waiting, with nothing in their My work for it.
+     */
+    private void assertOneSource(UUID caseId, String stage, Party party, Party... others) {
+        em.flush(); em.clear();
+        List<Map<String, Object>> open = jdbc.queryForList("SELECT task_type, owner_subject FROM case_tasks WHERE case_id=? AND visibility_scope='INTERNAL' AND status IN ('OPEN','IN_PROGRESS')", caseId);
+        assertThat(open).as(stage + ": exactly one open work item").hasSize(1);
+        assertThat(open.getFirst().get("owner_subject")).as(stage + ": owned by whoever the case waits on").isEqualTo(party.subject());
+        authenticate(party.subject(), party.role());
+        assertThat(staffWork.myWork()).as(stage + ": in My work").filteredOn(w -> w.caseId().equals(caseId)).hasSize(1);
+        cards(party.role()).stream().filter(card -> card.caseSummary().id().equals(caseId))
+                .forEach(card -> assertThat(card.myWorkCount()).as(stage + ": counted in At a glance").isEqualTo(1));
+        CaseActionsView a = journey.workspace(caseId).actions();
+        CurrentActionView current = a.currentAction();
+        assertThat(current.kind()).as(stage + ": the party acts").isIn("FOCUS", "ACCEPT", "COMPLETE");
+        assertThat("WORK_ITEM".equals(current.code()) ? current.workType() : current.code()).as(stage + ": the step").isEqualTo(party.step());
+        assertThat(a.waitingOn()).as(stage + ": waiting on the party's side").isIn(switch (party.role()) {
+            case CONSULTANT -> List.of("CONSULTANT");
+            case FINANCE -> List.of("STAFF", "PAYMENT");
+            case OPERATIONS -> List.of("STAFF", "TRAVEL_TEAM");
+            default -> List.of("STAFF");
+        });
+        for (Party other : others) assertWaiting(caseId, stage, other);
+        SecurityContextHolder.clearContext();
+    }
+
+    /** The patient owes the next move: every staff member on the case waits, and the case says so. */
+    private void assertWaitsOnPatient(UUID caseId, String stage, Party... staff) {
+        em.flush(); em.clear();
+        for (Party other : staff) {
+            assertWaiting(caseId, stage, other);
+            authenticate(other.subject(), other.role());
+            assertThat(journey.workspace(caseId).actions().waitingOn()).as(stage + ": waiting on the patient").isEqualTo("PATIENT");
+        }
+        SecurityContextHolder.clearContext();
+    }
+
+    private void assertWaiting(UUID caseId, String stage, Party other) {
+        authenticate(other.subject(), other.role());
+        assertThat(journey.workspace(caseId).actions().currentAction().kind()).as(stage + ": " + other.subject() + " waits").isIn("WAIT", "NONE");
+        assertThat(staffWork.myWork()).as(stage + ": nothing in " + other.subject() + "'s My work").noneMatch(w -> w.caseId().equals(caseId));
+    }
+
+    private List<StaffCaseCardView> cards(Role role) {
+        return role == Role.COORDINATOR ? journey.coordinatorCaseCards() : journey.assignedCaseCards(role);
+    }
+
+    private long taskVersion(UUID taskId) { return jdbc.queryForObject("SELECT version FROM case_tasks WHERE id=?", Long.class, taskId); }
 
     private ProfileActivationRequest request(String phone) {
         return new ProfileActivationRequest("Case", "Patient", null, null, "link@local.test", phone, "PATIENT", LocalDate.of(1990, 1, 1), "KE", "KE", "en", "MALE",

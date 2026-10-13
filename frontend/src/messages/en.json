@@ -1187,6 +1187,7 @@
     "myWork": {
       "title": "My work",
       "hint": "Work assigned to you personally, most urgent first.",
+      "hintTeam": "Work for you or your team, most urgent first.",
       "empty": "Nothing is assigned to you.",
       "emptyHint": "Anything assigned to you shows up here.",
       "open": "Open",
@@ -1206,6 +1207,7 @@
       "teamHint": "Cases owned by coordinators on your team. Transfer ownership to rebalance work.",
       "mineHint": "Cases you own as the responsible coordinator.",
       "assignedHint": "Cases you are assigned to.",
+      "assignedHintFinance": "Cases you are on, or with a deposit to record.",
       "transfer": "Transfer ownership",
       "received": "Received",
       "search": "Search case number, name or care area",
@@ -1524,6 +1526,13 @@
       "CLINICAL_OUTCOME_REVIEW": "Review the clinical outcome",
       "DEPOSIT_ARRANGEMENT": "Arrange the coordination deposit",
       "DEPOSIT_RECORD": "Record the deposit",
+      "ASSIGN_CONSULTANT": "Prepare the case for a Consultant",
+      "ASSIGN_OPERATIONS_PLAN": "Plan the travel package with Operations",
+      "ASSIGN_FINANCE": "Finance must approve the commercial terms",
+      "RELEASE_PROPOSAL": "Release the proposal to the patient",
+      "APPROVE_COMMERCIAL_TERMS": "Approve the commercial terms",
+      "PREPARE_TRAVEL_PACKAGE": "Plan the travel package",
+      "UPDATE_TRAVEL_PLAN": "Arrange travel and arrival",
       "TRAVEL": "Coordinate treatment and travel",
       "REASSIGN_CONSULTANT": "Reassign the case to a Consultant",
       "CONFIRM_TRANSFER": "Confirm the case transfer",
@@ -1680,6 +1689,34 @@
         "DEPOSIT_RECORD": {
           "title": "Record the deposit",
           "context": "The patient has the payment instructions. When the transfer arrives, record the amount received on this case."
+        },
+        "ASSIGN_CONSULTANT": {
+          "title": "Prepare the case for a Consultant",
+          "context": "Complete anything missing, then assign a Consultant for this care area."
+        },
+        "ASSIGN_OPERATIONS_PLAN": {
+          "title": "Plan the travel package with Operations",
+          "context": "The patient asked for a travel package. Assign Operations to plan and price it before the proposal is released."
+        },
+        "ASSIGN_FINANCE": {
+          "title": "Finance must approve the commercial terms",
+          "context": "A manually priced service needs Finance sign-off before release. Assign who should approve it."
+        },
+        "RELEASE_PROPOSAL": {
+          "title": "Release the proposal to the patient",
+          "context": "Check the release requirements, then release the secure link."
+        },
+        "APPROVE_COMMERCIAL_TERMS": {
+          "title": "Approve the commercial terms",
+          "context": "Review the manually priced services before the proposal can be released."
+        },
+        "PREPARE_TRAVEL_PACKAGE": {
+          "title": "Plan the travel package",
+          "context": "Describe the travel package for the proposal before it is released. Bookings and arrival are arranged only after the patient's deposit."
+        },
+        "UPDATE_TRAVEL_PLAN": {
+          "title": "Arrange travel and arrival",
+          "context": "Keep the travel plan current; confirm it once every requirement is met."
         },
         "TREATMENT_COORDINATION_START": {
           "title": "Start treatment coordination — deposit received",

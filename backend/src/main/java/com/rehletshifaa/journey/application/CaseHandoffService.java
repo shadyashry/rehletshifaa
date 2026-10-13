@@ -12,6 +12,7 @@ import com.rehletshifaa.journey.infrastructure.DepositRepository;
 import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.audit.AuditEventRepository;
 import com.rehletshifaa.shared.audit.AuditTrail;
+import com.rehletshifaa.workforce.application.WorkforceDirectory;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
@@ -44,6 +45,7 @@ public class CaseHandoffService {
     private final AuditTrail auditTrail;
     private final AuditEventRepository audits;
     private final DepositRepository deposits;
+    private final WorkforceDirectory workforce;
     /** Staff work for arranging the offline coordination deposit with the patient. */
     static final String DEPOSIT_WORK = "DEPOSIT_ARRANGEMENT";
     /** Finance work for recording the deposit once the patient has the payment instructions. */
@@ -57,7 +59,7 @@ public class CaseHandoffService {
 
     public CaseHandoffService(IntakeLifecycleService intake, StaffWorkService work, CaseTransitionPolicy policy, Clock clock,
                               @Value("${app.mail.coordinator}") String coordinatorEmail, AuditTrail auditTrail, AuditEventRepository audits, NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseStatusLog statusLog,
-                              DepositRepository deposits) { this.deposits = deposits; this.statusLog = statusLog; this.assignments = assignments; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail; this.audits = audits;
+                              DepositRepository deposits, WorkforceDirectory workforce) { this.deposits = deposits; this.workforce = workforce; this.statusLog = statusLog; this.assignments = assignments; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail; this.audits = audits;
         this.intake = intake; this.work = work; this.policy = policy; this.clock = clock; this.coordinatorEmail = coordinatorEmail;
     }
 
@@ -104,7 +106,10 @@ public class CaseHandoffService {
     public boolean onDepositInstructionsSent(UUID caseId) {
         CaseStatus status = cases.findStageAndVersion(caseId).map(MedicalCaseRepository.StageAndVersion::getStatus).orElse(null);
         if (status != CaseStatus.ACCEPTED || !deposits.isOpenOn(caseId)) return false;
-        String finance = assignments.findActiveAssignees(caseId, "FINANCE").stream().findFirst().orElse(null);
+        // Replayed: the item stands as it is now, never handed back to someone after a lead released it to the pool.
+        if (!work.openWorkOwners(caseId, java.util.Set.of(DEPOSIT_RECORD_WORK)).isEmpty()) return false;
+        // Only someone who still holds the role: a Finance assignee from the approval weeks ago may have left (QA A3).
+        String finance = assignments.findActiveAssignees(caseId, "FINANCE").stream().filter(s -> workforce.holds(s, "FINANCE")).findFirst().orElse(null);
         work.openWorkItem(new NewWorkItem(caseId, DEPOSIT_RECORD_WORK, "Record the deposit",
                 "The patient has the payment instructions. When the transfer arrives, record the amount received on the case.",
                 finance, "FINANCE", false, null, "SYSTEM", "DEPOSIT_INSTRUCTIONS_SENT",

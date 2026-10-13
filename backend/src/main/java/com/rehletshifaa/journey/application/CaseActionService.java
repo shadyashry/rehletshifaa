@@ -6,8 +6,10 @@ import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
+import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
 import com.rehletshifaa.journey.api.WorkDtos.PatientActionView;
 import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
+import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.application.CaseActionQueryService.Facts;
 import com.rehletshifaa.journey.application.CaseActionQueryService.Proposal;
 import com.rehletshifaa.journey.application.CaseActionQueryService.WorkItem;
@@ -45,6 +47,12 @@ public class CaseActionService {
     private static final Set<String> READINESS_STAGES = Set.of("ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED");
     /** Staff work that exists to move the deposit or coordination forward, so it waits behind the patient's readiness. */
     private static final Set<String> READINESS_GATED_WORK = Set.of("DEPOSIT_ARRANGEMENT", "TRAVEL");
+
+    /**
+     * Work that waits behind the patient's readiness is parked — out of My work and "At a glance" — while the case's
+     * responsibility (kept by {@link #reconcileWaitingOn}) is the patient, as the current action says (QA A3, #18).
+     */
+    static boolean parked(String workType, String waitingOn) { return READINESS_GATED_WORK.contains(workType) && "PATIENT".equals(waitingOn); }
     /** Stages in which "prepare the proposal" is still real work; anywhere else the item is obsolete. */
     private static final Set<String> PROPOSAL_WORK_STAGES = Set.of("CLINICAL_RECOMMENDATION_READY", "REVISION_REQUESTED", "EXPIRED");
     private static final Set<String> TERMINAL = Set.of("DRAFT", "CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE", "EXPIRED");
@@ -67,9 +75,12 @@ public class CaseActionService {
     private final ProposalAccessService proposals;
     private final Authority authority;
     private final Clock clock;
+    private final com.rehletshifaa.workforce.application.WorkforceDirectory workforce;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
-                             StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock) {
+                             StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
+                             com.rehletshifaa.workforce.application.WorkforceDirectory workforce) {
+        this.workforce = workforce;
         this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
         this.patientActions = patientActions; this.proposals = proposals; this.authority = authority; this.clock = clock;
     }
@@ -170,6 +181,8 @@ public class CaseActionService {
         if (coordinator && !owned)
             return "RECEIVED".equals(f.status()) && f.coordinatorSubject() == null ? simple("CLAIM_CASE", "CLAIM") : simple("VIEW_ONLY", "NONE");
         if (!coordinator && f.pendingFor(actor.subject(), actor.label())) return simple("ACCEPT_ASSIGNMENT", "ACCEPT");
+        // A stage step's work item is only its queue entry: the step itself (and its form) is the stage's answer below.
+        if (mine != null && STAGE_WORK.contains(mine.type())) mine = null;
         // Work that is mine and not itself waiting on the patient is what the workflow is waiting for.
         if (mine != null && !(READINESS_GATED_WORK.contains(mine.type()) && patientBlocked)) return workItem(mine);
         if (patientAction != null) return simple("WAIT_PATIENT_INFORMATION", "WAIT");
@@ -178,13 +191,17 @@ public class CaseActionService {
             return new CurrentActionView("WAIT_PATIENT_READINESS", "WAIT", null, null, null, null, null, null, false, first.code());
         }
         if (mine != null) return workItem(mine);
-        return stageFallback(caseId, f, proposal, actor, coordinator, blockers);
+        return stageFallback(caseId, f, proposal, actor.role(), blockers);
     }
 
-    /** Only reached when nothing is assigned: describe the stage honestly, including "nothing to do yet". */
-    private CurrentActionView stageFallback(UUID caseId, Facts f, Proposal proposal, Actor actor, boolean coordinator, List<BlockerView> blockers) {
+    /**
+     * Only reached when no other work is mine: describe the stage honestly, including "nothing to do yet". Also the one
+     * source of the stage's own steps that {@link #syncStageWork} keeps as work items, for the coordinator who owns the case
+     * and the Operations and Finance people active on it.
+     */
+    private CurrentActionView stageFallback(UUID caseId, Facts f, Proposal proposal, Role role, List<BlockerView> blockers) {
         String s = f.status();
-        if (coordinator) {
+        if (role == Role.COORDINATOR) {
             if (CONSULTANT_ASSIGNABLE.contains(s)) return simple("ASSIGN_CONSULTANT", "FOCUS");
             if (Set.of("CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW").contains(s)) return simple("WAIT_CONSULTANT", "WAIT");
             if (PROPOSAL_WORK_STAGES.contains(s)) return simple("PREPARE_PROPOSAL", "FOCUS");
@@ -197,15 +214,15 @@ public class CaseActionService {
             }
             return none();
         }
-        if (actor.role() == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
-        if (actor.role() == Role.OPERATIONS) {
+        if (role == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
+        if (role == Role.OPERATIONS) {
             if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
             // Before release Operations prices and plans the travel package for the proposal (QA #27); arranging travel
             // and arrival (UPDATE_TRAVEL_PLAN) only starts once the deposit is settled.
             if ("PROPOSAL_PREPARATION".equals(s) && f.travelPackage() && proposal != null && !proposal.operationsDone()
                     && "CLINICALLY_APPROVED".equals(proposal.status())) return simple("PREPARE_TRAVEL_PACKAGE", "FOCUS");
         }
-        if (actor.role() == Role.FINANCE && "PROPOSAL_PREPARATION".equals(s) && proposal != null && proposal.requiresFinance()
+        if (role == Role.FINANCE && "PROPOSAL_PREPARATION".equals(s) && proposal != null && proposal.requiresFinance()
                 && !proposal.financeDone() && (!f.travelPackage() || proposal.operationsDone())
                 && Set.of("CLINICALLY_APPROVED", "OPERATIONS_COMPLETED").contains(proposal.status()))
             return simple("APPROVE_COMMERCIAL_TERMS", "FOCUS");
@@ -360,19 +377,108 @@ public class CaseActionService {
         return work.reconcileWaitingOn(caseId, fallback, reason, patientStep.isPresent() || patientAction != null);
     }
 
+    // ---------------- the stage's own steps as work (QA A3) ----------------
+
+    /**
+     * Steps a stage owes one named person that no event raises work for: the coordinator's intake review and internal
+     * sign-off steps up to the release (#3, #3b), Finance's approval and Operations' plans once they have accepted. Each is
+     * carried by one work item named after the step, so My work, "At a glance" and the current action read one source. The
+     * step is still decided by {@link #stageFallback}; the item is its queue entry, and the current action keeps the step's
+     * own code and form.
+     */
+    static final Set<String> STAGE_WORK = Set.of("ASSIGN_CONSULTANT", "ASSIGN_OPERATIONS_PLAN", "ASSIGN_FINANCE", "RELEASE_PROPOSAL",
+            "APPROVE_COMMERCIAL_TERMS", "PREPARE_TRAVEL_PACKAGE", "UPDATE_TRAVEL_PLAN");
+    /** English title and context of each stage step's item; the portal words it from the step's code (EN/AR). */
+    private static final Map<String, List<String>> STAGE_WORK_TEXT = Map.of(
+            "ASSIGN_CONSULTANT", List.of("Prepare the case for a Consultant", "Complete anything missing, then assign a Consultant for this care area."),
+            "ASSIGN_OPERATIONS_PLAN", List.of("Plan the travel package with Operations", "The patient asked for a travel package. Assign Operations to plan and price it before the proposal is released."),
+            "ASSIGN_FINANCE", List.of("Finance must approve the commercial terms", "A manually priced service needs Finance sign-off before release. Assign who should approve it."),
+            "RELEASE_PROPOSAL", List.of("Release the proposal to the patient", "Every internal sign-off is in. Check the release requirements, then release the secure link."),
+            "APPROVE_COMMERCIAL_TERMS", List.of("Approve the commercial terms", "Review the manually priced services before the proposal can be released."),
+            "PREPARE_TRAVEL_PACKAGE", List.of("Plan the travel package", "Describe the travel package for the proposal before it is released. Bookings and arrival are arranged only after the patient's deposit."),
+            "UPDATE_TRAVEL_PLAN", List.of("Arrange travel and arrival", "Keep the travel plan current; confirm it once every requirement is met."));
+    /** Cases this thread is syncing: a change the sync makes announces itself again, and the outer pass already covers it. */
+    private final ThreadLocal<Set<UUID>> syncing = ThreadLocal.withInitial(HashSet::new);
+
+    private record StageStep(String subject, String role) {}
+
+    @EventListener
+    public void on(CaseEvents.WorkChanged event) { syncStageWork(event.caseId()); }
+
+    /**
+     * Keep exactly one open item per stage step owed now, owned by whoever owes it: open a missing one, close one the stage
+     * no longer owes (or owes someone else). A step stays out of the queue while its owner has other open work on the case
+     * (the event's own item names the same moment, e.g. a declined assignment) and while the case waits on the patient.
+     * Idempotent; runs on every {@link CaseEvents.WorkChanged}, never on a read.
+     */
+    @Transactional
+    public void syncStageWork(UUID caseId) {
+        if (!syncing.get().add(caseId)) return;
+        try {
+            Map<String, StageStep> owed = stageSteps(caseId);
+            Map<String, String> open = work.openWorkOwners(caseId, STAGE_WORK);
+            for (var item : open.entrySet()) {
+                StageStep step = owed.get(item.getKey());
+                if (step == null || !step.subject().equals(item.getValue()) || work.hasOtherOpenWork(caseId, step.subject(), STAGE_WORK))
+                    work.closeWorkItems(caseId, item.getKey(), "Superseded — the step is no longer owed here");
+                else owed.remove(item.getKey()); // already in the right queue
+            }
+            String actor = currentSubject();
+            for (var due : owed.entrySet()) {
+                StageStep step = due.getValue();
+                if (work.hasOtherOpenWork(caseId, step.subject(), STAGE_WORK)) continue;
+                List<String> text = STAGE_WORK_TEXT.get(due.getKey());
+                // Told only when someone else handed them the step; a routed intake was already announced by the routing decision.
+                boolean tell = !step.subject().equals(actor) && !"ASSIGN_CONSULTANT".equals(due.getKey());
+                work.openWorkItem(new NewWorkItem(caseId, due.getKey(), text.get(0), text.get(1), step.subject(), step.role(), false, null,
+                        "SYSTEM", "STAGE_STEP_DUE", "stage-step:" + due.getKey() + ":" + caseId + ":" + step.subject(), tell,
+                        WorkCopy.of(due.getKey())), tell);
+            }
+        } finally {
+            syncing.get().remove(caseId);
+        }
+    }
+
+    /** The stage steps owed now, by step: nothing while the patient owes an answer or a step only they can take. */
+    private Map<String, StageStep> stageSteps(UUID caseId) {
+        Facts f = queries.facts(caseId);
+        if (TERMINAL.contains(f.status()) || patientActions.openAction(caseId) != null) return new HashMap<>();
+        // Of the readiness stages only treatment coordination has a stage step (Operations); the others are read for nothing.
+        List<BlockerView> blockers = "TRAVEL_COORDINATION".equals(f.status()) ? readinessBlockers(caseId) : List.of();
+        if (blockers.stream().anyMatch(CaseActionService::patientGate)) return new HashMap<>();
+        Proposal proposal = queries.latestProposal(caseId);
+        Map<String, StageStep> owed = new HashMap<>();
+        for (Role role : List.of(Role.COORDINATOR, Role.FINANCE, Role.OPERATIONS)) {
+            String subject = role == Role.COORDINATOR ? f.coordinatorSubject() : f.activeAssignee(role.caseAssignmentRole());
+            // Never work for someone who has left the role (the coordinator is re-routed on departure; assignees are not).
+            if (subject == null || role != Role.COORDINATOR && !workforce.holds(subject, role.caseAssignmentRole())) continue;
+            String code = stageFallback(caseId, f, proposal, role, blockers).code();
+            // In ACCEPTED the case waits on the deposit, whatever Operations' page offers; their plan is owed once coordination starts.
+            if (STAGE_WORK.contains(code) && !("UPDATE_TRAVEL_PLAN".equals(code) && !"TRAVEL_COORDINATION".equals(f.status())))
+                owed.put(code, new StageStep(subject, role.caseAssignmentRole()));
+        }
+        return owed;
+    }
+
+    private static String currentSubject() {
+        try { return com.rehletshifaa.authority.application.Principal.current().subject(); }
+        catch (ApiException unauthenticated) { return null; } // routing at submission and other system steps
+    }
+
     /** Work made obsolete by a stage the case has already left. Idempotent; a no-op on a healthy case. */
     private void closeObsoleteWork(UUID caseId, String status, Proposal proposal) {
         // An assisted-decision call is owed only while the latest version can still be decided (expired, replaced or decided: done).
+        // A read repairs quietly: it never sets the stage's steps moving (no work opened, nobody told, on a page view).
         if (proposal == null || !Set.of("RELEASED", "VIEWED").contains(proposal.status()))
-            work.closeWorkItems(caseId, ProposalAssistanceService.WORK_TYPE, "Superseded — no proposal decision is owed");
+            work.closeWorkItems(caseId, ProposalAssistanceService.WORK_TYPE, "Superseded — no proposal decision is owed", false);
         if (!PROPOSAL_WORK_STAGES.contains(status)) {
-            work.closeWorkItems(caseId, "PREPARE_PROPOSAL", "Superseded — the proposal has already been prepared");
-            work.closeWorkItems(caseId, "PROPOSAL_REVISION", "Superseded — the proposal has already been revised");
+            work.closeWorkItems(caseId, "PREPARE_PROPOSAL", "Superseded — the proposal has already been prepared", false);
+            work.closeWorkItems(caseId, "PROPOSAL_REVISION", "Superseded — the proposal has already been revised", false);
         }
         if (!Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(status))
-            work.closeWorkItems(caseId, "TRAVEL", "Superseded — treatment coordination is already under way");
+            work.closeWorkItems(caseId, "TRAVEL", "Superseded — treatment coordination is already under way", false);
         if (!"ACCEPTED".equals(status))
-            work.closeWorkItems(caseId, CaseHandoffService.DEPOSIT_RECORD_WORK, "Superseded — the case is past the deposit stage");
+            work.closeWorkItems(caseId, CaseHandoffService.DEPOSIT_RECORD_WORK, "Superseded — the case is past the deposit stage", false);
     }
 
     /** My work on the case: an item I own, else unowned work in my role's pool (Finance: the deposit to record). */
