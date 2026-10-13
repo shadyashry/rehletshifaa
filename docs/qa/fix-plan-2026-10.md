@@ -335,22 +335,25 @@ converges from the legacy base theme to Petrol & Paper here.
 
 ## Decisions owed
 
-| Item | Decided by | Blocks |
-|---|---|---|
-| #30, L1–L5, W-27 | Legal: refund/cancellation wording and the stored refund class | launch; proposal terms |
-| G-3 | Legal: representative consent wording | consent variant |
-| G-13 | Native Arabic review | launch |
-| W-1 | Business: deposit cap/waiver | A4 |
-| DEP-2 | Business: online payment provider | DEP-2 |
-| R1 decisions | Business | R1 |
-| D1 | Owner: confirm staff MFA at sign-in (MFA-1 agreed the approach) | A2 |
-| #15 | Owner: sub-steps vs separate stages | A5 |
-| #33 | Owner: continuity routing | A6 |
-| W-32 | Owner: does "never say Verified" cover staff views? | A7 |
-| W-10 / #31 | Owner: two codes or carried session | C1 |
-| G-11 | Owner/design: connector contrast | C1 |
+**Owner decisions, 2026-10-14** (each with the batch that builds it):
 
-Already decided: G-2 (option C), G-8 (layered limits, done), DEP (keep Finance confirmation, DEP-1), MFA-1 (approach).
+| Item | Decision | Batch |
+|---|---|---|
+| W-1 | The coordination deposit is **15% of the patient's estimated total** (no fixed amount, no threshold). The percentage is a setting. | A4b |
+| Commercial settings | The medical margin, the travel margin (R1), the deposit percentage and the refund cut-off are changed **only by System Administrators and Finance Managers**; Finance reads them. Every change is versioned and audited, with recent sign-in. | A4b |
+| D1 | Best practice, as MFA-1: second factor at sign-in for every workforce account; passkeys for privileged roles (System Administrator, credentialing, Finance, Finance Manager) with an authenticator app as backup; enrolment at first sign-in, never mid-task; recovery through the two-person MFA reset; step-up window 15–30 min. | A2 |
+| #15 | Staff-only sub-steps under "Proposal" ("Finance approval — waiting · name", "Operations travel plan — waiting · name"); patients see "Preparing your proposal"; strip and history from workflow events. | A5 |
+| #33 | A returning patient's new case goes to their current coordinator when eligible; otherwise normal routing. | A6 |
+| W-32 | The "never say Verified" rule covers staff views: "Credentials reviewed · current"; "Doctor reviews" → "Consultant reviews". | A7 |
+| W-10 / #31 | A contact verified on the same number in the last 15 minutes carries into profile activation (bound to the same case and number, single use, server-side); otherwise a new code. | C1 |
+| G-11 | Connector lines stay decorative (progress is carried by the markers); recorded in DESIGN.md. | C1 |
+| DEP-2 | Provider not chosen yet: build a **provider-agnostic payment adapter** (hosted checkout or link, signed webhook, idempotent confirmation into the same receipt path); the online option stays disabled until a provider is configured. | DEP-2 |
+| R1 | As recommended: travel costs carry a **separate travel margin** (setting, System Administrators and Finance Managers only); Finance always approves travel prices (after Operations); prices as a range (lowest–highest); documents and visas per traveller; the coordination deposit stays medical, travel gets its own payment step. | R1 |
+| #30, L1–L5, W-27 | **Deposit:** fully refundable until **10 calendar days before the first confirmed appointment** (cut-off is a setting; Bookimed's model), then non-refundable and credited to the treatment price; always refunded in full if we, the hospital or the Consultant cancel, or the case is medically declined. **Travel fees:** refundable until the case's **point of no return**, set by Operations per case and approved by Finance after Operations. The stored refund class and the wording shown to the patient follow this rule. Legal review of the final wording is still recommended before launch. | Refunds |
+| G-3 | Representative consent variant: third-person wording naming the relationship ("I confirm I am authorised to share ‹name›'s medical case as their ‹relationship›…"), EN + AR, recorded with the capacity. | G-3 |
+| G-13 | An Arabic consistency and terminology pass over all patient and staff copy; a native-speaker review is still recommended before launch. | B1 |
+
+Build order: A4b → A2 → A5 → A6 → A7 → C1 items → G-3 → DEP-2 adapter → R1 → Refunds → B1 (with G-13) → B2.
 
 ---
 
