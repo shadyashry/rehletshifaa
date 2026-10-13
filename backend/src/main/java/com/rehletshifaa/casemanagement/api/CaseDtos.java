@@ -28,7 +28,7 @@ public final class CaseDtos {
         @Size(max=2048) String turnstileToken,
         @Email @Size(max=254) String email,
         @Size(max=80) String timeZone,
-        @Pattern(regexp="cardiology|rheumatology-rehabilitation|orthopedics") String careArea,
+        @Size(max=80) String careArea,
         Boolean travelPackageRequested
     ) {
         public CreateCaseRequest(String givenName,String familyName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken){this("MYSELF",givenName,familyName,null,null,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,null,null,null,null);}
@@ -46,7 +46,7 @@ public final class CaseDtos {
     /** A signed-in patient's next case: only case information, never identity — that comes from the canonical patient. */
     public record NewCaseForPatientRequest(
         @Size(max=2000) String conditionDescription,
-        @Pattern(regexp="cardiology|rheumatology-rehabilitation|orthopedics") String careArea,
+        @Size(max=80) String careArea,
         Boolean travelPackageRequested,
         @AssertTrue Boolean consent
     ) {}

@@ -15,7 +15,7 @@ public final class JourneyDtos {
     public record AssignmentRequest(@NotBlank @Size(max=255)String assigneeSubject,@NotBlank String assigneeRole,@NotBlank @Pattern(regexp="PRIMARY|SECONDARY")String assignmentType,@Size(max=100)String pod,@NotBlank @Size(max=500)String reason) {}
     public record CoordinatorReassignmentRequest(@NotBlank @Size(max=255)String assigneeSubject,@NotBlank @Size(max=500)String reason) {}
     public record TravelPackageRequest(@NotNull Boolean requested) {}
-    public record CareCategoryUpdateRequest(@NotBlank @Pattern(regexp="cardiology|rheumatology-rehabilitation|orthopedics")String careCategory,@NotNull Long expectedVersion,@Size(max=500)String reason) {}
+    public record CareCategoryUpdateRequest(@NotBlank @Size(max=80)String careCategory,@NotNull Long expectedVersion,@Size(max=500)String reason) {}
     public record MessageRequest(@NotBlank @Pattern(regexp="PATIENT_COORDINATOR|COORDINATOR_DOCTOR|COORDINATOR_OPERATIONS|COORDINATOR_FINANCE")String threadType,@NotBlank @Size(max=10000)String body,@Pattern(regexp="en|ar")String language,boolean internalOnly) {}
     public record TaskRequest(@NotBlank @Size(max=80)String taskType,@NotBlank @Size(max=240)String title,@Size(max=10000)String description,@Size(max=255)String ownerSubject,@Size(max=40)String ownerRole,@NotBlank String priority,boolean blocking,Instant dueAt) {}
     public record CompleteTaskRequest(@NotBlank @Size(max=10000)String evidence,@NotNull Long expectedVersion) {}

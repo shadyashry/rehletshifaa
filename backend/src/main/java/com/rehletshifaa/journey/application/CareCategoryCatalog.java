@@ -16,7 +16,7 @@ import java.util.List;
  * authorizes would let a cache hit skip the authorization entirely.
  */
 @Service
-public class CareCategoryCatalog {
+public class CareCategoryCatalog implements com.rehletshifaa.casemanagement.application.CareAreas {
     private final CareCategoryRepository categories;
 
     public CareCategoryCatalog(CareCategoryRepository categories) { this.categories = categories; }
@@ -28,5 +28,5 @@ public class CareCategoryCatalog {
     }
 
     /** A managed care area. Not cached: a value about to be stored is checked against the table itself. */
-    public boolean exists(String slug) { return categories.existsBySlug(slug); }
+    @Override public boolean exists(String slug) { return categories.existsBySlug(slug); }
 }

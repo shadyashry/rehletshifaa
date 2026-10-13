@@ -13,14 +13,19 @@ import java.time.Clock; import java.time.Instant; import java.util.UUID;
 
 @Service
 public class CaseService {
-    private final MedicalCaseRepository cases; private final CaseNumberGenerator numbers; private final IntakeLifecycleService intake; private final CaseIntakeGrantService intakeGrants; private final Clock clock; private final org.springframework.context.ApplicationEventPublisher events;
-    public CaseService(MedicalCaseRepository cases, CaseNumberGenerator numbers, IntakeLifecycleService intake, CaseIntakeGrantService intakeGrants, Clock clock, org.springframework.context.ApplicationEventPublisher events) { this.cases=cases; this.numbers=numbers; this.intake=intake;this.intakeGrants=intakeGrants;this.clock=clock;this.events=events; }
+    private final MedicalCaseRepository cases; private final CaseNumberGenerator numbers; private final IntakeLifecycleService intake; private final CaseIntakeGrantService intakeGrants; private final Clock clock; private final org.springframework.context.ApplicationEventPublisher events; private final CareAreas careAreas;
+    public CaseService(MedicalCaseRepository cases, CaseNumberGenerator numbers, IntakeLifecycleService intake, CaseIntakeGrantService intakeGrants, Clock clock, org.springframework.context.ApplicationEventPublisher events, CareAreas careAreas) { this.cases=cases; this.numbers=numbers; this.intake=intake;this.intakeGrants=intakeGrants;this.clock=clock;this.events=events;this.careAreas=careAreas; }
+    /** The care area is optional; when given it must be one of the managed areas, the same check as a coordinator's correction. */
+    private void requireManagedCareArea(String careArea) {
+        if (careArea != null && !careArea.isBlank() && !careAreas.exists(careArea))
+            throw new ApiException(400, "INVALID_CARE_CATEGORY", "Select a managed care area");
+    }
     /**
      * Create the draft case together with its canonical patient and submission contact. The patient's name and
      * channels live on patient_profiles and the submission contact, never on the case row.
      */
     @Transactional public CreateCaseResponse create(CreateCaseRequest request) {
-        validateNames(request);
+        validateNames(request); requireManagedCareArea(request.careArea());
         Instant now = clock.instant();
         UUID patientId = intake.registerPatient(request);
         var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), patientId, request.country(), request.conditionDescription(), request.preferredLanguage(), request.careArea(), now);
@@ -33,6 +38,7 @@ public class CaseService {
      * only clinical/case information is new — and the case is linked to the SAME patient.
      */
     @Transactional public CreateCaseResponse createForExistingPatient(UUID patientId, NewCaseForPatientRequest request) {
+        requireManagedCareArea(request.careArea());
         Instant now = clock.instant();
         IntakeLifecycleService.PatientSnapshot p = intake.patientSnapshot(patientId)
                 .orElseThrow(() -> new ApiException(404, "PATIENT_NOT_FOUND", "Patient profile was not found"));

@@ -3,6 +3,7 @@ package com.rehletshifaa.journey.application;
 import com.rehletshifaa.authority.domain.Role;
 
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
+import com.rehletshifaa.casemanagement.api.CaseDtos.NewCaseForPatientRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.shared.crypto.CryptoService;
@@ -382,6 +383,19 @@ class JourneyServiceIntegrationTest {
         assertThat(result.status()).isEqualTo("IN_PROGRESS");
         Integer reviewTasks=jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='EMERGENCY_OVERRIDE_REVIEW'",Integer.class,caseId);
         assertThat(reviewTasks).isEqualTo(1);
+    }
+
+    @Test void aCaseIsSentInAnyManagedCareAreaAndAnUnknownOneIsRefused()throws Exception{
+        var newer=cases.create(new CreateCaseRequest("Surgery","Patient","Kenya","+254700000094","Reports","en",true,null,"cs1@local.test","Africa/Nairobi","general-surgery"));
+        assertThat(jdbc.queryForObject("SELECT care_category FROM medical_cases WHERE id=?",String.class,newer.caseId())).isEqualTo("general-surgery");
+        assertThatThrownBy(()->cases.create(new CreateCaseRequest("Unknown","Patient","Kenya","+254700000095","Reports","en",true,null,"cs2@local.test","Africa/Nairobi","not-a-care-area")))
+            .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("care area");
+        UUID patientId=jdbc.queryForObject("SELECT patient_id FROM medical_cases WHERE id=?",UUID.class,newer.caseId());
+        var next=cases.createForExistingPatient(patientId,new NewCaseForPatientRequest("Second case",
+            "womens-health",null,true));
+        assertThat(jdbc.queryForObject("SELECT care_category FROM medical_cases WHERE id=?",String.class,next.caseId())).isEqualTo("womens-health");
+        assertThatThrownBy(()->cases.createForExistingPatient(patientId,new NewCaseForPatientRequest("Third case","not-a-care-area",null,true)))
+            .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("care area");
     }
 
     // UC-12: the clinical end of the journey. Written from the protocol (docs/qa-test-protocol.md UC-12), not from the code.
