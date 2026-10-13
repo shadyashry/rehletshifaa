@@ -7,6 +7,8 @@ RS-2026-000001 (cardiology, English, self) and RS-2026-000002 (orthopedics, Arab
 Agreed approach: finish the journey first, then fix in batches — logic first, then UX/copy through `/redesign-area`.
 Only blockers and serious security/data issues are fixed immediately.
 
+Fix plan (draft, 2026-10-13): `docs/qa/fix-plan-2026-10.md` — every finding below is assigned to a batch there.
+
 Status: **Open** unless marked. "Owner" = raised by the product owner during the walk.
 
 ## Fixed immediately (blockers)
