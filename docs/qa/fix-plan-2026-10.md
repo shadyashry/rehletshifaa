@@ -121,6 +121,9 @@ Root cause: one action code and one stage label serve two different moments.
 | #11 | Consultant view wording from the consultant's side. |
 | #28 (+W-23) | Re-check with a fresh link; if it reproduces, read the outbox delivery state. |
 
+**Done — `306757d` (2026-10-13).** #25, #27 (copy), #21, #13, W-5, #11 fixed with tests; #28 not reproduced (closed). The
+"one test per stage" invariant (header = brief = action) is folded into A3's invariant test, which owns the work-item source.
+
 ### A2 — Staff sign-in, MFA policy, security re-check, browser history (1–2 sessions)
 
 Root cause: second factors enrolled ad hoc and asked only at submit time; the portal rewrites history.
