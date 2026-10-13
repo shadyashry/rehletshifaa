@@ -376,6 +376,7 @@ matching the English payment wording) and the cheap MEDIUM/LOWs were fixed in th
 | LOW | `:root:has(.portal-shell)` hides the reading hairline; an attribute set by the portal layout would be cheaper. | web guidelines | `theme-petrol.css` | /impeccable optimize |
 | LOW | Coordinator languages (plan item 4) and the reply-cover name are not on the patient API; the card omits them until the API exposes them. | plan gap | backend patient workspace | backend follow-up |
 | LOW | "Send a new case for someone else" from My Care (owner decision 1a): needs a representative on `NewCaseForPatientRequest`. | plan | backend `PatientAccountService.startNewCase` | backend follow-up |
+| LOW | Signed-in patients still see the public header links ("activated their account" entry points) — from journey finding MC-1. | journey findings MC-1 | `Header.tsx` | /impeccable distill |
 | LOW | Pre-existing: Arabic amounts render as "500 US$" inside the LTR isolate (`formatMoney` ar). | screenshot review | `lib/money.ts` | /impeccable clarify |
 
 ## Blocked on a decision or approval (Close, 2026-10-09)
