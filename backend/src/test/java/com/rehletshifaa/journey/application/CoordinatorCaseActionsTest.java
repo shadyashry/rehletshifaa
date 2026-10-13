@@ -309,6 +309,15 @@ class CoordinatorCaseActionsTest {
         assertThat(journey.workspace(ctx.caseId).actions().currentAction().workType()).isEqualTo("DEPOSIT_RECORD");
     }
 
+    /** QA W-8/#29 (A0 live check): the one-time code reaches an Arabic patient in Arabic — the message carries the case's language. */
+    @Test void anArabicPatientsAccessCodeIsQueuedInArabic() throws Exception {
+        var ctx = acknowledged();
+        raw("UPDATE medical_cases SET preferred_language='ar' WHERE id=?", ctx.caseId);
+        publicCases.requestAccess(ctx.token, "WHATSAPP"); em.flush();
+        String raw = payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN case_access_challenges ch ON o.idempotency_key='case-access:'||ch.id JOIN case_access_links l ON l.id=ch.link_id WHERE l.token_hash=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1", String.class, intakeLifecycle.hash(ctx.token)));
+        assertThat(json.readValue(raw, new TypeReference<Map<String, String>>() {})).containsEntry("lang", "ar").containsKey("code");
+    }
+
     // ---------- entering treatment coordination: one policy, every path ----------
 
     @Test void operationsMayDraftATravelPlanButCannotAdvanceTheJourney() throws Exception {
