@@ -202,6 +202,16 @@ count); RS-2026-000003/000004 (routed before A3, no work items) removed from dev
 | #20 | One "Approve commercial terms" action. |
 | W-1 | After the business rule: deposit cap or waiver. |
 
+**Done (2026-10-14) on `fix/a4-finance-commercial`.** #19 + #20: Finance approves in the action card, beside each line's price
+source, the Consultant's EGP base price, the patient's price, the margin (rate, amount, policy) and the totals — the one
+"Approve commercial terms" (the figures are on the case workspace for Finance on the case only). W-26: EGP total/paid/balance
+beside the patient currency, amount prefilled. W-22: the readiness line follows the payment state; "Last updated" moves on
+every deposit action (no case revision). #22: care areas from the platform list (all 9), unknown ones refused (400
+`CARE_AREA_UNKNOWN`). #12: every total is the sum of its rounded lines (patient proposal page, Consultant summary). W-21,
+W-28, DEP-1: superseded by DEP-3 (dead copy removed). Also: a refund is checked against case visibility like a receipt and a
+waiver. **Open: W-1** — needs the business rule (deposit cap). Gates: backend 727/0/2, vitest 60 files / 428, typecheck,
+lint 0 errors, Playwright staff-home/portal/a11y 37 passed.
+
 ### A5 — Journey history and audit from workflow events (1–2 sessions)
 
 | ID | Fix |

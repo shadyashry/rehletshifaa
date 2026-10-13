@@ -112,7 +112,7 @@ public class CaseWorkspaceQueryService {
         return new com.rehletshifaa.journey.api.JourneyDtos.DepositView(d.id(), d.status(), d.currency(), d.totalEgp(), d.totalDisplay(),
                 d.paidDisplay(), d.balanceDisplay(), d.components(), d.events().stream()
                 .map(e -> new com.rehletshifaa.journey.api.JourneyDtos.PaymentEventView(e.eventType(), e.amountDisplay(), e.currency(), e.method(),
-                        e.provider(), null, e.status(), e.reason(), e.occurredAt())).toList(), null, null);
+                        e.provider(), null, e.status(), e.reason(), e.occurredAt())).toList(), null, null, d.paidEgp(), d.balanceEgp());
     }
 
     public CaseWorkspace workspace(UUID caseId) {
@@ -158,7 +158,9 @@ public class CaseWorkspaceQueryService {
         return new CaseWorkspace(summary, timeline, taskViews, messageViews, assignmentViews, reviewViews, latest, proposals.gates(caseId, latest),
                 delivery, depositFor(caseId, actor), cases.findConditionDescription(caseId).orElse(null), patientActions.openAction(caseId),
                 actions, proposalAccess.state(caseId), actor.role() == Role.COORDINATOR ? representatives(caseId) : List.of(),
-                patientActor ? null : patientReply(caseId, actor), false);
+                patientActor ? null : patientReply(caseId, actor), false,
+                // QA #19: the commercial calculation only for whoever may approve it (Finance on the case).
+                latest != null && !patientActor && authority.allowed(Permission.FINANCE_SETTLE, onCase) ? proposals.commercial(latest.versionId()) : null);
     }
 
     /**
@@ -169,7 +171,7 @@ public class CaseWorkspaceQueryService {
         var actor = authority.authorize(Permission.CASE_DEPOSIT_READ, Resource.ofCase(caseId));
         CaseActionsView actions = caseActions.resolve(caseId, actor);
         return new CaseWorkspace(JourneyCaseQueryService.withoutStaffSubjects(caseQueries.caseView(caseId)), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null,
-                deposits.depositForCase(caseId), null, null, actions, null, List.of(), null, true);
+                deposits.depositForCase(caseId), null, null, actions, null, List.of(), null, true, null);
     }
 
     /** Who answers the patient now, as the staff viewer needs it: whether they may, and who covers the owner until when. */

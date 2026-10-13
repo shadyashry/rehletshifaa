@@ -66,6 +66,7 @@ public class DepositTransferService {
         Actor actor = authority.authorize(Permission.DEPOSIT_TRANSFER_REPORT, Resource.ofCase(caseId));
         String reference = normalize(request.reference());
         cases.lockById(caseId);
+        cases.touch(caseId, micros(clock.instant())); // QA W-22
         DepositRepository.Quoted deposit = payableDeposit(caseId);
         var pending = transfers.findPendingOn(deposit.getId(), Limit.of(1)).stream().findFirst();
         if (pending.isPresent()) {
@@ -91,6 +92,7 @@ public class DepositTransferService {
     public DepositView reject(UUID caseId, UUID depositId, UUID reportId, TransferRejectionRequest request) {
         Actor actor = authorizeFinance(caseId);
         cases.lockById(caseId);
+        cases.touch(caseId, micros(clock.instant())); // QA W-22
         DepositRepository.Quoted deposit = payableDeposit(caseId);
         if (!deposit.getId().equals(depositId)) throw new ApiException(404, "DEPOSIT_NOT_FOUND", "The deposit was not found for this case");
         Instant now = clock.instant();

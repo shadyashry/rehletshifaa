@@ -1074,7 +1074,6 @@
         "PROPOSAL_REVISION": "تعديل العرض",
         "PROPOSAL_DECLINED_REVIEW": "تأكيد الاطلاع",
         "CLINICAL_OUTCOME_REVIEW": "تأكيد الاطلاع",
-        "DEPOSIT_ARRANGEMENT": "تم إرسال تعليمات الدفع",
         "DEPOSIT_RECORD": "التحقق من التحويل",
         "TRAVEL": "تعيين فريق العمليات",
         "REASSIGN_CONSULTANT": "إعادة تعيين استشاري",
@@ -1601,7 +1600,6 @@
       "PROPOSAL_REVISION": "تعديل العرض",
       "PROPOSAL_DECLINED_REVIEW": "مراجعة العرض المرفوض",
       "CLINICAL_OUTCOME_REVIEW": "مراجعة النتيجة السريرية",
-      "DEPOSIT_ARRANGEMENT": "ترتيب وديعة التنسيق",
       "DEPOSIT_RECORD": "التحقق من التحويل",
       "ASSIGN_CONSULTANT": "جهّز الحالة للاستشاري",
       "ASSIGN_OPERATIONS_PLAN": "خطّط لباقة السفر مع فريق العمليات",
@@ -1761,14 +1759,6 @@
         "SECOND_OPINION_DUE": {
           "title": "تقديم الرأي الثاني",
           "context": "مراجعة الحالة وتقديم الرأي. ينتهي الوصول إلى الحالة عند الإرسال."
-        },
-        "DEPOSIT_DUE": {
-          "title": "أقرّ المريض بالتقدير — ترتيب وديعة التنسيق",
-          "context": "أقرّ المريض بتقديره المبدئي، وأصبحت وديعة التنسيق مستحقة. الخطوة التالية: إرسال تعليمات الدفع ثم تسجيل المبلغ المستلَم."
-        },
-        "DEPOSIT_RECORD": {
-          "title": "تسجيل الوديعة",
-          "context": "وصلت تعليمات الدفع إلى المريض. عند وصول التحويل، سجّل المبلغ المستلَم على هذه الحالة."
         },
         "DEPOSIT_VERIFY_TRANSFER": {
           "title": "التحقق من التحويل",

@@ -6,7 +6,7 @@ import type { Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import type { BlockerView } from "@/components/portal/CurrentAction";
 
-type Deposit = { status: string; currency: string; totalDisplay?: number; paidDisplay?: number };
+type Deposit = { status: string; currency: string; totalDisplay?: number; paidDisplay?: number; balanceDisplay?: number; transfer?: { status: string } | null };
 
 /**
  * Readiness & blockers, compactly: what is still outstanding and whose move each item is. Rendered only
@@ -51,9 +51,14 @@ function ownerLabel(b: BlockerView, ar: boolean) {
   return ar ? "بانتظار الجاهزية" : "Pending readiness";
 }
 
+/** QA W-22: where the payment stands — queued behind readiness, the patient's to pay, Finance checking the reference, or a balance due. */
 function depositDetail(deposit: Deposit, owner: BlockerView["owner"], money: (n?: number) => string | null, ar: boolean) {
-  const status = ({ REQUESTED: ar ? "مطلوبة" : "Requested", PARTIALLY_PAID: ar ? "مدفوعة جزئيًا" : "Partially paid", REQUIRED: ar ? "مطلوبة" : "Required" } as Record<string, string>)[deposit.status] ?? deposit.status;
-  const amount = money(deposit.totalDisplay);
-  const tail = owner === "LATER" ? (ar ? "بانتظار الجاهزية" : "pending readiness") : (ar ? "للترتيب مع المريض" : "to arrange with the patient");
+  if (owner === "STAFF") return ar ? "وصل الرقم المرجعي للتحويل · تتحقق منه المالية" : "Transfer reference received · Finance is checking it";
+  const partial = deposit.status === "PARTIALLY_PAID";
+  const status = partial ? (ar ? "مدفوعة جزئيًا" : "Partially paid") : (ar ? "مطلوبة" : "Requested");
+  const amount = money(partial ? deposit.balanceDisplay : deposit.totalDisplay);
+  if (owner === "LATER") return [status, amount, ar ? "بانتظار الجاهزية" : "pending readiness"].filter(Boolean).join(" · ");
+  if (deposit.transfer?.status === "REJECTED") return ar ? "لم يُؤكَّد الرقم المرجعي · بانتظار أن يعيد المريض إرساله" : "Reference not confirmed · waiting for the patient to resend it";
+  const tail = partial ? (ar ? "متبقٍ على المريض" : "still due from the patient") : (ar ? "بانتظار دفع المريض" : "waiting for the patient's payment");
   return [status, amount, tail].filter(Boolean).join(" · ");
 }

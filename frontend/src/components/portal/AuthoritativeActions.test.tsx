@@ -19,6 +19,10 @@ describe("server-authoritative proposal actions", () => {
     cleanup();
     render(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={{ ...gates, financeRequired: false }} availableActions={["APPROVE_COMMERCIAL_TERMS"]} locale="en" mutate={vi.fn()}/>);
     expect(screen.getByRole("button", { name: /approve commercial terms/i })).toBeTruthy();
+    // QA #20: when the action card carries the approval, there is no second button here.
+    cleanup();
+    render(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={gates} availableActions={["APPROVE_COMMERCIAL_TERMS"]} locale="en" mutate={vi.fn()} approvalInCard/>);
+    expect(screen.queryByRole("button", { name: /approve commercial terms/i })).toBeNull();
   });
 
   it("does not reconstruct Operations authority from proposal status or gates", () => {

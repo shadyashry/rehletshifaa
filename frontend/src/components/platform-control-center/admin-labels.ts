@@ -140,7 +140,13 @@ const relationshipNames: Record<string, [string, string]> = {
 };
 export const relationshipLabel = (key: string, locale: Locale) => relationshipNames[key]?.[locale === "ar" ? 1 : 0] ?? readable(key);
 
-const careAreas: Record<string, [string, string]> = { cardiology: ["Cardiology", "أمراض القلب"], "rheumatology-rehabilitation": ["Rehabilitation & Dysphagia", "إعادة التأهيل والبلع"], orthopedics: ["Orthopedics", "العظام"] };
+const careAreas: Record<string, [string, string]> = {
+  cardiology: ["Cardiology", "أمراض القلب"], "rheumatology-rehabilitation": ["Rehabilitation & Dysphagia", "إعادة التأهيل والبلع"], orthopedics: ["Orthopedics", "العظام"],
+  "gastroenterology-hepatology": ["Digestive & Liver Care", "الجهاز الهضمي والكبد"], "interventional-neuroradiology": ["Interventional Neuroradiology", "الأشعة العصبية التداخلية"],
+  "womens-health": ["Women's Health", "صحة المرأة"], "general-surgery": ["General & Metabolic Surgery", "الجراحة العامة وجراحات السمنة"],
+  "plastic-reconstructive-surgery": ["Plastic & Reconstructive Surgery", "جراحة التجميل والترميم"],
+  "vascular-endovascular-surgery": ["Vascular & Endovascular Surgery", "جراحة الأوعية الدموية والقسطرة الطرفية"],
+};
 export const CARE_AREAS = Object.keys(careAreas);
 export const careAreaLabel = (slug: string | null | undefined, locale: Locale) => (slug ? careAreas[slug]?.[locale === "ar" ? 1 : 0] ?? slug.replace(/-/g, " ") : "—");
 

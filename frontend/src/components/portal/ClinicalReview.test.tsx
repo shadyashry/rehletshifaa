@@ -129,6 +129,18 @@ describe("ClinicalReviewPanel", () => {
     }));
   });
 
+  it("adds the converted lines, each rounded to the cent, as the proposal does (QA #12)", () => {
+    // Two lines of EGP 1,000.25 at 0.02: each is $20.01, so the proposal shows $40.02 — the EGP total converted at once would be $40.01.
+    setup({ catalog: [
+      { id: "a", serviceCode: "A", serviceName: "Line A", category: "Procedure", priceEgp: 1000.25, active: true },
+      { id: "b", serviceCode: "B", serviceName: "Line B", category: "Procedure", priceEgp: 1000.25, active: true },
+    ], fxRates: [{ currency: "USD", rate: 0.02, rateDate: "2026-10-14", source: "CBE" }] });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Line A/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Line B/ }));
+    fireEvent.change(screen.getByLabelText("Proposal currency"), { target: { value: "USD" } });
+    expect(screen.getByText("Proposal value").nextElementSibling?.textContent).toMatch(/40\.02/);
+  });
+
   it("summarises the recommendation before it is submitted", () => {
     setup();
     fireEvent.change(screen.getByLabelText("Clinical recommendation"), { target: { value: "Pacemaker implantation" } });

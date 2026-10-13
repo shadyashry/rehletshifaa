@@ -32,11 +32,18 @@ public class CommercialPolicyService {
     private final Authority authority;
     private final AuditTrail audit;
     private final Clock clock;
+    private final CareCategoryCatalog careAreas;
 
     public record Policy(UUID id, String name, String careCategory, BigDecimal marginRate, int version) {}
 
-    public CommercialPolicyService(CommercialPolicyRepository policies, Authority authority, AuditTrail audit, Clock clock) {
-        this.policies = policies; this.authority = authority; this.audit = audit; this.clock = clock;
+    public CommercialPolicyService(CommercialPolicyRepository policies, Authority authority, AuditTrail audit, Clock clock, CareCategoryCatalog careAreas) {
+        this.policies = policies; this.authority = authority; this.audit = audit; this.clock = clock; this.careAreas = careAreas;
+    }
+
+    /** QA #22: the care areas a margin or deposit policy can be set for — every managed one, named as the platform names it. */
+    public List<com.rehletshifaa.journey.api.JourneyDtos.CareCategoryView> careAreas() {
+        authority.authorize(Permission.COMMERCIAL_POLICY_READ);
+        return careAreas.all();
     }
 
     /**
@@ -67,6 +74,8 @@ public class CommercialPolicyService {
         if (rate == null || rate.signum() < 0 || rate.compareTo(MAX_MARGIN) > 0)
             throw new ApiException(400, "MARGIN_RATE_INVALID", "The margin rate must be between 0 and 0.5");
         String careCategory = request.careCategory() == null || request.careCategory().isBlank() ? null : request.careCategory().trim();
+        // QA #22: any managed care area, never a misspelt one that no case would ever match.
+        if (careCategory != null && !careAreas.exists(careCategory)) throw new ApiException(400, "CARE_AREA_UNKNOWN", "This care area does not exist");
         int previous = (careCategory == null ? policies.findFirstByCareCategoryIsNullOrderByVersionDesc()
                 : policies.findFirstByCareCategoryOrderByVersionDesc(careCategory)).map(CommercialPolicy::getVersion).orElse(0);
         List<CommercialPolicy> active = careCategory == null ? policies.findByActiveTrueAndCareCategoryIsNull()

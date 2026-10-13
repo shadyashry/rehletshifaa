@@ -384,6 +384,23 @@ class CoordinatorCaseActionsTest {
         journey.decideAssignment(caseId, financeOffer.id(), new AssignmentDecisionRequest(true, null), Role.FINANCE);
         assertOneSource(caseId, "Finance approval", new Party("finance-subject", Role.FINANCE, "APPROVE_COMMERCIAL_TERMS"), COORDINATOR_WAITING);
 
+        // QA #19 (A4): Finance approves what it can see — the manual line, the Consultant's EGP base price and the margin.
+        authenticate("finance-subject", Role.FINANCE);
+        var commercial = journey.workspace(caseId).commercial();
+        assertThat(commercial).isNotNull();
+        assertThat(commercial.requiresFinanceApproval()).isTrue();
+        assertThat(commercial.lines()).singleElement().satisfies(line -> {
+            assertThat(line.source()).isEqualTo("MANUAL");
+            assertThat(line.baseEgp()).isEqualByComparingTo("3500.00");
+        });
+        assertThat(commercial.baseTotalEgp()).isEqualByComparingTo("3500.00");
+        assertThat(commercial.patientTotalEgp()).isEqualByComparingTo(commercial.baseTotalEgp().add(commercial.marginEgp()));
+        // Nobody else on the case sees the margin.
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        assertThat(journey.workspace(caseId).commercial()).isNull();
+        authenticate("doctor-subject", Role.CONSULTANT);
+        assertThat(journey.workspace(caseId).commercial()).isNull();
+
         // QA #3b: Finance's approval hands the release to the coordinator, who is told.
         authenticate("finance-subject", Role.FINANCE);
         journey.approveFinance(caseId, proposal.versionId());
@@ -502,7 +519,13 @@ class CoordinatorCaseActionsTest {
         // Someone else's account cannot enter a reference on this case.
         authenticate("another-patient", Role.PATIENT);
         assertThat(catchThrowableOfType(() -> transfers.submitReference(ctx.caseId, new TransferReferenceRequest("FT-NOT-MINE")), ApiException.class).status()).isEqualTo(403);
+        // QA W-22: "Last updated" moves with the patient's reference (and with Finance's decision), without a case revision.
+        Instant yesterday = Instant.now().minus(java.time.Duration.ofDays(1));
+        raw("UPDATE medical_cases SET updated_at=? WHERE id=?", yesterday, ctx.caseId);
+        long revision = jdbc.queryForObject("SELECT version FROM medical_cases WHERE id=?", Long.class, ctx.caseId);
         submitReference(ctx.caseId, "FT-WRONG-1");
+        assertThat(jdbc.queryForObject("SELECT updated_at FROM medical_cases WHERE id=?", java.sql.Timestamp.class, ctx.caseId).toInstant()).isAfter(yesterday.plusSeconds(60));
+        assertThat(jdbc.queryForObject("SELECT version FROM medical_cases WHERE id=?", Long.class, ctx.caseId)).isEqualTo(revision);
         UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=?", UUID.class, ctx.caseId);
         UUID transferId = jdbc.queryForObject("SELECT id FROM deposit_transfer_reports WHERE case_id=?", UUID.class, ctx.caseId);
 

@@ -56,14 +56,15 @@ public class PaymentService {
     private final Clock clock;
     private final ApplicationEventPublisher events;
     private final DepositTransferReportRepository transfers;
+    private final com.rehletshifaa.casemanagement.application.CareAreas careAreas;
 
     public PaymentService(DepositQueryService queries, Authority authority, Clock clock, ApplicationEventPublisher events, AuditTrail auditTrail,
                           DepositRepository deposits, DepositComponentRepository depositComponents, CoordinationDepositPolicyRepository depositPolicies,
                           PaymentEventRepository paymentEvents, MedicalCaseRepository cases, ProposalVersionRepository proposalVersions,
-                          DepositTransferReportRepository transfers) {
+                          DepositTransferReportRepository transfers, com.rehletshifaa.casemanagement.application.CareAreas careAreas) {
         this.queries = queries; this.paymentEvents = paymentEvents; this.depositPolicies = depositPolicies; this.depositComponents = depositComponents;
         this.deposits = deposits; this.auditTrail = auditTrail; this.cases = cases; this.proposalVersions = proposalVersions;
-        this.authority = authority; this.clock = clock; this.events = events; this.transfers = transfers;
+        this.authority = authority; this.clock = clock; this.events = events; this.transfers = transfers; this.careAreas = careAreas;
     }
 
     /**
@@ -153,6 +154,7 @@ public class PaymentService {
         Resource onCase = Resource.ofCase(caseId);
         if (!authority.allowed(Permission.CASE_READ, onCase)) authority.require(Permission.CASE_DEPOSIT_READ, onCase);
         cases.lockById(caseId);
+        cases.touch(caseId, micros(clock.instant())); // QA W-22: "Last updated" moves with the deposit
         requireDeposit(caseId, depositId);
         DepositRepository.Quoted open = queries.openDeposit(caseId);
         if (open == null || !open.getId().equals(depositId) || !deposits.isOpenOn(caseId))
@@ -177,6 +179,11 @@ public class PaymentService {
     @Transactional
     public DepositView recordRefund(UUID caseId, UUID depositId, RefundRequest request) {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
+        // Like a receipt or a waiver: only on a case this person may see, or whose open deposit they may read.
+        Resource onCase = Resource.ofCase(caseId);
+        if (!authority.allowed(Permission.CASE_READ, onCase)) authority.require(Permission.CASE_DEPOSIT_READ, onCase);
+        cases.lockById(caseId);
+        cases.touch(caseId, micros(clock.instant()));
         DepositRepository.Quoted deposit = requireDeposit(caseId, depositId);
         appendEvent(caseId, depositId, "REFUND_RECORDED", request.amountEgp(), displayFor(deposit, request.amountEgp()), deposit.getCurrency(), null, "OFFLINE", null, "RECORDED", actor.subject(), request.reason(), request.idempotencyKey());
         recomputeStatus(caseId, deposit);
@@ -195,6 +202,8 @@ public class PaymentService {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
         if (request.coordinationDepositEgp() == null || request.coordinationDepositEgp().signum() < 0) throw new ApiException(400, "DEPOSIT_AMOUNT_INVALID", "The coordination deposit must be zero or more");
         String careCategory = request.careCategory() == null || request.careCategory().isBlank() ? null : request.careCategory().trim();
+        // QA #22: any managed care area, never a misspelt one that no case would ever match.
+        if (careCategory != null && !careAreas.exists(careCategory)) throw new ApiException(400, "CARE_AREA_UNKNOWN", "This care area does not exist");
         int prev = (careCategory == null ? depositPolicies.findLatestDefaultVersion() : depositPolicies.findLatestVersionFor(careCategory)).orElse(0);
         if (careCategory == null) depositPolicies.retireDefault(); else depositPolicies.retireFor(careCategory);
         UUID id = UUID.randomUUID();
@@ -231,6 +240,7 @@ public class PaymentService {
         Resource onCase = Resource.ofCase(caseId);
         if (!authority.allowed(Permission.CASE_READ, onCase)) authority.require(Permission.CASE_DEPOSIT_READ, onCase);
         cases.lockById(caseId);
+        cases.touch(caseId, micros(clock.instant())); // QA W-22: "Last updated" moves with the deposit
         requireDeposit(caseId, depositId);
         // DEP-3: a transfer the patient reported is decided first (confirmed or returned), never left behind by a waiver.
         if (!transfers.findPendingOn(depositId, Limit.of(1)).isEmpty())

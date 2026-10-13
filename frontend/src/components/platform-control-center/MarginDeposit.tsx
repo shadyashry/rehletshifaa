@@ -12,7 +12,7 @@ import { FocusTrapDialog } from "./FocusTrapDialog";
 
 type CommercialPolicy = { id: string; careCategory?: string; marginRate: number; active: boolean; version: number; validFrom?: string };
 type DepositPolicy = { id: string; careCategory?: string; coordinationDepositEgp: number; active: boolean; version: number; validFrom?: string };
-const AREAS = ["cardiology", "rheumatology-rehabilitation", "orthopedics"];
+type CareArea = { slug: string; nameEn: string; nameAr: string };
 type Pending = { kind: "margin" | "deposit"; area: string; value: number; form: HTMLFormElement };
 
 /**
@@ -29,21 +29,23 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   const api = useAdminApi();
   const [margins, setMargins] = useState<CommercialPolicy[] | null>(null);
   const [deposits, setDeposits] = useState<DepositPolicy[]>([]);
+  // QA #22: the care areas come from the platform's list, so a policy can be set for every one of them.
+  const [careAreas, setCareAreas] = useState<CareArea[]>([]);
   const [loadError, setLoadError] = useState<unknown>(null); const [saveError, setSaveError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false); const [notice, setNotice] = useState(""); const [pending, setPending] = useState<Pending | null>(null);
   const allowed = access.can("COMMERCIAL_POLICY_READ");
   // Reading is shared with Consultant Operations and the auditor; only Finance publishes a new version.
   const canEdit = access.can("COMMERCIAL_POLICY_MANAGE");
-  const read = useCallback(() => Promise.all([api<CommercialPolicy[]>("/finance/commercial-policies"), api<DepositPolicy[]>("/finance/deposit-policies")]), [api]);
+  const read = useCallback(() => Promise.all([api<CommercialPolicy[]>("/finance/commercial-policies"), api<DepositPolicy[]>("/finance/deposit-policies"), api<CareArea[]>("/finance/care-areas")]), [api]);
   const load = useCallback(async () => {
     setLoadError(null);
-    try { const [c, d] = await read(); setMargins(c); setDeposits(d); }
+    try { const [c, d, a] = await read(); setMargins(c); setDeposits(d); setCareAreas(a); }
     catch (e) { setLoadError(e); setMargins([]); }
   }, [read]);
   useEffect(() => {
     if (!user || !allowed) return;
     let live = true;
-    read().then(([c, d]) => { if (live) { setMargins(c); setDeposits(d); } }, (e) => { if (live) { setLoadError(e); setMargins([]); } });
+    read().then(([c, d, a]) => { if (live) { setMargins(c); setDeposits(d); setCareAreas(a); } }, (e) => { if (live) { setLoadError(e); setMargins([]); } });
     return () => { live = false; };
   }, [user, allowed, read]);
   const confirm = async () => {
@@ -56,7 +58,8 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
       pending.form.reset(); setPending(null); setNotice(ar ? "حُفظ إصدار جديد." : "New version saved."); await load();
     } catch (e) { setSaveError(e); } finally { setBusy(false); }
   };
-  const area = (a?: string) => (a ? careAreaLabel(a, locale) : ar ? "الافتراضي (كل مجالات الرعاية)" : "Default (all care areas)");
+  const named = (slug: string) => { const found = careAreas.find((c) => c.slug === slug); return found ? (ar ? found.nameAr : found.nameEn) : careAreaLabel(slug, locale); };
+  const area = (a?: string) => (a ? named(a) : ar ? "الافتراضي (كل مجالات الرعاية)" : "Default (all care areas)");
   const since = (d?: string) => d ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(d)) : null;
   const title = ar ? "الهامش والدفعة المقدمة" : "Margin & Deposit";
   const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="marginDeposit" title={title}
@@ -66,7 +69,7 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   if (!allowed) return shell(<EmptyState title={ar ? "ليس لديك وصول إلى سياسات الهامش والدفعة المقدمة" : "You don't have access to margin and deposit policies"} body={ar ? "يديرها الفريق المالي." : "Finance manages these policies."} />);
   if (margins === null) return shell(<p role="status">{ar ? "جارٍ تحميل السياسات…" : "Loading policies…"}</p>);
   if (loadError) return shell(<ErrorNotice error={loadError} locale={locale} action="load" onRetry={() => void load()} />);
-  const areaSelect = <Field label={ar ? "مجال الرعاية" : "Care area"}><select name="area"><option value="">{area()}</option>{AREAS.map((a) => <option key={a} value={a}>{area(a)}</option>)}</select></Field>;
+  const areaSelect = <Field label={ar ? "مجال الرعاية" : "Care area"}><select name="area"><option value="">{area()}</option>{careAreas.map((a) => <option key={a.slug} value={a.slug}>{ar ? a.nameAr : a.nameEn}</option>)}</select></Field>;
   const stage = (kind: Pending["kind"]) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const d = new FormData(e.currentTarget); setPending({ kind, area: String(d.get("area") || ""), value: Number(d.get(kind === "margin" ? "rate" : "amount")) || 0, form: e.currentTarget }); };
   const egp = (n: number) => <bdi dir="ltr">{new Intl.NumberFormat("en").format(n)} EGP</bdi>;
   return shell(<>

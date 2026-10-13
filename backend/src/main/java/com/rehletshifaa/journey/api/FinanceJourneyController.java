@@ -4,6 +4,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/finance") public class FinanceJourneyController{
  private final JourneyService service;private final CommercialPolicyService policies;private final PaymentService payment;public FinanceJourneyController(JourneyService service,CommercialPolicyService policies,PaymentService payment){this.service=service;this.policies=policies;this.payment=payment;}
  @GetMapping("/commercial-policies")public List<CommercialPolicyView>policies(){return policies.list();}
+ @GetMapping("/care-areas")public List<CareCategoryView>careAreas(){return policies.careAreas();}
  @PutMapping("/commercial-policies")public CommercialPolicyView configurePolicy(@Valid @RequestBody CommercialPolicyRequest request){return policies.configure(request);}
  @GetMapping("/cases/{caseId}/deposit")public DepositView deposit(@PathVariable UUID caseId){return payment.readDeposit(caseId);}
  @PostMapping("/cases/{caseId}/deposits/{depositId}/payments")public DepositView recordPayment(@PathVariable UUID caseId,@PathVariable UUID depositId,@Valid @RequestBody RecordReceiptRequest request){return payment.recordReceipt(caseId,depositId,request);}

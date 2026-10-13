@@ -81,6 +81,8 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
   const catalogueTotal = picks.reduce((sum, s) => sum + s.priceEgp, 0);
   const offListTotal = offList.reduce((sum, row) => sum + row.amountEgp, 0);
   const baseTotal = catalogueTotal + offListTotal;
+  // QA #12, one rounding rule: each line converted and rounded to the cent, then added — the proposal's own arithmetic.
+  const convertedTotal = [...picks.map(s => s.priceEgp), ...offList.map(row => row.amountEgp)].reduce((sum, egp) => sum + Math.round(egp * rate * 100) / 100, 0);
   const serviceCount = picks.length + offList.length;
   const readyDocuments = documents.filter(doc => doc.status === "CLEAN");
   const canSubmit = recommendation.trim().length > 0 && serviceCount > 0;
@@ -300,7 +302,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
           {converted && (
             <div>
               <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.proposalEstimate}</dt>
-              <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(baseTotal * rate, proposalCurrency, locale)}</dd>
+              <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(convertedTotal, proposalCurrency, locale)}</dd>
             </div>
           )}
         </dl>

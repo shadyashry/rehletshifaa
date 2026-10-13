@@ -180,6 +180,32 @@ class UatDefectCorrectionsTest {
         assertThat(jdbc.queryForObject("SELECT unit_price_egp FROM proposal_items WHERE proposal_version_id=?", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("436800.00");
     }
 
+    /** QA #12: one rounding rule — the patient's total is the sum of the lines they see, never the EGP total converted in one go. */
+    @Test void thePatientsTotalIsTheSumOfTheConvertedLinesItShows() throws Exception {
+        UUID caseId = ownedCase("+254700000508", "uat-e3@local.test");
+        toClinicalRecommendation(caseId, "USD");
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        ClinicalReviewView review = journey.workspace(caseId).clinicalReviews().stream().filter(r -> "APPROVED".equals(r.status())).findFirst().orElseThrow();
+        var proposal = journey.createProposal(caseId, draftRequest(review.id()));
+        // Two lines of 1,000.25 EGP: each is 20.005 USD → 20.01 at the 0.02 snapshot; the EGP total 2,000.50 alone would give 40.01.
+        jdbc.update("UPDATE proposal_items SET unit_price_egp=1000.25,unit_price_min_egp=1000.25,unit_price_max_egp=1000.25 WHERE proposal_version_id=?", proposal.versionId());
+        jdbc.update("""
+                INSERT INTO proposal_items(id,proposal_version_id,category,description,quantity,unit_price,optional,sort_order,source,unit_price_egp,
+                    provider_price_egp,unit_price_min_egp,unit_price_max_egp,conditional)
+                SELECT ?,proposal_version_id,category,'Second line',quantity,unit_price,optional,1,source,unit_price_egp,provider_price_egp,
+                    unit_price_min_egp,unit_price_max_egp,conditional FROM proposal_items WHERE proposal_version_id=?""", UUID.randomUUID(), proposal.versionId());
+        jdbc.update("UPDATE proposal_versions SET requires_finance_approval=FALSE,patient_total_min_egp=2000.50,patient_total_expected_egp=2000.50,patient_total_max_egp=2000.50 WHERE id=?",
+                proposal.versionId());
+        journey.releaseProposal(caseId, proposal.versionId()); em.flush();
+
+        var ctx = openViaStatusLink(caseId, "+254700000508");
+        PublicProposalView view = journey.viewProposal(ctx.token(), ctx.grant());
+        assertThat(view.items()).hasSize(2).allSatisfy(item -> assertThat(item.unitPrice()).isEqualByComparingTo("20.01"));
+        assertThat(view.totalExpected()).isEqualByComparingTo("40.02");
+        assertThat(view.totalMin()).isEqualByComparingTo("40.02");
+        assertThat(view.totalMax()).isEqualByComparingTo("40.02");
+    }
+
     @Test void aForeignCurrencyProposalIsNotReleasedWithoutASnapshotRate() throws Exception {
         UUID caseId = ownedCase("+254700000507", "uat-e2@local.test");
         toClinicalRecommendation(caseId, "USD");

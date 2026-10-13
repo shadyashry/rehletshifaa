@@ -122,13 +122,6 @@ describe("CurrentActionPanel", () => {
     expect(screen.queryByText(/assign operations/i)).toBeNull();
   });
 
-  it("renders the deposit arrangement as staff work with its own outcome label", () => {
-    renderWithWork(<CurrentActionPanel locale="en" role="coordinator" onComplete={vi.fn()}
-                               action={{ code: "WORK_ITEM", kind: "COMPLETE", workItemId: "w2", workItemVersion: 0, workType: "DEPOSIT_ARRANGEMENT", title: "Arrange the coordination deposit" }}/>);
-    expect(screen.getByRole("heading", { name: /arrange the coordination deposit/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /payment instructions sent/i })).toBeTruthy();
-  });
-
   it("words the pre-release travel-package step as planning, never as a settled deposit (QA #25, #27)", () => {
     renderWithWork(<CurrentActionPanel locale="en" role="coordinator" onFocusAction={vi.fn()} action={{ code: "ASSIGN_OPERATIONS_PLAN", kind: "FOCUS" }}/>);
     expect(screen.getByRole("heading", { name: "Plan the travel package with Operations" })).toBeTruthy();

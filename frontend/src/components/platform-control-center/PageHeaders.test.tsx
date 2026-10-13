@@ -20,6 +20,8 @@ const trail = () => within(screen.getByRole("navigation", { name: "Breadcrumb" }
 const policies = {
   "/finance/commercial-policies": [{ id: "m1", careCategory: "cardiology", marginRate: 0.12, active: true, version: 3 }],
   "/finance/deposit-policies": [{ id: "d1", coordinationDepositEgp: 3000, active: true, version: 1 }],
+  "/finance/care-areas": [{ slug: "cardiology", nameEn: "Cardiology", nameAr: "أمراض القلب" }, { slug: "womens-health", nameEn: "Women's Health", nameAr: "صحة المرأة" },
+    { slug: "general-surgery", nameEn: "General & Metabolic Surgery", nameAr: "الجراحة العامة وجراحات السمنة" }],
 };
 
 describe("Commercial › Margin & Deposit", () => {
@@ -28,6 +30,9 @@ describe("Commercial › Margin & Deposit", () => {
     vi.mocked(apiFetchAs).mockImplementation(fakeApi(policies));
     render(<MarginDeposit locale="en" />);
     expect(await screen.findByText("12.00%")).toBeVisible();
+    // QA #22: every care area the platform manages can carry a policy, not only the first three.
+    expect(screen.getAllByRole("option", { name: "Women's Health" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("option", { name: "General & Metabolic Surgery" }).length).toBeGreaterThan(0);
     expect(screen.getByText("Default (all care areas)", { selector: "strong" })).toBeVisible();
     expect(h1()).toEqual(["Margin & Deposit"]);
     expect(trail()).toEqual(["Control Center", "Commercial", "Margin & Deposit"]);

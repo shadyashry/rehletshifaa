@@ -4,6 +4,8 @@ import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.DeliveryStatus;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalAssistanceView;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalGates;
+import com.rehletshifaa.journey.api.JourneyDtos.ProposalCommercialLine;
+import com.rehletshifaa.journey.api.JourneyDtos.ProposalCommercialView;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalItemView;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalView;
 import com.rehletshifaa.journey.domain.ProposalDecision;
@@ -18,6 +20,8 @@ import com.rehletshifaa.shared.api.ApiException;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -59,6 +63,41 @@ public class ProposalQueryService {
                 v.getValidUntil(), v.getOperationalPlan(), v.getIncludedServices(), v.getExcludedServices(), v.getPaymentTerms(),
                 v.getRefundTerms(), v.getDisclaimers(), lines, v.getCoordinatorNotes(), v.getDocumentType(), v.getScopeChangeReason(), assistance(versionId));
     }
+
+    /** QA #19: the version as Finance approves it — each line's source and base price, the margin and the totals. */
+    ProposalCommercialView commercial(UUID versionId) {
+        var v = versions.findCommercial(versionId).orElse(null);
+        if (v == null) return null;
+        List<ProposalCommercialLine> lines = items.findPricedRowsOf(versionId).stream()
+                .map(i -> new ProposalCommercialLine(i.getId(), i.getDescription(), i.getSource(), i.getQuantity(), i.getProviderPriceEgp(),
+                        i.getUnitPriceEgp(), i.getUnitPrice()))
+                .toList();
+        BigDecimal displayTotal = lines.stream().map(l -> l.displayUnitPrice().multiply(l.quantity())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new ProposalCommercialView(v.getId(), v.getCurrency(), v.getFxRate(), v.getFxRateDate(), Boolean.TRUE.equals(v.getRequiresFinanceApproval()),
+                v.getPolicyName(), v.getPolicyCareArea(), v.getCommercialPolicyVersion(), v.getMarginRate(), v.getProviderNetEgp(),
+                v.getMarginAmountEgp(), v.getPatientTotalExpectedEgp(), displayTotal, lines);
+    }
+
+    /** The patient's totals in the proposal currency: lowest, expected and highest. */
+    record DisplayTotals(BigDecimal min, BigDecimal expected, BigDecimal max) {}
+
+    /**
+     * QA #12, one rounding rule: a total is the sum of its lines, each converted and rounded to the cent first — the same figures the
+     * patient sees line by line — never the EGP total converted in one go, which can differ from the lines by a cent.
+     */
+    DisplayTotals displayTotals(UUID versionId, BigDecimal rate) {
+        BigDecimal min = BigDecimal.ZERO, expected = BigDecimal.ZERO, max = BigDecimal.ZERO;
+        for (var i : items.findPricedRowsOf(versionId)) {
+            if (Boolean.TRUE.equals(i.getOptionalItem()) || i.getUnitPriceEgp() == null) continue;
+            BigDecimal quantity = i.getQuantity();
+            expected = expected.add(convert(i.getUnitPriceEgp(), rate).multiply(quantity));
+            min = min.add(convert(i.getUnitPriceMinEgp() == null ? i.getUnitPriceEgp() : i.getUnitPriceMinEgp(), rate).multiply(quantity));
+            max = max.add(convert(i.getUnitPriceMaxEgp() == null ? i.getUnitPriceEgp() : i.getUnitPriceMaxEgp(), rate).multiply(quantity));
+        }
+        return new DisplayTotals(min, expected, max);
+    }
+
+    private static BigDecimal convert(BigDecimal egp, BigDecimal rate) { return egp.multiply(rate).setScale(2, RoundingMode.HALF_UP); }
 
     /**
      * The assisted-decision facts of a version, or null when there are none: no request was made and the decision (if any)

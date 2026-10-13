@@ -93,6 +93,22 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
             where v.id = :id""")
     java.util.Optional<PatientDocument> findPatientDocument(@Param("id") UUID id);
 
+    /** A version's commercial calculation and the margin policy it was made under (QA #19, Finance only). */
+    interface Commercial {
+        UUID getId(); String getCurrency(); BigDecimal getFxRate(); LocalDate getFxRateDate(); Boolean getRequiresFinanceApproval();
+        BigDecimal getProviderNetEgp(); BigDecimal getMarginRate(); BigDecimal getMarginAmountEgp(); BigDecimal getPatientTotalExpectedEgp();
+        Integer getCommercialPolicyVersion(); String getPolicyName(); String getPolicyCareArea();
+    }
+
+    @Query("""
+            select v.id as id, v.currency as currency, v.fxRate as fxRate, v.fxRateDate as fxRateDate,
+                v.requiresFinanceApproval as requiresFinanceApproval, v.providerNetEgp as providerNetEgp, v.marginRate as marginRate,
+                v.marginAmountEgp as marginAmountEgp, v.patientTotalExpectedEgp as patientTotalExpectedEgp,
+                v.commercialPolicyVersion as commercialPolicyVersion, cp.name as policyName, cp.careCategory as policyCareArea
+            from ProposalVersion v left join CommercialPolicy cp on cp.id = v.commercialPolicyId
+            where v.id = :id""")
+    java.util.Optional<Commercial> findCommercial(@Param("id") UUID id);
+
     /** The case's versions, latest first (pass {@code Limit.of(1)} for the current one). */
     @Query("select v.id from ProposalVersion v join Proposal p on p.id = v.proposalId where p.caseId = :caseId order by v.versionNumber desc")
     List<UUID> findLatestIdOf(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);

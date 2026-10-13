@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class JourneyServiceIntegrationTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto; @Autowired EntityManager entityManager; @Autowired PaymentService payment; @Autowired MockMvc mvc;
     @Autowired com.rehletshifaa.journey.application.ConsultantOnboardingService onboarding;
+    @Autowired CommercialPolicyService commercialPolicies;
     @AfterEach void clearSecurity(){SecurityContextHolder.clearContext();}
 
     @Test void credentialDecisionRequiresIndependentReviewerEvenForSystemAdministrators() {
@@ -191,6 +192,11 @@ class JourneyServiceIntegrationTest {
         payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("1000.00")));
         payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("2000.00")));
         var current=payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("2500.00")));
+        // QA #22: a policy can be set for every managed care area, and only for one.
+        assertThat(commercialPolicies.careAreas()).extracting(CareCategoryView::slug)
+                .hasSize(jdbc.queryForObject("SELECT count(*) FROM care_categories",Integer.class)).contains("cardiology","womens-health","general-surgery");
+        assertThat(catchThrowableOfType(()->payment.configurePolicy(new DepositPolicyRequest("Typo","cardiolgy",BigDecimal.ONE)),com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("CARE_AREA_UNKNOWN");
+        assertThat(catchThrowableOfType(()->commercialPolicies.configure(new CommercialPolicyRequest("Typo","cardiolgy",new BigDecimal("0.10"))),com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("CARE_AREA_UNKNOWN");
         var listed=payment.listPolicies();
         int firstCareArea=(int)listed.stream().takeWhile(p->p.careCategory()==null).count();
         assertThat(listed.subList(firstCareArea,listed.size())).allSatisfy(p->assertThat(p.careCategory()).isNotNull());
@@ -220,6 +226,9 @@ class JourneyServiceIntegrationTest {
         assertThat(partial.currency()).isEqualTo("USD");
         assertThat(partial.paidDisplay()).isEqualByComparingTo("25.12");     // 1234.56 × 0.02035, half-up
         assertThat(partial.balanceDisplay()).isEqualByComparingTo("35.93");  // 1765.44 × 0.02035, half-up
+        // QA W-26: Finance records in EGP, so the EGP paid and balance are on the deposit beside the patient's currency.
+        assertThat(partial.paidEgp()).isEqualByComparingTo("1234.56");
+        assertThat(partial.balanceEgp()).isEqualByComparingTo("1765.44");
         assertThat(partial.components()).singleElement().satisfies(c->assertThat(c.amountDisplay()).isEqualByComparingTo("61.05"));
         assertThat(partial.events()).singleElement().satisfies(e->{assertThat(e.amountDisplay()).isEqualByComparingTo("25.12");assertThat(e.currency()).isEqualTo("USD");});
         assertThat(payment.netPaidEgp(caseId)).isEqualByComparingTo("1234.56");

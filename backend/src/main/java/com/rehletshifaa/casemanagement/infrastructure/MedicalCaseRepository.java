@@ -267,6 +267,11 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("update MedicalCase c set c.travelPackageRequested = :requested, c.updatedAt = :now where c.id = :id")
     int requestTravelPackage(@Param("id") UUID id, @Param("requested") boolean requested, @Param("now") Instant now);
 
+    /** Something happened on the case ("Last updated" moves) that is not a revision of it: no version bump, so no open form goes stale. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update MedicalCase c set c.updatedAt = :now where c.id = :id")
+    int touch(@Param("id") UUID id, @Param("now") Instant now);
+
     /** Who the case waits on; the waiting clock keeps running while the party stays the same. Not a case revision. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

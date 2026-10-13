@@ -116,6 +116,16 @@ public final class JourneyDtos {
     public record AssignmentHistoryEntry(String role,String assigneeName,String status,Instant assignedAt,Instant endedAt,String assignedByKind,String assignedByName,String reason) {}
     public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason,ProposalAssistanceView assistance) {}
     public record ProposalItemView(UUID id,String category,String description,BigDecimal quantity,BigDecimal unitPrice,boolean optional) {}
+    /**
+     * QA #19 (A4): what Finance approves, line by line — whether the price comes from the Consultant's approved list (CATALOG) or was
+     * entered by them (MANUAL), the Consultant's EGP base price, the patient's EGP price (margin included) and the price in the
+     * proposal's currency. Finance only; never on a patient, Consultant or Operations view.
+     */
+    public record ProposalCommercialLine(UUID id,String description,String source,BigDecimal quantity,BigDecimal baseEgp,BigDecimal patientEgp,BigDecimal displayUnitPrice) {}
+    /** The version's commercial calculation for Finance: base total, margin (rate, amount, policy), patient total in EGP and in the proposal currency. */
+    public record ProposalCommercialView(UUID versionId,String currency,BigDecimal fxRate,java.time.LocalDate fxRateDate,boolean requiresFinanceApproval,
+            String policyName,String policyCareArea,Integer policyVersion,BigDecimal marginRate,BigDecimal baseTotalEgp,BigDecimal marginEgp,
+            BigDecimal patientTotalEgp,BigDecimal displayTotal,List<ProposalCommercialLine> lines) {}
     /** {@code assigneeName} is resolved server-side so no interface ever renders an identity subject. */
     public record AssignmentView(UUID id,String assigneeSubject,String assigneeName,String assigneeRole,String assignmentType,String status,Instant assignedAt,long version) {}
 
@@ -133,7 +143,7 @@ public final class JourneyDtos {
     // Secure-delivery status of the latest released proposal notification (masked; no raw contact or token).
     public record DeliveryStatus(String status,String channel,String destinationMasked,int attempts,Instant deliveredAt,Instant nextAttemptAt) {}
     /** {@code patientAction} is the open request to the patient, so staff can see and record exactly what was asked. */
-    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions,PatientProposalState patientProposal,List<RepresentativeOption> representatives,PatientReplyView patientReply,boolean paymentOnly) {}
+    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions,PatientProposalState patientProposal,List<RepresentativeOption> representatives,PatientReplyView patientReply,boolean paymentOnly,ProposalCommercialView commercial) {}
     /**
      * Who answers the patient on this case, for the viewer: {@code canReply} is the one-voice rule (the primary coordinator,
      * or their active cover instead of them); {@code coverName}/{@code coverEndsAt} are set while someone covers the owner.
@@ -185,7 +195,7 @@ public final class JourneyDtos {
     public record DepositComponentView(String beneficiary,String purpose,BigDecimal amountEgp,BigDecimal amountDisplay,String refundability,String cancellationTerms,boolean creditedToFinal) {}
     public record PaymentEventView(String eventType,BigDecimal amountDisplay,String currency,String method,String provider,String providerReference,String status,String reason,Instant occurredAt) {}
     /** {@code transfer}: the latest bank-transfer reference the patient entered (DEP-3), null before any; {@code bankTransfer}: the platform account to pay into. */
-    public record DepositView(UUID id,String status,String currency,BigDecimal totalEgp,BigDecimal totalDisplay,BigDecimal paidDisplay,BigDecimal balanceDisplay,List<DepositComponentView>components,List<PaymentEventView>events,TransferReportView transfer,BankTransferView bankTransfer) {}
+    public record DepositView(UUID id,String status,String currency,BigDecimal totalEgp,BigDecimal totalDisplay,BigDecimal paidDisplay,BigDecimal balanceDisplay,List<DepositComponentView>components,List<PaymentEventView>events,TransferReportView transfer,BankTransferView bankTransfer,BigDecimal paidEgp,BigDecimal balanceEgp) {}
     /** A transfer reference and Finance's decision on it: SUBMITTED (being checked), CONFIRMED or REJECTED (with the reason). */
     public record TransferReportView(UUID id,String method,String reference,String status,Instant submittedAt,Instant decidedAt,String reason,long version) {}
     /** The platform bank account (configuration; dummy values outside production) and the reference to write on the transfer. */

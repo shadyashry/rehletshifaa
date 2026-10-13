@@ -73,10 +73,11 @@ public class DepositQueryService {
                 .toList();
         BigDecimal netPaidEgp = totalsOf(d.getId()).netEgp();
         BigDecimal paidDisplay = display(netPaidEgp, rate);
-        BigDecimal balanceDisplay = display(d.getTotalEgp().subtract(netPaidEgp).max(BigDecimal.ZERO), rate);
+        BigDecimal balanceEgp = d.getTotalEgp().subtract(netPaidEgp).max(BigDecimal.ZERO);
+        BigDecimal balanceDisplay = display(balanceEgp, rate);
         TransferReportView transfer = transfers.findLatestOn(d.getId(), Limit.of(1)).stream().findFirst().map(DepositQueryService::transferView).orElse(null);
         return new DepositView(d.getId(), d.getStatus(), d.getCurrency(), d.getTotalEgp(), d.getTotalDisplay(), paidDisplay, balanceDisplay, lines, events,
-                transfer, bank.forCase(cases.findCaseNumber(caseId).orElse(null)));
+                transfer, bank.forCase(cases.findCaseNumber(caseId).orElse(null)), netPaidEgp, balanceEgp);
     }
 
     Standing standing(UUID caseId) {

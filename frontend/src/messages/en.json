@@ -1050,7 +1050,6 @@
         "PROPOSAL_REVISION": "Revise proposal",
         "PROPOSAL_DECLINED_REVIEW": "Acknowledge outcome",
         "CLINICAL_OUTCOME_REVIEW": "Acknowledge outcome",
-        "DEPOSIT_ARRANGEMENT": "Payment instructions sent",
         "DEPOSIT_RECORD": "Verify the transfer",
         "TRAVEL": "Assign Operations",
         "REASSIGN_CONSULTANT": "Reassign Consultant",
@@ -1577,7 +1576,6 @@
       "PROPOSAL_REVISION": "Revise the proposal",
       "PROPOSAL_DECLINED_REVIEW": "Review the declined proposal",
       "CLINICAL_OUTCOME_REVIEW": "Review the clinical outcome",
-      "DEPOSIT_ARRANGEMENT": "Arrange the coordination deposit",
       "DEPOSIT_RECORD": "Verify the transfer",
       "ASSIGN_CONSULTANT": "Prepare the case for a Consultant",
       "ASSIGN_OPERATIONS_PLAN": "Plan the travel package with Operations",
@@ -1737,14 +1735,6 @@
         "SECOND_OPINION_DUE": {
           "title": "Give your second opinion",
           "context": "Review the case and submit your opinion. Your access ends when you submit it."
-        },
-        "DEPOSIT_DUE": {
-          "title": "Patient acknowledged the estimate — arrange the coordination deposit",
-          "context": "The patient acknowledged their preliminary estimate and a coordination deposit is now due. Send the payment instructions, then record the amount received."
-        },
-        "DEPOSIT_RECORD": {
-          "title": "Record the deposit",
-          "context": "The patient has the payment instructions. When the transfer arrives, record the amount received on this case."
         },
         "DEPOSIT_VERIFY_TRANSFER": {
           "title": "Verify the transfer",
