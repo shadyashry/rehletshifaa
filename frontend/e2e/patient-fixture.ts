@@ -21,9 +21,11 @@ export type Scenario = "deposit-arranging" | "deposit-paid" | "proposal-ready" |
 /** `viewer` is the backend's per-case relation; `roles` the account's. They differ for someone who is a patient and also acts for a relative. */
 /** `identity`: the case's current step is identity verification, and this is the latest submission (none when null). */
 /** `multipleCases`: the account also represents a relative (Omar, whose case waits on them — the session opens it) and has a closed case of its own. */
-export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: string[]; identity?: { status: string; rejectionReason?: string } | null; multipleCases?: boolean };
+export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: string[]; identity?: { status: string; rejectionReason?: string } | null; multipleCases?: boolean;
+  /** The server refuses a new case with this error code (e.g. a limit on cases sent for others). */
+  newCaseRefusal?: { status: number; code: string } };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false }: PatientOptions = {}) {
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
       profile: { sub: "patient-1", name: "Maya Example", email: "maya@example.test", roles: ["PATIENT"] }, expires_at: Math.floor(Date.now() / 1000) + 3600 }));
@@ -83,6 +85,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (api === "/work/mine") return reply([]);
     if (api === "/clinics/mine") return reply([]);
     // A new case from the signed-in form: a draft, then the intake submit with its grant (synthetic).
+    if (api === "/patient/cases" && request.method() === "POST" && newCaseRefusal) return reply({ code: newCaseRefusal.code, message: "refused" }, newCaseRefusal.status);
     if (api === "/patient/cases" && request.method() === "POST") return reply({ caseId: "case-new", caseNumber: "RS-2026-000120", status: "DRAFT", intakeGrant: "synthetic-grant" });
     if (api === "/cases/case-new/submit") return reply({ caseNumber: "RS-2026-000120", status: "RECEIVED", statusToken: null });
     if (api === "/patient/cases") return reply(scenario === "no-case" ? [] : caseList);

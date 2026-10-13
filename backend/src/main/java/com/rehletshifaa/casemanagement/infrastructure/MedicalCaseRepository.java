@@ -106,11 +106,12 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
 
     long countByPatientId(UUID patientId);
 
-    /** Unsent drafts of people the identity acts for (the cap on cases a signed-in account starts for others). */
+    /** Unsent drafts started since {@code since} for people the identity acts for (the cap on cases sent for others). */
     @Query("""
             select count(c) from MedicalCase c where c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT
+            and c.createdAt > :since
             and exists (select 1 from PatientRepresentative r where r.patientId = c.patientId and r.representativeSubject = :subject and r.revokedAt is null)""")
-    long countDraftCasesRepresentedBy(@Param("subject") String subject);
+    long countDraftCasesRepresentedBy(@Param("subject") String subject, @Param("since") Instant since);
 
     /** The cases on the identity's own patient record — the rest of their case list belongs to people they represent. */
     @Query("select c.id from MedicalCase c join PatientProfile p on p.id = c.patientId where p.externalSubject = :subject")

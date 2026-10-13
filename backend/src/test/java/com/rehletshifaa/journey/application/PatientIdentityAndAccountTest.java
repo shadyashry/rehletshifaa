@@ -417,19 +417,49 @@ class PatientIdentityAndAccountTest {
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE notification_type='ACCOUNT_LINK' AND destination=?", "rel32@local.test")).isEqualTo(linkMails);
     }
 
-    @Test void anAccountKeepsOnlyAFewUnsentCasesForOthers() throws Exception {
-        var ctx = accepted(request("Link", "Patient", "+254700000034", null));
+    @Test void casesForOthersAreLimitedPerHourAndAbandonedDraftsStopCountingAfterADay() throws Exception {
+        String subject = signedInPatient("+254700000034", "rel34@local.test");
+        for (int i = 0; i < 3; i++) { startForOther("Draft " + i, "Number" + "abc".charAt(i)); em.flush(); }
+        // A burst: the fourth within the hour is refused.
+        assertThatThrownBy(() -> startForOther("One too many", "Four"))
+                .isInstanceOfSatisfying(ApiException.class, e -> { assertThat(e.code()).isEqualTo("TOO_MANY_CASES_FOR_OTHERS"); assertThat(e.status()).isEqualTo(429); });
+        // Two hours later the burst is over, but three unsent drafts from today still hold the next one back.
+        backdate(subject, java.time.Duration.ofHours(2));
+        assertThatThrownBy(() -> startForOther("Still too many drafts", "Five"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("TOO_MANY_DRAFT_CASES"));
+        // A day later the abandoned drafts no longer count: nobody is blocked for good.
+        backdate(subject, java.time.Duration.ofHours(23));
+        var next = startForOther("After a day", "Six"); em.flush();
+        assertThat(next.caseNumber()).isNotBlank();
+    }
+
+    @Test void sendingForSomeoneElseNeedsAVerifiedNumberAndAddress() throws Exception {
+        String subject = signedInPatient("+254700000035", "rel35@local.test");
+        jdbc.update("UPDATE patient_profiles SET phone_verified_at=NULL WHERE external_subject=?", subject);
+        assertThatThrownBy(() -> startForOther("Unverified number", "Seven"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("VERIFIED_CONTACT_REQUIRED"));
+    }
+
+    private String signedInPatient(String whatsapp, String email) throws Exception {
+        var ctx = accepted(request("Link", "Patient", whatsapp, null));
         String g = grant(ctx);
-        activation.activate(ctx.token, g, profile("Link", "Patient", "rel34@local.test", "+254700000034", "PATIENT")); em.flush();
+        activation.activate(ctx.token, g, profile("Link", "Patient", email, whatsapp, "PATIENT")); em.flush();
         String subject = subjectOf(ctx.caseId);
         finishSetup(subject);
         authenticate(subject, Role.PATIENT);
-        for (int i = 0; i < 3; i++) {
-            account.startNewCase(new NewCaseForPatientRequest("Draft " + i, null, false, true, "SOMEONE_ELSE", new SomeoneElse("Relative", "Number" + "abc".charAt(i), false, "Kenya", "SIBLING")));
-            em.flush();
-        }
-        assertThatThrownBy(() -> account.startNewCase(new NewCaseForPatientRequest("One too many", null, false, true, "SOMEONE_ELSE", new SomeoneElse("Relative", "Four", false, "Kenya", "SIBLING"))))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("TOO_MANY_DRAFT_CASES"));
+        return subject;
+    }
+
+    private CreateCaseResponse startForOther(String description, String familyName) {
+        return account.startNewCase(new NewCaseForPatientRequest(description, null, false, true, "SOMEONE_ELSE", new SomeoneElse("Relative", familyName, false, "Kenya", "SIBLING")));
+    }
+
+    /** Moves the account's grants for others, and those people's cases, back in time. */
+    private void backdate(String subject, java.time.Duration by) {
+        em.flush();
+        jdbc.update("UPDATE patient_representatives SET created_at=DATEADD(SECOND, ?, created_at) WHERE representative_subject=?", -by.toSeconds(), subject);
+        jdbc.update("UPDATE medical_cases SET created_at=DATEADD(SECOND, ?, created_at) WHERE patient_id IN (SELECT patient_id FROM patient_representatives WHERE representative_subject=?)", -by.toSeconds(), subject);
+        em.clear();
     }
 
     @Test void sendingForSomeoneElseNeedsWhoAndTheRelationship() throws Exception {

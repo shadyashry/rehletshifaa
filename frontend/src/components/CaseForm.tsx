@@ -243,7 +243,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       let created = draftBody.current === body ? draftCase.current : null;
       if (!created) {
         const response = await apiFetchAs(user.access_token, "/patient/cases", { method: "POST", body });
-        if (!response.ok) throw new SubmitFailure("server");
+        if (!response.ok) throw new SubmitFailure(await refusal(response));
         created = await response.json() as CreateCaseResponse;
         draftCase.current = created; draftBody.current = body;
       }
@@ -450,7 +450,15 @@ function Field({ label, required, requiredMark, valid, error, hint, children }: 
 }
 
 /** Which step failed, so the patient is told what to do next rather than "something went wrong". */
-type FailureStage = "server" | "upload" | "submitAfterUpload";
+type FailureStage = "server" | "upload" | "submitAfterUpload" | "verifiedContactRequired" | "forOthersLimit";
+/** The server's reason for refusing a signed-in new case, when it is one the patient can act on. */
+async function refusal(response: Response): Promise<FailureStage> {
+  const code = await response.json().then((body: { code?: string }) => body.code, () => undefined);
+  if (code === "VERIFIED_CONTACT_REQUIRED") return "verifiedContactRequired";
+  if (code === "TOO_MANY_CASES_FOR_OTHERS" || code === "TOO_MANY_DRAFT_CASES") return "forOthersLimit";
+  return "server";
+}
+
 class SubmitFailure extends Error {
   constructor(readonly stage: FailureStage) { super(stage); }
 }

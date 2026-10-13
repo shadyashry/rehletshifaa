@@ -250,20 +250,24 @@ public class PatientAccountService {
         if (person == null || person.relationship() == null || person.relationship().isBlank())
             throw new ApiException(400, "SOMEONE_ELSE_REQUIRED", "Tell us who this case is for and your relationship to them");
         var me = patients.findOwnProfile(subject).orElseThrow(() -> new ApiException(409, "PATIENT_NOT_LINKED", "Your account is not linked to a patient profile yet"));
-        // The account holder's saved number is the case's contact (as for their own next case); it is their own account's
-        // number, so a status link sent there reaches the person who sent the case.
-        if (me.getPhone() == null) throw new ApiException(409, "MOBILE_REQUIRED", "Add a WhatsApp number to your profile before sending a case");
-        // This path has no CAPTCHA: an account keeps at most a few unsent drafts for others and a daily number of new people.
+        // Accountability: the sender's own number and address are the case's contact and receive its status link, so both
+        // must be proven theirs (activation verifies them).
+        if (me.getPhone() == null || me.getPhoneVerifiedAt() == null || me.getEmail() == null || me.getEmailVerifiedAt() == null)
+            throw new ApiException(409, "VERIFIED_CONTACT_REQUIRED", "Verify your WhatsApp number and email address before sending a case for someone else");
+        // This path has no CAPTCHA, so the server limits it per account: a burst per hour, new people per day, and unsent
+        // drafts — the last counted over a day only, so an abandoned attempt never blocks a family for good.
         Instant now = clock.instant();
-        if (cases.countDraftCasesRepresentedBy(subject) >= MAX_OPEN_DRAFTS_FOR_OTHERS)
-            throw new ApiException(409, "TOO_MANY_DRAFT_CASES", "Finish or wait on the cases you have already started before sending another");
+        if (representatives.countByRepresentativeSubjectAndCreatedAtAfter(subject, now.minus(java.time.Duration.ofHours(1))) >= MAX_PEOPLE_PER_HOUR)
+            throw limitReached("HOURLY", 429, "TOO_MANY_CASES_FOR_OTHERS", "You have just sent several cases for other people; please wait an hour or message your coordinator");
         if (representatives.countByRepresentativeSubjectAndCreatedAtAfter(subject, now.minus(java.time.Duration.ofDays(1))) >= MAX_PEOPLE_PER_DAY)
-            throw new ApiException(429, "TOO_MANY_CASES_FOR_OTHERS", "You have sent several cases for other people today; please try again tomorrow or message your coordinator");
+            throw limitReached("DAILY", 429, "TOO_MANY_CASES_FOR_OTHERS", "You have sent several cases for other people today; please try again tomorrow or message your coordinator");
+        if (cases.countDraftCasesRepresentedBy(subject, now.minus(java.time.Duration.ofDays(1))) >= MAX_OPEN_DRAFTS_FOR_OTHERS)
+            throw limitReached("DRAFTS", 409, "TOO_MANY_DRAFT_CASES", "Finish or wait on the cases you have already started before sending another");
         String relationship = person.relationship().trim().toUpperCase(Locale.ROOT);
         var intakeRequest = new com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest("SOMEONE_ELSE", person.givenName(), person.familyName(), person.singleLegalName(),
                 new com.rehletshifaa.casemanagement.api.CaseDtos.RepresentativeContact(PatientNames.display(me.getGivenName(), me.getFamilyName()), relationship),
                 person.country(), me.getPhone(), request.conditionDescription(), "ar".equals(me.getLanguage()) ? "ar" : "en", true, null,
-                me.getEmailVerifiedAt() != null ? me.getEmail() : null, null, request.careArea(), request.travelPackageRequested());
+                me.getEmail(), null, request.careArea(), request.travelPackageRequested());
         var created = caseService.create(intakeRequest, subject);
         UUID patientId = cases.findById(created.caseId()).orElseThrow().getPatientId();
         // The grant is safe only on a person this request just created: never on an existing record.
@@ -379,7 +383,17 @@ public class PatientAccountService {
 
     /** Fold the pending patient {@code from} into the canonical {@code into}. Every patient-scoped row moves. */
     private static final int MAX_OPEN_DRAFTS_FOR_OTHERS = 3;
+    private static final int MAX_PEOPLE_PER_HOUR = 3;
     private static final int MAX_PEOPLE_PER_DAY = 10;
+
+    /**
+     * A limit on cases sent for others was reached. The refusal rolls the request back, so the signal for monitoring is
+     * the log line's stable event.code (an account that keeps hitting it is a script or a hijacked session).
+     */
+    private static ApiException limitReached(String limit, int status, String code, String message) {
+        log.atWarn().addKeyValue("event.code", "CASE_FOR_OTHERS_LIMIT").addKeyValue("limit", limit).log("Case for someone else refused: {} limit reached", limit);
+        return new ApiException(status, code, message);
+    }
 
     private void mergePatient(UUID from, UUID into, Instant now) {
         cases.moveToPatient(from, into);

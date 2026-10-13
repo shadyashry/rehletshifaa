@@ -43,6 +43,19 @@ test("someone else without a name or relationship is not sent", async ({ page })
   expect(createBody(writes)).toBeUndefined();
 });
 
+test("a limit on cases for others is explained, not a generic failure", async ({ page }) => {
+  await setupPatient(page, "deposit-arranging", { newCaseRefusal: { status: 429, code: "TOO_MANY_CASES_FOR_OTHERS" } });
+  await page.goto("/en/send-my-case");
+  await page.getByText("Someone else", { exact: true }).click();
+  await page.getByLabel("Given name(s)").fill("Omar");
+  await page.getByLabel(/^Family name \/ surname/).fill("Example");
+  await page.getByRole("combobox", { name: /country of residence/i }).fill("Kenya");
+  await page.getByRole("listbox").getByRole("option", { name: /Kenya/ }).click();
+  await page.getByLabel("Your relationship to the patient").selectOption("PARENT");
+  await consentAndSend(page);
+  await expect(page.getByRole("alert").filter({ hasText: "You have sent several cases for other people recently" })).toBeVisible();
+});
+
 test("the default is still the patient's own next case, with nothing about another person", async ({ page }) => {
   const { writes } = await setupPatient(page, "deposit-arranging");
   await page.goto("/en/send-my-case");
