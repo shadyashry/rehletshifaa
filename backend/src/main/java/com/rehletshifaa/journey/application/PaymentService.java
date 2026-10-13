@@ -76,7 +76,7 @@ public class PaymentService {
     public void createDepositForAcknowledgement(UUID caseId, UUID versionId) {
         if (deposits.existsByCaseIdAndStatusNot(caseId, "CANCELLED")) return;
         DepositQueryService.ActivePolicy policy = queries.activePolicyFor(cases.findCareCategory(caseId).orElse(null));
-        if (policy == null || policy.coordinationEgp() == null || policy.coordinationEgp().signum() <= 0) return;
+        if (policy == null || !policy.due()) return;
         ProposalVersionRepository.FxSnapshot fx = proposalVersions.findFxSnapshot(versionId)
                 .orElseThrow(() -> new ApiException(409, "PROPOSAL_NOT_FOUND", "The acknowledged proposal version was not found"));
         if (fx.getCurrency() == null) throw new ApiException(409, "PROPOSAL_CURRENCY_MISSING", "The acknowledged proposal has no currency");
@@ -85,7 +85,9 @@ public class PaymentService {
         if (fx.getFxRate() == null && !"EGP".equals(fx.getCurrency()))
             throw new ApiException(409, "PROPOSAL_FX_SNAPSHOT_MISSING", "The accepted proposal has no exchange-rate snapshot");
         BigDecimal rate = fx.getFxRate() == null ? BigDecimal.ONE : fx.getFxRate();
-        BigDecimal totalEgp = policy.coordinationEgp();
+        // W-1 (owner, 2026-10-14): the deposit is the policy's share (15%) of the estimate the patient acknowledged.
+        BigDecimal totalEgp = policy.of(fx.getPatientTotalExpectedEgp());
+        if (totalEgp.signum() <= 0) return;
         BigDecimal totalDisplay = DepositQueryService.display(totalEgp, rate);
         UUID depositId = UUID.randomUUID(); java.time.Instant now = clock.instant();
         deposits.saveAndFlush(new Deposit(depositId, caseId, versionId, new Deposit.Quote(fx.getCurrency(), rate, fx.getFxRateDate(), fx.getFxSource(), totalEgp, totalDisplay), policy.id(), policy.version(), "SYSTEM", now));
@@ -199,16 +201,18 @@ public class PaymentService {
 
     @Transactional
     public DepositPolicyView configurePolicy(DepositPolicyRequest request) {
-        var actor = authority.authorize(Permission.PAYMENT_RECORD);
-        if (request.coordinationDepositEgp() == null || request.coordinationDepositEgp().signum() < 0) throw new ApiException(400, "DEPOSIT_AMOUNT_INVALID", "The coordination deposit must be zero or more");
+        // Owner, 2026-10-14: the deposit rate is a commercial setting — System Administrators and Finance Managers only, recent sign-in.
+        var actor = authority.authorize(Permission.COMMERCIAL_POLICY_MANAGE);
+        if (request.depositRate() == null || request.depositRate().signum() < 0 || request.depositRate().compareTo(BigDecimal.ONE) > 0)
+            throw new ApiException(400, "DEPOSIT_RATE_INVALID", "The deposit rate must be between 0% and 100%");
         String careCategory = request.careCategory() == null || request.careCategory().isBlank() ? null : request.careCategory().trim();
         // QA #22: any managed care area, never a misspelt one that no case would ever match.
         if (careCategory != null && !careAreas.exists(careCategory)) throw new ApiException(400, "CARE_AREA_UNKNOWN", "This care area does not exist");
         int prev = (careCategory == null ? depositPolicies.findLatestDefaultVersion() : depositPolicies.findLatestVersionFor(careCategory)).orElse(0);
         if (careCategory == null) depositPolicies.retireDefault(); else depositPolicies.retireFor(careCategory);
         UUID id = UUID.randomUUID();
-        depositPolicies.saveAndFlush(new CoordinationDepositPolicy(id, request.name() == null || request.name().isBlank() ? "Coordination-initiation deposit" : request.name().trim(), careCategory, request.coordinationDepositEgp(), prev + 1, actor.subject(), LocalDate.now(clock), clock.instant()));
-        audit(actor, null, "DEPOSIT_POLICY_CONFIGURED", id, "amount=" + request.coordinationDepositEgp());
+        depositPolicies.saveAndFlush(new CoordinationDepositPolicy(id, request.name() == null || request.name().isBlank() ? "Coordination-initiation deposit" : request.name().trim(), careCategory, request.depositRate(), prev + 1, actor.subject(), LocalDate.now(clock), clock.instant()));
+        audit(actor, null, "DEPOSIT_POLICY_CONFIGURED", id, "rate=" + request.depositRate());
         return queries.policy(id);
     }
 

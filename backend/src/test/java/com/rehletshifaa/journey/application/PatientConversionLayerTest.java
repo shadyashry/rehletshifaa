@@ -384,7 +384,7 @@ class PatientConversionLayerTest {
         raw("DELETE FROM patient_onboardings WHERE case_id=?", ctx.caseId);
         UUID depositId = depositId(ctx.caseId);
         authenticate("finance-subject", Role.FINANCE);
-        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId, new BigDecimal("3000.00"), "missing-onboarding-pay-1");
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId, jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId), "missing-onboarding-pay-1");
         driveToTravelCoordination(ctx);
         authenticate("operations-subject", Role.OPERATIONS);
         assertThat(readiness.compute(ctx.caseId).blockingItems()).extracting(BlockingItem::code).contains("ONBOARDING_NOT_STARTED");
@@ -402,7 +402,7 @@ class PatientConversionLayerTest {
         for (String type : List.of("PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS"))
             consent(patient, null, type, null);
         authenticate("finance-subject", Role.FINANCE);
-        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId(ctx.caseId), new BigDecimal("3000.00"), "no-onboarding-" + ctx.caseId);
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId(ctx.caseId), jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId(ctx.caseId)), "no-onboarding-" + ctx.caseId);
         em.flush();
         assertThat(caseActions.readinessBlockers(ctx.caseId)).as("nothing is left for the patient").noneMatch(CaseActionService::patientGate);
         assertThat(readiness.compute(ctx.caseId).readyForCoordination()).isFalse();
@@ -503,7 +503,7 @@ class PatientConversionLayerTest {
             onboarding.recordConsent(ctx.caseId, new OnboardingConsentRequest(type, "I agree to " + type, "v1", "en", null, null));
         UUID depositId = depositId(ctx.caseId);
         authenticate("finance-subject", Role.FINANCE);
-        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId, new BigDecimal("3000.00"), "ready-pay-" + ctx.caseId);
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId, jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId), "ready-pay-" + ctx.caseId);
         SecurityContextHolder.clearContext();
     }
 

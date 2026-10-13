@@ -14,7 +14,7 @@ import java.util.UUID;
 
 public interface CoordinationDepositPolicyRepository extends BaseRepository<CoordinationDepositPolicy, UUID> {
     interface Row {
-        UUID getId(); String getName(); String getCareCategory(); BigDecimal getCoordinationDepositEgp(); Boolean getActive(); Integer getVersion();
+        UUID getId(); String getName(); String getCareCategory(); BigDecimal getDepositRate(); Boolean getActive(); Integer getVersion();
         String getCreatedBy(); LocalDate getValidFrom();
     }
 
@@ -24,28 +24,28 @@ public interface CoordinationDepositPolicyRepository extends BaseRepository<Coor
      * which the PostgreSQL-ordered test database ({@code DEFAULT_NULL_ORDERING=HIGH}) does not share.
      */
     @Query("""
-            select p.id as id, p.name as name, p.careCategory as careCategory, p.coordinationDepositEgp as coordinationDepositEgp,
+            select p.id as id, p.name as name, p.careCategory as careCategory, p.depositRate as depositRate,
                 p.active as active, p.version as version, p.createdBy as createdBy, p.validFrom as validFrom
             from CoordinationDepositPolicy p
             order by case when p.careCategory is null then 0 else 1 end, p.careCategory, p.version desc""")
     List<Row> findAllRows();
 
     @Query("""
-            select p.id as id, p.name as name, p.careCategory as careCategory, p.coordinationDepositEgp as coordinationDepositEgp,
+            select p.id as id, p.name as name, p.careCategory as careCategory, p.depositRate as depositRate,
                 p.active as active, p.version as version, p.createdBy as createdBy, p.validFrom as validFrom
             from CoordinationDepositPolicy p where p.id = :id""")
     Optional<Row> findRow(@Param("id") UUID id);
 
     /** The care area's active revisions, newest first (pass {@code Limit.of(1)}). */
     @Query("""
-            select p.id as id, p.name as name, p.careCategory as careCategory, p.coordinationDepositEgp as coordinationDepositEgp,
+            select p.id as id, p.name as name, p.careCategory as careCategory, p.depositRate as depositRate,
                 p.active as active, p.version as version, p.createdBy as createdBy, p.validFrom as validFrom
             from CoordinationDepositPolicy p where p.active = true and p.careCategory = :careCategory order by p.version desc""")
     List<Row> findActiveFor(@Param("careCategory") String careCategory, org.springframework.data.domain.Limit limit);
 
     /** The default policy's active revisions, newest first (pass {@code Limit.of(1)}). */
     @Query("""
-            select p.id as id, p.name as name, p.careCategory as careCategory, p.coordinationDepositEgp as coordinationDepositEgp,
+            select p.id as id, p.name as name, p.careCategory as careCategory, p.depositRate as depositRate,
                 p.active as active, p.version as version, p.createdBy as createdBy, p.validFrom as validFrom
             from CoordinationDepositPolicy p where p.active = true and p.careCategory is null order by p.version desc""")
     List<Row> findActiveDefault(org.springframework.data.domain.Limit limit);

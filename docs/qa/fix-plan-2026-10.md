@@ -209,8 +209,16 @@ beside the patient currency, amount prefilled. W-22: the readiness line follows 
 every deposit action (no case revision). #22: care areas from the platform list (all 9), unknown ones refused (400
 `CARE_AREA_UNKNOWN`). #12: every total is the sum of its rounded lines (patient proposal page, Consultant summary). W-21,
 W-28, DEP-1: superseded by DEP-3 (dead copy removed). Also: a refund is checked against case visibility like a receipt and a
-waiver. **Open: W-1** — needs the business rule (deposit cap). Gates: backend 727/0/2, vitest 60 files / 428, typecheck,
+waiver. W-1 done in **A4b** (below). Gates: backend 727/0/2, vitest 60 files / 428, typecheck,
 lint 0 errors, Playwright staff-home/portal/a11y 37 passed.
+
+### A4b — Deposit share and commercial settings owners (2026-10-14)
+
+Owner decisions W-1 and commercial settings: the coordination deposit is **15% of the expected total of the estimate the patient
+acknowledged** (V84 replaces the fixed amount with `deposit_policies.deposit_rate`; care areas may override); the margin, the
+deposit rate and the exchange-rate override are changed only by **System Administrators and Finance Managers**
+(`COMMERCIAL_POLICY_MANAGE`, recent sign-in, audited); Finance reads them. Margin & Deposit shows and edits the deposit as a
+percentage. Gates: backend 727/0/2, vitest 60 files / 429, typecheck, lint 0 errors, Playwright 37 passed.
 
 ### A5 — Journey history and audit from workflow events (1–2 sessions)
 

@@ -74,7 +74,7 @@ class PricingCatalogServiceTest {
     }
 
     @Test void adminFxOverrideWinsAndShowsInEffectiveRates() {
-        authenticate("admin-subject", Role.FINANCE);
+        authenticate("admin-subject", Role.FINANCE_MANAGER); // owner, 2026-10-14: commercial settings
         pricing.setFxOverride("USD", new FxOverrideRequest(new BigDecimal("0.02000000"), null));
         assertThat(pricing.fxRates(null))
                 .anySatisfy(r -> { assertThat(r.currency()).isEqualTo("EGP"); assertThat(r.rate()).isEqualByComparingTo("1"); })

@@ -30,9 +30,12 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
     List<PatientFacing> latestForCase(@Param("caseId") UUID caseId, org.springframework.data.domain.Pageable page);
 
     /** The currency and exchange-rate snapshot a version was released at. */
-    interface FxSnapshot { String getCurrency(); BigDecimal getFxRate(); LocalDate getFxRateDate(); String getFxSource(); }
+    interface FxSnapshot { String getCurrency(); BigDecimal getFxRate(); LocalDate getFxRateDate(); String getFxSource(); BigDecimal getPatientTotalExpectedEgp(); }
 
-    @Query("select v.currency as currency, v.fxRate as fxRate, v.fxRateDate as fxRateDate, v.fxSource as fxSource from ProposalVersion v where v.id = :id")
+    @Query("""
+            select v.currency as currency, v.fxRate as fxRate, v.fxRateDate as fxRateDate, v.fxSource as fxSource,
+                v.patientTotalExpectedEgp as patientTotalExpectedEgp
+            from ProposalVersion v where v.id = :id""")
     java.util.Optional<FxSnapshot> findFxSnapshot(@Param("id") UUID id);
 
     /** Where a version stands in internal approval before release. */
@@ -108,6 +111,13 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
             from ProposalVersion v left join CommercialPolicy cp on cp.id = v.commercialPolicyId
             where v.id = :id""")
     java.util.Optional<Commercial> findCommercial(@Param("id") UUID id);
+
+    /** The expected patient total (EGP) of the case's latest preliminary estimate: what the deposit is a share of (W-1). */
+    @Query("""
+            select v.patientTotalExpectedEgp from ProposalVersion v join Proposal p on p.id = v.proposalId
+            where p.caseId = :caseId and v.documentType = 'PRELIMINARY_ESTIMATE' and v.patientTotalExpectedEgp is not null
+            order by v.versionNumber desc""")
+    List<BigDecimal> findLatestEstimateTotal(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
 
     /** The case's versions, latest first (pass {@code Limit.of(1)} for the current one). */
     @Query("select v.id from ProposalVersion v join Proposal p on p.id = v.proposalId where p.caseId = :caseId order by v.versionNumber desc")

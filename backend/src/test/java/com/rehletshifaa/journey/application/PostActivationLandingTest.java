@@ -52,7 +52,7 @@ class PostActivationLandingTest {
     @Test void afterAcknowledgingTheEstimateThePatientPaysTheDepositAndEntersTheTransferReference() throws Exception {
         UUID caseId = ownedCase("+254700000601", "landing-a@local.test");
         UUID versionId = releasedUsdProposal(caseId);
-        seedDepositPolicy(new BigDecimal("25000.00"));
+        seedDepositPolicy(new BigDecimal("0.15"));
         acknowledge(caseId, "+254700000601");
         linkPatient(caseId, "patient-landing-a");
         markProfileActive(caseId); // activation completed the profile and the base consents
@@ -74,8 +74,11 @@ class PostActivationLandingTest {
         assertThat(ws.deposit()).isNotNull();
         assertThat(ws.deposit().status()).isEqualTo("REQUESTED");
         assertThat(ws.deposit().currency()).isEqualTo("USD");
-        assertThat(ws.deposit().totalEgp()).isEqualByComparingTo("25000.00");
-        assertThat(ws.deposit().totalDisplay()).isEqualByComparingTo("500.00"); // 25,000 EGP × 0.02
+        // W-1 (owner, 2026-10-14): 15% of the estimate the patient acknowledged, at the proposal's snapshot rate.
+        BigDecimal estimate = jdbc.queryForObject("SELECT v.patient_total_expected_egp FROM proposal_versions v JOIN proposals p ON p.id=v.proposal_id WHERE p.case_id=? AND v.document_type='PRELIMINARY_ESTIMATE' ORDER BY v.version_number DESC LIMIT 1", BigDecimal.class, caseId);
+        BigDecimal expectedDeposit = estimate.multiply(new BigDecimal("0.15")).setScale(2, java.math.RoundingMode.HALF_UP);
+        assertThat(ws.deposit().totalEgp()).isEqualByComparingTo(expectedDeposit);
+        assertThat(ws.deposit().totalDisplay()).isEqualByComparingTo(expectedDeposit.multiply(new BigDecimal("0.02")).setScale(2, java.math.RoundingMode.HALF_UP));
         // The proposal: acknowledged, exactly one read-only action, the version the patient decided on.
         assertThat(ws.patientProposal().state()).isEqualTo("ACCEPTED");
         assertThat(ws.patientProposal().action()).isEqualTo("VIEW_PROPOSAL");
@@ -106,7 +109,7 @@ class PostActivationLandingTest {
     @Test void onceTheDepositIsConfirmedTheStepMovesOnAndTheDepositReadsAsReceived() throws Exception {
         UUID caseId = ownedCase("+254700000602", "landing-b@local.test");
         releasedUsdProposal(caseId);
-        seedDepositPolicy(new BigDecimal("25000.00"));
+        seedDepositPolicy(new BigDecimal("0.15"));
         acknowledge(caseId, "+254700000602");
         linkPatient(caseId, "patient-landing-b");
         markProfileActive(caseId);
@@ -116,13 +119,13 @@ class PostActivationLandingTest {
 
         seedStaff("finance-subject", "FINANCE");
         authenticate("finance-subject", Role.FINANCE);
-        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, caseId, depositId, new BigDecimal("25000.00"), "landing-b:" + caseId);
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, caseId, depositId, jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId), "landing-b:" + caseId);
         em.flush();
 
         authenticate("patient-landing-b", Role.PATIENT);
         CaseWorkspace ws = journey.workspace(caseId);
         assertThat(ws.deposit().status()).isEqualTo("PAID");
-        assertThat(ws.deposit().paidDisplay()).isEqualByComparingTo("500.00");
+        assertThat(ws.deposit().paidDisplay()).isEqualByComparingTo(ws.deposit().totalDisplay());
         assertThat(ws.actions().currentAction().code()).isNotEqualTo("PAY_DEPOSIT"); // the step is done
         assertThat(ws.actions().currentAction().code()).isEqualTo("WAIT_COORDINATION");
         assertThat(ws.actions().currentAction().kind()).isEqualTo("WAIT");
@@ -350,10 +353,10 @@ class PostActivationLandingTest {
         jdbc.update("INSERT INTO fx_rates(id,base_currency,quote_currency,rate,rate_date,source,fetched_at) VALUES(?,?,?,?,?,?,?)",
                 UUID.randomUUID(), "EGP", quoteCurrency, rate, java.time.LocalDate.now(java.time.ZoneOffset.UTC), "API", Instant.now());
     }
-    private void seedDepositPolicy(BigDecimal egp) {
+    private void seedDepositPolicy(BigDecimal rate) {
         jdbc.update("UPDATE deposit_policies SET active=FALSE");
-        jdbc.update("INSERT INTO deposit_policies(id,name,care_category,coordination_deposit_egp,active,version,created_by,valid_from,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                UUID.randomUUID(), "Landing deposit", null, egp, true, 1, "test", java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1), Instant.now());
+        jdbc.update("INSERT INTO deposit_policies(id,name,care_category,deposit_rate,active,version,created_by,valid_from,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(), "Landing deposit", null, rate, true, 1, "test", java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1), Instant.now());
     }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }

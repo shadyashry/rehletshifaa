@@ -207,8 +207,9 @@ public final class JourneyDtos {
     /** Finance confirms the amount received against the patient's pending transfer reference (method and reference come from it). */
     public record RecordReceiptRequest(@NotNull @DecimalMin("0.01")@Digits(integer=12,fraction=2)BigDecimal amountEgp,@NotBlank @Size(max=180)String idempotencyKey) {}
     public record RefundRequest(@NotNull @DecimalMin("0.01")BigDecimal amountEgp,@NotBlank @Size(max=2000)String reason,@NotBlank @Size(max=180)String idempotencyKey) {}
-    public record DepositPolicyView(UUID id,String name,String careCategory,BigDecimal coordinationDepositEgp,boolean active,int version,String createdBy,LocalDate validFrom) {}
-    public record DepositPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal coordinationDepositEgp) {}
+    public record DepositPolicyView(UUID id,String name,String careCategory,BigDecimal depositRate,boolean active,int version,String createdBy,LocalDate validFrom) {}
+    /** {@code depositRate}: the share of the patient's estimated total due as the coordination deposit, 0–1 (0.15 = 15%). */
+    public record DepositPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("1.0") @Digits(integer=1,fraction=4)BigDecimal depositRate) {}
     public record CatalogImportRow(int line,String serviceCode,String serviceName,String category,BigDecimal priceEgp,String action,String message) {}
     public record CatalogImportResult(boolean committed,int added,int updated,int unchanged,int errors,List<CatalogImportRow> rows) {}
 

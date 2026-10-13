@@ -276,8 +276,8 @@ class AssistedProposalDecisionTest {
         UUID caseId = ownedCase("+254700000810", "assist-j@local.test");
         UUID versionId = releasedProposal(caseId);
         jdbc.update("UPDATE deposit_policies SET active=FALSE");
-        jdbc.update("INSERT INTO deposit_policies(id,name,care_category,coordination_deposit_egp,active,version,created_by,valid_from,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                UUID.randomUUID(), "Assisted deposit", null, new BigDecimal("5000.00"), true, 1, "test", java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1), Instant.now());
+        jdbc.update("INSERT INTO deposit_policies(id,name,care_category,deposit_rate,active,version,created_by,valid_from,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(), "Assisted deposit", null, new BigDecimal("0.15"), true, 1, "test", java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1), Instant.now());
         authenticate("coordinator-subject", Role.COORDINATOR);
         assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "VIDEO", "PATIENT", Instant.now(), true));
         em.flush();

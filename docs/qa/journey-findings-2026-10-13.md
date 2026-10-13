@@ -128,7 +128,7 @@ sources: `docs/ux-redesign/backlog.md`, section "My Care + multiple cases".
 
 | # | Finding | Proposed fix | Severity |
 |---|---|---|---|
-| W-1 | Case 2 (consultation only): the coordination deposit is SAR 214.40 against an estimated total of SAR 280.15 — the deposit is 77% of the care being estimated. A fixed deposit can approach or exceed a small estimate. | Business rule: cap the deposit at a share of the estimate (or waive it under a threshold); decide in the commercial policy. | Medium (business) |
+| W-1 | Case 2 (consultation only): the coordination deposit is SAR 214.40 against an estimated total of SAR 280.15 — the deposit is 77% of the care being estimated. A fixed deposit can approach or exceed a small estimate. | Business rule: cap the deposit at a share of the estimate (or waive it under a threshold); decide in the commercial policy. | Medium (business) — **Fixed in A4b**: owner decision 2026-10-14 — the deposit is 15% of the acknowledged estimate (a setting, System Administrators and Finance Managers only) |
 | W-2 | Arabic proposal shows the catalogue item name in English ("Diagnostic cardiology consultation") and the exchange-rate note in English ("Amounts in SAR are converted…"). | Arabic names on catalogue items; the FX note in both message files. | Medium |
 | W-3 | On a narrow screen the proposal repeats its actions: "طلب تعديلات" and "اطلب من منسّقي" appear in the page and again in the sticky bottom bar. | Part of G-1 (proposal redesign): one action location per screen size. | Low |
 | W-4 | Arabic assisted path works: the request is confirmed on the page ("أُرسل الطلب في 13 أكتوبر 2026") and the coordinator is emailed "Go through the proposal terms with the patient in Arabic". | Keep. | — |

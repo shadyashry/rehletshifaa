@@ -358,7 +358,7 @@ class UatDefectCorrectionsTest {
         UUID caseId = ownedCase("+254700000515", "uat-l@local.test");
         setStaffEmail("coordinator-subject", "coordinator.l@local.test");
         UUID versionId = releasedUsdProposal(caseId);
-        seedDepositPolicy(new BigDecimal("5000.00"));
+        seedDepositPolicy(new BigDecimal("0.15"));
         var ctx = openViaStatusLink(caseId, "+254700000515");
         int coordinatorMailBefore = count("SELECT count(*) FROM notification_outbox WHERE destination='coordinator.l@local.test'");
         int teamMailBefore = count("SELECT count(*) FROM notification_outbox WHERE destination='coordinator@test.invalid'");
@@ -396,7 +396,7 @@ class UatDefectCorrectionsTest {
     @Test void anUnownedCaseRaisesNoDepositAlertTheDepositIsThePatientsToPay() throws Exception {
         UUID caseId = ownedCase("+254700000517", "uat-l3@local.test");
         releasedUsdProposal(caseId);
-        seedDepositPolicy(new BigDecimal("5000.00"));
+        seedDepositPolicy(new BigDecimal("0.15"));
         jdbc.update("UPDATE case_assignments SET status='ENDED' WHERE case_id=? AND assignee_role='COORDINATOR'", caseId);
         var ctx = openViaStatusLink(caseId, "+254700000517");
         int notificationsBefore = count("SELECT count(*) FROM staff_notifications WHERE case_id=?", caseId);
@@ -458,7 +458,7 @@ class UatDefectCorrectionsTest {
     private UUID acknowledgedCase(String whatsapp, String email) throws Exception {
         UUID caseId = ownedCase(whatsapp, email);
         releasedUsdProposal(caseId);
-        seedDepositPolicy(new BigDecimal("5000.00"));
+        seedDepositPolicy(new BigDecimal("0.15"));
         var ctx = openViaStatusLink(caseId, whatsapp);
         journey.decideProposalPublic(ctx.token(), ctx.grant(), new PublicProposalDecisionRequest(ctx.grant(), "ACKNOWLEDGED", null, true));
         em.flush();
@@ -649,10 +649,10 @@ class UatDefectCorrectionsTest {
     @Autowired(required = false) org.springframework.cache.CacheManager cacheManager;
     private void evictFxCache() { if (cacheManager == null) return; var cache = cacheManager.getCache(com.rehletshifaa.shared.cache.CacheNames.FX_RATES); if (cache != null) cache.clear(); var tables = cacheManager.getCache(com.rehletshifaa.shared.cache.CacheNames.FX_RATE_TABLES); if (tables != null) tables.clear(); }
 
-    private void seedDepositPolicy(BigDecimal egp) {
+    private void seedDepositPolicy(BigDecimal rate) {
         jdbc.update("UPDATE deposit_policies SET active=FALSE");
-        jdbc.update("INSERT INTO deposit_policies(id,name,care_category,coordination_deposit_egp,active,version,created_by,valid_from,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                UUID.randomUUID(), "UAT deposit", null, egp, true, 1, "test", java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1), Instant.now());
+        jdbc.update("INSERT INTO deposit_policies(id,name,care_category,deposit_rate,active,version,created_by,valid_from,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(), "UAT deposit", null, rate, true, 1, "test", java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1), Instant.now());
     }
 
     private String caseNumber(UUID caseId) { return jdbc.queryForObject("SELECT case_number FROM medical_cases WHERE id=?", String.class, caseId); }

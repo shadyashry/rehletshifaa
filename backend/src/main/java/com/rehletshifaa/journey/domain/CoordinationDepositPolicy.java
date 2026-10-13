@@ -13,15 +13,16 @@ import java.util.UUID;
 import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
- * One revision of the coordination-deposit policy, for one care area or (no care area) the default. Configuring a new
- * amount deactivates the previous revision and adds the next one.
+ * One revision of the coordination-deposit policy, for one care area or (no care area) the default: the share of the patient's
+ * estimated total that is due as the deposit (owner, 2026-10-14: 15%). Configuring a new rate deactivates the previous revision
+ * and adds the next one.
  */
 @Entity
 @Table(name = "deposit_policies")
 public class CoordinationDepositPolicy extends AssignedIdEntity {
     @Column(nullable = false, length = 160) private String name;
     @Column(name = "care_category", length = 60) private String careCategory;
-    @Column(name = "coordination_deposit_egp", nullable = false) private BigDecimal coordinationDepositEgp;
+    @Column(name = "deposit_rate", nullable = false, precision = 6, scale = 4) private BigDecimal depositRate;
     @Column(nullable = false) private boolean active;
     @Column(nullable = false) private int version;
     @Column(name = "created_by", length = 120) private String createdBy;
@@ -30,10 +31,10 @@ public class CoordinationDepositPolicy extends AssignedIdEntity {
 
     protected CoordinationDepositPolicy() {}
 
-    public CoordinationDepositPolicy(UUID id, String name, String careCategory, BigDecimal coordinationDepositEgp, int version,
+    public CoordinationDepositPolicy(UUID id, String name, String careCategory, BigDecimal depositRate, int version,
                                      String createdBy, LocalDate validFrom, Instant now) {
         super(id);
-        this.name = name; this.careCategory = careCategory; this.coordinationDepositEgp = coordinationDepositEgp; this.active = true;
+        this.name = name; this.careCategory = careCategory; this.depositRate = depositRate; this.active = true;
         this.version = version; this.createdBy = createdBy; this.validFrom = validFrom; this.createdAt = micros(now);
     }
 }

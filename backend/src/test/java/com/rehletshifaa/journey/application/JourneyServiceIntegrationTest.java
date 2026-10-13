@@ -163,24 +163,27 @@ class JourneyServiceIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT decision FROM proposal_decisions WHERE proposal_version_id=?",String.class,proposal.versionId())).isEqualTo("ACKNOWLEDGED");
         var deposit=payment.depositForCase(created.caseId());
         assertThat(deposit).isNotNull();
-        assertThat(deposit.totalEgp()).isEqualByComparingTo("3000.00");
+        // W-1 (owner, 2026-10-14): the deposit is 15% of the estimate the patient acknowledged.
+        BigDecimal estimate=jdbc.queryForObject("SELECT patient_total_expected_egp FROM proposal_versions WHERE id=?",BigDecimal.class,proposal.versionId());
+        assertThat(deposit.totalEgp()).isEqualByComparingTo(estimate.multiply(new BigDecimal("0.15")).setScale(2,java.math.RoundingMode.HALF_UP));
+        BigDecimal due=deposit.totalEgp();
         assertThat(deposit.status()).isEqualTo("REQUESTED");
         // DEP-3: without the patient's transfer reference there is nothing for Finance to confirm.
         authenticate("finance-subject",Role.FINANCE);
-        assertThat(catchThrowableOfType(()->payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"idem-1")),
+        assertThat(catchThrowableOfType(()->payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(due,"idem-1")),
                 com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("TRANSFER_REFERENCE_REQUIRED");
         com.rehletshifaa.journey.DepositTestData.reportTransfer(jdbc,created.caseId(),"FT123456");
         // #21: a non-Finance actor cannot record a receipt.
         authenticate("coordinator-subject",Role.COORDINATOR);
-        assertThatThrownBy(()->payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"idem-1"))).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
+        assertThatThrownBy(()->payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(due,"idem-1"))).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
         // Finance records the receipt (recent auth) -> PAID, against the patient's reference.
         authenticate("finance-subject",Role.FINANCE);
-        var paid=payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"idem-1"));
+        var paid=payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(due,"idem-1"));
         assertThat(paid.status()).isEqualTo("PAID");
         assertThat(paid.events()).filteredOn(e->"PAYMENT_RECORDED".equals(e.eventType())).singleElement().satisfies(e->{assertThat(e.providerReference()).isEqualTo("FT123456");assertThat(e.method()).isEqualTo("BANK_TRANSFER");});
         assertThat(paid.transfer().status()).isEqualTo("CONFIRMED");
         // #20: replaying the same idempotency key records no second payment.
-        assertThat(payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"idem-1")).status()).isEqualTo("PAID");
+        assertThat(payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(due,"idem-1")).status()).isEqualTo("PAID");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'",Integer.class,deposit.id())).isEqualTo(1);
     }
 
@@ -188,23 +191,30 @@ class JourneyServiceIntegrationTest {
         var created=cases.create(new CreateCaseRequest("Ledger", "Patient","Kenya","+254700000093","Cardiac reports","en",true,null,"ledger@local.test","Africa/Nairobi","cardiology"));
         UUID caseId=created.caseId();
         com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-subject", "FINANCE", crypto.encrypt("Finance One"));
+        // Owner, 2026-10-14: Finance reads the deposit rate; Finance Managers and System Administrators set it.
         authenticate("finance-subject",Role.FINANCE);
-        payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("1000.00")));
-        payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("2000.00")));
-        var current=payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("2500.00")));
+        assertThat(catchThrowableOfType(()->payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("0.20"))),com.rehletshifaa.shared.api.ApiException.class).status()).isEqualTo(403);
+        assertThat(catchThrowableOfType(()->commercialPolicies.configure(new CommercialPolicyRequest(null,null,new BigDecimal("0.20"))),com.rehletshifaa.shared.api.ApiException.class).status()).isEqualTo(403);
+        authenticate("system-admin-subject",Role.SYSTEM_ADMINISTRATOR);
+        payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("0.15")));
+        authenticate("finance-manager-subject",Role.FINANCE_MANAGER);
+        assertThat(catchThrowableOfType(()->payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("1.50"))),com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("DEPOSIT_RATE_INVALID");
+        payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("0.20")));
+        var current=payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("0.25")));
         // QA #22: a policy can be set for every managed care area, and only for one.
         assertThat(commercialPolicies.careAreas()).extracting(CareCategoryView::slug)
                 .hasSize(jdbc.queryForObject("SELECT count(*) FROM care_categories",Integer.class)).contains("cardiology","womens-health","general-surgery");
-        assertThat(catchThrowableOfType(()->payment.configurePolicy(new DepositPolicyRequest("Typo","cardiolgy",BigDecimal.ONE)),com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("CARE_AREA_UNKNOWN");
+        assertThat(catchThrowableOfType(()->payment.configurePolicy(new DepositPolicyRequest("Typo","cardiolgy",new BigDecimal("0.15"))),com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("CARE_AREA_UNKNOWN");
         assertThat(catchThrowableOfType(()->commercialPolicies.configure(new CommercialPolicyRequest("Typo","cardiolgy",new BigDecimal("0.10"))),com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("CARE_AREA_UNKNOWN");
+        authenticate("finance-subject",Role.FINANCE);
         var listed=payment.listPolicies();
         int firstCareArea=(int)listed.stream().takeWhile(p->p.careCategory()==null).count();
         assertThat(listed.subList(firstCareArea,listed.size())).allSatisfy(p->assertThat(p.careCategory()).isNotNull());
         assertThat(listed.stream().filter(p->"cardiology".equals(p.careCategory())).toList())
                 .extracting(DepositPolicyView::version,DepositPolicyView::active).startsWith(tuple(current.version(),true),tuple(current.version()-1,false));
-        // No deposit yet: the active care-area policy is what will be due.
+        // No deposit and no estimate yet: one is required (the policy asks for 25%); its amount follows the estimate.
         assertThat(payment.depositForCase(caseId)).isNull();
-        assertThat(payment.anticipatedCoordinationDepositEgp(caseId)).isEqualByComparingTo("2500.00");
+        assertThat(payment.anticipatedCoordinationDepositEgp(caseId)).isEqualByComparingTo("0.00");
         assertThat(payment.depositStatusFor(caseId)).isEqualTo("REQUIRED");
         assertThat(payment.depositSatisfied(caseId)).isFalse();
 
