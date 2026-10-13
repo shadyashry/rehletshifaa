@@ -56,7 +56,7 @@ case page, which Finance cannot open on such a case (403). Fix: when the coordin
 create a Finance work item "Record the deposit" (closes W-24); give Finance `CASE_READ` on cases with an open deposit (as
 B1 did for offered cases); test that a catalogue-only case is paid end to end; independent security review.
 
-**Done — `0778a3e` on `fix/b3-finance-deposit-access` (from `7d36005`; not pushed, awaiting the owner).** The security review
+**Done — `0778a3e` (pushed with `bb055f2`).** The security review
 narrowed the read: Finance gets `CASE_DEPOSIT_READ` (payment view only, audited), not `CASE_READ`, while the case is
 ACCEPTED with an open deposit; W-24 (the Finance work item) is closed here. Follow-ups from the review, slotted into
 later batches: `recordReceipt`/`recordRefund`/`waiveDeposit` are platform-wide `PAYMENT_RECORD` with no open-deposit or
@@ -153,7 +153,7 @@ Root cause: second factors enrolled ad hoc and asked only at submit time; the po
 | — | Invariant test: every waiting stage has exactly one open work item for whoever it waits on; header agrees. |
 | 3-UX | Then rename tabs ("To do" / "My cases") with counts; validate with one coordinator. |
 
-**Done — `eca4d05` on `fix/a3-work-items-one-source` (from `666bf80`; not pushed, awaiting the owner).** Root cause: the current
+**Done — `eca4d05` (pushed with `8268cbd`; live-verified, `52c8b47`).** Root cause: the current
 action fell back to the stage for steps no event raised work for, and "At a glance" counted by stage. Now
 `CaseActionService.syncStageWork` keeps exactly one work item per step a stage owes a person (coordinator intake review,
 internal sign-off steps and release; Finance approval; Operations' plans), decided by the same `stageFallback` as the
@@ -170,7 +170,7 @@ stage, the release step notified and emailed); it found Finance's pending assign
 "not saved" notice after success) in A2; the Consultant's summary calls a total that includes a manual line "Approved
 catalogue price" (#8, A4).
 
-### Walk findings batch — `fix/walk-findings-2026-10-14` (2026-10-14)
+### Walk findings batch — `e4122a7` (2026-10-14, pushed and deployed to dev)
 
 Everything the live walks on 2026-10-13/14 caught that was not yet fixed, done before the next live test (owner):
 
@@ -202,7 +202,7 @@ count); RS-2026-000003/000004 (routed before A3, no work items) removed from dev
 | #20 | One "Approve commercial terms" action. |
 | W-1 | After the business rule: deposit cap or waiver. |
 
-**Done (2026-10-14) on `fix/a4-finance-commercial`.** #19 + #20: Finance approves in the action card, beside each line's price
+**Done (2026-10-14) — `f078864`, pushed and deployed to dev.** #19 + #20: Finance approves in the action card, beside each line's price
 source, the Consultant's EGP base price, the patient's price, the margin (rate, amount, policy) and the totals — the one
 "Approve commercial terms" (the figures are on the case workspace for Finance on the case only). W-26: EGP total/paid/balance
 beside the patient currency, amount prefilled. W-22: the readiness line follows the payment state; "Last updated" moves on
@@ -313,7 +313,7 @@ converges from the legacy base theme to Petrol & Paper here.
   sees the remaining amount, with the preliminary-estimate caveat highlighted; reminders daily for three days, the
   coordinator alerted on the fourth; build it on priority.
 
-  **Done — on `feat/dep3-patient-payment-step` (from `f46c37f`; commit hash in the findings DEP row).** The coordinator's
+  **Done — `45dcd77`, pushed and deployed to dev; no waiver without a confirmed patient reference (`cf3cdd5`).** The coordinator's
   "arrange the deposit / instructions sent" item is retired. The patient's step `PAY_DEPOSIT` (My Care): amount due with
   the estimate caveat, Online shown disabled, bank transfer with the configured account and the case number as payment
   reference, and the mandatory transaction-reference field (what it is for, where to find it). Submitting opens Finance's
@@ -394,8 +394,9 @@ Already decided: G-2 (option C), G-8 (layered limits, done), DEP (keep Finance c
 
 ## Next exact action
 
-1. Owner approves this plan (order, batch boundaries) and answers what the decision register needs before each batch.
-2. ~~B3~~ done (`0778a3e`, awaiting the owner's merge and push). Next session: **T1**, then **W0** (owner signs in) — so the
-   walk is complete before the logic batches. W0 adds: Finance records the deposit on RS-2026-000002 (catalogue-only)
-   from My work, and on RS-2026-000001. **W0 closed 2026-10-13** (deposit, identity review; credential recording moved to T1).
-3. Then A0 → A1 → A2 → … one batch per session, each committed when green. A3 done (`eca4d05`, awaiting merge); A2 still waits on D1.
+Done and on dev (2026-10-14): B3, T1, W0, A0, A1, A3, DEP-3 (+ waiver rule `cf3cdd5`), walk findings (`e4122a7`), A4 (`f078864`).
+
+1. Owner's live test on dev of the payment step (DEP-3) and the Finance approval (A4), with synthetic cases only.
+2. Owner decisions that unblock work: **W-1** (deposit cap — recommended: the lower of the policy amount and 25% of the
+   estimate, none under a threshold) and **D1** (staff sign-in policy, unblocks A2).
+3. Next batch without a decision: **B2** (accessible names, ½ session), then A5 → A6 → A7 → B1; A2 once D1 is decided.
