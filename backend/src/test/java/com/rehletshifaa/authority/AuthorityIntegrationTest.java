@@ -72,6 +72,20 @@ class AuthorityIntegrationTest {
     }
 
     @Test
+    void financeAndOperationsReadACaseTheyWereOfferedButActOnlyOnceTheyAccept() {
+        new WorkforceTestData(jdbc, crypto, clock.instant())
+                .person("a-finance", "FINANCE").person("a-ops", "OPERATIONS").person("a-finance-unoffered", "FINANCE");
+        Instant now = clock.instant();
+        assign("a-finance", "FINANCE", "PRIMARY", "PENDING", now);
+        assign("a-ops", "OPERATIONS", "PRIMARY", "PENDING", now);
+        // An offer is reviewed before it is accepted, as a consultant reviews theirs: the case opens, the work does not.
+        assertThat(decide("a-finance", Permission.CASE_READ, Resource.ofCase(caseId)).granted()).isTrue();
+        assertThat(decide("a-ops", Permission.CASE_READ, Resource.ofCase(caseId)).granted()).isTrue();
+        assertThat(decide("a-finance", Permission.FINANCE_SETTLE, Resource.ofCase(caseId)).granted()).isFalse();
+        assertThat(decide("a-finance-unoffered", Permission.CASE_READ, Resource.ofCase(caseId)).granted()).isFalse();
+    }
+
+    @Test
     void administratorsAndAuditorsHoldNoCasePower() {
         assertThat(decide("a-admin", Permission.CASE_READ, Resource.ofCase(caseId)).code()).isEqualTo("PERMISSION_NOT_HELD");
         assertThat(decide("a-auditor", Permission.CASE_READ, Resource.ofCase(caseId)).code()).isEqualTo("PERMISSION_NOT_HELD");
