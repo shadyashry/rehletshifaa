@@ -723,8 +723,13 @@ class CoordinatorCaseActionsTest {
         assertThat(open.getFirst().get("owner_subject")).as(stage + ": owned by whoever the case waits on").isEqualTo(party.subject());
         authenticate(party.subject(), party.role());
         assertThat(staffWork.myWork()).as(stage + ": in My work").filteredOn(w -> w.caseId().equals(caseId)).hasSize(1);
-        cards(party.role()).stream().filter(card -> card.caseSummary().id().equals(caseId))
-                .forEach(card -> assertThat(card.myWorkCount()).as(stage + ": counted in At a glance").isEqualTo(1));
+        // At a glance counts the party's case card; a pending assignment is not a case in their list yet, so the portal counts
+        // it from My work as a new assignment (the live A3 walk found Finance's missing).
+        var card = cards(party.role()).stream().filter(c -> c.caseSummary().id().equals(caseId)).findFirst();
+        if ("ACCEPT_ASSIGNMENT".equals(party.step()) && party.role() != Role.COORDINATOR)
+            assertThat(staffWork.myWork()).as(stage + ": counted as a new assignment").anyMatch(w -> w.caseId().equals(caseId) && "CONSULTANT_ASSIGNMENT".equals(w.type()));
+        else assertThat(card).as(stage + ": the case is in the party's list").hasValueSatisfying(c ->
+                assertThat(c.myWorkCount()).as(stage + ": counted in At a glance").isEqualTo(1));
         CaseActionsView a = journey.workspace(caseId).actions();
         CurrentActionView current = a.currentAction();
         assertThat(current.kind()).as(stage + ": the party acts").isIn("FOCUS", "ACCEPT", "COMPLETE");

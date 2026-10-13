@@ -478,6 +478,15 @@ describe("consultant workspace", () => {
     ]} selected="" onSelect={vi.fn()}/>);
     expect(screen.getByRole("button", { name: "1 new assignment" })).toBeTruthy();
   });
+
+  it("counts Finance's and Operations' pending assignments from My work, where the case list cannot show them yet (QA #18, live A3)", () => {
+    for (const role of ["finance", "operations"]) {
+      renderWithWork(<RoleDashboardSummary role={role} cases={[]} tasks={[{ overdue: false, status: "OPEN", type: "CONSULTANT_ASSIGNMENT" }]} selected="" onSelect={vi.fn()}/>);
+      expect(screen.getByRole("button", { name: "1 new assignment" })).toBeTruthy();
+      expect(screen.queryByText("No cases need action right now.")).toBeNull();
+      cleanup();
+    }
+  });
 });
 
 describe("notification bell unread state", () => {

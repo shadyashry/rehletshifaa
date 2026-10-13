@@ -40,17 +40,17 @@ export function RoleDashboardSummary({ role, cases, tasks, loading = false, sele
     cases.filter(item => matchesKpi(item, "overdue", role)).length,
   );
   const needsAction = cases.filter(item => matchesKpi(item, "action", role)).length;
-  // A consultant's new assignments are work items awaiting accept/decline — pending assignments are deliberately not
-  // cases yet, so they are counted from My work. Operations and finance read "pending" as their "needs action" already.
-  const unowned = role === "doctor"
-    ? tasks.filter(task => task.type === "CONSULTANT_ASSIGNMENT" && task.status !== "COMPLETED").length
-    : role === "coordinator" ? cases.filter(item => matchesKpi(item, "unowned", role)).length : 0;
+  // New assignments are work items awaiting accept/decline, and a pending assignment is deliberately not a case in the
+  // list yet, so they are counted from My work for every assigned role (Consultant, Finance, Operations) — QA #18.
+  const unowned = role === "coordinator"
+    ? cases.filter(item => matchesKpi(item, "unowned", role)).length
+    : tasks.filter(task => task.type === "CONSULTANT_ASSIGNMENT" && task.status !== "COMPLETED").length;
 
   // Zero counts are left out — except the one that is filtering the list, so it can always be switched off again.
   const shown = (id: KpiFilter, count: number) => count > 0 || selected === id;
   const items: { id: KpiFilter; text: string; alert?: boolean }[] = [];
   if (shown("action", needsAction)) items.push({ id: "action", text: plural(work.locale, needsAction, work.plural.needAction) });
-  if (shown("unowned", unowned)) items.push({ id: "unowned", text: plural(work.locale, unowned, role === "doctor" ? work.plural.newAssignments : work.plural.unownedCases) });
+  if (shown("unowned", unowned)) items.push({ id: "unowned", text: plural(work.locale, unowned, role === "coordinator" ? work.plural.unownedCases : work.plural.newAssignments) });
   if (shown("overdue", overdue)) items.push({ id: "overdue", text: plural(work.locale, overdue, work.plural.overdueCases), alert: overdue > 0 });
 
   // The counts arrive after the list and change as work moves; the live line says them once, politely, in words. It is
