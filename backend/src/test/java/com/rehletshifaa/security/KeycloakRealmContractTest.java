@@ -16,6 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class KeycloakRealmContractTest {
     private static final Path REALM_EXPORT = Path.of("..", "infrastructure", "keycloak", "realm-rehletshifaa.json");
+    /** The production realm import must carry the same step-up levels, or staff could never finish their second step (D1). */
+    private static final Path PRODUCTION_REALM = Path.of("..", "deploy", "oracle", "keycloak", "rehletshifaa-realm.json");
     private static final Set<String> IDENTITY_ADMIN_ROLES = Set.of("manage-users", "view-realm", "view-users", "query-users");
 
     @Test
@@ -41,15 +43,20 @@ class KeycloakRealmContractTest {
 
     @Test
     void realmExportProvidesOrderedPasswordOtpAndWebAuthnLevels() throws IOException {
-        JsonNode realm = new ObjectMapper().readTree(REALM_EXPORT.toFile());
+        assertStepUpLevels(new ObjectMapper().readTree(REALM_EXPORT.toFile()));
+        assertStepUpLevels(new ObjectMapper().readTree(PRODUCTION_REALM.toFile()));
+    }
+
+    private void assertStepUpLevels(JsonNode realm) {
 
         assertThat(realm.path("browserFlow").asText()).isEqualTo("rehletshifaa-browser-step-up");
         assertThat(realm.path("webAuthnPolicyUserVerificationRequirement").asText()).isEqualTo("required");
         assertThat(realm.path("webAuthnPolicyAvoidSameAuthenticatorRegister").asBoolean()).isTrue();
 
         assertLoa(realm, "rehletshifaa-loa-1", "1", "36000", "rehletshifaa-loa-1-flow", "auth-username-password-form");
-        assertLoa(realm, "rehletshifaa-loa-2", "2", "600", "rehletshifaa-loa-2-flow", "auth-otp-form");
-        assertLoa(realm, "rehletshifaa-loa-3", "3", "600", "rehletshifaa-loa-3-flow", "webauthn-authenticator");
+        // D1: the second step lasts the sign-in session; a sensitive action still forces a fresh sign-in (prompt=login, max_age=0).
+        assertLoa(realm, "rehletshifaa-loa-2", "2", "36000", "rehletshifaa-loa-2-flow", "auth-otp-form");
+        assertLoa(realm, "rehletshifaa-loa-3", "3", "36000", "rehletshifaa-loa-3-flow", "webauthn-authenticator");
 
         JsonNode ordered = findBy(realm.path("authenticationFlows"), "alias", "rehletshifaa-browser-authentication")
                 .path("authenticationExecutions");

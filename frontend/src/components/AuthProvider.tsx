@@ -1,10 +1,13 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { User } from "oidc-client-ts";
 import { authManager, rememberSignInLocale } from "@/lib/auth-client";
 import { apiFetchAs } from "@/lib/api";
 import { reauthenticationAcr, type Me } from "@/lib/access";
+import { guardsSecondStep, lastSecondStepAttempt, rememberSecondStepAttempt, secondStepPlan } from "@/lib/second-step";
+import { SecondStepGate } from "@/components/SecondStepGate";
 
 /**
  * `user` is the identity session; `me` is what the platform says this person holds (`GET /api/v1/me`), read once per
@@ -53,7 +56,24 @@ export function AuthProvider({children}:{children:React.ReactNode}){
   const signIn=useCallback(async(reauthenticate=false,returnTo?:string)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";rememberSignInLocale(locale);return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,...(reauthenticate?{acr_values:reauthenticationAcr(meRef.current)}:{})},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[]);
   const signOut=useCallback(async()=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";await authManager().signoutRedirect({post_logout_redirect_uri:`${window.location.origin}/${locale}/portal`});},[]);
   const value=useMemo(()=>({user,me,roles:me?.roles??[],loading:loading||meLoading,meFailed,activationIssue,refreshMe,signIn,signOut}),[user,me,loading,meLoading,meFailed,activationIssue,refreshMe,signIn,signOut]);
-  return <Context.Provider value={value}>{children}</Context.Provider>;
+  // D1: a staff session without its second factor finishes the sign-in (Keycloak asks only for the second step) before any
+  // staff page renders; coming back without it shows the explanation instead of redirecting again.
+  const pathname=usePathname()??"";
+  const secondStepAcr=me?.secondFactorRequired&&me.signInAcr&&guardsSecondStep(pathname)?me.signInAcr:null;
+  const[secondStepGate,setSecondStepGate]=useState(false);
+  const completeSecondStep=useCallback((acr:"2"|"3")=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";rememberSecondStepAttempt();
+    void authManager().signinRedirect({state:{returnTo:`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,acr_values:acr}});},[]);
+  useEffect(()=>{
+    if(!secondStepAcr)return;
+    const plan=secondStepPlan(meRef.current,lastSecondStepAttempt());
+    if(plan==="redirect")completeSecondStep(secondStepAcr);
+    else if(plan==="gate")setSecondStepGate(true);
+  },[secondStepAcr,completeSecondStep]);
+  const locale=pathname.split("/")[1]==="ar"?"ar":"en";
+  return <Context.Provider value={value}>{secondStepAcr
+    ?(secondStepGate?<SecondStepGate locale={locale} acr={secondStepAcr} onContinue={completeSecondStep} onSignOut={()=>void signOut()}/>
+      :<p role="status" className="mx-auto max-w-xl px-4 py-16 text-sm text-ink-600">{locale==="ar"?"جارٍ إكمال تسجيل الدخول…":"Finishing your sign-in…"}</p>)
+    :children}</Context.Provider>;
 }
 /** POST /me/activation: null once activated, otherwise the platform's refusal (a network failure is a retryable refusal). */
 async function activate(token:string):Promise<ActivationIssue|null>{

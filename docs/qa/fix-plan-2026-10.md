@@ -142,6 +142,16 @@ Root cause: second factors enrolled ad hoc and asked only at submit time; the po
 | W-11 | Keycloak "already signed in as a different user" themed (EN + AR) with sign out and continue. |
 | #32 | Used setup link says "already used — sign in". |
 
+**Done (2026-10-14, `fix/a4b-commercial-settings`).** D1/MFA-1: `Authority` refuses staff work in a session without a second
+factor (`MFA_REQUIRED`, 401) — every workforce role, Consultants and practice managers; `/me` returns `signInAcr` ("2" app,
+"3" passkey for System Administrator, credentialing, Finance, Finance Manager and the platform owner) and
+`secondFactorRequired`; the app finishes the sign-in once (Keycloak asks only for the second step) and otherwise shows "Finish
+signing in". Privileged sensitive actions confirm with a passkey; the step-up window is 20 minutes. Keycloak: LoA 2/3 max-age =
+session (both realm files; `keycloak-sync` updates dev), production realm gains the step-up flows it lacked (contract test
+covers both files), passkey registration without `prompt()`, EN + AR wording for the second step, a used setup link and a
+signed-in different user. W-30, W-38, W-35 (list without fresh re-check: `Authority.requireToList`), G-5. Recovery codes and a
+themed sign-out button on Keycloak's "different user" page are not done.
+
 ### A3 — Work items and "waiting on" from one source (1 session)
 
 | ID | Fix |

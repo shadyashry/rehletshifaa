@@ -142,7 +142,7 @@ public class AccessHygieneService {
 
     @Transactional(readOnly = true)
     public List<MfaReset> mfaResets() {
-        authority.require(Permission.WORKFORCE_ADMINISTER);
+        authority.requireToList(Permission.WORKFORCE_ADMINISTER); // QA W-35: the approval asks for the re-check, the list does not
         return store.mfaResets();
     }
 

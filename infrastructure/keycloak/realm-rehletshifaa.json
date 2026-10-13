@@ -54,14 +54,14 @@
       "alias": "rehletshifaa-loa-2",
       "config": {
         "loa-condition-level": "2",
-        "loa-max-age": "600"
+        "loa-max-age": "36000"
       }
     },
     {
       "alias": "rehletshifaa-loa-3",
       "config": {
         "loa-condition-level": "3",
-        "loa-max-age": "600"
+        "loa-max-age": "36000"
       }
     }
   ],

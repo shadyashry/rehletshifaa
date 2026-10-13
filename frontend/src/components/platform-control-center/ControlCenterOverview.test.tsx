@@ -62,6 +62,16 @@ describe("Control Center Home answers 'What needs my attention?'", () => {
     expect(vi.mocked(apiFetchAs)).not.toHaveBeenCalled();
   });
 
+  it("asks to confirm, not to try again, when a list needs a fresh re-check (QA W-35)", async () => {
+    auth.me = meWith(["PATIENT_IDENTITY_REVIEW", "PATIENT_IDENTITY_READ"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/identity-review/queue": failure(401, "REAUTHENTICATION_REQUIRED") }));
+    render(<ControlCenterOverview locale="en" />);
+    expect(await screen.findByRole("status", { name: "" })).toHaveTextContent("Confirm it's you to see: Identity checks waiting for a decision.");
+    expect(screen.getByRole("button", { name: "Confirm it's you" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("reports a count it could not read as not checked — not as zero and not as no access", async () => {
     auth.me = meWith(["PATIENT_IDENTITY_REVIEW", "PATIENT_IDENTITY_READ"]);
     vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "/identity-review/queue": failure(500, "REQUEST_FAILED") }));

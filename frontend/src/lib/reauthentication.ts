@@ -24,6 +24,10 @@ export const reauthenticationCopy = {
     howTo: "Sign in again, then repeat the change. Copy anything you typed first — signing in reloads this page.",
     action: "Sign in again",
     returned: "You signed in again. The change you were making was not saved — please make it again.",
+    abandoned: "The security check was not completed. Nothing was changed.",
+    requiredRead: "To see this, confirm it's you with your second step. Nothing was changed.",
+    requiredReadList: "Confirm it's you to see:",
+    actionRead: "Confirm it's you",
     returnedPending: "You signed in again. Your change has not been sent yet.",
     resend: "Send it now",
     discard: "Discard",
@@ -34,6 +38,10 @@ export const reauthenticationCopy = {
     howTo: "سجّل الدخول مجددًا ثم كرّر التغيير. انسخ ما كتبته أولًا — تسجيل الدخول يعيد تحميل هذه الصفحة.",
     action: "تسجيل الدخول مجددًا",
     returned: "سجّلت الدخول مجددًا. لم يُحفظ التغيير الذي كنت تجريه — يرجى إجراؤه مرة أخرى.",
+    abandoned: "لم يكتمل التحقق الأمني. لم يتغيّر شيء.",
+    requiredRead: "لعرض هذا، أكّد هويتك بخطوتك الثانية. لم يتغيّر شيء.",
+    requiredReadList: "أكّد هويتك لعرض:",
+    actionRead: "أكّد هويتك",
     returnedPending: "سجّلت الدخول مجددًا. لم يُرسَل تغييرك بعد.",
     resend: "أرسله الآن",
     discard: "تجاهل",
@@ -64,11 +72,20 @@ export function takePendingChange(now = Date.now()): PendingChange | null {
 }
 
 /** True once after returning from a re-authentication this tab started; clears the marker. */
-export function takeReauthenticationReturn(now = Date.now()): boolean {
+/**
+ * Back from the re-check: "completed" when the identity provider signed the person in again after the request, "abandoned"
+ * when they came back without signing in (QA W-30: then nothing may claim they did), null when there is nothing to report.
+ */
+export type ReauthenticationReturn = "completed" | "abandoned" | null;
+
+export function takeReauthenticationReturn(authTimeSeconds?: number, now = Date.now()): ReauthenticationReturn {
   try {
     const value = sessionStorage.getItem(KEY);
-    if (!value) return false;
+    if (!value) return null;
     sessionStorage.removeItem(KEY);
-    return now - Number(value) < MARKER_TTL_MS;
-  } catch { return false; }
+    const requestedAt = Number(value);
+    if (!(now - requestedAt < MARKER_TTL_MS)) return null;
+    // A sign-in older than the request (a few seconds of clock skew allowed) is the session from before: no re-check happened.
+    return typeof authTimeSeconds === "number" && authTimeSeconds * 1000 < requestedAt - 5_000 ? "abandoned" : "completed";
+  } catch { return null; }
 }

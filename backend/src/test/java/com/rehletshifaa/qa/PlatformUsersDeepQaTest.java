@@ -453,16 +453,18 @@ class PlatformUsersDeepQaTest {
         Instant now = clock.instant();
         assertThat(authority.decide(new Principal(ADMIN_A, now, "2"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code())
                 .as("administrators need a passkey (LoA 3)").isEqualTo("REAUTHENTICATION_REQUIRED");
-        assertThat(authority.decide(new Principal(ADMIN_A, now, "1"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code()).isEqualTo("REAUTHENTICATION_REQUIRED");
-        assertThat(authority.decide(new Principal(ADMIN_A, now.minusSeconds(601), "3"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code()).isEqualTo("REAUTHENTICATION_REQUIRED");
+        assertThat(authority.decide(new Principal(ADMIN_A, now, "1"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code()).isEqualTo("MFA_REQUIRED");
+        assertThat(authority.decide(new Principal(ADMIN_A, now.minusSeconds(1201), "3"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code()).isEqualTo("REAUTHENTICATION_REQUIRED");
         assertThat(authority.decide(new Principal(ADMIN_A, now.plusSeconds(120), "3"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code())
                 .as("a future auth_time is not trusted").isEqualTo("REAUTHENTICATION_REQUIRED");
         assertThat(authority.decide(new Principal(ADMIN_A, null, "3"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code()).isEqualTo("REAUTHENTICATION_REQUIRED");
         assertThat(authority.decide(new Principal(ADMIN_A, now, "3"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).granted()).isTrue();
-        assertThat(authority.decide(new Principal(ADMIN_A, now.minusSeconds(3600), "1"), Permission.WORKFORCE_READ, Resource.platform()).granted())
+        assertThat(authority.decide(new Principal(ADMIN_A, now.minusSeconds(3600), "2"), Permission.WORKFORCE_READ, Resource.platform()).granted())
                 .as("non-step-up reads need no fresh MFA").isTrue();
+        assertThat(authority.decide(new Principal(ADMIN_A, now.minusSeconds(3600), "1"), Permission.WORKFORCE_READ, Resource.platform()).code())
+                .as("D1: but staff never work in a password-only session").isEqualTo("MFA_REQUIRED");
 
-        assertThat(authority.decide(new Principal("qa-ccm4", now, "1"), Permission.ROUTING_CONFIGURE, Resource.platform()).code()).isEqualTo("REAUTHENTICATION_REQUIRED");
+        assertThat(authority.decide(new Principal("qa-ccm4", now, "1"), Permission.ROUTING_CONFIGURE, Resource.platform()).code()).isEqualTo("MFA_REQUIRED");
         assertThat(authority.decide(new Principal("qa-ccm4", now, "2"), Permission.ROUTING_CONFIGURE, Resource.platform()).granted()).isTrue();
         assertThat(authority.decide(new Principal("qa-ccm4", now, "3"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code())
                 .as("a step-up never compensates for a missing role").isEqualTo("PERMISSION_NOT_HELD");

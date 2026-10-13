@@ -23,6 +23,11 @@ public class AuthenticationStrength {
         this.phishingResistantAcrValues = values(phishingResistantAcrValues);
     }
 
+    /** The session was established with a second factor (any multi-factor level), however long ago. */
+    public boolean mfa(Principal principal) {
+        return mfaAcrValues.contains(normalize(principal.acr()));
+    }
+
     public boolean recentMfa(Principal principal, Duration window, Instant now) {
         return principal.authenticatedWithin(window, now) && mfaAcrValues.contains(normalize(principal.acr()));
     }

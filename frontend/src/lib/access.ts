@@ -27,6 +27,10 @@ export type Me = {
   platformAccountOwner: boolean;
   workforce: WorkforceFacts | null;
   pendingActions: string[];
+  /** D1: the second factor this account signs in with — "2" authenticator app, "3" passkey — or null (patients). */
+  signInAcr?: "2" | "3" | null;
+  /** D1: the session lacks that second factor; the app finishes the sign-in before showing staff work. */
+  secondFactorRequired?: boolean;
 };
 
 /** The care portal's case workspaces. The Control Center workspaces open the Control Center instead. */
@@ -58,7 +62,7 @@ export function hasRole(me: Me | null, role: string) {
 
 /** The Keycloak LoA requested for a sensitive action. Unknown access fails closed at the strongest level. */
 export function reauthenticationAcr(me: Me | null): "2" | "3" {
-  return !me || me.platformAccountOwner || me.roles.includes("SYSTEM_ADMINISTRATOR") ? "3" : "2";
+  return !me || me.platformAccountOwner || me.signInAcr === "3" || me.roles.includes("SYSTEM_ADMINISTRATOR") ? "3" : "2";
 }
 
 /** Whether the token proves at least the LoA the platform requires for this actor. */

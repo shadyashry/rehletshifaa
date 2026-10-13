@@ -48,7 +48,9 @@ public class EffectiveAccessService {
     public record PlatformRoleView(String role, Instant effectiveFrom, Instant effectiveTo, boolean effectiveNow) {}
     public record MeView(String subject, Instant evaluatedAt, Set<Role> roles, Set<Permission> permissions, Set<Permission> reauthenticate, Set<Workspace> workspaces,
                          List<String> managedFunctions, boolean platformAccountOwner, List<PlatformRoleView> platformRoles,
-                         PersonFacts workforce, List<String> pendingActions) {}
+                         PersonFacts workforce, List<String> pendingActions,
+                         /** D1: "2", "3" or null — the second factor this account signs in with. */ String signInAcr,
+                         /** D1: the session lacks the second factor its roles require; the app finishes the sign-in first. */ boolean secondFactorRequired) {}
 
     @Transactional
     public MeView me() {
@@ -75,8 +77,9 @@ public class EffectiveAccessService {
         boolean pendingAdoption = identityReviews.awaitsAdoptionBy(principal.subject(), com.rehletshifaa.shared.persistence.SqlValues.micros(now));
         if (pendingAdoption) pending.add("ACCEPT_WORKFORCE_ADOPTION");
         if (person != null && "INVITED".equals(person.lifecycleStatus())) pending.add("ACTIVATE_ACCOUNT");
+        var strength = authority.signInStrength(principal, held.roles(), owner);
         return new MeView(principal.subject(), now, held.roles(), held.platformPermissions(),
                 held.platformPermissions().stream().filter(Permission::stepUp).collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new)), workspaces, held.managedFunctions(),
-                owner, platformRoles, person, List.copyOf(pending));
+                owner, platformRoles, person, List.copyOf(pending), strength.acr(), !strength.satisfied());
     }
 }

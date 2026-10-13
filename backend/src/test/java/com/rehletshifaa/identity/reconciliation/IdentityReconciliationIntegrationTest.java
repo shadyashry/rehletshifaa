@@ -57,7 +57,7 @@ class IdentityReconciliationIntegrationTest {
         assertThat(run.trigger()).isEqualTo("POST_RESTORE");
         assertThat(run.status()).isEqualTo("DISCREPANCIES");
         // IAM-08: the admin whose MFA evidence was just removed no longer has authority; an auditor reviews the run.
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(Jwt.withTokenValue("t").header("alg","none").subject("reconciliation-auditor").claim("auth_time",clock.instant()).build(),List.of()));
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(Jwt.withTokenValue("t").header("alg","none").subject("reconciliation-auditor").claim("acr","2").claim("auth_time",clock.instant()).build(),List.of()));
         assertThat(reconciliation.discrepancies(run.id())).extracting(IdentityReconciliationStore.Discrepancy::type)
                 .contains("MFA_NOT_ENROLLED","PHISHING_RESISTANT_MFA_NOT_ENROLLED","ZERO_EFFECTIVE_SYSTEM_ADMINISTRATORS");
         assertThat(jdbc.queryForObject("SELECT mfa_enrolled FROM workforce_people WHERE subject=?",Boolean.class,healthy)).isTrue();

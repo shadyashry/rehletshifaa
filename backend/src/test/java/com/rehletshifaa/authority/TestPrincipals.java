@@ -27,6 +27,11 @@ public final class TestPrincipals {
         signIn(subject, authenticatedAt, "2");
     }
 
+    /** MFA-1: the level a role signs in with — a passkey (3) for privileged roles, the authenticator app (2) otherwise. */
+    public static String acrFor(Role... roles) {
+        return java.util.Arrays.stream(roles).anyMatch(Role::privileged) ? "3" : "2";
+    }
+
     public static void signIn(String subject, Instant authenticatedAt, String acr) {
         var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject)
                 .claim("auth_time", authenticatedAt).claim("acr", acr).build();
@@ -36,7 +41,8 @@ public final class TestPrincipals {
     /** Records the facts for {@code roles} (idempotently) and signs in as {@code subject}. */
     public static void signIn(JdbcTemplate jdbc, CryptoService crypto, String subject, Role... roles) {
         for (Role role : roles) grant(jdbc, crypto, subject, role);
-        signIn(subject, Instant.now(), java.util.Arrays.asList(roles).contains(Role.SYSTEM_ADMINISTRATOR) ? "3" : "2");
+        // MFA-1: privileged roles sign in with a passkey (acr 3), everyone else with the authenticator app (acr 2).
+        signIn(subject, Instant.now(), java.util.Arrays.stream(roles).anyMatch(Role::privileged) ? "3" : "2");
     }
 
     public static void grant(JdbcTemplate jdbc, CryptoService crypto, String subject, Role role) {

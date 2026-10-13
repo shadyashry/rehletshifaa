@@ -35,7 +35,7 @@ export function friendlyError(error: unknown, locale: Locale, action: "load" | "
   const ar = locale === "ar";
   const e = error instanceof ControlCenterError ? error : null;
   const detail = e?.message && e.message !== e.code && !/^\d+$/.test(e.message) ? e.message : "";
-  if (isReauthenticationCode(e?.code)) return reauthenticationCopy[locale].required;
+  if (isReauthenticationCode(e?.code)) return action === "load" ? reauthenticationCopy[locale].requiredRead : reauthenticationCopy[locale].required;
   if (e?.status === 401) return ar ? "انتهت جلستك. سجّل الدخول مجددًا. لم يتغير شيء." : "Your session has ended. Sign in again. Nothing was changed.";
   if (e?.status === 403) return ar ? "ليس لديك صلاحية لهذا الإجراء، ولم يتغير شيء. تواصل مع مسؤول الوصول إذا كنت تحتاجها." : "You don't have permission to do this, so nothing was changed. Ask your access administrator if you need it.";
   if (e?.status === 404) return ar ? "لم يعد هذا العنصر موجودًا أو لا يمكنك رؤيته." : "This item no longer exists, or you can't see it.";
@@ -52,7 +52,7 @@ export function ErrorNotice({ error, locale, action = "save", onRetry }: { error
   const code = error instanceof ControlCenterError ? error.code : undefined;
   const raw = error instanceof Error ? error.message : String(error);
   if (isReauthenticationCode(code)) return (
-    <div role="alert" className="cc-notice cc-notice-info"><Info size={18} aria-hidden /><div><ReauthenticationPrompt locale={locale} /></div></div>
+    <div role="alert" className="cc-notice cc-notice-info"><Info size={18} aria-hidden /><div><ReauthenticationPrompt locale={locale} read={action === "load"} /></div></div>
   );
   return (
     <div role="alert" className="cc-notice cc-notice-error">

@@ -135,21 +135,49 @@ class AuthorityIntegrationTest {
                 .as("IAM-11: workforce identities hold no patient authority").isEqualTo("PERMISSION_NOT_HELD");
     }
 
+    /** D1 / MFA-1 (owner, 2026-10-14): who signs in with which second factor. */
+    @Test
+    void staffSignInWithASecondFactorAndPrivilegedRolesWithAPasskey() {
+        Principal password = new Principal("someone", clock.instant(), "1");
+        assertThat(authority.signInStrength(password, java.util.Set.of(Role.COORDINATOR), false)).isEqualTo(new Authority.SignInStrength("2", false));
+        assertThat(authority.signInStrength(password, java.util.Set.of(Role.CONSULTANT), false).acr()).as("Consultants read medical records").isEqualTo("2");
+        assertThat(authority.signInStrength(password, java.util.Set.of(Role.FINANCE), false).acr()).isEqualTo("3");
+        assertThat(authority.signInStrength(password, java.util.Set.of(Role.CREDENTIAL_VERIFIER), false).acr()).isEqualTo("3");
+        assertThat(authority.signInStrength(password, java.util.Set.of(), true).acr()).as("the platform owner").isEqualTo("3");
+        assertThat(authority.signInStrength(password, java.util.Set.of(Role.PATIENT), false)).isEqualTo(new Authority.SignInStrength(null, true));
+        assertThat(authority.signInStrength(new Principal("someone", clock.instant(), "2"), java.util.Set.of(Role.FINANCE), false).satisfied())
+                .as("the authenticator app is the privileged roles' backup sign-in").isTrue();
+    }
+
+    /** QA W-35: listing what a sensitive permission decides needs the role and a second-factor session, not a fresh re-check. */
+    @Test
+    void listingPendingDecisionsNeedsNoFreshRecheckButDecidingDoes() {
+        TestPrincipals.signIn("a-admin", clock.instant().minusSeconds(3600), "3");
+        assertThat(authority.allowedToList(Permission.WORKFORCE_ADMINISTER)).isTrue();
+        assertThat(authority.allowed(Permission.WORKFORCE_ADMINISTER, Resource.platform())).isFalse();
+        TestPrincipals.signIn("a-admin", clock.instant(), "1");
+        assertThat(authority.allowedToList(Permission.WORKFORCE_ADMINISTER)).as("never in a password-only session").isFalse();
+        TestPrincipals.signIn("a-stranger", clock.instant(), "2");
+        assertThat(catchThrowableOfType(ApiException.class, () -> authority.requireToList(Permission.WORKFORCE_ADMINISTER)).code())
+                .isEqualTo("PERMISSION_NOT_HELD");
+    }
+
     @Test
     void stepUpAndNextRequestRevocationApply() {
-        Principal stale = new Principal("a-admin", clock.instant().minusSeconds(3600), null);
+        Principal stale = new Principal("a-admin", clock.instant().minusSeconds(3600), "3");
         assertThat(authority.decide(stale, Permission.WORKFORCE_ADMINISTER, Resource.platform()).code()).isEqualTo("REAUTHENTICATION_REQUIRED");
-        assertThat(authority.decide(new Principal("a-admin", clock.instant(), "pwd"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).reason())
-                .contains("multi-factor");
+        // D1: a password-only session of a staff member reaches nothing that needs a role.
+        assertThat(authority.decide(new Principal("a-admin", clock.instant(), "pwd"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code())
+                .isEqualTo("MFA_REQUIRED");
         assertThat(authority.decide(new Principal("a-admin", clock.instant(), "2"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).reason())
-                .contains("WebAuthn passkey");
+                .contains("passkey");
         assertThat(authority.decide(new Principal("a-admin", clock.instant(), "3"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).granted()).isTrue();
         jdbc.update("INSERT INTO workforce_role_assignments(id,subject,role_key,effective_from,status,source,assigned_by,reason,created_at,revision) "
                         + "VALUES(?,'a-admin','JOURNEY_APPROVER',?,'ACTIVE','GRANT','test','Mixed-role check',?,0)",
                 UUID.randomUUID(), clock.instant().minusSeconds(60), clock.instant());
         assertThat(authority.decide(new Principal("a-admin", clock.instant(), "2"), Permission.JOURNEY_APPROVE, Resource.platform()).reason())
                 .as("an administrator cannot bypass passkey strength through another granting role")
-                .contains("WebAuthn passkey");
+                .contains("passkey");
         jdbc.update("UPDATE workforce_role_assignments SET status='REVOKED' WHERE subject='a-owner'");
         assertThat(decide("a-owner", Permission.CASE_COORDINATE, Resource.ofCase(caseId)).code()).isEqualTo("PERMISSION_NOT_HELD");
     }

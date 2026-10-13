@@ -64,17 +64,21 @@ abandoned sign-in is still in that browser: open the link in a private (Incognit
 and skips everything that exists (passwords, authenticators and passkeys set during testing survive). Check it with
 `docker logs rehletshifaa-keycloak-sync-1` (it prints the added/skipped counts) — QA W-51.
 
-**Second factor per account (MFA-1, W-29).** A normal sign-in is password only; every sensitive action (record a payment,
-an identity decision, an invitation, approvals) asks for a fresh sign-in with the second factor ("Sign in again").
+**Second factor per account (D1 / MFA-1, owner 2026-10-14).** Every staff sign-in now includes the second step — the
+app asks for it right after the password, and nothing staff-side opens without it. A sensitive action (record a payment,
+an identity decision, an invitation, approvals) still asks for a fresh sign-in after 20 minutes ("Sign in again").
+Privileged roles (System Administrator, credentialing, Finance, Finance Manager) use a **passkey**; their authenticator
+app is the backup sign-in, but their sensitive actions always confirm with the passkey. Keycloak sets up whatever is
+missing at that sign-in (never mid-task).
 
 | Account | Second factor | Where the secret lives | Reset route |
 |---|---|---|---|
-| `finance`, `doctor`, `coordinator`, `operations`, invited staff, `doctor-orthopedics` | Authenticator app (TOTP codes), enrolled at first step-up / first sign-in | Owner's authenticator app + password manager | Control Center › People › MFA reset (approved by a second administrator), or Keycloak admin console › Users › Credentials (dev only) |
-| `credential-admin` (System Administrator) | **Passkey** (WebAuthn) — administrator changes require phishing-resistant MFA | Owner's device (Windows Hello / security key) | Keycloak admin console › Users › Credentials (dev only) |
-| `patient` and activated patients | Authenticator app if asked; patients act mostly through secure links + one-time codes | Owner's app | Account settings, or Keycloak admin console (dev only) |
+| `doctor`, `coordinator`, `operations`, invited non-privileged staff, `doctor-orthopedics` | Authenticator app (TOTP codes), set up at first sign-in | Owner's authenticator app + password manager | Control Center › People › MFA reset (approved by a second administrator), or Keycloak admin console › Users › Credentials (dev only) |
+| `finance`, `finance-manager`, `credential-admin` (System Administrator), `credentialing-manager` | **Passkey** (WebAuthn) at sign-in — after this change `finance` registers one at its next sign-in; authenticator app kept as backup | Owner's device (Windows Hello / security key) | Keycloak admin console › Users › Credentials (dev only) |
+| `patient` and activated patients | None at sign-in; patients act mostly through secure links + one-time codes | Owner's app | Account settings, or Keycloak admin console (dev only) |
 
-Passkey registration fails in browsers that block `window.prompt()` (W-40) — including the Claude desktop built-in
-browser: register and use the administrator passkey in Chrome.
+Passkey registration no longer opens a browser pop-up for the passkey's name (W-40: the theme names it "RehletShifaa
+passkey"), so it works in browsers that block `window.prompt()`; a device with Windows Hello or a phone is still needed.
 
 **Accounts created during testing** (patients who activate, invited provider clinicians / practice managers) set their own
 password through the Keycloak email link in Mailpit. Their passwords are never stored in the repo and cannot be looked up.

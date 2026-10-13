@@ -52,7 +52,8 @@ public class PlatformAccessGovernanceService {
     /** Who administers the platform now (and is scheduled to), and the two-person change requests. Administrators and the owner (GOV-02). */
     @Transactional(readOnly = true)
     public Overview overview() {
-        if (!isCurrentOwner(Principal.current())) authority.require(Permission.ACCESS_GOVERN);
+        // QA W-35: reading the overview is not a governance action; deciding a change still asks for a fresh passkey sign-in.
+        if (!isCurrentOwner(Principal.current())) authority.requireToList(Permission.ACCESS_GOVERN);
         var administrators = repository.administratorAssignments(clock.instant());
         var requests = repository.recentRequests(50);
         java.util.Map<String, String> names = new java.util.TreeMap<>();

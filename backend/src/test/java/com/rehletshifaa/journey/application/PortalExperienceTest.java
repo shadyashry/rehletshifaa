@@ -92,8 +92,8 @@ class PortalExperienceTest {
         team("OPERATIONS","ops-lead-a","ops-staff-a");team("OPERATIONS","ops-lead-b","ops-staff-b");
         UUID opsCase=intake();
         jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",UUID.randomUUID(),opsCase,"ops-staff-a","OPERATIONS","PRIMARY","ACTIVE","Test","admin",Instant.now(),Instant.now());
-        assertThat(authority.decide(new com.rehletshifaa.authority.application.Principal("ops-lead-a",Instant.now(),null),com.rehletshifaa.authority.domain.Permission.CASE_READ,com.rehletshifaa.authority.application.Resource.ofCase(opsCase)).granted()).isTrue();
-        assertThat(authority.decide(new com.rehletshifaa.authority.application.Principal("ops-lead-b",Instant.now(),null),com.rehletshifaa.authority.domain.Permission.CASE_READ,com.rehletshifaa.authority.application.Resource.ofCase(opsCase)).granted()).isFalse();
+        assertThat(authority.decide(new com.rehletshifaa.authority.application.Principal("ops-lead-a",Instant.now(),"2"),com.rehletshifaa.authority.domain.Permission.CASE_READ,com.rehletshifaa.authority.application.Resource.ofCase(opsCase)).granted()).isTrue();
+        assertThat(authority.decide(new com.rehletshifaa.authority.application.Principal("ops-lead-b",Instant.now(),"2"),com.rehletshifaa.authority.domain.Permission.CASE_READ,com.rehletshifaa.authority.application.Resource.ofCase(opsCase)).granted()).isFalse();
         auth("ops-lead-a",Role.OPERATIONS,Role.OPERATIONS);
         assertThat(journey.assignedCases(com.rehletshifaa.authority.domain.Role.OPERATIONS)).extracting(c->c.id()).contains(opsCase);
         assertThat(journey.workspace(opsCase).caseSummary().id()).isEqualTo(opsCase);

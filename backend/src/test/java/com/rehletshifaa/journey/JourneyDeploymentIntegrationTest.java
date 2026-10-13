@@ -70,7 +70,7 @@ class JourneyDeploymentIntegrationTest {
             assertThat(runtime.complete(original.reference(),"review",Map.of()).completed()).isTrue();
             String path="/api/v1/admin/journeys/"+published.definitionId()+"/versions/"+published.id()+"/runtime";
             mvc.perform(get(path).with(jwt().jwt(j->j.subject("unassigned")))).andExpect(status().isForbidden());
-            mvc.perform(get(path).with(jwt().jwt(j->j.subject("maker")))).andExpect(status().isOk())
+            mvc.perform(get(path).with(jwt().jwt(j->j.subject("maker").claim("acr","2")))).andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("DEPLOYED"))
                     .andExpect(jsonPath("$.engine").doesNotExist());
             f.signIn("maker");

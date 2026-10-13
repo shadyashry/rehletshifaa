@@ -352,7 +352,8 @@ public class StaffLifecycleService {
     public List<StaffingRequest> staffingRequests() {
         Instant now = clock.instant();
         String actor = com.rehletshifaa.authority.application.Principal.current().subject();
-        if (authority.allowed(Permission.WORKFORCE_ADMINISTER, com.rehletshifaa.authority.application.Resource.platform())) return store.staffingRequests(null);
+        // QA W-35: reading the list is not the decision; it needs the role, not a fresh re-check.
+        if (authority.allowedToList(Permission.WORKFORCE_ADMINISTER)) return store.staffingRequests(null);
         List<String> managed = authority.held(com.rehletshifaa.authority.application.Principal.current()).managedFunctions();
         if (managed.isEmpty()) throw new ApiException(403, "ACCESS_DENIED", "The account is not authorized for this operation");
         return store.staffingRequests(managed);

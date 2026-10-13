@@ -541,5 +541,5 @@ class PatientConversionLayerTest {
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
     private void authenticate(String subject, Role role) { authenticate(subject, role, Instant.now()); }
     private void authenticateStale(String subject, Role role) { authenticate(subject, role, Instant.now().minusSeconds(3600)); }
-    private void authenticate(String subject, Role role, Instant authTime) { com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, subject, role); com.rehletshifaa.authority.TestPrincipals.signIn(subject, authTime); }
+    private void authenticate(String subject, Role role, Instant authTime) { com.rehletshifaa.authority.TestPrincipals.grant(jdbc, crypto, subject, role); com.rehletshifaa.authority.TestPrincipals.signIn(subject, authTime, com.rehletshifaa.authority.TestPrincipals.acrFor(role)); }
 }

@@ -91,7 +91,7 @@ class JourneyServiceIntegrationTest {
         // Direct POST cannot bypass the same current business preconditions that kept the action absent.
         assertThat(journey.workspace(created.caseId()).actions().availableActions()).doesNotContain("APPROVE_COMMERCIAL_TERMS");
         mvc.perform(post("/api/v1/finance/cases/{caseId}/proposals/{versionId}/approve", created.caseId(), proposalVersionId)
-                        .with(jwt().jwt(token -> token.subject("finance-subject").claim("auth_time", Instant.now().getEpochSecond()).claim("acr", "2"))
+                        .with(jwt().jwt(token -> token.subject("finance-subject").claim("auth_time", Instant.now().getEpochSecond()).claim("acr", "3"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_FINANCE"))))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("OPERATIONS_REQUIRED_FIRST"));
         authenticate("operations-subject",Role.OPERATIONS);proposal=journey.completeOperations(created.caseId(),proposal.versionId(),"Operational plan confirmed");assertThat(proposal.status()).isEqualTo("OPERATIONS_COMPLETED");
@@ -99,7 +99,7 @@ class JourneyServiceIntegrationTest {
         UUID approvedVersionId=proposal.versionId();proposal=journey.approveFinance(created.caseId(),approvedVersionId);assertThat(proposal.status()).isEqualTo("FINANCE_APPROVED");
         // A once-valid action is stale after the transition; the endpoint revalidates and rejects it.
         mvc.perform(post("/api/v1/finance/cases/{caseId}/proposals/{versionId}/approve", created.caseId(), approvedVersionId)
-                        .with(jwt().jwt(token -> token.subject("finance-subject").claim("auth_time", Instant.now().getEpochSecond()).claim("acr", "2"))
+                        .with(jwt().jwt(token -> token.subject("finance-subject").claim("auth_time", Instant.now().getEpochSecond()).claim("acr", "3"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_FINANCE"))))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CASE_STATE_CONFLICT"));
         authenticate("coordinator-subject",Role.COORDINATOR);proposal=journey.releaseProposal(created.caseId(),proposal.versionId());assertThat(proposal.status()).isEqualTo("RELEASED");

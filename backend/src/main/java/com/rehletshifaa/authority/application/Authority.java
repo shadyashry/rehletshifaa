@@ -28,7 +28,8 @@ import java.util.TreeSet;
  */
 @Service
 public class Authority {
-    private static final Duration STEP_UP = Duration.ofMinutes(10);
+    /** MFA-1: a sensitive action re-confirms after this long (owner-agreed 15–30 minutes). */
+    private static final Duration STEP_UP = Duration.ofMinutes(20);
     private final EffectiveRoleStore roles;
     private final CaseRelationships cases;
     private final ConversationRelationships conversations;
@@ -49,7 +50,23 @@ public class Authority {
     }
 
     /** {@code granted=false} carries the refusal code and the reason; {@code role}/{@code scope} name the grant used. */
+    /** Refusals answered by signing in (again), not by different access: 401 rather than 403. */
+    private static final Set<String> SIGN_IN_AGAIN = Set.of("REAUTHENTICATION_REQUIRED", "MFA_REQUIRED");
+
     public record Decision(boolean granted, Permission permission, Role role, Scope scope, String code, String reason) {}
+
+    /**
+     * D1: the sign-in a session needs — {@code acr} "2" (authenticator app), "3" (passkey: privileged roles and the platform
+     * owner) or null (no second factor required) — and whether the current token already proves a second factor.
+     */
+    public record SignInStrength(String acr, boolean satisfied) {}
+
+    public SignInStrength signInStrength(Principal principal, Set<Role> effective, boolean platformOwner) {
+        boolean required = platformOwner || effective.stream().anyMatch(Role::secondFactorAtSignIn);
+        if (!required) return new SignInStrength(null, true);
+        String acr = platformOwner || effective.stream().anyMatch(Role::privileged) ? "3" : "2";
+        return new SignInStrength(acr, authenticationStrength.mfa(principal));
+    }
 
     public record Held(Principal principal, Set<Role> roles, Set<Permission> platformPermissions, Set<Workspace> workspaces,
                        List<String> managedFunctions) {}
@@ -59,7 +76,7 @@ public class Authority {
         Principal principal = Principal.current();
         Decision decision = decide(principal, permission, resource);
         if (!decision.granted())
-            throw new ApiException("REAUTHENTICATION_REQUIRED".equals(decision.code()) ? 401 : 403, decision.code(), decision.reason());
+            throw new ApiException(SIGN_IN_AGAIN.contains(decision.code()) ? 401 : 403, decision.code(), decision.reason());
         auditSupervisoryRead(principal, permission, resource, decision);
         return principal;
     }
@@ -71,7 +88,7 @@ public class Authority {
         Principal principal = Principal.current();
         Decision decision = decide(principal, permission, resource);
         if (!decision.granted())
-            throw new ApiException("REAUTHENTICATION_REQUIRED".equals(decision.code()) ? 401 : 403, decision.code(), decision.reason());
+            throw new ApiException(SIGN_IN_AGAIN.contains(decision.code()) ? 401 : 403, decision.code(), decision.reason());
         auditSupervisoryRead(principal, permission, resource, decision);
         return new Actor(principal.subject(), principal.authenticatedAt(), decision.role(), roles.roles(principal.subject(), clock.instant()));
     }
@@ -82,27 +99,51 @@ public class Authority {
         return decide(Principal.current(), permission, resource).granted();
     }
 
+    /**
+     * QA W-35: listing what a sensitive platform permission decides (pending requests, changes awaiting approval) needs the
+     * role and a second-factor session, but not a fresh re-check — the decision itself asks for one.
+     */
+    public Principal requireToList(Permission permission) {
+        Principal principal = Principal.current();
+        Decision decision = decide(principal, permission, Resource.platform(), false);
+        if (!decision.granted())
+            throw new ApiException(SIGN_IN_AGAIN.contains(decision.code()) ? 401 : 403, decision.code(), decision.reason());
+        return principal;
+    }
+
+    public boolean allowedToList(Permission permission) {
+        return decide(Principal.current(), permission, Resource.platform(), false).granted();
+    }
+
     public Decision decide(Principal principal, Permission permission, Resource resource) {
+        return decide(principal, permission, resource, true);
+    }
+
+    private Decision decide(Principal principal, Permission permission, Resource resource, boolean stepUp) {
         Instant now = clock.instant();
         Set<Role> effective = roles.roles(principal.subject(), now);
         List<Grant> candidates = RolePolicy.grantsFor(permission).stream().filter(g -> effective.contains(g.role())).toList();
         if (candidates.isEmpty())
             return new Decision(false, permission, null, null, "PERMISSION_NOT_HELD",
                     "Your roles do not include this action (" + permission + ")");
+        // D1: staff work only in a session signed in with a second factor; a password-only session reaches nothing but /me.
+        if (effective.stream().anyMatch(Role::secondFactorAtSignIn) && !authenticationStrength.mfa(principal))
+            return new Decision(false, permission, null, null, "MFA_REQUIRED",
+                    "Finish signing in with your second step (authenticator app or passkey)");
         Grant matched = candidates.stream().filter(g -> inScope(principal.subject(), g, resource)).findFirst().orElse(null);
         if (matched == null)
             return new Decision(false, permission, null, null, "OUT_OF_SCOPE",
                     "You are not related to this record in a way that allows this action (" + permission + ")");
-        if (permission.stepUp()) {
+        if (stepUp && permission.stepUp()) {
             if (!principal.authenticatedWithin(STEP_UP, now))
                 return new Decision(false, permission, matched.role(), matched.scope(), "REAUTHENTICATION_REQUIRED",
                         "Sign in again with multi-factor authentication to confirm this sensitive action");
             if (!authenticationStrength.recentMfa(principal, STEP_UP, now))
                 return new Decision(false, permission, matched.role(), matched.scope(), "REAUTHENTICATION_REQUIRED",
                         "Use multi-factor authentication to confirm this sensitive action");
-            if (effective.contains(Role.SYSTEM_ADMINISTRATOR) && !authenticationStrength.phishingResistant(principal))
+            if (effective.stream().anyMatch(Role::privileged) && !authenticationStrength.phishingResistant(principal))
                 return new Decision(false, permission, matched.role(), matched.scope(), "REAUTHENTICATION_REQUIRED",
-                        "Use a WebAuthn passkey to confirm this administrator action");
+                        "Use your passkey to confirm this sensitive action");
         }
         return new Decision(true, permission, matched.role(), matched.scope(), "GRANTED", "Granted by " + matched.role() + " (" + matched.scope() + ")");
     }

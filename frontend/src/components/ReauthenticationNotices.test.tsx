@@ -18,6 +18,12 @@ describe("PortalReauthenticationNotice", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("after an abandoned re-check claims no sign-in and offers nothing to send (QA W-30)", () => {
+    render(<PortalReauthenticationNotice locale="en" pending={change} abandoned busy={false} onResend={vi.fn()} onClose={vi.fn()} className=""/>);
+    expect(screen.getByRole("status").textContent).toContain("The security check was not completed. Nothing was changed.");
+    expect(screen.queryByRole("button", { name: "Send it now" })).toBeNull();
+  });
+
   it("without a kept change says to repeat it, in Arabic too", () => {
     render(<PortalReauthenticationNotice locale="ar" pending={null} busy={false} onResend={vi.fn()} onClose={vi.fn()} className=""/>);
     expect(screen.getByRole("status").textContent).toContain("يرجى إجراؤه مرة أخرى");

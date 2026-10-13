@@ -9,8 +9,15 @@ describe("Recent-authentication round trip", () => {
     const signIn = vi.fn(async () => undefined);
     await requestReauthentication(signIn);
     expect(signIn).toHaveBeenCalledWith(true);
-    expect(takeReauthenticationReturn()).toBe(true);
-    expect(takeReauthenticationReturn()).toBe(false);
+    expect(takeReauthenticationReturn()).toBe("completed");
+    expect(takeReauthenticationReturn()).toBeNull();
+  });
+
+  it("tells a completed re-check from an abandoned one by the sign-in time (QA W-30)", async () => {
+    await requestReauthentication(vi.fn(async () => undefined));
+    expect(takeReauthenticationReturn(Math.floor(Date.now() / 1000) - 3600)).toBe("abandoned");
+    await requestReauthentication(vi.fn(async () => undefined));
+    expect(takeReauthenticationReturn(Math.floor(Date.now() / 1000) + 1)).toBe("completed");
   });
 
   it("keeps the refused change for one re-send after the sign-in (QA #6 / W-6), never twice and never when stale", async () => {
@@ -29,7 +36,7 @@ describe("Recent-authentication round trip", () => {
 
   it("ignores an abandoned, stale marker", async () => {
     await requestReauthentication(vi.fn(async () => undefined));
-    expect(takeReauthenticationReturn(Date.now() + 31 * 60_000)).toBe(false);
+    expect(takeReauthenticationReturn(undefined, Date.now() + 31 * 60_000)).toBeNull();
   });
 
   it("treats a sign-in older than the backend window (or of unknown age) as stale", () => {

@@ -87,7 +87,7 @@ class ConsultantOperationsOwnershipIntegrationTest {
     @Test
     void ownerMustBeActiveConsultantOperationsStaffAndConsultantCannotDecideCapabilities() {
         grant("unrelated-staff", Role.OPERATIONS_MANAGER);
-        signIn("operations-owner-a", Role.CONSULTANT_OPERATIONS_MANAGER);
+        signIn("operations-owner-a", Role.CONSULTANT_OPERATIONS_MANAGER, Role.CREDENTIAL_VERIFIER);
         assertCode("CONSULTANT_OWNER_NOT_ELIGIBLE", () -> ownership.assign(consultant,
                 new ConsultantOperationsOwnershipService.Assign("unrelated-staff", "Wrong function")));
 

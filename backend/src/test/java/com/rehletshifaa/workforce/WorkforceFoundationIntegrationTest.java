@@ -83,15 +83,15 @@ class WorkforceFoundationIntegrationTest {
     void httpReadIsDecidedByTheDatabase() throws Exception {
         TestSecurityContextHolder.clearContext();
         SecurityContextHolder.clearContext();
-        mvc.perform(get("/api/v1/admin/workforce/catalogue").with(jwt().jwt(t -> t.subject(auditor).claim("auth_time", clock.instant()))))
+        mvc.perform(get("/api/v1/admin/workforce/catalogue").with(jwt().jwt(t -> t.subject(auditor).claim("auth_time", clock.instant()).claim("acr", "2"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.key == 'CARE_COORDINATION')]").exists());
-        mvc.perform(get("/api/v1/admin/workforce/catalogue").with(jwt().jwt(t -> t.subject(coordinator).claim("auth_time", clock.instant()))))
+        mvc.perform(get("/api/v1/admin/workforce/catalogue").with(jwt().jwt(t -> t.subject(coordinator).claim("auth_time", clock.instant()).claim("acr", "2"))))
                 .andExpect(status().isForbidden());
     }
 
     private void authenticate(String subject) {
-        var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", clock.instant()).build();
+        var token = Jwt.withTokenValue("test").header("alg", "none").subject(subject).claim("auth_time", clock.instant()).claim("acr", "2").build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(token, List.of()));
     }
 }

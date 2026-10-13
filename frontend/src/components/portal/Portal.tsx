@@ -181,7 +181,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
         if(request!==opening.current)return;setWorkspace(ws);setDocuments([]);
         const docs=await pending;if(request===opening.current){setDocuments(docs.rows);if(docs.failed&&!ws.paymentOnly)setDocumentError(true);}
       }
-      if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);window.history.replaceState({},"",url);if(!workspace)requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());}
+      if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);if(url.search!==window.location.search)window.history.pushState({},"",url);if(!workspace)requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());}
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}
     finally{if(!managedBusy)setBusyCount(n=>n-1);}
   }
@@ -216,15 +216,16 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     const item=cases.find(c=>c.id===id)??(patientView?cases[0]:undefined);if(item)queueMicrotask(()=>void openCase(item));});
   // The patient's three destinations are one page with a view switch, kept in the URL so a reload or a shared link lands in the same place.
   const [careView,setCareView]=useState<CareView>(()=>{if(typeof window==="undefined")return "care";const v=new URLSearchParams(window.location.search).get("view");return v==="documents"||v==="messages"?v:"care";});
-  const changeCareView=(view:CareView)=>{setCareView(view);const url=new URL(window.location.href);if(view==="care")url.searchParams.delete("view");else url.searchParams.set("view",view);window.history.replaceState({},"",url);requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());};
+  const changeCareView=(view:CareView,fromHistory=false)=>{setCareView(view);const url=new URL(window.location.href);if(view==="care")url.searchParams.delete("view");else url.searchParams.set("view",view);if(!fromHistory&&url.search!==window.location.search)window.history.pushState({},"",url);requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());};
   async function downloadDoc(id:string){setError("");try{const res=await api<{downloadUrl:string}>(`/documents/${id}/download`);if(res?.downloadUrl)window.open(res.downloadUrl,"_blank","noopener,noreferrer");}catch(e){setError(e instanceof Error?e.message:t.error);}}
   async function viewDoc(id:string){setError("");try{const res=await api<{downloadUrl:string}>(`/documents/${id}/view`);if(res?.downloadUrl)window.open(res.downloadUrl,"_blank","noopener,noreferrer");}catch(e){setError(e instanceof Error?e.message:t.error);}}
   async function sendProposal(caseId:string,body:unknown){setBusyCount(n=>n+1);setError("");setNotice("");try{await api(`/coordinator/cases/${caseId}/proposals`,{method:"POST",body:JSON.stringify(body)});setNotice(t.success);if(workspace)await openCase(workspace.caseSummary);}catch(e){setError(e instanceof Error?e.message:t.error);}finally{setBusyCount(n=>n-1);}}
   // Back from a re-check (QA #6 / W-6): the refused change, kept to send again with one click; cleared by any later success (#9).
-  const[reauthReturn,setReauthReturn]=useState<{pending:PendingChange|null}|null>(null);
+  const[reauthReturn,setReauthReturn]=useState<{pending:PendingChange|null;abandoned:boolean}|null>(null);
   // sessionStorage is only readable after mount.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(()=>{if(takeReauthenticationReturn())setReauthReturn({pending:takePendingChange()});},[]);
+  useEffect(()=>{const back=takeReauthenticationReturn(typeof user?.profile?.auth_time==="number"?user.profile.auth_time:undefined);const pending=takePendingChange();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if(back)setReauthReturn({pending:back==="completed"?pending:null,abandoned:back==="abandoned"});},[]); // eslint-disable-line react-hooks/exhaustive-deps
   async function mutate(path:string,body?:unknown,method="POST"):Promise<MutationResult|null|undefined>{
     // Another action is still running: nothing was sent, which is not a failure (null, not undefined).
     if(mutationPending.current)return null;mutationPending.current=true;setBusyCount(n=>n+1);setError("");setNotice("");
@@ -270,8 +271,14 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   // Back/Forward between views and cases: the URL says where to be; leaving a case with a draft still asks.
   const onHistory=useRef<()=>void>(()=>{});const skipGuard=useRef(false);
   useEffect(()=>{onHistory.current=()=>{
-    if(!currentRole||currentRole==="patient"||!staffViews)return;
     const params=new URLSearchParams(window.location.search);const caseId=params.get("case");const view=params.get("view");
+    // QA G-5: in My Care, Back returns to the previous case and view instead of leaving the portal.
+    if(currentRole==="patient"){
+      changeCareView(view==="documents"||view==="messages"?view:"care",true);
+      if(caseId&&workspace?.caseSummary.id!==caseId)void openCaseById(caseId);
+      return;
+    }
+    if(!currentRole||!staffViews)return;
     // An entry made under another working role belongs to that role's queue: this one leaves it alone.
     const role=params.get("role");if(role&&role!==currentRole)return;
     const apply=()=>{if(caseId){if(workspace?.caseSummary.id!==caseId)void openCaseById(caseId);return;}
@@ -311,7 +318,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
       roles={available.length>1?{label:work.nav.workingAs,current:currentRole,options:available.map(role=>({key:role,label:roleLabel(role,locale)})),onSelect:key=>switchRole(key as RoleKey)}:null}/>
     {/* A patient-side account that also manages a clinic keeps its one way in; staff reach it from the navigation. */}
     {isPatientRole&&clinicLink&&<p className="mb-6"><a className="btn-secondary" href={clinicLink.href}>{clinicLink.label}</a></p>}
-    {reauthReturn&&<PortalReauthenticationNotice locale={locale} pending={reauthReturn.pending} busy={busy} className="mb-4 rounded-lg bg-brand-50 p-4 text-brand-800"
+    {reauthReturn&&<PortalReauthenticationNotice locale={locale} pending={reauthReturn.pending} abandoned={reauthReturn.abandoned} busy={busy} className="mb-4 rounded-lg bg-brand-50 p-4 text-brand-800"
       onClose={()=>setReauthReturn(null)} onResend={change=>{void mutate(change.path,change.body===undefined?undefined:JSON.parse(change.body),change.method);}}/>}
     {!available.length&&<NoPortalWorkspace locale={locale}/>}
     {linkToken&&currentRole==="patient"&&<AccountLinkRequest locale={locale} token={linkToken} api={api} onResolved={()=>{setLinkToken(null);restored.current=false;void refresh();}}/>}

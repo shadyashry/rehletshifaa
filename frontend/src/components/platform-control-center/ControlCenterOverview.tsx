@@ -9,7 +9,8 @@ import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess, type ControlCenterAccess } from "./control-center-access";
 import { useAdminApi, type AdminApi } from "./admin-api";
 import { NAV_GROUPS, ccHref, openableSections, pick } from "./control-center-nav";
-import { EmptyState } from "./cc-ui";
+import { ControlCenterError, EmptyState } from "./cc-ui";
+import { isReauthenticationCode, reauthenticationCopy, requestReauthentication } from "@/lib/reauthentication";
 import { addConsultantHref } from "./consultant-model";
 
 /** Where the waiting work is and how much of it; `partial` says the count covers only part of the data. */
@@ -17,7 +18,8 @@ type Found = { count: number; href: string; partial?: boolean };
 /** One kind of waiting work, read from an endpoint the caller is already allowed to read. */
 type Source = { key: string; group: string; label: [string, string]; applies: (a: ControlCenterAccess) => boolean; find: (ctx: Ctx) => Promise<Found> };
 type Ctx = { api: AdminApi; locale: Locale };
-type Result = { source: Source; found?: Found; failed?: boolean };
+/** `failed`: "recheck" when the list needs a fresh confirmation (QA W-35: "Try again" cannot fix that), "error" otherwise. */
+type Result = { source: Source; found?: Found; failed?: "recheck" | "error" };
 
 /**
  * Every source of "needs attention" the Home page knows, in navigation order. Each is shown only to people who hold the
@@ -65,7 +67,7 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
     if (access.loading || !user) return;
     let live = true;
     const ctx: Ctx = { api, locale };
-    void Promise.all(sources.map((source) => source.find(ctx).then((found): Result => ({ source, found }), (): Result => ({ source, failed: true }))))
+    void Promise.all(sources.map((source) => source.find(ctx).then((found): Result => ({ source, found }), (e: unknown): Result => ({ source, failed: e instanceof ControlCenterError && isReauthenticationCode(e.code) ? "recheck" : "error" }))))
       .then((r) => { if (live) setRead({ key: resultsKey, results: r }); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,13 +93,19 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
   if (!results) return shell(checking);
 
   const waiting = results.filter((r) => r.found && r.found.count > 0);
-  const failed = results.filter((r) => r.failed);
+  const failed = results.filter((r) => r.failed === "error");
+  const recheck = results.filter((r) => r.failed === "recheck");
+  const reauth = reauthenticationCopy[locale];
   const Next = ar ? ChevronLeft : ChevronRight;
   const groupLabel = (key: string) => pick(NAV_GROUPS.find((g) => g.key === key)!.label, locale);
   const checked = results.filter((r) => r.found).map((r) => groupLabel(r.source.group)).filter((g, i, all) => all.indexOf(g) === i);
   return shell(
     <section aria-labelledby="attention-title" className="cc-section">
       <h2 id="attention-title" className="cc-sr">{ar ? "ما يحتاج إلى متابعتك" : "Needs your attention"}</h2>
+      {recheck.length > 0 && <div className="cc-notice cc-notice-info" role="status">
+        {reauth.requiredReadList} {recheck.map((r) => pick(r.source.label, locale)).join(ar ? "، " : ", ")}.{" "}
+        <button type="button" className="cc-link" onClick={() => void requestReauthentication(signIn)}>{reauth.actionRead}</button>
+      </div>}
       {failed.length > 0 && <div className="cc-notice cc-notice-error" role="alert">
         {ar ? "تعذّر التحقق من: " : "Some waiting work couldn't be checked: "}{failed.map((r) => pick(r.source.label, locale)).join(ar ? "، " : ", ")}.{" "}
         <button type="button" className="cc-link" onClick={() => setAttempt((n) => n + 1)}>{ar ? "إعادة المحاولة" : "Try again"}</button>

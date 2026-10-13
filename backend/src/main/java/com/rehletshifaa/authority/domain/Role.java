@@ -40,6 +40,18 @@ public enum Role {
     }
 
     public Kind kind() { return kind; }
+
+    /**
+     * D1 / MFA-1 (owner, 2026-10-14): whoever works on cases or the platform signs in with a second factor — every workforce
+     * role, Consultants and practice managers (they read medical records). Patients, representatives and bare account holders
+     * do not.
+     */
+    public boolean secondFactorAtSignIn() { return kind == Kind.WORKFORCE || this == CONSULTANT || this == PRACTICE_MANAGER; }
+
+    /** MFA-1: roles that hold money, credentials or the platform itself sign in and confirm with a phishing-resistant passkey. */
+    public boolean privileged() {
+        return this == SYSTEM_ADMINISTRATOR || this == CREDENTIAL_VERIFIER || this == CREDENTIALING_MANAGER || this == FINANCE || this == FINANCE_MANAGER;
+    }
     /** The workforce function the role belongs to (WF-03); null for population roles. */
     public String function() { return function; }
     /** The case-assignment role this role works under ({@code case_assignments.assignee_role}); null if none. */

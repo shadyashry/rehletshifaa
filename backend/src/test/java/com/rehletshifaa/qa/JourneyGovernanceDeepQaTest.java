@@ -155,7 +155,7 @@ class JourneyGovernanceDeepQaTest {
         signIn("qa-ja", "2");
         assertCode("PERMISSION_NOT_HELD", () -> journeys.edit(d, pending.id(), new Edit(pending.revision(), "Approver edits", careJourney())));
         signIn("qa-ja", "1");
-        assertCode("REAUTHENTICATION_REQUIRED", () -> journeys.publish(d, pending.id(), new Change(pending.revision(), "No MFA")));
+        assertCode("MFA_REQUIRED", () -> journeys.publish(d, pending.id(), new Change(pending.revision(), "No MFA")));
         signIn("qa-ja", "2");
         var published = journeys.publish(d, pending.id(), new Change(pending.revision(), "Independent approval"));
         assertThat(published.status()).isEqualTo(Status.PUBLISHED);
