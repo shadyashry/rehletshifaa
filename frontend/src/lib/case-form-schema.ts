@@ -13,12 +13,12 @@ export type Relationship = (typeof RELATIONSHIPS)[number];
  * Send my case: structured given/family names (never one "full name"); an explicit "who is this case for";
  * a representative's name + relationship when it is for someone else. Email stays optional here.
  */
-export function buildCaseSchema(messages: { name: string; familyName?: string; required: string; phone: string; consent: string; email?: string; representative?: string }) {
-  const name = (message: string) => z.string().trim().min(1, message).max(80, message).regex(NAME_PART, message);
+export function buildCaseSchema(messages: { name: string; familyName?: string; nameCharacters?: string; required: string; phone: string; consent: string; email?: string; representative?: string }) {
+  const name = (message: string) => z.string().trim().min(1, message).max(80, message).regex(NAME_PART, messages.nameCharacters ?? message);
   return z.object({
     caseFor: z.enum(["MYSELF", "SOMEONE_ELSE"]),
     givenName: name(messages.name),
-    familyName: z.string().trim().max(80).regex(/^$|^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u, messages.familyName ?? messages.name),
+    familyName: z.string().trim().max(80).regex(/^$|^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u, messages.nameCharacters ?? messages.familyName ?? messages.name),
     singleLegalName: z.boolean(),
     representativeName: z.string().trim().max(160),
     representativeRelationship: z.union([z.enum(RELATIONSHIPS), z.literal("")]),

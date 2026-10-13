@@ -567,6 +567,7 @@
       "required": "This field is required.",
       "name": "Please enter the given name(s).",
       "familyName": "Please enter the family name, or confirm a single legal name.",
+      "nameCharacters": "Use letters only: a name can't contain numbers or symbols.",
       "representative": "Please tell us who is submitting and their relationship to the patient.",
       "phone": "Please enter a valid WhatsApp number.",
       "email": "Please enter a valid email address.",

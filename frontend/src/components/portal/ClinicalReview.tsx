@@ -77,7 +77,10 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
   const currencies = [BASE, ...fxRates.filter(fx => fx.currency !== BASE).map(fx => fx.currency)];
 
   const picks = catalog.filter(service => selected.has(service.id));
-  const baseTotal = picks.reduce((sum, s) => sum + s.priceEgp, 0) + offList.reduce((sum, row) => sum + row.amountEgp, 0);
+  // QA #8: only catalogue lines are "approved"; anything off the list is shown apart, as awaiting Finance.
+  const catalogueTotal = picks.reduce((sum, s) => sum + s.priceEgp, 0);
+  const offListTotal = offList.reduce((sum, row) => sum + row.amountEgp, 0);
+  const baseTotal = catalogueTotal + offListTotal;
   const serviceCount = picks.length + offList.length;
   const readyDocuments = documents.filter(doc => doc.status === "CLEAN");
   const canSubmit = recommendation.trim().length > 0 && serviceCount > 0;
@@ -280,8 +283,20 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
           </div>
           <div>
             <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.baseEstimate}</dt>
-            <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(baseTotal, BASE, locale)}</dd>
+            <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(catalogueTotal, BASE, locale)}</dd>
           </div>
+          {offListTotal > 0 && (
+            <>
+              <div>
+                <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.offListEstimate}</dt>
+                <dd className="mt-0.5 text-[1rem] font-bold text-status-warning-fg">{money(offListTotal, BASE, locale)}</dd>
+              </div>
+              <div>
+                <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.estimateTotal}</dt>
+                <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(baseTotal, BASE, locale)}</dd>
+              </div>
+            </>
+          )}
           {converted && (
             <div>
               <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.proposalEstimate}</dt>
@@ -368,6 +383,7 @@ function copy(ar: boolean) {
     summary: "ملخص التوصية", notRecorded: "لم تُسجَّل بعد",
     servicesShort: "الخدمات", documentsReviewed: "المستندات المراجَعة",
     baseEstimate: "السعر المعتمد في قائمتك", proposalEstimate: "قيمة العرض",
+    offListEstimate: "خارج قائمتك — تحتاج موافقة المالية", estimateTotal: "إجمالي التقدير",
     approxNote: "تبقى أسعار قائمتك المعتمدة بالجنيه المصري؛ يُعدّ عرض المريض بالعملة المختارة أعلاه.",
     cataloguePrice: "سعر القائمة المعتمد",
     selectedCount: (n: number) => `${n} مختارة`,
@@ -417,6 +433,7 @@ function copy(ar: boolean) {
     summary: "Recommendation summary", notRecorded: "Not recorded yet",
     servicesShort: "Services", documentsReviewed: "Documents reviewed",
     baseEstimate: "Approved catalogue price", proposalEstimate: "Proposal value",
+    offListEstimate: "Outside your list — needs Finance approval", estimateTotal: "Estimate total",
     approxNote: "Your approved catalogue prices stay in EGP; the patient proposal is prepared in the currency selected above.",
     cataloguePrice: "Approved catalogue price",
     selectedCount: (n: number) => `${n} selected`,

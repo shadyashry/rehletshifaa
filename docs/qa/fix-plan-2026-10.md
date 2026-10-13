@@ -133,8 +133,8 @@ Root cause: second factors enrolled ad hoc and asked only at submit time; the po
 | D1 / MFA-1 | Second factor at sign-in for every workforce account; passkeys required for privileged roles (system admin, credentialing, Finance), authenticator app as backup; recovery codes; documented two-person "MFA reset request" recovery. |
 | #7 / W-39 | Enrol at first sign-in, one method policy per role — never mid-task. |
 | W-40 | Keycloak passkey registration without `prompt()` (label inline or not asked); EN + AR explanation. |
-| #6 (+W-6) | Ask for the re-check **before** the form starts (clinical review, Finance approval, recording a decision, recording a payment) or keep a draft and resubmit. High. |
-| #9 (+W-7, W-30) | Notice cleared on success; abandoned re-check worded as not completed. |
+| #6 (+W-6) | ~~Keep the refused change and resubmit after the re-check.~~ Done in the walk findings batch (one-click re-send). |
+| #9 (+W-7, W-30) | ~~Notice cleared on success~~ (done, walk findings batch); abandoned re-check worded as not completed. |
 | W-38 | Read-specific wording ("to see these, confirm with your authenticator"). |
 | W-35 | Control Center: don't request or show areas the account cannot use (menu included); re-authentication offered as an action, not "Try again". |
 | — | Recent-authentication window 15–30 min. |
@@ -168,7 +168,23 @@ Playwright staff-home/portal/a11y 37 passed. Live walk on dev (RS-2026-000005, 2
 stage, the release step notified and emailed); it found Finance's pending assignment missing from "At a glance", fixed in
 `52c8b47`. Also seen live, already planned: W-6 (re-check loses the recommendation and the Finance approval) and #9 (stale
 "not saved" notice after success) in A2; the Consultant's summary calls a total that includes a manual line "Approved
-catalogue price" (#19, A4).
+catalogue price" (#8, A4).
+
+### Walk findings batch — `fix/walk-findings-2026-10-14` (2026-10-14)
+
+Everything the live walks on 2026-10-13/14 caught that was not yet fixed, done before the next live test (owner):
+
+| ID | Fix |
+|---|---|
+| #6 / W-6 | The portal keeps the request the re-check refused (this tab, 10 minutes, read once) and, back from the sign-in, offers "Send it now" / "Discard" — nothing is filled in again. Chosen over asking for the re-check before the form, which would still lose a form whose window lapses while it is filled. The rest of A2 (D1/MFA-1 sign-in policy, enrolment, W-38 wording) is unchanged and still open. |
+| #9 | The return notice clears on any successful change. |
+| #8 | Consultant summary: "Approved catalogue price" is the catalogue lines only; an off-list amount shows apart ("Outside your list — needs Finance approval") with the estimate total. |
+| W-57 | Name with digits or symbols: its own message (EN + AR), not "please enter the family name". |
+| DEP-3 review | A deposit waiver is checked against case visibility, like a receipt (CASE_READ, else CASE_DEPOSIT_READ); the unused `deposit-required-coordinator` template is removed. |
+
+Gates: backend 726/0/2, vitest 58 files / 424, typecheck, lint 0 errors, Playwright staff-home/portal/a11y 37 passed.
+Open for the owner: whether a Finance waiver may settle a deposit with no patient reference; what to do with
+RS-2026-000003/000004 (routed before A3, no work items).
 
 ### A4 — Finance and commercial logic (1 session)
 
@@ -181,7 +197,7 @@ catalogue price" (#19, A4).
 | W-21 / W-22 | Deposit copy from the actual flow; readiness wording per deposit state; case touched on the action. |
 | #22 | Margin and deposit policy for all 9 care areas. |
 | #12 | One rounding rule for totals. |
-| #8 | "Approved catalogue price" excludes off-list items. |
+| #8 | ~~"Approved catalogue price" excludes off-list items.~~ Done in the walk findings batch. |
 | #20 | One "Approve commercial terms" action. |
 | W-1 | After the business rule: deposit cap or waiver. |
 

@@ -227,6 +227,9 @@ public class PaymentService {
     public DepositView waiveDeposit(UUID caseId, UUID depositId, String reason) {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
         if (reason == null || reason.isBlank()) throw new ApiException(400, "WAIVER_REASON_REQUIRED", "A reason is required to waive a deposit");
+        // Like a receipt: the waiver is only for a case this person may see, or whose open deposit they may read.
+        Resource onCase = Resource.ofCase(caseId);
+        if (!authority.allowed(Permission.CASE_READ, onCase)) authority.require(Permission.CASE_DEPOSIT_READ, onCase);
         cases.lockById(caseId);
         requireDeposit(caseId, depositId);
         // DEP-3: a transfer the patient reported is decided first (confirmed or returned), never left behind by a waiver.

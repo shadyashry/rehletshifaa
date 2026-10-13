@@ -351,6 +351,15 @@ class PatientConversionLayerTest {
         assertThat(payment.depositStatusFor(ctx.caseId)).isEqualTo("WAIVED");
     }
 
+    @Test void financeWaivesOnlyOnACaseItMaySee() throws Exception {
+        var ctx = onboardedCase();
+        UUID depositId = depositId(ctx.caseId);
+        authenticate("finance-subject", Role.FINANCE);
+        // A case Finance may not see is refused before anything about it is read, so its existence is not probeable.
+        assertThatThrownBy(() -> payment.waiveDeposit(UUID.randomUUID(), depositId, "unknown case"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("OUT_OF_SCOPE"));
+    }
+
     // ---------- Commitment gate ----------
 
     @Test void nonCancellableCommitmentRejectedWhenNotReady() throws Exception {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { requestReauthentication, takeReauthenticationReturn } from "./reauthentication";
+import { requestReauthentication, takePendingChange, takeReauthenticationReturn } from "./reauthentication";
 import { signInIsStale } from "@/components/platform-control-center/control-center-access";
 
 afterEach(() => { sessionStorage.clear(); });
@@ -11,6 +11,20 @@ describe("Recent-authentication round trip", () => {
     expect(signIn).toHaveBeenCalledWith(true);
     expect(takeReauthenticationReturn()).toBe(true);
     expect(takeReauthenticationReturn()).toBe(false);
+  });
+
+  it("keeps the refused change for one re-send after the sign-in (QA #6 / W-6), never twice and never when stale", async () => {
+    const change = { path: "/finance/cases/c1/proposals/v1/approve", method: "POST", body: undefined };
+    await requestReauthentication(vi.fn(async () => undefined), change);
+    expect(takePendingChange()).toEqual(change);
+    expect(takePendingChange()).toBeNull();
+    await requestReauthentication(vi.fn(async () => undefined), { path: "/doctor/cases/c1/review", method: "POST", body: "{\"a\":1}" });
+    expect(takePendingChange(Date.now() + 11 * 60_000)).toBeNull();
+    // A sign-in for a read keeps nothing; a stored value that is not an API path is never re-sent.
+    await requestReauthentication(vi.fn(async () => undefined));
+    expect(takePendingChange()).toBeNull();
+    sessionStorage.setItem("rs:reauthentication-pending-change", JSON.stringify({ path: "https://elsewhere.example", method: "POST", at: Date.now() }));
+    expect(takePendingChange()).toBeNull();
   });
 
   it("ignores an abandoned, stale marker", async () => {

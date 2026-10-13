@@ -18,6 +18,17 @@ describe("case form validation", () => {
     if (!result.success) expect(result.error.issues.map(i => i.path[0])).toEqual(expect.arrayContaining(["representativeName", "representativeRelationship"]));
     expect(schema.safeParse({ ...base, caseFor: "SOMEONE_ELSE", representativeName: "Omar", representativeRelationship: "PARENT" }).success).toBe(true);
   });
+  it("says a name with digits or symbols has the wrong characters, not that it is missing (walk finding)", () => {
+    const schema = buildCaseSchema({ ...messages, nameCharacters: "nameCharacters" });
+    const messageFor = (patch: Partial<typeof base>, field: string) => {
+      const result = schema.safeParse({ ...base, ...patch });
+      return result.success ? null : result.error.issues.find(i => i.path[0] === field)?.message;
+    };
+    expect(messageFor({ givenName: "Jane2" }, "givenName")).toBe("nameCharacters");
+    expect(messageFor({ familyName: "Doe#" }, "familyName")).toBe("nameCharacters");
+    expect(messageFor({ givenName: "" }, "givenName")).toBe("name");
+    expect(messageFor({ familyName: "" }, "familyName")).toBe("familyName");
+  });
   it("keeps email optional", () => expect(buildCaseSchema(messages).safeParse({ ...base, email: "" }).success).toBe(true));
   it("rejects unsupported and oversized files", () => { expect(filesAreValid([new File(["x"], "report.exe", { type: "application/octet-stream" })])).toBe(false); expect(filesAreValid([new File([new Uint8Array(maxFileBytes + 1)], "report.pdf", { type: "application/pdf" })])).toBe(false); });
 });

@@ -134,8 +134,9 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   function fieldError(key: FieldKey): string | undefined {
     if (errors[key]) return errors[key];
     if (!touched[key]) return undefined;
-    if (key === "givenName" && !valid.givenName) return d.form.errors.name;
-    if (key === "familyName" && !valid.familyName) return d.form.errors.familyName;
+    // A name that is there but has digits or symbols says what to fix, not that it is missing.
+    if (key === "givenName" && !valid.givenName) return values.givenName.trim() ? d.form.errors.nameCharacters : d.form.errors.name;
+    if (key === "familyName" && !valid.familyName) return values.familyName.trim() ? d.form.errors.nameCharacters : d.form.errors.familyName;
     if ((key === "representativeName" && !valid.representativeName) || (key === "representativeRelationship" && !valid.representativeRelationship)) return d.form.errors.representative;
     if (key === "country" && !valid.country) return t.selectCountryFirst;
     if (key === "whatsappNumber" && !valid.whatsappNumber) return dialCountry ? d.form.errors.phone : d.form.dialCodeChoose;

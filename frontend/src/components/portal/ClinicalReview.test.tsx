@@ -118,6 +118,11 @@ describe("ClinicalReviewPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add service" }));
 
     expect(screen.getByText("Requires Finance approval")).toBeTruthy();
+    // QA #8: the summary never calls an off-list amount "approved".
+    const summary = (label: string) => screen.getByText(label).nextElementSibling?.textContent;
+    expect(summary("Approved catalogue price")).toMatch(/^EGP\s?0/);
+    expect(summary("Outside your list — needs Finance approval")).toMatch(/50,000/);
+    expect(summary("Estimate total")).toMatch(/50,000/);
     fireEvent.click(screen.getByRole("button", { name: "Submit recommendation" }));
     expect(mutate).toHaveBeenCalledWith("/doctor/cases/case-1/review-decision", expect.objectContaining({
       costEstimates: [{ serviceDescription: "Bespoke lead extraction", estimatedCost: 50000, currency: "EGP" }],
