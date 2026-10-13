@@ -235,6 +235,9 @@ public class PaymentService {
         // DEP-3: a transfer the patient reported is decided first (confirmed or returned), never left behind by a waiver.
         if (!transfers.findPendingOn(depositId, Limit.of(1)).isEmpty())
             throw new ApiException(409, "TRANSFER_PENDING", "Decide the patient's transfer reference before waiving the deposit");
+        // Owner (2026-10-14): no waiver without evidence from the patient — only the rest of a deposit Finance has seen paid.
+        if (!transfers.existsByDepositIdAndStatus(depositId, "CONFIRMED"))
+            throw new ApiException(409, "PATIENT_REFERENCE_REQUIRED", "A deposit can be waived only after Finance has confirmed the patient's transfer reference");
         int changed = deposits.waive(depositId, actor.subject(), reason.trim(), micros(clock.instant()));
         if (changed != 1) throw new ApiException(409, "DEPOSIT_NOT_WAIVABLE", "This deposit cannot be waived");
         audit(actor, caseId, "DEPOSIT_WAIVED", depositId, reason.trim());

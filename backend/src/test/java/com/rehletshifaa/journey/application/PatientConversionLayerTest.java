@@ -346,6 +346,14 @@ class PatientConversionLayerTest {
         assertThatThrownBy(() -> payment.waiveDeposit(ctx.caseId, depositId, "reason")).isInstanceOf(ApiException.class).hasMessageContaining("Sign in again");
         authenticate("finance-subject", Role.FINANCE);
         assertThatThrownBy(() -> payment.waiveDeposit(ctx.caseId, depositId, "  ")).isInstanceOf(ApiException.class);
+        // Owner (2026-10-14): never without the patient's reference — a rejected one does not count, a confirmed one does.
+        assertThatThrownBy(() -> payment.waiveDeposit(ctx.caseId, depositId, "Hardship approved by senior finance"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("PATIENT_REFERENCE_REQUIRED"));
+        transferReport(ctx.caseId, depositId, "FT-WRONG-1", "REJECTED");
+        assertThatThrownBy(() -> payment.waiveDeposit(ctx.caseId, depositId, "Hardship approved by senior finance"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("PATIENT_REFERENCE_REQUIRED"));
+        assertThat(payment.depositSatisfied(ctx.caseId)).isFalse();
+        transferReport(ctx.caseId, depositId, "FT-PART-1", "CONFIRMED");
         payment.waiveDeposit(ctx.caseId, depositId, "Hardship approved by senior finance");
         assertThat(payment.depositSatisfied(ctx.caseId)).isTrue();
         assertThat(payment.depositStatusFor(ctx.caseId)).isEqualTo("WAIVED");
@@ -523,6 +531,10 @@ class PatientConversionLayerTest {
         accounts.session();
     }
     private Instant verifiedAt(UUID caseId, String column) { return jdbc.queryForObject("SELECT " + column + " FROM patient_profiles WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", Instant.class, caseId); }
+    private void transferReport(UUID caseId, UUID depositId, String reference, String status) {
+        raw("INSERT INTO deposit_transfer_reports(id,case_id,deposit_id,method,transfer_reference,status,submitted_by,submitted_at,decided_by,decided_at,version) VALUES(?,?,?,'BANK_TRANSFER',?,?,'TEST',?,'TEST',?,0)",
+                UUID.randomUUID(), caseId, depositId, reference, status, java.time.Instant.now(), java.time.Instant.now());
+    }
     private UUID depositId(UUID caseId) { return jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, caseId); }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }
     private int count(String sql, Object... args) { Integer n = jdbc.queryForObject(sql, Integer.class, args); return n == null ? 0 : n; }

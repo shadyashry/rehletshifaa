@@ -34,6 +34,9 @@ public interface DepositTransferReportRepository extends BaseRepository<DepositT
     @Query(ROW + "where r.depositId = :depositId and r.status = 'SUBMITTED' order by r.submittedAt desc")
     List<Row> findPendingOn(@Param("depositId") UUID depositId, Limit limit);
 
+    /** Finance has confirmed a reference of the patient's on this deposit (a waiver needs one: owner, 2026-10-14). */
+    boolean existsByDepositIdAndStatus(UUID depositId, String status);
+
     /** The reference is already waiting for, or recorded against, another deposit (a transfer pays one deposit only). */
     boolean existsByTransferReferenceAndStatusInAndDepositIdNot(String transferReference, java.util.Collection<String> statuses, UUID depositId);
 

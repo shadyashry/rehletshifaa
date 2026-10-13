@@ -183,8 +183,9 @@ Everything the live walks on 2026-10-13/14 caught that was not yet fixed, done b
 | DEP-3 review | A deposit waiver is checked against case visibility, like a receipt (CASE_READ, else CASE_DEPOSIT_READ); the unused `deposit-required-coordinator` template is removed. |
 
 Gates: backend 726/0/2, vitest 58 files / 424, typecheck, lint 0 errors, Playwright staff-home/portal/a11y 37 passed.
-Open for the owner: whether a Finance waiver may settle a deposit with no patient reference; what to do with
-RS-2026-000003/000004 (routed before A3, no work items).
+Owner decisions (2026-10-14): **no waiver without the patient's reference** — Finance waives only once it has confirmed
+a transfer reference of the patient's on that deposit (409 `PATIENT_REFERENCE_REQUIRED`; a rejected reference does not
+count); RS-2026-000003/000004 (routed before A3, no work items) removed from dev.
 
 ### A4 — Finance and commercial logic (1 session)
 
