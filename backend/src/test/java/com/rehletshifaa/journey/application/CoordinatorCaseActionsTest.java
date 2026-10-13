@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.*;
 class CoordinatorCaseActionsTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired PatientActivationService activation; @Autowired PaymentService payment; @Autowired CaseActionService caseActions;
-    @Autowired ReplyCoverService covers;
+    @Autowired ReplyCoverService covers; @Autowired StaffWorkQueryService staffWork;
     @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff; @Autowired StaffWorkService work;
     @Autowired PatientAccountService account; @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort;
     @org.junit.jupiter.api.BeforeEach void resetIdentity() { ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).reset(); }
@@ -214,6 +214,99 @@ class CoordinatorCaseActionsTest {
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_SETTLED'", "coordinator-subject")).isEqualTo(1);
         authenticate("coordinator-subject", Role.COORDINATOR);
         assertThat(journey.workspace(ctx.caseId).actions().availableActions()).contains("ASSIGN_OPERATIONS");
+    }
+
+    // ---------- Finance records the deposit (QA B3, W-24) ----------
+
+    @Test void aCatalogueOnlyCaseIsPaidEndToEndByAFinanceTeamThatWasNeverAssigned() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        // Priced from the catalogue only: Finance never approved anything and holds no assignment.
+        assertThat(count("SELECT count(*) FROM case_assignments WHERE case_id=? AND assignee_role='FINANCE'", ctx.caseId)).isZero();
+
+        // The coordinator marks "Payment instructions sent".
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        CurrentActionView arrange = journey.workspace(ctx.caseId).actions().currentAction();
+        assertThat(arrange.workType()).isEqualTo("DEPOSIT_ARRANGEMENT");
+        journey.completeTask(ctx.caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent on WhatsApp", arrange.workItemVersion())); em.flush();
+
+        // Another unowned Finance item (not the pooled type) stays out of every queue.
+        raw("INSERT INTO case_tasks(id,case_id,task_type,title,owner_subject,owner_role,visibility_scope,priority,status,blocking,created_by,created_at,updated_at,version) VALUES(?,?,'APPROVE_COMMERCIAL_TERMS',?,NULL,'FINANCE','INTERNAL','NORMAL','OPEN',FALSE,'SYSTEM',?,?,0)",
+                UUID.randomUUID(), ctx.caseId, "enc:" + crypto.encrypt("Approve"), Instant.now(), Instant.now());
+
+        // Finance has the work, can open the case's payment view, and the case says what Finance must do.
+        authenticate("finance-subject", Role.FINANCE);
+        assertThat(staffWork.myWork()).singleElement().satisfies(w -> {
+            assertThat(w.caseId()).isEqualTo(ctx.caseId);
+            assertThat(w.type()).isEqualTo("DEPOSIT_RECORD");
+            assertThat(w.copy().code()).isEqualTo("DEPOSIT_RECORD");
+        });
+        CaseWorkspace paymentView = journey.workspace(ctx.caseId);
+        assertThat(paymentView.paymentOnly()).isTrue();
+        assertThat(paymentView.deposit()).isNotNull();
+        // The payment view only: nothing clinical, no documents, threads, tasks, history or proposal.
+        assertThat(paymentView.clinicalReviews()).isEmpty();
+        assertThat(paymentView.messages()).isEmpty();
+        assertThat(paymentView.tasks()).isEmpty();
+        assertThat(paymentView.timeline()).isEmpty();
+        assertThat(paymentView.intakeSummary()).isNull();
+        assertThat(paymentView.proposal()).isNull();
+        assertThat(paymentView.caseSummary().coordinatorSubject()).as("names only, no staff subjects").isNull();
+        assertThat(catchThrowableOfType(() -> journey.assertCanReadDocument(ctx.caseId), ApiException.class).code()).isEqualTo("OUT_OF_SCOPE");
+        assertThat(count("SELECT count(*) FROM audit_events WHERE event_type='ACCESS_GOVERNANCE' AND action='DEPOSIT_SCOPE_READ' AND actor_subject=?", "finance-subject"))
+                .as("the read through the open deposit leaves evidence").isPositive();
+        assertThat(payment.readDeposit(ctx.caseId)).isNotNull();
+        // The Finance deposit endpoint answers only someone who may see the case or its payment view.
+        authenticate("operations-subject", Role.OPERATIONS);
+        assertThat(catchThrowableOfType(() -> payment.readDeposit(ctx.caseId), ApiException.class).status()).isEqualTo(403);
+        authenticate("finance-subject", Role.FINANCE);
+        CaseActionsView finance = paymentView.actions();
+        assertThat(finance.currentAction().code()).isEqualTo("WORK_ITEM");
+        assertThat(finance.currentAction().workType()).isEqualTo("DEPOSIT_RECORD");
+        assertThat(finance.currentAction().kind()).isEqualTo("FOCUS");
+        assertThat(finance.waitingOn()).isEqualTo("PAYMENT");
+        assertThat(journey.assignedCaseCards(Role.FINANCE)).filteredOn(card -> card.caseSummary().id().equals(ctx.caseId))
+                .singleElement().satisfies(card -> assertThat(card.myWorkCount()).isEqualTo(1));
+        // Marking the instructions sent again (a replayed event) opens no second item.
+        handoff.onDepositInstructionsSent(ctx.caseId); em.flush();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD'", ctx.caseId)).isEqualTo(1);
+
+        // Finance records the receipt: the deposit is paid, Finance's work closes and the journey continues.
+        settleDeposit(ctx); em.flush();
+        assertThat(jdbc.queryForObject("SELECT status FROM deposits WHERE case_id=?", String.class, ctx.caseId)).isEqualTo("PAID");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD' AND status='OPEN'", ctx.caseId)).isZero();
+        assertThat(status(ctx.caseId)).isEqualTo("TRAVEL_COORDINATION");
+
+        // Nothing left to record and no assignment: Finance's read ends with the open deposit.
+        authenticate("finance-subject", Role.FINANCE);
+        assertThat(staffWork.myWork()).isEmpty();
+        assertThat(journey.assignedCaseCards(Role.FINANCE)).noneMatch(card -> card.caseSummary().id().equals(ctx.caseId));
+        assertThat(catchThrowableOfType(() -> journey.workspace(ctx.caseId), ApiException.class).code()).isEqualTo("OUT_OF_SCOPE");
+    }
+
+    @Test void aPartPaymentKeepsTheDepositFinancesWorkAndTheFinanceItemFollowsTheAssignedFinancePerson() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        // Before the instructions go out there is nothing for Finance to record yet.
+        authenticate("finance-subject", Role.FINANCE);
+        assertThat(staffWork.myWork()).isEmpty();
+        assertThat(journey.workspace(ctx.caseId).actions().currentAction().code()).isEqualTo("NONE");
+        raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                UUID.randomUUID(), ctx.caseId, "finance-subject", "FINANCE", "PRIMARY", "ACTIVE", "Commercial terms", "coordinator-subject", Instant.now(), Instant.now());
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        CurrentActionView arrange = journey.workspace(ctx.caseId).actions().currentAction();
+        journey.completeTask(ctx.caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent", arrange.workItemVersion())); em.flush();
+        assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD'", String.class, ctx.caseId))
+                .as("the Finance person on the case owns it").isEqualTo("finance-subject");
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_INSTRUCTIONS_SENT'", "finance-subject")).isEqualTo(1);
+
+        UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=?", UUID.class, ctx.caseId);
+        authenticate("finance-subject", Role.FINANCE);
+        payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(new BigDecimal("1.00"), "BANK", "ref-part", "part-" + ctx.caseId)); em.flush();
+        assertThat(jdbc.queryForObject("SELECT status FROM deposits WHERE id=?", String.class, depositId)).isEqualTo("PARTIALLY_PAID");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
+        assertThat(journey.workspace(ctx.caseId).actions().currentAction().workType()).isEqualTo("DEPOSIT_RECORD");
     }
 
     // ---------- entering treatment coordination: one policy, every path ----------

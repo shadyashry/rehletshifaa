@@ -8,6 +8,7 @@ import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
 import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
 import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
+import com.rehletshifaa.journey.infrastructure.DepositRepository;
 import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.audit.AuditEventRepository;
 import com.rehletshifaa.shared.audit.AuditTrail;
@@ -42,8 +43,11 @@ public class CaseHandoffService {
     private final NotificationOutbox notificationOutbox;
     private final AuditTrail auditTrail;
     private final AuditEventRepository audits;
+    private final DepositRepository deposits;
     /** Staff work for arranging the offline coordination deposit with the patient. */
-    private static final String DEPOSIT_WORK = "DEPOSIT_ARRANGEMENT";
+    static final String DEPOSIT_WORK = "DEPOSIT_ARRANGEMENT";
+    /** Finance work for recording the deposit once the patient has the payment instructions. */
+    static final String DEPOSIT_RECORD_WORK = "DEPOSIT_RECORD";
 
     private final IntakeLifecycleService intake;
     private final StaffWorkService work;
@@ -52,7 +56,8 @@ public class CaseHandoffService {
     private final String coordinatorEmail;
 
     public CaseHandoffService(IntakeLifecycleService intake, StaffWorkService work, CaseTransitionPolicy policy, Clock clock,
-                              @Value("${app.mail.coordinator}") String coordinatorEmail, AuditTrail auditTrail, AuditEventRepository audits, NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseStatusLog statusLog) { this.statusLog = statusLog; this.assignments = assignments; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail; this.audits = audits;
+                              @Value("${app.mail.coordinator}") String coordinatorEmail, AuditTrail auditTrail, AuditEventRepository audits, NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseStatusLog statusLog,
+                              DepositRepository deposits) { this.deposits = deposits; this.statusLog = statusLog; this.assignments = assignments; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail; this.audits = audits;
         this.intake = intake; this.work = work; this.policy = policy; this.clock = clock; this.coordinatorEmail = coordinatorEmail;
     }
 
@@ -87,6 +92,27 @@ public class CaseHandoffService {
     }
 
     /**
+     * The coordinator has sent the payment instructions, so the next move is Finance's: record the money when it arrives.
+     * Without this Finance had no work, and on a catalogue-only case (never routed to Finance) no way to the case at all.
+     * The item goes to the Finance person on the case when there is one, else to the Finance pool
+     * ({@link StaffWorkService#poolOf}). Not blocking, like the coordinator's deposit work: the deposit gates the stage itself.
+     * Idempotent: an open item of the type is reused; nothing opens once the deposit is no longer open.
+     *
+     * @return true when a work item was opened or reactivated
+     */
+    @Transactional
+    public boolean onDepositInstructionsSent(UUID caseId) {
+        CaseStatus status = cases.findStageAndVersion(caseId).map(MedicalCaseRepository.StageAndVersion::getStatus).orElse(null);
+        if (status != CaseStatus.ACCEPTED || !deposits.isOpenOn(caseId)) return false;
+        String finance = assignments.findActiveAssignees(caseId, "FINANCE").stream().findFirst().orElse(null);
+        work.openWorkItem(new NewWorkItem(caseId, DEPOSIT_RECORD_WORK, "Record the deposit",
+                "The patient has the payment instructions. When the transfer arrives, record the amount received on the case.",
+                finance, "FINANCE", false, null, "SYSTEM", "DEPOSIT_INSTRUCTIONS_SENT",
+                "deposit-record:" + caseId, true, WorkCopy.of("DEPOSIT_RECORD")));
+        return true;
+    }
+
+    /**
      * Continue the journey once the deposit is authoritatively settled. Safe to call repeatedly: the
      * handoff itself (work, notifications, email, audit) happens once, while the move into treatment
      * coordination is attempted every time and only succeeds when {@link CaseTransitionPolicy} lets the
@@ -105,6 +131,7 @@ public class CaseHandoffService {
 
         if (first) {
             work.closeWorkItems(caseId, DEPOSIT_WORK, "Coordination deposit received");
+            work.closeWorkItems(caseId, DEPOSIT_RECORD_WORK, "Coordination deposit received");
             String coordinator = restoreCoordinator(caseId, now);
             // One idempotent operation opens the work item, raises the in-app notification and sends the work
             // email, so a duplicate confirmation cannot produce duplicate work or duplicate alerts.
@@ -137,6 +164,7 @@ public class CaseHandoffService {
     }
 
     @EventListener public void on(CaseEvents.DepositRequired event) { onDepositRequired(event.caseId()); }
+    @EventListener public void on(CaseEvents.DepositInstructionsSent event) { onDepositInstructionsSent(event.caseId()); }
     @EventListener public void on(CaseEvents.DepositSettled event) { onDepositSettled(event.caseId()); }
     @EventListener public void on(CaseEvents.PatientReadinessChanged event) { onPatientReadinessChanged(event.caseId()); }
 

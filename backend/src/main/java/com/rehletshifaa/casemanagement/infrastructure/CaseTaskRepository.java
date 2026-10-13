@@ -66,6 +66,23 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
     java.util.List<CaseWorkRow> findOpenInternalWorkOf(@Param("caseId") UUID caseId, @Param("owner") String owner,
                                                        org.springframework.data.domain.Limit limit);
 
+    /**
+     * As {@link #findOpenInternalWorkOf}, for unowned pooled work of one type and role, owed only while the case is at the
+     * deposit stage (ACCEPTED) (pass {@code Limit.of(1)}).
+     */
+    @Query("""
+            select t.id as id, t.taskType as taskType, t.title as title, t.description as description, t.dueAt as dueAt, t.version as version,
+                t.copyCode as copyCode, t.copyParams as copyParams
+            from CaseTask t
+            where t.caseId = :caseId and t.ownerSubject is null and t.ownerRole = :role and t.taskType = :type
+                and t.visibilityScope = 'INTERNAL' and t.status in ('OPEN', 'IN_PROGRESS')
+                and exists (select 1 from MedicalCase c where c.id = t.caseId
+                    and c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.ACCEPTED)
+            order by case when t.blocking = true then 0 else 1 end,
+                case t.priority when 'URGENT' then 0 when 'HIGH' then 1 when 'NORMAL' then 2 else 3 end, t.createdAt""")
+    java.util.List<CaseWorkRow> findOpenInternalPoolWork(@Param("caseId") UUID caseId, @Param("role") String role,
+                                                         @Param("type") String type, org.springframework.data.domain.Limit limit);
+
     /** One row of a staff member's work queue: the task with the case facts needed to act on it. */
     interface OpenWorkRow {
         UUID getId(); UUID getCaseId(); String getTaskType(); String getTitle(); String getDescription(); String getPriority();
@@ -86,6 +103,20 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
             order by case t.priority when 'URGENT' then 0 when 'HIGH' then 1 when 'NORMAL' then 2 else 3 end,
                 t.dueAt nulls last, t.createdAt""")
     java.util.List<OpenWorkRow> findOpenWorkOf(@Param("owner") String owner);
+
+    /** Unowned open internal pooled work of one type and role on ACCEPTED cases, in the {@link #findOpenWorkOf} order. */
+    @Query("""
+            select t.id as id, t.caseId as caseId, t.taskType as taskType, t.title as title, t.description as description,
+                t.priority as priority, t.status as status, t.blocking as blocking, t.dueAt as dueAt, t.createdAt as createdAt,
+                t.version as version, c.caseNumber as caseNumber, c.status as caseStatus, c.waitingOn as waitingOn,
+                c.careCategory as careCategory, trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as patientName,
+                t.copyCode as copyCode, t.copyParams as copyParams
+            from CaseTask t join MedicalCase c on c.id = t.caseId left join PatientProfile p on p.id = c.patientId
+            where t.ownerSubject is null and t.ownerRole = :role and t.taskType = :type and t.visibilityScope = 'INTERNAL'
+                and t.status in ('OPEN', 'IN_PROGRESS') and c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.ACCEPTED
+            order by case t.priority when 'URGENT' then 0 when 'HIGH' then 1 when 'NORMAL' then 2 else 3 end,
+                t.dueAt nulls last, t.createdAt""")
+    java.util.List<OpenWorkRow> findOpenPoolWork(@Param("role") String role, @Param("type") String type);
 
     /** A task as the case page and task lists show it (title and description still encrypted). */
     interface TaskRow {

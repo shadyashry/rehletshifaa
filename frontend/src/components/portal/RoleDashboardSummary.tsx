@@ -5,7 +5,7 @@ import { useId } from "react";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { plural } from "@/lib/portal-labels";
 
-type SummaryCase = { status: string; coordinatorSubject?: string; assignmentStatus?: string; overdueTaskCount?: number };
+type SummaryCase = { status: string; coordinatorSubject?: string; assignmentStatus?: string; overdueTaskCount?: number; myWorkCount?: number };
 type SummaryTask = { overdue: boolean; status: string; type?: string };
 
 const doctorAction = new Set(["CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW", "ARRIVAL_CONFIRMED"]);
@@ -23,6 +23,8 @@ export function matchesKpi(item: SummaryCase, kpi: KpiFilter, role: string) {
     : item.assignmentStatus === "PENDING";
   return role === "doctor" ? doctorAction.has(item.status)
     : role === "coordinator" ? coordinatorAction.has(item.status)
+    // Finance also owes the cases with its work on them (a deposit to record), assigned or not.
+    : role === "finance" ? item.assignmentStatus === "PENDING" || (item.myWorkCount ?? 0) > 0
     : item.assignmentStatus === "PENDING";
 }
 

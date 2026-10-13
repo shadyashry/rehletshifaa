@@ -230,6 +230,10 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
             order by c.updatedAt desc""")
     java.util.List<CaseRow> findCoordinatorQueueRows(@Param("subjects") java.util.Collection<String> subjects);
 
+    /** The cases with these ids (never empty); least recently changed first. */
+    @Query(CASE_ROW + "where c.id in :ids order by c.updatedAt asc")
+    java.util.List<CaseRow> findCaseRowsIn(@Param("ids") java.util.Collection<UUID> ids);
+
     /** Cases one of the subjects actively holds in an assignment role; least recently changed first. */
     @Query(CASE_ROW + """
             where exists (select 1 from CaseAssignment a where a.caseId = c.id and a.assigneeSubject in :subjects

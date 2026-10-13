@@ -2,6 +2,7 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
+import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
@@ -96,6 +97,14 @@ public class PaymentService {
     /** The case's latest deposit with its components, ledger and paid/balance amounts; null when the case has none. */
     @Transactional(readOnly = true)
     public DepositView depositForCase(UUID caseId) { return queries.depositForCase(caseId); }
+
+    /** {@link #depositForCase} for a reader who may see the case, or only its payment view while the deposit is open. */
+    @Transactional(readOnly = true)
+    public DepositView readDeposit(UUID caseId) {
+        Resource onCase = Resource.ofCase(caseId);
+        if (!authority.allowed(Permission.CASE_READ, onCase)) authority.require(Permission.CASE_DEPOSIT_READ, onCase);
+        return queries.depositForCase(caseId);
+    }
 
     /**
      * Provider-agnostic authoritative settlement — the one domain operation every confirmation path goes

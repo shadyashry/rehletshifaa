@@ -15,6 +15,9 @@ public final class CaseEvents {
     /** A coordination deposit was raised on an accepted case and must be arranged offline. */
     public record DepositRequired(UUID caseId) {}
 
+    /** The coordinator sent the patient the payment instructions: the deposit is now Finance's to record when it arrives. */
+    public record DepositInstructionsSent(UUID caseId) {}
+
     /** The deposit was authoritatively settled (paid in full, or waived by an authorized actor). */
     public record DepositSettled(UUID caseId) {}
 

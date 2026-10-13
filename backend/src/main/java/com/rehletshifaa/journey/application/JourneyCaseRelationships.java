@@ -3,6 +3,7 @@ package com.rehletshifaa.journey.application;
 import com.rehletshifaa.authority.application.CaseRelationships;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
+import com.rehletshifaa.journey.infrastructure.DepositRepository;
 import com.rehletshifaa.journey.infrastructure.ReplyCoverRepository;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
@@ -15,17 +16,20 @@ import java.util.UUID;
 
 import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
-/** The case module's relationship facts for authority scope rules (assignments, ownership, intake, patient links). */
+/** The case module's relationship facts for authority scope rules (assignments, ownership, intake, patient links, open deposit). */
 @Component
 public class JourneyCaseRelationships implements CaseRelationships {
     private static final Set<String> OFFERED_OR_ACTIVE = Set.of("PENDING", "ACTIVE");
     private final CaseAssignmentRepository assignments;
     private final MedicalCaseRepository cases;
     private final ReplyCoverRepository covers;
+    private final DepositRepository deposits;
     private final Clock clock;
 
-    public JourneyCaseRelationships(CaseAssignmentRepository assignments, MedicalCaseRepository cases, ReplyCoverRepository covers, Clock clock) {
+    public JourneyCaseRelationships(CaseAssignmentRepository assignments, MedicalCaseRepository cases, ReplyCoverRepository covers,
+                                    DepositRepository deposits, Clock clock) {
         this.assignments = assignments;
+        this.deposits = deposits;
         this.covers = covers;
         this.cases = cases;
         this.clock = clock;
@@ -56,6 +60,11 @@ public class JourneyCaseRelationships implements CaseRelationships {
     @Override
     public boolean unclaimedIntake(UUID caseId) {
         return cases.isUnclaimedIntake(caseId);
+    }
+
+    @Override
+    public boolean depositOpen(UUID caseId) {
+        return deposits.isOpenOn(caseId);
     }
 
     @Override

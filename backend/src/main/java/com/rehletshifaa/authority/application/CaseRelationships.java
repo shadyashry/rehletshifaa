@@ -23,6 +23,9 @@ public interface CaseRelationships {
     /** The case is in intake and no primary coordinator holds it. */
     boolean unclaimedIntake(UUID caseId);
 
+    /** The case is ACCEPTED and its coordination deposit is open: requested or partly paid, and not waived. */
+    boolean depositOpen(UUID caseId);
+
     /** The case belongs to the subject's own patient record or to a patient they currently represent. */
     boolean ownPatientCase(UUID caseId, String subject);
 

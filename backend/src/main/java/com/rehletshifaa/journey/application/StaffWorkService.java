@@ -55,6 +55,13 @@ public class StaffWorkService {
     private final AuditTrail auditTrail;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StaffWorkService.class);
     private static final Set<String> OPEN = Set.of("OPEN", "IN_PROGRESS");
+    /**
+     * Work owed by a function rather than one person: an unowned item of exactly this type and role is every holder's work
+     * until one of them does it. Only Finance's deposit to record, on a case no Finance person is assigned to; any other
+     * unowned item stays out of everyone's queue.
+     */
+    public record Pool(String role, String type) {}
+    private static final java.util.Map<String, Pool> POOLS = java.util.Map.of("FINANCE", new Pool("FINANCE", CaseHandoffService.DEPOSIT_RECORD_WORK));
     /** Responsibility values a case can carry; kept in sync with the database check constraint. */
     private static final Set<String> WAITING = Set.of("STAFF", "PATIENT", "CONSULTANT", "HOSPITAL", "TRAVEL_TEAM", "PAYMENT", "EXTERNAL", "NONE");
 
@@ -280,6 +287,9 @@ public class StaffWorkService {
             default -> "STAFF";
         };
     }
+
+    /** The work pool a case-assignment role reads besides its own items, or null when the role's work is always personal. */
+    public static Pool poolOf(String assignmentRole) { return assignmentRole == null ? null : POOLS.get(assignmentRole); }
 
     /** True when an open internal work item is owned by the given staff role on this case. */
     @Transactional(readOnly = true)

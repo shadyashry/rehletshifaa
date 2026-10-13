@@ -35,6 +35,12 @@ public class GovernanceAuditLog {
         record(actor, caseId, "SUPERVISORY_READ", "SUCCESS", permission);
     }
 
+    /** A case seen through its open deposit (Finance without an assignment); like a supervisory read, the evidence must survive. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void depositRead(String actor, String caseId, String permission) {
+        record(actor, caseId, "DEPOSIT_SCOPE_READ", "SUCCESS", permission);
+    }
+
     public void record(String actor, String entity, String action, String outcome, String reason) { record(actor, entity, action, outcome, reason, null); }
 
     /**

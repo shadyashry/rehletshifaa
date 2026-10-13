@@ -73,10 +73,17 @@ public class CaseActionQueryService {
 
     /** The one open item assigned to this person: blocking first, then by priority, then oldest. */
     WorkItem myWork(UUID caseId, String subject) {
-        return tasks.findOpenInternalWorkOf(caseId, subject, Limit.of(1)).stream().findFirst()
-                .map(t -> new WorkItem(t.getId(), t.getTaskType(), work.decryptText(t.getTitle()), work.decryptText(t.getDescription()),
-                        t.getDueAt(), t.getVersion(), work.copyOf(t.getCopyCode(), t.getCopyParams())))
-                .orElse(null);
+        return tasks.findOpenInternalWorkOf(caseId, subject, Limit.of(1)).stream().findFirst().map(this::workItem).orElse(null);
+    }
+
+    /** The case's unowned work in a role's pool ({@link StaffWorkService#poolOf}): every holder of the role may do it. */
+    WorkItem poolWork(UUID caseId, StaffWorkService.Pool pool) {
+        return tasks.findOpenInternalPoolWork(caseId, pool.role(), pool.type(), Limit.of(1)).stream().findFirst().map(this::workItem).orElse(null);
+    }
+
+    private WorkItem workItem(CaseTaskRepository.CaseWorkRow t) {
+        return new WorkItem(t.getId(), t.getTaskType(), work.decryptText(t.getTitle()), work.decryptText(t.getDescription()),
+                t.getDueAt(), t.getVersion(), work.copyOf(t.getCopyCode(), t.getCopyParams()));
     }
 
     /** The approval gates of the latest proposal version, or null before a proposal exists. */

@@ -1047,6 +1047,7 @@
         "PROPOSAL_DECLINED_REVIEW": "Acknowledge outcome",
         "CLINICAL_OUTCOME_REVIEW": "Acknowledge outcome",
         "DEPOSIT_ARRANGEMENT": "Payment instructions sent",
+        "DEPOSIT_RECORD": "Record the deposit",
         "TRAVEL": "Assign Operations",
         "REASSIGN_CONSULTANT": "Reassign Consultant",
         "CONFIRM_TRANSFER": "Confirm the transfer",
@@ -1509,6 +1510,7 @@
       "PROPOSAL_DECLINED_REVIEW": "Review the declined proposal",
       "CLINICAL_OUTCOME_REVIEW": "Review the clinical outcome",
       "DEPOSIT_ARRANGEMENT": "Arrange the coordination deposit",
+      "DEPOSIT_RECORD": "Record the deposit",
       "TRAVEL": "Coordinate treatment and travel",
       "REASSIGN_CONSULTANT": "Reassign the case to a Consultant",
       "CONFIRM_TRANSFER": "Confirm the case transfer",
@@ -1661,6 +1663,10 @@
         "DEPOSIT_DUE": {
           "title": "Patient acknowledged the estimate — arrange the coordination deposit",
           "context": "The patient acknowledged their preliminary estimate and a coordination deposit is now due. Send the payment instructions, then record the amount received."
+        },
+        "DEPOSIT_RECORD": {
+          "title": "Record the deposit",
+          "context": "The patient has the payment instructions. When the transfer arrives, record the amount received on this case."
         },
         "TREATMENT_COORDINATION_START": {
           "title": "Start treatment coordination — deposit received",

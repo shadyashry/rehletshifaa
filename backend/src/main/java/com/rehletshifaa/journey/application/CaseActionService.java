@@ -88,7 +88,7 @@ public class CaseActionService {
         PatientActionView patientAction = patientActions.openAction(caseId);
         List<BlockerView> blockers = READINESS_STAGES.contains(f.status()) ? readinessBlockers(caseId) : List.of();
         boolean patientBlocked = blockers.stream().anyMatch(CaseActionService::patientGate);
-        WorkItem mine = queries.myWork(caseId, actor.subject());
+        WorkItem mine = myWork(caseId, actor);
         String waitingOn = reconcileWaitingOn(caseId, f.status(), blockers, patientAction, mine);
         WaitingReason waitingReason = queries.waitingReason(caseId);
 
@@ -365,6 +365,16 @@ public class CaseActionService {
         }
         if (!Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(status))
             work.closeWorkItems(caseId, "TRAVEL", "Superseded — treatment coordination is already under way");
+        if (!"ACCEPTED".equals(status))
+            work.closeWorkItems(caseId, CaseHandoffService.DEPOSIT_RECORD_WORK, "Superseded — the case is past the deposit stage");
+    }
+
+    /** My work on the case: an item I own, else unowned work in my role's pool (Finance: the deposit to record). */
+    private WorkItem myWork(UUID caseId, Actor actor) {
+        WorkItem owned = queries.myWork(caseId, actor.subject());
+        if (owned != null) return owned;
+        StaffWorkService.Pool pool = StaffWorkService.poolOf(actor.role().caseAssignmentRole());
+        return pool == null ? null : queries.poolWork(caseId, pool);
     }
 
     private CurrentActionView workItem(WorkItem w) {

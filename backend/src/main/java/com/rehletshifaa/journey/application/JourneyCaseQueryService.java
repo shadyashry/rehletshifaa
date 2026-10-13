@@ -10,6 +10,7 @@ import com.rehletshifaa.document.infrastructure.MedicalDocumentRepository;
 import com.rehletshifaa.journey.api.JourneyDtos.AssignmentHistoryEntry;
 import com.rehletshifaa.journey.api.JourneyDtos.CaseView;
 import com.rehletshifaa.journey.api.JourneyDtos.StaffCaseCardView;
+import com.rehletshifaa.journey.infrastructure.DepositRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.workforce.domain.WorkforcePerson;
@@ -17,6 +18,7 @@ import com.rehletshifaa.workforce.infrastructure.WorkforcePersonRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,11 +47,13 @@ public class JourneyCaseQueryService {
     private final MedicalDocumentRepository documents;
     private final PractitionerProfileRepository practitioners;
     private final WorkforcePersonRepository people;
+    private final DepositRepository deposits;
     private final CryptoService crypto;
 
     public JourneyCaseQueryService(MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseTaskRepository tasks,
                                    MedicalDocumentRepository documents, PractitionerProfileRepository practitioners,
-                                   WorkforcePersonRepository people, CryptoService crypto) {
+                                   WorkforcePersonRepository people, DepositRepository deposits, CryptoService crypto) {
+        this.deposits = deposits;
         this.cases = cases; this.assignments = assignments; this.tasks = tasks; this.documents = documents;
         this.practitioners = practitioners; this.people = people; this.crypto = crypto;
     }
@@ -73,6 +77,12 @@ public class JourneyCaseQueryService {
         return withAssignments(cases.findAssignedCaseRows(subjects, assignmentRole));
     }
 
+    /** Cases whose coordination deposit is open: Finance's payments due, whoever holds the case; least recently changed first. */
+    List<CaseView> openDepositCases() {
+        List<UUID> ids = deposits.findOpenCaseIds();
+        return ids.isEmpty() ? List.of() : withAssignments(cases.findCaseRowsIn(ids));
+    }
+
     CaseView caseView(UUID caseId) {
         CaseRow row = cases.findCaseRow(caseId).orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
         return withAssignments(List.of(row)).get(0);
@@ -80,6 +90,9 @@ public class JourneyCaseQueryService {
 
     /** The patient sees the people on their case by name only: staff identity subjects are internal identifiers. */
     static CaseView forPatient(CaseView view) { return forPatient(view, view.viewer()); }
+
+    /** Names only, no staff identity subjects: for a viewer outside the case team (Finance's payment view). */
+    static CaseView withoutStaffSubjects(CaseView view) { return forPatient(view, view.viewer()); }
 
     private static CaseView forPatient(CaseView view, String viewer) {
         return new CaseView(view.id(), view.caseNumber(), view.status(), view.patientName(), view.country(), view.preferredLanguage(),
@@ -89,8 +102,8 @@ public class JourneyCaseQueryService {
 
     /**
      * Case cards with the operational signals the queue orders by: overdue, blocking-overdue, high-priority, the next due
-     * date and whether a patient response is waiting for staff review, plus the viewer's own assignment and the document
-     * count. Nothing is persisted — attention is a view over work items, never a second status on the case.
+     * date and whether a patient response is waiting for staff review, plus the viewer's own assignment, the document
+     * count and how much open work on the case is the viewer's (theirs, or their role's pool). Nothing is persisted — attention is a view over work items, never a second status on the case.
      */
     List<StaffCaseCardView> staffCaseCards(List<CaseView> views, String subject, String assignmentRole, Instant now) {
         if (views.isEmpty()) return List.of();
@@ -102,13 +115,17 @@ public class JourneyCaseQueryService {
                 .collect(Collectors.toMap(CaseTaskRepository.WorkSignals::getCaseId, s -> s));
         Map<UUID, Long> documentCounts = documents.countByCaseExcluding(ids, DocumentStatus.REJECTED).stream()
                 .collect(Collectors.toMap(MedicalDocumentRepository.CaseDocumentCount::getCaseId, MedicalDocumentRepository.CaseDocumentCount::getDocuments));
+        List<CaseTaskRepository.OpenWorkRow> myWork = new ArrayList<>(tasks.findOpenWorkOf(subject));
+        StaffWorkService.Pool pool = StaffWorkService.poolOf(assignmentRole);
+        if (pool != null) myWork.addAll(tasks.findOpenPoolWork(pool.role(), pool.type()));
+        Map<UUID, Long> mine = myWork.stream().collect(Collectors.groupingBy(CaseTaskRepository.OpenWorkRow::getCaseId, Collectors.counting()));
         return views.stream().map(view -> {
             var assignment = held.get(view.id());
             var s = signals.get(view.id());
             return new StaffCaseCardView(view, assignment == null ? null : assignment.getId(), assignment == null ? null : assignment.getStatus(),
                     s == null ? 0 : s.getOpenCount(), s == null ? 0 : s.getOverdueCount(), documentCounts.getOrDefault(view.id(), 0L),
                     s == null ? 0 : s.getBlockingOverdueCount(), s == null ? 0 : s.getHighPriorityCount(), s == null ? null : s.getNextDue(),
-                    s != null && s.getPatientResponseCount() > 0);
+                    s != null && s.getPatientResponseCount() > 0, mine.getOrDefault(view.id(), 0L));
         }).toList();
     }
 

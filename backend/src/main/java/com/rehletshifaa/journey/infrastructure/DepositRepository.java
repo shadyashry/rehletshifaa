@@ -42,6 +42,25 @@ public interface DepositRepository extends BaseRepository<Deposit, UUID> {
 
     boolean existsByCaseIdAndStatusNot(UUID caseId, String status);
 
+    /**
+     * The accepted case's deposit is open: requested or partly paid, and not waived. Finance sees the case's payment view
+     * while it is; leaving ACCEPTED (paid and handed over, or closed) ends it.
+     */
+    @Query("""
+            select count(d) > 0 from Deposit d
+            where d.caseId = :caseId and d.status in ('REQUESTED', 'PARTIALLY_PAID') and d.waivedAt is null
+                and exists (select 1 from MedicalCase c where c.id = d.caseId
+                    and c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.ACCEPTED)""")
+    boolean isOpenOn(@Param("caseId") UUID caseId);
+
+    /** Cases with an open deposit (the {@link #isOpenOn} rule): where Finance looks for payments due. */
+    @Query("""
+            select distinct d.caseId from Deposit d
+            where d.status in ('REQUESTED', 'PARTIALLY_PAID') and d.waivedAt is null
+                and exists (select 1 from MedicalCase c where c.id = d.caseId
+                    and c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.ACCEPTED)""")
+    List<UUID> findOpenCaseIds();
+
     /** An authorized waiver, once, and never of a cancelled deposit. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

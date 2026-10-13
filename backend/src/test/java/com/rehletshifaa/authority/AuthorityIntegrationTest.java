@@ -6,6 +6,7 @@ import com.rehletshifaa.authority.application.Principal;
 import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.authority.domain.Role;
+import com.rehletshifaa.authority.domain.Scope;
 import com.rehletshifaa.authority.domain.Workspace;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
@@ -83,6 +84,38 @@ class AuthorityIntegrationTest {
         assertThat(decide("a-ops", Permission.CASE_READ, Resource.ofCase(caseId)).granted()).isTrue();
         assertThat(decide("a-finance", Permission.FINANCE_SETTLE, Resource.ofCase(caseId)).granted()).isFalse();
         assertThat(decide("a-finance-unoffered", Permission.CASE_READ, Resource.ofCase(caseId)).granted()).isFalse();
+    }
+
+    @Test
+    void financeSeesOnlyThePaymentViewOfAnAcceptedCaseWhileItsDepositIsOpenAndActsOnNothingThere() {
+        new WorkforceTestData(jdbc, crypto, clock.instant()).person("a-finance-pool", "FINANCE").person("a-ops-pool", "OPERATIONS");
+        Resource onCase = Resource.ofCase(caseId);
+        jdbc.update("UPDATE medical_cases SET status='ACCEPTED' WHERE id=?", caseId);
+        // No deposit and no assignment: nothing to record, nothing to see.
+        assertThat(decide("a-finance-pool", Permission.CASE_DEPOSIT_READ, onCase).code()).isEqualTo("OUT_OF_SCOPE");
+
+        UUID deposit = UUID.randomUUID();
+        jdbc.update("INSERT INTO deposits(id,case_id,currency,total_egp,status,created_at,version) VALUES(?,?,'EGP',3000,'REQUESTED',?,0)",
+                deposit, caseId, clock.instant());
+        assertThat(decide("a-finance-pool", Permission.CASE_DEPOSIT_READ, onCase).scope()).isEqualTo(Scope.CASE_DEPOSIT_OPEN);
+        // The payment view only: never the case record (clinical, documents, threads), and no settlement, messaging,
+        // assignment or coordination power; nothing for other roles.
+        for (Permission action : List.of(Permission.CASE_READ, Permission.FINANCE_SETTLE, Permission.CASE_MESSAGE,
+                Permission.ASSIGNMENT_RESPOND, Permission.CASE_COORDINATE, Permission.TASK_CREATE))
+            assertThat(decide("a-finance-pool", action, onCase).granted()).as(action.name()).isFalse();
+        assertThat(decide("a-ops-pool", Permission.CASE_DEPOSIT_READ, onCase).granted()).isFalse();
+        assertThat(decide("a-other", Permission.CASE_DEPOSIT_READ, onCase).granted()).isFalse();
+
+        jdbc.update("UPDATE deposits SET status='PARTIALLY_PAID' WHERE id=?", deposit);
+        assertThat(decide("a-finance-pool", Permission.CASE_DEPOSIT_READ, onCase).granted()).as("partly paid is still open").isTrue();
+        jdbc.update("UPDATE medical_cases SET status='CANCELLED' WHERE id=?", caseId);
+        assertThat(decide("a-finance-pool", Permission.CASE_DEPOSIT_READ, onCase).code()).as("past ACCEPTED: it ends").isEqualTo("OUT_OF_SCOPE");
+        jdbc.update("UPDATE medical_cases SET status='ACCEPTED' WHERE id=?", caseId);
+        jdbc.update("UPDATE deposits SET status='PAID' WHERE id=?", deposit);
+        assertThat(decide("a-finance-pool", Permission.CASE_DEPOSIT_READ, onCase).code()).as("paid: it ends").isEqualTo("OUT_OF_SCOPE");
+        jdbc.update("UPDATE deposits SET status='REQUESTED', waived_at=?, waived_by='a-finance-pool', waiver_reason='Waived' WHERE id=?",
+                clock.instant(), deposit);
+        assertThat(decide("a-finance-pool", Permission.CASE_DEPOSIT_READ, onCase).code()).as("waived: it ends").isEqualTo("OUT_OF_SCOPE");
     }
 
     @Test

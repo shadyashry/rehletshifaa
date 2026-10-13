@@ -8,7 +8,7 @@ beforeAll(() => {
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { JourneyPulse, FullJourneyDialog, type TimelineEvent } from "./JourneySnapshot";
-import { CurrentActionPanel } from "./CurrentAction";
+import { CurrentActionPanel, type CurrentActionView } from "./CurrentAction";
 import { CaseBlockers } from "./CaseBlockers";
 import { MoreActions } from "./CoordinatorActions";
 import { RoleDashboardSummary } from "./RoleDashboardSummary";
@@ -129,6 +129,20 @@ describe("CurrentActionPanel", () => {
     expect(screen.getByRole("button", { name: /payment instructions sent/i })).toBeTruthy();
   });
 
+  it("asks Finance to record the deposit in English and Arabic (QA W-24)", () => {
+    const action: CurrentActionView = { code: "WORK_ITEM", kind: "FOCUS", workItemId: "w3", workItemVersion: 0, workType: "DEPOSIT_RECORD", title: "Record the deposit",
+      copy: { code: "DEPOSIT_RECORD", params: {} } };
+    const onFocusAction = vi.fn();
+    renderWithWork(<CurrentActionPanel locale="en" role="finance" action={action} onFocusAction={onFocusAction}/>);
+    expect(screen.getByRole("heading", { name: "Record the deposit" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /record the deposit/i }));
+    expect(onFocusAction).toHaveBeenCalled();
+    cleanup();
+    renderWithWork(<CurrentActionPanel locale="ar" role="finance" action={action}/>, "ar");
+    expect(screen.getByRole("heading", { name: "تسجيل الوديعة" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /تسجيل الوديعة/ })).toBeTruthy();
+  });
+
   it("reads right-to-left with Arabic copy for the same contract", () => {
     renderWithWork(<CurrentActionPanel locale="ar" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "PROFILE_NOT_ACTIVATED" }}/>, "ar");
     expect(screen.getByText("الإجراء الحالي")).toBeTruthy();
@@ -201,6 +215,15 @@ describe("RoleDashboardSummary", () => {
     expect(overdue.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(overdue);
     expect(onSelect).toHaveBeenCalledWith("overdue");
+  });
+
+  it("counts a Finance case with Finance work on it as needing action, assigned or not (QA B3)", () => {
+    renderWithWork(<RoleDashboardSummary role="finance" tasks={[]} cases={[
+      { status: "ACCEPTED", myWorkCount: 1 },
+      { status: "PROPOSAL_PREPARATION", assignmentStatus: "PENDING" },
+      { status: "ACCEPTED", assignmentStatus: "ACTIVE", myWorkCount: 0 },
+    ]}/>);
+    expect(screen.getByRole("button", { name: "2 cases need action" })).toBeTruthy();
   });
 
   it("leaves zero counts out and says so in words when nothing is owed", () => {

@@ -179,7 +179,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
         const pending=api<CaseDocument[]>(`/cases/${item.id}/documents`).then(rows=>({rows,failed:false}),()=>({rows:[] as CaseDocument[],failed:true}));
         const ws=preloaded??await api<Workspace>(`/${currentRole}/cases/${item.id}`);
         if(request!==opening.current)return;setWorkspace(ws);setDocuments([]);
-        const docs=await pending;if(request===opening.current){setDocuments(docs.rows);if(docs.failed)setDocumentError(true);}
+        const docs=await pending;if(request===opening.current){setDocuments(docs.rows);if(docs.failed&&!ws.paymentOnly)setDocumentError(true);}
       }
       if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);window.history.replaceState({},"",url);if(!workspace)requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());}
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}

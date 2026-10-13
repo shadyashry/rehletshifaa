@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,11 @@ import java.util.stream.Collectors;
 @Service
 public class StaffWorkQueryService {
     private static final int FEED_SIZE = 30;
+    /** The {@code findOpenWorkOf} order, for a queue merged from personal and pooled work: most urgent, soonest due, oldest. */
+    private static final Comparator<OpenWorkRow> QUEUE_ORDER = Comparator
+            .comparingInt((OpenWorkRow row) -> switch (String.valueOf(row.getPriority())) { case "URGENT" -> 0; case "HIGH" -> 1; case "NORMAL" -> 2; default -> 3; })
+            .thenComparing(OpenWorkRow::getDueAt, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(OpenWorkRow::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
 
     private final Authority authority;
     private final CaseTaskRepository tasks;
@@ -68,8 +75,14 @@ public class StaffWorkQueryService {
             return List.of();
         }
         var actor = authority.authorize(Permission.TASK_WORK);
-        List<OpenWorkRow> rows = tasks.findOpenWorkOf(actor.subject());
+        List<OpenWorkRow> rows = new ArrayList<>(tasks.findOpenWorkOf(actor.subject()));
+        // Work owed by a function rather than a person (a deposit to record on a case no Finance person holds) is every
+        // holder's work until one of them does it.
+        Set<StaffWorkService.Pool> pools = actor.roles().stream().map(role -> StaffWorkService.poolOf(role.caseAssignmentRole()))
+                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        for (StaffWorkService.Pool pool : pools) rows.addAll(tasks.findOpenPoolWork(pool.role(), pool.type()));
         if (rows.isEmpty()) return List.of();
+        if (!pools.isEmpty()) rows.sort(QUEUE_ORDER);
         Set<UUID> caseIds = rows.stream().map(OpenWorkRow::getCaseId).collect(Collectors.toSet());
 
         Map<UUID, Long> documentCounts = documents.countByCaseExcluding(caseIds, DocumentStatus.REJECTED).stream()

@@ -104,7 +104,9 @@ public class CaseWorkspaceQueryService {
     static Set<String> allowedThreads(Actor actor) { return ROLE_THREADS.getOrDefault(actor.role(), Set.of()); }
 
     public CaseWorkspace workspace(UUID caseId) {
-        var actor = authority.authorize(Permission.CASE_READ, Resource.ofCase(caseId));
+        Resource onCase = Resource.ofCase(caseId);
+        if (!authority.allowed(Permission.CASE_READ, onCase) && authority.allowed(Permission.CASE_DEPOSIT_READ, onCase)) return paymentWorkspace(caseId);
+        var actor = authority.authorize(Permission.CASE_READ, onCase);
         // Resolved first and fresh: the current action, blockers and available actions the page renders from.
         // It closes work made obsolete by the stage and re-derives waiting-on, so every list below reads the repaired state.
         CaseActionsView actions = caseActions.resolve(caseId, actor);
@@ -144,7 +146,18 @@ public class CaseWorkspaceQueryService {
         return new CaseWorkspace(summary, timeline, taskViews, messageViews, assignmentViews, reviewViews, latest, proposals.gates(caseId, latest),
                 delivery, deposits.depositForCase(caseId), cases.findConditionDescription(caseId).orElse(null), patientActions.openAction(caseId),
                 actions, proposalAccess.state(caseId), actor.role() == Role.COORDINATOR ? representatives(caseId) : List.of(),
-                patientActor ? null : patientReply(caseId, actor));
+                patientActor ? null : patientReply(caseId, actor), false);
+    }
+
+    /**
+     * The case as Finance sees it to record a deposit on a case it holds no assignment on (QA B3): who and which case, the
+     * deposit and Finance's current action. Nothing clinical, no documents, threads, tasks, history or proposal.
+     */
+    private CaseWorkspace paymentWorkspace(UUID caseId) {
+        var actor = authority.authorize(Permission.CASE_DEPOSIT_READ, Resource.ofCase(caseId));
+        CaseActionsView actions = caseActions.resolve(caseId, actor);
+        return new CaseWorkspace(JourneyCaseQueryService.withoutStaffSubjects(caseQueries.caseView(caseId)), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null,
+                deposits.depositForCase(caseId), null, null, actions, null, List.of(), null, true);
     }
 
     /** Who answers the patient now, as the staff viewer needs it: whether they may, and who covers the owner until when. */

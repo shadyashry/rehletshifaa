@@ -5,7 +5,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  private final JourneyService service;private final CommercialPolicyService policies;private final PaymentService payment;public FinanceJourneyController(JourneyService service,CommercialPolicyService policies,PaymentService payment){this.service=service;this.policies=policies;this.payment=payment;}
  @GetMapping("/commercial-policies")public List<CommercialPolicyView>policies(){return policies.list();}
  @PutMapping("/commercial-policies")public CommercialPolicyView configurePolicy(@Valid @RequestBody CommercialPolicyRequest request){return policies.configure(request);}
- @GetMapping("/cases/{caseId}/deposit")public DepositView deposit(@PathVariable UUID caseId){return payment.depositForCase(caseId);}
+ @GetMapping("/cases/{caseId}/deposit")public DepositView deposit(@PathVariable UUID caseId){return payment.readDeposit(caseId);}
  @PostMapping("/cases/{caseId}/deposits/{depositId}/payments")public DepositView recordPayment(@PathVariable UUID caseId,@PathVariable UUID depositId,@Valid @RequestBody RecordReceiptRequest request){return payment.recordReceipt(caseId,depositId,request);}
  @PostMapping("/cases/{caseId}/deposits/{depositId}/refunds")public DepositView recordRefund(@PathVariable UUID caseId,@PathVariable UUID depositId,@Valid @RequestBody RefundRequest request){return payment.recordRefund(caseId,depositId,request);}
  @PostMapping("/cases/{caseId}/deposits/{depositId}/waiver")public DepositView waive(@PathVariable UUID caseId,@PathVariable UUID depositId,@Valid @RequestBody DepositWaiverRequest request){return payment.waiveDeposit(caseId,depositId,request.reason());}

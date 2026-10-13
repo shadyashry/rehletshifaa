@@ -25,6 +25,11 @@ public enum Scope {
     CONVERSATION_UNCLAIMED,
     /** The case is in intake and no primary coordinator holds it. */
     CASE_UNCLAIMED,
+    /**
+     * The accepted case's coordination deposit is open: requested or partly paid, not waived. Lets whoever records payments
+     * see the case they record against; it ends when the deposit is paid, waived or refunded, or the case leaves ACCEPTED.
+     */
+    CASE_DEPOSIT_OPEN,
     /** A live assignee of the case (or the affected subject) is in a team the principal leads, or reports to them. */
     SUPERVISED,
     /** The case belongs to the principal's own patient record or one they represent. */
