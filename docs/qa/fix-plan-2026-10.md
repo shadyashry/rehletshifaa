@@ -289,7 +289,9 @@ Already decided: G-2 (option C), G-8 (layered limits, done), DEP (keep Finance c
 | W-34 | T1 | W-35, W-38, W-39, W-40 | A2 | W-36, W-37 | A7 |
 | W-41 | verified (B3) | W-42 | A0 (W-8) | W-43, W-44 | C2, A3 |
 | W-45 | B2, C2 | W-46 | B1 (G-13) | W-47 | T1/W0 watch |
-| W-48 | A4 (W-21/W-22) | | | | |
+| W-48 | A4 (W-21/W-22) | W-49 | fixed (`f60a3d0`) | W-50 | A6 |
+| W-51 | T1 | W-52 | T1, A7 | W-53 | B2 |
+| W-54 | C1 | W-55 | B1 (#1), B2 | | |
 
 ## Next exact action
 
