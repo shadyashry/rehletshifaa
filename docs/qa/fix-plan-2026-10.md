@@ -1,70 +1,89 @@
 # Fix plan — journey findings, October 2026
 
-Status: **draft for the owner's approval** (2026-10-13). Source: `docs/qa/journey-findings-2026-10-13.md` (IDs #1–#33,
-B1–B2, D1, R1, G-1…G-16, W-1…W-20, 2a–2k). Approach agreed with the owner: findings are grouped by **root cause**,
-sequenced **logic and truth first, then copy, accessibility and redesign**, and each batch fits **one session** on
-`codex/platform-control-plane` (commit when green, owner approves merge and push; see `AGENTS.md`).
+Status: **v2, for the owner's approval** (2026-10-13). Covers every finding in
+`docs/qa/journey-findings-2026-10-13.md` to date: #1–#33, B1–B3, D1, R1, P-UX-1, MC-1, F-UX-1, DEP, MFA-1, G-1…G-16,
+W-1…W-40, 2a–2k. The **Coverage index** at the end maps each ID to its batch.
 
-Two groups are marked **pending walk evidence**: the walk still has the deposit recording (step 5) and step 6
-(identity reviewer, credentialing, referrals, Conversations). Their findings are slotted in before those batches start.
-
-Housekeeping: B1 and B2 read "Fixed, **not committed**" in the findings; both are committed and pushed (`b06ae3f`,
-`9e1e6c8`). Correct the status when Batch A0 lands.
+Approach agreed with the owner: findings are grouped by **root cause**, sequenced **blockers and test readiness first,
+then logic and truth, then copy, accessibility and redesign, then new features**. Each batch fits **one session** on
+`codex/platform-control-plane`: build, verify, commit when green; the owner approves merge and push (`AGENTS.md`).
+Security-sensitive batches (B3, A2, A6, A7) get an independent review before commit.
 
 ## Duplicates merged
 
-| Kept | Merged into it | Why |
+| Kept | Merged | Why |
 |---|---|---|
-| #6 | W-6 | Step-up loses the form — same defect, seen for Consultant/Finance (#6) and coordinator (W-6). |
-| #9 | W-7 | Stale "not saved" banner after a later save. |
+| #6 | W-6 | Step-up loses the form (Consultant, Finance, coordinator). |
+| #9 | W-7, W-30 | "Not saved" notice wrong or stale after a re-check. |
 | #31 | W-10 | Two one-time codes within an hour. |
-| #1 | W-12 | Country search and names in English for Arabic users (case form and profile). |
-| #29 | W-8 | "To verify: Arabic patient's WhatsApp text in English" — now confirmed (profile message, 2026-10-13). |
+| #1 | W-12 | Country names and search in English for Arabic users. |
+| #29 | W-8 | Arabic patient's WhatsApp text in English — confirmed. |
 | #13 | W-5 | "Waiting on" contradicts the current action. |
+| W-25 | B3 | Catalogue-only deposits unreachable — the blocker. |
+| #28 | W-23 | Delivery status — did not reproduce; re-check before fixing. |
 
 ## Sequence at a glance
 
-| Order | Batch | Theme | Size | Blocked by |
+| Order | Batch | Theme | Size | Waits on |
 |---|---|---|---|---|
-| 0 | **B3** | Blocker: deposits on catalogue-only cases cannot be recorded | ½ session | — (security review of the authorization change) |
-| 1 | **A0** | Quick, high-impact truth fixes | ½ session | — |
-| 2 | **A1** | The next action tells the truth | 1 session | — |
-| 3 | **A2** | Sign-in, security re-check and browser history | 1 session | D1 (owner) for one item |
-| 4 | **A3** | Work items and "waiting on" from one source | 1 session | — |
-| 5 | **A4** | Finance and commercial clarity | 1 session | W-1 rule (business) |
-| 6 | **A5** | Journey history and audit from workflow events | 1–2 sessions | #15 shape (owner) |
-| 7 | **A6** | Continuity, identity and representation | 1–2 sessions | walk step 6; #33 confirm |
-| 8 | **B1** | Notifications and Arabic copy | 1 session | — |
-| 9 | **B2** | Accessible names | ½ session | — |
-| 10 | **C1** | Patient proposal, status link and profile redesign | 2 sessions (plan + build) | shape plan approval |
-| 10b | **C2** | Finance workspace redesign (owner: complete revamp) | 2–3 sessions (critique + plan + build) | A4 + B3 logic first; shape plan approval |
-| 11 | **R1** | Travel services priced by Operations | design + 3–4 sessions | R1 decisions |
-| — | **Blocked** | Legal, business and native-review items | — | see register |
+| 1 | **B3** | Blocker: Finance cannot reach deposits on catalogue-only cases | ½ session | — |
+| 2 | **T1** | Test readiness: QA authenticators, second Consultant, inbound WhatsApp on dev | ½–1 session | — |
+| 3 | **W0** | Finish the walk (deposit end to end, identity review, credentialing actions) | ½ session (owner signs in) | B3, T1 |
+| 4 | **A0** | Quick, high-impact truth fixes | ½ session | — |
+| 5 | **A1** | The next action tells the truth | 1 session | — |
+| 6 | **A2** | Staff sign-in, MFA policy, security re-check, browser history | 1–2 sessions | D1 confirmed (MFA-1 agreed) |
+| 7 | **A3** | Work items and "waiting on" from one source | 1 session | — |
+| 8 | **A4** | Finance and commercial logic | 1 session | W-1 rule |
+| 9 | **A5** | Journey history and audit from workflow events | 1–2 sessions | #15 shape |
+| 10 | **A6** | Continuity, identity and representation | 1–2 sessions | W0 identity evidence; #33 |
+| 11 | **A7** | Credentialing and workforce truth | 1 session | W0 credentialing evidence; W-32 scope |
+| 12 | **B1** | Notifications and Arabic copy | 1 session | — |
+| 13 | **B2** | Accessible names and navigation | ½ session | — |
+| 14 | **C1** | Patient proposal, status link and profile redesign | 2 sessions | shape plan approval |
+| 15 | **C2** | Finance workspace redesign (complete revamp) | 2–3 sessions | A4 + B3; shape plan approval |
+| 16 | **DEP-2** | Online deposit payment (if approved) | design + 2 sessions | business decision |
+| 17 | **R1** | Travel services priced by Operations | design + 3–4 sessions | R1 decisions |
 
 ---
 
-## Phase A — logic and truth
+## 1. Blockers and test readiness
 
-### B3 — Blocker: Finance cannot reach deposits on catalogue-only cases (first, next session)
+### B3 — Finance cannot reach deposits on catalogue-only cases (blocker)
 
-W-25 → B3: Finance is assignable only while the proposal is prepared, so a catalogue-only case never has Finance and
-its deposit cannot be recorded in the product (Finance gets 403 on the case). Fix: a Finance work item "Record the
-deposit" when payment instructions are sent (with W-24), and `CASE_READ` for Finance on cases with an open deposit (as
-B1 did for offered cases); test that a catalogue-only case can be paid end to end; independent security review of the
-authorization change.
+A case priced only from the catalogue never needs Finance approval, so Finance is never assigned
+(`JourneyService.assign` allows FINANCE only in `PROPOSAL_PREPARATION`); recording a deposit happens only on the staff
+case page, which Finance cannot open on such a case (403). Fix: when the coordinator marks payment instructions sent,
+create a Finance work item "Record the deposit" (closes W-24); give Finance `CASE_READ` on cases with an open deposit (as
+B1 did for offered cases); test that a catalogue-only case is paid end to end; independent security review.
+
+### T1 — Test readiness (½–1 session)
+
+| ID | Fix |
+|---|---|
+| MFA-1 / W-29 | Seeded QA staff accounts get documented test authenticators (app codes) whose secrets live in the owner's password manager, never the repo; `docs/qa/test-accounts-and-e2e-journey.md` records which method each account uses and the reset route. |
+| W-34 | Seed a second Consultant login (another care area) so referrals can be accepted and care areas need no shortcut (#23). |
+| W-31 | A dev-only inbound WhatsApp simulator (disabled in production) or seeded synthetic conversations, so Conversations and the coordinator routing (R1–R11, S0–S6) can be walked. |
+| — | Invited accounts (`patient-identity-reviewer` and others): document the activation route for walks. |
+
+### W0 — Finish the walk (owner signs in)
+
+Deposit end to end on RS-2026-000001 and on a catalogue-only case (after B3); the patient sees "Deposit received";
+patient identity submission (owner types a synthetic document number) → reviewer activation → review; credentialing
+actions (record a credential, approval decision) to settle W-37. New findings are slotted into A6/A7 before they start.
+
+---
+
+## 2. Logic and truth
 
 ### A0 — Quick, high-impact truth fixes (½ session)
 
 | ID | Fix |
 |---|---|
-| W-19 | After sign-in, replace the `/auth/callback` history entry (`location.replace`) so Back never lands on a used code; localise the callback error (EN + AR). `frontend/src/app/auth/callback/page.tsx`. |
-| W-8 (+#29) | Profile-completion WhatsApp template: Arabic for Arabic patients, and "you acknowledged your preliminary estimate" instead of "accepted". Check every patient template for language selection (`NotificationOutboxProcessor`). |
-| W-16 | "Verify first" refusal points to the coordinator, not the read-only Profile & Security (EN + AR) — copy added this week. |
-| W-9 | Coordinator email "Case for case RS-…" (`NotificationOutboxProcessor`). |
-| B1/B2 | Correct the status in the findings document. |
-
-Verify: unit tests for the callback and the templates (language + wording), Playwright my-care and callback check, backend
-notification tests.
+| W-19 | After sign-in, replace the `/auth/callback` history entry (`location.replace`); localise the callback error. `frontend/src/app/auth/callback/page.tsx`. High. |
+| W-8 (+#29) | Profile-completion WhatsApp template in the patient's language; "acknowledged your preliminary estimate", not "accepted"; check every patient template for language (`NotificationOutboxProcessor`). High. |
+| W-16 | "Verify first" refusal points to the coordinator (EN + AR). |
+| W-9 | Coordinator email "Case for case RS-…". |
+| B1/B2 | Correct their status in the findings (committed and pushed: `b06ae3f`, `9e1e6c8`). |
 
 ### A1 — The next action tells the truth (1 session)
 
@@ -72,159 +91,197 @@ Root cause: one action code and one stage label serve two different moments.
 
 | ID | Fix |
 |---|---|
-| #25 | Separate code for the **pre-release** Operations travel plan (today `ASSIGN_OPERATIONS` at `CaseActionService` ~l.222 shares the post-deposit copy "The deposit is settled…"); own EN + AR copy; test that no pre-release case says the deposit is settled. |
-| #27 (copy part) | Pre-release Operations action copy without "confirm it once every requirement is met" (after-deposit wording). |
-| #21 | After Finance approval the stage reads "Ready to release", not "Internal approval". |
-| #13 / W-5 | "Waiting on" derived from the current action (coordinator owes the Arabic-terms call → "waiting on: our team / you"); one test per stage that header and action agree. |
-| #11 | Consultant view labels from the consultant's side (no "Waiting on: our team" leaks). |
-| #28 | Secure-link delivery status shown to staff reads the outbox state ("Delivered", not "Queued"). |
+| #25 | Separate code and copy for the **pre-release** Operations plan (today `ASSIGN_OPERATIONS`, `CaseActionService` ~l.222, says "The deposit is settled"). High. |
+| #27 (copy) | Pre-release Operations copy without after-deposit wording. |
+| #21 | After Finance approval the stage reads "Ready to release". |
+| #13 (+W-5) | "Waiting on" derived from the current action; one test per stage that header, brief and action agree. |
+| #11 | Consultant view wording from the consultant's side. |
+| #28 (+W-23) | Re-check with a fresh link; if it reproduces, read the outbox delivery state. |
 
-Verify: backend `CaseActionService` tests per stage; unit tests for the copy; full suite.
+### A2 — Staff sign-in, MFA policy, security re-check, browser history (1–2 sessions)
 
-### A2 — Sign-in, security re-check and browser history (1 session)
-
-Root cause: sensitive actions ask for re-authentication only at submit time, and the portal rewrites history.
+Root cause: second factors enrolled ad hoc and asked only at submit time; the portal rewrites history.
 
 | ID | Fix |
 |---|---|
-| #6 (+W-6) | Ask for the re-check **before** the form starts (opening clinical review, Finance approval, recording a patient decision) — or keep a draft and resubmit after it. High. |
-| #9 (+W-7) | Clear the "not saved" notice on the next success. |
-| — | Check the recent-authentication window (aim 15–30 min) so step-up is not asked on every click. |
-| #7 | Enrol the authenticator at first sign-in for roles that need it, not mid-task. |
-| G-5 | Push history on case and view switches, reopen from `popstate` (with W-19 already done, Back returns to the previous case). |
-| W-11 | Keycloak theme (EN + AR) for "already signed in as a different user" with a "sign out and continue" action. |
-| #32 | Keycloak: a used setup link says "already used — sign in", not "expired". |
-| D1 | **Owner decision first:** authenticator at sign-in for every workforce account (recommended) — then configure. |
-
-Verify: Playwright for history (Back between cases), unit tests for the re-check entry point, a live re-check walk on dev
-(owner signs in).
+| D1 / MFA-1 | Second factor at sign-in for every workforce account; passkeys required for privileged roles (system admin, credentialing, Finance), authenticator app as backup; recovery codes; documented two-person "MFA reset request" recovery. |
+| #7 / W-39 | Enrol at first sign-in, one method policy per role — never mid-task. |
+| W-40 | Keycloak passkey registration without `prompt()` (label inline or not asked); EN + AR explanation. |
+| #6 (+W-6) | Ask for the re-check **before** the form starts (clinical review, Finance approval, recording a decision, recording a payment) or keep a draft and resubmit. High. |
+| #9 (+W-7, W-30) | Notice cleared on success; abandoned re-check worded as not completed. |
+| W-38 | Read-specific wording ("to see these, confirm with your authenticator"). |
+| W-35 | Control Center: don't request or show areas the account cannot use (menu included); re-authentication offered as an action, not "Try again". |
+| — | Recent-authentication window 15–30 min. |
+| G-5 | Push history on case and view switches; reopen from `popstate`. |
+| W-11 | Keycloak "already signed in as a different user" themed (EN + AR) with sign out and continue. |
+| #32 | Used setup link says "already used — sign in". |
 
 ### A3 — Work items and "waiting on" from one source (1 session)
-
-Root cause: "Needs attention" comes from open work items, "Waiting on" from the stage; some stages create no work item.
 
 | ID | Fix |
 |---|---|
 | #3 | Routing at submission creates the coordinator's work item. |
-| #3b | Finance approval creates "Release the proposal" for the coordinator. |
-| #18 | Finance "At a glance" uses the same source as My work. |
-| — | Invariant test: every stage that waits on someone has exactly one open work item for them, and the header agrees. |
-| 3-UX | Then rename the tabs ("To do" / "My cases"), counts on the tabs; validate with one coordinator. |
+| #3b | Finance approval creates "Release the proposal". |
+| #18 | "At a glance" uses the same source as My work (all roles). |
+| W-24 | Finance work item for a deposit (with B3). |
+| — | Invariant test: every waiting stage has exactly one open work item for whoever it waits on; header agrees. |
+| 3-UX | Then rename tabs ("To do" / "My cases") with counts; validate with one coordinator. |
 
-Verify: backend invariant test over all stages; dashboard Playwright specs; full suite.
-
-### A4 — Finance and commercial clarity (1 session)
+### A4 — Finance and commercial logic (1 session)
 
 | ID | Fix |
 |---|---|
-| #19 | Finance sees which lines are manual, their base EGP price and the margin before approving. High. |
-| #22 | Margin and deposit policy settable for all 9 care areas. |
-| #12 | One rounding rule for proposal totals (sum of rounded lines vs rounded total). |
+| #19 | Finance sees manual lines, base EGP prices and margin before approving. High. |
+| W-26 | EGP amount due and balance shown beside the patient-currency figure; amount prefilled. |
+| W-28 | Fixed payment-method list. |
+| DEP-1 | Patient uploads proof of transfer; Finance work item to verify and record; patient sees "Payment received". |
+| W-21 / W-22 | Deposit copy from the actual flow; readiness wording per deposit state; case touched on the action. |
+| #22 | Margin and deposit policy for all 9 care areas. |
+| #12 | One rounding rule for totals. |
 | #8 | "Approved catalogue price" excludes off-list items. |
 | #20 | One "Approve commercial terms" action. |
-| W-1 | **Business decision first:** cap the deposit at a share of the estimate, or waive under a threshold — then implement in the commercial policy. |
-| W-21 / W-22 | Deposit copy from the actual flow (the coordinator sends instructions; Finance records the receipt); readiness wording per deposit state. |
-| DEP-1 | **Agreed 2026-10-13:** keep Finance confirming offline payments (no payment source exists), made smoother: the patient uploads proof of transfer from My Care; Finance gets a work item to verify and record it; the patient sees "Payment received" once confirmed. |
-
-*Pending walk evidence:* the deposit-recording step (walk step 5) may add items here.
+| W-1 | After the business rule: deposit cap or waiver. |
 
 ### A5 — Journey history and audit from workflow events (1–2 sessions)
 
-Root cause: history is built from stage changes only.
+| ID | Fix |
+|---|---|
+| #15 / 15-ops | History and strip from workflow events (Finance, Operations, waits, completions); owner picks sub-steps vs stages. |
+| #16 / 2j | Names, never raw subject IDs. |
+| #24 | Ownership transfer audited. |
+| #23 | Care-area change: reason, from→to, flagged to the Consultant. |
+| #17 | "Recommendation submitted" on that step. |
+
+### A6 — Continuity, identity and representation (1–2 sessions)
 
 | ID | Fix |
 |---|---|
-| #15 / 15-ops | History and journey strip from workflow events: Finance and Operations assignments, waiting periods and completions. **Owner to choose:** sub-steps under Proposal (recommended) or separate stages. |
-| #16 / 2j | Names, never raw subject IDs, in history and in the transfer choice. |
-| #24 | Ownership transfer as an audit event. |
-| #23 | Care-area change: reason when it differs from the patient's request, from→to recorded, mismatch flagged to the Consultant. |
-| #17 | "Consultant accepted the case" → "Recommendation submitted" on that step. |
-
-### A6 — Continuity, identity and representation (1–2 sessions) — *pending walk evidence (step 6)*
-
-| ID | Fix |
-|---|---|
-| #33 | Routing prefers the patient's current coordinator when eligible (as `INTAKE_CONTINUITY` does). Owner to confirm. |
-| G-2 | Option C (decided): on "this is me", the patient decides whether the sender keeps helping them (EN + AR); coordinators get a visible re-authorise action. |
-| G-14 | Representative access created on submit (authenticated submit step); drafts hidden from My Care. |
-| G-15 | Scheduled clean-up of drafts older than ~7 days, files included, audited. |
+| #33 | Routing prefers the patient's current coordinator (owner to confirm). |
+| G-2 | Option C (decided): the patient decides on "this is me" whether the sender keeps helping; coordinators get a re-authorise action. |
+| G-14 | Representative access on submit; drafts hidden from My Care. |
+| G-15 | Scheduled clean-up of drafts > ~7 days, files included, audited. |
 | G-16 | Invisible Turnstile on the signed-in send path. |
-| G-4 | Stable person key on `GET /patient/cases`; "for ‹name›" choices in the form; group by that key. |
-| W-13 | Profile copy says identity is checked next when travel support is requested. |
-| W-14 | Identity verification prefilled from the profile; asks only for the document. |
-| #26 | Travel package: coordinator note on turn on/off; "Travel package included" on the proposal; optional patient request. |
+| G-4 | Stable person key on the patient case list; "for ‹name›" choices; group by key. |
+| W-13 | Profile copy: identity checked next when travel support is requested. |
+| W-14 | Identity verification prefilled from the profile. |
+| #26 | Travel package: coordinator note, shown on the proposal, optional patient request. |
+| — | W0 identity-review findings. |
+
+### A7 — Credentialing and workforce truth (1 session)
+
+| ID | Fix |
+|---|---|
+| W-37 | Approval for cases requires at least one verified, unexpired credential; the tab lists recorded credentials (after W0 confirms the behaviour). |
+| W-36 | Account state from the identity link ("No account yet" + Invite). |
+| W-32 | "Verified" wording per the owner's scope decision ("Credentials reviewed · current"); "Doctor reviews" → "Consultant reviews". |
+| W-33 | Services & prices "Kind" column filled or removed. |
+| — | W0 credentialing findings. |
 
 ---
 
-## Phase B — copy, Arabic and accessibility
+## 3. Copy, Arabic and accessibility
 
 ### B1 — Notifications and Arabic copy (1 session)
 
 | ID | Fix |
 |---|---|
-| #1 (+W-12) | Arabic country names and Arabic search in the country picker (case form, profile). High. |
-| W-2 | Arabic names on catalogue items; the exchange-rate note in both message files. |
-| G-9 | Arabic amounts ("500 US$") — currency placement in `formatMoney` for `ar`. |
-| G-10 | Translated fallback label for unknown proposal/deposit states. |
+| #1 (+W-12) | Arabic country names and search (case form, profile). High. |
+| W-2 | Arabic catalogue item names; FX note in both message files. |
+| G-9 | Arabic amount format ("500 US$"). |
+| G-10 | Translated fallback for unknown states. |
 | W-18 | Short care-area names on switcher cards. |
-| #5 | One name per care area across public and staff screens. |
-| #14 | "Consultant", not "Doctor", in the messages panel. |
+| #5 | One name per care area. |
+| #14 | "Consultant", not "Doctor", in messages. |
 | W-15 | Hide "Track your case" in the phone menu when signed in. |
-| #4 | Review step shows care area, condition note and email. |
+| #4 | Review step shows care area, note and email. |
 
-### B2 — Accessible names (½ session)
+### B2 — Accessible names and navigation (½ session)
 
-2k first (the legal acknowledgement checkbox), then 2a–2j and the "My work , 1" stray comma (2h); #10 Virtual Clinic top
-bar (account menu, sign out, back to workspace). Verify with `e2e/a11y.spec.ts` (en + ar) and unit name assertions.
-
----
-
-## Phase C — redesign
-
-### C1 — Patient proposal, status link and profile (shape plan + build)
-
-G-1 via `/redesign-area`, reusing the My Care pieces: the proposal drawer and secure proposal link (W-3: one action
-location per screen size), the secure status link, profile completion. Includes the My Care follow-ups G-6, G-7, G-11,
-G-12 and the W-10/#31 decision (two codes in an hour). Starts with a shape plan in `docs/ux-redesign/plans/` for owner
-approval, as My Care did.
-
-### C2 — Finance workspace redesign (owner: complete UI/UX revamp)
-
-F-UX-1: the owner asked for a complete revamp of the Finance screens, not piecemeal fixes. Runs through
-`/redesign-area` with an Impeccable critique of the current Finance dashboard, case view (commercial approval, deposit
-and payments, refunds) and the Control Center Finance pages (exchange rates, margin & deposit policy), then a shape plan
-for owner approval. The logic it depends on lands first in A4 and B3 (Finance work items, EGP amount due, fixed payment
-methods, manual-line visibility, one approve action, deposits reachable on every case). Pass-specific: the Control
-Center still renders the legacy base theme and converges to Petrol & Paper here.
-
-## Phase D — new feature
-
-### R1 — Travel services priced by Operations
-
-Design session first (backend-design + Impeccable), following the outline in the findings. Needs the R1 decisions:
-margin on travel, Finance approval of travel prices, fixed price vs range, companions, travel deposit. Depends on A1
-(#25/#27) and A5 (journey events).
+2k first (the legal acknowledgement checkbox), then 2a–2j and 2h (stray comma); #10 Virtual Clinic top bar (account menu,
+sign out, back to workspace — confirmed again in W-33). Verify with `e2e/a11y.spec.ts` (en + ar).
 
 ---
 
-## Blocked register (decisions owed)
+## 4. Redesign
 
-| Item | Owner of the decision | Blocks |
+### C1 — Patient proposal, status link and profile
+
+G-1 via `/redesign-area`, reusing the My Care pieces: proposal drawer and secure proposal link (W-3), status link,
+profile completion; My Care follow-ups G-6, G-7, G-11, G-12; the W-10/#31 decision. Shape plan first.
+
+### C2 — Finance workspace (owner: complete revamp)
+
+F-UX-1 via `/redesign-area`: Impeccable critique of the Finance dashboard, case view (approval, deposit, payments,
+refunds) and Control Center Finance pages; shape plan for approval; build on the A4 + B3 logic. The Control Center
+converges from the legacy base theme to Petrol & Paper here.
+
+---
+
+## 5. New features (after decisions)
+
+- **DEP-2 — online deposit payment** through a payment provider (hosted checkout/link, automatic receipt on provider
+  confirmation, Finance handles exceptions). Design + build once the business decides provider, fees, currencies,
+  refunds and legal terms.
+- **R1 — travel services priced by Operations**, per the outline in the findings; design first; depends on A1 and A5.
+
+---
+
+## Decisions owed
+
+| Item | Decided by | Blocks |
 |---|---|---|
-| #30, L1–L5 | Legal: refund and cancellation wording | launch; proposal terms |
+| #30, L1–L5, W-27 | Legal: refund/cancellation wording and the stored refund class | launch; proposal terms |
 | G-3 | Legal: representative consent wording | consent variant |
 | G-13 | Native Arabic review | launch |
-| W-1 | Business: deposit cap/waiver rule | A4 |
-| DEP-2 | Business: online deposit payment through a payment provider (hosted checkout/link, automatic receipt by provider confirmation; Finance handles exceptions) — provider, fees, currencies, refunds, legal terms. If approved: its own batch after A4. | new batch |
-| R1 decisions | Business | R1 batch |
-| D1 | Owner: authenticator at sign-in for staff | one item in A2 |
+| W-1 | Business: deposit cap/waiver | A4 |
+| DEP-2 | Business: online payment provider | DEP-2 |
+| R1 decisions | Business | R1 |
+| D1 | Owner: confirm staff MFA at sign-in (MFA-1 agreed the approach) | A2 |
 | #15 | Owner: sub-steps vs separate stages | A5 |
-| #33 | Owner: confirm continuity routing | A6 |
-| W-10 / #31 | Owner: accept two codes or carry the session | C1 |
+| #33 | Owner: continuity routing | A6 |
+| W-32 | Owner: does "never say Verified" cover staff views? | A7 |
+| W-10 / #31 | Owner: two codes or carried session | C1 |
 | G-11 | Owner/design: connector contrast | C1 |
+
+Already decided: G-2 (option C), G-8 (layered limits, done), DEP (keep Finance confirmation, DEP-1), MFA-1 (approach).
+
+---
+
+## Coverage index
+
+| ID | Batch | ID | Batch | ID | Batch |
+|---|---|---|---|---|---|
+| #1 | B1 | #20 | A4 | G-9 | B1 |
+| 2a–2k | B2 (2j also A5) | #21 | A1 | G-10 | B1 |
+| #3, #3b | A3 | #22 | A4 | G-11 | C1 / decision |
+| 3-UX | A3 | #23 | A5 | G-12 | C1 |
+| #4 | B1 | #24 | A5 | G-13 | decision |
+| #5 | B1 | #25 | A1 | G-14, G-15, G-16 | A6 |
+| #6 | A2 | #26 | A6 | W-1 | A4 / decision |
+| #7 | A2 | #27 | A1, R1 | W-2 | B1 |
+| #8 | A4 | #28 | A1 | W-3 | C1 |
+| #9 | A2 | #29 | A0 (with W-8) | W-4, W-17, W-20 | works — keep |
+| #10 | B2 | #30 | decision | W-5 | A1 (#13) |
+| #11 | A1 | #31 | C1 / decision | W-6, W-7 | A2 |
+| #12 | A4 | #32 | A2 | W-8, W-9 | A0 |
+| #13 | A1 | #33 | A6 | W-10 | C1 |
+| #14 | B1 | B1, B2 | A0 (status) | W-11 | A2 |
+| #15, 15-ops | A5 | B3 | B3 | W-12 | B1 (#1) |
+| #16 | A5 | D1 | A2 / decision | W-13, W-14 | A6 |
+| #17 | A5 | R1 | R1 | W-15 | B1 |
+| #18 | A3 | P-UX-1, MC-1 | done | W-16 | A0 |
+| #19 | A4 | F-UX-1 | C2 | W-18 | B1 |
+| G-1 | C1 | DEP | A4 (DEP-1), DEP-2 | W-19 | A0 |
+| G-2 | A6 | MFA-1 | A2, T1 | W-21, W-22 | A4 |
+| G-3 | decision | G-5 | A2 | W-23 | A1 (#28) |
+| G-4 | A6 | G-6, G-7 | C1 | W-24 | B3, A3 |
+| G-8 | done | | | W-25 | B3 |
+| W-26, W-28 | A4 | W-27 | decision | W-29 | T1, A2 |
+| W-30 | A2 | W-31 | T1 | W-32, W-33 | A7 (W-33 also B2) |
+| W-34 | T1 | W-35, W-38, W-39, W-40 | A2 | W-36, W-37 | A7 |
 
 ## Next exact action
 
-1. Owner reviews this draft (order, batch boundaries, the decisions in the register).
-2. Next session: finish the walk (deposit recording, then step 6); slot new findings into A4/A6 (or a new batch).
-3. Owner approves the plan; batches then run one per session, starting with **A0**.
+1. Owner approves this plan (order, batch boundaries) and answers what the decision register needs before each batch.
+2. Next session: **B3**, then **T1**, then **W0** (owner signs in) — so the walk is complete before the logic batches.
+3. Then A0 → A1 → A2 → … one batch per session, each committed when green.
