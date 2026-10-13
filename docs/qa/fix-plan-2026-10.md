@@ -164,7 +164,11 @@ header = brief = action. B3 follow-ups: the deposit to record skips a Finance as
 member's items return to the pool (event + sweep, audited), a lead releases or hands on pool work via the reassign endpoint
 (audited from/to), pool work is never cancelled (409: recording or waiving the deposit closes it). Independent security
 review: no CRITICAL/HIGH; MEDIUM/LOW fixed. 3-UX rename left for the owner's validation. Backend 721/0/2, vitest 414,
-Playwright staff-home/portal/a11y 37 passed. Live checks: see the A3 report.
+Playwright staff-home/portal/a11y 37 passed. Live walk on dev (RS-2026-000005, 2026-10-13): #3 and #3b verified (one item per
+stage, the release step notified and emailed); it found Finance's pending assignment missing from "At a glance", fixed in
+`52c8b47`. Also seen live, already planned: W-6 (re-check loses the recommendation and the Finance approval) and #9 (stale
+"not saved" notice after success) in A2; the Consultant's summary calls a total that includes a manual line "Approved
+catalogue price" (#19, A4).
 
 ### A4 — Finance and commercial logic (1 session)
 
