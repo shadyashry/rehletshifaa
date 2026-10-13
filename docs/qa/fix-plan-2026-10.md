@@ -105,6 +105,9 @@ credential (needs `credential-admin`'s passkey, W-40) — moved to T1. New findi
 | W-9 | Coordinator email "Case for case RS-…". |
 | B1/B2 | ~~Correct their status in the findings (committed and pushed: `b06ae3f`, `9e1e6c8`).~~ Done in the B3 session. |
 
+**Done — `fc44ffb` (2026-10-13).** All A0 rows fixed with tests (W-19, W-8/#29/W-42, W-16, W-9). Live checks after the
+rebuild: Back after sign-in returns to the portal; an Arabic patient's secure-message / action link arrives in Arabic.
+
 ### A1 — The next action tells the truth (1 session)
 
 Root cause: one action code and one stage label serve two different moments.
