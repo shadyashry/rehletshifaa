@@ -45,6 +45,30 @@ services:
       timeout: 5s
       retries: 20
 
+  # --import-realm runs once per keycloak-data volume, so users added to the realm file later never reach an existing
+  # stack (QA W-51: the invited QA accounts were missing and their invitations failed). On every `up` this one-shot
+  # partial import adds whatever the realm file has and Keycloak lacks; anything that exists is left untouched (SKIP),
+  # so passwords, authenticators and passkeys set during testing survive. Dev only (local bootstrap admin).
+  keycloak-sync:
+    image: quay.io/keycloak/keycloak:26.7.3
+    depends_on:
+      keycloak: { condition: service_started }
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: Admin123!
+    volumes:
+      - ./infrastructure/keycloak/realm-rehletshifaa.json:/opt/sync/realm-rehletshifaa.json:ro
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        for attempt in $$(seq 1 60); do
+        /opt/keycloak/bin/kcadm.sh config credentials --config /tmp/kcadm.config --server http://keycloak:8080 --realm master
+        --user "$$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null 2>&1 && break;
+        [ "$$attempt" = 60 ] && { echo "keycloak-sync: Keycloak did not come up" >&2; exit 1; };
+        sleep 5; done &&
+        /opt/keycloak/bin/kcadm.sh create partialImport --config /tmp/kcadm.config -r rehletshifaa
+        -s ifResourceExists=SKIP -f /opt/sync/realm-rehletshifaa.json -o | head -c 300; echo
+
   minio-init:
     image: minio/mc:RELEASE.2025-07-21T05-28-08Z
     depends_on:

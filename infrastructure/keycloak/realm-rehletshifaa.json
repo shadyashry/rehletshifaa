@@ -312,6 +312,20 @@
       ]
     },
     {
+      "id": "00000000-0000-0000-0000-000000000202",
+      "username": "doctor-orthopedics",
+      "email": "doctor-orthopedics@local.test",
+      "firstName": "Hossam",
+      "lastName": "Kibba",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": [
+        "UPDATE_PASSWORD",
+        "CONFIGURE_TOTP"
+      ],
+      "credentials": []
+    },
+    {
       "id": "00000000-0000-0000-0000-000000000104",
       "username": "operations",
       "email": "operations@local.test",

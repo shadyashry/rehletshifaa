@@ -15,6 +15,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.timestamp;
 @Profile("local")
 public class LocalDemoDataSeeder implements ApplicationRunner {
     public static final String DOCTOR_SUBJECT="00000000-0000-0000-0000-000000000103";
+    public static final String ORTHOPEDICS_DOCTOR_SUBJECT="00000000-0000-0000-0000-000000000202";
     public static final String COORDINATOR_SUBJECT="00000000-0000-0000-0000-000000000102";
     public static final String SECOND_COORDINATOR_SUBJECT="06d5980a-76fe-4e34-9900-89aef8a9d87a";
     // The realm's seeded operations / finance logins (infrastructure/keycloak/realm-rehletshifaa.json). They
@@ -31,11 +32,14 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         // seeded doctor login (DOCTOR_SUBJECT) so the accept/review flow can be demonstrated.
         seedConsultant(DOCTOR_SUBJECT,"Dr Ahmed Alashry","General and Interventional Cardiology","Interventional cardiology","cardiology",now);
         seedConsultant("00000000-0000-0000-0000-000000000201","Dr Hanan Elshoura","Rheumatology, Rehabilitation and Physical Medicine","Adult & pediatric dysphagia rehabilitation","rheumatology-rehabilitation",now);
-        seedConsultant("00000000-0000-0000-0000-000000000202","Dr Hossam Kibba","Orthopedics, Trauma and Joint Replacement","Hip & knee replacement, lower-extremity","orthopedics",now);
+        seedConsultant(ORTHOPEDICS_DOCTOR_SUBJECT,"Dr Hossam Kibba","Orthopedics, Trauma and Joint Replacement","Hip & knee replacement, lower-extremity","orthopedics",now);
         // Work addresses of the QA identities (the realm's seeded logins), so work emails reach the person
         // the work belongs to — a consultant's assignment must be visible under the consultant's address in
         // Mailpit, never under the coordination team's. Only rows still without an address are touched.
         seedPractitionerEmail(DOCTOR_SUBJECT,"doctor@local.test",now);
+        // The second Consultant login (realm user doctor-orthopedics, another care area), so a referral can be accepted
+        // by a receiving Consultant on dev (QA W-34). No password in the repo: it is activated like the invited QA accounts.
+        seedPractitionerEmail(ORTHOPEDICS_DOCTOR_SUBJECT,"doctor-orthopedics@local.test",now);
     }
     public static final String ADMIN_SUBJECT="00000000-0000-0000-0000-000000000106";
     private static final UUID COORDINATION_TEAM=UUID.fromString("00000000-0000-0000-0000-00000000c001");

@@ -34,19 +34,61 @@ Roles below are **platform** roles granted in the database (Control Center › A
 | `coordinator` | coordinator@local.test | Layla Hassan | COORDINATOR (lead of "Coordination team", manager of `coordinator2`) | Coordination lead: Team queue, take/transfer case ownership, assign consultant, prepare/release proposals, final quotes, Coordination Setup | Staff Portal (`/en/portal`) |
 | `coordinator2` | coordinator2@local.test | Omar Nasser | COORDINATOR | Second coordinator — transfer target, "Owned by my team" queue, OPS-1 notification check | Staff Portal |
 | `doctor` | doctor@local.test | Ahmed AlAshry | CONSULTANT | Consultant: clinical review + cost estimate, final in-person assessment, procedure consent, treatment / discharge | Staff Portal (consultant work) |
+| `doctor-orthopedics` | doctor-orthopedics@local.test | Hossam Kibba | CONSULTANT (orthopedics) | Second Consultant (another care area): receiving end of a referral — transfer or second opinion (QA W-34). **No password in the repo**: activate as below | Staff Portal (consultant work) |
 | `operations` | operations@local.test | Mariam Soliman | OPERATIONS | Travel package before release (when travel is requested), travel coordination, arrival | Staff Portal |
 | `finance` | finance@local.test | Youssef Adel | FINANCE | Approve manually priced proposals, record deposit payments and refunds (offline, record-only) | Staff Portal |
 | `credential-admin` | credential-admin@local.test | Maya Farid | CREDENTIAL_VERIFIER, SYSTEM_ADMINISTRATOR | Control Center: people, teams, access governance, consultants and credential reviews | Control Center (`/en/portal/control-center`) |
 | `service-account-staff-identity-admin` | — | — | — | Backend service account (client `staff-identity-admin`). **Not a login.** | — |
 
-Seeded **invited** accounts (no password, no MFA; re-send the invitation from the Control Center and finish setup from
-Mailpit): `patient-identity-reviewer`, `care-manager`, `operations-manager`, `finance-manager`, `credentialing-manager`,
-`consultant-operations-manager`, `support-manager`, `support-officer`, `journey-manager`, `journey-approver`,
-`compliance-auditor`, `coordinator-scope`, `care-manager-scope` (all `@local.test`). Full role catalogue and
-boundaries: [qa-test-protocol.md §2](../qa-test-protocol.md#2-roles--test-accounts).
+Seeded **invited** accounts (no password, no MFA): `patient-identity-reviewer`, `care-manager`, `operations-manager`,
+`finance-manager`, `credentialing-manager`, `consultant-operations-manager`, `support-manager`, `support-officer`,
+`journey-manager`, `journey-approver`, `compliance-auditor`, `coordinator-scope`, `care-manager-scope` (all `@local.test`),
+plus the Consultant login `doctor-orthopedics`. Full role catalogue and boundaries:
+[qa-test-protocol.md §2](../qa-test-protocol.md#2-roles--test-accounts).
+
+**Activating an invited account for a walk (no admin chain needed):**
+
+1. Sign in page → **Forgot Password?** → the username (e.g. `patient-identity-reviewer`) → open the reset email in
+   Mailpit (https://mail-dev.rehletshifaa.com) → set a password.
+2. At the first sign-in Keycloak asks for an authenticator: scan the QR with the owner's authenticator app and save the
+   entry in the owner's password manager (name it `RehletShifaa dev — <username>`). Secrets never go into the repo.
+3. The portal activates the person on that first sign-in (staff invitations: needs the seeded `SENT` invitation, the
+   Keycloak user and the enrolled authenticator — `StaffLifecycleService.activate`).
+
+Alternative: Control Center › People › the person › **Resend invitation** (needs `credential-admin`, whose re-check needs
+a passkey — use Chrome, see MFA below). If a setup or reset link says *"already authenticated as different user"*, an
+abandoned sign-in is still in that browser: open the link in a private (Incognito) window.
+
+**Keycloak users added to the realm file after a stack was created** reach it on the next
+`docker compose … up -d`: the one-shot `keycloak-sync` service partial-imports `infrastructure/keycloak/realm-rehletshifaa.json`
+and skips everything that exists (passwords, authenticators and passkeys set during testing survive). Check it with
+`docker logs rehletshifaa-keycloak-sync-1` (it prints the added/skipped counts) — QA W-51.
+
+**Second factor per account (MFA-1, W-29).** A normal sign-in is password only; every sensitive action (record a payment,
+an identity decision, an invitation, approvals) asks for a fresh sign-in with the second factor ("Sign in again").
+
+| Account | Second factor | Where the secret lives | Reset route |
+|---|---|---|---|
+| `finance`, `doctor`, `coordinator`, `operations`, invited staff, `doctor-orthopedics` | Authenticator app (TOTP codes), enrolled at first step-up / first sign-in | Owner's authenticator app + password manager | Control Center › People › MFA reset (approved by a second administrator), or Keycloak admin console › Users › Credentials (dev only) |
+| `credential-admin` (System Administrator) | **Passkey** (WebAuthn) — administrator changes require phishing-resistant MFA | Owner's device (Windows Hello / security key) | Keycloak admin console › Users › Credentials (dev only) |
+| `patient` and activated patients | Authenticator app if asked; patients act mostly through secure links + one-time codes | Owner's app | Account settings, or Keycloak admin console (dev only) |
+
+Passkey registration fails in browsers that block `window.prompt()` (W-40) — including the Claude desktop built-in
+browser: register and use the administrator passkey in Chrome.
 
 **Accounts created during testing** (patients who activate, invited provider clinicians / practice managers) set their own
 password through the Keycloak email link in Mailpit. Their passwords are never stored in the repo and cannot be looked up.
+
+**Simulating an inbound WhatsApp message on dev (QA W-31).** The local stack sends WhatsApp to Mailpit and has no Meta
+webhook. To make "someone text the business number" (an intake conversation for a new number, or a message in the case
+thread of a number with an open case), call the dev-only endpoint from this machine — it is not reachable through the
+tunnel:
+
+```bash
+curl -s -X POST http://localhost:8080/dev/whatsapp/inbound -H "Content-Type: application/json" -d '{"from":"+254799000031","name":"QA Sender","text":"Hello, I need a knee consultation"}'
+```
+
+The scheduled inbound processor files it within ~5 s; Conversations (coordinator) shows it. Synthetic numbers only.
 
 End-to-end specs read the same seeded passwords from environment variables: `PORTAL_TEST_PASSWORD`, `DOCTOR_TEST_PASSWORD`,
 `OPERATIONS_TEST_PASSWORD`, `FINANCE_TEST_PASSWORD` (see `AGENTS.md` §5).
