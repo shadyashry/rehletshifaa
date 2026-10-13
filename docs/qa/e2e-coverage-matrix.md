@@ -1,7 +1,7 @@
 # End-to-end coverage matrix
 
 _Snapshot 2026-10-13 at `9a2304b` (`codex/platform-control-plane`), mapped against
-[qa-test-protocol.md](../qa-test-protocol.md) **v1.1** (19 use cases, 17 security checks). Replaces the 2026-09-13
+[qa-test-protocol.md](../qa-test-protocol.md) **v1.1** (20 use cases, 17 security checks). Replaces the 2026-09-13
 release-candidate package (removed 2026-10-13; recoverable from git at `9a2304b`)._
 
 Each row names the tests that prove the test case today, at three depths:
@@ -21,7 +21,7 @@ automated proof.
 | Status | Use cases | Security checks |
 |---|---|---|
 | Covered | UC-01, 02, 03, 06, 07, 10 | SEC-4, 5, 7, 10, 12, 14, 15, 16 |
-| Partial | UC-04, 05, 08, 09, 11, 12, 13, 14, 15, 16, 17, 18, 19 | SEC-1, 2, 3, 6, 8, 9, 11, 13, 17 |
+| Partial | UC-04, 05, 08, 09, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 | SEC-1, 2, 3, 6, 8, 9, 11, 13, 17 |
 
 Highest-value gaps, in order:
 1. **Document upload** — no browser test uploads a file through presign → MinIO → ClamAV (UC-01, SEC-13).
@@ -51,10 +51,11 @@ SEC-10 and UC-12 were closed on 2026-10-13; the SEC-10 test found and led to the
 | UC-13 | Case messages, tasks, ownership transfer | — | `care-coordination` (team queue, transfer, history, EN/AR); `portal-ux` (failed send keeps draft); `portal-p2-pass-3` (unsent-text guard) | `SecureJourneyCorrectionsTest` (thread membership, internal flag, lead rebalance, transfer notifies once); `ReplyCoverIntegrationTest.onlyTheOwnerRepliesWhenNobodyCovers`; `BypassRemovalNegativeTest.taskCancelAndReassignRequireSupervision…` | Partial | The non-owner refusal on the patient thread is not exercised in a browser |
 | UC-14 | Practitioner credentialing | — | — | `JourneyServiceIntegrationTest.credentialDecisionRequiresIndependentReviewer…`; `ConsultantVirtualClinicTest.capabilitiesAreNeverSelfApproved`; `SecureJourneyCorrectionsTest.expiredCredentialRemoves…` | Partial | Control Center consultant/credential screens have no browser test |
 | UC-15 | WhatsApp intake conversation → case | — | — | `IntakeConversationIntegrationTest` (owner by language, one per sender, queue + one claim wins, window, returning owner, limit); `CaseHandOffIntegrationTest` (continuity, introduced by name); `WhatsAppInboundProcessorTest` | Partial | No end-to-end run; needs the Meta test setup |
-| UC-16 | One voice, covers, reply timers, out of hours | — | — | `ReplyCoverIntegrationTest` (8: cover only, revoke, no overlap, who may set, link resend); `ReplyTimerIntegrationTest` (7: remind → lead → managers, working time, out of hours once, idle close) | Partial | No end-to-end run; simultaneous sends not asserted |
+| UC-16 | Who replies to the patient; covers, reply timers, out of hours | — | — | `ReplyCoverIntegrationTest` (8: only the owner replies with no cover, only the cover while covered, revoke, no overlap, who may set, link resend); `ReplyTimerIntegrationTest` (7); `SecureJourneyCorrectionsTest.coordinatorLeadCanRebalanceOwnershipAndOldOwnerLosesAccess` | Partial | No end-to-end run; the lead and the other team being refused on the patient thread, and simultaneous sends, are not asserted by name |
 | UC-17 | Consultant referral: transfer, second opinion | — | — | `ConsultantVirtualClinicTest` (confirm/accept, declined transfer, second opinion read + opinion only, only owning coordinator confirms) | Partial | No browser test |
 | UC-18 | A coordinator leaves | — | — | `CoordinationIntegrationTest.aCoordinatorWhoLeavesHandsTheirCases…`, `.withNobodyElseEligibleTheCaseGoesToTheQueue…`, `.aRoleThatEndedOnItsDateIsSweptLikeADeparture`; `CoordinatorDepartureIntegrationTest` (6) | Partial | No browser test |
 | UC-19 | Staff invitation and workforce hierarchy | `governance-bootstrap-live`; `mfa-live`; `restore-gate-live` | `staff-activation` (invite → ACTIVE, MFA required, never a patient); `staff-home` | `WorkforceHierarchyIntegrationTest`; `WorkforceRoleAssignmentIntegrationTest` (only lead, SoD, next-request revocation); `PortalExperienceTest.leadSupervisionIsLimitedToTheirOwnTeam…`; `BypassRemovalNegativeTest.leadsReadOnlyCasesOfTheirOwnTeam` | Partial | Team-scoped case visibility never runs in a browser |
+| UC-20 | Two coordination teams | — | `care-coordination` (team queue, transfer, EN/AR; mocked) | `CoordinationIntegrationTest` (`teamProfileRestrictsCareAreasAndCannotFallBackToItself`, `coordinationIntakeWithNoCareAreaAssignsOnlyToUnrestrictedTeam`, `managedCaseSummaryIsTeamScoped…`, `managerReassignmentUsesFullEligibility…`); `BypassRemovalNegativeTest.leadsReadOnlyCasesOfTheirOwnTeam`; `PortalExperienceTest.leadSupervisionIsLimitedToTheirOwnTeam…`; `IntakeConversationIntegrationTest.aLeadReassignsToSomeoneWhoTakesIntake` | Partial | Never run live: the dev data has one routed team; needs the two-team setup |
 
 ## Security checks
 

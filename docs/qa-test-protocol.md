@@ -13,7 +13,7 @@ matrix in §9. Run critical journeys in **both English and Arabic (RTL)**.
 - Scope: web portal + secure links + APIs
 - Languages: English & العربية (right-to-left)
 - Destination of care: Egypt · Pricing base: EGP
-- End-to-end use cases: 19 (coverage per case: [qa/e2e-coverage-matrix.md](qa/e2e-coverage-matrix.md))
+- End-to-end use cases: 20 (coverage per case: [qa/e2e-coverage-matrix.md](qa/e2e-coverage-matrix.md))
 
 ---
 
@@ -93,6 +93,37 @@ reassign within it; supervision never replaces the ownership or assignment neede
 `journey-manager`, `journey-approver`, `compliance-auditor`, plus `coordinator-scope` and `care-manager-scope` (a second
 team, for scope-denial tests). Usernames match `<name>@local.test`. To use one, re-send its invitation from the Control
 Center as `credential-admin` and finish password and MFA setup from the Mailpit link.
+
+### Test data setup
+
+**Baseline — created automatically.** `LocalDemoDataSeeder` (profile `local`) runs on every backend start and is
+idempotent: the accounts and relationships above, the verified cardiology consultant (`doctor`), and the routing a
+coordinator needs — "Coordination team" serves every care area in `en` and `ar`, routing policy v1 sends everything to
+that team, and **only `coordinator`** is on duty with capacity 100 (`en`, `ar`). So every new case routes to
+`coordinator`; that is deliberate, it keeps live journeys deterministic. Do not change the seeder for a scenario.
+The seeder only adds what is missing, so a database already used for UAT keeps earlier changes (e.g. the dev database
+has had `coordinator2` on duty with capacity 100 since a 2026-10-10 UAT preparation, so new cases are shared between
+both coordinators). Check Control Center › Coordination before a run that depends on who receives a case.
+
+**Per scenario — set, run, put back.** Anything beyond the baseline is part of the scenario: set it through the screen
+named (which also tests that screen), run the case, then restore the baseline so the next scenario starts clean.
+
+| Scenario | Setting it needs | Where | Signed in as | Restore |
+|---|---|---|---|---|
+| UC-03 B (case waits in the queue) | `coordinator` off duty, or at its case limit | Control Center › Coordination (teams and people) | `care-manager` | On duty, limit 100 |
+| UC-13, UC-18, transfer target | `coordinator2` on duty with capacity | Control Center › Coordination (teams and people) | `care-manager` | Remove its capacity |
+| UC-16, UC-20 (two teams) | Team B profile (care areas: orthopedics; `en`,`ar`); `coordinator-scope` on duty with capacity; routing policy mapping cardiology → Team A, orthopedics → Team B (publish a new policy version) | Control Center › Coordination (teams and people, routing policy); activate `coordinator-scope` and `care-manager-scope` first | `care-manager`; `credential-admin` for the activations | Publish the previous policy again (every area → Team A); remove `coordinator-scope` capacity |
+| UC-15 (WhatsApp intake) | Intake switched on for `coordinator` ("Not set up yet" until then) + Meta test number | Control Center › Coordination (conversations) | `care-manager` | Intake off |
+| UC-16 (one voice) | Shorter reply times / opening hours for the run; a cover for `coordinator` | Control Center › Coordination (conversations); cover on the coordinator's My work view | `care-manager`; `coordinator` or its lead | Defaults (Sat–Thu 10:00–20:00 Africa/Cairo, 30/60 min, 72 h); revoke the cover |
+| UC-18 (coordinator leaves) | `coordinator2` owning cases/conversations, then disabled | Control Center › People | `credential-admin` | Re-enable; reassign its work back if needed |
+| UC-08 B, UC-14, UC-19, manager screens | An invited account activated, or a role granted | Control Center › People / Access; Mailpit for the invitation | `credential-admin`, then the tester sets the password | Leave activated (no password is stored in the repo) |
+| UC-05 (all four gate paths) | Travel package on the case; an off-catalog price on the estimate | During the case itself (intake / consultant review) | the journey's own actors | none |
+
+**One-time prerequisite:** `care-manager` is only invited, and coordination setup needs the Care Coordination Manager
+role, so activate `care-manager` (row "UC-08 B, UC-14, UC-19" above) before any coordination scenario.
+
+Passwords for invited accounts are set by the person testing, from the Mailpit link; they are never committed or
+shared in chat. A full reset (fresh dev database) brings back the baseline only.
 
 ---
 
@@ -360,10 +391,18 @@ conditional branch, **NEG** = must be blocked.
   documents, and if someone else got the case `rs_coordinator_intro` introduces them by name. The drawer shows
   "WhatsApp before the case" read-only. Inbound files are scanned before anyone can open them. EN and AR templates.
 
-### UC-16 · One voice: covers, reply timers & out of hours — EDGE · Coordinator / Lead
-- **Pre:** A case with a WhatsApp-reachable patient; conversation settings in Control Center (default Sat–Thu
-  10:00–20:00 Africa/Cairo, 30/60 minutes, 72 hours; shorten them for the test).
-- **Steps:** Two coordinators send to the same conversation at once → the owner sets a time-bounded cover → the cover
+### UC-16 · One voice: who replies to the patient, covers, timers & out of hours — EDGE · Coordinator / Lead
+- **Pre:** A case owned by `coordinator` with a WhatsApp-reachable patient; `coordinator2` on duty; the second team set
+  up (UC-20); conversation settings in Control Center (default Sat–Thu 10:00–20:00 Africa/Cairo, 30/60 minutes,
+  72 hours; shorten them for the test).
+- **Steps — who replies:** The patient writes (WhatsApp and portal) → the owner replies → try to reply as
+  `coordinator2` (same team, not owner), as the owner's lead, and as `coordinator-scope` (other team) → transfer the
+  case to `coordinator2` → the patient writes again → both coordinators try to reply.
+- **Expected — who replies:** The patient's message lands in the case's patient thread and is the owner's to answer.
+  Only the owner replies; the colleague, the lead and the other team are refused by the server (a lead covers or
+  reassigns, never writes over the owner). After the transfer only `coordinator2` replies and the previous owner is
+  refused. The patient sees one coordinator by name and gets the "new secure message" nudge, never the message body.
+- **Steps — covers and timers:** Two coordinators send to the same conversation at once → the owner sets a time-bounded cover → the cover
   replies, and the cover resends the secure link → let the cover expire → the patient writes and nobody answers →
   someone with no case writes out of hours → leave an intake conversation silent.
 - **Expected:** The second concurrent send is refused. During the cover only the cover writes and the owner reads;
@@ -404,6 +443,21 @@ conditional branch, **NEG** = must be blocked.
   to set it up and are never treated as a patient. A lead reads only their own team's cases; another team's
   coordinator is refused. Removing the only lead or a manager with reports, and separation-of-duties conflicts, are
   refused at grant. Role changes take effect on the next request.
+
+### UC-20 · Two coordination teams — EDGE · Coordinators, Leads, Care Coordination Manager
+- **Pre:** Team A = "Coordination team" (lead `coordinator`, member `coordinator2`); Team B = "Coordination
+  scope-denial team" (lead `care-manager-scope`, member `coordinator-scope`), both activated. Routing set up per
+  "Test data setup": Team A serves cardiology, Team B serves orthopedics, each with an on-duty coordinator.
+- **Steps:** Submit a cardiology case and an orthopedics case → open each as each coordinator and lead → as
+  `coordinator` (lead A), try to reassign the orthopedics case and to reassign the cardiology case to
+  `coordinator-scope` → as `care-manager`, move a case from Team A to Team B → submit a case in a care area no team
+  serves.
+- **Expected:** Each case routes to the team serving its care area and to that team's eligible coordinator. A lead
+  sees only their own team's cases (no indirect depth) and reassigns only within the team; the other team's lead and
+  coordinators cannot open or act on it. The Care Coordination Manager can move work across teams, with a reason, and
+  the move is audited and notifies only the new owner. A care area no team serves follows the policy's fallback, or
+  waits in the queue with the manager alert — never lands on an ineligible team. Repeat with WhatsApp intake: an
+  Arabic speaker's conversation goes only to a coordinator who speaks Arabic.
 
 ---
 
@@ -479,7 +533,7 @@ Record every run with the same fields so a failure is reproducible.
 **Priority order for a first pass**
 
 1. UC-01 → UC-12 as one continuous journey (English), then UC-01 → UC-07 in Arabic using UC-06 B.
-2. UC-13 → UC-19 (coordination, referrals, WhatsApp, workforce).
+2. UC-13 → UC-20 (coordination, two teams, referrals, WhatsApp, workforce).
 3. All NEG cases and the §7 security checks.
 4. Both languages / RTL for §4 pages.
 5. Role-boundary checks from §2.
