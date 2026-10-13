@@ -262,6 +262,29 @@ converges from the legacy base theme to Petrol & Paper here.
 
 ## 5. New features (after decisions)
 
+- **DEP-3 — the patient's payment step (owner decision 2026-10-13; replaces DEP-1).** The journey never continues on
+  staff word alone: the patient must give a transfer reference.
+  1. After profile activation the patient's current step is "Pay your coordination deposit" (EN/AR); the case waits on
+     the **patient**. The coordinator's "arrange the deposit / payment instructions sent" work item is retired — the
+     platform shows the instructions itself.
+  2. The patient chooses the payment method: **Online** is shown but disabled ("coming soon") until a provider is
+     chosen (DEP-2); **Bank transfer to the platform account** shows the account details, the exact amount and the case
+     number as the payment reference to write on the transfer.
+  3. For a bank transfer the patient enters the **transaction reference number** the bank gave them — **mandatory, and
+     the only proof asked for** (no receipt upload). The field explains what it is for ("so Finance can find your
+     transfer and confirm it") and where to find it (the bank's confirmation SMS/email/receipt, or the transfer details
+     in the banking app; also called transfer ID / FT number). Two entry points, one screen: directly on the patient's
+     case screen (My Care), or — if the patient asks on WhatsApp — the coordinator sends a secure link that opens the
+     same field. Staff never type the reference for the patient.
+  4. Submitting it opens Finance's "Verify the transfer" work item automatically (assigned Finance person, else the
+     Finance pool), with in-app notification and work email; the coordinator is told; the patient reads "We're checking
+     your payment". Every step audited.
+  5. Finance checks the bank and **confirms** (records the receipt against the patient's reference; journey continues)
+     or **rejects with a reason** (the step returns to the patient with that reason). Treatment coordination starts
+     only after confirmation.
+  Open with the owner: platform bank account details (EN/AR text, as configuration); amount mismatch / part payment
+  rule; reminder timing when no reference arrives. Own batch with independent security review (patient input,
+  Finance authority, the deposit gate); bank-transfer path ~1–2 sessions, no provider needed.
 - **DEP-2 — online deposit payment** through a payment provider (hosted checkout/link, automatic receipt on provider
   confirmation, Finance handles exceptions). Design + build once the business decides provider, fees, currencies,
   refunds and legal terms.
