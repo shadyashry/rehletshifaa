@@ -46,7 +46,7 @@ public class CaseActionService {
     /** Stages where the customer's readiness (profile, contact, consents, identity, deposit) is live. */
     private static final Set<String> READINESS_STAGES = Set.of("ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED");
     /** Staff work that exists to move the deposit or coordination forward, so it waits behind the patient's readiness. */
-    private static final Set<String> READINESS_GATED_WORK = Set.of("DEPOSIT_ARRANGEMENT", "TRAVEL");
+    private static final Set<String> READINESS_GATED_WORK = Set.of("TRAVEL");
 
     /**
      * Work that waits behind the patient's readiness is parked — out of My work and "At a glance" — while the case's
@@ -165,8 +165,9 @@ public class CaseActionService {
         if (CONSULTANT_STAGES.contains(status)) return simple("WAIT_CONSULTANT_REVIEW", "WAIT");
         if (PROPOSAL_STAGES.contains(status)) return simple("WAIT_PROPOSAL", "WAIT");
         if ("ACCEPTED".equals(status)) {
-            String deposit = payment.depositStatusFor(caseId);
-            if (Set.of("REQUESTED", "PARTIALLY_PAID", "REQUIRED").contains(deposit)) return simple("WAIT_DEPOSIT_ARRANGEMENT", "WAIT");
+            // DEP-3: the deposit is the patient's to pay and their transfer reference is mandatory; once entered, Finance checks it.
+            if (mine.stream().anyMatch(b -> "DEPOSIT_UNPAID".equals(b.code()))) return simple("PAY_DEPOSIT", "FOCUS");
+            if (payment.transferPending(caseId)) return simple("WAIT_PAYMENT_CHECK", "WAIT");
             return simple("WAIT_COORDINATION", "WAIT");
         }
         if ("TRAVEL_COORDINATION".equals(status)) return simple("WAIT_COORDINATION", "WAIT");
@@ -277,6 +278,8 @@ public class CaseActionService {
         List<String> actions = new ArrayList<>();
         if (p != null && Set.of("RELEASED", "VIEWED").contains(p.status())) actions.add("RESEND_PROPOSAL_LINK");
         if (blockers.stream().anyMatch(b -> "PROFILE_NOT_ACTIVATED".equals(b.code()))) actions.add("RESEND_ONBOARDING_LINK");
+        // The patient asked how to pay (DEP-3): the link to their payment step, while they owe the transfer reference.
+        if (blockers.stream().anyMatch(b -> "DEPOSIT_UNPAID".equals(b.code()) && "PATIENT".equals(b.owner()))) actions.add("SEND_PAYMENT_LINK");
         return actions;
     }
 
@@ -342,8 +345,11 @@ public class CaseActionService {
             }
         }
         boolean patientOwed = out.stream().anyMatch(CaseActionService::patientGate);
+        // DEP-3: the patient pays and enters the transfer reference (theirs to do once every other step is done); while Finance
+        // checks a reference it is ours.
         if (r.depositRequired() && !r.depositSatisfied())
-            out.add(new BlockerView("DEPOSIT_UNPAID", "Coordination deposit", "وديعة التنسيق", patientOwed ? "LATER" : "STAFF", true));
+            out.add(new BlockerView("DEPOSIT_UNPAID", "Coordination deposit", "وديعة التنسيق",
+                    patientOwed ? "LATER" : payment.transferPending(caseId) ? "STAFF" : "PATIENT", true));
         return out;
     }
 
@@ -497,7 +503,7 @@ public class CaseActionService {
     /** Whether finishing the item is acknowledged in place or done through the form that does the real work. */
     private static String kindFor(String type) {
         return switch (type) {
-            case "REVIEW_PATIENT_RESPONSE", "PROPOSAL_DECLINED_REVIEW", "CLINICAL_OUTCOME_REVIEW", "DEPOSIT_ARRANGEMENT", "REVIEW", "INFORMATION_REQUEST" -> "COMPLETE";
+            case "REVIEW_PATIENT_RESPONSE", "PROPOSAL_DECLINED_REVIEW", "CLINICAL_OUTCOME_REVIEW", "REVIEW", "INFORMATION_REQUEST" -> "COMPLETE";
             default -> "FOCUS";
         };
     }

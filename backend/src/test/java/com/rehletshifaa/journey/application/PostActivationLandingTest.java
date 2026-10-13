@@ -42,13 +42,14 @@ import static org.assertj.core.api.Assertions.*;
 class PostActivationLandingTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired PublicCaseAccessService publicCases;
     @Autowired StaffWorkQueryService staffWork;
-    @Autowired PatientAccountService accounts; @Autowired PaymentService payment;
+    @Autowired PatientAccountService accounts; @Autowired PaymentService payment; @Autowired DepositTransferService transfers;
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---- scenarios 2, 3, 5, 6, 9: the deposit stage right after activation ----
 
-    @Test void afterAcknowledgingTheEstimateThePatientHasNothingToDoAndSeesTheDepositBeingArranged() throws Exception {
+    /** DEP-3 (owner decision 2026-10-13): the deposit is the patient's to pay, and the bank's transaction reference is mandatory. */
+    @Test void afterAcknowledgingTheEstimateThePatientPaysTheDepositAndEntersTheTransferReference() throws Exception {
         UUID caseId = ownedCase("+254700000601", "landing-a@local.test");
         UUID versionId = releasedUsdProposal(caseId);
         seedDepositPolicy(new BigDecimal("25000.00"));
@@ -59,13 +60,17 @@ class PostActivationLandingTest {
         authenticate("patient-landing-a", Role.PATIENT);
         CaseWorkspace ws = journey.workspace(caseId);
         assertThat(ws.caseSummary().status()).isEqualTo("ACCEPTED");
-        // One authoritative step: a WAIT, never a "pay" or "continue" action the patient cannot act on.
-        assertThat(ws.actions().currentAction().code()).isEqualTo("WAIT_DEPOSIT_ARRANGEMENT");
-        assertThat(ws.actions().currentAction().kind()).isEqualTo("WAIT");
-        assertThat(ws.actions().waitingOn()).isEqualTo("STAFF");
-        assertThat(ws.actions().blockers()).isEmpty(); // nothing left that only the patient can do
+        // One authoritative step: pay the deposit by bank transfer and enter the reference — the case waits on the patient.
+        assertThat(ws.actions().currentAction().code()).isEqualTo("PAY_DEPOSIT");
+        assertThat(ws.actions().currentAction().kind()).isEqualTo("FOCUS");
+        assertThat(ws.actions().waitingOn()).isEqualTo("PATIENT");
+        assertThat(ws.actions().blockers()).extracting(BlockerView::code).containsExactly("DEPOSIT_UNPAID");
         assertThat(ws.actions().availableActions()).containsExactly("MESSAGE_COORDINATOR");
-        // The deposit: authoritative amount, in the proposal's currency at its snapshot rate, arranged on our side.
+        // Where to pay: the platform account (configuration) and the case number to write on the transfer.
+        assertThat(ws.deposit().bankTransfer().iban()).isNotBlank();
+        assertThat(ws.deposit().bankTransfer().paymentReference()).isEqualTo(ws.caseSummary().caseNumber());
+        assertThat(ws.deposit().transfer()).isNull();
+        // The deposit: authoritative amount, in the proposal's currency at its snapshot rate.
         assertThat(ws.deposit()).isNotNull();
         assertThat(ws.deposit().status()).isEqualTo("REQUESTED");
         assertThat(ws.deposit().currency()).isEqualTo("USD");
@@ -80,6 +85,22 @@ class PostActivationLandingTest {
         // The coordinator shown is the case's actual owner, by name — never a subject.
         assertThat(ws.caseSummary().coordinatorName()).isEqualTo("Coordinator One");
         assertThat(ws.caseSummary().coordinatorSubject()).isNull();
+
+        // The patient enters the reference (Arabic digits read as 0-9): Finance checks it, and the patient waits.
+        transfers.submitReference(caseId, new TransferReferenceRequest("  ft ٢٠٢٦١٠١٣  "));
+        em.flush();
+        CaseWorkspace after = journey.workspace(caseId);
+        assertThat(after.deposit().transfer().reference()).isEqualTo("FT 20261013");
+        assertThat(after.deposit().transfer().status()).isEqualTo("SUBMITTED");
+        assertThat(after.actions().currentAction().code()).isEqualTo("WAIT_PAYMENT_CHECK");
+        assertThat(after.actions().currentAction().kind()).isEqualTo("WAIT");
+        assertThat(after.actions().waitingOn()).isEqualTo("PAYMENT");
+        // The same reference again is a replay; another one while the first is checked is refused.
+        transfers.submitReference(caseId, new TransferReferenceRequest("FT 20261013"));
+        assertThat(catchThrowableOfType(() -> transfers.submitReference(caseId, new TransferReferenceRequest("FT999999")), ApiException.class).code())
+                .isEqualTo("TRANSFER_ALREADY_SUBMITTED");
+        assertThat(catchThrowableOfType(() -> transfers.submitReference(caseId, new TransferReferenceRequest("<script>")), ApiException.class).code())
+                .isEqualTo("TRANSFER_REFERENCE_INVALID");
     }
 
     @Test void onceTheDepositIsConfirmedTheStepMovesOnAndTheDepositReadsAsReceived() throws Exception {
@@ -91,18 +112,18 @@ class PostActivationLandingTest {
         markProfileActive(caseId);
         authenticate("patient-landing-b", Role.PATIENT);
         UUID depositId = journey.workspace(caseId).deposit().id();
-        assertThat(journey.workspace(caseId).actions().currentAction().code()).isEqualTo("WAIT_DEPOSIT_ARRANGEMENT");
+        assertThat(journey.workspace(caseId).actions().currentAction().code()).isEqualTo("PAY_DEPOSIT");
 
         seedStaff("finance-subject", "FINANCE");
         authenticate("finance-subject", Role.FINANCE);
-        payment.recordReceipt(caseId, depositId, new RecordReceiptRequest(new BigDecimal("25000.00"), "BANK", "ref-1", "landing-b:" + caseId));
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, caseId, depositId, new BigDecimal("25000.00"), "landing-b:" + caseId);
         em.flush();
 
         authenticate("patient-landing-b", Role.PATIENT);
         CaseWorkspace ws = journey.workspace(caseId);
         assertThat(ws.deposit().status()).isEqualTo("PAID");
         assertThat(ws.deposit().paidDisplay()).isEqualByComparingTo("500.00");
-        assertThat(ws.actions().currentAction().code()).isNotEqualTo("WAIT_DEPOSIT_ARRANGEMENT"); // the stale step is gone
+        assertThat(ws.actions().currentAction().code()).isNotEqualTo("PAY_DEPOSIT"); // the step is done
         assertThat(ws.actions().currentAction().code()).isEqualTo("WAIT_COORDINATION");
         assertThat(ws.actions().currentAction().kind()).isEqualTo("WAIT");
     }

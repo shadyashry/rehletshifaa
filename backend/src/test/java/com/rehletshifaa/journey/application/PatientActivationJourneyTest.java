@@ -150,12 +150,12 @@ class PatientActivationJourneyTest {
         assertThat(result.deposit().satisfied()).isFalse();
         assertThat(result.waitingOn()).isEqualTo("PATIENT");
 
-        // Once the account is usable, the offline deposit is what remains — and it is staff's move, not the patient's.
+        // Once the account is usable, the deposit is what remains: the patient pays it on their case page (DEP-3).
         finishAccountSetup(ctx); em.flush();
         var afterSetup = activation.prefill(ctx.token, grant(ctx));
         assertThat(afterSetup.journeyStage()).isEqualTo(JourneyStage.DEPOSIT);
-        assertThat(afterSetup.currentAction()).isEqualTo(PatientAction.NONE);
-        assertThat(afterSetup.waitingOn()).isEqualTo("STAFF");
+        assertThat(afterSetup.currentAction()).isEqualTo(PatientAction.CONTINUE_IN_PORTAL);
+        assertThat(afterSetup.waitingOn()).isEqualTo("PATIENT");
     }
 
     @Test void completingTheProfileCreatesNoPaymentOfItsOwn() throws Exception {
@@ -177,15 +177,16 @@ class PatientActivationJourneyTest {
         assertThat(settled.journeyStage()).isEqualTo(JourneyStage.CARE_COORDINATION);
     }
 
-    @Test void aPartlyPaidDepositAsksThePatientForNothingFurther() throws Exception {
+    /** DEP-3: part of the deposit confirmed — the balance is the patient's to pay, on their case page. */
+    @Test void aPartlyPaidDepositSendsThePatientBackToTheirCasePageForTheBalance() throws Exception {
         var ctx = accepted(); String g = grant(ctx);
         activation.activate(ctx.token, g, request("Link Patient")); em.flush(); finishAccountSetup(ctx); em.flush();
         payPartOfDeposit(ctx, "part"); em.flush();
 
-        // A payment is mid-confirmation: still the deposit stage, still nothing for the patient to do.
         var prefill = activation.prefill(ctx.token, g);
         assertThat(prefill.journeyStage()).isEqualTo(JourneyStage.DEPOSIT);
-        assertThat(prefill.currentAction()).isEqualTo(PatientAction.NONE);
+        assertThat(prefill.currentAction()).isEqualTo(PatientAction.CONTINUE_IN_PORTAL);
+        assertThat(prefill.waitingOn()).isEqualTo("PATIENT");
     }
 
     @Test void theNextActionIsNeverDictatedByTheClient() throws Exception {
@@ -197,30 +198,32 @@ class PatientActivationJourneyTest {
         assertThat(prefill.currentAction()).isEqualTo(PatientAction.COMPLETE_PROFILE);
     }
 
-    @Test void anOfflineDepositBecomesRealWorkForTheStaffWhoMustArrangeIt() throws Exception {
+    /** DEP-3: the deposit is the patient's to pay; nothing for staff to arrange. They are told once their profile is done. */
+    @Test void theDepositIsThePatientsToPayOnceTheirProfileIsDone() throws Exception {
         var ctx = accepted(); em.flush();
+        UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=?", UUID.class, ctx.caseId);
 
-        // Raising the deposit is not enough on its own — somebody has to send the instructions.
-        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT owner_role FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", String.class, ctx.caseId)).isEqualTo("COORDINATOR");
-        // Work to do, not a gate: it must not stop travel planning or any other legitimate next step.
-        assertThat(jdbc.queryForObject("SELECT blocking FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", Boolean.class, ctx.caseId)).isFalse();
-        // The ball is the patient's first — their profile is still unactivated — and only then our team's.
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_role IN ('COORDINATOR','FINANCE') AND status='OPEN'", ctx.caseId)).isZero();
         assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("PATIENT");
-        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_REQUIRED'", "coordinator-subject")).isEqualTo(1);
+        // Not yet told to pay: their profile comes first.
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE ?", "deposit-due:" + depositId + "%")).isZero();
 
         activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
         assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("PATIENT");
         finishAccountSetup(ctx); em.flush();
-        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("STAFF");
+        // Profile done: the deposit itself is now the patient's step, and they are told once.
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("PATIENT");
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key LIKE ? AND template_key='deposit-payment-due'", "deposit-due:" + depositId + "%")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT payable_at FROM deposits WHERE id=?", Instant.class, depositId)).isNotNull();
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_role IN ('COORDINATOR','FINANCE') AND status='OPEN'", ctx.caseId)).isZero();
     }
 
-    @Test void settlingTheDepositClosesTheArrangementWorkAndDoesNotDuplicateTheHandoff() throws Exception {
+    @Test void settlingTheDepositConfirmsThePatientsTransferAndDoesNotDuplicateTheHandoff() throws Exception {
         var ctx = accepted();
         activation.activate(ctx.token, grant(ctx), request("Link Patient")); em.flush();
         settleDeposit(ctx, "once"); em.flush();
 
-        assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", String.class, ctx.caseId)).isEqualTo("COMPLETED");
+        assertThat(jdbc.queryForObject("SELECT status FROM deposit_transfer_reports WHERE case_id=?", String.class, ctx.caseId)).isEqualTo("CONFIRMED");
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='TRAVEL' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
 
         // A second authoritative confirmation must not re-run the handoff.
@@ -334,9 +337,9 @@ class PatientActivationJourneyTest {
 
         assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_DEPOSIT_HANDOFF'", ctx.caseId)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_role='COORDINATOR' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
-        // One notification per distinct event: arranging the deposit and settling it are different moments.
+        // One notification per distinct event: the patient's reference reported, then the deposit settled (DEP-3).
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type=?", "coordinator-subject", "DEPOSIT_SETTLED")).isEqualTo(1);
-        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type=?", "coordinator-subject", "DEPOSIT_REQUIRED")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type=?", "coordinator-subject", "DEPOSIT_REQUIRED")).isZero();
         assertThat(count("SELECT count(*) FROM case_status_history WHERE case_id=? AND to_status='TRAVEL_COORDINATION'", ctx.caseId)).isEqualTo(1);
     }
 
@@ -524,7 +527,7 @@ class PatientActivationJourneyTest {
         UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, ctx.caseId);
         BigDecimal total = jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId);
         authenticate("finance-subject", Role.FINANCE);
-        payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(total.divide(new BigDecimal("2"), 2, java.math.RoundingMode.HALF_UP), "BANK", "ref-" + key, key + "-" + ctx.caseId));
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId, total.divide(new BigDecimal("2"), 2, java.math.RoundingMode.HALF_UP), key + "-" + ctx.caseId);
         SecurityContextHolder.clearContext();
     }
 
@@ -532,7 +535,7 @@ class PatientActivationJourneyTest {
         UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, ctx.caseId);
         BigDecimal total = jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId);
         authenticate("finance-subject", Role.FINANCE);
-        payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(total, "BANK", "ref-" + key, key + "-" + ctx.caseId));
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId, total, key + "-" + ctx.caseId);
         SecurityContextHolder.clearContext();
     }
 

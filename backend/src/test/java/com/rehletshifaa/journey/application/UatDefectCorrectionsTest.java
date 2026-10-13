@@ -327,7 +327,8 @@ class UatDefectCorrectionsTest {
         assertThat(outboxRow(coordinatorMail.getFirst()).data().get("case")).isEqualTo(created.caseNumber());
     }
 
-    @Test void acknowledgingAnEstimateNotifiesTheCoordinatorOnlyThroughRealDepositWork() throws Exception {
+    /** DEP-3: the deposit is the patient's to pay, so acknowledging the estimate raises no coordinator work and no email. */
+    @Test void acknowledgingAnEstimateSendsTheCoordinatorNothingTheDepositIsThePatientsToPay() throws Exception {
         UUID caseId = ownedCase("+254700000515", "uat-l@local.test");
         setStaffEmail("coordinator-subject", "coordinator.l@local.test");
         UUID versionId = releasedUsdProposal(caseId);
@@ -338,21 +339,14 @@ class UatDefectCorrectionsTest {
         journey.decideProposalPublic(ctx.token(), ctx.grant(), new PublicProposalDecisionRequest(ctx.grant(), "ACKNOWLEDGED", null, true));
         em.flush();
         assertThat(status(caseId)).isEqualTo("ACCEPTED");
-        // The deposit must be arranged by our side: that is the coordinator's work, and the only coordinator email.
-        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT' AND status='OPEN' AND owner_subject='coordinator-subject'", caseId)).isEqualTo(1);
-        var mail = outboxRow("work-email:deposit-required:" + caseId);
-        assertThat(mail.destination()).isEqualTo("coordinator.l@local.test");
-        assertThat(mail.templateKey()).isEqualTo("coordinator-work-assigned");
-        assertThat(mail.data().get("title")).contains("acknowledged the estimate");
-        assertThat(count("SELECT count(*) FROM notification_outbox WHERE destination='coordinator.l@local.test'")).isEqualTo(coordinatorMailBefore + 1); // exactly one new coordinator email
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND visibility_scope='INTERNAL' AND status='OPEN'", caseId)).isZero();
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE destination='coordinator.l@local.test'")).isEqualTo(coordinatorMailBefore);
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE template_key LIKE 'deposit-settled%'")).isZero();
-        assertThat(count("SELECT count(*) FROM notification_outbox WHERE destination='coordinator@test.invalid'")).isEqualTo(teamMailBefore); // the shared mailbox is not copied on owned work
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE destination='coordinator@test.invalid'")).isEqualTo(teamMailBefore);
         assertThat(versionId).isNotNull();
-        // A replayed deposit event changes nothing.
+        // A replayed deposit event changes nothing: the patient's profile comes first, then their payment step.
         handoff.onDepositRequired(caseId); em.flush();
-        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", caseId)).isEqualTo(1);
-        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key=?", "work-email:deposit-required:" + caseId)).isEqualTo(1);
-        assertThat(count("SELECT count(*) FROM staff_notifications WHERE idempotency_key=?", "deposit-required:" + caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND visibility_scope='INTERNAL' AND status='OPEN'", caseId)).isZero();
     }
 
     @Test void acknowledgingWithoutADepositPolicySendsNoCoordinatorEmailAtAll() throws Exception {
@@ -372,7 +366,8 @@ class UatDefectCorrectionsTest {
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND status='OPEN' AND visibility_scope='INTERNAL'", caseId)).isZero();
     }
 
-    @Test void anUnownedDepositAlertUsesTheDepositRequiredWordingAndItsOwnKey() throws Exception {
+    /** DEP-3: with nobody owning the case, acknowledging still raises no deposit alert — the patient pays, not the team. */
+    @Test void anUnownedCaseRaisesNoDepositAlertTheDepositIsThePatientsToPay() throws Exception {
         UUID caseId = ownedCase("+254700000517", "uat-l3@local.test");
         releasedUsdProposal(caseId);
         seedDepositPolicy(new BigDecimal("5000.00"));
@@ -381,13 +376,10 @@ class UatDefectCorrectionsTest {
         int notificationsBefore = count("SELECT count(*) FROM staff_notifications WHERE case_id=?", caseId);
         journey.decideProposalPublic(ctx.token(), ctx.grant(), new PublicProposalDecisionRequest(ctx.grant(), "ACKNOWLEDGED", null, true));
         em.flush();
-        var mail = outboxRow("deposit-required-team:" + caseId);
-        assertThat(mail.destination()).isEqualTo("coordinator@test.invalid");
-        assertThat(mail.templateKey()).isEqualTo("deposit-required-coordinator");
-        assertThat(mail.data().get("case")).isEqualTo(caseNumber(caseId));
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE idempotency_key=?", "deposit-required-team:" + caseId)).isZero();
         assertThat(count("SELECT count(*) FROM notification_outbox WHERE template_key='deposit-settled-coordinator'")).isZero();
-        assertThat(count("SELECT count(*) FROM staff_notifications WHERE case_id=?", caseId)).isEqualTo(notificationsBefore); // nobody random was picked
-        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT' AND owner_subject IS NULL AND status='OPEN'", caseId)).isEqualTo(1); // the work waits in the shared queue
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE case_id=?", caseId)).isEqualTo(notificationsBefore);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", caseId)).isZero();
     }
 
     @Test void aSettledDepositRevivesTheEndedCoordinatorOnceAndTellsThePatientByEmailInTheirLanguage() throws Exception {

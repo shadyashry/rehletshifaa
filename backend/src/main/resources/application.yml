@@ -197,6 +197,10 @@ app:
         final-quote-ready: ${WHATSAPP_TEMPLATE_FINAL_QUOTE_READY:rs_final_quote_ready}
         onboarding-activation: ${WHATSAPP_TEMPLATE_ONBOARDING:rs_onboarding}
         deposit-settled-patient: ${WHATSAPP_TEMPLATE_DEPOSIT_SETTLED:rs_deposit_settled}
+        deposit-payment-due: ${WHATSAPP_TEMPLATE_DEPOSIT_PAYMENT_DUE:rs_deposit_payment_due}
+        deposit-payment-reminder: ${WHATSAPP_TEMPLATE_DEPOSIT_PAYMENT_REMINDER:rs_deposit_payment_reminder}
+        deposit-transfer-rejected: ${WHATSAPP_TEMPLATE_DEPOSIT_TRANSFER_REJECTED:rs_deposit_transfer_rejected}
+        deposit-balance-due: ${WHATSAPP_TEMPLATE_DEPOSIT_BALANCE_DUE:rs_deposit_balance_due}
         proposal-decision-recorded: ${WHATSAPP_TEMPLATE_DECISION_RECORDED:rs_decision_recorded}
         intake-followup: ${WHATSAPP_TEMPLATE_FOLLOWUP:rs_followup_window_closed}
         coordinator-intro: ${WHATSAPP_TEMPLATE_COORDINATOR_INTRO:rs_coordinator_intro}
@@ -204,6 +208,17 @@ app:
       languages:
         en: ${WHATSAPP_TEMPLATE_LANGUAGE_EN:en}
         ar: ${WHATSAPP_TEMPLATE_LANGUAGE_AR:ar}
+  payments:
+    # DEP-3: the platform account patients pay the coordination deposit into, shown on their payment step. Dummy values
+    # for development and test only: set the real account through the environment before production.
+    bank-transfer:
+      account-name: ${PAYMENT_BANK_ACCOUNT_NAME:RehletShifaa Test Account}
+      bank-name: ${PAYMENT_BANK_NAME:Test Bank (dummy details)}
+      account-number: ${PAYMENT_BANK_ACCOUNT_NUMBER:0000000000000}
+      iban: ${PAYMENT_BANK_IBAN:EG000000000000000000000000000}
+      swift: ${PAYMENT_BANK_SWIFT:TESTEGCXXXX}
+    # How often unpaid deposits are checked for the daily reminders (patient days 1-3, coordinator day 4).
+    reminder-poll-milliseconds: ${PAYMENT_REMINDER_POLL_MILLISECONDS:3600000}
   turnstile:
     enabled: ${TURNSTILE_ENABLED:false}
     secret: ${TURNSTILE_SECRET:}

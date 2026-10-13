@@ -184,8 +184,18 @@ public final class JourneyDtos {
     // Deposit + payment sub-workflow (offline record-only in this build).
     public record DepositComponentView(String beneficiary,String purpose,BigDecimal amountEgp,BigDecimal amountDisplay,String refundability,String cancellationTerms,boolean creditedToFinal) {}
     public record PaymentEventView(String eventType,BigDecimal amountDisplay,String currency,String method,String provider,String providerReference,String status,String reason,Instant occurredAt) {}
-    public record DepositView(UUID id,String status,String currency,BigDecimal totalEgp,BigDecimal totalDisplay,BigDecimal paidDisplay,BigDecimal balanceDisplay,List<DepositComponentView>components,List<PaymentEventView>events) {}
-    public record RecordReceiptRequest(@NotNull @DecimalMin("0.01")BigDecimal amountEgp,@Size(max=40)String method,@Size(max=200)String providerReference,@NotBlank @Size(max=180)String idempotencyKey) {}
+    /** {@code transfer}: the latest bank-transfer reference the patient entered (DEP-3), null before any; {@code bankTransfer}: the platform account to pay into. */
+    public record DepositView(UUID id,String status,String currency,BigDecimal totalEgp,BigDecimal totalDisplay,BigDecimal paidDisplay,BigDecimal balanceDisplay,List<DepositComponentView>components,List<PaymentEventView>events,TransferReportView transfer,BankTransferView bankTransfer) {}
+    /** A transfer reference and Finance's decision on it: SUBMITTED (being checked), CONFIRMED or REJECTED (with the reason). */
+    public record TransferReportView(UUID id,String method,String reference,String status,Instant submittedAt,Instant decidedAt,String reason,long version) {}
+    /** The platform bank account (configuration; dummy values outside production) and the reference to write on the transfer. */
+    public record BankTransferView(String accountName,String bankName,String accountNumber,String iban,String swift,String paymentReference) {}
+    /** The patient's transaction reference for their bank transfer (DEP-3). */
+    public record TransferReferenceRequest(@NotBlank @Size(max=80)String reference) {}
+    /** Finance cannot confirm the transfer: the reason goes back to the patient. */
+    public record TransferRejectionRequest(@NotBlank @Size(max=500)String reason) {}
+    /** Finance confirms the amount received against the patient's pending transfer reference (method and reference come from it). */
+    public record RecordReceiptRequest(@NotNull @DecimalMin("0.01")@Digits(integer=12,fraction=2)BigDecimal amountEgp,@NotBlank @Size(max=180)String idempotencyKey) {}
     public record RefundRequest(@NotNull @DecimalMin("0.01")BigDecimal amountEgp,@NotBlank @Size(max=2000)String reason,@NotBlank @Size(max=180)String idempotencyKey) {}
     public record DepositPolicyView(UUID id,String name,String careCategory,BigDecimal coordinationDepositEgp,boolean active,int version,String createdBy,LocalDate validFrom) {}
     public record DepositPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal coordinationDepositEgp) {}

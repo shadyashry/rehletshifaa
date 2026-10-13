@@ -362,8 +362,6 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     public List<TaskView> myTasks(){var actor=authority.authorize(Permission.TASK_WORK);return workspaces.openTasksOf(actor.subject());}
     @Transactional public IdResponse startTask(UUID caseId,UUID taskId,TaskVersionRequest request){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));int changed=tasks.start(taskId,caseId,actor.subject(),request.expectedVersion(),micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_STARTED",actor,caseId,"CaseTask",taskId.toString(),"START","SUCCESS",null);return new IdResponse(taskId,"IN_PROGRESS");}
     @Transactional public IdResponse completeTask(UUID caseId,UUID taskId,CompleteTaskRequest request){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));int changed=tasks.completeOwned(taskId,caseId,request.expectedVersion(),actor.subject(),"enc:"+crypto.encrypt(request.evidence()),micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_COMPLETED",actor,caseId,"CaseTask",taskId.toString(),"COMPLETE","SUCCESS",null);
-        // "Payment instructions sent": the deposit becomes Finance's to record.
-        if(tasks.findById(taskId).map(t->CaseHandoffService.DEPOSIT_WORK.equals(t.getTaskType())).orElse(false))events.publishEvent(new CaseEvents.DepositInstructionsSent(caseId));
         work.changed(caseId);
         return new IdResponse(taskId,"COMPLETED");}
     /**

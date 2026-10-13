@@ -142,18 +142,18 @@ describe("CurrentActionPanel", () => {
     expect(screen.getByRole("heading", { name: "خطّط لباقة السفر مع فريق العمليات" })).toBeTruthy();
   });
 
-  it("asks Finance to record the deposit in English and Arabic (QA W-24)", () => {
-    const action: CurrentActionView = { code: "WORK_ITEM", kind: "FOCUS", workItemId: "w3", workItemVersion: 0, workType: "DEPOSIT_RECORD", title: "Record the deposit",
-      copy: { code: "DEPOSIT_RECORD", params: {} } };
+  it("asks Finance to verify the patient's transfer in English and Arabic (QA W-24, DEP-3)", () => {
+    const action: CurrentActionView = { code: "WORK_ITEM", kind: "FOCUS", workItemId: "w3", workItemVersion: 0, workType: "DEPOSIT_RECORD", title: "Verify the transfer",
+      copy: { code: "DEPOSIT_VERIFY_TRANSFER", params: {} } };
     const onFocusAction = vi.fn();
     renderWithWork(<CurrentActionPanel locale="en" role="finance" action={action} onFocusAction={onFocusAction}/>);
-    expect(screen.getByRole("heading", { name: "Record the deposit" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /record the deposit/i }));
+    expect(screen.getByRole("heading", { name: "Verify the transfer" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /verify the transfer/i }));
     expect(onFocusAction).toHaveBeenCalled();
     cleanup();
     renderWithWork(<CurrentActionPanel locale="ar" role="finance" action={action}/>, "ar");
-    expect(screen.getByRole("heading", { name: "تسجيل الوديعة" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /تسجيل الوديعة/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "التحقق من التحويل" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /التحقق من التحويل/ })).toBeTruthy();
   });
 
   it("reads right-to-left with Arabic copy for the same contract", () => {

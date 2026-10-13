@@ -5,9 +5,11 @@ import com.rehletshifaa.journey.api.JourneyDtos.DepositComponentView;
 import com.rehletshifaa.journey.api.JourneyDtos.DepositPolicyView;
 import com.rehletshifaa.journey.api.JourneyDtos.DepositView;
 import com.rehletshifaa.journey.api.JourneyDtos.PaymentEventView;
+import com.rehletshifaa.journey.api.JourneyDtos.TransferReportView;
 import com.rehletshifaa.journey.infrastructure.CoordinationDepositPolicyRepository;
 import com.rehletshifaa.journey.infrastructure.DepositComponentRepository;
 import com.rehletshifaa.journey.infrastructure.DepositRepository;
+import com.rehletshifaa.journey.infrastructure.DepositTransferReportRepository;
 import com.rehletshifaa.journey.infrastructure.PaymentEventRepository;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
@@ -30,10 +32,14 @@ public class DepositQueryService {
     private final PaymentEventRepository ledger;
     private final CoordinationDepositPolicyRepository policies;
     private final MedicalCaseRepository cases;
+    private final DepositTransferReportRepository transfers;
+    private final BankTransferDetails bank;
 
     public DepositQueryService(DepositRepository deposits, DepositComponentRepository components, PaymentEventRepository ledger,
-                               CoordinationDepositPolicyRepository policies, MedicalCaseRepository cases) {
+                               CoordinationDepositPolicyRepository policies, MedicalCaseRepository cases,
+                               DepositTransferReportRepository transfers, BankTransferDetails bank) {
         this.deposits = deposits; this.components = components; this.ledger = ledger; this.policies = policies; this.cases = cases;
+        this.transfers = transfers; this.bank = bank;
     }
 
     /** EGP recorded as paid and as refunded on one deposit. */
@@ -68,7 +74,9 @@ public class DepositQueryService {
         BigDecimal netPaidEgp = totalsOf(d.getId()).netEgp();
         BigDecimal paidDisplay = display(netPaidEgp, rate);
         BigDecimal balanceDisplay = display(d.getTotalEgp().subtract(netPaidEgp).max(BigDecimal.ZERO), rate);
-        return new DepositView(d.getId(), d.getStatus(), d.getCurrency(), d.getTotalEgp(), d.getTotalDisplay(), paidDisplay, balanceDisplay, lines, events);
+        TransferReportView transfer = transfers.findLatestOn(d.getId(), Limit.of(1)).stream().findFirst().map(DepositQueryService::transferView).orElse(null);
+        return new DepositView(d.getId(), d.getStatus(), d.getCurrency(), d.getTotalEgp(), d.getTotalDisplay(), paidDisplay, balanceDisplay, lines, events,
+                transfer, bank.forCase(cases.findCaseNumber(caseId).orElse(null)));
     }
 
     Standing standing(UUID caseId) {
@@ -80,6 +88,23 @@ public class DepositQueryService {
         }
         boolean waived = d.getWaivedAt() != null;
         return new Standing(waived ? "WAIVED" : d.getStatus(), waived, waived || "PAID".equals(d.getStatus()), d.getTotalEgp());
+    }
+
+    /** The bank-transfer reference waiting for Finance on the case's active deposit, if any (DEP-3). */
+    TransferReportView pendingTransfer(UUID caseId) {
+        DepositRepository.Quoted d = activeDeposit(caseId);
+        return d == null ? null : transfers.findPendingOn(d.getId(), Limit.of(1)).stream().findFirst().map(DepositQueryService::transferView).orElse(null);
+    }
+
+    /** The case's active deposit while it is open (requested or part paid, not waived), or null. */
+    DepositRepository.Quoted openDeposit(UUID caseId) {
+        DepositRepository.Quoted d = activeDeposit(caseId);
+        return d != null && d.getWaivedAt() == null && java.util.Set.of("REQUESTED", "PARTIALLY_PAID").contains(d.getStatus()) ? d : null;
+    }
+
+    private static TransferReportView transferView(DepositTransferReportRepository.Row r) {
+        return new TransferReportView(r.getId(), r.getMethod(), r.getTransferReference(), r.getStatus(), r.getSubmittedAt(), r.getDecidedAt(),
+                r.getDecisionReason(), r.getVersion() == null ? 0 : r.getVersion());
     }
 
     /** Net EGP recorded as paid on the case's active deposit (paid minus refunded); zero without one. */

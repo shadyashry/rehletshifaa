@@ -36,6 +36,7 @@ public class Deposit extends AssignedIdEntity {
     @Column(name = "waived_at") private Instant waivedAt;
     @Column(name = "waived_by", length = 120) private String waivedBy;
     @Column(name = "waiver_reason", columnDefinition = "text") private String waiverReason;
+    @Column(name = "payable_at") private Instant payableAt;
 
     protected Deposit() {}
 

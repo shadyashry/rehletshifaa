@@ -12,6 +12,7 @@ import com.rehletshifaa.journey.domain.DepositComponent;
 import com.rehletshifaa.journey.infrastructure.CoordinationDepositPolicyRepository;
 import com.rehletshifaa.journey.infrastructure.DepositComponentRepository;
 import com.rehletshifaa.journey.infrastructure.DepositRepository;
+import com.rehletshifaa.journey.infrastructure.DepositTransferReportRepository;
 import com.rehletshifaa.journey.infrastructure.PaymentEventRepository;
 import com.rehletshifaa.journey.infrastructure.ProposalVersionRepository;
 import com.rehletshifaa.shared.api.ApiException;
@@ -26,6 +27,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.data.domain.Limit;
 
 import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
@@ -52,13 +55,15 @@ public class PaymentService {
     private final Authority authority;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final DepositTransferReportRepository transfers;
 
     public PaymentService(DepositQueryService queries, Authority authority, Clock clock, ApplicationEventPublisher events, AuditTrail auditTrail,
                           DepositRepository deposits, DepositComponentRepository depositComponents, CoordinationDepositPolicyRepository depositPolicies,
-                          PaymentEventRepository paymentEvents, MedicalCaseRepository cases, ProposalVersionRepository proposalVersions) {
+                          PaymentEventRepository paymentEvents, MedicalCaseRepository cases, ProposalVersionRepository proposalVersions,
+                          DepositTransferReportRepository transfers) {
         this.queries = queries; this.paymentEvents = paymentEvents; this.depositPolicies = depositPolicies; this.depositComponents = depositComponents;
         this.deposits = deposits; this.auditTrail = auditTrail; this.cases = cases; this.proposalVersions = proposalVersions;
-        this.authority = authority; this.clock = clock; this.events = events;
+        this.authority = authority; this.clock = clock; this.events = events; this.transfers = transfers;
     }
 
     /**
@@ -132,14 +137,41 @@ public class PaymentService {
     public record ConfirmedPayment(UUID caseId, UUID depositId, String provider, String providerReference,
                                    String method, BigDecimal amountEgp, String confirmedBy, String idempotencyKey) {}
 
-    /** Offline confirmation: Finance records a receipt it has verified, with recent authentication. */
+    /**
+     * Offline confirmation (DEP-3): Finance has found the patient's bank transfer and records the amount received against the
+     * transaction reference the patient entered. Never on staff word alone — without a reference waiting for Finance there is
+     * nothing to confirm; the method and reference come from the patient's report. A replay of the same confirmation
+     * (idempotency key) returns the deposit as it stands.
+     */
     @Transactional
     public DepositView recordReceipt(UUID caseId, UUID depositId, RecordReceiptRequest request) {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
-        DepositView view = confirmPayment(new ConfirmedPayment(caseId, depositId, "OFFLINE", request.providerReference(),
-                request.method(), request.amountEgp(), actor.subject(), request.idempotencyKey()));
-        audit(actor, caseId, "DEPOSIT_PAYMENT_RECORDED", depositId, "amount=" + request.amountEgp());
-        return view;
+        // The ledger key is namespaced to the deposit server-side, so a client key can never collide with another deposit's.
+        String key = "receipt:" + depositId + ":" + request.idempotencyKey();
+        // A double submit by the person who confirmed answers as the deposit stands, even once it is settled.
+        if (paymentEvents.existsByIdempotencyKeyAndDepositIdAndActorSubject(key, depositId, actor.subject())) return depositForCase(caseId);
+        Resource onCase = Resource.ofCase(caseId);
+        if (!authority.allowed(Permission.CASE_READ, onCase)) authority.require(Permission.CASE_DEPOSIT_READ, onCase);
+        cases.lockById(caseId);
+        requireDeposit(caseId, depositId);
+        DepositRepository.Quoted open = queries.openDeposit(caseId);
+        if (open == null || !open.getId().equals(depositId) || !deposits.isOpenOn(caseId))
+            throw new ApiException(409, "DEPOSIT_NOT_PAYABLE", "This deposit is no longer open for payment");
+        var pending = transfers.findPendingOn(depositId, Limit.of(1)).stream().findFirst()
+                .orElseThrow(() -> new ApiException(409, "TRANSFER_REFERENCE_REQUIRED", "The patient has not entered a transfer reference to verify yet"));
+        // Maker/checker: whoever entered the reference never confirms it (one person may hold a patient and a Finance role).
+        if (pending.getSubmittedBy().equals(actor.subject()))
+            throw new ApiException(403, "SELF_CONFIRMATION", "A transfer you reported yourself must be confirmed by someone else in Finance");
+        BigDecimal balance = open.getTotalEgp().subtract(queries.totalsOf(depositId).netEgp());
+        if (request.amountEgp().compareTo(balance) > 0)
+            throw new ApiException(400, "AMOUNT_EXCEEDS_BALANCE", "The amount is more than the balance still due (EGP " + balance.toPlainString() + ")");
+        if (transfers.decide(pending.getId(), depositId, "CONFIRMED", actor.subject(), null, micros(clock.instant())) != 1)
+            throw new ApiException(409, "TRANSFER_NOT_PENDING", "This transfer reference was already decided");
+        DepositView view = confirmPayment(new ConfirmedPayment(caseId, depositId, "OFFLINE", pending.getTransferReference(),
+                pending.getMethod(), request.amountEgp(), actor.subject(), key));
+        audit(actor, caseId, "DEPOSIT_PAYMENT_RECORDED", depositId, "amount=" + request.amountEgp() + "; transfer=" + pending.getId());
+        events.publishEvent(new CaseEvents.TransferConfirmed(caseId)); // a balance still due goes back to the patient
+        return depositForCase(caseId);
     }
 
     @Transactional
@@ -181,6 +213,8 @@ public class PaymentService {
     public boolean depositWaived(UUID caseId) { return queries.standing(caseId).waived(); }
     /** Deposit readiness: no deposit required, or PAID, or WAIVED by an authorized actor. */
     public boolean depositSatisfied(UUID caseId) { return queries.standing(caseId).satisfied(); }
+    /** A bank-transfer reference the patient entered is waiting for Finance to verify (DEP-3). */
+    public boolean transferPending(UUID caseId) { return queries.pendingTransfer(caseId) != null; }
     /** Patient-safe deposit status string for readiness: NONE / REQUIRED / REQUESTED / PARTIALLY_PAID / PAID / WAIVED. */
     public String depositStatusFor(UUID caseId) { return queries.standing(caseId).status(); }
 
@@ -193,7 +227,11 @@ public class PaymentService {
     public DepositView waiveDeposit(UUID caseId, UUID depositId, String reason) {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
         if (reason == null || reason.isBlank()) throw new ApiException(400, "WAIVER_REASON_REQUIRED", "A reason is required to waive a deposit");
+        cases.lockById(caseId);
         requireDeposit(caseId, depositId);
+        // DEP-3: a transfer the patient reported is decided first (confirmed or returned), never left behind by a waiver.
+        if (!transfers.findPendingOn(depositId, Limit.of(1)).isEmpty())
+            throw new ApiException(409, "TRANSFER_PENDING", "Decide the patient's transfer reference before waiving the deposit");
         int changed = deposits.waive(depositId, actor.subject(), reason.trim(), micros(clock.instant()));
         if (changed != 1) throw new ApiException(409, "DEPOSIT_NOT_WAIVABLE", "This deposit cannot be waived");
         audit(actor, caseId, "DEPOSIT_WAIVED", depositId, reason.trim());

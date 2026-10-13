@@ -46,9 +46,9 @@ public class CaseHandoffService {
     private final AuditEventRepository audits;
     private final DepositRepository deposits;
     private final WorkforceDirectory workforce;
-    /** Staff work for arranging the offline coordination deposit with the patient. */
-    static final String DEPOSIT_WORK = "DEPOSIT_ARRANGEMENT";
-    /** Finance work for recording the deposit once the patient has the payment instructions. */
+    private final DepositPaymentReminders reminders;
+    private final DepositPaymentNotices notices;
+    /** Finance work: verify the patient's bank transfer against the reference they entered, then confirm or reject (DEP-3). */
     static final String DEPOSIT_RECORD_WORK = "DEPOSIT_RECORD";
 
     private final IntakeLifecycleService intake;
@@ -59,62 +59,80 @@ public class CaseHandoffService {
 
     public CaseHandoffService(IntakeLifecycleService intake, StaffWorkService work, CaseTransitionPolicy policy, Clock clock,
                               @Value("${app.mail.coordinator}") String coordinatorEmail, AuditTrail auditTrail, AuditEventRepository audits, NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseStatusLog statusLog,
-                              DepositRepository deposits, WorkforceDirectory workforce) { this.deposits = deposits; this.workforce = workforce; this.statusLog = statusLog; this.assignments = assignments; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail; this.audits = audits;
+                              DepositRepository deposits, WorkforceDirectory workforce, DepositPaymentReminders reminders, DepositPaymentNotices notices) {
+        this.deposits = deposits; this.workforce = workforce; this.reminders = reminders; this.notices = notices; this.statusLog = statusLog; this.assignments = assignments; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail; this.audits = audits;
         this.intake = intake; this.work = work; this.policy = policy; this.clock = clock; this.coordinatorEmail = coordinatorEmail;
     }
 
     /**
-     * A deposit has been raised on an accepted case. With the current offline process the money cannot move
-     * until someone on our side sends the patient payment instructions and later records what arrived, so
-     * the deposit stage is owned by staff, not by the patient. This gives that ownership somewhere to live:
-     * real work in the coordinator queue, and a case that reads as waiting on us.
+     * A deposit is due on an accepted case. It is the patient's to pay (DEP-3, owner decision 2026-10-13): nothing opens
+     * for staff. Once every other patient step is done the patient is told it is due and the reminder cycle starts
+     * ({@link DepositPaymentReminders}); until then it waits behind those steps.
      *
-     * <p>Not blocking: this is work to do, not a gate. Whether the deposit has actually been paid already
-     * gates non-cancellable commitments elsewhere, and marking it blocking would additionally stop
-     * legitimate downstream transitions such as travel planning. Idempotent:
-     * {@link StaffWorkService#openWorkItem} reuses an open item of the same type on the case.
-     *
-     * @return true when a work item was opened or reactivated
+     * @return true when the patient was told the deposit is due (or reminded)
      */
     @Transactional
     public boolean onDepositRequired(UUID caseId) {
-        Instant now = clock.instant();
         CaseStatus status = cases.findStageAndVersion(caseId).map(MedicalCaseRepository.StageAndVersion::getStatus).orElse(null);
-        if (status != CaseStatus.ACCEPTED) return false; // already past the deposit stage; nothing to arrange
+        if (status != CaseStatus.ACCEPTED) return false; // already past the deposit stage
+        return !"NONE".equals(reminders.evaluate(caseId));
+    }
 
-        String coordinator = currentCoordinator(caseId);
-        work.openWorkItem(new NewWorkItem(caseId, DEPOSIT_WORK, "Patient acknowledged the estimate — arrange the coordination deposit",
-                "The patient acknowledged their preliminary estimate and a coordination deposit is now due. Send the payment instructions, then record the amount received.",
-                coordinator, "COORDINATOR", false, null, "SYSTEM", "DEPOSIT_REQUIRED",
-                "deposit-required:" + caseId, true, WorkCopy.of("DEPOSIT_DUE")));
-        // Unowned: the shared queue must still learn about it — with the wording of THIS event, not the settlement's.
-        if (coordinator == null) notifyTeamMailbox(caseId, "deposit-required-coordinator", "deposit-required-team:" + caseId, now);
-        work.refreshWaitingOn(caseId, "STAFF", WaitingReason.of("DEPOSIT_TO_ARRANGE", "Coordination deposit to be arranged with the patient"));
+    /**
+     * The patient entered the bank's transaction reference: the next move is Finance's, to verify the transfer. The item
+     * goes to the Finance person on the case who still holds the role, else to the Finance pool ({@link StaffWorkService#poolOf}),
+     * whose every member is told; the coordinator is told too. Idempotent: while an item is open (even one a lead released
+     * to the pool) a replay changes nothing.
+     *
+     * @return true when the Finance item was opened
+     */
+    @Transactional
+    public boolean onTransferReported(UUID caseId) {
+        CaseStatus status = cases.findStageAndVersion(caseId).map(MedicalCaseRepository.StageAndVersion::getStatus).orElse(null);
+        if (status != CaseStatus.ACCEPTED || !deposits.isOpenOn(caseId)) return false;
+        if (!work.openWorkOwners(caseId, java.util.Set.of(DEPOSIT_RECORD_WORK)).isEmpty()) return false;
+        // Only someone who still holds the role: a Finance assignee from the approval weeks ago may have left (QA A3).
+        String finance = assignments.findActiveAssignees(caseId, "FINANCE").stream().filter(s -> workforce.holds(s, "FINANCE")).findFirst().orElse(null);
+        String title = "Verify the transfer";
+        String context = "The patient entered the transaction reference of their bank transfer for the coordination deposit. Check the bank for it, then confirm the amount received or reject it with a reason.";
+        String key = "deposit-verify:" + caseId + ":" + clock.instant().toEpochMilli();
+        work.openWorkItem(new NewWorkItem(caseId, DEPOSIT_RECORD_WORK, title, context, finance, "FINANCE", false, null, "SYSTEM",
+                "DEPOSIT_TRANSFER_REPORTED", key, true, WorkCopy.of("DEPOSIT_VERIFY_TRANSFER")));
+        // The pool's item has no owner to notify: every Finance member is told, as each of them may verify it.
+        if (finance == null) for (var holder : workforce.activeHolders("FINANCE"))
+            work.notifyStaff(holder.subject(), caseId, null, "DEPOSIT_TRANSFER_REPORTED", title, context, key + ":" + holder.subject(), true,
+                    WorkCopy.of("DEPOSIT_VERIFY_TRANSFER"));
+        work.notifyStaff(currentCoordinator(caseId), caseId, null, "DEPOSIT_TRANSFER_REPORTED", "The patient sent their transfer reference",
+                "Finance is verifying the transfer for the coordination deposit.", key + ":coordinator", false, WorkCopy.of("DEPOSIT_TRANSFER_REPORTED"));
+        work.refreshWaitingOn(caseId, "PAYMENT", WaitingReason.of("TRANSFER_TO_VERIFY", "Transfer reference received — Finance to verify it"));
         return true;
     }
 
     /**
-     * The coordinator has sent the payment instructions, so the next move is Finance's: record the money when it arrives.
-     * Without this Finance had no work, and on a catalogue-only case (never routed to Finance) no way to the case at all.
-     * The item goes to the Finance person on the case when there is one, else to the Finance pool
-     * ({@link StaffWorkService#poolOf}). Not blocking, like the coordinator's deposit work: the deposit gates the stage itself.
-     * Idempotent: an open item of the type is reused; nothing opens once the deposit is no longer open.
-     *
-     * @return true when a work item was opened or reactivated
+     * Finance confirmed a transfer. Paid in full, the settlement hand-off ({@link #onDepositSettled}) has already run; with a
+     * balance still due the payment step returns to the patient for the rest, with a new reminder cycle.
      */
     @Transactional
-    public boolean onDepositInstructionsSent(UUID caseId) {
-        CaseStatus status = cases.findStageAndVersion(caseId).map(MedicalCaseRepository.StageAndVersion::getStatus).orElse(null);
-        if (status != CaseStatus.ACCEPTED || !deposits.isOpenOn(caseId)) return false;
-        // Replayed: the item stands as it is now, never handed back to someone after a lead released it to the pool.
-        if (!work.openWorkOwners(caseId, java.util.Set.of(DEPOSIT_RECORD_WORK)).isEmpty()) return false;
-        // Only someone who still holds the role: a Finance assignee from the approval weeks ago may have left (QA A3).
-        String finance = assignments.findActiveAssignees(caseId, "FINANCE").stream().filter(s -> workforce.holds(s, "FINANCE")).findFirst().orElse(null);
-        work.openWorkItem(new NewWorkItem(caseId, DEPOSIT_RECORD_WORK, "Record the deposit",
-                "The patient has the payment instructions. When the transfer arrives, record the amount received on the case.",
-                finance, "FINANCE", false, null, "SYSTEM", "DEPOSIT_INSTRUCTIONS_SENT",
-                "deposit-record:" + caseId, true, WorkCopy.of("DEPOSIT_RECORD")));
-        return true;
+    public void onTransferConfirmed(UUID caseId) {
+        if (!deposits.isOpenOn(caseId)) return;
+        UUID depositId = deposits.findLatestLiveOf(caseId, Limit.of(1)).stream().findFirst().map(DepositRepository.Quoted::getId).orElse(null);
+        if (depositId != null) deposits.restartPayable(depositId, micros(clock.instant()));
+        backToPatient(caseId, depositId, "Transfer confirmed — a balance is still due", DepositPaymentNotices.BALANCE_DUE,
+                WaitingReason.of("DEPOSIT_BALANCE_DUE", "Part of the deposit received — the patient owes the balance"));
+    }
+
+    /** Finance could not confirm the transfer: the step returns to the patient with the reason, and they are told. */
+    @Transactional
+    public void onTransferRejected(UUID caseId) {
+        UUID depositId = deposits.findLatestLiveOf(caseId, Limit.of(1)).stream().findFirst().map(DepositRepository.Quoted::getId).orElse(null);
+        backToPatient(caseId, depositId, "Transfer reference not confirmed", DepositPaymentNotices.REJECTED,
+                WaitingReason.of("DEPOSIT_TRANSFER_REJECTED", "Transfer not confirmed — the patient to check and resend the reference"));
+    }
+
+    private void backToPatient(UUID caseId, UUID depositId, String closing, String notice, WaitingReason reason) {
+        work.closeWorkItems(caseId, DEPOSIT_RECORD_WORK, closing);
+        notices.send(caseId, notice, notice + ":" + depositId + ":" + clock.instant().toEpochMilli());
+        work.refreshWaitingOn(caseId, "PATIENT", reason);
     }
 
     /**
@@ -135,7 +153,6 @@ public class CaseHandoffService {
         boolean first = audits.countByCaseIdAndEventType(caseId, "CASE_DEPOSIT_HANDOFF") == 0;
 
         if (first) {
-            work.closeWorkItems(caseId, DEPOSIT_WORK, "Coordination deposit received");
             work.closeWorkItems(caseId, DEPOSIT_RECORD_WORK, "Coordination deposit received");
             String coordinator = restoreCoordinator(caseId, now);
             // One idempotent operation opens the work item, raises the in-app notification and sends the work
@@ -165,11 +182,14 @@ public class CaseHandoffService {
         if (!"ACCEPTED".equals(status)) return false;
         boolean moved = advanceToCoordination(caseId, status, clock.instant());
         if (moved) work.refreshWaitingOn(caseId, "STAFF", WaitingReason.of("READY_AND_DEPOSIT_SETTLED", "Patient ready and deposit settled — coordinator to start the treatment journey"));
+        else reminders.evaluate(caseId); // the patient's last step may have made the deposit theirs to pay now (DEP-3)
         return moved;
     }
 
     @EventListener public void on(CaseEvents.DepositRequired event) { onDepositRequired(event.caseId()); }
-    @EventListener public void on(CaseEvents.DepositInstructionsSent event) { onDepositInstructionsSent(event.caseId()); }
+    @EventListener public void on(CaseEvents.TransferReported event) { onTransferReported(event.caseId()); }
+    @EventListener public void on(CaseEvents.TransferConfirmed event) { onTransferConfirmed(event.caseId()); }
+    @EventListener public void on(CaseEvents.TransferRejected event) { onTransferRejected(event.caseId()); }
     @EventListener public void on(CaseEvents.DepositSettled event) { onDepositSettled(event.caseId()); }
     @EventListener public void on(CaseEvents.PatientReadinessChanged event) { onPatientReadinessChanged(event.caseId()); }
 

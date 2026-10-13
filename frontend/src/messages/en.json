@@ -1050,7 +1050,7 @@
         "PROPOSAL_DECLINED_REVIEW": "Acknowledge outcome",
         "CLINICAL_OUTCOME_REVIEW": "Acknowledge outcome",
         "DEPOSIT_ARRANGEMENT": "Payment instructions sent",
-        "DEPOSIT_RECORD": "Record the deposit",
+        "DEPOSIT_RECORD": "Verify the transfer",
         "TRAVEL": "Assign Operations",
         "REASSIGN_CONSULTANT": "Reassign Consultant",
         "CONFIRM_TRANSFER": "Confirm the transfer",
@@ -1164,7 +1164,7 @@
       "readiness": {
         "CONTACT_NOT_VERIFIED": {
           "title": "Waiting for contact verification",
-          "body": "The patient verifies their contact channel through the secure link. The coordination deposit is arranged once that is done."
+          "body": "The patient verifies their contact channel through the secure link. The coordination deposit is paid once that is done."
         },
         "CONSENTS_INCOMPLETE": {
           "title": "Waiting for the patient's consents",
@@ -1177,6 +1177,10 @@
         "REPRESENTATIVE_AUTH_MISSING": {
           "title": "Waiting for representative authorization",
           "body": "A valid representative authorization is required before coordination continues."
+        },
+        "DEPOSIT_UNPAID": {
+          "title": "Waiting for the patient's deposit transfer",
+          "body": "The patient pays by bank transfer and enters the bank's transaction reference on their case page. Finance then verifies it."
         },
         "default": {
           "title": "Waiting for the patient to activate their profile",
@@ -1356,10 +1360,15 @@
           "body": "Your coordinator is putting together the treatment plan and its estimated cost.",
           "next": "You will receive the proposal to review in your own time."
         },
-        "WAIT_DEPOSIT_ARRANGEMENT": {
-          "title": "Deposit arrangements",
-          "body": "You acknowledged your preliminary estimate. We are arranging the coordination deposit details and will send you the payment instructions.",
-          "next": "Once the deposit is received, your coordinator starts arranging your treatment."
+        "PAY_DEPOSIT": {
+          "title": "Pay your coordination deposit",
+          "body": "Your profile is complete. Pay the deposit by bank transfer, then enter the transaction reference your bank gives you.",
+          "next": "Once our finance team confirms your payment, your coordinator starts arranging your treatment."
+        },
+        "WAIT_PAYMENT_CHECK": {
+          "title": "We're checking your payment",
+          "body": "Thank you. Our finance team is matching your transfer with the reference you sent, and we'll let you know as soon as it's confirmed.",
+          "next": "Once your payment is confirmed, your coordinator starts arranging your treatment."
         },
         "WAIT_COORDINATION": {
           "title": "We are arranging your treatment",
@@ -1397,11 +1406,40 @@
           "body": "Our team is handling the next step and will keep you updated."
         }
       },
+      "payment": {
+        "amountDue": "Amount to pay now",
+        "total": "Coordination deposit",
+        "received": "Already received",
+        "estimateNote": "This deposit is based on your preliminary estimate. Your treatment and its final price may change after your doctor examines you in person; the deposit is deducted from your final treatment plan and quote.",
+        "method": "How would you like to pay?",
+        "online": "Online payment",
+        "onlineSoon": "Coming soon — not available yet.",
+        "bankTransfer": "Bank transfer",
+        "bankTransferHint": "Transfer the amount to our account below.",
+        "bankTitle": "Transfer to this account",
+        "accountName": "Account name",
+        "bankName": "Bank",
+        "accountNumber": "Account number",
+        "iban": "IBAN",
+        "swift": "SWIFT / BIC",
+        "paymentReference": "Payment reference",
+        "paymentReferenceHint": "Write this on your transfer so we can match it to your case.",
+        "referenceLabel": "Transaction reference number",
+        "referenceWhat": "After you transfer, your bank gives you a reference number for the transaction. Enter it here so our finance team can find your payment and confirm it.",
+        "referenceWhere": "You'll find it in your bank's confirmation SMS or email, on the transfer receipt, or in your banking app under the transfer details. Banks may call it the transfer ID, FT number or reference number.",
+        "referenceInvalid": "Enter the reference exactly as your bank shows it: letters and numbers, 4 to 64 characters.",
+        "submit": "Send transfer reference",
+        "rejected": "We couldn't confirm your last transfer.",
+        "rejectedNext": "Check the reference and enter it again.",
+        "required": "required"
+      },
       "deposit": {
         "title": "Coordination deposit",
         "received": "Received",
+        "sentReference": "Reference you sent",
         "status": {
-          "REQUESTED": "Arranging",
+          "REQUESTED": "Due",
+          "CHECKING": "Being checked",
           "PARTIALLY_PAID": "Partly received",
           "PAID": "Deposit received",
           "WAIVED": "Waived",
@@ -1409,8 +1447,8 @@
           "CANCELLED": "Cancelled"
         },
         "note": {
-          "REQUESTED": "Your coordinator will send you the payment instructions.",
-          "PARTIALLY_PAID": "Your coordinator will confirm the remaining amount.",
+          "REQUESTED": "Pay by bank transfer and send us the transaction reference.",
+          "PARTIALLY_PAID": "The remaining amount is due.",
           "PAID": "Thank you — it will be deducted from the price in your final treatment plan and quote.",
           "WAIVED": "No deposit is needed for your case.",
           "REFUNDED": "The deposit has been returned to you."
@@ -1515,6 +1553,20 @@
       "saving": "Recording…",
       "failed": "The decision was not recorded. Nothing has changed; try again."
     },
+    "depositTransfer": {
+      "title": "Patient's bank transfer",
+      "waiting": "Waiting for the patient to pay and enter the transfer reference.",
+      "reference": "Transfer reference",
+      "sent": "Sent",
+      "rejectedLast": "Last reference not confirmed: {reason}",
+      "confirmedLast": "Last reference confirmed.",
+      "amount": "Amount received (EGP)",
+      "confirm": "Confirm payment received",
+      "rejectReason": "Why it can't be confirmed (shown to the patient)",
+      "reject": "Return to the patient",
+      "sendLink": "Send payment link",
+      "sendLinkHint": "Sends the patient a link to their payment step: the account details and where to enter the transfer reference."
+    },
     "workTitles": {
       "PROPOSAL_TERMS_CALL": "Go through the proposal terms in Arabic",
       "REVIEW_PATIENT_RESPONSE": "Review the patient's response",
@@ -1525,7 +1577,7 @@
       "PROPOSAL_DECLINED_REVIEW": "Review the declined proposal",
       "CLINICAL_OUTCOME_REVIEW": "Review the clinical outcome",
       "DEPOSIT_ARRANGEMENT": "Arrange the coordination deposit",
-      "DEPOSIT_RECORD": "Record the deposit",
+      "DEPOSIT_RECORD": "Verify the transfer",
       "ASSIGN_CONSULTANT": "Prepare the case for a Consultant",
       "ASSIGN_OPERATIONS_PLAN": "Plan the travel package with Operations",
       "ASSIGN_FINANCE": "Finance must approve the commercial terms",
@@ -1560,7 +1612,10 @@
         "DEPOSIT_PENDING": "Waiting for the coordination deposit",
         "DEFAULT_PATIENT": "Waiting for the patient",
         "DEFAULT_CONSULTANT": "Waiting for the Consultant",
-        "DEFAULT_STAFF": "Waiting for our team"
+        "DEFAULT_STAFF": "Waiting for our team",
+        "TRANSFER_TO_VERIFY": "Transfer reference received — Finance to verify it",
+        "DEPOSIT_BALANCE_DUE": "Part of the deposit received — the patient owes the balance",
+        "DEPOSIT_TRANSFER_REJECTED": "Transfer not confirmed — the patient to check and resend the reference"
       }
     },
     "leaveCase": {
@@ -1689,6 +1744,18 @@
         "DEPOSIT_RECORD": {
           "title": "Record the deposit",
           "context": "The patient has the payment instructions. When the transfer arrives, record the amount received on this case."
+        },
+        "DEPOSIT_VERIFY_TRANSFER": {
+          "title": "Verify the transfer",
+          "context": "The patient entered the transaction reference of their bank transfer for the coordination deposit. Check the bank for it, then confirm the amount received or reject it with a reason."
+        },
+        "DEPOSIT_TRANSFER_REPORTED": {
+          "title": "The patient sent their transfer reference",
+          "context": "Finance is verifying the transfer for the coordination deposit."
+        },
+        "DEPOSIT_REFERENCE_OVERDUE": {
+          "title": "No transfer reference yet — follow up with the patient",
+          "context": "The patient was reminded for three days and has not entered the bank transfer reference for the coordination deposit. Contact them, and send the payment link if they need it."
         },
         "ASSIGN_CONSULTANT": {
           "title": "Prepare the case for a Consultant",

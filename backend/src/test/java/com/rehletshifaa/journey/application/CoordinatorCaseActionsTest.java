@@ -44,7 +44,7 @@ class CoordinatorCaseActionsTest {
     @Autowired ReplyCoverService covers; @Autowired StaffWorkQueryService staffWork;
     @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff; @Autowired StaffWorkService work;
     @Autowired PatientAccountService account; @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort;
-    @Autowired PoolWorkDepartureService departures;
+    @Autowired PoolWorkDepartureService departures; @Autowired DepositTransferService transfers; @Autowired DepositPaymentReminders reminders;
     @org.junit.jupiter.api.BeforeEach void resetIdentity() { ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).reset(); }
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
 
@@ -149,11 +149,11 @@ class CoordinatorCaseActionsTest {
         assertThat(a.blockers().get(1).owner()).isEqualTo("LATER"); // the deposit waits behind the patient
         assertThat(a.availableActions()).contains("RESEND_ONBOARDING_LINK", "REQUEST_INFORMATION")
                 .doesNotContain("ASSIGN_OPERATIONS", "ASSIGN_CONSULTANT", "SET_TRAVEL_PACKAGE", "CANCEL_CASE");
-        // The deposit arrangement exists as staff work but is not what the case is waiting for yet.
-        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
+        // DEP-3: the deposit is the patient's to pay after their profile, so no staff item exists for it.
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND visibility_scope='INTERNAL' AND status='OPEN'", ctx.caseId)).isZero();
     }
 
-    @Test void contactVerificationOutranksTheDepositAndClearsIntoStaffDepositWork() throws Exception {
+    @Test void contactVerificationOutranksTheDepositThenTheDepositIsThePatientsToPay() throws Exception {
         var ctx = acknowledged();
         // Activating with a corrected number voids that channel's possession proof: verification is pending again.
         activation.activate(ctx.token, grant(ctx), request("+254700000099")); em.flush(); finishAccountSetup(ctx.caseId);
@@ -164,19 +164,19 @@ class CoordinatorCaseActionsTest {
         assertThat(blocked.currentAction().blockerCode()).isEqualTo("CONTACT_NOT_VERIFIED");
         assertThat(blocked.availableActions()).doesNotContain("ASSIGN_OPERATIONS", "RESEND_ONBOARDING_LINK");
 
-        // The patient verifies the new channel: the patient blocker closes and the deposit becomes our move.
+        // The patient verifies the new channel: that blocker closes and the deposit itself is the patient's step (DEP-3).
         raw("UPDATE patient_profiles SET phone_verified_at=? WHERE id=(SELECT patient_id FROM medical_cases WHERE id=?)", Instant.now(), ctx.caseId);
-        CaseActionsView ours = journey.workspace(ctx.caseId).actions();
-        assertThat(ours.waitingOn()).isEqualTo("STAFF");
-        assertThat(ours.currentAction().code()).isEqualTo("WORK_ITEM");
-        assertThat(ours.currentAction().workType()).isEqualTo("DEPOSIT_ARRANGEMENT");
-        assertThat(ours.currentAction().kind()).isEqualTo("COMPLETE");
-        assertThat(ours.blockers()).extracting(BlockerView::code).containsExactly("DEPOSIT_UNPAID");
-        assertThat(ours.blockers().get(0).owner()).isEqualTo("STAFF");
-        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("STAFF");
-        // Re-reading changes nothing: the recalculation is idempotent and opens no second item.
+        CaseActionsView theirs = journey.workspace(ctx.caseId).actions();
+        assertThat(theirs.waitingOn()).isEqualTo("PATIENT");
+        assertThat(theirs.currentAction().code()).isEqualTo("WAIT_PATIENT_READINESS");
+        assertThat(theirs.currentAction().blockerCode()).isEqualTo("DEPOSIT_UNPAID");
+        assertThat(theirs.blockers()).extracting(BlockerView::code).containsExactly("DEPOSIT_UNPAID");
+        assertThat(theirs.blockers().get(0).owner()).isEqualTo("PATIENT");
+        assertThat(theirs.availableActions()).contains("SEND_PAYMENT_LINK");
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("PATIENT");
+        // Re-reading changes nothing and opens no staff work.
         journey.workspace(ctx.caseId);
-        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", ctx.caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND visibility_scope='INTERNAL' AND status='OPEN'", ctx.caseId)).isZero();
     }
 
     @Test void operationsAssignmentIsRefusedWhileTheDepositIsUnsettledEvenWhenCalledDirectly() throws Exception {
@@ -243,11 +243,8 @@ class CoordinatorCaseActionsTest {
         // Priced from the catalogue only: Finance never approved anything and holds no assignment.
         assertThat(count("SELECT count(*) FROM case_assignments WHERE case_id=? AND assignee_role='FINANCE'", ctx.caseId)).isZero();
 
-        // The coordinator marks "Payment instructions sent".
-        authenticate("coordinator-subject", Role.COORDINATOR);
-        CurrentActionView arrange = journey.workspace(ctx.caseId).actions().currentAction();
-        assertThat(arrange.workType()).isEqualTo("DEPOSIT_ARRANGEMENT");
-        journey.completeTask(ctx.caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent on WhatsApp", arrange.workItemVersion())); em.flush();
+        // The patient pays by bank transfer and enters the bank's reference (DEP-3).
+        submitReference(ctx.caseId, "FT2026101301");
 
         // Another unowned Finance item (not the pooled type) stays out of every queue.
         raw("INSERT INTO case_tasks(id,case_id,task_type,title,owner_subject,owner_role,visibility_scope,priority,status,blocking,created_by,created_at,updated_at,version) VALUES(?,?,'APPROVE_COMMERCIAL_TERMS',?,NULL,'FINANCE','INTERNAL','NORMAL','OPEN',FALSE,'SYSTEM',?,?,0)",
@@ -258,7 +255,7 @@ class CoordinatorCaseActionsTest {
         assertThat(staffWork.myWork()).singleElement().satisfies(w -> {
             assertThat(w.caseId()).isEqualTo(ctx.caseId);
             assertThat(w.type()).isEqualTo("DEPOSIT_RECORD");
-            assertThat(w.copy().code()).isEqualTo("DEPOSIT_RECORD");
+            assertThat(w.copy().code()).isEqualTo("DEPOSIT_VERIFY_TRANSFER");
         });
         CaseWorkspace paymentView = journey.workspace(ctx.caseId);
         assertThat(paymentView.paymentOnly()).isTrue();
@@ -286,8 +283,8 @@ class CoordinatorCaseActionsTest {
         assertThat(finance.waitingOn()).isEqualTo("PAYMENT");
         assertThat(journey.assignedCaseCards(Role.FINANCE)).filteredOn(card -> card.caseSummary().id().equals(ctx.caseId))
                 .singleElement().satisfies(card -> assertThat(card.myWorkCount()).isEqualTo(1));
-        // Marking the instructions sent again (a replayed event) opens no second item.
-        handoff.onDepositInstructionsSent(ctx.caseId); em.flush();
+        // A replayed report opens no second item.
+        handoff.onTransferReported(ctx.caseId); em.flush();
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD'", ctx.caseId)).isEqualTo(1);
 
         // Finance records the receipt: the deposit is paid, Finance's work closes and the journey continues.
@@ -303,29 +300,34 @@ class CoordinatorCaseActionsTest {
         assertThat(catchThrowableOfType(() -> journey.workspace(ctx.caseId), ApiException.class).code()).isEqualTo("OUT_OF_SCOPE");
     }
 
-    @Test void aPartPaymentKeepsTheDepositFinancesWorkAndTheFinanceItemFollowsTheAssignedFinancePerson() throws Exception {
+    @Test void aPartPaymentReturnsTheBalanceToThePatientAndTheFinanceItemFollowsTheAssignedFinancePerson() throws Exception {
         var ctx = acknowledged();
         activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
-        // Before the instructions go out there is nothing for Finance to record yet.
+        // Before the patient sends a transfer reference there is nothing for Finance to verify yet.
         authenticate("finance-subject", Role.FINANCE);
         assertThat(staffWork.myWork()).isEmpty();
-        assertThat(journey.workspace(ctx.caseId).actions().currentAction().code()).isEqualTo("NONE");
+        assertThat(journey.workspace(ctx.caseId).actions().currentAction().code()).isEqualTo("WAIT_PATIENT_READINESS"); // the patient owes the transfer
         raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
                 UUID.randomUUID(), ctx.caseId, "finance-subject", "FINANCE", "PRIMARY", "ACTIVE", "Commercial terms", "coordinator-subject", Instant.now(), Instant.now());
 
-        authenticate("coordinator-subject", Role.COORDINATOR);
-        CurrentActionView arrange = journey.workspace(ctx.caseId).actions().currentAction();
-        journey.completeTask(ctx.caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent", arrange.workItemVersion())); em.flush();
+        submitReference(ctx.caseId, "FT-PART-1");
         assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD'", String.class, ctx.caseId))
                 .as("the Finance person on the case owns it").isEqualTo("finance-subject");
-        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_INSTRUCTIONS_SENT'", "finance-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_TRANSFER_REPORTED'", "finance-subject")).isEqualTo(1);
 
         UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=?", UUID.class, ctx.caseId);
         authenticate("finance-subject", Role.FINANCE);
-        payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(new BigDecimal("1.00"), "BANK", "ref-part", "part-" + ctx.caseId)); em.flush();
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId, new BigDecimal("1.00"), "part-" + ctx.caseId); em.flush();
         assertThat(jdbc.queryForObject("SELECT status FROM deposits WHERE id=?", String.class, depositId)).isEqualTo("PARTIALLY_PAID");
-        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
-        assertThat(journey.workspace(ctx.caseId).actions().currentAction().workType()).isEqualTo("DEPOSIT_RECORD");
+        // The balance is the patient's again: Finance's item closes, the patient is told, and a new reminder cycle starts.
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD' AND status='OPEN'", ctx.caseId)).isZero();
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE template_key='deposit-balance-due' AND idempotency_key LIKE ?", "deposit-balance-due:" + depositId + "%")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("PATIENT");
+        authenticate(patientSubject(ctx.caseId), Role.PATIENT);
+        CaseWorkspace patientView = journey.workspace(ctx.caseId);
+        assertThat(patientView.actions().currentAction().code()).isEqualTo("PAY_DEPOSIT");
+        assertThat(patientView.deposit().balanceDisplay()).isPositive();
+        assertThat(patientView.deposit().transfer().status()).isEqualTo("CONFIRMED");
     }
 
     // ---------- one source: work items, "At a glance" and "waiting on" (QA A3) ----------
@@ -397,12 +399,11 @@ class CoordinatorCaseActionsTest {
         assertWaitsOnPatient(caseId, "profile to activate", COORDINATOR_WAITING, finance);
 
         activation.activate(ctx.token(), grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(caseId);
-        assertOneSource(caseId, "deposit to arrange", coordinator("DEPOSIT_ARRANGEMENT"), finance);
+        // DEP-3: the deposit is the patient's to pay; nothing waits in a staff queue for it.
+        assertWaitsOnPatient(caseId, "deposit to pay", COORDINATOR_WAITING, finance);
 
-        authenticate("coordinator-subject", Role.COORDINATOR);
-        CurrentActionView arrange = journey.workspace(caseId).actions().currentAction();
-        journey.completeTask(caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent", arrange.workItemVersion()));
-        assertOneSource(caseId, "deposit to record", new Party("finance-subject", Role.FINANCE, "DEPOSIT_RECORD"), COORDINATOR_WAITING);
+        submitReference(caseId, "FT-WALK-1");
+        assertOneSource(caseId, "transfer to verify", new Party("finance-subject", Role.FINANCE, "DEPOSIT_RECORD"), COORDINATOR_WAITING);
 
         settleDeposit(ctx); em.flush();
         assertThat(status(caseId)).isEqualTo("TRAVEL_COORDINATION");
@@ -448,9 +449,7 @@ class CoordinatorCaseActionsTest {
         com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-lead", "FINANCE", crypto.encrypt("Finance Lead"));
         com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-two", "FINANCE", crypto.encrypt("Finance Two"));
         com.rehletshifaa.workforce.WorkforceTestData.leadTeam(jdbc, "FINANCE", "finance-lead", "finance-subject", "finance-two");
-        authenticate("coordinator-subject", Role.COORDINATOR);
-        CurrentActionView arrange = journey.workspace(ctx.caseId).actions().currentAction();
-        journey.completeTask(ctx.caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent", arrange.workItemVersion())); em.flush();
+        submitReference(ctx.caseId, "FT-POOL-1");
         UUID item = jdbc.queryForObject("SELECT id FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD'", UUID.class, ctx.caseId);
 
         // Not even the lead cancels it: recording or waiving the deposit closes it.
@@ -489,11 +488,139 @@ class CoordinatorCaseActionsTest {
         raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
                 UUID.randomUUID(), ctx.caseId, "finance-subject", "FINANCE", "PRIMARY", "ACTIVE", "Commercial terms", "coordinator-subject", Instant.now(), Instant.now());
         raw("UPDATE workforce_role_assignments SET status='REVOKED', revoked_at=?, revoked_by='TEST', revoke_reason='Left' WHERE subject=? AND role_key='FINANCE'", Instant.now(), "finance-subject");
-        authenticate("coordinator-subject", Role.COORDINATOR);
-        CurrentActionView arrange = journey.workspace(ctx.caseId).actions().currentAction();
-        journey.completeTask(ctx.caseId, arrange.workItemId(), new CompleteTaskRequest("Instructions sent", arrange.workItemVersion())); em.flush();
+        submitReference(ctx.caseId, "FT-LEFT-1");
         assertThat(jdbc.queryForObject("SELECT owner_subject FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD'", String.class, ctx.caseId))
                 .as("the Finance pool, not someone who left").isNull();
+    }
+
+    // ---------- DEP-3: the patient's payment step (owner decision 2026-10-13) ----------
+
+    /** Finance cannot confirm the transfer: the step goes back to the patient with the reason, and a new reference reopens Finance's check. */
+    @Test void aRejectedTransferReturnsTheStepToThePatientWithTheReason() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        // Someone else's account cannot enter a reference on this case.
+        authenticate("another-patient", Role.PATIENT);
+        assertThat(catchThrowableOfType(() -> transfers.submitReference(ctx.caseId, new TransferReferenceRequest("FT-NOT-MINE")), ApiException.class).status()).isEqualTo(403);
+        submitReference(ctx.caseId, "FT-WRONG-1");
+        UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=?", UUID.class, ctx.caseId);
+        UUID transferId = jdbc.queryForObject("SELECT id FROM deposit_transfer_reports WHERE case_id=?", UUID.class, ctx.caseId);
+
+        // A coordinator is not Finance.
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        assertThat(catchThrowableOfType(() -> transfers.reject(ctx.caseId, depositId, transferId, new TransferRejectionRequest("No such transfer")), ApiException.class).status()).isEqualTo(403);
+        authenticate("finance-subject", Role.FINANCE);
+        transfers.reject(ctx.caseId, depositId, transferId, new TransferRejectionRequest("No transfer with this reference reached the account")); em.flush();
+        assertThat(catchThrowableOfType(() -> transfers.reject(ctx.caseId, depositId, transferId, new TransferRejectionRequest("Again")), ApiException.class).code()).isEqualTo("TRANSFER_NOT_PENDING");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD' AND status='OPEN'", ctx.caseId)).isZero();
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE template_key='deposit-transfer-rejected' AND idempotency_key LIKE ?", "deposit-transfer-rejected:" + depositId + "%")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='DEPOSIT_TRANSFER_REJECTED'", ctx.caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("PATIENT");
+
+        authenticate(patientSubject(ctx.caseId), Role.PATIENT);
+        CaseWorkspace patientView = journey.workspace(ctx.caseId);
+        assertThat(patientView.actions().currentAction().code()).isEqualTo("PAY_DEPOSIT");
+        assertThat(patientView.deposit().transfer().status()).isEqualTo("REJECTED");
+        assertThat(patientView.deposit().transfer().reason()).isEqualTo("No transfer with this reference reached the account");
+        SecurityContextHolder.clearContext();
+
+        // The same rejected reference again is refused; the corrected one goes back to Finance.
+        authenticate(patientSubject(ctx.caseId), Role.PATIENT);
+        assertThat(catchThrowableOfType(() -> transfers.submitReference(ctx.caseId, new TransferReferenceRequest("FT-WRONG-1")), ApiException.class).code())
+                .isEqualTo("TRANSFER_REFERENCE_REJECTED");
+        SecurityContextHolder.clearContext();
+        // The corrected reference: Finance verifies again, then confirms; the journey continues.
+        submitReference(ctx.caseId, "FT-RIGHT-2");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_RECORD' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
+        settleDeposit(ctx); em.flush();
+        assertThat(jdbc.queryForObject("SELECT provider_reference FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'", String.class, depositId)).isEqualTo("FT-RIGHT-2");
+        assertThat(status(ctx.caseId)).isEqualTo("TRAVEL_COORDINATION");
+    }
+
+    /** Security review (DEP-3): Finance confirms only someone else's report, never above the balance, and a reference pays one deposit. */
+    @Test void aTransferIsConfirmedOnlyBySomeoneElseWithinTheBalanceAndOnlyOnce() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=?", UUID.class, ctx.caseId);
+        BigDecimal total = jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId);
+        // A reference already recorded against another deposit cannot pay this one.
+        UUID otherDeposit = UUID.randomUUID();
+        raw("INSERT INTO deposits(id,case_id,currency,total_egp,status,created_at,version) VALUES(?,?,?,?,?,?,0)", otherDeposit, ctx.caseId, "EGP", total, "CANCELLED", Instant.now().minusSeconds(3600));
+        raw("INSERT INTO deposit_transfer_reports(id,case_id,deposit_id,method,transfer_reference,status,submitted_by,submitted_at,decided_by,decided_at,version) VALUES(?,?,?,'BANK_TRANSFER',?,'CONFIRMED','TEST',?,'TEST',?,0)",
+                UUID.randomUUID(), ctx.caseId, otherDeposit, "FT-USED-9", Instant.now(), Instant.now());
+        authenticate(patientSubject(ctx.caseId), Role.PATIENT);
+        assertThat(catchThrowableOfType(() -> transfers.submitReference(ctx.caseId, new TransferReferenceRequest("FT-USED-9")), ApiException.class).code())
+                .isEqualTo("TRANSFER_REFERENCE_IN_USE");
+        SecurityContextHolder.clearContext();
+        // Maker/checker: the account that reported the transfer cannot confirm it, even holding Finance.
+        String patient = patientSubject(ctx.caseId);
+        submitReference(ctx.caseId, "FT-SELF-1");
+        authenticate(patient, Role.FINANCE);
+        assertThat(catchThrowableOfType(() -> payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(total, "self-" + ctx.caseId)), ApiException.class).code())
+                .isEqualTo("SELF_CONFIRMATION");
+        // Never above what is still due.
+        authenticate("finance-subject", Role.FINANCE);
+        assertThat(catchThrowableOfType(() -> payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(total.add(BigDecimal.ONE), "over-" + ctx.caseId)), ApiException.class).code())
+                .isEqualTo("AMOUNT_EXCEEDS_BALANCE");
+        // A waiver waits until the reported transfer is decided.
+        assertThat(catchThrowableOfType(() -> payment.waiveDeposit(ctx.caseId, depositId, "Goodwill"), ApiException.class).code()).isEqualTo("TRANSFER_PENDING");
+        // The coordinator sees the patient's transfer reference; the Consultant on the case does not, nor the account details.
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        assertThat(journey.workspace(ctx.caseId).deposit().transfer().reference()).isEqualTo("FT-SELF-1");
+        authenticate("doctor-subject", Role.CONSULTANT);
+        DepositView consultantView = journey.workspace(ctx.caseId).deposit();
+        assertThat(consultantView.transfer()).isNull();
+        assertThat(consultantView.bankTransfer()).isNull();
+        assertThat(consultantView.events()).allSatisfy(e -> assertThat(e.providerReference()).isNull());
+    }
+
+    /** Owner decision: remind the patient daily for three days, alert the coordinator on the fourth — each once. */
+    @Test void thePatientIsRemindedDailyForThreeDaysAndTheCoordinatorAlertedOnTheFourth() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=?", UUID.class, ctx.caseId);
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE template_key='deposit-payment-due' AND idempotency_key LIKE ?", "deposit-due:" + depositId + "%")).isEqualTo(1);
+        assertThat(reminders.evaluate(ctx.caseId)).as("same day: nothing more").isEqualTo("NONE");
+
+        for (int day = 1; day <= 3; day++) {
+            raw("UPDATE deposits SET payable_at=? WHERE id=?", Instant.now().minus(java.time.Duration.ofDays(day)).minusSeconds(60), depositId);
+            assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("REMINDER");
+            assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("REMINDER"); // the hourly sweep again: still one message
+        }
+        // Each day's reminder once (three cycles were simulated, each key per cycle and day).
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE template_key='deposit-payment-reminder' AND idempotency_key LIKE 'deposit-reminder:%'")).isEqualTo(3);
+
+        raw("UPDATE deposits SET payable_at=? WHERE id=?", Instant.now().minus(java.time.Duration.ofDays(4)).minusSeconds(60), depositId);
+        assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("OVERDUE");
+        assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("OVERDUE");
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='DEPOSIT_REFERENCE_OVERDUE'", "coordinator-subject")).isEqualTo(1);
+
+        // Once the patient sends the reference, nobody is chased.
+        submitReference(ctx.caseId, "FT-LATE-1");
+        assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("NONE");
+    }
+
+    /** The patient asked on WhatsApp how to pay: the case's one voice sends the link, only while the patient owes the reference. */
+    @Test void theCoordinatorSendsThePaymentLinkOnlyWhileThePatientOwesTheReference() throws Exception {
+        var ctx = acknowledged();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        assertThat(catchThrowableOfType(() -> transfers.sendPaymentLink(ctx.caseId), ApiException.class).code()).as("profile first").isEqualTo("PAYMENT_LINK_NOT_DUE");
+        SecurityContextHolder.clearContext();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        transfers.sendPaymentLink(ctx.caseId); em.flush();
+        assertThat(count("SELECT count(*) FROM notification_outbox WHERE template_key='deposit-payment-due' AND idempotency_key LIKE ?", "deposit-payment-link:" + ctx.caseId + "%")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='DEPOSIT_PAYMENT_LINK_SENT'", ctx.caseId)).isEqualTo(1);
+        // Another coordinator does not speak for this case.
+        com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "coordinator-other", "COORDINATOR", crypto.encrypt("Other Coordinator"));
+        authenticate("coordinator-other", Role.COORDINATOR);
+        assertThat(catchThrowableOfType(() -> transfers.sendPaymentLink(ctx.caseId), ApiException.class).status()).isEqualTo(403);
+
+        submitReference(ctx.caseId, "FT-LINK-1");
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        assertThat(journey.workspace(ctx.caseId).actions().availableActions()).doesNotContain("SEND_PAYMENT_LINK");
+        assertThat(catchThrowableOfType(() -> transfers.sendPaymentLink(ctx.caseId), ApiException.class).code()).isEqualTo("PAYMENT_LINK_NOT_DUE");
     }
 
     /** QA W-8/#29 (A0 live check): the one-time code reaches an Arabic patient in Arabic — the message carries the case's language. */
@@ -789,7 +916,7 @@ class CoordinatorCaseActionsTest {
         UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, ctx.caseId);
         BigDecimal total = jdbc.queryForObject("SELECT total_egp FROM deposits WHERE id=?", BigDecimal.class, depositId);
         authenticate("finance-subject", Role.FINANCE);
-        payment.recordReceipt(ctx.caseId, depositId, new RecordReceiptRequest(total, "BANK", "ref-1", "settle-" + ctx.caseId));
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId, total, "settle-" + ctx.caseId);
         SecurityContextHolder.clearContext();
     }
 
@@ -827,6 +954,16 @@ class CoordinatorCaseActionsTest {
         authenticate(subject, Role.PATIENT);
         account.session(); em.flush();
         SecurityContextHolder.clearContext();
+    }
+
+    /** The patient (signed in) enters the bank's transaction reference for their deposit transfer (DEP-3). */
+    private void submitReference(UUID caseId, String reference) {
+        authenticate(patientSubject(caseId), Role.PATIENT);
+        transfers.submitReference(caseId, new TransferReferenceRequest(reference)); em.flush();
+        SecurityContextHolder.clearContext();
+    }
+    private String patientSubject(UUID caseId) {
+        return jdbc.queryForObject("SELECT p.external_subject FROM patient_profiles p JOIN medical_cases c ON c.patient_id=p.id WHERE c.id=?", String.class, caseId);
     }
 
     private void authenticate(String subject, Role... roles) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, roles); }

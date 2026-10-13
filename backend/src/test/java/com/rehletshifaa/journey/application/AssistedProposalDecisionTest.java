@@ -282,7 +282,8 @@ class AssistedProposalDecisionTest {
         assistance.recordDecision(caseId, versionId, new RecordedDecisionRequest("ACKNOWLEDGED", null, "VIDEO", "PATIENT", Instant.now(), true));
         em.flush();
         assertThat(count("SELECT count(*) FROM deposits WHERE case_id=?", caseId)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT copy_code FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", String.class, caseId)).isEqualTo("DEPOSIT_DUE");
+        // DEP-3: the deposit is the patient's to pay; no staff item is raised for it.
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_ARRANGEMENT'", caseId)).isZero();
         assertThat(jdbc.queryForObject("SELECT waiting_reason_code FROM medical_cases WHERE id=?", String.class, caseId)).isNotNull();
         assertThat(count("SELECT count(*) FROM patient_onboardings WHERE case_id=?", caseId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT acknowledgement_version FROM proposal_decisions WHERE proposal_version_id=?", String.class, versionId))

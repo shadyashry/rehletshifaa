@@ -133,13 +133,12 @@ public class PatientActivationQueryService {
     }
 
     /**
-     * What the patient can do right now. The deposit is arranged offline by a coordinator, so on the deposit
-     * stage the honest answer is NONE rather than a payment action the platform cannot honour.
+     * What the patient can do right now. Once the profile and account are done everything continues on their case page —
+     * including the deposit, which they pay there by bank transfer and confirm with the bank's reference (DEP-3).
      */
     private static PatientAction currentAction(boolean profileActive, AccountSetup account, DepositSummary deposit) {
         if (!profileActive) return PatientAction.COMPLETE_PROFILE;
         if (account.status() != AccountStatus.ACTIVE && account.awaitingEmail()) return PatientAction.SET_UP_ACCOUNT;
-        if (deposit.satisfied() || !deposit.required()) return PatientAction.CONTINUE_IN_PORTAL;
-        return PatientAction.NONE;
+        return PatientAction.CONTINUE_IN_PORTAL;
     }
 }

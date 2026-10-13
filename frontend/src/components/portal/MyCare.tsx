@@ -29,20 +29,24 @@ export type CaseSummary = {
 export type PatientActionItem = { id: string; kind: string; code: string; label: string; required: boolean; completed: boolean };
 export type PatientAction = { taskId: string; title: string; message?: string | null; blocking: boolean; dueAt?: string | null; items: PatientActionItem[] };
 export type ProposalSummaryData = { versionNumber: number; status: string; currency: string; documentType?: string; validUntil?: string; items: { quantity: number; unitPrice: number; optional: boolean }[] };
-export type DepositSummaryData = { status: string; currency: string; totalDisplay?: number | null; paidDisplay?: number | null; balanceDisplay?: number | null };
+export type DepositSummaryData = { status: string; currency: string; totalDisplay?: number | null; paidDisplay?: number | null; balanceDisplay?: number | null;
+  /** The latest bank-transfer reference the patient entered (DEP-3). */
+  transfer?: { reference: string; status: string; reason?: string | null } | null };
 export type CaseDocument = { documentId: string; fileName: string; status: string; createdAt: string };
 export type CareView = "care" | "documents" | "messages";
 
 type StepText = { title: string; body: string; next?: string };
-/** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. */
-const MONEY_STEPS = new Set(["WAIT_DEPOSIT_ARRANGEMENT", "PAY_DEPOSIT"]);
+/** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. Paying it is the payment step's own panel. */
+const MONEY_STEPS = new Set(["PAY_DEPOSIT", "WAIT_PAYMENT_CHECK"]);
 
-export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, messagesPanel, newCaseHref = null }: {
+export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, paymentStep, messagesPanel, newCaseHref = null }: {
   locale: Locale; caseSummary: CaseSummary; actions: CaseActions; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
   proposal?: ProposalSummaryData | null; deposit?: DepositSummaryData | null; documents: CaseDocument[]; unreadMessages: number;
   /** Every case the account can open, this one included; the switcher shows from two. */
   cases: CaseSummary[]; view: CareView; onView: (view: CareView) => void;
-  onOpenCase: (id: string) => void; onOpenProposal: () => void; identityStep?: ReactNode; messagesPanel: ReactNode;
+  onOpenCase: (id: string) => void; onOpenProposal: () => void; identityStep?: ReactNode;
+  /** The deposit payment step (DEP-3), rendered when the backend says the patient owes it. */
+  paymentStep?: ReactNode; messagesPanel: ReactNode;
   /** Where the account holder sends a new case of their own; null when it is not theirs to send from here. */
   newCaseHref?: string | null;
 }) {
@@ -155,7 +159,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
             )}
 
             {/* The money this step is about, inside the step: one place for the amount, on the facts panel. */}
-            {depositInStep && deposit && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 rounded-md bg-mist p-4 sm:p-5"/>}
+            {depositInStep && deposit && !(code === "PAY_DEPOSIT" && paymentStep) && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 rounded-md bg-mist p-4 sm:p-5"/>}
+            {code === "PAY_DEPOSIT" && focus && paymentStep}
 
             {/* Exactly one primary action, and only when the backend says the patient owes something. */}
             {focus && code === "REVIEW_PROPOSAL" && (
@@ -272,13 +277,15 @@ function DepositFacts({ deposit, locale, copy, level, className }: { deposit: De
     <section aria-labelledby="deposit-title" className={className}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <Heading id="deposit-title" className={level === 2 ? "eyebrow" : "label-micro text-ink-500"}>{copy.title}</Heading>
-        <StatusBadge tone={depositTone(deposit.status)}>{status[deposit.status] ?? deposit.status}</StatusBadge>
+        <StatusBadge tone={depositTone(deposit.status)}>{(deposit.transfer?.status === "SUBMITTED" ? status.CHECKING : status[deposit.status]) ?? deposit.status}</StatusBadge>
       </div>
       <p className="statement mt-2 text-brand-900 tabular-nums"><bdi dir="ltr">{deposit.totalDisplay != null ? formatMoney(deposit.totalDisplay, deposit.currency, locale) : "—"}</bdi></p>
       {deposit.status === "PARTIALLY_PAID" && deposit.paidDisplay != null && (
         <p className="mt-1 text-[0.875rem] text-ink-600">{copy.received} <bdi dir="ltr" className="tabular-nums">{formatMoney(deposit.paidDisplay, deposit.currency, locale)}</bdi></p>
       )}
-      {note[deposit.status] && <p className="mt-1.5 text-[0.875rem] leading-6 text-ink-600">{note[deposit.status]}</p>}
+      {deposit.transfer?.status === "SUBMITTED"
+        ? <p className="mt-1.5 text-[0.875rem] leading-6 text-ink-600">{copy.sentReference}: <bdi dir="ltr" className="font-semibold text-ink-900">{deposit.transfer.reference}</bdi></p>
+        : note[deposit.status] && <p className="mt-1.5 text-[0.875rem] leading-6 text-ink-600">{note[deposit.status]}</p>}
     </section>
   );
 }
@@ -323,7 +330,7 @@ function stepText(code: string, steps: LocalizedWorkCopy["myCare"]["steps"], ctx
     case "WAIT_COORDINATOR_REVIEW": return ctx.status === "RECEIVED" ? s.WAIT_CASE_RECEIVED : s.WAIT_COORDINATOR_REVIEW;
     case "WAIT_PROPOSAL": return ctx.proposalState === "REVISION_REQUESTED" ? s.WAIT_PROPOSAL_REVISION : ctx.proposalState === "EXPIRED" ? s.WAIT_PROPOSAL_EXPIRED : s.WAIT_PROPOSAL;
     case "PROVIDE_INFORMATION": case "REVIEW_PROPOSAL": case "COMPLETE_PROFILE": case "VERIFY_IDENTITY": case "WAIT_CONSULTANT_REVIEW":
-    case "WAIT_DEPOSIT_ARRANGEMENT": case "WAIT_COORDINATION": case "WAIT_TREATMENT": case "IN_TREATMENT": case "FOLLOW_UP": return s[code];
+    case "PAY_DEPOSIT": case "WAIT_PAYMENT_CHECK": case "WAIT_COORDINATION": case "WAIT_TREATMENT": case "IN_TREATMENT": case "FOLLOW_UP": return s[code];
     default:
       if (ctx.status === "DECLINED" || ctx.status === "CLINICALLY_NOT_SUITABLE") return s[ctx.status];
       if (ctx.status === "CLOSED" || ctx.status === "CANCELLED") return s.CLOSED;

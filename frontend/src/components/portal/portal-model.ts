@@ -48,7 +48,10 @@ export type DepositComponentT={beneficiary:string;purpose:string;amountEgp:numbe
 
 export type PaymentEvent={eventType:string;amountDisplay?:number;currency?:string;method?:string;provider?:string;providerReference?:string;status:string;reason?:string;occurredAt?:string};
 
-export type DepositView={id:string;status:string;currency:string;totalEgp:number;totalDisplay?:number;paidDisplay?:number;balanceDisplay?:number;components:DepositComponentT[];events:PaymentEvent[]};
+/** DEP-3: {@code transfer} is the latest bank-transfer reference the patient entered; {@code bankTransfer} the platform account to pay into. */
+export type TransferReport={id:string;method:string;reference:string;status:"SUBMITTED"|"CONFIRMED"|"REJECTED"|string;submittedAt:string;decidedAt?:string|null;reason?:string|null;version:number};
+export type BankTransfer={accountName:string;bankName:string;accountNumber:string;iban:string;swift:string;paymentReference:string};
+export type DepositView={id:string;status:string;currency:string;totalEgp:number;totalDisplay?:number;paidDisplay?:number;balanceDisplay?:number;components:DepositComponentT[];events:PaymentEvent[];transfer?:TransferReport|null;bankTransfer?:BankTransfer|null};
 
 export type Workspace={preview?:boolean;/** Finance recording a deposit on a case it is not assigned to: summary, deposit and current action only. */paymentOnly?:boolean;intakeSummary?:string;patientAction?:{taskId:string;title:string;message?:string;blocking:boolean;dueAt?:string;items:{id:string;kind:string;code:string;label:string;required:boolean;completed:boolean;response?:string}[]}|null;caseSummary:CaseView;timeline:{type:string;label:string;occurredAt:string;status:string}[];tasks:Task[];messages:{id:string;senderRole:string;senderName?:string;direction:string;body:string;createdAt:string;internalOnly:boolean;read:boolean;channel?:string;attachmentStatus?:string|null}[];assignments:Assignment[];clinicalReviews:Review[];proposal?:Proposal;gates?:ProposalGates|null;delivery?:DeliveryStatus|null;deposit?:DepositView|null;actions?:CaseActions|null;patientProposal?:PatientProposalState|null;representatives?:RepresentativeOption[];patientReply?:PatientReply|null};
 /** Who answers the patient on this case for the staff viewer: the case coordinator, or their active cover instead of them. */

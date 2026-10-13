@@ -103,6 +103,18 @@ public class CaseWorkspaceQueryService {
     /** Threads follow the relationship that authorized the request (Section 1.1), never a union of populations. */
     static Set<String> allowedThreads(Actor actor) { return ROLE_THREADS.getOrDefault(actor.role(), Set.of()); }
 
+    /** Roles that see the patient's bank-transfer reference and the platform account on the deposit (DEP-3). */
+    private static final Set<Role> PAYMENT_DETAIL_ROLES = Set.of(Role.PATIENT, Role.PATIENT_REPRESENTATIVE, Role.COORDINATOR, Role.FINANCE);
+
+    private com.rehletshifaa.journey.api.JourneyDtos.DepositView depositFor(java.util.UUID caseId, Actor actor) {
+        var d = deposits.depositForCase(caseId);
+        if (d == null || PAYMENT_DETAIL_ROLES.contains(actor.role())) return d;
+        return new com.rehletshifaa.journey.api.JourneyDtos.DepositView(d.id(), d.status(), d.currency(), d.totalEgp(), d.totalDisplay(),
+                d.paidDisplay(), d.balanceDisplay(), d.components(), d.events().stream()
+                .map(e -> new com.rehletshifaa.journey.api.JourneyDtos.PaymentEventView(e.eventType(), e.amountDisplay(), e.currency(), e.method(),
+                        e.provider(), null, e.status(), e.reason(), e.occurredAt())).toList(), null, null);
+    }
+
     public CaseWorkspace workspace(UUID caseId) {
         Resource onCase = Resource.ofCase(caseId);
         if (!authority.allowed(Permission.CASE_READ, onCase) && authority.allowed(Permission.CASE_DEPOSIT_READ, onCase)) return paymentWorkspace(caseId);
@@ -144,7 +156,7 @@ public class CaseWorkspaceQueryService {
         ProposalView latest = proposals.latest(caseId, patientActor);
         DeliveryStatus delivery = latest != null && DELIVERED_STATUSES.contains(latest.status()) ? proposals.deliveryStatus(latest.versionId()) : null;
         return new CaseWorkspace(summary, timeline, taskViews, messageViews, assignmentViews, reviewViews, latest, proposals.gates(caseId, latest),
-                delivery, deposits.depositForCase(caseId), cases.findConditionDescription(caseId).orElse(null), patientActions.openAction(caseId),
+                delivery, depositFor(caseId, actor), cases.findConditionDescription(caseId).orElse(null), patientActions.openAction(caseId),
                 actions, proposalAccess.state(caseId), actor.role() == Role.COORDINATOR ? representatives(caseId) : List.of(),
                 patientActor ? null : patientReply(caseId, actor), false);
     }

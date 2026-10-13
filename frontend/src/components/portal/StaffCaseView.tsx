@@ -452,27 +452,47 @@ function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;proposal?
  return <div className="mt-4 rounded-lg border border-brand-200 p-4"><h4 className="font-bold text-brand-800">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.createIntro}</p>{!reviewId?<p className="mt-2 text-sm text-ink-500">{g.needReview}</p>:<><label className="mt-3 block text-sm font-bold">{g.currency}<select className="field mt-1 w-auto" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></label><label className="mt-3 block text-sm font-bold">{g.scope}<textarea className="field mt-1" rows={2} value={scope} onChange={e=>setScope(e.target.value)}/></label><button className="btn-primary mt-3" disabled={busy} onClick={()=>{const validUntil=validUntilInDays(14);void mutate(`/coordinator/cases/${caseId}/final-quotes`,{clinicalReviewId:reviewId,currency,scopeChangeReason:scope||undefined,validUntil});}}>{g.create}</button></>}</div>;
 }
 
+/**
+ * The patient's bank transfer (DEP-3): the reference they entered and where it stands. Finance confirms the amount received
+ * against it, or returns it to the patient with a reason; there is nothing to confirm until the patient has sent one.
+ */
+function TransferPanel({locale,deposit,caseId,isFinance,busy,mutate,tx,amountLabel}:{locale:Locale;deposit:DepositView;caseId:string;isFinance:boolean;busy:boolean;mutate:Mutate;tx:ReturnType<typeof useWorkCopy>["depositTransfer"];amountLabel:string}){
+ const transfer=deposit.transfer;const pending=transfer?.status==="SUBMITTED";
+ return <section aria-label={tx.title} className="mt-4 border-t border-line pt-3">
+  <h5 className="text-[0.875rem] font-bold text-ink-800">{tx.title}</h5>
+  {pending&&transfer?<p className="mt-1 text-sm text-ink-700">{tx.reference}: <bdi dir="ltr" translate="no" className="select-all break-all font-semibold text-ink-900">{transfer.reference}</bdi> <span className="text-ink-500">· {tx.sent} <bdi dir="ltr">{new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(transfer.submittedAt))}</bdi></span></p>
+   :<p className="mt-1 text-sm text-ink-600">{tx.waiting}</p>}
+  {!pending&&transfer?.status==="REJECTED"&&<p className="mt-1 text-sm text-alert-700">{tx.rejectedLast.replace("{reason}",transfer.reason??"")}</p>}
+  {isFinance&&pending&&transfer&&<>
+   <form id="deposit-payment" className="mt-3 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/payments`,{amountEgp:Number(d.get("amount"))||0,idempotencyKey:crypto.randomUUID()}).then(result=>{if(result)f.reset();});}}>
+    <label className="text-[0.8125rem] font-bold">{amountLabel}<input className="field w-32" name="amount" type="number" min="0.01" step="0.01" required/></label>
+    <button className="btn-primary" disabled={busy}>{tx.confirm}</button>
+   </form>
+   <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/transfers/${transfer.id}/reject`,{reason:String(d.get("reason")||"").trim()}).then(result=>{if(result)f.reset();});}}>
+    <label className="flex-1 text-[0.8125rem] font-bold">{tx.rejectReason}<input className="field" name="reason" required maxLength={500}/></label>
+    <button className="btn-secondary" disabled={busy}>{tx.reject}</button>
+   </form>
+  </>}
+ </section>;
+}
+
 function DepositCard({deposit}:{deposit:DepositView}){
  const {locale,role,c:{id:caseId},busy,mutate}=useCaseWorkspace();
- const confirmCopy=useWorkCopy().confirm;
+ const workCopy=useWorkCopy();const confirmCopy=workCopy.confirm;const tx=workCopy.depositTransfer;
  // A refund is money leaving: the amount is read back before it is recorded.
  const [refund,setRefund]=useState<{form:HTMLFormElement;amountEgp:number;reason:string}|null>(null);
  const isFinance=role==="finance";
  const g=locale==="ar"?{title:"وديعة التنسيق والدفعات",total:"الإجمالي",paid:"المدفوع",balance:"المتبقي",record:"تسجيل دفعة",refund:"تسجيل استرداد",amount:"المبلغ (ج.م)",method:"الطريقة",reference:"مرجع المزوّد",reason:"سبب الاسترداد",note:"تسجيل دون اتصال فقط — يسجّل الدفعات المستلمة فعليًا؛ لا تُدخل بيانات بطاقة.",credited:"تُخصم من الرصيد النهائي",REQUESTED:"مطلوبة",PARTIALLY_PAID:"مدفوعة جزئيًا",PAID:"مدفوعة",CANCELLED:"ملغاة",REFUNDED:"مستردة"}:{title:"Coordination deposit & payments",total:"Total",paid:"Paid",balance:"Balance",record:"Record a payment",refund:"Record a refund",amount:"Amount (EGP)",method:"Method",reference:"Provider reference",reason:"Refund reason",note:"Offline record-only — records payments actually received; no card data is entered.",credited:"credited to final",REQUESTED:"Requested",PARTIALLY_PAID:"Partially paid",PAID:"Paid",CANCELLED:"Cancelled",REFUNDED:"Refunded"};
  const amount=(n?:number)=>n==null?"—":money(n,deposit.currency||"EGP",locale);
+ const open=deposit.status==="REQUESTED"||deposit.status==="PARTIALLY_PAID";
  const label=(g as Record<string,string>)[deposit.status]??deposit.status;
  const cls=deposit.status==="PAID"?"bg-brand-50 text-brand-700":(deposit.status==="REFUNDED"||deposit.status==="CANCELLED")?"bg-mist text-ink-600":"bg-alert-50 text-alert-700";
  return <div className="mt-4 rounded-lg border border-line p-4">
   <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-bold text-ink-800">{g.title}</h4><span className={`rounded px-2 py-0.5 text-[0.8125rem] font-bold ${cls}`}>{label}</span></div>
   <div className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><span className="text-ink-500">{g.total}</span><br/><strong><bdi dir="ltr">{amount(deposit.totalDisplay)}</bdi></strong></div><div><span className="text-ink-500">{g.paid}</span><br/><strong><bdi dir="ltr">{amount(deposit.paidDisplay)}</bdi></strong></div><div><span className="text-ink-500">{g.balance}</span><br/><strong><bdi dir="ltr">{amount(deposit.balanceDisplay)}</bdi></strong></div></div>
   {deposit.components.length>0&&<ul className="mt-3 space-y-1 text-sm">{deposit.components.map((cp,i)=><li key={i} className="flex justify-between gap-3"><span>{cp.purpose} <span className="text-[0.8125rem] text-ink-400">({cp.beneficiary}{cp.creditedToFinal?` · ${g.credited}`:""})</span></span><strong className="whitespace-nowrap"><bdi dir="ltr">{amount(cp.amountDisplay)}</bdi></strong></li>)}</ul>}
+  {open&&<TransferPanel locale={locale} deposit={deposit} caseId={caseId} isFinance={isFinance} busy={busy} mutate={mutate} tx={tx} amountLabel={g.amount}/>}
   {isFinance&&<>
-   <form id="deposit-payment" className="mt-4 flex flex-wrap items-end gap-2 border-t border-line pt-3" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/payments`,{amountEgp:Number(d.get("amount"))||0,method:String(d.get("method")||"")||undefined,providerReference:String(d.get("reference")||"")||undefined,idempotencyKey:crypto.randomUUID()}).then(result=>{if(result)f.reset();});}}>
-    <label className="text-[0.8125rem] font-bold">{g.amount}<input className="field w-28" name="amount" type="number" min="0.01" step="0.01" required/></label>
-    <label className="text-[0.8125rem] font-bold">{g.method}<input className="field w-28" name="method" placeholder="Bank"/></label>
-    <label className="text-[0.8125rem] font-bold">{g.reference}<input className="field w-32" name="reference"/></label>
-    <button className="btn-primary" disabled={busy}>{g.record}</button>
-   </form>
    <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);setRefund({form:f,amountEgp:Number(d.get("amount"))||0,reason:String(d.get("reason")||"").trim()});}}>
     <label className="text-[0.8125rem] font-bold">{g.amount}<input className="field w-28" name="amount" type="number" min="0.01" step="0.01" required/></label>
     <label className="flex-1 text-[0.8125rem] font-bold">{g.reason}<input className="field" name="reason" required/></label>

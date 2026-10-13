@@ -14,6 +14,7 @@ import type { Mutate } from "@/components/portal/portal-model";
 // Role-specific panels, loaded on demand: a coordinator never downloads My Care, a patient never the clinical review.
 const MyCare=dynamic(()=>import("@/components/portal/MyCare").then(m=>m.MyCare));
 const PatientIdentityStep=dynamic(()=>import("@/components/portal/PatientIdentityStep").then(m=>m.PatientIdentityStep));
+const PatientDepositPayment=dynamic(()=>import("@/components/portal/PatientDepositPayment").then(m=>m.PatientDepositPayment));
 const PatientProposal=dynamic(()=>import("@/components/portal/PatientProposal").then(m=>m.PatientProposal));
 const PatientProposalDecision=dynamic(()=>import("@/components/portal/PatientProposal").then(m=>m.PatientProposalDecision));
 
@@ -39,6 +40,9 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
      documents={documents} unreadMessages={unread} cases={allCases} newCaseHref={sendsOwnCase?localeHref(locale,"send-my-case"):null} view={careView} onView={view=>onCareView?.(view)}
      onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)}
      identityStep={actions.currentAction.code==="VERIFY_IDENTITY"?<IdentityStep key={c.id} locale={locale} caseId={c.id} busy={busy} mutate={mutate} load={load}/>:undefined}
+     paymentStep={actions.currentAction.code==="PAY_DEPOSIT"&&value.deposit?.bankTransfer?<PatientDepositPayment key={`${c.id}:${value.deposit.transfer?.id??"new"}`} locale={locale} caseId={c.id} currency={value.deposit.currency}
+      amountDue={value.deposit.balanceDisplay??value.deposit.totalDisplay??null} totalDue={value.deposit.totalDisplay??null} received={value.deposit.paidDisplay??null}
+      bank={value.deposit.bankTransfer} transfer={value.deposit.transfer} busy={busy} mutate={mutate}/>:undefined}
      messagesPanel={<div aria-busy={busy||undefined} className="min-w-0"><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={true} busy={busy} mutate={mutate}/></div>}/>
     {proposalOpen&&value.proposal&&<CaseDrawer locale={locale} title={proposalCopy.title} onClose={()=>setProposalOpen(false)}>
      <div aria-busy={busy||undefined} className="min-w-0"><PatientProposal locale={locale} copy={proposalCopy} proposal={value.proposal}

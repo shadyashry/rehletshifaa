@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.UUID;
 
 public interface PaymentEventRepository extends BaseRepository<PaymentEvent, UUID> {
+    /** The ledger already holds this command (a replayed receipt or callback). */
+    boolean existsByIdempotencyKeyAndDepositIdAndActorSubject(String idempotencyKey, UUID depositId, String actorSubject);
+
     interface Entry {
         String getEventType(); BigDecimal getAmountDisplay(); String getCurrency(); String getMethod(); String getProvider();
         String getProviderReference(); String getStatus(); String getReason(); Instant getOccurredAt();

@@ -21,8 +21,8 @@ const accepted = { state: "ACCEPTED", action: "VIEW_PROPOSAL" as const, versionI
 
 function renderCare(overrides: Partial<Parameters<typeof MyCare>[0]> = {}) {
   const onView = vi.fn(), onOpenProposal = vi.fn(), onOpenCase = vi.fn();
-  renderWithWork(<MyCare locale="en" caseSummary={base} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
-                 deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} cases={[base]}
+  renderWithWork(<MyCare locale="en" caseSummary={base} actions={wait("WAIT_PAYMENT_CHECK")} patientProposal={accepted} proposal={proposal}
+                 deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500, transfer: { reference: "FT123456", status: "SUBMITTED" } }} documents={[]} unreadMessages={0} cases={[base]}
                  view="care" onView={onView} onOpenCase={onOpenCase} onOpenProposal={onOpenProposal} messagesPanel={<p>messages panel</p>} {...overrides}/>);
   return { onView, onOpenProposal, onOpenCase };
 }
@@ -35,7 +35,7 @@ describe("MyCare", () => {
     for (const name of ["Your cases", "Your proposal", "Your coordinator", "Your care journey"])
       expect(screen.getByRole("heading", { level: 2, name })).toBeTruthy();
     // The deposit is part of the current step (a sub-heading inside it), not a second section saying the same thing.
-    const step = screen.getByRole("region", { name: "Deposit arrangements" });
+    const step = screen.getByRole("region", { name: "We're checking your payment" });
     expect(within(step).getByRole("heading", { level: 3, name: "Coordination deposit" })).toBeTruthy();
     // "Message (2 unread messages)", not "Message2".
     expect(screen.getByRole("button", { name: "Message (2 unread messages)" })).toBeTruthy();
@@ -43,8 +43,8 @@ describe("MyCare", () => {
   });
 
   it("isolates the figure, not the line, in Arabic, and labels care areas from the shared list", () => {
-    renderWithWork(<MyCare locale="ar" caseSummary={{ ...base, careCategory: "general-surgery" }} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
-                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} cases={[base]}
+    renderWithWork(<MyCare locale="ar" caseSummary={{ ...base, careCategory: "general-surgery" }} actions={wait("WAIT_PAYMENT_CHECK")} patientProposal={accepted} proposal={proposal}
+                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500, transfer: { reference: "FT123456", status: "SUBMITTED" } }} documents={[]} unreadMessages={0} cases={[base]}
                    view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={vi.fn()} messagesPanel={null}/>, "ar");
     const deposit = screen.getByRole("region", { name: "وديعة التنسيق" });
     const figure = within(deposit).getByText(/500/);
@@ -57,7 +57,7 @@ describe("MyCare", () => {
     renderCare({ caseSummary: { ...base, patientName: "Maya Example" } });
     expect(document.getElementById("case-heading")?.textContent).toContain("Maya Example");
     cleanup();
-    renderCare({ caseSummary: { ...base, patientName: "Maya Example" }, actions: { ...wait("WAIT_DEPOSIT_ARRANGEMENT"), viewer: "REPRESENTATIVE" } });
+    renderCare({ caseSummary: { ...base, patientName: "Maya Example" }, actions: { ...wait("WAIT_PAYMENT_CHECK"), viewer: "REPRESENTATIVE" } });
     expect(document.getElementById("case-heading")?.textContent).toMatch(/Care for .*Maya Example/);
   });
 
@@ -69,18 +69,18 @@ describe("MyCare", () => {
     expect(screen.getAllByText("Sara Ahmed").length).toBeGreaterThan(0);
     expect(screen.queryByText(/ACCEPTED|WAIT_DEPOSIT/)).toBeNull();
     // Current step: what is happening, no action, what happens next.
-    expect(screen.getByRole("heading", { name: "Deposit arrangements" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "We're checking your payment" })).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("No action is required from you right now.");
-    expect(screen.getByText(/Once the deposit is received/)).toBeTruthy();
+    expect(screen.getByText(/Once your payment is confirmed/)).toBeTruthy();
     // The patient acknowledged an estimate; nothing says a proposal was accepted.
-    expect(screen.getByText(/You acknowledged your preliminary estimate/)).toBeTruthy();
+    expect(screen.getByText(/matching your transfer with the reference you sent/)).toBeTruthy();
     expect(screen.queryByText(/has been accepted/)).toBeNull();
     // No fake workflow CTA of any kind.
     expect(screen.queryByRole("button", { name: /continue|pay|check status|refresh/i })).toBeNull();
     // Deposit: USD 500, arranging, and no pay button.
     const deposit = screen.getByRole("region", { name: "Coordination deposit" });
     expect(within(deposit).getByText("$500")).toBeTruthy();
-    expect(within(deposit).getByText("Arranging")).toBeTruthy();
+    expect(within(deposit).getByText("Being checked")).toBeTruthy();
     expect(within(deposit).queryByRole("button")).toBeNull();
     // Proposal: amount, status, exactly one action.
     const proposalBlock = screen.getByRole("region", { name: "Your proposal" });
@@ -107,12 +107,19 @@ describe("MyCare", () => {
     expect(screen.queryByText(/Pay deposit/i)).toBeNull();
   });
 
+  it("when the deposit is the patient's to pay, the payment step is the step's one panel (DEP-3)", () => {
+    renderCare({ actions: focus("PAY_DEPOSIT"), paymentStep: <p>payment step</p> });
+    expect(screen.getByRole("heading", { name: "Pay your coordination deposit" })).toBeTruthy();
+    expect(screen.getByText("payment step")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Coordination deposit" })).toBeNull(); // the amount lives in the payment step
+  });
+
   it("once the deposit is confirmed it reads as received and the stale step is gone", () => {
     renderCare({ actions: wait("WAIT_COORDINATION"), deposit: { status: "PAID", currency: "USD", totalDisplay: 500, paidDisplay: 500 } });
     const deposit = screen.getByRole("region", { name: "Coordination deposit" });
     expect(within(deposit).getByText("Deposit received")).toBeTruthy();
     expect(within(deposit).getByText("$500")).toBeTruthy();
-    expect(screen.queryByText(/Arranging|Deposit arrangements/)).toBeNull();
+    expect(screen.queryByText(/Being checked|checking your payment/)).toBeNull();
     expect(screen.getByRole("heading", { name: "We are arranging your treatment" })).toBeTruthy();
   });
 
@@ -179,7 +186,7 @@ describe("MyCare", () => {
     // The case's own heading names whose file this is; the current step is the first section after it.
     const headings = screen.getAllByRole("heading").map(h => h.textContent);
     expect(headings[0]).toBe("RS-2026-000081");
-    expect(headings[1]).toBe("Deposit arrangements");
+    expect(headings[1]).toBe("We're checking your payment");
     const journey = screen.getByRole("list");
     expect(within(journey).queryByRole("button")).toBeNull();
     const steps = within(journey).getAllByRole("listitem").map(li => li.getAttribute("aria-current"));
@@ -189,7 +196,7 @@ describe("MyCare", () => {
   it("switches between My Care, Documents and Messages without leaving the case", () => {
     const { onView } = renderCare({ view: "documents", documents: [{ documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", createdAt: "2026-09-08T09:00:00Z" }] });
     expect(screen.getByText("Echo_Report.pdf")).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Deposit arrangements" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "We're checking your payment" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "My Care" }));
     expect(onView).toHaveBeenCalledWith("care");
     cleanup();
@@ -200,12 +207,12 @@ describe("MyCare", () => {
 
   it("reads right-to-left with Arabic copy for the same state", () => {
     const onOpenProposal = vi.fn();
-    renderWithWork(<MyCare locale="ar" caseSummary={base} actions={wait("WAIT_DEPOSIT_ARRANGEMENT")} patientProposal={accepted} proposal={proposal}
-                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500 }} documents={[]} unreadMessages={0} cases={[base]}
+    renderWithWork(<MyCare locale="ar" caseSummary={base} actions={wait("WAIT_PAYMENT_CHECK")} patientProposal={accepted} proposal={proposal}
+                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500, transfer: { reference: "FT123456", status: "SUBMITTED" } }} documents={[]} unreadMessages={0} cases={[base]}
                    view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={onOpenProposal} messagesPanel={null}/>, "ar");
-    expect(screen.getByRole("heading", { name: "ترتيبات الوديعة" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "نتحقق من دفعتك" })).toBeTruthy();
     expect(screen.getByText("لا يلزم منك أي إجراء الآن.")).toBeTruthy();
-    expect(screen.getByText("قيد الترتيب")).toBeTruthy();
+    expect(screen.getByText("قيد التحقق")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /الاطلاع على العرض/ })).toHaveLength(1);
     expect(screen.getByRole("button", { name: /مراسلة/ })).toBeTruthy();
   });

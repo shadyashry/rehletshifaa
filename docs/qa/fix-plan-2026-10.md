@@ -282,9 +282,23 @@ converges from the legacy base theme to Petrol & Paper here.
   5. Finance checks the bank and **confirms** (records the receipt against the patient's reference; journey continues)
      or **rejects with a reason** (the step returns to the patient with that reason). Treatment coordination starts
      only after confirmation.
-  Open with the owner: platform bank account details (EN/AR text, as configuration); amount mismatch / part payment
-  rule; reminder timing when no reference arrives. Own batch with independent security review (patient input,
-  Finance authority, the deposit gate); bank-transfer path ~1–2 sessions, no provider needed.
+  Owner answers (2026-10-13): bank details dummy for now and configurable (`app.payments.bank-transfer.*`); the patient
+  sees the remaining amount, with the preliminary-estimate caveat highlighted; reminders daily for three days, the
+  coordinator alerted on the fourth; build it on priority.
+
+  **Done — on `feat/dep3-patient-payment-step` (from `f46c37f`; commit hash in the findings DEP row).** The coordinator's
+  "arrange the deposit / instructions sent" item is retired. The patient's step `PAY_DEPOSIT` (My Care): amount due with
+  the estimate caveat, Online shown disabled, bank transfer with the configured account and the case number as payment
+  reference, and the mandatory transaction-reference field (what it is for, where to find it). Submitting opens Finance's
+  "Verify the transfer" (`DEPOSIT_RECORD`, assigned Finance holder else pool, all told), the coordinator is told, the
+  patient reads "We're checking your payment" (`WAIT_PAYMENT_CHECK`). Finance confirms the amount received against the
+  reference (never without one; never their own report; never above the balance) or returns it with a reason; a part
+  payment returns the balance to the patient. Reminders: due notice once, days 1–3 to the patient, day 4 to the
+  coordinator (each once). Coordinator action "Send payment link" (WhatsApp request; at most once a day). New WhatsApp
+  templates listed in `docs/whatsapp-message-templates.md` (to register with Meta before production). Production
+  refuses to start with the dummy bank account. Independent security review: no CRITICAL/HIGH; MEDIUM (replay leak,
+  maker/checker, prod dummy account, key collision, open-deposit check) and most LOW fixed. Owner to confirm: a waiver
+  still settles without a patient reference (pre-existing; now refused while a reference is pending).
 - **DEP-2 — online deposit payment** through a payment provider (hosted checkout/link, automatic receipt on provider
   confirmation, Finance handles exceptions). Design + build once the business decides provider, fees, currencies,
   refunds and legal terms.

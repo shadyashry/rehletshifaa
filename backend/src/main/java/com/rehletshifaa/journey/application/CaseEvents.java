@@ -15,8 +15,14 @@ public final class CaseEvents {
     /** A coordination deposit was raised on an accepted case and must be arranged offline. */
     public record DepositRequired(UUID caseId) {}
 
-    /** The coordinator sent the patient the payment instructions: the deposit is now Finance's to record when it arrives. */
-    public record DepositInstructionsSent(UUID caseId) {}
+    /** The patient entered the bank's transaction reference for their deposit transfer: Finance verifies it (DEP-3). */
+    public record TransferReported(UUID caseId) {}
+
+    /** Finance confirmed a transfer reference and recorded the amount received (the deposit may still have a balance). */
+    public record TransferConfirmed(UUID caseId) {}
+
+    /** Finance could not confirm the transfer reference: the payment step returns to the patient with the reason. */
+    public record TransferRejected(UUID caseId) {}
 
     /** The deposit was authoritatively settled (paid in full, or waived by an authorized actor). */
     public record DepositSettled(UUID caseId) {}

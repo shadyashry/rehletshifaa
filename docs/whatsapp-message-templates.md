@@ -28,6 +28,10 @@ created under the same template name.
 | `rs_final_quote_ready` | `final-quote-ready` | Review final quote / مراجعة العرض النهائي → `proposal` |
 | `rs_onboarding` | `onboarding-activation` | Complete my profile / إكمال ملفي → `activate` |
 | `rs_deposit_settled` | `deposit-settled-patient` | none |
+| `rs_deposit_payment_due` | `deposit-payment-due` | Pay deposit / دفع الوديعة → portal (suffix `<lang>/portal?case=<case id>`; sign-in required, no token) |
+| `rs_deposit_payment_reminder` | `deposit-payment-reminder` | Pay deposit / دفع الوديعة → portal (as above) |
+| `rs_deposit_transfer_rejected` | `deposit-transfer-rejected` | Check my payment / مراجعة دفعتي → portal (as above) |
+| `rs_deposit_balance_due` | `deposit-balance-due` | Pay the balance / دفع المتبقي → portal (as above) |
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
 | `rs_followup_window_closed` | `intake-followup` | none |
 | `rs_coordinator_intro` | `coordinator-intro` | none (1 body variable: the coordinator's name) |
@@ -65,6 +69,22 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 **`rs_deposit_settled`**
 - en: We have received your coordination deposit. Your RehletShifaa coordinator is starting the next stage of your treatment journey and will contact you shortly.
 - ar: استلمنا دفعة التنسيق الخاصة بك. يبدأ منسّقك في رحلة شفاء المرحلة التالية من رحلتك العلاجية وسيتواصل معك قريباً.
+
+**`rs_deposit_payment_due`** (DEP-3: the profile is done; also the coordinator's "Send payment link")
+- en: Your profile is complete. Pay your coordination deposit by bank transfer, then enter the transaction reference your bank gives you on your case page using the button below.
+- ar: اكتمل ملفك. ادفع وديعة التنسيق بتحويل بنكي، ثم أدخل الرقم المرجعي للعملية الذي يعطيك إياه البنك في صفحة حالتك عبر الزر أدناه.
+
+**`rs_deposit_payment_reminder`** (DEP-3: daily, days 1–3, until the patient enters the reference)
+- en: We have not received the reference for your coordination deposit transfer yet. Once you have paid by bank transfer, enter the transaction reference on your case page using the button below.
+- ar: لم يصلنا بعد الرقم المرجعي لتحويل وديعة التنسيق. بعد إتمام التحويل البنكي، أدخل الرقم المرجعي للعملية في صفحة حالتك عبر الزر أدناه.
+
+**`rs_deposit_transfer_rejected`** (DEP-3: Finance could not confirm the reference)
+- en: Our finance team could not confirm the transfer reference you sent. Please check the details on your case page and enter the reference again using the button below.
+- ar: لم يتمكن فريق المالية من تأكيد الرقم المرجعي الذي أرسلته. راجِع التفاصيل في صفحة حالتك وأدخل الرقم المرجعي مرة أخرى عبر الزر أدناه.
+
+**`rs_deposit_balance_due`** (DEP-3: part of the deposit received)
+- en: We received part of your coordination deposit. The remaining amount is on your case page: pay it by bank transfer and enter the new transaction reference there using the button below.
+- ar: استلمنا جزءًا من وديعة التنسيق. المبلغ المتبقي موضّح في صفحة حالتك: ادفعه بتحويل بنكي وأدخل الرقم المرجعي الجديد للعملية هناك عبر الزر أدناه.
 
 **`rs_followup_window_closed`** (S3: sent once after WhatsApp's 24-hour window has closed)
 - en: Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation.

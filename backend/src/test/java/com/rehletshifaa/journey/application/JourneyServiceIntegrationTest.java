@@ -164,14 +164,22 @@ class JourneyServiceIntegrationTest {
         assertThat(deposit).isNotNull();
         assertThat(deposit.totalEgp()).isEqualByComparingTo("3000.00");
         assertThat(deposit.status()).isEqualTo("REQUESTED");
+        // DEP-3: without the patient's transfer reference there is nothing for Finance to confirm.
+        authenticate("finance-subject",Role.FINANCE);
+        assertThat(catchThrowableOfType(()->payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"idem-1")),
+                com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("TRANSFER_REFERENCE_REQUIRED");
+        com.rehletshifaa.journey.DepositTestData.reportTransfer(jdbc,created.caseId(),"FT123456");
         // #21: a non-Finance actor cannot record a receipt.
         authenticate("coordinator-subject",Role.COORDINATOR);
-        assertThatThrownBy(()->payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"BANK","ref1","idem-1"))).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
-        // Finance records the receipt (recent auth) -> PAID.
+        assertThatThrownBy(()->payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"idem-1"))).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
+        // Finance records the receipt (recent auth) -> PAID, against the patient's reference.
         authenticate("finance-subject",Role.FINANCE);
-        assertThat(payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"BANK","ref1","idem-1")).status()).isEqualTo("PAID");
+        var paid=payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"idem-1"));
+        assertThat(paid.status()).isEqualTo("PAID");
+        assertThat(paid.events()).filteredOn(e->"PAYMENT_RECORDED".equals(e.eventType())).singleElement().satisfies(e->{assertThat(e.providerReference()).isEqualTo("FT123456");assertThat(e.method()).isEqualTo("BANK_TRANSFER");});
+        assertThat(paid.transfer().status()).isEqualTo("CONFIRMED");
         // #20: replaying the same idempotency key records no second payment.
-        assertThat(payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"BANK","ref1","idem-1")).status()).isEqualTo("PAID");
+        assertThat(payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(new BigDecimal("3000.00"),"idem-1")).status()).isEqualTo("PAID");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'",Integer.class,deposit.id())).isEqualTo(1);
     }
 
@@ -200,9 +208,14 @@ class JourneyServiceIntegrationTest {
                 depositId,caseId,"USD",new BigDecimal("0.02035"),new BigDecimal("3000.00"),new BigDecimal("61.05"),"REQUESTED",Instant.now());
         jdbc.update("INSERT INTO deposit_components(id,deposit_id,beneficiary,purpose,amount_egp,refundability,credited_to_final,sort_order) VALUES(?,?,?,?,?,?,?,?)",
                 UUID.randomUUID(),depositId,"PLATFORM","Case coordination initiation",new BigDecimal("3000.00"),"NON_REFUNDABLE",true,0);
+        // Finance on the case, at the deposit stage: payments are recorded on a case Finance may see (DEP-3).
+        jdbc.update("UPDATE medical_cases SET status='ACCEPTED' WHERE id=?",caseId);
+        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                UUID.randomUUID(),caseId,"finance-subject","FINANCE","PRIMARY","ACTIVE","Ledger","coordinator-subject",Instant.now(),Instant.now());
+        com.rehletshifaa.journey.DepositTestData.reportTransfer(jdbc,caseId,"FT-A");
         entityManager.clear();
 
-        var partial=payment.recordReceipt(caseId,depositId,new RecordReceiptRequest(new BigDecimal("1234.56"),"BANK","ref-a","ledger-a-"+caseId));
+        var partial=payment.recordReceipt(caseId,depositId,new RecordReceiptRequest(new BigDecimal("1234.56"),"ledger-a-"+caseId));
         assertThat(partial.status()).isEqualTo("PARTIALLY_PAID");
         assertThat(partial.currency()).isEqualTo("USD");
         assertThat(partial.paidDisplay()).isEqualByComparingTo("25.12");     // 1234.56 × 0.02035, half-up
@@ -213,7 +226,8 @@ class JourneyServiceIntegrationTest {
         assertThat(payment.anticipatedCoordinationDepositEgp(caseId)).isEqualByComparingTo("3000.00");
         assertThat(payment.depositStatusFor(caseId)).isEqualTo("PARTIALLY_PAID");
 
-        assertThat(payment.recordReceipt(caseId,depositId,new RecordReceiptRequest(new BigDecimal("1765.44"),"BANK","ref-b","ledger-b-"+caseId)).status()).isEqualTo("PAID");
+        com.rehletshifaa.journey.DepositTestData.reportTransfer(jdbc,caseId,"FT-B");
+        assertThat(payment.recordReceipt(caseId,depositId,new RecordReceiptRequest(new BigDecimal("1765.44"),"ledger-b-"+caseId)).status()).isEqualTo("PAID");
         assertThat(payment.depositSatisfied(caseId)).isTrue();
         assertThat(payment.recordRefund(caseId,depositId,new RefundRequest(new BigDecimal("500.00"),"Partial refund","ledger-c-"+caseId)).status()).isEqualTo("PARTIALLY_PAID");
         var refunded=payment.recordRefund(caseId,depositId,new RefundRequest(new BigDecimal("2500.00"),"Full refund","ledger-d-"+caseId));
@@ -222,7 +236,7 @@ class JourneyServiceIntegrationTest {
         assertThat(refunded.balanceDisplay()).isEqualByComparingTo("61.05");
         assertThat(refunded.events()).extracting(PaymentEventView::eventType).containsExactly("PAYMENT_RECORDED","PAYMENT_RECORDED","REFUND_RECORDED","REFUND_RECORDED");
         assertThat(payment.netPaidEgp(caseId)).isEqualByComparingTo("0");
-        assertThatThrownBy(()->payment.recordReceipt(caseId,UUID.randomUUID(),new RecordReceiptRequest(BigDecimal.ONE,"BANK","ref-x","ledger-x-"+caseId)))
+        assertThatThrownBy(()->payment.recordReceipt(caseId,UUID.randomUUID(),new RecordReceiptRequest(BigDecimal.ONE,"ledger-x-"+caseId)))
                 .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("not found for this case");
     }
 

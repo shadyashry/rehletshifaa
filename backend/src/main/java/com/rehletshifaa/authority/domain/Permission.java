@@ -19,6 +19,8 @@ public enum Permission {
     REFERENCE_DATA_READ(false),
     // patient self-service
     PATIENT_SELF_SERVICE(false), PATIENT_DECIDE(true), ACCOUNT_BINDING(false),
+    /** DEP-3: the patient (or representative) enters the bank's transfer reference for their deposit; evidence, not a decision, so no step-up. */
+    DEPOSIT_TRANSFER_REPORT(false),
     // consultants, credentials, identity
     CONSULTANT_ONBOARD(true), CREDENTIAL_READ(false), CREDENTIAL_DECIDE(true), PATIENT_IDENTITY_REVIEW(true), PATIENT_IDENTITY_READ(false),
     CLINIC_MANAGE(false), CLINIC_APPROVE(true), CAPABILITY_DECIDE(true),
