@@ -287,11 +287,15 @@ Already decided: G-2 (option C), G-8 (layered limits, done), DEP (keep Finance c
 | W-26, W-28 | A4 | W-27 | decision | W-29 | T1, A2 |
 | W-30 | A2 | W-31 | T1 | W-32, W-33 | A7 (W-33 also B2) |
 | W-34 | T1 | W-35, W-38, W-39, W-40 | A2 | W-36, W-37 | A7 |
+| W-41 | verified (B3) | W-42 | A0 (W-8) | W-43, W-44 | C2, A3 |
+| W-45 | B2, C2 | W-46 | B1 (G-13) | W-47 | T1/W0 watch |
+| W-48 | A4 (W-21/W-22) | | | | |
 
 ## Next exact action
 
 1. Owner approves this plan (order, batch boundaries) and answers what the decision register needs before each batch.
 2. ~~B3~~ done (`0778a3e`, awaiting the owner's merge and push). Next session: **T1**, then **W0** (owner signs in) — so the
    walk is complete before the logic batches. W0 adds: Finance records the deposit on RS-2026-000002 (catalogue-only)
-   from My work, and on RS-2026-000001.
+   from My work, and on RS-2026-000001. **Deposit part walked 2026-10-13 (W-41): works**; W0 still owes identity review and
+   credentialing actions.
 3. Then A0 → A1 → A2 → … one batch per session, each committed when green.
