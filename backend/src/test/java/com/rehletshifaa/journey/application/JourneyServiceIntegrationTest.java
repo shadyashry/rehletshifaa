@@ -315,10 +315,10 @@ class JourneyServiceIntegrationTest {
         authenticate("coordinator-subject",Role.COORDINATOR);
         var proposal=journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Consultation only","USD","Consultation","None","Deposit","Refund","Consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Consultation",BigDecimal.ONE,new BigDecimal("3500.00"),false,0)),null));
         assertThat(proposal.currency()).isEqualTo("USD");
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("78.40")); // 3500 EGP * 1.12 margin * 0.02 fx
+        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("80.50")); // 3500 EGP * 1.15 margin * 0.02 fx
         proposal=journey.releaseProposal(created.caseId(),proposal.versionId());
         assertThat(proposal.status()).isEqualTo("RELEASED");
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("78.40")); // frozen: 3500 * 1.12 * 0.02
+        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("80.50")); // frozen: 3500 * 1.15 * 0.02
     }
 
     @Test void manualNoTravelRequiresFinanceFromClinicallyApprovedAndGatesReflectIt()throws Exception{
@@ -375,16 +375,16 @@ class JourneyServiceIntegrationTest {
         jdbc.update("INSERT INTO clinical_review_cost_estimates(id,clinical_review_id,service_description,estimated_cost,currency,sort_order,catalog_service_id,price_egp,price_egp_min,price_egp_max,requires_finance_approval) VALUES(?,?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),review.id(),"Consultation",new BigDecimal("10000.00"),"EGP",0,catalogId,new BigDecimal("10000.00"),new BigDecimal("10000.00"),new BigDecimal("10000.00"),false);
         authenticate("coordinator-subject",Role.COORDINATOR);
         journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Consultation only","EGP","Consultation","None","Deposit","Refund","Consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Consultation",BigDecimal.ONE,new BigDecimal("10000.00"),false,0)),null));
-        // Seeded default policy is 12%: patient inclusive expected = 10000 * 1.12 = 11200; margin held internally.
+        // Default policy is 15% (owner, 2026-10-14): patient inclusive expected = 10000 * 1.15 = 11500; margin held internally.
         var pv=jdbc.queryForMap("SELECT provider_net_egp,margin_rate,margin_amount_egp,patient_total_expected_egp,commercial_policy_id FROM proposal_versions WHERE clinical_review_id=? ORDER BY version_number DESC LIMIT 1",review.id());
         assertThat(new BigDecimal(pv.get("provider_net_egp").toString())).isEqualByComparingTo("10000.00");
-        assertThat(new BigDecimal(pv.get("margin_rate").toString())).isEqualByComparingTo("0.1200");
-        assertThat(new BigDecimal(pv.get("margin_amount_egp").toString())).isEqualByComparingTo("1200.00");
-        assertThat(new BigDecimal(pv.get("patient_total_expected_egp").toString())).isEqualByComparingTo("11200.00");
+        assertThat(new BigDecimal(pv.get("margin_rate").toString())).isEqualByComparingTo("0.1500");
+        assertThat(new BigDecimal(pv.get("margin_amount_egp").toString())).isEqualByComparingTo("1500.00");
+        assertThat(new BigDecimal(pv.get("patient_total_expected_egp").toString())).isEqualByComparingTo("11500.00");
         assertThat(pv.get("commercial_policy_id")).isNotNull();
         // The patient-facing item price is the inclusive amount (margin baked in), not the provider price.
         var proposal=journey.workspace(created.caseId()).proposal();
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("11200.00"));
+        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("11500.00"));
     }
 
     private UUID arriveWithDoctor(String name,String phone,String email)throws Exception{
@@ -493,9 +493,9 @@ class JourneyServiceIntegrationTest {
         var fq=finalQuoteAfterArrival("Final","+254700000090","fq2@local.test");
         var pv=jdbc.queryForMap("SELECT document_type,patient_total_expected_egp,margin_amount_egp,margin_rate FROM proposal_versions WHERE id=?",fq.versionId());
         assertThat(pv.get("document_type")).isEqualTo("FINAL_TREATMENT_QUOTE");
-        assertThat(new BigDecimal(pv.get("patient_total_expected_egp").toString())).isEqualByComparingTo("11200.00"); // 10000 * 1.12 (< 16800 preliminary)
-        assertThat(new BigDecimal(pv.get("margin_amount_egp").toString())).isEqualByComparingTo("1200.00");           // < 1800 preliminary
-        assertThat(new BigDecimal(pv.get("margin_rate").toString())).isEqualByComparingTo("0.1200");                  // reused locked rate
+        assertThat(new BigDecimal(pv.get("patient_total_expected_egp").toString())).isEqualByComparingTo("11500.00"); // 10000 * 1.15 (< 17250 preliminary)
+        assertThat(new BigDecimal(pv.get("margin_amount_egp").toString())).isEqualByComparingTo("1500.00");           // < 2250 preliminary
+        assertThat(new BigDecimal(pv.get("margin_rate").toString())).isEqualByComparingTo("0.1500");                  // reused locked rate
         // #13: releasing the final quote does not move the macro case.
         authenticate("coordinator-subject",Role.COORDINATOR);
         var released=journey.releaseFinalQuote(fq.caseId(),fq.versionId());

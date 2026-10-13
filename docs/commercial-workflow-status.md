@@ -40,7 +40,7 @@ in any patient-facing DTO/UI).
 |---|---|---|
 | Per-consultant **price catalog** + care-area templates + CSV import | `PricingCatalogService` | admin catalog screen; doctor multi-select |
 | **Currency** (daily FX cached in `fx_rates`, senior-Finance override, snapshot+freeze on release) | `CurrencyService` | currency switcher (doctor/coordinator) |
-| **Central margin / commercial policy** (senior Finance, versioned, audited; 12% default) | `CommercialPolicyService` | Finance "Commercial settings" panel |
+| **Central margin / commercial policy** (System Administrators and Finance Managers, versioned, audited; 15% default) | `CommercialPolicyService` | Finance "Commercial settings" panel |
 | **Two document types** `PRELIMINARY_ESTIMATE` / `FINAL_TREATMENT_QUOTE`, min/expected/max **ranges** | `JourneyService.createProposal` / `createFinalQuote` | `ProposalSign` (patient) + coordinator/doctor panels |
 | **Conditional gates** (backend-computed `ProposalGates`) | `computeGates` | Not required / Waiting / Complete checklist |
 | **Final in-person assessment → final quote** (locked rate, scope diff, case stays `ARRIVAL_CONFIRMED`) | `saveFinalAssessment` / `createFinalQuote` / `releaseFinalQuote` | doctor `FinalAssessment`, coordinator `FinalQuoteActions` |

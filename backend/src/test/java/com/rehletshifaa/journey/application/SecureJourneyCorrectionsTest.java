@@ -622,8 +622,8 @@ class SecureJourneyCorrectionsTest {
         var proposal=journey.createProposal(ctx.caseId,draftRequest(approvedReview(ctx.caseId),null));
         assertThat(proposal.currency()).isEqualTo("USD");
         assertThat(proposal.items()).allSatisfy(item->assertThat(item.unitPrice()).isLessThan(new BigDecimal("100000")));
-        // 390000 EGP * 1.12 margin * 0.02 = 8736.00 — line and total agree in the same currency.
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("8736.00"));
+        // 390000 EGP * 1.15 margin * 0.02 = 8970.00 — line and total agree in the same currency.
+        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("8970.00"));
     }
 
     @Test void anotherSupportedCurrencyPropagatesJustTheSame() throws Exception {

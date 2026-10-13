@@ -170,14 +170,14 @@ class UatDefectCorrectionsTest {
         var ctx = openViaStatusLink(caseId, "+254700000506");
         PublicProposalView view = journey.viewProposal(ctx.token(), ctx.grant());
         assertThat(view.currency()).isEqualTo("USD");
-        // 390,000 EGP provider price × 1.12 seeded margin = 436,800 EGP inclusive; × 0.02 snapshot = 8,736 USD per line. Totals follow the same snapshot.
-        assertThat(view.items()).isNotEmpty().allSatisfy(item -> assertThat(item.unitPrice()).isEqualByComparingTo("8736.00"));
-        assertThat(view.totalExpected()).isEqualByComparingTo("8736.00");
-        assertThat(view.totalMin()).isEqualByComparingTo("8736.00");
-        assertThat(view.totalMax()).isEqualByComparingTo("8736.00");
+        // 390,000 EGP provider price × 1.15 default margin = 448,500 EGP inclusive; × 0.02 snapshot = 8,970 USD per line. Totals follow the same snapshot.
+        assertThat(view.items()).isNotEmpty().allSatisfy(item -> assertThat(item.unitPrice()).isEqualByComparingTo("8970.00"));
+        assertThat(view.totalExpected()).isEqualByComparingTo("8970.00");
+        assertThat(view.totalMin()).isEqualByComparingTo("8970.00");
+        assertThat(view.totalMax()).isEqualByComparingTo("8970.00");
         // The base-currency amounts are preserved alongside, not destroyed.
         assertThat(jdbc.queryForObject("SELECT provider_price_egp FROM proposal_items WHERE proposal_version_id=?", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("390000.00");
-        assertThat(jdbc.queryForObject("SELECT unit_price_egp FROM proposal_items WHERE proposal_version_id=?", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("436800.00");
+        assertThat(jdbc.queryForObject("SELECT unit_price_egp FROM proposal_items WHERE proposal_version_id=?", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("448500.00");
     }
 
     /** QA #12: one rounding rule — the patient's total is the sum of the lines they see, never the EGP total converted in one go. */

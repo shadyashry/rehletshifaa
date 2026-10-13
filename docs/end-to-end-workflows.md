@@ -90,7 +90,7 @@ ordinary centrally-calculated margin does **not** by itself require case-level F
 
 Prices are held in **EGP**. A central **commercial policy** (configured by a senior
 Finance user, versioned and audited — not a per-case slider; standard band ~10–15%,
-12% default) supplies the internal margin, which is **baked into an inclusive
+15% default since 2026-10-14) supplies the internal margin, which is **baked into an inclusive
 patient package** and never itemized or exposed to the patient. Estimates carry
 min/expected/max **ranges**. At release the EGP→display-currency FX rate, the policy
 id/version/rate, the margin, and the patient totals are **snapshotted and frozen**.
