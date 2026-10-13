@@ -185,4 +185,20 @@ Severity: Medium (several block screen-reader users from completing the form).
 3. Coordinator: case 2 proposal → expect Operations required, Finance not (journey check 15-ops).
 4. Operations: travel plan before release; then coordinator releases.
 5. Patient: secure link + OTP (Mailpit) → view → acknowledge (English) / Arabic coordinator-recorded path; profile completion; deposit; My Care; SEC-10 visual check.
+   Checks added for the My Care redesign and the MC-1 follow-up (`0d743b2`, `ff39128`; needs the stack rebuilt from
+   `codex/platform-control-plane` after the fast-forward). Synthetic data only.
+   - [ ] Activation lands in My Care on the case waiting on the patient (else the newest); paper background, no coral line under the header.
+   - [ ] Case header: care-area icon on its colour, patient name, case number (LTR) and care area; "Care for ‹name›" on a relative's case.
+   - [ ] Current step is the one card with the petrol top edge: one primary action, or "No action is required from you right now"; "What happens next".
+   - [ ] Deposit step: amount, status badge and note **inside** the current step; the amount appears once on the page. After payment it shows in the estimate card.
+   - [ ] Coordinator card near the top (under the step on a phone): initials, name, Message (with unread count), WhatsApp line; Consultant row below.
+   - [ ] Journey: reached steps filled, current step ringed, labels readable; a closed case shows no step as reached.
+   - [ ] Estimate card: document type, total, status badge, the preliminary-estimate line, "View proposal" only once the decision is made.
+   - [ ] Two or more cases: "Your cases" switcher on top; "Needs you" on the case waiting on the patient; "Your care" / "Care for ‹name›" groups; past cases folded; switching updates `?case=` and lands on the case heading. Note what Back does (G-5).
+   - [ ] Send a new case → **Myself**: only case details asked; the case joins the same patient.
+   - [ ] Send a new case → **Someone else**: name, country, relationship only; the case appears under "Care for ‹name›" at once; Mailpit gets **no** "is this case for you?" email for the sender's own address; the coordinator sees the sender as representative.
+   - [ ] A fourth unsent draft for someone else is refused (G-8 caps).
+   - [ ] Signed in on public pages: the header shows "My Care" (desktop and phone menu) instead of "My case" / Sign in / Track case; the case form has no "sign in" note.
+   - [ ] Arabic at 390px: right-to-left, case numbers and amounts isolated; record how amounts read (G-9).
+   - [ ] If a patient confirms a relative-sent case as their own, record what the relative and the coordinator see afterwards (G-2).
 6. Identity reviewer, credentialing, referrals, Conversations with live data where possible.
