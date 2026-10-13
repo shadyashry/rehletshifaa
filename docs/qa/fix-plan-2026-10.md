@@ -79,6 +79,10 @@ Deposit end to end on RS-2026-000001 and on a catalogue-only case (after B3); th
 patient identity submission (owner types a synthetic document number) → reviewer activation → review; credentialing
 actions (record a credential, approval decision) to settle W-37. New findings are slotted into A6/A7 before they start.
 
+**Closed 2026-10-13.** Deposit end to end on both cases (W-41); identity submitted → reviewer activated (after W-51) →
+verified (after the W-49 fix, `f60a3d0`, verified live); W-37 settled from the database (UI only). Not walked: recording a
+credential (needs `credential-admin`'s passkey, W-40) — moved to T1. New findings W-42…W-56 are in the coverage index.
+
 ---
 
 ## 2. Logic and truth
@@ -179,7 +183,7 @@ Root cause: second factors enrolled ad hoc and asked only at submit time; the po
 
 | ID | Fix |
 |---|---|
-| W-37 | Approval for cases requires at least one verified, unexpired credential; the tab lists recorded credentials (after W0 confirms the behaviour). |
+| W-37 | Settled in W0: credentials are recorded; the tab must list them (type, issuer, expiry, status). |
 | W-36 | Account state from the identity link ("No account yet" + Invite). |
 | W-32 | "Verified" wording per the owner's scope decision ("Credentials reviewed · current"); "Doctor reviews" → "Consultant reviews". |
 | W-33 | Services & prices "Kind" column filled or removed. |
@@ -291,13 +295,12 @@ Already decided: G-2 (option C), G-8 (layered limits, done), DEP (keep Finance c
 | W-45 | B2, C2 | W-46 | B1 (G-13) | W-47 | T1/W0 watch |
 | W-48 | A4 (W-21/W-22) | W-49 | fixed (`f60a3d0`) | W-50 | A6 |
 | W-51 | T1 | W-52 | T1, A7 | W-53 | B2 |
-| W-54 | C1 | W-55 | B1 (#1), B2 | | |
+| W-54 | C1 | W-55 | B1 (#1), B2 | W-56 | A6, A2 |
 
 ## Next exact action
 
 1. Owner approves this plan (order, batch boundaries) and answers what the decision register needs before each batch.
 2. ~~B3~~ done (`0778a3e`, awaiting the owner's merge and push). Next session: **T1**, then **W0** (owner signs in) — so the
    walk is complete before the logic batches. W0 adds: Finance records the deposit on RS-2026-000002 (catalogue-only)
-   from My work, and on RS-2026-000001. **Deposit part walked 2026-10-13 (W-41): works**; W0 still owes identity review and
-   credentialing actions.
+   from My work, and on RS-2026-000001. **W0 closed 2026-10-13** (deposit, identity review; credential recording moved to T1).
 3. Then A0 → A1 → A2 → … one batch per session, each committed when green.
