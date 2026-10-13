@@ -153,6 +153,19 @@ Root cause: second factors enrolled ad hoc and asked only at submit time; the po
 | — | Invariant test: every waiting stage has exactly one open work item for whoever it waits on; header agrees. |
 | 3-UX | Then rename tabs ("To do" / "My cases") with counts; validate with one coordinator. |
 
+**Done — `eca4d05` on `fix/a3-work-items-one-source` (from `666bf80`; not pushed, awaiting the owner).** Root cause: the current
+action fell back to the stage for steps no event raised work for, and "At a glance" counted by stage. Now
+`CaseActionService.syncStageWork` keeps exactly one work item per step a stage owes a person (coordinator intake review,
+internal sign-off steps and release; Finance approval; Operations' plans), decided by the same `stageFallback` as the
+current action (codes and forms unchanged), on every `WorkChanged` event, never on a read. Readiness-gated work is parked
+out of My work while the case waits on the patient. #3, #3b, #18, W-44 fixed; the invariant test
+(`everyWaitingStageHasExactlyOneOpenWorkItemForWhoeverItWaitsOn`, submission to treatment coordination) also carries A1's
+header = brief = action. B3 follow-ups: the deposit to record skips a Finance assignee who left the role, a departing
+member's items return to the pool (event + sweep, audited), a lead releases or hands on pool work via the reassign endpoint
+(audited from/to), pool work is never cancelled (409: recording or waiving the deposit closes it). Independent security
+review: no CRITICAL/HIGH; MEDIUM/LOW fixed. 3-UX rename left for the owner's validation. Backend 721/0/2, vitest 414,
+Playwright staff-home/portal/a11y 37 passed. Live checks: see the A3 report.
+
 ### A4 — Finance and commercial logic (1 session)
 
 | ID | Fix |
@@ -317,4 +330,4 @@ Already decided: G-2 (option C), G-8 (layered limits, done), DEP (keep Finance c
 2. ~~B3~~ done (`0778a3e`, awaiting the owner's merge and push). Next session: **T1**, then **W0** (owner signs in) — so the
    walk is complete before the logic batches. W0 adds: Finance records the deposit on RS-2026-000002 (catalogue-only)
    from My work, and on RS-2026-000001. **W0 closed 2026-10-13** (deposit, identity review; credential recording moved to T1).
-3. Then A0 → A1 → A2 → … one batch per session, each committed when green.
+3. Then A0 → A1 → A2 → … one batch per session, each committed when green. A3 done (`eca4d05`, awaiting merge); A2 still waits on D1.
