@@ -562,6 +562,50 @@ export on demand (C-07); region-per-market deployment (E-10); video consultation
 
 ---
 
+## Remaining work (as of 2026-10-14, after P1-6)
+
+Delivered on `feat/review-p0` (local, not pushed; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped), P0-5, P1-6.
+Everything below is still to do, in the recommended order.
+
+### Phases still to run
+
+| # | Phase | Sessions | Model | Before it starts |
+|---|---|---|---|---|
+| 1 | P1-8 Metrics, alerts, scheduler leadership | 2 + 1 short | Opus 5.5, medium; ShedLock check Fable high | Write its kickoff block in `docs/platform-review-phase-prompts.md`; ShedLock now covers 19 `@Scheduled` jobs (16 + offer expiry, due-soon raise, information reminders) |
+| 2 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide the retention of plaintext WhatsApp sender digits (carried from P0-1) |
+| 3 | P1-10 Commercial truth on the proposal | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: guarantee wording and final-quote validity |
+| 4 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-10, so the extracted code is final |
+| 5 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths reviewed by Fable | Owner: payer terms and partner commission |
+| 6 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — |
+| 7 | P1-9 Backups and restore drill | 1–2 | Opus 5.5, medium | — |
+| 8 | P1-14 Consultant public profiles | 1 | Sonnet 5.5; Impeccable pass by Fable | — |
+| 9 | P2-15 … P2-26 | about 20 | per the P2 table | P2-15 needs the second-destination timing decision |
+| 10 | P3 backlog | one each | Sonnet or Opus | — |
+
+### Owner decisions still open
+
+- [ ] P1-10: guarantee wording on the proposal and final-quote validity.
+- [ ] P1-12: payer terms and partner commission.
+- [ ] P2-15: when a second destination is added.
+- [ ] Legal review of the patient refund copy (F2); the refund rule itself is decided (P0-4).
+- [ ] Whether a case cancelled for an unanswered information request gets a reopen path (P1-6; today the patient sends it again).
+
+### Before production (from delivered phases)
+
+- [ ] Submit the new WhatsApp templates to Meta for approval: `rs_patient_action_reminder`, `rs_information_request_closed` (P1-6), and the deposit templates if not yet approved (P0-4).
+- [ ] Set the real bank-transfer details (`PAYMENT_BANK_*`); the defaults are dummy values (DEP-3).
+- [ ] Start every environment with `PII_INDEX_KEY` set before V86 runs (P0-1).
+- [ ] Native Arabic review of all new copy (P0-3, P0-5, P1-6 and earlier), as part of P2-21.
+
+### Follow-ups carried from delivered phases
+
+- [ ] P0-1: encrypt patient and submitter `email` with the blind-index pattern, after reviewing the Keycloak email-resolution paths.
+- [ ] P0-2: tell the patient when a case expires (today only the coordinator is told); Consultant UI for "no follow-up needed" and follow-up plans.
+- [ ] P0-3: set urgency inside the intake form; show the previous reason in the urgency dialog; sort and badge queue cards and the team queue by urgency; a Send my case unit test for the emergency notice.
+- [ ] P0-4: vetted agent list for agent cash (comes with the partner entity in P1-12); card payments through the DEP-2 adapter.
+- [ ] P0-5: notify Consultant Operations when an accreditation lapses; store accreditation evidence documents; stamp `Facility.updated_at` from the expiry job; a dev-seed facility in `LocalDemoDataSeeder`; facility name on the patient proposal; patient-facing travel view.
+- [ ] P1-6: an identity-review work item, so its 2-day level becomes a due date and a patient window; deadlines on referral offers; the offer deadline on queue cards (`CaseQueue.tsx`); email the consultant when an offer expires; an availability penalty after repeated expiry; escalate to the Finance Manager on an SLA breach (A-04); a window in the status link's deposit phase while Finance checks a transfer.
+
 ## Order of sessions (recommended)
 
 1. P0-1 (crypto) → 2. P0-2 (exits) → 3. P0-3 (urgency) → 4. P0-4 (deposit; needs owner decisions) → 5. P0-5
