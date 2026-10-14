@@ -13,7 +13,7 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/public/**").permitAll()
         .requestMatchers("/actuator/health/**","/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
         // P1-8: the operational meters, on the internal metrics port only (never the main port, the gateway or the tunnel).
-        .requestMatchers("/actuator/metrics","/actuator/metrics/**").access(metricsPort)
+        .requestMatchers("/actuator/metrics","/actuator/metrics/**","/actuator/prometheus").access(metricsPort)
                 // Every business path requires authentication only; the authority core decides each request from the database.
         .requestMatchers("/api/v1/patient/**","/api/v1/coordinator/**","/api/v1/doctor/**","/api/v1/operations/**","/api/v1/finance/**","/api/v1/identity-review/**").authenticated()
         .requestMatchers("/api/v1/account/preferences").authenticated()

@@ -14,6 +14,7 @@ import com.rehletshifaa.identity.IdentityProvisioningPort;
 import com.rehletshifaa.identity.operations.IdentityOperationRequested;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import com.rehletshifaa.workforce.application.WorkforceEvents.StaffAccessReduced;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -218,6 +219,7 @@ public class StaffLifecycleService {
     }
 
     /** STF invitation expiry: lapsed invitations close; a re-invite creates a new invitation. */
+    @LeasedJob(maxHold = LeasedJob.EXPIRY_SCAN)
     @Scheduled(fixedDelayString = "${app.staff.invitation-expiry-delay-milliseconds:900000}",
             initialDelayString = "${app.staff.invitation-expiry-initial-delay-milliseconds:120000}")
     @Transactional

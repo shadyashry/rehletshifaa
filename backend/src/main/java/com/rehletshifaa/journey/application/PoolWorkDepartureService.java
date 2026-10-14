@@ -1,5 +1,6 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import com.rehletshifaa.workforce.application.WorkforceDirectory;
 import com.rehletshifaa.workforce.application.WorkforceEvents;
 import org.springframework.context.event.EventListener;
@@ -31,6 +32,7 @@ public class PoolWorkDepartureService {
     }
 
     /** A role that ends on a scheduled date raises no event; this sweep releases those owners' pool work the same way. */
+    @LeasedJob(maxHold = LeasedJob.SWEEP)
     @Scheduled(fixedDelayString = "${app.conversations.idle-poll-milliseconds:900000}")
     @Transactional
     public void releaseDepartedOwners() {

@@ -1,5 +1,6 @@
 package com.rehletshifaa.shared.crypto;
 
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -57,6 +58,7 @@ public class PiiKeyRotationService {
     /** Tables to sweep with their PII columns and the key column each is batched by ({@code id}, else {@code subject}). */
     record Discovery(Map<String, List<String>> targets, Map<String, String> keyColumns, Set<String> withoutId) {}
 
+    @LeasedJob(maxHold = LeasedJob.DAILY)
     @Scheduled(cron = "${app.crypto.rotation-cron:-}")
     public void rotate() { rotateNow(); }
 

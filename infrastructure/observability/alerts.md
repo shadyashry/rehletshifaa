@@ -1,10 +1,10 @@
 # Alert rules
 
-These are the alert rules as code for today. The backend publishes business meters on Micrometer (`micrometer-core` only). There is no Prometheus registry, Prometheus or Grafana in the stack yet. Until there is, an operator or a script checks each rule against the backend's metrics port. When the registry is added (P1-8 session 2 or later), this file is the source for a Prometheus rules file.
+These are the alert rules as code and the source of truth for their thresholds, owners and runbooks. The backend publishes business and job-health meters on Micrometer with the Prometheus registry. `prometheus/rules/alerts.yml` translates every rule below into PromQL (Prometheus metric names: dots become underscores, a gauge loses `.total` and gains its unit, so `work.open.overdue` is `work_open_overdue_items`). Change a threshold here first, then in the rules file. Prometheus and Grafana run from `docker-compose.observability.yml` (see README.md); there is no Alertmanager yet, so alerts show in Prometheus and Grafana only.
 
 How to read the meters:
 
-- `GET /actuator/metrics/{name}?tag=key:value` on the backend's internal metrics port, `backend:8090` (`app.management.metrics-port`, `METRICS_PORT`). No token is needed.
+- Prometheus scrapes `/actuator/prometheus` every 30 s; by hand, `GET /actuator/metrics/{name}?tag=key:value`, both on the backend's internal metrics port, `backend:8090` (`app.management.metrics-port`, `METRICS_PORT`). No token is needed.
 - Only containers on the Docker network can reach that port: Compose does not publish it, and neither the API gateway nor the tunnel routes to it. The main port (8080) serves health only and refuses `/actuator/metrics`; the metrics port serves nothing but the meters.
 - Gauges are refreshed from the database at most every 60 seconds.
 - Counters count only committed work and reset when the backend restarts. "Increase over a window" is computed from two reads.
@@ -160,10 +160,20 @@ Any information request closed with `outcome=case_cancelled` in 24 hours. A pati
 
 Time from case submitted to first preliminary proposal released, max (or mean over 7 days) above 7 calendar days. This is a derived figure, not a single SLA entry: ASSIGN_CONSULTANT 1 + CLINICAL_REVIEW 2 + PREPARE_PROPOSAL 2 = 5 working days, about 7 calendar days. First step: find which stage queue holds the slow cases. Owner: Care Coordination Manager. Ticket.
 
+## SCHEDULER_JOB_STALE, SCHEDULER_JOB_FAILING, BACKEND_METRICS_DOWN (P1-8 session 2)
+
+The 18 leased jobs (sweeps, expiry scans, daily crons) publish `scheduler.job.last.success` (epoch seconds, read from
+`scheduler_leases`, so the success of any instance counts; a job that has not succeeded yet reports the instance's start),
+`scheduler.job.cadence` (seconds), `scheduler.job.duration` and `scheduler.job.failures`, tagged `task` = `SimpleClassName.method`.
+
+- SCHEDULER_JOB_STALE: `time() - last_success > 2 x cadence` for 5 minutes. A job switched off (cron `-`) has no cadence and never
+  fires. First step: read the task's row in `scheduler_leases` (holder, `locked_until`, `last_failed_at`, `last_error_code`) and the
+  backend log for `event.code` `SCHEDULER_LEASE_*`. Owner: platform on-call. Ticket.
+- SCHEDULER_JOB_FAILING: any failure in an hour. `last_error_code` holds the exception class. Owner: platform on-call. Ticket.
+- BACKEND_METRICS_DOWN: Prometheus cannot scrape `backend:8090` for 5 minutes. Owner: platform on-call. Page.
+
 ## Not covered yet
 
-- Scheduler leadership (lease table, P1-8 session 2).
-- Grafana dashboard (session 2).
-- A Prometheus rules file, once the registry is approved.
+- Alert delivery (no Alertmanager; alerts are visible in Prometheus and Grafana only).
 - Identity review queue (no work item yet).
 - Finance Manager escalation on SLA breach (A-04 follow-up).

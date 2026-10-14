@@ -6,6 +6,7 @@ import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.infrastructure.ProposalShareTokenRepository;
 import com.rehletshifaa.journey.infrastructure.ProposalVersionRepository;
 import com.rehletshifaa.shared.audit.AuditTrail;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class ProposalExpiryService {
                 this.clock = clock;
     }
 
+    @LeasedJob(maxHold = LeasedJob.EXPIRY_SCAN)
     @Scheduled(fixedDelayString = "${app.proposals.expiry-scan-ms:60000}")
     @Transactional
     public void expireReleasedProposals() {

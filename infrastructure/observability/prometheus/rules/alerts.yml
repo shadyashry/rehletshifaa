@@ -1,0 +1,133 @@
+# Generated from infrastructure/observability/alerts.md (P1-8 session 2); change thresholds there first, then here.
+groups:
+  - name: rehletshifaa-queues
+    rules:
+      - alert: DEPOSIT_VERIFICATION_LATE
+        expr: work_open_overdue_items{queue="DEPOSIT_RECORD"} > 0
+        for: 15m
+        labels:
+          severity: ticket
+          owner: Finance Manager
+        annotations:
+          summary: "{{ $value }} deposit record(s) past the 1 working day service level for team {{ $labels.team }}."
+          runbook: "Open the oldest deposit record, verify or reject it."
+          threshold_source: "SLA DEPOSIT_RECORD = 1 working day"
+      - alert: QUEUE_OVERDUE
+        expr: sum by (queue, team) (work_open_overdue_items) > 0
+        for: 30m
+        labels:
+          severity: ticket
+          owner: team lead of the team tag
+        annotations:
+          summary: "Queue {{ $labels.queue }} ({{ $labels.team }}) has {{ $value }} item(s) past its service level."
+          runbook: "Read work.open.oldest.age for the same queue and team, clear or reassign the oldest item."
+          threshold_source: "that queue's SLA working days"
+      - alert: QUEUE_HIGH_BACKLOG
+        expr: sum by (team) (work_open_high_items) > 10
+        for: 30m
+        labels:
+          severity: ticket
+          owner: team lead of the team
+        annotations:
+          summary: "Team {{ $labels.team }} has {{ $value }} open HIGH or URGENT items."
+          runbook: "List HIGH and URGENT items for the team, rebalance."
+          threshold_source: "none; starting value, tune after a month of data"
+  - name: rehletshifaa-outbox-and-journey
+    rules:
+      - alert: OUTBOX_DEAD_LETTER
+        expr: max(delta(notification_outbox_dead_letters[15m])) > 0 or sum(increase(notification_delivery_total{outcome=~"dead_letter.*"}[15m])) > 0
+        labels:
+          severity: page
+          owner: platform on-call
+        annotations:
+          summary: "A notification went to dead letter in the last 15 minutes."
+          runbook: "Read the message's last_error_code, fix the cause, requeue."
+          threshold_source: "any dead letter is a lost message"
+      - alert: OUTBOX_STUCK
+        expr: notification_outbox_oldest_pending_age_seconds > 900
+        for: 10m
+        labels:
+          severity: page
+          owner: platform on-call
+        annotations:
+          summary: "Oldest pending {{ $labels.channel }} message is {{ $value | humanizeDuration }} old."
+          runbook: "Check the dispatcher and the channel provider, then the pending count."
+          threshold_source: "15 minutes is the longest a pending message should wait"
+      - alert: OUTBOX_RETRYING
+        expr: notification_outbox_retrying_items > 20
+        for: 15m
+        labels:
+          severity: ticket
+          owner: platform on-call
+        annotations:
+          summary: "{{ $value }} {{ $labels.channel }} messages are waiting after a failed attempt."
+          runbook: "Read recent errors for the channel, check the provider status."
+          threshold_source: "starting value, tune with data"
+      - alert: REPLY_TIMER_BREACH
+        expr: sum(increase(conversation_reply_timer_breach_total[15m])) > 0
+        labels:
+          severity: ticket
+          owner: Care Coordination Manager
+        annotations:
+          summary: "A conversation reply timer was breached in the last 15 minutes."
+          runbook: "Check which conversation and step breached, look for a staffing gap."
+          threshold_source: "reply timer deadlines"
+      - alert: OFFERS_EXPIRING
+        expr: sum(increase(journey_consultant_offer_expired_total[24h])) > 3
+        labels:
+          severity: ticket
+          owner: Consultant Operations
+        annotations:
+          summary: "More than 3 consultant offers lapsed in 24 hours."
+          runbook: "See which consultants let offers lapse, reassign or talk to them."
+          threshold_source: "offer deadline 48 working hours, 24 on URGENT; the count is a starting value"
+      - alert: INFORMATION_REQUESTS_CANCELLING
+        expr: sum(increase(journey_information_request_closed_total{outcome="case_cancelled"}[24h])) > 0
+        labels:
+          severity: ticket
+          owner: coordinator lead
+        annotations:
+          summary: "An information request closed as case_cancelled in the last 24 hours."
+          runbook: "A patient journey was lost. Find the case and contact the patient."
+          threshold_source: "information requests close at day 30"
+      - alert: PROPOSAL_SLOW
+        expr: (sum(increase(journey_proposal_time_to_release_seconds_sum{revision="first"}[7d])) / sum(increase(journey_proposal_time_to_release_seconds_count{revision="first"}[7d])) > 604800) or max(journey_proposal_time_to_release_seconds_max{revision="first"}) > 604800
+        for: 24h
+        labels:
+          severity: ticket
+          owner: Care Coordination Manager
+        annotations:
+          summary: "Time to first proposal is above 7 calendar days."
+          runbook: "Find which stage queue holds the slow cases."
+          threshold_source: "derived: ASSIGN_CONSULTANT 1 + CLINICAL_REVIEW 2 + PREPARE_PROPOSAL 2 = 5 working days, about 7 calendar days"
+  - name: rehletshifaa-scheduler
+    rules:
+      - alert: SCHEDULER_JOB_STALE
+        expr: time() - scheduler_job_last_success_seconds > 2 * scheduler_job_cadence_seconds
+        for: 5m
+        labels:
+          severity: ticket
+          owner: platform on-call
+        annotations:
+          summary: "Scheduled job {{ $labels.task }} has not succeeded for more than twice its cadence."
+          runbook: "Read scheduler_leases for the task (holder, locked_until, last_failed_at, last_error_code) and the backend log for event.code SCHEDULER_LEASE_*; a lease held past its maximum hold frees itself."
+          threshold_source: "twice the job's cadence (fixed delay or cron interval)"
+      - alert: SCHEDULER_JOB_FAILING
+        expr: increase(scheduler_job_failures_total[1h]) > 0
+        labels:
+          severity: ticket
+          owner: platform on-call
+        annotations:
+          summary: "Scheduled job {{ $labels.task }} failed in the last hour."
+          runbook: "scheduler_leases.last_error_code holds the exception class; find the stack trace in the backend log."
+          threshold_source: "any failure of a scheduled job"
+      - alert: BACKEND_METRICS_DOWN
+        expr: up{job="backend"} == 0
+        for: 5m
+        labels:
+          severity: page
+          owner: platform on-call
+        annotations:
+          summary: "Prometheus cannot scrape the backend metrics endpoint ({{ $labels.instance }})."
+          runbook: "Prometheus cannot scrape backend:8090/actuator/prometheus: check the backend container and METRICS_PORT."
+          threshold_source: "scrape down for 5 minutes"

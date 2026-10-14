@@ -12,6 +12,7 @@ import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import com.rehletshifaa.workforce.infrastructure.WorkforcePersonRepository;
 import com.rehletshifaa.workforce.infrastructure.WorkforceRoleAssignmentRepository;
 
@@ -200,6 +201,7 @@ public class StaffWorkService {
      *
      * @return how many open items were raised
      */
+    @LeasedJob(maxHold = LeasedJob.EXPIRY_SCAN)
     @Scheduled(fixedDelayString = "${app.sla.due-soon-scan-ms:300000}")
     @Transactional
     public int raiseWorkDueSoon() {

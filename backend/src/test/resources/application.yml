@@ -10,8 +10,10 @@ spring:
 # Readable console output for test runs; the application itself emits ECS JSON.
 logging.structured.format.console: ""
 # As the application: the operational meters, on the internal metrics port only (MetricsPort).
-management.endpoints.web.exposure.include: health,metrics
+management.endpoints.web.exposure.include: health,metrics,prometheus
 app:
+  # P1-8: the scheduler does not fire in tests; each test calls the job it exercises (through the scheduler lease).
+  scheduling.enabled: false
   # No Redis in the test JVM. ReferenceDataCachingTest re-enables caching with a map cache manager to prove
   # the @Cacheable/@CacheEvict wiring; every other test exercises the uncached, authoritative path.
   cache.enabled: false

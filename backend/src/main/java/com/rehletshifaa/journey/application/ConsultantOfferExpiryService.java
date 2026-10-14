@@ -10,6 +10,7 @@ import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
 import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
 import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.shared.audit.AuditTrail;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import org.springframework.data.domain.Limit;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,7 @@ public class ConsultantOfferExpiryService {
     }
 
     /** Declines every pending primary Consultant offer whose deadline has passed; returns how many it declined. */
+    @LeasedJob(maxHold = LeasedJob.EXPIRY_SCAN)
     @Scheduled(fixedDelayString = "${app.sla.offer-expiry-scan-ms:60000}")
     @Transactional
     public int expireOffers() {

@@ -22,7 +22,8 @@ import java.io.IOException;
 import java.util.function.Supplier;
 
 /**
- * P1-8 (E-05): the operational meters ({@code /actuator/metrics}) are served on a second connector,
+ * P1-8 (E-05): the operational meters ({@code /actuator/metrics} and the Prometheus scrape {@code /actuator/prometheus}) are
+ * served on a second connector,
  * {@code app.management.metrics-port} (8090), and nowhere else. Compose does not publish that port, and neither the gateway nor
  * the tunnel routes to it, so only containers on the Docker network (a future Prometheus) can reach it, without a token. The main
  * port keeps serving health only; the metrics port serves the meters only (anything else is 404 there). A port of 0 or less
@@ -48,10 +49,10 @@ public class MetricsPort extends OncePerRequestFilter
 
     static boolean metricsPath(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return path.equals("/actuator/metrics") || path.startsWith("/actuator/metrics/");
+        return path.equals("/actuator/metrics") || path.startsWith("/actuator/metrics/") || path.equals("/actuator/prometheus");
     }
 
-    /** The security rule for {@code /actuator/metrics/**}: granted on the metrics port, refused on every other port. */
+    /** The security rule for {@code /actuator/metrics/**} and {@code /actuator/prometheus}: granted on the metrics port, refused on every other port. */
     @Override
     public AuthorizationDecision check(Supplier<Authentication> authentication, RequestAuthorizationContext context) {
         return new AuthorizationDecision(onMetricsPort(context.getRequest()));

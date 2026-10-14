@@ -3,6 +3,7 @@ package com.rehletshifaa.journey.application;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.infrastructure.DepositRepository;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,6 +59,7 @@ public class DepositPaymentReminders {
     }
 
     /** Every open deposit, each in its own transaction so one case's failure never stops the others. */
+    @LeasedJob(maxHold = LeasedJob.SWEEP)
     @Scheduled(fixedDelayString = "${app.payments.reminder-poll-milliseconds:3600000}")
     public void sweep() {
         for (UUID caseId : deposits.findOpenCaseIds()) {

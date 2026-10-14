@@ -5,6 +5,7 @@ import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.application.Principal;
 import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.shared.api.ApiException;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +34,7 @@ public class IdentityReconciliationService {
         return run(command.postRestore()?"POST_RESTORE":"MANUAL",actor.subject(),reason);
     }
 
+    @LeasedJob(maxHold = LeasedJob.DAILY)
     @Scheduled(cron="${app.identity-reconciliation.cron:0 20 2 * * *}")
     public void scheduled() { run("SCHEDULED","SYSTEM","Daily database-to-identity reconciliation"); }
 

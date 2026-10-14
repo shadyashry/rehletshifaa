@@ -563,6 +563,76 @@ phases.
     `docker-compose.observability.yml`, Grafana bound to localhost), the
     Grafana dashboard JSON (mechanical-worker, exact meter names from `alerts.md`), then the short Fable 5.1 high verification
     session for the lease and the row-lock claiming stores.
+- **Status (2026-10-15, session 2 of 2, branch `claude/p1-8-lease-5e9409`, cut from 5919bf1):** delivered (Opus 5.5, normal mode).
+  - Scheduler lease (E-04), owner's in-house JPA design, no ShedLock: V95 `scheduler_leases` (name PK `pk_scheduler_leases`,
+    holder, locked_at, locked_until, last_started_at, last_succeeded_at, last_failed_at, last_error_code; TIMESTAMP WITH TIME
+    ZONE; CHECKs `ck_scheduler_leases_name|_window|_error`; a row is inserted already taken on a job's first run, so holder and
+    window are NOT NULL). Module `shared.scheduling` (domain `SchedulerLease`, infrastructure `SchedulerLeaseRepository`,
+    application `LeasedJob`, `SchedulerLeases`, `LeasedJobs`, `SchedulerJobMetrics`, `SchedulingConfig`), inside `shared` so every
+    module uses it without a cycle. `@LeasedJob(maxHold = EXPIRY_SCAN|SWEEP|DAILY)` (5, 10, 60 min) next to `@Scheduled`; an
+    infrastructure-role Spring AOP advisor (no AspectJ on the classpath) at the highest precedence wraps the call outside the
+    job's own `@Transactional`. Take: JPQL `select current_timestamp` (database clock, truncated to microseconds), then ONE
+    guarded JPQL update `where name = :name and (locked_until <= :now or (holder = :me and the lease was released))`, else insert
+    the first row (a duplicate-key race means another instance won). The extra disjunct lets the holder's own next tick run at
+    once, so the minimum hold (= the fixed delay; `maxHold` for a cron) only keeps the other instances out and a slower database
+    clock never makes the only instance skip a tick; a running lease is never re-taken, not even by its holder. Release (own
+    REQUIRES_NEW transaction, also on exception) is guarded by holder + locked_at, sets locked_until = db now + minimum hold and
+    stamps last_succeeded_at, or last_failed_at + the exception class (never the message); a lost or failed release is logged
+    (`event.code` `SCHEDULER_LEASE_LOST` / `SCHEDULER_LEASE_RELEASE_FAILED`) and the lease frees itself at its maximum hold. A
+    skipped call returns 0 / nothing. Holder = `pid@host` (one per container). Lease name = `SimpleClassName.method`.
+  - The 18/3 split (21 `@Scheduled` methods in 19 classes; session 1's "22" was a miscount). Leased (18): EXPIRY_SCAN
+    `StaffLifecycleService.expireInvitations`, `FacilityAccreditationExpiryService.expireAccreditations`,
+    `ConsultantOfferExpiryService.expireOffers`, `CredentialExpiryService.expireCredentials`,
+    `ProposalExpiryService.expireReleasedProposals`, `StaffWorkService.raiseWorkDueSoon`, `ReplyTimerService.dispatch`,
+    `ReplyTimerService.closeIdle`; SWEEP `IntakeConversationService.releaseDepartedOwners`,
+    `CoordinatorDepartureService.releaseDepartedOwners`, `PoolWorkDepartureService.releaseDepartedOwners`,
+    `CoordinationQueueRetry.retry`, `DepositPaymentReminders.sweep`, `InformationRequestReminders.sweep`; DAILY
+    `AccessHygieneService.runRecertificationSchedule`, `.disableDormantAccounts`, `IdentityReconciliationService.scheduled`,
+    `PiiKeyRotationService.rotate` (off by default, cron `-`). Unleased claim-based workers (3): `NotificationOutboxProcessor`,
+    `WhatsAppInboundProcessor`, `IdentityOperationProcessor` (PESSIMISTIC_WRITE + SKIP LOCKED). The two reply-timer jobs session 1
+    left open are leased as the lead decided (18/3); their row locks stay as a second guard.
+  - Job health meters (`SchedulerJobMetrics`, tag `task`, not `job`, which Prometheus uses as its target label), registered at
+    startup for every leased job: `scheduler.job.duration` (timer), `scheduler.job.failures` (counter),
+    `scheduler.job.last.success` (epoch seconds from `scheduler_leases`, 30 s snapshot, so any instance's success counts; the
+    instance start until a first success), `scheduler.job.cadence` (fixed delay or cron interval; none for a disabled cron), so
+    "no success within 2x cadence" is one PromQL rule.
+  - Prometheus (E-05): `micrometer-registry-prometheus` 1.15.8 (Boot 3.5.10 BOM) by the one approved online fetch, every build since
+    `mvn -o`. `/actuator/prometheus` is served on the internal metrics port only (`MetricsPort.metricsPath`, `SecurityConfig`);
+    the main port refuses it. Prometheus names: a gauge loses `.total` and gains its unit (`work.open.high` ->
+    `work_open_high_items`, `work.open.total` -> `work_open`); checked on a real scrape, no name collisions.
+  - Observability compose: `prom/prometheus:v3.5.0` (scrapes `backend:8090`, rules from `prometheus/rules/`, 15 d retention,
+    127.0.0.1:9090) and `grafana/grafana:12.1.0` (127.0.0.1:3300, admin password `GRAFANA_ADMIN_PASSWORD` from .env, no sign-up or
+    anonymous access, provisioned data source + read-only dashboard); no route through api-gateway, Caddy or the tunnel. Rule file
+    `prometheus/rules/alerts.yml` (mechanical-worker, reviewed; `promtool check rules`: 13 rules): the 10 alerts.md rules plus
+    SCHEDULER_JOB_STALE, SCHEDULER_JOB_FAILING, BACKEND_METRICS_DOWN. Dashboard `grafana/dashboards/rehletshifaa-operations.json`
+    (mechanical-worker): Queues, Service levels, Outbox, Scheduled jobs rows. alerts.md and the observability README updated.
+    Started locally (`up -d prometheus grafana` on the running dev stack's network): 13 rules loaded, dashboard provisioned without
+    error, both ports loopback-only; the scrape target showed down because the running dev backend is the pre-P1-8 image (no
+    port 8090), which changes after the next `--build`. Then stopped and removed.
+  - Tests: `app.scheduling.enabled` (default true) now gates `@EnableScheduling`; the test `application.yml` turns it off, so no
+    background tick races a test's direct call (the `spring.task.scheduling.enabled=false` some tests set was never a real
+    property). New `SchedulerLeaseTest` (8): two instances racing 10 rounds (first insert, then the guarded update) take it once;
+    success and failure both release for the minimum hold (other instance refused, holder re-takes), failure counted and coded
+    by class only; an expired lease is taken over and the late holder's release changes nothing; lease times come from the
+    database while the instance clock reads 2001; a leased bean method skips while another instance holds it and runs once it
+    expires, closed for its 60 s fixed delay; every job's meters from startup with cadence 60 s / 86,400 s / none for the
+    disabled rotation; the last-success gauge follows the database through the snapshot. `MetricsPortTest` (+1): the metrics
+    port serves the Prometheus scrape with the business and job meters; the main port refuses it to anonymous and to a System
+    Administrator. Every leased job still runs in its existing test (each now goes through the lease).
+    Verification: `mvn -o -q test` 829 tests (820 + 9 new), 3 pre-existing skips: 0 failures from this phase; the only 3 failures and 2 errors are the pre-existing facility date tests below, which pass with the JVM in UTC (`JAVA_TOOL_OPTIONS=-Duser.timezone=UTC`). PostgreSQL proof
+    `PostgresJpaMappingTest` on postgres:17-alpine with V95: green (every repository query, the lease's included).
+  - Pre-existing, not from this phase: `FacilityCatalogServiceTest`, `FacilityDirectoryTest` and `FacilityPackageLineGateTest`
+    (3 failures, 2 errors) fail at 5919bf1 too whenever the machine's local date is ahead of the UTC date (the tests build
+    validity dates with `LocalDate.now()`, the services compare with the UTC clock).
+  - Open gaps: no Alertmanager (alerts are visible in Prometheus and Grafana, notify no one); the dev backend must be rebuilt
+    for V95 and port 8090 before the dashboard shows data; a run longer than its maximum hold can overlap a second instance (the
+    late release is then a no-op, logged); the lease is per job, not per row, so the three claim-based workers still rely on
+    SKIP LOCKED alone; image tags v3.5.0 / 12.1.0 were pinned without checking for newer patch releases.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack
+    (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`, V95 runs); then a short Fable 5.1 high
+    verification session for the lease (`shared.scheduling`, V95, the advisor order versus `@Transactional`) and the row-lock
+    claiming in `QueuedNotificationRepository`, `WhatsAppInboundMessageRepository`, `IdentityOperationRepository`,
+    `ReplyObligationRepository`, `IntakeConversationRepository` and `BaseRepositoryImpl`; then P1-7.
 
 ### P1-9  Backups and restore drill  (E-09)
 - Managed Postgres PITR settings documented and scripted for the chosen host; versioned S3 with cross-region copy;
@@ -633,16 +703,16 @@ export on demand (C-07); region-per-market deployment (E-10); video consultation
 
 ---
 
-## Remaining work (as of 2026-10-14, after P1-8 session 1)
+## Remaining work (as of 2026-10-15, after P1-8 session 2)
 
-Delivered on `feat/review-p0` (local, not pushed; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped), P0-5, P1-6, P1-8 session 1 (meters, internal metrics port, alert rules).
+Delivered on `feat/review-p0` (local, not pushed; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped), P0-5, P1-6, P1-8 session 1 (meters, internal metrics port, alert rules); P1-8 session 2 on `claude/p1-8-lease-5e9409` (scheduler lease V95, Prometheus registry, Prometheus + Grafana, rules file, dashboard).
 Everything below is still to do, in the recommended order.
 
 ### Phases still to run
 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
-| 1 | P1-8 Metrics, alerts, scheduler leadership | session 1 done; session 2 + 1 short left | Opus 5.5, medium; lease check Fable high | Session 2: JPA lease table (V95, owner chose it over ShedLock, database clock) on the 17 sweep jobs, not the 5 claim-based workers; Grafana dashboard JSON; Prometheus registry and images only with the owner's OK |
+| 1 | P1-8 Metrics, alerts, scheduler leadership | sessions 1 and 2 done; 1 short verification left | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 commit and rebuilds the dev stack (V95); verify the lease and the row-lock claiming |
 | 2 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide the retention of plaintext WhatsApp sender digits (carried from P0-1) |
 | 3 | P1-10 Commercial truth on the proposal | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: guarantee wording and final-quote validity |
 | 4 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-10, so the extracted code is final |
@@ -660,7 +730,7 @@ Everything below is still to do, in the recommended order.
 - [ ] P2-15: when a second destination is added.
 - [ ] Legal review of the patient refund copy (F2); the refund rule itself is decided (P0-4).
 - [ ] Whether a case cancelled for an unanswered information request gets a reopen path (P1-6; today the patient sends it again).
-- [x] P1-8: one online fetch of `micrometer-registry-prometheus` and the Prometheus/Grafana images, approved by the owner (2026-10-14); the fetch itself runs in P1-8 session 2.
+- [x] P1-8: one online fetch of `micrometer-registry-prometheus` and the Prometheus/Grafana images, approved by the owner (2026-10-14); fetched in P1-8 session 2 (1.15.8); images pulled (prom/prometheus:v3.5.0, grafana/grafana:12.1.0).
 
 ### Before production (from delivered phases)
 
@@ -676,7 +746,7 @@ Everything below is still to do, in the recommended order.
 - [ ] P0-3: set urgency inside the intake form; show the previous reason in the urgency dialog; sort and badge queue cards and the team queue by urgency; a Send my case unit test for the emergency notice.
 - [ ] P0-4: vetted agent list for agent cash (comes with the partner entity in P1-12); card payments through the DEP-2 adapter.
 - [ ] P0-5: notify Consultant Operations when an accreditation lapses; store accreditation evidence documents; stamp `Facility.updated_at` from the expiry job; a dev-seed facility in `LocalDemoDataSeeder`; facility name on the patient proposal; patient-facing travel view.
-- [ ] P1-8: archive or acknowledge dead letters so the level can fall; tune the starting alert thresholds after a month of data.
+- [ ] P1-8: archive or acknowledge dead letters so the level can fall; tune the starting alert thresholds after a month of data; an Alertmanager route (page, ticket) for the Prometheus rules; fix the three facility tests' `LocalDate.now()` (local versus UTC date).
 - [ ] P1-6: an identity-review work item, so its 2-day level becomes a due date and a patient window; deadlines on referral offers; the offer deadline on queue cards (`CaseQueue.tsx`); email the consultant when an offer expires; an availability penalty after repeated expiry; escalate to the Finance Manager on an SLA breach (A-04); a window in the status link's deposit phase while Finance checks a transfer.
 
 ## Order of sessions (recommended)

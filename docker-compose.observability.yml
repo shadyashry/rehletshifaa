@@ -1,4 +1,5 @@
-# Opt-in centralized log search: Filebeat -> Elasticsearch -> Kibana. Never required by the application.
+# Opt-in centralized log search: Filebeat -> Elasticsearch -> Kibana, and meters: Prometheus -> Grafana (P1-8).
+# Never required by the application.
 #
 #   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.observability.yml up -d --build
 #
@@ -7,6 +8,12 @@
 # (user "elastic"). Both ports are bound to loopback; nothing here is routed through the tunnel.
 # Requires in .env: ELASTIC_PASSWORD, KIBANA_SYSTEM_PASSWORD, LOG_WRITER_PASSWORD (see infrastructure/observability/README.md).
 # Versions are the latest GA Elastic release verified on 2026-10-06; keep all three on the same version.
+#
+# Meters only (the Elastic services stay stopped):
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.observability.yml up -d prometheus grafana
+# Prometheus scrapes backend:8090 (the internal metrics port) on the compose network and evaluates
+# infrastructure/observability/prometheus/rules/. Grafana: http://localhost:3300 (user "admin", GRAFANA_ADMIN_PASSWORD from .env),
+# Prometheus: http://localhost:9090; both bound to loopback, never routed by the api-gateway, Caddy or the tunnel.
 
 x-elastic-env: &elastic-env
   ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?Set ELASTIC_PASSWORD}
@@ -97,6 +104,40 @@ services:
       elastic-setup:
         condition: service_completed_successfully
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+    volumes:
+      - ./infrastructure/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    ports: ["127.0.0.1:9090:9090"]
+    mem_limit: 512m
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./infrastructure/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["127.0.0.1:3300:3000"]
+    mem_limit: 512m
+    depends_on:
+      - prometheus
+
 volumes:
   elasticsearch-data:
   filebeat-data:
+  prometheus-data:
+  grafana-data:

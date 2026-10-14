@@ -13,6 +13,7 @@ import com.rehletshifaa.access.platform.infrastructure.StaffLifecycleStore;
 import com.rehletshifaa.identity.operations.IdentityOperationRequested;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.crypto.CryptoService;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -221,6 +222,7 @@ public class AccessHygieneService {
     }
 
     /** IAM-15: open campaigns on schedule and suspend whatever was not recertified by the due date. */
+    @LeasedJob(maxHold = LeasedJob.DAILY)
     @Scheduled(cron = "${app.access.recertification-cron:0 30 3 * * *}")
     @Transactional
     public void runRecertificationSchedule() {
@@ -265,6 +267,7 @@ public class AccessHygieneService {
     // ================= IAM-16 dormancy =================
 
     /** IAM-16: 90 days without sign-in disables the account through the ordinary lifecycle, never the last administrator. */
+    @LeasedJob(maxHold = LeasedJob.DAILY)
     @Scheduled(cron = "${app.access.dormancy-cron:0 0 4 * * *}")
     @Transactional
     public int disableDormantAccounts() {
