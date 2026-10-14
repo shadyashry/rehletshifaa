@@ -10,6 +10,7 @@ const commercial: ProposalCommercial = {
   lines: [
     { id: "l1", description: "Echocardiogram", source: "CATALOG", quantity: 1, baseEgp: 3500, patientEgp: 3920, displayUnitPrice: 78.4 },
     { id: "l2", description: "Bespoke lead extraction", source: "MANUAL", quantity: 1, baseEgp: 50000, patientEgp: 56000, displayUnitPrice: 1120 },
+    { id: "l3", description: "Bypass package", source: "FACILITY_PACKAGE", quantity: 1, baseEgp: 180000, patientEgp: 201600, displayUnitPrice: 4032, facilityPackageId: "pkg-1", facilityName: "Nile Heart Hospital" },
   ],
 };
 
@@ -26,6 +27,8 @@ describe("FinanceApproval", () => {
     expect(manualRow.textContent).toMatch(/50,000/);
     expect(manualRow.textContent).toMatch(/56,000/);
     expect(within(screen.getByRole("row", { name: /Echocardiogram/ })).getByText("Approved list")).toBeTruthy();
+    // P0-5: a facility package line says whose approved price it carries, and is not counted as a manual line.
+    expect(within(screen.getByRole("row", { name: /Bypass package/ })).getByText("Approved facility package · Nile Heart Hospital")).toBeTruthy();
     const term = (label: string) => screen.getByText(label, { selector: "dt" }).parentElement?.textContent;
     expect(term("Consultant price total")).toMatch(/53,500/);
     expect(term("Platform margin")).toMatch(/6,420/);

@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface TreatmentEpisodeRepository extends BaseRepository<TreatmentEpisode, UUID> {
     boolean existsByIdAndCaseId(UUID id, UUID caseId);
+
+    java.util.List<TreatmentEpisode> findByCaseIdOrderByStartAtAsc(UUID caseId);
 }

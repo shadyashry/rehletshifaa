@@ -68,6 +68,9 @@ class FacilityDirectoryTest {
         assertThat(nile.name()).isEqualTo("Nile Heart Hospital");
         assertThat(nile.packages()).extracting(DirectoryPackage::id).containsExactly(approved);
         assertThat(nile.packages().get(0).minEgp()).isEqualByComparingTo("100000.00");
+        // Name lookups for the views that store only ids (travel plan, treatment episode, package lines).
+        assertThat(directory.names(java.util.List.of(open, suspended))).containsEntry(open, "Nile Heart Hospital").containsEntry(suspended, "Closed Clinic");
+        assertThat(directory.facilityNamesOfPackages(java.util.List.of(approved, UUID.randomUUID()))).containsExactly(java.util.Map.entry(approved, "Nile Heart Hospital"));
         // Filtered by care area: no cardiology package means an empty list for that facility, not a missing facility.
         assertThat(directory.directory("general-surgery")).filteredOn(f -> f.id().equals(open)).singleElement().satisfies(f -> assertThat(f.packages()).isEmpty());
 

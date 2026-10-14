@@ -45,4 +45,19 @@ public class TreatmentEpisode extends AssignedIdEntity {
         this.dischargeReady = r.dischargeReady(); this.dischargeDocumentId = r.dischargeDocumentId();
         this.createdAt = micros(now); this.updatedAt = micros(now);
     }
+
+    public UUID getCaseId() { return caseId; }
+    public UUID getFacilityId() { return facilityId; }
+    public UUID getPractitionerId() { return practitionerId; }
+    public Instant getStartAt() { return startAt; }
+    public Instant getEndAt() { return endAt; }
+    public String getStatus() { return status; }
+    public String getPlannedProcedures() { return plannedProcedures; }
+    public String getActualProcedures() { return actualProcedures; }
+    public String getMilestones() { return milestones; }
+    public String getComplications() { return complications; }
+    public boolean isDischargeReady() { return dischargeReady; }
+    public UUID getDischargeDocumentId() { return dischargeDocumentId; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
 }

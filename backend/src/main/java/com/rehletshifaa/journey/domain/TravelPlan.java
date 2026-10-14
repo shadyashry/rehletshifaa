@@ -50,4 +50,20 @@ public class TravelPlan extends AssignedIdEntity {
         this.responsibleSubject = responsibleSubject; this.status = status; updatedAt = micros(now);
         if (!isNew()) version++;
     }
+
+    public UUID getCaseId() { return caseId; }
+    public Instant getPlannedArrival() { return plannedArrival; }
+    public Instant getConfirmedArrival() { return confirmedArrival; }
+    public String getVisaStatus() { return visaStatus; }
+    public String getFlightDetails() { return flightDetails; }
+    public String getAirportReception() { return airportReception; }
+    public String getAccommodation() { return accommodation; }
+    public String getLocalTransport() { return localTransport; }
+    public String getCompanionDetails() { return companionDetails; }
+    public UUID getFacilityId() { return facilityId; }
+    public String getExceptions() { return exceptions; }
+    public String getResponsibleSubject() { return responsibleSubject; }
+    public String getStatus() { return status; }
+    public Instant getUpdatedAt() { return updatedAt; }
+    public long getVersion() { return version; }
 }

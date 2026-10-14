@@ -138,7 +138,7 @@ public final class JourneyDtos {
      * entered by them (MANUAL), the Consultant's EGP base price, the patient's EGP price (margin included) and the price in the
      * proposal's currency. Finance only; never on a patient, Consultant or Operations view.
      */
-    public record ProposalCommercialLine(UUID id,String description,String source,BigDecimal quantity,BigDecimal baseEgp,BigDecimal patientEgp,BigDecimal displayUnitPrice) {}
+    public record ProposalCommercialLine(UUID id,String description,String source,BigDecimal quantity,BigDecimal baseEgp,BigDecimal patientEgp,BigDecimal displayUnitPrice,UUID facilityPackageId,String facilityName) {}
     /** The version's commercial calculation for Finance: base total, margin (rate, amount, policy), patient total in EGP and in the proposal currency. */
     public record ProposalCommercialView(UUID versionId,String currency,BigDecimal fxRate,java.time.LocalDate fxRateDate,boolean requiresFinanceApproval,
             String policyName,String policyCareArea,Integer policyVersion,BigDecimal marginRate,BigDecimal baseTotalEgp,BigDecimal marginEgp,
@@ -160,7 +160,10 @@ public final class JourneyDtos {
     // Secure-delivery status of the latest released proposal notification (masked; no raw contact or token).
     public record DeliveryStatus(String status,String channel,String destinationMasked,int attempts,Instant deliveredAt,Instant nextAttemptAt) {}
     /** {@code patientAction} is the open request to the patient, so staff can see and record exactly what was asked. */
-    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions,PatientProposalState patientProposal,List<RepresentativeOption> representatives,PatientReplyView patientReply,boolean paymentOnly,ProposalCommercialView commercial) {}
+    public record CaseWorkspace(CaseView caseSummary,List<TimelineEvent>timeline,List<TaskView>tasks,List<MessageView>messages,List<AssignmentView>assignments,List<ClinicalReviewView>clinicalReviews,ProposalView proposal,ProposalGates gates,DeliveryStatus delivery,DepositView deposit,String intakeSummary,WorkDtos.PatientActionView patientAction,CaseActionsView actions,PatientProposalState patientProposal,List<RepresentativeOption> representatives,PatientReplyView patientReply,boolean paymentOnly,ProposalCommercialView commercial,TravelPlanView travelPlan,List<TreatmentEpisodeView> treatmentEpisodes) {}
+    /** P0-5: the travel plan as Operations recorded it, with the destination facility named (staff only). */
+    public record TravelPlanView(UUID id,String status,Instant plannedArrival,Instant confirmedArrival,String visaStatus,String flightDetails,String airportReception,String accommodation,String localTransport,String companionDetails,UUID facilityId,String facilityName,String exceptions,Instant updatedAt) {}
+    public record TreatmentEpisodeView(UUID id,UUID facilityId,String facilityName,UUID practitionerId,Instant startAt,Instant endAt,String status,String plannedProcedures,String actualProcedures,String milestones,String complications,boolean dischargeReady,UUID dischargeDocumentId) {}
     /**
      * Who answers the patient on this case, for the viewer: {@code canReply} is the one-voice rule (the primary coordinator,
      * or their active cover instead of them); {@code coverName}/{@code coverEndsAt} are set while someone covers the owner.

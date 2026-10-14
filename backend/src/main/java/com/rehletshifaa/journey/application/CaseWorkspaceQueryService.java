@@ -85,6 +85,9 @@ public class CaseWorkspaceQueryService {
     private final CryptoService crypto;
     private final PortalPreferenceRepository preferences;
     private final Clock clock;
+    private final com.rehletshifaa.journey.infrastructure.TravelPlanRepository travelPlans;
+    private final com.rehletshifaa.journey.infrastructure.TreatmentEpisodeRepository episodes;
+    private final com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory;
 
     public CaseWorkspaceQueryService(Authority authority, CaseActionService caseActions, JourneyCaseQueryService caseQueries,
                                      ProposalQueryService proposals, MedicalCaseRepository cases, CaseStatusChangeRepository statusHistory,
@@ -92,8 +95,10 @@ public class CaseWorkspaceQueryService {
                                      ClinicalReviewVersionRepository reviews, ClinicalReviewCostEstimateRepository estimates,
                                      DepositQueryService deposits, PatientActionQueryService patientActions, ProposalAccessService proposalAccess,
                                      CurrencyService currency, CryptoService crypto, PortalPreferenceRepository preferences, Clock clock,
-                                     ReplyCoverService replyCovers) {
-        this.replyCovers = replyCovers;
+                                     ReplyCoverService replyCovers, com.rehletshifaa.journey.infrastructure.TravelPlanRepository travelPlans,
+                                     com.rehletshifaa.journey.infrastructure.TreatmentEpisodeRepository episodes,
+                                     com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory) {
+        this.replyCovers = replyCovers; this.travelPlans = travelPlans; this.episodes = episodes; this.facilityDirectory = facilityDirectory;
         this.authority = authority; this.caseActions = caseActions; this.caseQueries = caseQueries; this.proposals = proposals;
         this.cases = cases; this.statusHistory = statusHistory; this.tasks = tasks; this.messages = messages; this.assignments = assignments;
         this.reviews = reviews; this.estimates = estimates; this.deposits = deposits; this.patientActions = patientActions;
@@ -160,18 +165,38 @@ public class CaseWorkspaceQueryService {
                 actions, proposalAccess.state(caseId), actor.role() == Role.COORDINATOR ? representatives(caseId) : List.of(),
                 patientActor ? null : patientReply(caseId, actor), false,
                 // QA #19: the commercial calculation only for whoever may approve it (Finance on the case).
-                latest != null && !patientActor && authority.allowed(Permission.FINANCE_SETTLE, onCase) ? proposals.commercial(latest.versionId()) : null);
+                latest != null && !patientActor && authority.allowed(Permission.FINANCE_SETTLE, onCase) ? proposals.commercial(latest.versionId()) : null,
+                // P0-5: the destination and the episodes, each with its facility named; staff only for now.
+                patientActor ? null : travelPlan(caseId), patientActor ? List.of() : treatmentEpisodes(caseId));
     }
 
     /**
      * The case as Finance sees it to record a deposit on a case it holds no assignment on (QA B3): who and which case, the
      * deposit and Finance's current action. Nothing clinical, no documents, threads, tasks, history or proposal.
      */
+    private com.rehletshifaa.journey.api.JourneyDtos.TravelPlanView travelPlan(UUID caseId) {
+        return travelPlans.findByCaseId(caseId).map(p -> {
+            String name = p.getFacilityId() == null ? null : facilityDirectory.names(List.of(p.getFacilityId())).get(p.getFacilityId());
+            return new com.rehletshifaa.journey.api.JourneyDtos.TravelPlanView(p.getId(), p.getStatus(), p.getPlannedArrival(), p.getConfirmedArrival(), p.getVisaStatus(),
+                    p.getFlightDetails(), p.getAirportReception(), p.getAccommodation(), p.getLocalTransport(), p.getCompanionDetails(), p.getFacilityId(), name,
+                    p.getExceptions(), p.getUpdatedAt());
+        }).orElse(null);
+    }
+
+    private List<com.rehletshifaa.journey.api.JourneyDtos.TreatmentEpisodeView> treatmentEpisodes(UUID caseId) {
+        var rows = episodes.findByCaseIdOrderByStartAtAsc(caseId);
+        if (rows.isEmpty()) return List.of();
+        var names = facilityDirectory.names(rows.stream().map(com.rehletshifaa.journey.domain.TreatmentEpisode::getFacilityId).filter(java.util.Objects::nonNull).distinct().toList());
+        return rows.stream().map(x -> new com.rehletshifaa.journey.api.JourneyDtos.TreatmentEpisodeView(x.getId(), x.getFacilityId(),
+                x.getFacilityId() == null ? null : names.get(x.getFacilityId()), x.getPractitionerId(), x.getStartAt(), x.getEndAt(), x.getStatus(),
+                x.getPlannedProcedures(), x.getActualProcedures(), x.getMilestones(), x.getComplications(), x.isDischargeReady(), x.getDischargeDocumentId())).toList();
+    }
+
     private CaseWorkspace paymentWorkspace(UUID caseId) {
         var actor = authority.authorize(Permission.CASE_DEPOSIT_READ, Resource.ofCase(caseId));
         CaseActionsView actions = caseActions.resolve(caseId, actor);
         return new CaseWorkspace(JourneyCaseQueryService.withoutStaffSubjects(caseQueries.caseView(caseId)), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null,
-                deposits.depositForCase(caseId), null, null, actions, null, List.of(), null, true, null);
+                deposits.depositForCase(caseId), null, null, actions, null, List.of(), null, true, null, null, List.of());
     }
 
     /** Who answers the patient now, as the staff viewer needs it: whether they may, and who covers the owner until when. */

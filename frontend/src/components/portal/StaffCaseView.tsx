@@ -95,7 +95,19 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
  // Operations and consultants keep their stage forms; the coordinator's work is driven by the current action.
- const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired}/></div>:null;
+ const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null}/></div>:null;
+ // P0-5: the destination and the treatment episodes read back with their facility named, for every staff role on the case.
+ const when=(v?:string|null)=>v?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
+ const episodes=value.treatmentEpisodes??[];
+ const logistics=value.travelPlan||episodes.length>0?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{locale==="ar"?"الوجهة والعلاج":"Destination & treatment"}</h3>
+  {value.travelPlan&&<dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-2 lg:grid-cols-4">
+   <div><dt className="text-ink-500">{locale==="ar"?"المنشأة":"Facility"}</dt><dd className="font-semibold text-ink-900">{value.travelPlan.facilityName??(locale==="ar"?"لم تُحدَّد بعد":"Not chosen yet")}</dd></div>
+   <div><dt className="text-ink-500">{locale==="ar"?"حالة السفر":"Travel status"}</dt><dd className="font-semibold text-ink-900">{pair(TRAVEL_STATUS,value.travelPlan.status,locale)}</dd></div>
+   <div><dt className="text-ink-500">{locale==="ar"?"الوصول المخطط":"Planned arrival"}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.plannedArrival)}</dd></div>
+   <div><dt className="text-ink-500">{locale==="ar"?"الوصول المؤكد":"Confirmed arrival"}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.confirmedArrival)}</dd></div>
+  </dl>}
+  {episodes.length>0&&<ul className="mt-3 space-y-1.5 text-[0.85rem]" aria-label={locale==="ar"?"مراحل العلاج":"Treatment episodes"}>{episodes.map(ep=><li key={ep.id} className="flex flex-wrap items-baseline justify-between gap-3 border-t border-line pt-1.5"><span className="font-semibold text-ink-900">{ep.facilityName??(locale==="ar"?"منشأة غير مسماة":"Unnamed facility")}</span><span className="text-ink-600">{pair(EPISODE_STATUS,ep.status,locale)} · {when(ep.startAt)}{ep.endAt?` – ${when(ep.endAt)}`:""}</span></li>)}</ul>}
+ </section>:null;
  const recommendationBlock=approved&&(approved.recommendedTreatment||approved.risksAndLimitations)?<div className="rounded-lg border border-line p-4"><p className="mb-2 label-micro text-brand-700">{locale==="ar"?"التوصية السريرية للاستشاري":"Consultant's clinical recommendation"}</p>{approved.recommendedTreatment&&<div className="mb-3"><p className="text-sm font-bold text-ink-800">{t.reviewTreatment}</p><p className="mt-0.5 whitespace-pre-wrap text-ink-700">{approved.recommendedTreatment}</p></div>}{approved.risksAndLimitations&&<div><p className="text-sm font-bold text-ink-800">{t.reviewRisks}</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-600">{approved.risksAndLimitations}</p></div>}</div>:null;
  // The proposal is the coordinator's work while it is being prepared or released (or, at arrival, finalised);
  // once decided it becomes reference history.
@@ -228,6 +240,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
         </div>
        </section>}
        {banners}
+       {logistics}
        {workflowBlock}
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>
@@ -544,3 +557,8 @@ export function RoleActions({role,t,c,proposal,gates,availableActions,locale,mut
 }
 
 function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const {locale,t}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-lg bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong><bdi dir="ltr">{money(total,proposal.currency,locale)}</bdi></strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?(locale==="ar"?" (اختياري)":" (optional)"):""}</span><strong className="whitespace-nowrap"><bdi dir="ltr">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</bdi></strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{locale==="ar"?"صالح حتى":"Valid until"} {new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))}</p>}</div>}
+
+// P0-5: business labels for the travel plan and treatment episode states shown on the case page.
+const TRAVEL_STATUS:Record<string,[string,string]>={PLANNING:["Planning","قيد التخطيط"],CONFIRMED:["Confirmed booking","حجز مؤكد"],ARRIVED:["Arrived","تم الوصول"]};
+const EPISODE_STATUS:Record<string,[string,string]>={PLANNED:["Planned","مخطط"],IN_PROGRESS:["In progress","قيد التنفيذ"],COMPLETED:["Completed","مكتمل"]};
+const pair=(map:Record<string,[string,string]>,key:string,locale:Locale)=>map[key]?.[locale==="ar"?1:0]??key;

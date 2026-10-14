@@ -45,7 +45,7 @@ export function FinanceApproval({ locale, commercial, busy, approveLabel, onAppr
                 <td className="py-2 pe-3">
                   {line.source === "MANUAL"
                     ? <span className="rounded bg-status-warning-surface px-1.5 py-0.5 text-[0.8125rem] font-bold text-status-warning-fg">{t.manual}</span>
-                    : line.source === "FACILITY_PACKAGE" ? <span className="text-[0.8125rem] text-ink-600">{t.facilityPackage}</span>
+                    : line.source === "FACILITY_PACKAGE" ? <span className="text-[0.8125rem] text-ink-600">{t.facilityPackage}{line.facilityName ? ` · ${line.facilityName}` : ""}</span>
                     : <span className="text-[0.8125rem] text-ink-600">{t.catalogue}</span>}
                 </td>
                 <td className="py-2 pe-3 text-end whitespace-nowrap"><bdi dir="ltr">{egp(line.baseEgp)}</bdi></td>

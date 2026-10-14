@@ -41,6 +41,20 @@ public class FacilityDirectory {
         return facilityId == null ? Optional.empty() : facilities.findById(facilityId).filter(f -> f.getStatus() == Facility.Status.ACTIVE);
     }
 
+    /** Facility names by id, for views that store only the id (travel plan, treatment episode). No authorization: the case read was. */
+    public Map<UUID, String> names(java.util.Collection<UUID> facilityIds) {
+        if (facilityIds.isEmpty()) return Map.of();
+        return facilities.findAllById(facilityIds).stream().collect(Collectors.toMap(Facility::getId, Facility::getName));
+    }
+
+    /** Facility names by package id, so a proposal line priced from a package says whose approved price it carries. */
+    public Map<UUID, String> facilityNamesOfPackages(java.util.Collection<UUID> packageIds) {
+        if (packageIds.isEmpty()) return Map.of();
+        List<FacilityPackage> found = packages.findAllById(packageIds);
+        Map<UUID, String> names = names(found.stream().map(FacilityPackage::getFacilityId).distinct().toList());
+        return found.stream().filter(p -> names.containsKey(p.getFacilityId())).collect(Collectors.toMap(FacilityPackage::getId, p -> names.get(p.getFacilityId())));
+    }
+
     /** Active facilities, each with the packages priceable today (optionally only those of one care area). */
     public List<DirectoryFacility> directory(String careArea) {
         authority.authorize(Permission.REFERENCE_DATA_READ);

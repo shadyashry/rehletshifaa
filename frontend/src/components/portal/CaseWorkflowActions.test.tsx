@@ -21,6 +21,13 @@ describe("CaseWorkflowActions facility pickers", () => {
     expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/travel", expect.objectContaining({ facilityId: "f1", status: "PLANNING" }), "PUT");
   });
 
+  it("reopens the travel form on the facility and status already stored", () => {
+    render(<CaseWorkflowActions locale="en" role="operations" caseSummary={{ id: "c1", status: "TRAVEL_COORDINATION", version: 1 }}
+                                availableActions={["UPDATE_TRAVEL_PLAN"]} mutate={vi.fn()} facilities={facilities} travelPlan={{ facilityId: "f1", status: "CONFIRMED" }}/>);
+    expect((screen.getByLabelText("Facility") as HTMLSelectElement).value).toBe("f1");
+    expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe("CONFIRMED");
+  });
+
   it("the treatment record requires a facility and says when none is set up yet", () => {
     const mutate = vi.fn().mockResolvedValue({ id: "e1" });
     render(<CaseWorkflowActions locale="en" role="doctor" caseSummary={{ id: "c1", status: "ARRIVAL_CONFIRMED", version: 1 }} mutate={mutate} facilities={[]}/>);

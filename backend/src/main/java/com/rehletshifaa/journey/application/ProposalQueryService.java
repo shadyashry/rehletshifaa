@@ -45,12 +45,14 @@ public class ProposalQueryService {
     private final ProposalDecisionRepository decisions;
     private final ProposalAssistanceRequestRepository assistance;
     private final JourneyCaseQueryService people;
+    private final com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory;
 
     public ProposalQueryService(ProposalVersionRepository versions, ProposalItemRepository items, MedicalCaseRepository cases,
                                 QueuedNotificationRepository outbox, ProposalDecisionRepository decisions,
-                                ProposalAssistanceRequestRepository assistance, JourneyCaseQueryService people) {
+                                ProposalAssistanceRequestRepository assistance, JourneyCaseQueryService people,
+                                com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory) {
         this.versions = versions; this.items = items; this.cases = cases; this.outbox = outbox;
-        this.decisions = decisions; this.assistance = assistance; this.people = people;
+        this.decisions = decisions; this.assistance = assistance; this.people = people; this.facilityDirectory = facilityDirectory;
     }
 
     ProposalView proposal(UUID versionId) {
@@ -68,9 +70,13 @@ public class ProposalQueryService {
     ProposalCommercialView commercial(UUID versionId) {
         var v = versions.findCommercial(versionId).orElse(null);
         if (v == null) return null;
-        List<ProposalCommercialLine> lines = items.findPricedRowsOf(versionId).stream()
+        var rows = items.findPricedRowsOf(versionId);
+        // P0-5: a facility package line names its facility, so Finance sees whose approved price it carries.
+        var facilityNames = facilityDirectory.facilityNamesOfPackages(rows.stream().map(ProposalItemRepository.PricedRow::getFacilityPackageId)
+                .filter(java.util.Objects::nonNull).distinct().toList());
+        List<ProposalCommercialLine> lines = rows.stream()
                 .map(i -> new ProposalCommercialLine(i.getId(), i.getDescription(), i.getSource(), i.getQuantity(), i.getProviderPriceEgp(),
-                        i.getUnitPriceEgp(), i.getUnitPrice()))
+                        i.getUnitPriceEgp(), i.getUnitPrice(), i.getFacilityPackageId(), i.getFacilityPackageId() == null ? null : facilityNames.get(i.getFacilityPackageId())))
                 .toList();
         BigDecimal displayTotal = lines.stream().map(l -> l.displayUnitPrice().multiply(l.quantity())).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new ProposalCommercialView(v.getId(), v.getCurrency(), v.getFxRate(), v.getFxRateDate(), Boolean.TRUE.equals(v.getRequiresFinanceApproval()),

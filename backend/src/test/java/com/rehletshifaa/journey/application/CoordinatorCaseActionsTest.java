@@ -803,6 +803,8 @@ class CoordinatorCaseActionsTest {
         journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "Visa pending", "MS123", null, null, null, null, facilityId, null, "PLANNING"));
         em.flush();
         assertThat(jdbc.queryForObject("SELECT facility_id FROM travel_plans WHERE case_id=?", UUID.class, ctx.caseId)).isEqualTo(facilityId);
+        // The plan reads back on the case page with its destination named.
+        assertThat(journey.workspace(ctx.caseId).travelPlan()).satisfies(plan -> { assertThat(plan.facilityId()).isEqualTo(facilityId); assertThat(plan.facilityName()).startsWith("Cairo Heart Centre"); assertThat(plan.status()).isEqualTo("PLANNING"); });
         // The draft is saved; the stage is untouched and no transition was written anywhere.
         assertThat(count("SELECT count(*) FROM travel_plans WHERE case_id=?", ctx.caseId)).isEqualTo(1);
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");

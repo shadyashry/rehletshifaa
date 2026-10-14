@@ -22,13 +22,13 @@ public interface ProposalItemRepository extends BaseRepository<ProposalItem, UUI
     /** A line with its EGP prices: what Finance approves (QA #19) and what the patient's totals are summed from (QA #12). */
     interface PricedRow {
         UUID getId(); String getDescription(); String getSource(); BigDecimal getQuantity(); BigDecimal getUnitPrice(); Boolean getOptionalItem();
-        BigDecimal getUnitPriceEgp(); BigDecimal getProviderPriceEgp(); BigDecimal getUnitPriceMinEgp(); BigDecimal getUnitPriceMaxEgp();
+        BigDecimal getUnitPriceEgp(); BigDecimal getProviderPriceEgp(); BigDecimal getUnitPriceMinEgp(); BigDecimal getUnitPriceMaxEgp(); UUID getFacilityPackageId();
     }
 
     @Query("""
             select i.id as id, i.description as description, i.source as source, i.quantity as quantity, i.unitPrice as unitPrice,
                 i.optional as optionalItem, i.unitPriceEgp as unitPriceEgp, i.providerPriceEgp as providerPriceEgp,
-                i.unitPriceMinEgp as unitPriceMinEgp, i.unitPriceMaxEgp as unitPriceMaxEgp
+                i.unitPriceMinEgp as unitPriceMinEgp, i.unitPriceMaxEgp as unitPriceMaxEgp, i.facilityPackageId as facilityPackageId
             from ProposalItem i where i.proposalVersionId = :versionId order by i.sortOrder, i.id""")
     java.util.List<PricedRow> findPricedRowsOf(@Param("versionId") UUID versionId);
 
