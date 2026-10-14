@@ -74,11 +74,14 @@ class PostActivationLandingTest {
         assertThat(ws.deposit()).isNotNull();
         assertThat(ws.deposit().status()).isEqualTo("REQUESTED");
         assertThat(ws.deposit().currency()).isEqualTo("USD");
-        // W-1 (owner, 2026-10-14): 15% of the estimate the patient acknowledged, at the proposal's snapshot rate.
+        // W-1 + P0-4 (owner, 2026-10-14): 15% of the estimate the patient acknowledged at the proposal's snapshot rate,
+        // inside USD 200..1,500 and rounded up to the next USD 10; the EGP ledger amount is the rounded figure's.
         BigDecimal estimate = jdbc.queryForObject("SELECT v.patient_total_expected_egp FROM proposal_versions v JOIN proposals p ON p.id=v.proposal_id WHERE p.case_id=? AND v.document_type='PRELIMINARY_ESTIMATE' ORDER BY v.version_number DESC LIMIT 1", BigDecimal.class, caseId);
-        BigDecimal expectedDeposit = estimate.multiply(new BigDecimal("0.15")).setScale(2, java.math.RoundingMode.HALF_UP);
-        assertThat(ws.deposit().totalEgp()).isEqualByComparingTo(expectedDeposit);
-        assertThat(ws.deposit().totalDisplay()).isEqualByComparingTo(expectedDeposit.multiply(new BigDecimal("0.02")).setScale(2, java.math.RoundingMode.HALF_UP));
+        BigDecimal shareUsd = estimate.multiply(new BigDecimal("0.15")).multiply(new BigDecimal("0.02"));
+        assertThat(shareUsd).isBetween(new BigDecimal("200"), new BigDecimal("1500"));
+        BigDecimal expectedUsd = shareUsd.divide(BigDecimal.TEN, 0, java.math.RoundingMode.CEILING).multiply(BigDecimal.TEN);
+        assertThat(ws.deposit().totalDisplay()).isEqualByComparingTo(expectedUsd);
+        assertThat(ws.deposit().totalEgp()).isEqualByComparingTo(expectedUsd.divide(new BigDecimal("0.02"), 2, java.math.RoundingMode.HALF_UP));
         // The proposal: acknowledged, exactly one read-only action, the version the patient decided on.
         assertThat(ws.patientProposal().state()).isEqualTo("ACCEPTED");
         assertThat(ws.patientProposal().action()).isEqualTo("VIEW_PROPOSAL");

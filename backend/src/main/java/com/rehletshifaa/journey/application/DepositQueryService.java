@@ -35,13 +35,14 @@ public class DepositQueryService {
     private final DepositTransferReportRepository transfers;
     private final BankTransferDetails bank;
     private final com.rehletshifaa.journey.infrastructure.ProposalVersionRepository proposalVersions;
+    private final DepositCalculator calculator;
 
     public DepositQueryService(DepositRepository deposits, DepositComponentRepository components, PaymentEventRepository ledger,
                                CoordinationDepositPolicyRepository policies, MedicalCaseRepository cases,
                                DepositTransferReportRepository transfers, BankTransferDetails bank,
-                               com.rehletshifaa.journey.infrastructure.ProposalVersionRepository proposalVersions) {
+                               com.rehletshifaa.journey.infrastructure.ProposalVersionRepository proposalVersions, DepositCalculator calculator) {
         this.deposits = deposits; this.components = components; this.ledger = ledger; this.policies = policies; this.cases = cases;
-        this.transfers = transfers; this.bank = bank; this.proposalVersions = proposalVersions;
+        this.transfers = transfers; this.bank = bank; this.proposalVersions = proposalVersions; this.calculator = calculator;
     }
 
     /** EGP recorded as paid and as refunded on one deposit. */
@@ -49,14 +50,12 @@ public class DepositQueryService {
         BigDecimal netEgp() { return paidEgp.subtract(refundedEgp); }
     }
 
-    /** The active revision of a deposit policy. */
-    /** The active deposit policy: the share of the estimate due as the deposit (W-1). */
-    record ActivePolicy(UUID id, BigDecimal rate, int version) {
+    /**
+     * The active deposit policy: the share of the estimate due as the deposit (W-1) and its bounds in US dollars (P0-4,
+     * null: unbounded). The amount itself is {@link DepositCalculator}'s.
+     */
+    record ActivePolicy(UUID id, BigDecimal rate, int version, BigDecimal minimumUsd, BigDecimal maximumUsd) {
         boolean due() { return rate != null && rate.signum() > 0; }
-        /** The deposit on an estimate: its share, rounded half-up to the piastre. */
-        BigDecimal of(BigDecimal estimateEgp) {
-            return estimateEgp == null || !due() ? BigDecimal.ZERO : estimateEgp.multiply(rate).setScale(2, RoundingMode.HALF_UP);
-        }
     }
 
     /**
@@ -64,7 +63,7 @@ public class DepositQueryService {
      * PARTIALLY_PAID / PAID / WAIVED), whether an authorized waiver is recorded, whether it no longer blocks
      * (none due, PAID or WAIVED), and the amount due on acknowledgement (the live deposit's total, else the policy amount).
      */
-    record Standing(String status, boolean waived, boolean satisfied, BigDecimal anticipatedEgp) {}
+    record Standing(String status, boolean waived, boolean satisfied, BigDecimal anticipatedEgp, BigDecimal anticipatedDisplay, String currency) {}
 
     /** The case's latest deposit (cancelled included) with its components, ledger and paid/balance amounts; null when none. */
     @Transactional(readOnly = true)
@@ -95,12 +94,13 @@ public class DepositQueryService {
             ActivePolicy policy = activePolicyFor(cases.findCareCategory(caseId).orElse(null));
             // W-1: a share of the latest estimate; required whenever the policy asks for one, even before an estimate exists.
             boolean due = policy != null && policy.due();
-            BigDecimal estimate = proposalVersions.findLatestEstimateTotal(caseId, Limit.of(1)).stream().findFirst().orElse(null);
-            BigDecimal anticipated = due ? policy.of(estimate) : BigDecimal.ZERO;
-            return new Standing(due ? "REQUIRED" : "NONE", false, !due, anticipated);
+            var estimate = proposalVersions.findLatestEstimate(caseId, Limit.of(1)).stream().findFirst().orElse(null);
+            DepositCalculator.Amount anticipated = !due || estimate == null ? DepositCalculator.Amount.none(estimate == null ? "EGP" : estimate.getCurrency())
+                    : calculator.quote(policy, estimate.getPatientTotalExpectedEgp(), estimate.getCurrency(), estimate.getFxRate(), estimate.getFxRateDate());
+            return new Standing(due ? "REQUIRED" : "NONE", false, !due, anticipated.egp(), anticipated.display(), anticipated.currency());
         }
         boolean waived = d.getWaivedAt() != null;
-        return new Standing(waived ? "WAIVED" : d.getStatus(), waived, waived || "PAID".equals(d.getStatus()), d.getTotalEgp());
+        return new Standing(waived ? "WAIVED" : d.getStatus(), waived, waived || "PAID".equals(d.getStatus()), d.getTotalEgp(), d.getTotalDisplay(), d.getCurrency());
     }
 
     /** The bank-transfer reference waiting for Finance on the case's active deposit, if any (DEP-3). */
@@ -117,7 +117,7 @@ public class DepositQueryService {
 
     private static TransferReportView transferView(DepositTransferReportRepository.Row r) {
         return new TransferReportView(r.getId(), r.getMethod(), r.getTransferReference(), r.getStatus(), r.getSubmittedAt(), r.getDecidedAt(),
-                r.getDecisionReason(), r.getVersion() == null ? 0 : r.getVersion());
+                r.getDecisionReason(), r.getVersion() == null ? 0 : r.getVersion(), r.getAgentName());
     }
 
     /** Net EGP recorded as paid on the case's active deposit (paid minus refunded); zero without one. */
@@ -136,7 +136,7 @@ public class DepositQueryService {
         CoordinationDepositPolicyRepository.Row p = careCategory == null ? null
                 : policies.findActiveFor(careCategory, Limit.of(1)).stream().findFirst().orElse(null);
         if (p == null) p = policies.findActiveDefault(Limit.of(1)).stream().findFirst().orElse(null);
-        return p == null ? null : new ActivePolicy(p.getId(), p.getDepositRate(), p.getVersion());
+        return p == null ? null : new ActivePolicy(p.getId(), p.getDepositRate(), p.getVersion(), p.getMinimumUsd(), p.getMaximumUsd());
     }
 
     List<DepositPolicyView> policies() {
@@ -153,7 +153,7 @@ public class DepositQueryService {
     }
 
     private static DepositPolicyView policyView(CoordinationDepositPolicyRepository.Row p) {
-        return new DepositPolicyView(p.getId(), p.getName(), p.getCareCategory(), p.getDepositRate(), Boolean.TRUE.equals(p.getActive()),
+        return new DepositPolicyView(p.getId(), p.getName(), p.getCareCategory(), p.getDepositRate(), p.getMinimumUsd(), p.getMaximumUsd(), Boolean.TRUE.equals(p.getActive()),
                 p.getVersion(), p.getCreatedBy(), p.getValidFrom());
     }
 

@@ -16,13 +16,13 @@ public interface DepositTransferReportRepository extends BaseRepository<DepositT
     /** A reference as the case page shows it. */
     interface Row {
         UUID getId(); UUID getDepositId(); String getMethod(); String getTransferReference(); String getStatus(); String getSubmittedBy();
-        Instant getSubmittedAt(); Instant getDecidedAt(); String getDecisionReason(); Long getVersion();
+        Instant getSubmittedAt(); Instant getDecidedAt(); String getDecisionReason(); Long getVersion(); String getAgentName();
     }
 
     String ROW = """
             select r.id as id, r.depositId as depositId, r.method as method, r.transferReference as transferReference, r.status as status,
                 r.submittedBy as submittedBy, r.submittedAt as submittedAt, r.decidedAt as decidedAt, r.decisionReason as decisionReason,
-                r.version as version
+                r.version as version, r.agentName as agentName
             from DepositTransferReport r
             """;
 

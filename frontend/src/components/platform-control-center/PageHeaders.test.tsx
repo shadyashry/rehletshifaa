@@ -19,7 +19,7 @@ const h1 = () => screen.getAllByRole("heading", { level: 1 }).map((h) => h.textC
 const trail = () => within(screen.getByRole("navigation", { name: "Breadcrumb" })).getAllByRole("listitem").map((li) => li.textContent);
 const policies = {
   "/finance/commercial-policies": [{ id: "m1", careCategory: "cardiology", marginRate: 0.12, active: true, version: 3 }],
-  "/finance/deposit-policies": [{ id: "d1", depositRate: 0.15, active: true, version: 1 }],
+  "/finance/deposit-policies": [{ id: "d1", depositRate: 0.15, minimumUsd: 200, maximumUsd: 1500, active: true, version: 1 }],
   "/finance/care-areas": [{ slug: "cardiology", nameEn: "Cardiology", nameAr: "أمراض القلب" }, { slug: "womens-health", nameEn: "Women's Health", nameAr: "صحة المرأة" },
     { slug: "general-surgery", nameEn: "General & Metabolic Surgery", nameAr: "الجراحة العامة وجراحات السمنة" }],
 };
@@ -55,8 +55,22 @@ describe("Commercial › Margin & Deposit", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Review new version" })[1]);
     const dialog = screen.getByRole("dialog", { name: "Confirm new version" });
     expect(dialog).toHaveTextContent("20.00% of the estimate");
+    // P0-4: the revision states its dollar bounds too, prefilled from the policy in use, so saving a rate never drops them.
+    expect(dialog).toHaveTextContent("Minimum 200 USD · Maximum 1500 USD");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/deposit-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ depositRate: 0.2 }) })));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/deposit-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ depositRate: 0.2, minimumUsd: 200, maximumUsd: 1500 }) })));
+  });
+
+  it("shows the deposit bounds in use and sends an emptied bound as none (P0-4)", async () => {
+    auth.me = meWith(["COMMERCIAL_POLICY_READ", "COMMERCIAL_POLICY_MANAGE", "REFERENCE_DATA_READ"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi(policies));
+    render(<MarginDeposit locale="en" />);
+    expect(await screen.findByText("Minimum 200 USD · Maximum 1500 USD")).toBeVisible();
+    fireEvent.change(screen.getByLabelText("Coordination deposit (% of the estimate)"), { target: { value: "15" } });
+    fireEvent.change(screen.getByLabelText("Maximum (USD)"), { target: { value: "" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Review new version" })[1]);
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Confirm new version" })).getByRole("button", { name: "Save new version" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/deposit-policies", expect.objectContaining({ body: JSON.stringify({ depositRate: 0.15, minimumUsd: 200, maximumUsd: null }) })));
   });
 
   it("is read-only for someone who may read but not manage commercial policy", async () => {

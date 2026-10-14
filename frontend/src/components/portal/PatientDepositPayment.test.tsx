@@ -56,6 +56,33 @@ describe("PatientDepositPayment", () => {
     expect(mutate).toHaveBeenCalledWith("/patient/cases/c1/deposit/transfer-reference", { reference: "FT 2026 1013" });
   });
 
+  // P0-4 corridor rail: cash through an agent, proven by the agent's name and receipt number, verified by Finance.
+  it("lets the patient pay cash through an agent and send the agent's name with the receipt number", () => {
+    const { mutate } = renderPayment();
+    fireEvent.click(screen.getByRole("radio", { name: /Cash through an agent/ }));
+    // No bank account to copy; the payment reference to give the agent instead.
+    expect(screen.queryByText("EG000000000000000000000000000")).toBeNull();
+    expect(screen.getByText(/give the agent your payment reference/)).toBeTruthy();
+    expect(screen.getByText("RS-2026-000081")).toBeTruthy();
+    const submit = screen.getByRole("button", { name: "Send receipt number" });
+    const receipt = screen.getByRole("textbox", { name: /Receipt number/ });
+    fireEvent.change(receipt, { target: { value: "AG-7731" } });
+    fireEvent.click(submit);
+    // The agent is mandatory: nothing is sent and the focus goes to the agent field.
+    const agent = screen.getByRole("textbox", { name: /Agent’s name and city/ });
+    expect(screen.getByText("Enter the name of the agent you paid.")).toBeTruthy();
+    expect(document.activeElement).toBe(agent);
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.change(agent, { target: { value: " Al Noor Exchange, Benghazi " } });
+    fireEvent.click(submit);
+    expect(mutate).toHaveBeenCalledWith("/patient/cases/c1/deposit/transfer-reference", { reference: "AG-7731", method: "AGENT_CASH", agentName: "Al Noor Exchange, Benghazi" });
+  });
+
+  it("offers the agent option in Arabic", () => {
+    renderPayment({}, "ar");
+    expect(screen.getByRole("radio", { name: /نقدًا عبر وكيل/ })).toBeTruthy();
+  });
+
   it("shows the remaining amount after a part payment, and why the last reference was not confirmed", () => {
     renderPayment({ amountDue: 300, received: 200, transfer: { id: "t1", reference: "FT1", status: "REJECTED", submittedAt: "2026-10-13T09:00:00Z", reason: "No transfer with this reference" } });
     expect(screen.getByText("$300")).toBeTruthy();

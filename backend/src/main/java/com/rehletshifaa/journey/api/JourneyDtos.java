@@ -219,19 +219,31 @@ public final class JourneyDtos {
     /** {@code transfer}: the latest bank-transfer reference the patient entered (DEP-3), null before any; {@code bankTransfer}: the platform account to pay into. */
     public record DepositView(UUID id,String status,String currency,BigDecimal totalEgp,BigDecimal totalDisplay,BigDecimal paidDisplay,BigDecimal balanceDisplay,List<DepositComponentView>components,List<PaymentEventView>events,TransferReportView transfer,BankTransferView bankTransfer,BigDecimal paidEgp,BigDecimal balanceEgp) {}
     /** A transfer reference and Finance's decision on it: SUBMITTED (being checked), CONFIRMED or REJECTED (with the reason). */
-    public record TransferReportView(UUID id,String method,String reference,String status,Instant submittedAt,Instant decidedAt,String reason,long version) {}
+    public record TransferReportView(UUID id,String method,String reference,String status,Instant submittedAt,Instant decidedAt,String reason,long version,String agentName) {}
     /** The platform bank account (configuration; dummy values outside production) and the reference to write on the transfer. */
     public record BankTransferView(String accountName,String bankName,String accountNumber,String iban,String swift,String paymentReference) {}
     /** The patient's transaction reference for their bank transfer (DEP-3). */
-    public record TransferReferenceRequest(@NotBlank @Size(max=80)String reference) {}
+    /**
+     * The patient's proof of payment: the bank's transaction reference, or (P0-4, corridor rail) the receipt number an agent
+     * gave for cash, with the agent's name. {@code method} null reads as BANK_TRANSFER.
+     */
+    public record TransferReferenceRequest(@NotBlank @Size(max=80)String reference,@Size(max=20)String method,@Size(max=120)String agentName) {
+        public TransferReferenceRequest(String reference){this(reference,null,null);}
+    }
     /** Finance cannot confirm the transfer: the reason goes back to the patient. */
     public record TransferRejectionRequest(@NotBlank @Size(max=500)String reason) {}
     /** Finance confirms the amount received against the patient's pending transfer reference (method and reference come from it). */
     public record RecordReceiptRequest(@NotNull @DecimalMin("0.01")@Digits(integer=12,fraction=2)BigDecimal amountEgp,@NotBlank @Size(max=180)String idempotencyKey) {}
     public record RefundRequest(@NotNull @DecimalMin("0.01")BigDecimal amountEgp,@NotBlank @Size(max=2000)String reason,@NotBlank @Size(max=180)String idempotencyKey) {}
-    public record DepositPolicyView(UUID id,String name,String careCategory,BigDecimal depositRate,boolean active,int version,String createdBy,LocalDate validFrom) {}
-    /** {@code depositRate}: the share of the patient's estimated total due as the coordination deposit, 0–1 (0.15 = 15%). */
-    public record DepositPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("1.0") @Digits(integer=1,fraction=4)BigDecimal depositRate) {}
+    public record DepositPolicyView(UUID id,String name,String careCategory,BigDecimal depositRate,BigDecimal minimumUsd,BigDecimal maximumUsd,boolean active,int version,String createdBy,LocalDate validFrom) {}
+    /**
+     * {@code depositRate}: the share of the patient's estimated total due as the coordination deposit, 0–1 (0.15 = 15%);
+     * {@code minimumUsd} / {@code maximumUsd}: its bounds in US dollars (P0-4), null for none.
+     */
+    public record DepositPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("1.0") @Digits(integer=1,fraction=4)BigDecimal depositRate,
+            @DecimalMin("0.0") @Digits(integer=10,fraction=2)BigDecimal minimumUsd,@DecimalMin("0.01") @Digits(integer=10,fraction=2)BigDecimal maximumUsd) {
+        public DepositPolicyRequest(String name,String careCategory,BigDecimal depositRate){this(name,careCategory,depositRate,null,null);}
+    }
     public record CatalogImportRow(int line,String serviceCode,String serviceName,String category,BigDecimal priceEgp,String action,String message) {}
     public record CatalogImportResult(boolean committed,int added,int updated,int unchanged,int errors,List<CatalogImportRow> rows) {}
 

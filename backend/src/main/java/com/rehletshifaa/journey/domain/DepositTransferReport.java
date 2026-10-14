@@ -29,13 +29,23 @@ public class DepositTransferReport extends AssignedIdEntity {
     @Column(name = "decided_at") private Instant decidedAt;
     @Column(name = "decision_reason", length = 500) private String decisionReason;
     @Column(nullable = false) private long version;
+    @Column(name = "agent_name", length = 120) private String agentName;
 
     protected DepositTransferReport() {}
 
     /** A bank-transfer reference just submitted for Finance to verify. */
     public DepositTransferReport(UUID id, UUID caseId, UUID depositId, String transferReference, String submittedBy, Instant now) {
+        this(id, caseId, depositId, "BANK_TRANSFER", null, transferReference, submittedBy, now);
+    }
+
+    /**
+     * A proof of payment just submitted for Finance to verify: a bank reference ({@code BANK_TRANSFER}, no agent) or the
+     * receipt number of cash paid through a named agent ({@code AGENT_CASH}, P0-4). The CHECK constraint ties the two.
+     */
+    public DepositTransferReport(UUID id, UUID caseId, UUID depositId, String method, String agentName, String transferReference,
+                                 String submittedBy, Instant now) {
         super(id);
-        this.caseId = caseId; this.depositId = depositId; this.method = "BANK_TRANSFER"; this.transferReference = transferReference;
+        this.caseId = caseId; this.depositId = depositId; this.method = method; this.agentName = agentName; this.transferReference = transferReference;
         this.status = "SUBMITTED"; this.submittedBy = submittedBy; this.submittedAt = micros(now);
     }
 }

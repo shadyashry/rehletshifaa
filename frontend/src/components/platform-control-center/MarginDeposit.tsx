@@ -11,9 +11,10 @@ import { EmptyState, ErrorNotice, Field, Section, SuccessNotice } from "./cc-ui"
 import { FocusTrapDialog } from "./FocusTrapDialog";
 
 type CommercialPolicy = { id: string; careCategory?: string; marginRate: number; active: boolean; version: number; validFrom?: string };
-type DepositPolicy = { id: string; careCategory?: string; /** Share of the estimate, 0–1 (W-1). */ depositRate: number; active: boolean; version: number; validFrom?: string };
+type DepositPolicy = { id: string; careCategory?: string; /** Share of the estimate, 0–1 (W-1). */ depositRate: number;
+  /** P0-4: bounds in US dollars, null for none. */ minimumUsd?: number | null; maximumUsd?: number | null; active: boolean; version: number; validFrom?: string };
 type CareArea = { slug: string; nameEn: string; nameAr: string };
-type Pending = { kind: "margin" | "deposit"; area: string; value: number; form: HTMLFormElement };
+type Pending = { kind: "margin" | "deposit"; area: string; value: number; minimumUsd?: number | null; maximumUsd?: number | null; form: HTMLFormElement };
 
 /**
  * Commercial › Margin & Deposit — internal commercial configuration: the central margin and coordination-deposit policies.
@@ -55,7 +56,8 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
     const careCategory = pending.area || undefined;
     try {
       if (pending.kind === "margin") await api("/finance/commercial-policies", { method: "PUT", body: { careCategory, marginRate: pending.value / 100 } });
-      else await api("/finance/deposit-policies", { method: "PUT", body: { careCategory, depositRate: pending.value / 100 } });
+      // P0-4: every revision states its bounds; an empty field is no bound, never "keep the old one".
+      else await api("/finance/deposit-policies", { method: "PUT", body: { careCategory, depositRate: pending.value / 100, minimumUsd: pending.minimumUsd ?? null, maximumUsd: pending.maximumUsd ?? null } });
       pending.form.reset(); setPending(null); setNotice(ar ? "حُفظ إصدار جديد." : "New version saved."); await load();
     } catch (e) { setSaveError(e); } finally { setBusy(false); }
   };
@@ -71,7 +73,11 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   if (margins === null) return shell(<p role="status">{ar ? "جارٍ تحميل السياسات…" : "Loading policies…"}</p>);
   if (loadError) return shell(<ErrorNotice error={loadError} locale={locale} action="load" onRetry={() => void load()} />);
   const areaSelect = <Field label={ar ? "مجال الرعاية" : "Care area"}><select name="area"><option value="">{area()}</option>{careAreas.map((a) => <option key={a.slug} value={a.slug}>{ar ? a.nameAr : a.nameEn}</option>)}</select></Field>;
-  const stage = (kind: Pending["kind"]) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const d = new FormData(e.currentTarget); setPending({ kind, area: String(d.get("area") || ""), value: Number(d.get("rate")) || 0, form: e.currentTarget }); };
+  const usd = (raw: FormDataEntryValue | null) => { const text = String(raw ?? "").trim(); return text === "" ? null : Number(text); };
+  const stage = (kind: Pending["kind"]) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const d = new FormData(e.currentTarget); setPending({ kind, area: String(d.get("area") || ""), value: Number(d.get("rate")) || 0, form: e.currentTarget, ...(kind === "deposit" ? { minimumUsd: usd(d.get("minimumUsd")), maximumUsd: usd(d.get("maximumUsd")) } : {}) }); };
+  const bounds = (min?: number | null, max?: number | null) => min == null && max == null ? (ar ? "بلا حد أدنى أو أقصى" : "No minimum or maximum")
+    : `${min != null ? `${ar ? "الحد الأدنى" : "Minimum"} ${min} USD` : ""}${min != null && max != null ? " · " : ""}${max != null ? `${ar ? "الحد الأقصى" : "Maximum"} ${max} USD` : ""}`;
+  const currentDefault = deposits.find((p) => p.active && !p.careCategory);
   return shell(<>
     <p className="cc-internal" role="note"><strong>{ar ? "داخلي فقط." : "Internal only."}</strong> {ar ? "لا يظهر الهامش أبدًا للمرضى أو الأطباء أو الجهات الطبية؛ يرى المريض سعر الباقة الشامل ودفعة التنسيق فقط." : "The margin is never shown to patients, clinicians or provider organizations; patients see only the inclusive package price and the coordination deposit."}</p>
     <SuccessNotice>{notice || null}</SuccessNotice>
@@ -85,16 +91,18 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
       </form>}
     </Section>
     <Section id="deposit" title={ar ? "سياسة دفعة التنسيق" : "Coordination deposit policy"} description={ar ? "نسبة من الإجمالي المتوقَّع في التقدير المبدئي، تُطلب عندما يُقرّ المريض بالتقدير، وتُحوَّل بسعر الصرف المجمَّد فيه." : "A share of the preliminary estimate's expected total, requested when the patient acknowledges the estimate and converted at its frozen exchange rate."}>
-      <ul className="cc-list">{deposits.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.depositRate * 100).toFixed(2)}%</bdi></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
+      <ul className="cc-list">{deposits.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.depositRate * 100).toFixed(2)}%</bdi> <span className="cc-meta"><bdi dir="ltr">{bounds(p.minimumUsd, p.maximumUsd)}</bdi></span></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
       {canEdit && <form className="cc-filterbar" onSubmit={stage("deposit")} aria-label={ar ? "إصدار جديد من سياسة دفعة التنسيق" : "New coordination deposit policy version"}>
         {areaSelect}
         <Field label={ar ? "دفعة التنسيق (% من التقدير)" : "Coordination deposit (% of the estimate)"}><input name="rate" type="number" min="0" max="100" step="0.01" required dir="ltr" /></Field>
+        <Field label={ar ? "الحد الأدنى (دولار أمريكي)" : "Minimum (USD)"}><input name="minimumUsd" type="number" min="0" step="1" dir="ltr" defaultValue={currentDefault?.minimumUsd ?? 200} /></Field>
+        <Field label={ar ? "الحد الأقصى (دولار أمريكي)" : "Maximum (USD)"}><input name="maximumUsd" type="number" min="1" step="1" dir="ltr" defaultValue={currentDefault?.maximumUsd ?? 1500} /></Field>
         <button disabled={busy}>{ar ? "مراجعة الإصدار الجديد" : "Review new version"}</button>
       </form>}
     </Section>
     {pending && <FocusTrapDialog label={ar ? "تأكيد الإصدار الجديد" : "Confirm new version"} onClose={busy ? () => undefined : () => setPending(null)}>
       <h2>{pending.kind === "margin" ? (ar ? "حفظ إصدار جديد من الهامش؟" : "Save a new margin version?") : (ar ? "حفظ إصدار جديد من دفعة التنسيق؟" : "Save a new coordination deposit version?")}</h2>
-      <p><strong>{area(pending.area || undefined)}</strong> · <bdi dir="ltr">{pending.value.toFixed(2)}%</bdi>{pending.kind === "deposit" ? (ar ? " من التقدير" : " of the estimate") : null}</p>
+      <p><strong>{area(pending.area || undefined)}</strong> · <bdi dir="ltr">{pending.value.toFixed(2)}%</bdi>{pending.kind === "deposit" ? (ar ? " من التقدير" : " of the estimate") : null}{pending.kind === "deposit" && <> · <bdi dir="ltr">{bounds(pending.minimumUsd, pending.maximumUsd)}</bdi></>}</p>
       <ul className="cc-consequences">
         <li>{ar ? "يحل محل الإصدار الحالي لمجال الرعاية هذا فورًا." : "It replaces the current version for this care area immediately."}</li>
         <li>{pending.kind === "margin"

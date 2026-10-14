@@ -164,9 +164,11 @@ class JourneyServiceIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT decision FROM proposal_decisions WHERE proposal_version_id=?",String.class,proposal.versionId())).isEqualTo("ACKNOWLEDGED");
         var deposit=payment.depositForCase(created.caseId());
         assertThat(deposit).isNotNull();
-        // W-1 (owner, 2026-10-14): the deposit is 15% of the estimate the patient acknowledged.
+        // W-1 + P0-4 (owner, 2026-10-14): 15% of the estimate the patient acknowledged, rounded up to the next EGP 100
+        // (this fixture has no USD rate, so the dollar bounds do not apply: 603.75 -> 700).
         BigDecimal estimate=jdbc.queryForObject("SELECT patient_total_expected_egp FROM proposal_versions WHERE id=?",BigDecimal.class,proposal.versionId());
-        assertThat(deposit.totalEgp()).isEqualByComparingTo(estimate.multiply(new BigDecimal("0.15")).setScale(2,java.math.RoundingMode.HALF_UP));
+        BigDecimal share=estimate.multiply(new BigDecimal("0.15"));
+        assertThat(deposit.totalEgp()).isEqualByComparingTo(share.divide(new BigDecimal("100"),0,java.math.RoundingMode.CEILING).multiply(new BigDecimal("100")));
         BigDecimal due=deposit.totalEgp();
         assertThat(deposit.status()).isEqualTo("REQUESTED");
         // DEP-3: without the patient's transfer reference there is nothing for Finance to confirm.
@@ -202,6 +204,12 @@ class JourneyServiceIntegrationTest {
         assertThat(catchThrowableOfType(()->payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("1.50"))),com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("DEPOSIT_RATE_INVALID");
         payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("0.20")));
         var current=payment.configurePolicy(new DepositPolicyRequest("Cardiology deposit","cardiology",new BigDecimal("0.25")));
+        // P0-4: the dollar bounds are part of each revision, validated and kept as set.
+        assertThat(catchThrowableOfType(()->payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("0.15"),new BigDecimal("1600"),new BigDecimal("1500"))),com.rehletshifaa.shared.api.ApiException.class).code()).isEqualTo("DEPOSIT_BOUNDS_INVALID");
+        var bounded=payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("0.15"),new BigDecimal("200"),new BigDecimal("1500")));
+        assertThat(bounded.minimumUsd()).isEqualByComparingTo("200");
+        assertThat(bounded.maximumUsd()).isEqualByComparingTo("1500");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='DEPOSIT_POLICY_CONFIGURED' AND reason='rate=0.15; minUsd=200; maxUsd=1500'",Integer.class)).isEqualTo(1);
         // QA #22: a policy can be set for every managed care area, and only for one.
         assertThat(commercialPolicies.careAreas()).extracting(CareCategoryView::slug)
                 .hasSize(jdbc.queryForObject("SELECT count(*) FROM care_categories",Integer.class)).contains("cardiology","womens-health","general-surgery");

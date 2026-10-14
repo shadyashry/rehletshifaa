@@ -65,6 +65,14 @@ public class DepositTransferService {
     public DepositView submitReference(UUID caseId, TransferReferenceRequest request) {
         Actor actor = authority.authorize(Permission.DEPOSIT_TRANSFER_REPORT, Resource.ofCase(caseId));
         String reference = normalize(request.reference());
+        // P0-4 corridor rail: cash through an agent is proven by the agent's receipt number and name, verified by Finance
+        // exactly like a bank reference. Card is not a reported method: it settles through the payment adapter.
+        String method = request.method() == null || request.method().isBlank() ? "BANK_TRANSFER" : request.method().trim();
+        if (!METHODS.contains(method)) throw new ApiException(400, "PAYMENT_METHOD_INVALID", "Choose bank transfer or cash through an agent");
+        String agent = request.agentName() == null ? null : request.agentName().trim().replaceAll("\\s+", " ");
+        if ("AGENT_CASH".equals(method) && (agent == null || agent.isEmpty()))
+            throw new ApiException(400, "AGENT_NAME_REQUIRED", "Enter the name of the agent you paid");
+        if (!"AGENT_CASH".equals(method)) agent = null;
         cases.lockById(caseId);
         cases.touch(caseId, micros(clock.instant())); // QA W-22
         DepositRepository.Quoted deposit = payableDeposit(caseId);
@@ -81,8 +89,8 @@ public class DepositTransferService {
         if (transfers.existsByTransferReferenceAndStatusInAndDepositIdNot(reference, java.util.List.of("SUBMITTED", "CONFIRMED"), deposit.getId()))
             throw new ApiException(409, "TRANSFER_REFERENCE_IN_USE", "This reference is already recorded for another payment. Check it, or contact your coordinator.");
         UUID id = UUID.randomUUID();
-        transfers.saveAndFlush(new DepositTransferReport(id, caseId, deposit.getId(), reference, actor.subject(), clock.instant()));
-        audit(actor, caseId, "DEPOSIT_TRANSFER_REPORTED", id, "method=BANK_TRANSFER");
+        transfers.saveAndFlush(new DepositTransferReport(id, caseId, deposit.getId(), method, agent, reference, actor.subject(), clock.instant()));
+        audit(actor, caseId, "DEPOSIT_TRANSFER_REPORTED", id, "method=" + method);
         events.publishEvent(new CaseEvents.TransferReported(caseId));
         return queries.depositForCase(caseId);
     }
@@ -146,6 +154,9 @@ public class DepositTransferService {
     }
 
     /** As the bank shows it: trimmed, single spaces, Arabic-Indic digits as 0-9, upper case (banks match without case). */
+    /** Proofs of payment a patient can report (P0-4); the CHECK constraint on the table mirrors this list. */
+    static final java.util.Set<String> METHODS = java.util.Set.of("BANK_TRANSFER", "AGENT_CASH");
+
     static String normalize(String raw) {
         if (raw == null) throw invalid();
         StringBuilder out = new StringBuilder();

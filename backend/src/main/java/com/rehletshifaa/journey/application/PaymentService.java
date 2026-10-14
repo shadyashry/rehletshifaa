@@ -58,10 +58,14 @@ public class PaymentService {
     private final DepositTransferReportRepository transfers;
     private final com.rehletshifaa.casemanagement.application.CareAreas careAreas;
 
+    private final DepositCalculator calculator;
+
     public PaymentService(DepositQueryService queries, Authority authority, Clock clock, ApplicationEventPublisher events, AuditTrail auditTrail,
                           DepositRepository deposits, DepositComponentRepository depositComponents, CoordinationDepositPolicyRepository depositPolicies,
                           PaymentEventRepository paymentEvents, MedicalCaseRepository cases, ProposalVersionRepository proposalVersions,
-                          DepositTransferReportRepository transfers, com.rehletshifaa.casemanagement.application.CareAreas careAreas) {
+                          DepositTransferReportRepository transfers, com.rehletshifaa.casemanagement.application.CareAreas careAreas,
+                          DepositCalculator calculator) {
+        this.calculator = calculator;
         this.queries = queries; this.paymentEvents = paymentEvents; this.depositPolicies = depositPolicies; this.depositComponents = depositComponents;
         this.deposits = deposits; this.auditTrail = auditTrail; this.cases = cases; this.proposalVersions = proposalVersions;
         this.authority = authority; this.clock = clock; this.events = events; this.transfers = transfers; this.careAreas = careAreas;
@@ -85,20 +89,20 @@ public class PaymentService {
         if (fx.getFxRate() == null && !"EGP".equals(fx.getCurrency()))
             throw new ApiException(409, "PROPOSAL_FX_SNAPSHOT_MISSING", "The accepted proposal has no exchange-rate snapshot");
         BigDecimal rate = fx.getFxRate() == null ? BigDecimal.ONE : fx.getFxRate();
-        // W-1 (owner, 2026-10-14): the deposit is the policy's share (15%) of the estimate the patient acknowledged.
-        BigDecimal totalEgp = policy.of(fx.getPatientTotalExpectedEgp());
+        // W-1 + P0-4 (owner, 2026-10-14): the policy's share (15%) of the estimate the patient acknowledged, within its
+        // dollar bounds, never above the medical total, rounded up in the patient's currency (DepositCalculator).
+        DepositCalculator.Amount amount = calculator.quote(policy, fx.getPatientTotalExpectedEgp(), fx.getCurrency(), rate, fx.getFxRateDate());
+        BigDecimal totalEgp = amount.egp();
         if (totalEgp.signum() <= 0) return;
-        BigDecimal totalDisplay = DepositQueryService.display(totalEgp, rate);
+        BigDecimal totalDisplay = amount.display();
         UUID depositId = UUID.randomUUID(); java.time.Instant now = clock.instant();
         deposits.saveAndFlush(new Deposit(depositId, caseId, versionId, new Deposit.Quote(fx.getCurrency(), rate, fx.getFxRateDate(), fx.getFxSource(), totalEgp, totalDisplay), policy.id(), policy.version(), "SYSTEM", now));
         // Raising the deposit is not the end of the story: with an offline process a person has to arrange
         // it, so the case gains real staff work rather than sitting silently waiting for money to appear.
         events.publishEvent(new CaseEvents.DepositRequired(caseId));
-        // Pre-8C copy decisions (F2): the refund class is left as it was because conditional refund eligibility has no
-        // truthful value in the current model and its enforceability awaits a legal decision. The terms text only
-        // points to the terms the patient is shown; it no longer claims a refund window tied to coordination starting,
-        // which payment of this deposit itself triggers. Existing rows keep the text they were created with.
-        depositComponents.saveAndFlush(new DepositComponent(depositId, "PLATFORM", "Case coordination initiation", totalEgp, "NON_REFUNDABLE", DEPOSIT_TERMS_REFERENCE, true));
+        // Owner refund decision 2026-10-14 (P0-4): the deposit is refundable, fully until 10 days before the first confirmed
+        // appointment and always when we, the hospital or the Consultant cancel; it counts towards the final bill (credited).
+        depositComponents.saveAndFlush(new DepositComponent(depositId, "PLATFORM", "Case coordination initiation", totalEgp, "REFUNDABLE", DEPOSIT_TERMS_REFERENCE, true));
         appendEvent(caseId, depositId, "DEPOSIT_REQUESTED", totalEgp, totalDisplay, fx.getCurrency(), null, "OFFLINE", null, "REQUESTED", "SYSTEM", null, "deposit-req:" + depositId);
     }
 
@@ -205,19 +209,37 @@ public class PaymentService {
         var actor = authority.authorize(Permission.COMMERCIAL_POLICY_MANAGE);
         if (request.depositRate() == null || request.depositRate().signum() < 0 || request.depositRate().compareTo(BigDecimal.ONE) > 0)
             throw new ApiException(400, "DEPOSIT_RATE_INVALID", "The deposit rate must be between 0% and 100%");
+        if (request.minimumUsd() != null && request.minimumUsd().signum() < 0 || request.maximumUsd() != null && request.maximumUsd().signum() <= 0)
+            throw new ApiException(400, "DEPOSIT_BOUNDS_INVALID", "The minimum must not be negative and the maximum must be above zero");
+        if (request.minimumUsd() != null && request.maximumUsd() != null && request.minimumUsd().compareTo(request.maximumUsd()) > 0)
+            throw new ApiException(400, "DEPOSIT_BOUNDS_INVALID", "The minimum must not be above the maximum");
         String careCategory = request.careCategory() == null || request.careCategory().isBlank() ? null : request.careCategory().trim();
         // QA #22: any managed care area, never a misspelt one that no case would ever match.
         if (careCategory != null && !careAreas.exists(careCategory)) throw new ApiException(400, "CARE_AREA_UNKNOWN", "This care area does not exist");
         int prev = (careCategory == null ? depositPolicies.findLatestDefaultVersion() : depositPolicies.findLatestVersionFor(careCategory)).orElse(0);
         if (careCategory == null) depositPolicies.retireDefault(); else depositPolicies.retireFor(careCategory);
         UUID id = UUID.randomUUID();
-        depositPolicies.saveAndFlush(new CoordinationDepositPolicy(id, request.name() == null || request.name().isBlank() ? "Coordination-initiation deposit" : request.name().trim(), careCategory, request.depositRate(), prev + 1, actor.subject(), LocalDate.now(clock), clock.instant()));
-        audit(actor, null, "DEPOSIT_POLICY_CONFIGURED", id, "rate=" + request.depositRate());
+        depositPolicies.saveAndFlush(new CoordinationDepositPolicy(id, request.name() == null || request.name().isBlank() ? "Coordination-initiation deposit" : request.name().trim(), careCategory, request.depositRate(), request.minimumUsd(), request.maximumUsd(), prev + 1, actor.subject(), LocalDate.now(clock), clock.instant()));
+        audit(actor, null, "DEPOSIT_POLICY_CONFIGURED", id, "rate=" + request.depositRate() + "; minUsd=" + request.minimumUsd() + "; maxUsd=" + request.maximumUsd());
         return queries.policy(id);
     }
 
     /** The coordination deposit that will be due on acknowledgement (existing deposit total, else the active policy amount). */
     public BigDecimal anticipatedCoordinationDepositEgp(UUID caseId) { return queries.standing(caseId).anticipatedEgp(); }
+
+    /**
+     * The deposit a proposal version shows as due, in its own currency: the live deposit when one exists in that currency,
+     * else the calculator's amount on this version's own total and snapshot, so the patient reads the exact figure that
+     * acknowledging will request.
+     */
+    public BigDecimal depositDueDisplay(UUID caseId, UUID versionId) {
+        var standing = queries.standing(caseId);
+        var fx = proposalVersions.findFxSnapshot(versionId).orElse(null);
+        // A deposit already raised (or waived) is its own figure; none due is zero; otherwise this version's quote.
+        if (fx == null || !"REQUIRED".equals(standing.status())) return standing.anticipatedDisplay();
+        var policy = queries.activePolicyFor(cases.findCareCategory(caseId).orElse(null));
+        return calculator.quote(policy, fx.getPatientTotalExpectedEgp(), fx.getCurrency(), fx.getFxRate(), fx.getFxRateDate()).display();
+    }
 
     /** Net amount recorded as paid on the case's latest deposit, in EGP (paid minus refunded). */
     public BigDecimal netPaidEgp(UUID caseId) { return queries.netPaidEgp(caseId); }

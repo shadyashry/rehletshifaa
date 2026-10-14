@@ -115,10 +115,12 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
 
     /** The expected patient total (EGP) of the case's latest preliminary estimate: what the deposit is a share of (W-1). */
     @Query("""
-            select v.patientTotalExpectedEgp from ProposalVersion v join Proposal p on p.id = v.proposalId
+            select v.currency as currency, v.fxRate as fxRate, v.fxRateDate as fxRateDate, v.fxSource as fxSource,
+                v.patientTotalExpectedEgp as patientTotalExpectedEgp
+            from ProposalVersion v join Proposal p on p.id = v.proposalId
             where p.caseId = :caseId and v.documentType = 'PRELIMINARY_ESTIMATE' and v.patientTotalExpectedEgp is not null
             order by v.versionNumber desc""")
-    List<BigDecimal> findLatestEstimateTotal(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+    List<FxSnapshot> findLatestEstimate(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
 
     /** The case's versions, latest first (pass {@code Limit.of(1)} for the current one). */
     @Query("select v.id from ProposalVersion v join Proposal p on p.id = v.proposalId where p.caseId = :caseId order by v.versionNumber desc")

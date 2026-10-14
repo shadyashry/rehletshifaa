@@ -302,6 +302,27 @@ class CoordinatorCaseActionsTest {
         assertThat(catchThrowableOfType(() -> journey.workspace(ctx.caseId), ApiException.class).code()).isEqualTo("OUT_OF_SCOPE");
     }
 
+    /** P0-4 corridor rail: cash through an agent is proven by the agent's receipt and name, and Finance verifies it like a bank reference. */
+    @Test void cashPaidThroughAnAgentIsReportedWithTheAgentAndVerifiedByFinance() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        authenticate(patientSubject(ctx.caseId), Role.PATIENT);
+        assertThat(catchThrowableOfType(() -> transfers.submitReference(ctx.caseId, new TransferReferenceRequest("AG-1", "AGENT_CASH", "  ")), ApiException.class).code())
+                .isEqualTo("AGENT_NAME_REQUIRED");
+        assertThat(catchThrowableOfType(() -> transfers.submitReference(ctx.caseId, new TransferReferenceRequest("AG-1", "CARD", null)), ApiException.class).code())
+                .isEqualTo("PAYMENT_METHOD_INVALID");
+        DepositView reported = transfers.submitReference(ctx.caseId, new TransferReferenceRequest("AG-7731", "AGENT_CASH", "  Al Noor   Exchange, Benghazi "));
+        em.flush(); SecurityContextHolder.clearContext();
+        assertThat(reported.transfer().method()).isEqualTo("AGENT_CASH");
+        assertThat(reported.transfer().agentName()).isEqualTo("Al Noor Exchange, Benghazi");
+        assertThat(count("SELECT count(*) FROM audit_events WHERE event_type='DEPOSIT_TRANSFER_REPORTED' AND case_id=? AND reason='method=AGENT_CASH'", ctx.caseId)).isEqualTo(1);
+        // Finance verifies it like any proof of payment: the deposit settles and the journey continues.
+        settleDeposit(ctx); em.flush();
+        assertThat(jdbc.queryForObject("SELECT status FROM deposits WHERE case_id=?", String.class, ctx.caseId)).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT method FROM payment_events WHERE deposit_id=(SELECT id FROM deposits WHERE case_id=?) AND event_type='PAYMENT_RECORDED'", String.class, ctx.caseId))
+                .isEqualTo("AGENT_CASH");
+    }
+
     @Test void aPartPaymentReturnsTheBalanceToThePatientAndTheFinanceItemFollowsTheAssignedFinancePerson() throws Exception {
         var ctx = acknowledged();
         activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);

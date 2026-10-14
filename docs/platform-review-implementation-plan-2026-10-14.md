@@ -177,6 +177,49 @@ phases.
 - **Tests:** readiness with commitment only; travel confirm refused without treatment deposit; ledger recompute per
   component; waiver per component.
 - **Sessions:** 2. **Model:** Fable 5.1, high.
+- **Owner decisions (2026-10-14, in chat):** keep ONE deposit; no commitment fee and no second payment. Reasons: the
+  platform arranges travel only on some cases, so "at travel confirmation" is not a moment every case has, and a split
+  adds a second due date and a second Finance check. The deposit stays 15% of the patient's medical total (marked-up
+  Consultant lines, travel excluded), now at least USD 200 and at most USD 1,500 (Claude's recommended values, accepted:
+  "use your numbers"), never above the medical total, rounded up to the next 10 (USD/EUR/...) or 100 (EGP), and it
+  counts towards the final bill. Rails: bank transfer as before, plus cash through an agent now; card later through the
+  provider-agnostic adapter once a provider is signed. Revisit a split only if acceptances stall at the deposit.
+- **Status (2026-10-14, branch `feat/review-p0`):** delivered as re-scoped above (Opus 5.5; the plan named Fable 5.1).
+  - Delivered: `V89__deposit_bounds_and_agent_cash.sql` (the P0-5 file names shift by one): `deposit_policies.minimum_usd`
+    and `maximum_usd` (CHECKs, existing policies set to 200 / 1,500); `deposit_transfer_reports.method` gains `AGENT_CASH`
+    with `agent_name` (CHECK: agent name exactly when agent cash); existing PLATFORM components relabelled REFUNDABLE.
+    New `DepositCalculator` is the one amount rule, used for the deposit itself (`PaymentService.createDepositForAcknowledgement`),
+    the anticipated amount before it exists (`DepositQueryService.standing`, now in the estimate's currency; the patient
+    summary no longer shows an EGP figure under it) and the proposal's "deposit due" line (`PaymentService.depositDueDisplay`
+    on the viewed version's own snapshot, replacing an EGP-to-display re-conversion). Bounds are USD converted at the
+    proposal's FX date (`CurrencyService.effectiveRate("USD", date)`; a missing USD rate applies the share unbounded and
+    logs `DEPOSIT_BOUNDS_FX_UNAVAILABLE` rather than blocking the acceptance). The EGP ledger amount is derived from the
+    rounded display amount, so patient and Finance read one figure. `configurePolicy` takes and validates
+    `minimumUsd`/`maximumUsd` (`DEPOSIT_BOUNDS_INVALID`; audit carries both). New deposits are REFUNDABLE (owner refund
+    rule) and remain credited to the final bill. Agent cash: `TransferReferenceRequest(reference, method, agentName)`,
+    `PAYMENT_METHOD_INVALID` / `AGENT_NAME_REQUIRED`, same maker/checker verification by Finance; ledger method AGENT_CASH.
+    Frontend: `PatientDepositPayment` third option "Cash through an agent" (agent name + receipt number, the payment
+    reference to give the agent, no bank details), Finance `TransferPanel` shows the method and agent,
+    `MarginDeposit` (Control Center) shows and sends the bounds with every revision (prefilled, so saving a rate never
+    drops them; an emptied field means no bound). EN/AR copy by the mechanical-worker subagent.
+  - Tests: new `DepositCalculatorTest` (the worked examples 800 / 3,000 / 8,000 / 20,000 USD -> 200 / 450 / 1,200 /
+    1,500; rounding USD and EGP; never above the total, also after rounding; EUR and EGP proposals use dollar bounds;
+    unbounded without a rate); `CoordinatorCaseActionsTest.cashPaidThroughAnAgentIsReportedWithTheAgentAndVerifiedByFinance`;
+    `JourneyServiceIntegrationTest` bounds validation + audit, and the deposit now rounded up to EGP 100;
+    `PostActivationLandingTest` (USD rounding, ledger from the rounded figure); `PatientActivationJourneyTest` deposit
+    REFUNDABLE; frontend `PatientDepositPayment.test.tsx` (agent path, mandatory agent, Arabic) and
+    `PageHeaders.test.tsx` (bounds shown, sent, emptied bound sent as null). Verification: `mvn -o -q test` 775 tests,
+    0 failures, 3 pre-existing skips; `pnpm typecheck` clean; eslint clean on touched files; touched vitest files green;
+    `PostgresJpaMappingTest` on postgres:17 green with V89 applied (bounds 200.00 / 1500.00).
+  - Open gaps: no vetted agent list yet (free-text agent name until the partner entity in P1-12; coordinators tell the
+    patient which agent to use). Card stays disabled until a provider is chosen (DEP-2 adapter). The patient-facing
+    refund wording is unchanged: the refund rule is decided, but the legal review of the refund copy (F2) is still open,
+    so only the stored class changed. Many fixtures have no USD rate, so integration tests mostly exercise the
+    unbounded path; the bounds are pinned by the unit test and the USD fixture in `PostActivationLandingTest`. A case
+    whose medical total is below USD 200 pays its whole medical total as the deposit, by design.
+  - Next exact action: P0-5 session 1 (facility entity and package catalogue) in a new session from its prompt block,
+    Fable 5.1 high, taking V90, after fast-forwarding `feat/review-p0` to this commit and rebuilding the dev stack so
+    V88 and V89 run.
 
 ### P0-5  Facility entity and package catalogue  (B-02, A-07)
 - **Scope:** `facilities` (name, city, accreditation records with expiry, settlement terms, contact) and

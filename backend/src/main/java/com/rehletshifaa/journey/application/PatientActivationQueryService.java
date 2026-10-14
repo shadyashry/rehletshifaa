@@ -112,9 +112,10 @@ public class PatientActivationQueryService {
         boolean satisfied = standing.satisfied();
         String status = standing.status();
         if (view == null) {
-            BigDecimal anticipated = standing.anticipatedEgp();
+            // P0-4: the amount the calculator will request, in the estimate's own currency (not an EGP figure).
+            BigDecimal anticipated = standing.anticipatedDisplay() == null ? BigDecimal.ZERO : standing.anticipatedDisplay();
             boolean required = anticipated.signum() > 0;
-            return new DepositSummary(required, status, "EGP", required ? anticipated : BigDecimal.ZERO, BigDecimal.ZERO,
+            return new DepositSummary(required, status, standing.currency() == null ? "EGP" : standing.currency(), required ? anticipated : BigDecimal.ZERO, BigDecimal.ZERO,
                     required ? anticipated : BigDecimal.ZERO, satisfied);
         }
         boolean required = !satisfied && view.totalDisplay() != null && view.totalDisplay().signum() > 0;

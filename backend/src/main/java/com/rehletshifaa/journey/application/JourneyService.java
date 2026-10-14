@@ -572,7 +572,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         BigDecimal fx=m.getFxRate()==null?BigDecimal.ONE:m.getFxRate();java.util.function.Function<BigDecimal,BigDecimal> conv=egp->egp==null?null:egp.multiply(fx).setScale(2,java.math.RoundingMode.HALF_UP);
         boolean decided=!Set.of("RELEASED","VIEWED").contains(view.status());String decisionState=decided?view.status():null;
         boolean isFinal="FINAL_TREATMENT_QUOTE".equals(m.getDocumentType());
-        BigDecimal depositDueDisplay=isFinal?null:conv.apply(payment.anticipatedCoordinationDepositEgp(share.caseId()));
+        BigDecimal depositDueDisplay=isFinal?null:payment.depositDueDisplay(share.caseId(),share.versionId());
         BigDecimal depositPaidDisplay=isFinal?conv.apply(payment.netPaidEgp(share.caseId())):null;
         var totals=proposalQueries.displayTotals(share.versionId(),fx); // QA #12: the totals are the sum of the lines shown
         return new PublicProposalView(m.getCaseNumber(),m.getPatientName(),m.getDocumentType(),m.getVersionNumber(),m.getCurrency(),view.items(),totals.min(),totals.expected(),totals.max(),m.getAssumptions(),m.getIncludedServices(),m.getExcludedServices(),m.getScopeChangeReason(),m.getPaymentTerms(),m.getRefundTerms(),m.getDisclaimers(),m.getValidUntil(),decided,decisionState,m.getRecommendedTreatment(),m.getRisksAndLimitations(),view.coordinatorNotes(),depositDueDisplay,depositPaidDisplay,m.getConsultantName(),m.getFxRateDate(),proposalQueries.assistance(share.versionId()));}

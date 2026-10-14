@@ -469,7 +469,7 @@ function TransferPanel({locale,deposit,caseId,isFinance,busy,mutate,tx,amountLab
  const transfer=deposit.transfer;const pending=transfer?.status==="SUBMITTED";
  return <section aria-label={tx.title} className="mt-4 border-t border-line pt-3">
   <h5 className="text-[0.875rem] font-bold text-ink-800">{tx.title}</h5>
-  {pending&&transfer?<p className="mt-1 text-sm text-ink-700">{tx.reference}: <bdi dir="ltr" translate="no" className="select-all break-all font-semibold text-ink-900">{transfer.reference}</bdi> <span className="text-ink-500">· {tx.sent} <bdi dir="ltr">{new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(transfer.submittedAt))}</bdi></span></p>
+  {pending&&transfer?<p className="mt-1 text-sm text-ink-700">{transfer.method&&<span className="me-2 font-semibold text-ink-800">{tx.method[transfer.method as keyof typeof tx.method]??transfer.method} ·</span>}{transfer.agentName&&<>{tx.agent}: <bdi dir="auto" className="font-semibold text-ink-900">{transfer.agentName}</bdi> · </>}{tx.reference}: <bdi dir="ltr" translate="no" className="select-all break-all font-semibold text-ink-900">{transfer.reference}</bdi> <span className="text-ink-500">· {tx.sent} <bdi dir="ltr">{new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(transfer.submittedAt))}</bdi></span></p>
    :<p className="mt-1 text-sm text-ink-600">{tx.waiting}</p>}
   {!pending&&transfer?.status==="REJECTED"&&<p className="mt-1 text-sm text-alert-700">{tx.rejectedLast.replace("{reason}",transfer.reason??"")}</p>}
   {isFinance&&pending&&transfer&&<>

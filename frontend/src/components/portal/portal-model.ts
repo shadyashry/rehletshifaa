@@ -49,7 +49,7 @@ export type DepositComponentT={beneficiary:string;purpose:string;amountEgp:numbe
 export type PaymentEvent={eventType:string;amountDisplay?:number;currency?:string;method?:string;provider?:string;providerReference?:string;status:string;reason?:string;occurredAt?:string};
 
 /** DEP-3: {@code transfer} is the latest bank-transfer reference the patient entered; {@code bankTransfer} the platform account to pay into. */
-export type TransferReport={id:string;method:string;reference:string;status:"SUBMITTED"|"CONFIRMED"|"REJECTED"|string;submittedAt:string;decidedAt?:string|null;reason?:string|null;version:number};
+export type TransferReport={id:string;method:string;reference:string;status:"SUBMITTED"|"CONFIRMED"|"REJECTED"|string;submittedAt:string;decidedAt?:string|null;reason?:string|null;version:number;/** P0-4: the agent a cash payment went through. */agentName?:string|null};
 export type BankTransfer={accountName:string;bankName:string;accountNumber:string;iban:string;swift:string;paymentReference:string};
 export type DepositView={id:string;status:string;currency:string;totalEgp:number;totalDisplay?:number;paidDisplay?:number;balanceDisplay?:number;components:DepositComponentT[];events:PaymentEvent[];transfer?:TransferReport|null;bankTransfer?:BankTransfer|null;/** EGP paid and still due (QA W-26): what Finance records in. */paidEgp?:number;balanceEgp?:number};
 /** QA #19: the version as Finance approves it (Finance only): each line's price source and EGP base price, the margin and the totals. */

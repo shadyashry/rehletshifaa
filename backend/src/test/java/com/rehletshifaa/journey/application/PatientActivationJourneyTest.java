@@ -288,13 +288,13 @@ class PatientActivationJourneyTest {
                 .isNotEmpty().doesNotContain(PaymentService.DEPOSIT_TERMS_VERSION);
     }
 
-    @Test void aNewDepositNoLongerClaimsARefundWindowAndItsRefundClassIsLeftForTheLegalDecision() throws Exception {
+    @Test void aNewDepositNoLongerClaimsARefundWindowAndIsRefundableUnderTheOwnersRule() throws Exception {
         var ctx = accepted();
         var component = jdbc.queryForMap("SELECT dc.refundability,dc.cancellation_terms FROM deposit_components dc JOIN deposits d ON d.id=dc.deposit_id WHERE d.case_id=?", ctx.caseId);
         assertThat((String) component.get("cancellation_terms")).isEqualTo(PaymentService.DEPOSIT_TERMS_REFERENCE)
                 .doesNotContainIgnoringCase("before case coordination begins").doesNotContainIgnoringCase("refundable in full");
-        // F2 is blocked: no conditional value exists and PARTIALLY_REFUNDABLE would mean a partial amount, so the class is unchanged.
-        assertThat(component.get("refundability")).isEqualTo("NON_REFUNDABLE");
+        // P0-4: the owner decided refunds (fully until 10 days before the first confirmed appointment), so the deposit is refundable.
+        assertThat(component.get("refundability")).isEqualTo("REFUNDABLE");
     }
 
     @Test void readingAHistoricalDepositNeverRewritesItsTerms() throws Exception {

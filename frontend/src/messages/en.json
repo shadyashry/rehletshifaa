@@ -1449,6 +1449,16 @@
         "onlineSoon": "Coming soon — not available yet.",
         "bankTransfer": "Bank transfer",
         "bankTransferHint": "Transfer the amount to our account below.",
+        "agentCash": "Cash through an agent",
+        "agentCashHint": "Pay cash at an agent office and enter the receipt number they give you.",
+        "agentPayTo": "Ask your coordinator which agent to use near you, and give the agent your payment reference: {reference}.",
+        "agentLabel": "Agent’s name and city",
+        "agentHint": "As it is written on your receipt, for example the exchange office and its city.",
+        "agentRequired": "Enter the name of the agent you paid.",
+        "receiptLabel": "Receipt number",
+        "receiptWhat": "The agent gives you a receipt with a number. Enter it here so our finance team can confirm your payment with the agent.",
+        "receiptInvalid": "Enter the receipt number exactly as it is printed: letters and numbers, 4 to 64 characters.",
+        "submitReceipt": "Send receipt number",
         "bankTitle": "Transfer to this account",
         "accountName": "Account name",
         "bankName": "Bank",
@@ -1631,9 +1641,14 @@
       "failed": "The decision was not recorded. Nothing has changed; try again."
     },
     "depositTransfer": {
-      "title": "Patient's bank transfer",
+      "title": "Patient’s payment",
       "waiting": "Waiting for the patient to pay and enter the transfer reference.",
       "reference": "Transfer reference",
+      "agent": "Agent",
+      "method": {
+        "BANK_TRANSFER": "Bank transfer",
+        "AGENT_CASH": "Cash through an agent"
+      },
       "sent": "Sent",
       "rejectedLast": "Last reference not confirmed: {reason}",
       "confirmedLast": "Last reference confirmed.",
