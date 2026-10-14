@@ -49,4 +49,9 @@ public final class FacilityDtos {
                                List<AccreditationView> accreditations, List<PackageView> packages) {}
 
     public record CareAreaView(String slug, String nameEn, String nameAr) {}
+
+    /** The picker view (session 3): approved, in-validity packages with their ranges; no contacts or settlement terms. */
+    public record DirectoryPackage(UUID id, String procedureCode, String name, String careCategory, BigDecimal minEgp, BigDecimal maxEgp, LocalDate validTo) {}
+
+    public record DirectoryFacility(UUID id, String name, String city, String kind, String accreditationStatus, List<DirectoryPackage> packages) {}
 }

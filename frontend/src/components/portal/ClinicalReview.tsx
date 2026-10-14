@@ -6,11 +6,12 @@ import { Clock, FileText } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
+import type { DirectoryFacility } from "@/components/portal/portal-model";
 
 export type CatalogService = { id: string; serviceCode: string; serviceName: string; category?: string; priceEgp: number; active: boolean };
 export type FxRate = { currency: string; rate: number; rateDate: string; source: string };
 export type ReviewDocument = { documentId: string; fileName: string; status: string };
-export type DraftEstimate = { serviceDescription: string; estimatedCost: number; currency: string; catalogServiceId?: string | null };
+export type DraftEstimate = { serviceDescription: string; estimatedCost: number; currency: string; catalogServiceId?: string | null; facilityPackageId?: string | null };
 export type ReviewDraft = { id: string; recommendedTreatment?: string | null; risksAndLimitations?: string | null; costEstimates?: DraftEstimate[]; proposalCurrency?: string | null } | null;
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
 
@@ -37,8 +38,8 @@ function money(amount: number, currency: string, locale: Locale) {
  * normal completion — Submit recommendation — which the backend turns into a coordinator handoff by
  * itself; the exceptional outcomes stay behind a single disclosure so they never compete with it.
  */
-export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, documents, draft, viewDoc, downloadDoc, mutate }: {
-  locale: Locale; caseId: string; busy: boolean; catalog: CatalogService[]; fxRates: FxRate[];
+export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, facilities = [], documents, draft, viewDoc, downloadDoc, mutate }: {
+  locale: Locale; caseId: string; busy: boolean; catalog: CatalogService[]; fxRates: FxRate[]; /** P0-5: active facilities with Finance-approved packages. */ facilities?: DirectoryFacility[];
   documents: ReviewDocument[]; draft?: ReviewDraft; viewDoc: (id: string) => void; downloadDoc: (id: string) => void; mutate: Mutate;
 }) {
   const ar = locale === "ar";
@@ -52,6 +53,8 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
   const [considerations, setConsiderations] = useState(draft?.risksAndLimitations ?? "");
   const [selected, setSelected] = useState<Set<string>>(() => seedSelection(draft, catalog));
   const [offList, setOffList] = useState<{ description: string; amountEgp: number }[]>(() => seedOffList(draft));
+  // P0-5: Finance-approved facility packages; the consultant sets the expected figure inside each range.
+  const [packagePicks, setPackagePicks] = useState<Map<string, number>>(() => seedPackages(draft));
   const [proposalCurrency, setProposalCurrency] = useState(draft?.proposalCurrency ?? BASE);
   if (synced !== seedKey) {
     setSynced(seedKey);
@@ -59,6 +62,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
     setConsiderations(draft?.risksAndLimitations ?? "");
     setSelected(seedSelection(draft, catalog));
     setOffList(seedOffList(draft));
+    setPackagePicks(seedPackages(draft));
     setProposalCurrency(draft?.proposalCurrency ?? BASE);
   }
 
@@ -79,24 +83,37 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
   const picks = catalog.filter(service => selected.has(service.id));
   // QA #8: only catalogue lines are "approved"; anything off the list is shown apart, as awaiting Finance.
   const catalogueTotal = picks.reduce((sum, s) => sum + s.priceEgp, 0);
+  // P0-5: packages are approved lines too; the expected figure must stay inside the approved range (the server refuses otherwise).
+  const packages = facilities.flatMap(f => f.packages.map(p => ({ ...p, facilityId: f.id, facilityName: f.name })));
+  const packageLines = packages.filter(p => packagePicks.has(p.id)).map(p => ({ ...p, amountEgp: packagePicks.get(p.id) ?? p.minEgp }));
+  const packageTotal = packageLines.reduce((sum, p) => sum + p.amountEgp, 0);
+  const packagesInRange = packageLines.every(p => p.amountEgp >= p.minEgp && p.amountEgp <= p.maxEgp);
   const offListTotal = offList.reduce((sum, row) => sum + row.amountEgp, 0);
-  const baseTotal = catalogueTotal + offListTotal;
+  const baseTotal = catalogueTotal + packageTotal + offListTotal;
   // QA #12, one rounding rule: each line converted and rounded to the cent, then added — the proposal's own arithmetic.
-  const convertedTotal = [...picks.map(s => s.priceEgp), ...offList.map(row => row.amountEgp)].reduce((sum, egp) => sum + Math.round(egp * rate * 100) / 100, 0);
-  const serviceCount = picks.length + offList.length;
+  const convertedTotal = [...picks.map(s => s.priceEgp), ...packageLines.map(p => p.amountEgp), ...offList.map(row => row.amountEgp)].reduce((sum, egp) => sum + Math.round(egp * rate * 100) / 100, 0);
+  const serviceCount = picks.length + packageLines.length + offList.length;
   const readyDocuments = documents.filter(doc => doc.status === "CLEAN");
-  const canSubmit = recommendation.trim().length > 0 && serviceCount > 0;
+  const canSubmit = recommendation.trim().length > 0 && serviceCount > 0 && packagesInRange;
 
   const toggle = (id: string) => setSelected(current => {
     const next = new Set(current);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+  const togglePackage = (id: string, minEgp: number) => setPackagePicks(current => {
+    const next = new Map(current);
+    if (next.has(id)) next.delete(id); else next.set(id, minEgp);
+    return next;
+  });
+  const setPackageAmount = (id: string, amount: number) => setPackagePicks(current => new Map(current).set(id, amount));
 
   const estimates = () => [
     // Catalogue picks always travel at their approved EGP price. The display currency is a lens, never a
     // value the server should trust — and the server re-reads the catalogue price regardless.
     ...picks.map(s => ({ serviceDescription: s.serviceName, estimatedCost: s.priceEgp, currency: BASE, catalogServiceId: s.id })),
+    // Facility packages (P0-5): the expected EGP figure inside the approved range; the server re-checks the package and the range.
+    ...packageLines.map(p => ({ serviceDescription: `${p.name} — ${p.facilityName}`, estimatedCost: p.amountEgp, currency: BASE, facilityPackageId: p.id })),
     ...offList.map(row => ({ serviceDescription: row.description, estimatedCost: row.amountEgp, currency: BASE })),
   ];
 
@@ -226,6 +243,39 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
               })}
             </ul>}
 
+        {packages.length > 0 && (
+          <div className="mt-4">
+            <h4 className="label-micro text-brand-700">{t.packagesTitle}</h4>
+            <p className="mt-1 text-[0.8rem] leading-6 text-ink-600">{t.packagesHint}</p>
+            <ul className="mt-2 space-y-1">
+              {packages.map(pkg => {
+                const on = packagePicks.has(pkg.id);
+                const amount = packagePicks.get(pkg.id) ?? pkg.minEgp;
+                const inRange = amount >= pkg.minEgp && amount <= pkg.maxEgp;
+                return (
+                  <li key={pkg.id} className={`rounded-lg border p-2.5 transition ${on ? "border-brand-500 bg-brand-50" : "border-line"}`}>
+                    <label className="flex cursor-pointer items-center gap-3">
+                      <input type="checkbox" className="h-4 w-4 flex-none accent-brand-600" checked={on} onChange={() => togglePackage(pkg.id, pkg.minEgp)}/>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[0.9rem] font-semibold text-ink-900">{pkg.name}</span>
+                        <span className="block text-[0.8125rem] text-ink-500">{pkg.facilityName} · <bdi dir="ltr">{pkg.procedureCode}</bdi></span>
+                      </span>
+                      <span className="flex-none whitespace-nowrap text-end text-[0.8125rem] text-ink-600"><bdi dir="ltr">{money(pkg.minEgp, BASE, locale)} – {money(pkg.maxEgp, BASE, locale)}</bdi></span>
+                    </label>
+                    {on && (
+                      <label className="mt-2 block text-[0.8rem] font-bold text-ink-700">{t.packageExpected}
+                        <input className="field mt-1" type="number" min={pkg.minEgp} max={pkg.maxEgp} step="1" value={amount} aria-invalid={!inRange}
+                               onChange={event => setPackageAmount(pkg.id, Number(event.target.value) || 0)}/>
+                        {!inRange && <span className="mt-1 block font-semibold text-alert-700">{t.packageOutOfRange}</span>}
+                      </label>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {offList.length > 0 && (
           <ul className="mt-2 space-y-1">
             {offList.map((row, index) => (
@@ -287,6 +337,12 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, do
             <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.baseEstimate}</dt>
             <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(catalogueTotal, BASE, locale)}</dd>
           </div>
+          {packageTotal > 0 && (
+            <div>
+              <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.packageEstimate}</dt>
+              <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(packageTotal, BASE, locale)}</dd>
+            </div>
+          )}
           {offListTotal > 0 && (
             <>
               <div>
@@ -355,9 +411,13 @@ function seedSelection(draft: ReviewDraft | undefined, catalog: CatalogService[]
   return new Set((draft?.costEstimates ?? []).map(e => e.catalogServiceId).filter((id): id is string => !!id && known.has(id)));
 }
 
+function seedPackages(draft: ReviewDraft | undefined) {
+  return new Map((draft?.costEstimates ?? []).filter(e => !!e.facilityPackageId).map(e => [e.facilityPackageId as string, Number(e.estimatedCost) || 0]));
+}
+
 function seedOffList(draft: ReviewDraft | undefined) {
   return (draft?.costEstimates ?? [])
-    .filter(e => !e.catalogServiceId)
+    .filter(e => !e.catalogServiceId && !e.facilityPackageId)
     .map(e => ({ description: e.serviceDescription, amountEgp: Number(e.estimatedCost) || 0 }));
 }
 
@@ -376,6 +436,8 @@ function copy(ar: boolean) {
     currencyHint: "ستُعدّ التوصية وعرض المريض بهذه العملة.",
     noCatalog: "لا توجد لديك قائمة خدمات معتمدة بعد. أضف خدمة خارج القائمة أدناه (تتطلب موافقة مالية).",
     needsFinance: "تتطلب موافقة مالية",
+    packagesTitle: "باقات المنشآت (معتمدة ماليًا)", packagesHint: "باقات المستشفى وغرفة العمليات والعناية المركزة والمستلزمات التي اعتمدها الفريق المالي. حدّد الرقم المتوقع داخل النطاق؛ يُطلق البند دون موافقة مالية.",
+    packageExpected: "المتوقع (ج.م)", packageOutOfRange: "الرقم خارج النطاق المعتمد", packageEstimate: "باقات المنشآت المعتمدة",
     removeService: "إزالة الخدمة",
     offListToggle: "إضافة خدمة خارج قائمتي المعتمدة",
     offListHint: "أي خدمة خارج قائمتك المعتمدة تتطلب موافقة مالية قبل أن تصل إلى عرض المريض.",
@@ -426,6 +488,8 @@ function copy(ar: boolean) {
     currencyHint: "The recommendation and the patient proposal will be prepared in this currency.",
     noCatalog: "You have no approved service list yet. Add a service outside your list below (it needs Finance approval).",
     needsFinance: "Requires Finance approval",
+    packagesTitle: "Facility packages (Finance-approved)", packagesHint: "Hospital, theatre, ICU and implant packages Finance has approved. Set the expected figure inside the range; the line releases without Finance.",
+    packageExpected: "Expected (EGP)", packageOutOfRange: "Outside the approved range", packageEstimate: "Approved facility packages",
     removeService: "Remove service",
     offListToggle: "Add service outside my approved list",
     offListHint: "Anything outside your approved list needs Finance approval before it can reach the patient proposal.",

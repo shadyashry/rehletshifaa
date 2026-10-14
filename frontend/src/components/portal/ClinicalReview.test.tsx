@@ -129,6 +129,27 @@ describe("ClinicalReviewPanel", () => {
     }));
   });
 
+  it("prices a Finance-approved facility package inside its range as an approved line (P0-5)", () => {
+    const { mutate } = setup({ facilities: [{ id: "f1", name: "Nile Heart Hospital", city: "Cairo", kind: "HOSPITAL", accreditationStatus: "CURRENT",
+      packages: [{ id: "pkg-1", procedureCode: "CABG", name: "Bypass package", careCategory: "cardiology", minEgp: 150000, maxEgp: 200000 }] }] });
+    fireEvent.change(screen.getByLabelText("Clinical recommendation"), { target: { value: "Bypass" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Bypass package/ }));
+    expect(screen.queryByText("Requires Finance approval")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Expected (EGP)"), { target: { value: "180000" } });
+    const summary = (label: string) => screen.getByText(label).nextElementSibling?.textContent;
+    expect(summary("Approved facility packages")).toMatch(/180,000/);
+    fireEvent.click(screen.getByRole("button", { name: "Submit recommendation" }));
+    expect(mutate).toHaveBeenCalledWith("/doctor/cases/case-1/review-decision", expect.objectContaining({
+      costEstimates: [{ serviceDescription: "Bypass package — Nile Heart Hospital", estimatedCost: 180000, currency: "EGP", facilityPackageId: "pkg-1" }],
+    }));
+    // Outside the approved range the line is flagged and the submit is held back, as the server would refuse it.
+    fireEvent.change(screen.getByLabelText("Expected (EGP)"), { target: { value: "250000" } });
+    expect(screen.getByText("Outside the approved range")).toBeTruthy();
+    mutate.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Submit recommendation" }));
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
   it("adds the converted lines, each rounded to the cent, as the proposal does (QA #12)", () => {
     // Two lines of EGP 1,000.25 at 0.02: each is $20.01, so the proposal shows $40.02 — the EGP total converted at once would be $40.01.
     setup({ catalog: [

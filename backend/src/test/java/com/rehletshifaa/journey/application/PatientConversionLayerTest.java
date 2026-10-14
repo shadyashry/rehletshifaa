@@ -374,7 +374,7 @@ class PatientConversionLayerTest {
         var ctx = onboardedCase();
         driveToTravelCoordination(ctx);
         authenticate("operations-subject", Role.OPERATIONS);
-        assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "CONFIRMED")))
+        assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, null, null, "CONFIRMED")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("not ready");
     }
 
@@ -388,7 +388,7 @@ class PatientConversionLayerTest {
         driveToTravelCoordination(ctx);
         authenticate("operations-subject", Role.OPERATIONS);
         assertThat(readiness.compute(ctx.caseId).blockingItems()).extracting(BlockingItem::code).contains("ONBOARDING_NOT_STARTED");
-        assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "CONFIRMED")))
+        assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, null, null, "CONFIRMED")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("start onboarding");
         // CL3: no deposit-only gate — without onboarding evidence the case does not even enter treatment coordination.
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
@@ -516,7 +516,7 @@ class PatientConversionLayerTest {
         raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
                 UUID.randomUUID(), ctx.caseId, "operations-subject", "OPERATIONS", "PRIMARY", "ACTIVE", "Ops", "coordinator-subject", Instant.now(), Instant.now());
         authenticate("operations-subject", Role.OPERATIONS);
-        journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, "Facility", null, "PLANNING"));
+        journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "OK", null, null, null, null, null, null, null, "PLANNING"));
     }
 
     private void seedDoctor() { if (count("SELECT count(*) FROM practitioner_profiles WHERE external_subject=?", "doctor-subject") > 0) return; UUID id = UUID.randomUUID(); raw("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now()); raw("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); }

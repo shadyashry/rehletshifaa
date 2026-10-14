@@ -796,15 +796,20 @@ class CoordinatorCaseActionsTest {
         var ctx = acknowledged();
         seedOperationsAssignment(ctx);
         authenticate("operations-subject", Role.OPERATIONS);
-        journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "Visa pending", "MS123", null, null, null, null, "Cairo Heart Centre", null, "PLANNING"));
+        // P0-5: the destination is a facility record, never free text; an unknown or suspended facility is refused.
+        assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "Visa pending", "MS123", null, null, null, null, UUID.randomUUID(), null, "PLANNING")))
+                .isInstanceOf(ApiException.class).hasMessageContaining("facility");
+        UUID facilityId = facility();
+        journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), null, "Visa pending", "MS123", null, null, null, null, facilityId, null, "PLANNING"));
         em.flush();
+        assertThat(jdbc.queryForObject("SELECT facility_id FROM travel_plans WHERE case_id=?", UUID.class, ctx.caseId)).isEqualTo(facilityId);
         // The draft is saved; the stage is untouched and no transition was written anywhere.
         assertThat(count("SELECT count(*) FROM travel_plans WHERE case_id=?", ctx.caseId)).isEqualTo(1);
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
         assertThat(count("SELECT count(*) FROM case_status_history WHERE case_id=? AND to_status='TRAVEL_COORDINATION'", ctx.caseId)).isZero();
 
         // Recording an arrival is a stage change, and ACCEPTED cannot reach it: refused, and the save rolled back with it.
-        assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), Instant.now(), "Issued", "MS123", null, null, null, null, "Cairo Heart Centre", null, "ARRIVED")))
+        assertThatThrownBy(() -> journey.upsertTravel(ctx.caseId, new TravelPlanRequest(Instant.now().plusSeconds(86400), Instant.now(), "Issued", "MS123", null, null, null, null, facilityId, null, "ARRIVED")))
                 .isInstanceOf(ApiException.class).hasMessageContaining("not allowed");
         assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
     }
@@ -1124,6 +1129,8 @@ class CoordinatorCaseActionsTest {
         return jdbc.queryForObject("SELECT p.external_subject FROM patient_profiles p JOIN medical_cases c ON c.patient_id=p.id WHERE c.id=?", String.class, caseId);
     }
 
+    /** P0-5: an active facility, seeded straight into the table, for travel plans and treatment records. */
+    private UUID facility() { UUID id = UUID.randomUUID(); raw("INSERT INTO facilities(id,name,city,kind,status,accreditation_status,settlement_terms,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)", id, "Cairo Heart Centre " + id, "Cairo", "HOSPITAL", "ACTIVE", "NONE", "NET_30", "test", Instant.now(), "test", Instant.now()); return id; }
     private void authenticate(String subject, Role... roles) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, roles); }
     private String status(UUID caseId) { return jdbc.queryForObject("SELECT status FROM medical_cases WHERE id=?", String.class, caseId); }
     private String payload(String stored) { return stored.startsWith("enc:") ? crypto.decrypt(stored.substring(4)) : stored; }

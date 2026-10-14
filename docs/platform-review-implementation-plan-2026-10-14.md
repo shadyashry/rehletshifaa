@@ -320,6 +320,46 @@ phases.
     session 3 (Fable 5.1, high): facility picker replacing the free-text facility field on the travel plan and treatment
     record (`TravelPlan`, `TreatmentEpisode`, journey/domain), the `ClinicalReview.tsx` line picker for facility packages,
     `FACILITY_READ` for Operations and coordinators where the pickers need it. V92 is the next free Flyway version.
+- **Status (2026-10-14, session 3 of 3, Fable 5.1 high, same session at the owner's "go ahead with session 3"; committed on
+  `claude/elegant-dewdney-e89e74` on top of 8bc5fa9, so the owner fast-forwards `feat/review-p0` again):**
+  - Delivered: `V92__facility_picker_on_travel_and_treatment.sql`: `travel_plans.facility_id` and `treatment_episodes.facility_id`
+    (FK to `facilities`, indexed) replace the free-text `facility` columns, which are dropped (pre-production, nothing
+    migrated). `treatment_episodes.facility_id` stays nullable in the schema for rows older than V92; the service refuses a new
+    episode without one (`FACILITY_REQUIRED`). `TravelPlan.Details` and `TreatmentEpisode.Record` carry `facilityId`;
+    `TravelPlanRequest.facilityId` (optional while planning) and `TreatmentRequest.facilityId` (`@NotNull`) replace the strings;
+    both paths refuse an unknown or suspended facility (`FACILITY_INVALID`, 409) through the new `FacilityDirectory.active`.
+    Picker data: `GET /api/v1/facilities/directory?careArea=` (`FacilityDirectoryController`, new authenticated path in
+    `SecurityConfig`) returns active facilities with their approved, in-validity packages and ranges only (no contacts, no
+    settlement terms), guarded by `REFERENCE_DATA_READ`. Decision, deviating from the plan wording: the directory is reference
+    data every case builder already holds (consultants, coordinators, Operations, managers), so no `FACILITY_READ` grants were
+    added for Operations or coordinators; the full commercial record stays behind `FACILITY_READ` in the Control Center.
+    Frontend: `Portal.tsx` loads the directory for consultants (with their catalogue) and for Operations and passes it through
+    `StaffCaseView` to `CaseWorkflowActions`, where the travel plan and the treatment record now carry a facility select
+    (`name · city`; required on the treatment record; an empty directory says so and points to Consultant Operations), and to
+    `ClinicalReview.tsx`, which gains a "Facility packages (Finance-approved)" section: tick a package, set the expected EGP
+    figure inside its range (out-of-range is flagged and holds the submit), and the line travels as `facilityPackageId` with
+    the consultant's figure; a saved draft re-seeds the picks; totals show "Approved facility packages" apart from the
+    catalogue price and never as "awaiting Finance". EN/AR inline, as the siblings. `DirectoryFacility`/`DirectoryPackage`
+    types in `portal-model.ts`; `operations-gate-live.spec.ts` sends `facilityId: null`.
+  - Tests: new `FacilityDirectoryTest` (2: active facilities with priceable packages only and nothing commercial beyond the
+    range, care-area filter, consultant/coordinator/Operations may read, patient and the full record refused; `active()` for
+    suspended/unknown/null), `CoordinatorCaseActionsTest` travel test now refuses an unknown facility and stores the chosen id
+    (35 green), `JourneyServiceIntegrationTest` (21) and `PatientConversionLayerTest` (31) updated to facility ids,
+    `PasswordOnlySessionCoverageTest` covers the new endpoint, `ArchitectureRulesTest` (22). Frontend: `ClinicalReview.test.tsx`
+    gains the package-line case (approved line, exact body, out-of-range holds the submit), new `CaseWorkflowActions.test.tsx`
+    (2: Operations sends the facility id, the treatment record requires one), `FinanceApproval.test.tsx` (17/17 across the
+    three); every `src/components/portal` test green (24 files, 200 tests). Verification: `mvn -o -q test` 791 tests, 0 failures, 3 pre-existing skips (789 after session 2 + 2 new); `pnpm typecheck` clean;
+    eslint clean on touched files; `PostgresJpaMappingTest` on postgres:17-alpine with V92 applied green (1/1; `travel_plans.facility_id` present, the text column gone).
+  - Open gaps: the final-assessment form (`StaffCaseView` → `/doctor/cases/{id}/final-assessment`) still offers catalogue and
+    manual lines only, so a final quote cannot yet add a facility package line (the backend accepts it). The Finance commercial
+    view and the patient proposal do not name the facility on a package line. Travel plan and treatment episode have no read
+    view in the API (unchanged), so the chosen facility is stored but not yet shown back on the case page. Coordinators do not
+    yet see the directory anywhere (no picker needs it on their screens). `FACILITY_READ` for Operations/coordinators was not
+    granted (see decision above); revisit if a screen needs contacts or settlement terms outside the Control Center.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack so V92 runs; P0-5 is
+    complete as planned. Next phase per the sequence: P1-6 (time bounds on waits) in a new session from its prompt block,
+    taking V93. B-02 follow-ups to schedule later: package line on the final assessment, facility name on Finance and patient
+    views, a read view for the travel plan and treatment episode.
 
 ---
 

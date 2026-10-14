@@ -174,7 +174,7 @@ test("operations may draft before the gate, cannot advance the journey, and the 
 
   // --- Before the gate: drafting is data entry; the journey does not move -------------------------
   const draft = { plannedArrival: new Date(Date.now() + 21 * 86400000).toISOString(), confirmedArrival: null, visaStatus: "pending", flightDetails: "MS123",
-    airportReception: null, accommodation: null, localTransport: null, companionDetails: null, facility: "Cairo Heart Centre", exceptions: null, status: "PLANNING" };
+    airportReception: null, accommodation: null, localTransport: null, companionDetails: null, facilityId: null, exceptions: null, status: "PLANNING" };
   await call(operations, "PUT", `/operations/cases/${caseId}/travel`, draft, 200);
   ws = await workspace();
   expect(ws.caseSummary.status, "a saved draft leaves the stage alone").toBe("ACCEPTED");

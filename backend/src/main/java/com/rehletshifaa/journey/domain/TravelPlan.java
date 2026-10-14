@@ -23,7 +23,8 @@ public class TravelPlan extends AssignedIdEntity {
     @Column(columnDefinition = "text") private String accommodation;
     @Column(name = "local_transport", columnDefinition = "text") private String localTransport;
     @Column(name = "companion_details", columnDefinition = "text") private String companionDetails;
-    @Column(length = 300) private String facility;
+    /** P0-5: the destination facility record (picker), never free text. */
+    @Column(name = "facility_id") private UUID facilityId;
     @Column(columnDefinition = "text") private String exceptions;
     @Column(name = "responsible_subject") private String responsibleSubject;
     @Column(nullable = false, length = 40) private String status;
@@ -39,13 +40,13 @@ public class TravelPlan extends AssignedIdEntity {
 
     /** The plan as Operations entered it. */
     public record Details(Instant plannedArrival, Instant confirmedArrival, String visaStatus, String flightDetails, String airportReception,
-                          String accommodation, String localTransport, String companionDetails, String facility, String exceptions) {}
+                          String accommodation, String localTransport, String companionDetails, UUID facilityId, String exceptions) {}
 
     /** Replaces the plan; an existing plan moves to its next version. */
     public void record(Details d, String responsibleSubject, String status, Instant now) {
         plannedArrival = micros(d.plannedArrival()); confirmedArrival = micros(d.confirmedArrival()); visaStatus = d.visaStatus();
         flightDetails = d.flightDetails(); airportReception = d.airportReception(); accommodation = d.accommodation();
-        localTransport = d.localTransport(); companionDetails = d.companionDetails(); facility = d.facility(); exceptions = d.exceptions();
+        localTransport = d.localTransport(); companionDetails = d.companionDetails(); facilityId = d.facilityId(); exceptions = d.exceptions();
         this.responsibleSubject = responsibleSubject; this.status = status; updatedAt = micros(now);
         if (!isNew()) version++;
     }

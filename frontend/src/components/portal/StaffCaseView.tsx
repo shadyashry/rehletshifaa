@@ -26,7 +26,7 @@ import type { PortalView as RoleKey } from "@/lib/access";
 import { scrollIntoView } from "@/lib/scroll";
 import { countryName } from "@/lib/countries";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
-import { type CaseView, type CatalogService, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
+import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
 import { copy, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, UnreadCount, LockedSection } from "@/components/portal/portal-ui";
 
 const ClinicalReviewPanel=dynamic(()=>import("@/components/portal/ClinicalReview").then(m=>m.ClinicalReviewPanel));
@@ -34,7 +34,7 @@ const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAss
 const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnership").then(m=>m.TransferOwnership));
 const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatientResponse").then(m=>m.RecordPatientResponse));
 
-export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
+export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];/** P0-5: active facilities with their approved packages, for the travel/treatment pickers and the consultant's package lines. */facilities?:DirectoryFacility[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
 
 /**
  * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
@@ -66,7 +66,7 @@ type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
-export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
+export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
  const work=useWorkCopy();
  const c=value.caseSummary;
  const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,mySubject]);
@@ -95,7 +95,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
  // Operations and consultants keep their stage forms; the coordinator's work is driven by the current action.
- const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired}/></div>:null;
+ const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired}/></div>:null;
  const recommendationBlock=approved&&(approved.recommendedTreatment||approved.risksAndLimitations)?<div className="rounded-lg border border-line p-4"><p className="mb-2 label-micro text-brand-700">{locale==="ar"?"التوصية السريرية للاستشاري":"Consultant's clinical recommendation"}</p>{approved.recommendedTreatment&&<div className="mb-3"><p className="text-sm font-bold text-ink-800">{t.reviewTreatment}</p><p className="mt-0.5 whitespace-pre-wrap text-ink-700">{approved.recommendedTreatment}</p></div>}{approved.risksAndLimitations&&<div><p className="text-sm font-bold text-ink-800">{t.reviewRisks}</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-600">{approved.risksAndLimitations}</p></div>}</div>:null;
  // The proposal is the coordinator's work while it is being prepared or released (or, at arrival, finalised);
  // once decided it becomes reference history.
@@ -112,7 +112,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
  // A second-opinion consultant reads the case and gives an opinion; the clinical decision stays with the primary consultant.
  const secondOpinionOnly=isDoctor&&current.workType==="SECOND_OPINION";
  const clinicalReviewPanel=isDoctor&&c.status==="CONSULTANT_REVIEW"&&!secondOpinionOnly
-  ?<ClinicalReviewPanel locale={locale} caseId={c.id} busy={busy} catalog={catalog} fxRates={fxRates} documents={documents}
+  ?<ClinicalReviewPanel locale={locale} caseId={c.id} busy={busy} catalog={catalog} fxRates={fxRates} facilities={facilities} documents={documents}
      draft={reviewDraft&&{id:reviewDraft.id,recommendedTreatment:reviewDraft.recommendedTreatment,risksAndLimitations:reviewDraft.risksAndLimitations,costEstimates:reviewDraft.costEstimates,proposalCurrency:reviewDraft.proposalCurrency}}
      viewDoc={viewDoc} downloadDoc={downloadDoc} mutate={mutate}/>
   :null;
