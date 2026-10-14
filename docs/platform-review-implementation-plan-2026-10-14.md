@@ -53,10 +53,10 @@ phases.
     compose/deploy env and docs carry `PII_INDEX_KEY`.
   - Tests: full offline suite 744 run / 0 failures after fixes; `CryptoServiceTest`, `PatientPiiAtRestTest`,
     `PiiKeyRotationServiceTest`, `ProductionSafetyValidatorTest`, `CleanPatientSchemaMigrationTest` (V86 on H2),
-    `PostgresJpaMappingTest` against a PostgreSQL 17 container.
+    `PostgresJpaMappingTest` and `PostgresPiiKeyRotationTest` against a PostgreSQL 17 container.
   - Open gaps: patient `email` and submitter `email` are still plaintext (blind index pattern is ready; needs the
     Keycloak email-resolution paths reviewed first); intake conversations and inbound WhatsApp rows keep plaintext
-    sender digits (operational key; decide in P1-7 with retention); the rotation sweep has run on H2 only; the dev
+    sender digits (operational key; decide in P1-7 with retention); the dev
     database must be started with `PII_INDEX_KEY` set (compose files updated) before V86 runs there.
   - Next exact action: P0-2 (lifecycle exits) in a new session; rebuild the dev stack first so V86 runs on dev data.
 

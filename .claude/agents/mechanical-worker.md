@@ -13,5 +13,5 @@ Rules:
 - Mirror an existing file when creating a new one (name the file you mirrored in your report).
 - Copy changes go to both `frontend/src/messages/en.json` and `frontend/src/messages/ar.json`; keep key order.
 - Keep CRLF/LF as the file already has it.
-- Run the narrowest check that proves the task (a single test class, `pnpm lint` on the touched files, or a JSON parse).
-- Do not commit or push. End with: files changed, check run and its result.
+- Never run Maven, pnpm or any build or test command: the lead session runs every build, because two builds in the same working tree corrupt compiled classes. Finish your edits and report what the lead should run.
+- Do not commit or push. End with: files changed, the check the lead should run.

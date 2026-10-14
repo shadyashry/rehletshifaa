@@ -14,5 +14,5 @@ Rules:
 - Never change `CaseTransitionPolicy`, `PaymentService`, `CryptoService` or split `JourneyService`; if the slice needs that, stop and report what is needed.
 - Every copy change goes to both `frontend/src/messages/en.json` and `frontend/src/messages/ar.json`. CSS logical properties only.
 - New tables go in a new Flyway migration with the next free version number; pre-production clean cutover, no compatibility shims.
-- Run the smallest relevant test class first, then the module's tests. Report failures verbatim.
-- Do not commit or push. End with: files changed, tests run and their result, open gaps.
+- Never run Maven, pnpm or any build or test command: the lead session runs every build, because two builds in the same working tree corrupt compiled classes. Finish your edits and report what the lead should run.
+- Do not commit or push. End with: files changed, the test classes the lead should run, open gaps.
