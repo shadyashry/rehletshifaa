@@ -166,6 +166,81 @@ and that the owner must fast-forward feat/review-p0 and rebuild the dev stack so
 
 ---
 
+## P1-8 — Metrics, alerts, scheduler leadership
+Model: Opus 5.5 · Effort: medium · Fast: owner's choice (normal mode was used for P1-6) · Sessions: 2, then 1 short
+Fable 5.1 high verification session
+
+```
+Implement phase P1-8, session 1 of 2, of docs/platform-review-implementation-plan-2026-10-14.md (findings E-05 and
+E-04 in docs/platform-review-2026-10-14.md). Intended model: Opus 5.5, effort medium. If you are a different model,
+say so in your first line and continue.
+
+Before you start: read AGENTS.md, then the P1-8 entry and the "Remaining work" section in the plan file, and the
+P1-6 Status entries (the newest scheduled jobs and the SLA table). Do not re-discover the architecture.
+
+Branch: work on top of feat/review-p0 (pushed at e68dbc5, plus this prompt's docs commit). If this session runs in a
+worktree on another branch, first `git merge --ff-only feat/review-p0`, do the work there, commit, and say so in your
+final report so the owner can fast-forward feat/review-p0.
+
+Facts the plan predates (checked 2026-10-14):
+- There are 21 @Scheduled methods in 19 classes, not 16 (P1-6 added ConsultantOfferExpiryService.expireOffers,
+  StaffWorkService.raiseWorkDueSoon, InformationRequestReminders.sweep). List them with
+  `grep -rn "@Scheduled" backend/src/main/java` before you start.
+- Maven is offline. ~/.m2 has micrometer-core (through spring-boot-starter-actuator) but NOT
+  micrometer-registry-prometheus, and has NO ShedLock artifact at all. Actuator exposes only `health` today.
+- docker-compose.observability.yml is Elasticsearch, Kibana and Filebeat only; there is no Prometheus or Grafana.
+- Next free Flyway version is V95. Persistence is JPA only (no plain SQL, no native queries, repositories extend
+  BaseRepository, entities in ..domain.., repositories in ..infrastructure..); ArchitectureRulesTest must stay green.
+- Row claiming already uses locks in QueuedNotificationRepository, WhatsAppInboundMessageRepository,
+  IdentityOperationRepository, ReplyObligationRepository, IntakeConversationRepository and BaseRepositoryImpl.
+
+Recommendation on the two missing artifacts (the owner decides once, at the start; ask in one question):
+- Scheduler leadership WITHOUT ShedLock: a JPA lease table (V95 `scheduler_leases`: name PK, owner instance id,
+  locked_until TIMESTAMP WITH TIME ZONE, locked_at) taken with a guarded JPQL update ("take when free or expired"),
+  wrapped around every job by one small aspect or helper. No new dependency, no JdbcTemplate exception in
+  ArchitectureRulesTest, and it is the same guarded-update pattern the jobs already use. Recommended.
+- Prometheus: micrometer-registry-prometheus needs one online Maven fetch (version from the Spring Boot BOM) and
+  Prometheus + Grafana images need docker pulls. Ask the owner before any download. Without it, ship the meters on
+  micrometer-core and expose them on the actuator `metrics` endpoint behind authentication; add the registry later.
+
+Session 1 scope (meters and alerts):
+1. Business meters on Micrometer (MeterRegistry), registered in one place per module, tags low-cardinality only
+   (team, queue type, channel; never case ids, subjects or names): open work per queue type and its oldest age,
+   HIGH and overdue counts; time to proposal (submitted -> released, timer recorded at release); deposit verification
+   age (oldest DEPOSIT_RECORD item); reply-timer breaches (ReplyTimerService escalations); outbox dead letters and
+   retries by channel; consultant offers expired; information requests cancelled. Gauges read through the existing
+   repositories, cached at most 60 s so a scrape never scans tables.
+2. Actuator: expose `metrics` (and `prometheus` only if the owner approved the fetch) to authenticated operators
+   only; never through the public gateway path without auth. Update SecurityConfig and its coverage test.
+3. Alert rules as code: a short alerts document (or Prometheus rules file if approved) with thresholds read from the
+   SLA table where one exists (e.g. deposit verification older than 1 working day, any outbox dead letter, reply
+   breaches > 0 in 15 min).
+Session 2 (later, not now): the scheduler lease on all 21 jobs, the Grafana dashboard JSON, and the Fable 5.1 high
+verification session for the lease and the SKIP LOCKED / row-lock claiming in the stores listed above.
+
+Delegation (you own the meter design, security exposure, integration and all verification):
+- Delegate the meter registrations for one module at a time to the workflow-builder subagent once you have written
+  the first module's meters as the pattern; review each diff.
+- Delegate the alerts document and, in session 2, the Grafana dashboard JSON to the mechanical-worker subagent with
+  the exact meter names.
+- Subagents never run Maven or pnpm. You run every build and test yourself, one at a time, never two in parallel.
+- Anything that touches CaseTransitionPolicy, CaseExitService, PaymentService or authorization stays with you.
+
+Verification: `cd backend && mvn -o -q test` stays at 0 failures (811 tests and 3 pre-existing skips at 7d0bbd4).
+Add a test that each meter exists with the expected tags and changes when its source changes, and that the metrics
+endpoint refuses an anonymous request. If a migration is added, run the PostgreSQL proof: `docker run -d --name
+rs-jpa-mapping-pg -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=jpa_mapping_test -p 127.0.0.1:55439:5432
+postgres:17-alpine`, wait for pg_isready, run `mvn -o -q -Dtest=PostgresJpaMappingTest
+-Djpa.postgres.test-url=jdbc:postgresql://127.0.0.1:55439/jpa_mapping_test test`, then `docker rm -f rs-jpa-mapping-pg`.
+
+Finish: when green, commit with a conventional message (feat(p1-8): ...) ending in "Co-Authored-By: <your model name>
+<noreply@anthropic.com>". Do not push. Add a Status block to the P1-8 entry in the plan file in the same shape as the
+P1-6 entries (delivered work, tests and numbers, open gaps, next exact action: P1-8 session 2), and tick or update
+the "Remaining work" section.
+```
+
+---
+
 ## Delegation inside a session
 
 A Fable session can hand bounded work to the project subagents in `.claude/agents/`:
