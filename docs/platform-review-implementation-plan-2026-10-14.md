@@ -534,6 +534,77 @@ phases.
   platform case volume, optional intro video (S3, scanned); no ratings.
 - Sessions: 1. Model: Sonnet 5.5 fast, medium (Impeccable pass by Fable at the end).
 
+### P1-15  Admission, voucher and balance  (post-deposit design §5 stages 1–3, §6; architecture §5.1)
+- Source: `docs/post-deposit-journey-design.md` (decisions D-B, D-C, D-D) and `docs/post-deposit-solution-architecture.md`.
+- `case_evidence` ledger with countersign rule; `facility_admissions` (reserve, hospital admission letter with quoted
+  amount, Finance pro-forma check and `PRICE_VARIANCE`, voucher with the frozen money split as a generated document,
+  point of no return set by Operations and approved by Finance); balance evidence recorded by Operations and
+  countersigned by Finance (step-up); new macro state `ADMISSION_READY` in `CaseTransitionPolicy` with evidence
+  blockers; `JourneyService.treatment` requires balance evidence and the admission number; patient states
+  `CONFIRM_ARRIVAL`, `PAY_BALANCE` (voucher, pay at the hospital in phase 1), `CLEARED_FOR_ADMISSION`; "Your dates"
+  and the arrival card on My Care and the status link; Operations and Finance screens.
+- Files: new `journey/application/EvidenceLedger`, `AdmissionService`; `CaseTransitionPolicy`, `CaseHandoffService`,
+  `CaseActionService`, `StaffWorkService.stageDefault`, `SlaPolicy`; `V95__evidence_ledger_and_admission_ready.sql`,
+  `V96__facility_admissions.sql`; `MyCare.tsx`, `CaseStatusAccess.tsx`, `StaffCaseView.tsx`, `CaseWorkflowActions.tsx`,
+  Finance verification screen; copy; templates `rs_your_dates`, `rs_arrival_card`, `rs_admission_voucher`,
+  `rs_cleared_for_admission`.
+- Tests: architecture §14 rows for the policy, admission and money split; `PasswordOnlySessionCoverageTest`;
+  `PostgresJpaMappingTest` on V95–V96.
+- Sessions: 2. Model: Fable 5.1, high (lifecycle and money). Needs: D-B, D-C, D-D decided; P1-10 fee line first.
+
+### P1-16  Treatment evidence: milestones and change orders  (design §5 stage 4; architecture §5.2–5.3)
+- `TreatmentMilestoneService` (eight milestone kinds, Consultant or Operations-with-countersign, 24-working-hour
+  `RECORD_MILESTONE` rotation, complication → incident); `ChangeOrderService` with the band settings on the
+  commercial policy (D-E), Finance pricing, patient acceptance above the band (step-up, My Care and secure link),
+  emergency path; interim bills; the patient's treatment timeline; staff evidence checklist per stage.
+- Files: new services; `V97__change_orders.sql`; `CommercialPolicyService` band settings; Consultant portal forms;
+  `MyCare.tsx` timeline; Finance pricing screen; templates `rs_treatment_update`, `rs_change_order_review`.
+- Sessions: 2. Model: Fable 5.1, high (money and consent-adjacent); milestone forms by Opus 5.5. Needs: P1-13
+  incidents (can be built in the same session order: P1-13 first).
+
+### P1-17  Discharge pack, reconciliation and statements  (design §5 stage 5, §6; architecture §5.4–5.5)
+- `DischargeService` pack completeness (summary, medication list, operative note, implant record, fit-to-fly with the
+  72-hour rule D-F, follow-up plan), typed uploads, handover letter generated EN/AR; departure gated on fit-to-fly;
+  final invoice; new module `settlement`: `ReconciliationService` (variance codes, unapproved extras never charged,
+  dispute path, manager countersign above band, credits → refunds) and `StatementService` (`DISCHARGE` statement,
+  immutable PDF, e-invoice reference slot); `DISCHARGED` entry blockers.
+- Files: new services and module; `V98__reconciliation_and_statements.sql`; `JourneyService.upsertTravel` return
+  gate; Finance reconciliation workbench (two-column invoice vs quote); patient "Going home" block; templates
+  `rs_discharge_pack_ready`, `rs_statement_ready`.
+- Sessions: 2. Model: Fable 5.1, high. Needs: P1-12's settlement statement for the payout leg (the reconciliation
+  itself does not).
+
+### P1-18  Follow-up execution and outcomes  (design §5 stage 6; architecture §5.6)
+- `FollowUpService`: scheduled contacts from the plan, `FOLLOW_UP_CONTACT` items and reminders, coordinator
+  check-ins D3/D14/D30, outcomes at D30/D90 from My Care or a secure link (new OTP purpose `OUTCOME`), complication →
+  incident + Consultant review + `REOPEN` (P1-13), 30-day window (D-G) closing the case, closure review request,
+  `CLOSURE` statement.
+- Files: new service; `V99__follow_up_contacts_and_outcomes.sql`; Consultant follow-up UI (also closes the P0-2
+  follow-up gap); `MyCare.tsx` follow-up block and outcomes form; templates `rs_follow_up_reminder`,
+  `rs_outcome_request`, `rs_closure_review`.
+- Sessions: 1–2. Model: Opus 5.5 fast, medium; the outcome data classification reviewed by Fable (PDPL).
+
+### P1-19  Hospital-agreement audit  (design §7; architecture §5.7)
+- `consultant_affiliations` (yearly declaration, Compliance review, eligibility condition D-H, `UNDECLARED_FACILITY`
+  flag at reservation); separate Consultant and hospital lines on the final quote (with P1-10); `ScorecardService`
+  per Consultant and facility; `SamplingAuditService` monthly samples; facility package suspension path after
+  repeated unapproved extras; "Raise a concern" on My Care creating an incident visible to Compliance.
+- Files: `clinic` affiliation service and Virtual Clinic page; new `compliance` module (read-only); Control Center
+  Compliance screens; `V100__affiliations_and_audit_samples.sql`.
+- Sessions: 1–2. Model: Opus 5.5 fast, medium; eligibility change reviewed by Fable.
+
+### P1-20  Public site trust pass  (UX review 2026-10-14)
+- Source: `docs/ux-redesign/patient-site-review-2026-10-14.md` (critique 24/32 and the "dossier" direction). Runs
+  through `/redesign-area` with shape plans and gates, in parallel with the backend phases (frontend only).
+- Slices: (a) hero as the product artifact (dossier preview strip) with the photograph demoted, entrance animation
+  robustness; (b) Consultant cards and profiles with photographs, "Credentials reviewed · current", where they
+  practise, languages (joins P1-14); (c) Send my case opening: calm promise header with the reply window, emergency
+  notice as a quiet disclosure, "what happens next" rail, resume by WhatsApp, camera-capture guidance on uploads;
+  (d) home order and length (privacy before travel; care-area grid distilled); (e) confirmation page as the first
+  stamped dossier page (joins P2-20); (f) Arabic-first typography and numerals (joins P2-21).
+- Sessions: 3 (shape 0.5, build 2, polish 0.5). Model: Fable 5.1 high for shape and the hero; Opus 5.5 for the form
+  and cards; Sonnet 5.5 for copy sweeps.
+
 ---
 
 ## P2 — Medium (first quarter after launch)
@@ -562,30 +633,51 @@ export on demand (C-07); region-per-market deployment (E-10); video consultation
 
 ---
 
-## Remaining work (as of 2026-10-14, after P1-6)
+## Remaining work (as of 2026-10-14, after P1-6; re-prioritised with the post-deposit design and the UX review)
 
-Delivered on `feat/review-p0` (local, not pushed; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped), P0-5, P1-6.
-Everything below is still to do, in the recommended order.
+Delivered on `feat/review-p0` (pushed at `69329b8`; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped), P0-5,
+P1-6, and the P1-8 kickoff prompt. Everything below is still to do.
 
-### Phases still to run
+**Why the order changed.** The owner's two priorities are (1) a complete, auditable journey after the deposit —
+today nothing collects, proves or reconciles money after the 15%, and the Consultant's hospital deal is invisible —
+and (2) a patient site that earns trust at the first visit. The post-deposit phases (P1-15…P1-19) need the fee
+restructuring (P1-10, legal) and the incidents model (P1-13) first; the UX pass (P1-20) is frontend-only and runs in
+parallel. `JourneyService` is split (P1-11) only after the journey code is final, and retention (P1-7) and the DR
+drill (P1-9) stay launch blockers that do not shape the product.
+
+### Phases still to run (recommended order)
 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
-| 1 | P1-8 Metrics, alerts, scheduler leadership | 2 + 1 short | Opus 5.5, medium; ShedLock check Fable high | Write its kickoff block in `docs/platform-review-phase-prompts.md`; ShedLock now covers 19 `@Scheduled` jobs (16 + offer expiry, due-soon raise, information reminders) |
-| 2 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide the retention of plaintext WhatsApp sender digits (carried from P0-1) |
-| 3 | P1-10 Commercial truth on the proposal | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: guarantee wording and final-quote validity |
-| 4 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-10, so the extracted code is final |
-| 5 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths reviewed by Fable | Owner: payer terms and partner commission |
-| 6 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — |
-| 7 | P1-9 Backups and restore drill | 1–2 | Opus 5.5, medium | — |
-| 8 | P1-14 Consultant public profiles | 1 | Sonnet 5.5; Impeccable pass by Fable | — |
-| 9 | P2-15 … P2-26 | about 20 | per the P2 table | P2-15 needs the second-destination timing decision |
-| 10 | P3 backlog | one each | Sonnet or Opus | — |
+| 1 | P1-8 Metrics, alerts, scheduler leadership | 2 + 1 short | Opus 5.5, medium; ShedLock check Fable high | Prompt block written (`69329b8`); ShedLock now covers 19 `@Scheduled` jobs |
+| 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: D-A (platform fee line), guarantee wording, final-quote validity; counsel on the VAT rate of the fee |
+| 3 | **P1-20 Public site trust pass** (parallel track) | 3 | Fable (shape, hero), Opus (form, cards), Sonnet (copy) | Owner reads the UX review; shape-plan gate |
+| 4 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
+| 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |
+| 6 | **P1-16 Treatment evidence: milestones, change orders** | 2 | Fable 5.1 high; forms by Opus | D-E band; P1-13 |
+| 7 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths by Fable | Owner: payer terms, partner commission |
+| 8 | **P1-17 Discharge pack, reconciliation, statements** | 2 | Fable 5.1, high | D-F; P1-12 settlement statement |
+| 9 | **P1-18 Follow-up execution and outcomes** | 1–2 | Opus 5.5; data classification by Fable | D-G; P1-13 |
+| 10 | **P1-19 Hospital-agreement audit** | 1–2 | Opus 5.5; eligibility change by Fable | D-H |
+| 11 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide retention of plaintext WhatsApp sender digits; evidence and statements as `LEGAL_RECORD` class |
+| 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
+| 13 | P1-9 Backups and restore drill | 1–2 | Opus 5.5, medium | — |
+| 14 | P1-14 Consultant public profiles | 1 | Sonnet 5.5; Impeccable pass by Fable | Photographs with consent (P1-20 b) |
+| 15 | P2-24 Refund rules enforced | 1 | Fable high | Moves up from P2: the point of no return (P1-15) and the 10-day rule need enforcement before the first paying patient |
+| 16 | P2-15 … P2-26 (rest) | about 19 | per the P2 table | P2-15 needs the second-destination timing decision |
+| 17 | P3 backlog | one each | Sonnet or Opus | — |
+
+Decision D-I (PDPL licence application; liability-fund subscription as a Consultant credential) is not a phase: start
+the licence now; the credential type is a one-line addition in P1-19.
 
 ### Owner decisions still open
 
-- [ ] P1-10: guarantee wording on the proposal and final-quote validity.
+- [ ] D-A…D-H from `docs/post-deposit-journey-design.md` §12 (fee restructuring, voucher model, pay to admit, new
+      stage, change-order band, fit-to-fly window, free follow-up window, affiliations as eligibility).
+- [ ] D-I: start the PDPL licence application and the Law 13/2025 liability-fund subscription (owner action).
+- [ ] P1-10: guarantee wording on the proposal and final-quote validity; counsel: VAT rate on the platform fee.
 - [ ] P1-12: payer terms and partner commission.
+- [ ] P1-20: approve the "dossier" direction in the UX review before the shape plan; consent for Consultant photographs.
 - [ ] P2-15: when a second destination is added.
 - [ ] Legal review of the patient refund copy (F2); the refund rule itself is decided (P0-4).
 - [ ] Whether a case cancelled for an unanswered information request gets a reopen path (P1-6; today the patient sends it again).
@@ -606,14 +698,18 @@ Everything below is still to do, in the recommended order.
 - [ ] P0-5: notify Consultant Operations when an accreditation lapses; store accreditation evidence documents; stamp `Facility.updated_at` from the expiry job; a dev-seed facility in `LocalDemoDataSeeder`; facility name on the patient proposal; patient-facing travel view.
 - [ ] P1-6: an identity-review work item, so its 2-day level becomes a due date and a patient window; deadlines on referral offers; the offer deadline on queue cards (`CaseQueue.tsx`); email the consultant when an offer expires; an availability penalty after repeated expiry; escalate to the Finance Manager on an SLA breach (A-04); a window in the status link's deposit phase while Finance checks a transfer.
 
-## Order of sessions (recommended)
+## Order of sessions (recommended, revised 2026-10-14)
 
-1. P0-1 (crypto) → 2. P0-2 (exits) → 3. P0-3 (urgency) → 4. P0-4 (deposit; needs owner decisions) → 5. P0-5
-(facility) → 6. P1-6 (time bounds) → 7. P1-8 (metrics + ShedLock) → 8. P1-7 (retention) → 9. P1-10 (commercial
-truth) → 10. P1-11 (split) → 11. P1-12 (payouts/payer/partner) → 12. P1-13 (guardian/incidents) → 13. P1-9 (DR
-drill) → 14. P1-14 (profiles) → P2 in table order.
+Done: 1. P0-1 → 2. P0-2 → 3. P0-3 → 4. P0-4 → 5. P0-5 → 6. P1-6.
 
-Owner decisions that gate a slice: P0-4 (fee amounts, deposit basis, rails), P1-10 (guarantee wording, validity),
-P1-12 (payer terms, partner commission), P2-15 (second destination timing).
+Next: 7. P1-8 (metrics + ShedLock) → 8. P1-10 (commercial truth + fee restructuring) → 9. P1-20 (public site trust
+pass; parallel frontend track from here on) → 10. P1-13 (guardian/incidents) → 11. P1-15 (admission, voucher,
+balance) → 12. P1-16 (milestones, change orders) → 13. P1-12 (payouts/payer/partner) → 14. P1-17 (discharge,
+reconciliation, statements) → 15. P1-18 (follow-up, outcomes) → 16. P1-19 (hospital-agreement audit) → 17. P1-7
+(retention) → 18. P1-11 (split) → 19. P1-9 (DR drill) → 20. P1-14 (profiles) → 21. P2-24 (refund enforcement) →
+P2 in table order.
 
-Roughly 35 sessions for P0+P1, 20 for P2.
+Owner decisions that gate a slice: D-A (P1-10), D-B/D-C/D-D (P1-15), D-E (P1-16), D-F (P1-17), D-G (P1-18), D-H
+(P1-19), the UX direction (P1-20), P1-12 (payer terms, partner commission), P2-15 (second destination timing).
+
+Roughly 25 sessions for the rest of P1 (including the six new phases), 19 for P2.

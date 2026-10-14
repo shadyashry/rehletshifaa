@@ -480,3 +480,17 @@ Every open P3 from the sections above, moved here at the close of the redesign e
 | Decision | Item | By |
 |---|---|---|
 | The site does not state anything about fees (2026-10-09) | Whether sending a case or the Consultant review costs anything, raised by the Close re-critique (public A). "No commitment to start" stays as it is. | Owner |
+
+## Public site — trust pass (review 2026-10-14)
+
+Review: `docs/ux-redesign/patient-site-review-2026-10-14.md` (24/32). Plan slot: P1-20 in
+`docs/platform-review-implementation-plan-2026-10-14.md`. Shape plan to write: `plans/public-site-trust.md`.
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P1 | Hero shows a stock photograph, not the product; replace the visual with a synthetic dossier preview (three stamped pages) and demote the photo. | Review 2026-10-14 | `components/home/Hero.tsx`, `theme-petrol.css` | shape, bolder |
+| P1 | Named people promised, initials shown: Consultant cards with photographs (consent), "Credentials reviewed · current", practice location, languages; a coordinators strip with the reply window. | Review 2026-10-14 | `components/home/CareSystemsGrid.tsx`, `components/consultants/*`, new `CoordinatorsStrip` | harden, clarify |
+| P1 | Send my case opens with the emergency box, the account line and a question; add the promise header (time, reply window, no commitment), quiet emergency disclosure, "what happens next" rail, continue-later on WhatsApp, camera guidance on uploads. | Review 2026-10-14 | `components/CaseForm.tsx`, `app/[locale]/send-my-case/page.tsx` | onboard, clarify |
+| P2 | Home order and length: privacy before travel; care areas as one quiet row; five-icon rail folded into the hero card. | Review 2026-10-14 | `app/[locale]/page.tsx` | distill, layout |
+| P2 | Hero entrance animation leaves the lead and card invisible until it runs; shorten delays and use `backwards` fill. | Review 2026-10-14 | `theme-petrol.css` 666–687 | animate |
+| P3 | Header: demote the Coordinator link to the language-switch weight; footer disclaimer shortened; emergency card out of the trust palette. | Review 2026-10-14 | `Header.tsx`, `Footer.tsx`, `TrustSection.tsx` | polish |
