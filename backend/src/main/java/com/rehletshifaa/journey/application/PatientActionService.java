@@ -84,9 +84,11 @@ public class PatientActionService {
         UUID taskId = openRequestId(caseId);
         if (taskId == null) {
             taskId = UUID.randomUUID();
-            tasks.saveAndFlush(new CaseTask(taskId, caseId, TASK_TYPE, encrypt(title(language)), encryptNullable(message), null, "PATIENT", "PATIENT_ACTION", StaffWorkService.derivePriority(command.blocking(), command.dueAt(), work.urgency(caseId), now), command.blocking(), command.dueAt(), actorSubject, now));
+            tasks.saveAndFlush(new CaseTask(taskId, caseId, TASK_TYPE, encrypt(title(language)), encryptNullable(message), null, "PATIENT", "PATIENT_ACTION", StaffWorkService.derivePriority(command.blocking(), command.dueAt(), work.urgency(caseId), now), command.blocking(), command.dueAt(), actorSubject, now)
+                    .withReminderCycle(now)); // P1-6: InformationRequestReminders counts its days from here
         } else {
             tasks.renewPatientAction(taskId, encryptNullable(message), command.blocking(), micros(command.dueAt()), micros(now));
+            tasks.restartReminderCycle(taskId, micros(now));
         }
         int order = (int) actionItems.countByTaskId(taskId);
         for (RequestedItem item : items) {

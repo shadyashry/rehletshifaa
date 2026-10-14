@@ -121,6 +121,21 @@ public class CaseExitService {
         return true;
     }
 
+    /**
+     * P1-6 (A-10): the case waited in INFORMATION_REQUIRED for the patient's answer past the information-request limit
+     * ({@link InformationRequestReminders}) and is cancelled; the exit cancels the open request with the rest of the work.
+     * Quietly a no-op when the case moved on.
+     *
+     * @return true when the case was cancelled now
+     */
+    @Transactional
+    public boolean cancelUnansweredInformation(UUID caseId) {
+        State current = state(caseId);
+        if (!"INFORMATION_REQUIRED".equals(current.status())) return false;
+        exit(caseId, current, "CANCELLED", Reason.INFORMATION_NOT_PROVIDED, null, "SYSTEM", "SYSTEM");
+        return true;
+    }
+
     private void exit(UUID caseId, State current, String target, Reason reason, String note, String actorSubject, String actorLabel) {
         policy.assertAllowed(caseId, current.status(), target);
         Instant now = clock.instant();

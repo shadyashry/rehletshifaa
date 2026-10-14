@@ -5,7 +5,7 @@ import { ArrowRight, CalendarClock, CircleAlert, FileText, MessageSquareText } f
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { workCopyText, type WorkCopy, type WorkItemCopy } from "@/lib/portal-labels";
+import { plural, workCopyText, type WorkCopy, type WorkItemCopy } from "@/lib/portal-labels";
 
 /** The backend's resolution of what this person should do now — rendered, never re-derived here. */
 export type CurrentActionView = {
@@ -16,6 +16,8 @@ export type CurrentActionView = {
   copy?: WorkItemCopy | null;
   /** NONE on a journey that ended after acceptance: the calm word it ended with (WITHDRAWN, CANCELLED, EXPIRED, COMPLETED, CLOSED). */
   exit?: string | null;
+  /** On a waiting state: how many working days the team usually takes over it (the backend's SLA table, P1-6). */
+  expectedWorkingDays?: number | null;
 };
 export type BlockerView = { code: string; labelEn: string; labelAr: string; owner: "PATIENT" | "STAFF" | "LATER"; gating: boolean };
 /** `viewer`: who is looking at this case, per case — the patient (SELF), someone acting for them (REPRESENTATIVE) or STAFF. */
@@ -66,6 +68,11 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
           <span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500">
             <CalendarClock size={13} aria-hidden/>
             {t.respondBy.replace("{time}", new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(deadline)))}
+          </span>
+        ) : waiting && action.expectedWorkingDays ? (
+          <span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500">
+            <CalendarClock size={13} aria-hidden/>
+            {t.usuallyWithin.replace("{duration}", plural(locale, action.expectedWorkingDays, work.plural.workingDays))}
           </span>
         ) : action.dueAt && (
           <span className={`inline-flex items-center gap-1 text-[0.8125rem] ${action.overdue ? "font-bold text-alert-700" : "text-ink-500"}`}>

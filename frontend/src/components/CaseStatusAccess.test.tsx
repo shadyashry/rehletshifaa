@@ -161,10 +161,18 @@ describe("CaseStatusAccess journey", () => {
     expect(screen.queryByText(/CONSULTANT_REVIEW/)).toBeNull();
   });
 
+  it("says how long the team usually takes over the phase and what to do meanwhile (P1-6)", async () => {
+    await reachStatus({ ...consultantStatus, expectedWorkingDays: 2 });
+    expect(await screen.findByText("This usually takes up to 2 working days.")).toBeTruthy();
+    expect(screen.getByText(/keep following your own doctor's advice/i)).toBeTruthy();
+  });
+
   it("leads with the request when the patient has something to do", async () => {
     await reachStatus({ ...consultantStatus, phase: "coordinator", actionRequired: true, action });
     expect(await screen.findByRole("heading", { name: /we need something from you/i })).toBeTruthy();
     expect(screen.queryByText(/no action is required/i)).toBeNull();
+    expect(screen.queryByText(/usually takes/i)).toBeNull();
+    expect(screen.queryByText(/meanwhile/i)).toBeNull();
     expect(screen.getByLabelText(/current medication/i)).toBeTruthy();
   });
 

@@ -45,6 +45,10 @@ public class CaseTask extends AssignedIdEntity {
     @Column(name = "coordination_queued_at") private Instant coordinationQueuedAt;
     @Column(name = "copy_code", length = 80) private String copyCode;
     @Column(name = "copy_params", columnDefinition = "text") private String copyParams;
+    /** P1-6: when an information request was last asked; its reminder days count from here. Null on other tasks. */
+    @Column(name = "reminder_cycle_at") private Instant reminderCycleAt;
+    /** P1-6: 0 none, 1 and 2 the patient reminders, 3 the coordinator alert (InformationRequestReminders). */
+    @Column(name = "reminder_step", nullable = false) private int reminderStep;
 
     protected CaseTask() {}
 
@@ -60,6 +64,8 @@ public class CaseTask extends AssignedIdEntity {
 
     /** The message code and (already encrypted) parameters the portal words this task from. */
     public CaseTask withCopy(String code, String encryptedParams) { this.copyCode = code; this.copyParams = encryptedParams; return this; }
+    /** An information request starts its reminder cycle when it is asked (P1-6). */
+    public CaseTask withReminderCycle(Instant at) { this.reminderCycleAt = at == null ? null : micros(at); this.reminderStep = 0; return this; }
 
     public UUID getCaseId() { return caseId; }
     public String getTaskType() { return taskType; }

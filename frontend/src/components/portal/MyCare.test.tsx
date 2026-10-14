@@ -120,6 +120,26 @@ describe("MyCare", () => {
     expect(screen.queryByRole("region", { name: "Coordination deposit" })).toBeNull(); // the amount lives in the payment step
   });
 
+  it("says how long the team usually takes and what the patient can do meanwhile, only while the team has the step (P1-6)", () => {
+    renderCare({ actions: { ...wait("WAIT_CONSULTANT_REVIEW"), currentAction: { code: "WAIT_CONSULTANT_REVIEW", kind: "WAIT", expectedWorkingDays: 2 } } });
+    expect(screen.getByText("This usually takes up to 2 working days.")).toBeTruthy();
+    expect(screen.getByText("Meanwhile")).toBeTruthy();
+    expect(screen.getByText(/keep following your own doctor's advice/i)).toBeTruthy();
+    cleanup();
+    // The patient's own step promises no team window and has no meanwhile line.
+    renderCare({ actions: focus("PROVIDE_INFORMATION", { expectedWorkingDays: 2 }) });
+    expect(screen.queryByText(/usually takes/i)).toBeNull();
+    expect(screen.queryByText("Meanwhile")).toBeNull();
+  });
+
+  it("words the window in Arabic plural forms", () => {
+    renderWithWork(<MyCare locale="ar" caseSummary={base} actions={{ ...wait("WAIT_PAYMENT_CHECK"), currentAction: { code: "WAIT_PAYMENT_CHECK", kind: "WAIT", expectedWorkingDays: 1 } }}
+                   patientProposal={accepted} proposal={proposal} deposit={null} documents={[]} unreadMessages={0} cases={[base]}
+                   view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={vi.fn()} messagesPanel={null}/>, "ar");
+    expect(screen.getByText(/يوم عمل واحد/)).toBeTruthy();
+    expect(screen.getByText(/لا داعي للدفع مرة أخرى/)).toBeTruthy();
+  });
+
   it("once the deposit is confirmed it reads as received and the stale step is gone", () => {
     renderCare({ actions: wait("WAIT_COORDINATION"), deposit: { status: "PAID", currency: "USD", totalDisplay: 500, paidDisplay: 500 } });
     const deposit = screen.getByRole("region", { name: "Coordination deposit" });

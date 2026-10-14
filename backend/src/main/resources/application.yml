@@ -192,6 +192,12 @@ app:
     offer-expiry-scan-ms: ${SLA_OFFER_EXPIRY_SCAN_MS:60000}
     # How often open work that is now in the last stretch before its due time (StaffWorkService.DUE_SOON) is raised to HIGH.
     due-soon-scan-ms: ${SLA_DUE_SOON_SCAN_MS:300000}
+    # P1-6 session 2: an unanswered information request (InformationRequestReminders), in calendar days from when it
+    # was asked: patient reminders, then the coordinator alert, then the case is cancelled (or the request withdrawn).
+    information-reminder-days: ${SLA_INFORMATION_REMINDER_DAYS:2,5}
+    information-alert-day: ${SLA_INFORMATION_ALERT_DAY:7}
+    information-cancel-days: ${SLA_INFORMATION_CANCEL_DAYS:30}
+    information-reminder-scan-ms: ${SLA_INFORMATION_REMINDER_SCAN_MS:3600000}
   facilities:
     # Accreditation renewal reminders to the facility contact, days before expiry (FacilityAccreditationExpiryService).
     reminder-days: ${FACILITY_ACCREDITATION_REMINDER_DAYS:60,30,7}
@@ -218,6 +224,8 @@ app:
         case-status-link: ${WHATSAPP_TEMPLATE_CASE_RECEIVED:rs_case_received}
         secure-message: ${WHATSAPP_TEMPLATE_SECURE_MESSAGE:rs_secure_message}
         patient-action-link: ${WHATSAPP_TEMPLATE_PATIENT_ACTION:rs_patient_action}
+        patient-action-reminder: ${WHATSAPP_TEMPLATE_PATIENT_ACTION_REMINDER:rs_patient_action_reminder}
+        information-request-closed: ${WHATSAPP_TEMPLATE_INFORMATION_REQUEST_CLOSED:rs_information_request_closed}
         proposal-ready: ${WHATSAPP_TEMPLATE_PROPOSAL_READY:rs_proposal_ready}
         final-quote-ready: ${WHATSAPP_TEMPLATE_FINAL_QUOTE_READY:rs_final_quote_ready}
         onboarding-activation: ${WHATSAPP_TEMPLATE_ONBOARDING:rs_onboarding}

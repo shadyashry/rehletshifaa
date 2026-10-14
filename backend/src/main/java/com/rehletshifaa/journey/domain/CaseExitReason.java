@@ -29,7 +29,9 @@ public class CaseExitReason extends AssignedIdEntity {
         // the deposit reminder cycle ended unpaid (ACCEPTED -> EXPIRED)
         DEPOSIT_UNPAID,
         // the Consultant recorded that no follow-up is needed (DISCHARGED -> CLOSED)
-        NO_FOLLOW_UP_NEEDED
+        NO_FOLLOW_UP_NEEDED,
+        // P1-6: the patient left an information request unanswered for 30 days (INFORMATION_REQUIRED -> CANCELLED)
+        INFORMATION_NOT_PROVIDED
     }
 
     @Column(name = "case_id", nullable = false) private UUID caseId;

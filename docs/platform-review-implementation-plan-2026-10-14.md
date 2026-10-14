@@ -429,12 +429,54 @@ phases.
     expired, and repeated expiry carries no availability penalty (A-03's last clause, not planned here). Escalation to the Finance
     Manager on breach (A-04) is not built; HIGH in the queue is the only signal. Native Arabic review of the new copy pending
     with the rest.
-  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (made on the worktree branch
+  - Next exact action (session 1, done): owner fast-forwards `feat/review-p0` to this commit (made on the worktree branch
     `claude/keen-montalcini-720fa3`) and rebuilds the dev stack (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml
     up -d --build`) so V93 runs; then P1-6 session 2 in a new session: information-request reminders on day 2 and day 5 and a
     coordinator alert (`DepositPaymentReminders` pattern), auto-cancel at 30 days through `CaseExitService`, and the
     patient-facing "usually within N working days" (read `SlaPolicy.workingDays`) plus a "meanwhile" line on every `WAIT_*`
     state in `CurrentAction.tsx`, `MyCare.tsx` and `CaseStatusAccess.tsx`.
+  - Done after session 1: the owner fast-forwarded `feat/review-p0` to ccba170 and the dev stack was rebuilt; V93 applied.
+- **Status (2026-10-14, session 2 of 2, branch `feat/review-p0`):** delivered (Opus 5.5, normal mode at the owner's request).
+  - Delivered: `V94__information_request_reminders.sql` adds `case_tasks.reminder_cycle_at` and `reminder_step` (0–3, named
+    CHECK, indexed with type and status) and widens `ck_case_exit_reasons_reason` with `INFORMATION_NOT_PROVIDED`.
+    `PatientActionService.request` starts the cycle on a new request and restarts it when the coordinator asks again.
+    New `InformationRequestReminders` (`DepositPaymentReminders` shape: hourly sweep, one transaction per request, guarded
+    step so each message goes once, a sweep that was down skips to the step the day calls for): calendar days from the ask,
+    because the patient's time is not the team's week. Day 2 and day 5 (`app.sla.information-reminder-days`) send the patient
+    a reminder with a fresh secure link (`PublicCaseAccessService.issueInformationLink(caseId, lang, template)`, new outbox
+    template `patient-action-reminder`, the earlier link revoked); day 7 (`information-alert-day`) alerts the coordinator
+    (`INFO_REQUEST_UNANSWERED`); day 30 (`information-cancel-days`) cancels a case parked in INFORMATION_REQUIRED through the
+    new `CaseExitService.cancelUnansweredInformation` (lifecycle policy, typed exit reason, open work cancelled), tells the
+    patient in their language how to come back (template `information-request-closed`) and the coordinator
+    (`CASE_CANCELLED_NO_INFORMATION`); a non-blocking request on a case that moved on is only withdrawn (`INFO_REQUEST_CLOSED`,
+    waiting reason `PATIENT_INFO_UNANSWERED`). Both templates are bound under `app.whatsapp.meta.templates` and registered in
+    `docs/whatsapp-message-templates.md`. Wait windows (D-02): `SlaPolicy` gains `PREPARE_PROPOSAL` 2 working days and maps
+    each waiting state to its queue (`WAIT_QUEUES`, `PHASE_QUEUES`); `CurrentActionView.expectedWorkingDays` is filled by
+    `CaseActionService` on every WAIT current action for patient and staff, and `PublicCaseStatus.expectedWorkingDays` per
+    status-link phase. My Care shows "This usually takes up to N working days." and a "Meanwhile" line on every waiting
+    step; the status link shows the same per phase (`phaseMeanwhile`); the staff panel shows "Usually within N working days"
+    on a wait on another team. EN/AR copy in `portalWork.plural.workingDays` (Arabic plural forms), `currentAction.usuallyWithin`,
+    `myCare.step.usuallyWithin`/`meanwhile`, `meanwhile` on each WAIT_* step, the three new work-copy items and the waiting
+    reason; the status link's copy is inline as its siblings.
+  - Tests: new `InformationRequestRemindersTest` (5: cycle start, day 2/5 reminders once each with one live link, day 7 alert
+    once; a sweep that was down sends one reminder; asking again restarts; day 30 cancels a parked case once through the
+    policy with the typed reason, the patient and coordinator told once; a non-blocking request is withdrawn and the case
+    continues); `SlaPolicyTest` gains the wait and phase windows; `ConsultantOfferExpiryServiceTest` checks the coordinator's
+    WAIT_CONSULTANT carries 2; `NotificationOutboxProcessorTest` renders both new templates in EN and AR. Frontend:
+    `MyCare.test.tsx` (window and meanwhile only on a team step, Arabic plural), `CaseStatusAccess.test.tsx` (window and
+    meanwhile per phase, none while the patient owes the step), `StaffOperationalUi.test.tsx` (staff wait window).
+    Verification: `mvn -o -q test` 811 tests, 0 failures, 3 pre-existing skips (804 after session 1 + 7 new); `pnpm typecheck`
+    clean; eslint clean on the seven touched frontend files; `MyCare`, `CaseStatusAccess`, `StaffOperationalUi` and
+    `portal-labels` (EN/AR key parity) 109/109; `PostgresJpaMappingTest` on postgres:17-alpine with V94 applied green (1/1).
+  - Open gaps: the two WhatsApp templates must be submitted to Meta for approval before production (email works now).
+    A case cancelled for no answer has no in-place recovery: CANCELLED is terminal, so the patient sends the case again; an
+    owner decision if a reopen path is wanted. The status link shows no window in the deposit phase (the patient's own step)
+    and none for identity review. `PREPARE_PROPOSAL` now has a 2-working-day staff due date too, as the patient window
+    needs one figure. Native Arabic review of the new copy is pending with the rest. Scheduler leadership for the three
+    new jobs belongs to P1-8 (ShedLock on what is now 19 `@Scheduled` jobs).
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (worktree branch `claude/keen-montalcini-720fa3`)
+    and rebuilds the dev stack so V94 runs; P1-6 is complete. Next phase per the sequence: P1-8 (metrics, alerts, scheduler
+    leadership), whose kickoff prompt block still has to be written in `docs/platform-review-phase-prompts.md`.
 
 ### P1-7  Retention, purge, erasure, draft clean-up  (E-03, §7.13)
 - `retention_policies` table (record class → days, legal-hold flag); scheduled purge with audit (abandoned drafts

@@ -1005,6 +1005,10 @@
       "patientResponded": "Patient responded"
     },
     "plural": {
+      "workingDays": {
+        "one": "{count} working day",
+        "other": "{count} working days"
+      },
       "cases": {
         "one": "{count} case",
         "other": "{count} cases"
@@ -1192,7 +1196,8 @@
           "body": "The secure profile link was sent to the patient. The coordination deposit is arranged once the profile is active."
         }
       },
-      "respondBy": "Respond by {time}"
+      "respondBy": "Respond by {time}",
+      "usuallyWithin": "Usually within {duration}"
     },
     "myWork": {
       "title": "My work",
@@ -1313,7 +1318,9 @@
         "requested": "What we need from you",
         "provided": "provided",
         "requestedBy": "Requested by your coordinator",
-        "replyBy": "Please reply by"
+        "replyBy": "Please reply by",
+        "usuallyWithin": "This usually takes up to {duration}.",
+        "meanwhile": "Meanwhile"
       },
       "withdraw": {
         "lead": "Changed your mind?",
@@ -1351,32 +1358,38 @@
         "WAIT_CASE_RECEIVED": {
           "title": "We have your case",
           "body": "Your case has been received and is waiting for a coordinator to look at it.",
-          "next": "A coordinator will check what you sent and tell you if anything is missing."
+          "next": "A coordinator will check what you sent and tell you if anything is missing.",
+          "meanwhile": "Gather any recent reports, scans or prescriptions you have, in case your coordinator asks for them."
         },
         "WAIT_COORDINATOR_REVIEW": {
           "title": "Your coordinator is reviewing your case",
           "body": "Your coordinator is going through what you sent and preparing it for a Consultant.",
-          "next": "Your case will be sent to a Consultant in the right specialty."
+          "next": "Your case will be sent to a Consultant in the right specialty.",
+          "meanwhile": "Keep your recent reports to hand, and message your coordinator if anything about your condition changes."
         },
         "WAIT_CONSULTANT_REVIEW": {
           "title": "A Consultant is reviewing your case",
           "body": "A Consultant is going through your reports and history now.",
-          "next": "You will receive a recommendation and an initial cost estimate."
+          "next": "You will receive a recommendation and an initial cost estimate.",
+          "meanwhile": "Keep following your own doctor's advice, and tell your coordinator if your symptoms change."
         },
         "WAIT_PROPOSAL_REVISION": {
           "title": "We are preparing a revised proposal",
           "body": "Your coordinator is updating the proposal with the changes you asked for.",
-          "next": "You will receive a new secure link to review it."
+          "next": "You will receive a new secure link to review it.",
+          "meanwhile": "Note any other questions about the plan or the cost, so your coordinator can answer them together."
         },
         "WAIT_PROPOSAL_EXPIRED": {
           "title": "We are preparing an updated proposal",
           "body": "Your previous estimate expired. Your coordinator is preparing an updated one.",
-          "next": "You will receive a new secure link to review it."
+          "next": "You will receive a new secure link to review it.",
+          "meanwhile": "Check that your passport is valid and think about who would travel with you."
         },
         "WAIT_PROPOSAL": {
           "title": "We are preparing your proposal",
           "body": "Your coordinator is putting together the treatment plan and its estimated cost.",
-          "next": "You will receive the proposal to review in your own time."
+          "next": "You will receive the proposal to review in your own time.",
+          "meanwhile": "Check that your passport is valid and think about who would travel with you."
         },
         "PAY_DEPOSIT": {
           "title": "Pay your coordination deposit",
@@ -1386,17 +1399,20 @@
         "WAIT_PAYMENT_CHECK": {
           "title": "We're checking your payment",
           "body": "Thank you. Our finance team is matching your transfer with the reference you sent, and we'll let you know as soon as it's confirmed.",
-          "next": "Once your payment is confirmed, your coordinator starts arranging your treatment."
+          "next": "Once your payment is confirmed, your coordinator starts arranging your treatment.",
+          "meanwhile": "Keep your bank's transfer receipt. There is no need to pay again."
         },
         "WAIT_COORDINATION": {
           "title": "We are arranging your treatment",
           "body": "Your coordinator is organising your appointments and, where agreed, the practical side of your trip.",
-          "next": "You will receive your dates and arrival details."
+          "next": "You will receive your dates and arrival details.",
+          "meanwhile": "Keep your passport and phone to hand; your coordinator will message you with dates."
         },
         "WAIT_TREATMENT": {
           "title": "Your arrival is confirmed",
           "body": "Everything is set for your arrival.",
-          "next": "Your treatment begins as planned."
+          "next": "Your treatment begins as planned.",
+          "meanwhile": "Follow the arrival instructions you received and bring all your reports with you."
         },
         "IN_TREATMENT": {
           "title": "Your treatment is under way",
@@ -1707,7 +1723,8 @@
         "DEFAULT_STAFF": "Waiting for our team",
         "TRANSFER_TO_VERIFY": "Transfer reference received — Finance to verify it",
         "DEPOSIT_BALANCE_DUE": "Part of the deposit received — the patient owes the balance",
-        "DEPOSIT_TRANSFER_REJECTED": "Transfer not confirmed — the patient to check and resend the reference"
+        "DEPOSIT_TRANSFER_REJECTED": "Transfer not confirmed — the patient to check and resend the reference",
+        "PATIENT_INFO_UNANSWERED": "The patient did not answer the information request"
       }
     },
     "leaveCase": {
@@ -1725,6 +1742,18 @@
         "caseNumber": "this case"
       },
       "items": {
+        "CASE_CANCELLED_NO_INFORMATION": {
+          "title": "The case was cancelled — the patient did not answer",
+          "context": "The information request went unanswered for {days} days. The patient was told they can send their case again."
+        },
+        "INFO_REQUEST_CLOSED": {
+          "title": "An unanswered information request was closed",
+          "context": "The patient did not answer within {days} days, so the request was withdrawn. The case continues without it."
+        },
+        "INFO_REQUEST_UNANSWERED": {
+          "title": "The patient has not answered your information request",
+          "context": "They were reminded twice. Contact them, or record what they sent another way; the request closes on day {days}."
+        },
         "NEW_ASSIGNMENT_CLINICAL": {
           "title": "New clinical assignment",
           "context": "You have been assigned case {caseNumber} for clinical review. Accept it to start, or decline so the coordinator can reassign."

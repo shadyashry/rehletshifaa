@@ -60,6 +60,24 @@ class SlaPolicyTest {
         assertThat(DEFAULTS.plusWorkingDays(cairo("2026-10-13T15:00"), 1)).isEqualTo(cairo("2026-10-14T15:00"));
     }
 
+    @Test void everyWaitingStateReadsItsWindowFromTheQueueTable() {
+        assertThat(DEFAULTS.waitWorkingDays("WAIT_COORDINATOR_REVIEW")).isEqualTo(1);
+        assertThat(DEFAULTS.waitWorkingDays("WAIT_CONSULTANT_REVIEW")).isEqualTo(2);
+        assertThat(DEFAULTS.waitWorkingDays("WAIT_PROPOSAL")).isEqualTo(2);
+        assertThat(DEFAULTS.waitWorkingDays("WAIT_PAYMENT_CHECK")).isEqualTo(1);
+        assertThat(DEFAULTS.waitWorkingDays("WAIT_COORDINATION")).isEqualTo(2);
+        assertThat(DEFAULTS.waitWorkingDays("WAIT_CONSULTANT")).isEqualTo(2);
+        assertThat(DEFAULTS.waitWorkingDays("WAIT_OPERATIONS")).isEqualTo(2);
+        // Not the team's clock: treatment dates and the patient's own steps carry no window.
+        assertThat(DEFAULTS.waitWorkingDays("WAIT_TREATMENT")).isNull();
+        assertThat(DEFAULTS.waitWorkingDays("WAIT_PATIENT_DECISION")).isNull();
+        assertThat(DEFAULTS.waitWorkingDays(null)).isNull();
+        assertThat(DEFAULTS.phaseWorkingDays("received")).isEqualTo(1);
+        assertThat(DEFAULTS.phaseWorkingDays("consultant")).isEqualTo(2);
+        assertThat(DEFAULTS.phaseWorkingDays("deposit")).isNull();
+        assertThat(DEFAULTS.phaseWorkingDays("followup")).isNull();
+    }
+
     @Test void theWindowIsConfigurable() {
         SlaPolicy narrow = new SlaPolicy("Africa/Cairo", List.of("MONDAY", "tuesday"), "09:00", "13:00", 8, 4);
         assertThat(narrow.workingDay()).isEqualTo(Duration.ofHours(4));

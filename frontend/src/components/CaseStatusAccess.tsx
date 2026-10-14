@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileUp, LockKeyhole, ShieldCheck, X } from "lucide-react";
 
-import { PatientJourneyTracker, phaseExplanation } from "@/components/PatientJourneyTracker";
+import { PatientJourneyTracker, phaseExplanation, phaseMeanwhile } from "@/components/PatientJourneyTracker";
+import { plural } from "@/lib/portal-labels";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
@@ -14,7 +15,8 @@ type Summary = { caseNumber: string; destinationHint: string };
 type ActionItem = { id: string; kind: "INFORMATION" | "DOCUMENT"; code: string; label: string; required: boolean; completed: boolean; response: string | null };
 type Action = { taskId: string; title: string; message: string | null; blocking: boolean; dueAt: string | null; items: ActionItem[] };
 type ProposalState = { state: string; action: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionNumber: number | null; validUntil: string | null; decidedAt: string | null };
-type Status = { caseNumber: string; statusEn: string; statusAr: string; phase?: string | null; actionRequired: boolean; action: Action | null; proposal?: ProposalState | null };
+/** `expectedWorkingDays`: P1-6 (D-02), how long the team usually takes over this phase; null while the patient owes the step. */
+type Status = { caseNumber: string; statusEn: string; statusAr: string; phase?: string | null; actionRequired: boolean; action: Action | null; proposal?: ProposalState | null; expectedWorkingDays?: number | null };
 type ProposalHandoff = { token: string; grant: string; expiresAt: string };
 /** Hands the already-verified proposal grant to the proposal page in this browser session only — never through the URL. */
 export const PROPOSAL_HANDOFF_KEY = (token: string) => `rs-proposal-grant:${token}`;
@@ -28,6 +30,8 @@ const copy = {
     private: "Your medical information is shown only after contact verification.",
     status: "Current update", action: "Your response", now: "What happens now", next: "Next",
     noAction: "No action is required from you right now.", journey: "Your case",
+    usuallyWithin: "This usually takes up to {duration}.", meanwhile: "Meanwhile",
+    workingDays: { one: "{count} working day", other: "{count} working days" },
     noItems: "Add anything you would like your coordinator to know.",
     required: "Required", optional: "Optional", already: "Already provided",
     choose: "Choose a file", chosen: "file selected", replace: "Choose a different file", remove: "Remove",
@@ -54,6 +58,8 @@ const copy = {
     private: "لا تظهر معلوماتك الطبية إلا بعد التحقق من جهة الاتصال.",
     status: "آخر تحديث", action: "ردّك", now: "ما يحدث الآن", next: "الخطوة التالية",
     noAction: "لا يلزم منك أي إجراء الآن.", journey: "مسار حالتك",
+    usuallyWithin: "يستغرق هذا عادةً مدة تصل إلى {duration}.", meanwhile: "في الأثناء",
+    workingDays: { zero: "{count} يوم عمل", one: "يوم عمل واحد", two: "يومَي عمل", few: "{count} أيام عمل", many: "{count} يوم عمل", other: "{count} يوم عمل" },
     noItems: "أضف أي معلومة تودّ أن يعرفها منسقك.",
     required: "مطلوب", optional: "اختياري", already: "تم تقديمه",
     choose: "اختيار ملف", chosen: "ملف محدد", replace: "اختيار ملف آخر", remove: "إزالة",
@@ -221,6 +227,10 @@ export function CaseStatusAccess({ locale, token, emergency }: { locale: Locale;
   const explain = proposalState === "READY" ? { title: t.proposalReadyTitle, body: t.proposalReady, next: t.proposalReadyNext }
     : proposalState === "PREPARING" ? { title: t.proposalPreparingTitle, body: t.proposalPreparing, next: t.proposalPreparingNext }
     : phaseExplanation(status?.phase, !!status?.actionRequired, locale);
+  // P1-6 (D-02): while the team has the step, how long it usually takes and what the patient can do meanwhile.
+  const teamStep = !!status && !status.actionRequired && proposalState !== "READY";
+  const usually = teamStep && status?.expectedWorkingDays ? t.usuallyWithin.replace("{duration}", plural(locale, status.expectedWorkingDays, t.workingDays)) : null;
+  const meanwhile = teamStep ? phaseMeanwhile(status?.phase, false, locale) : null;
   return (
     <Frame title={t.title} notice={notice}>
       {summary && <p className="mb-5 font-bold text-brand-800">{summary.caseNumber}</p>}
@@ -247,10 +257,16 @@ export function CaseStatusAccess({ locale, token, emergency }: { locale: Locale;
           <p className="text-[0.7rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.now}</p>
           <h2 id="status-now" className="mt-1 text-[1.05rem] font-bold leading-6 text-brand-900">{explain.title}</h2>
           <p className="mt-1.5 leading-6 text-ink-700">{explain.body}</p>
+          {usually && <p className="mt-2 text-[0.9rem] text-ink-700">{usually}</p>}
           {!status.actionRequired && proposalState !== "READY" && <p className="mt-2 text-[0.9rem] font-semibold text-brand-800">{t.noAction}</p>}
           {explain.next && (
             <p className="mt-3 border-t border-brand-200 pt-3 text-[0.88rem] leading-6 text-ink-600">
               <span className="font-bold text-ink-800">{t.next}:</span> {explain.next}
+            </p>
+          )}
+          {meanwhile && (
+            <p className="mt-2 text-[0.88rem] leading-6 text-ink-600">
+              <span className="font-bold text-ink-800">{t.meanwhile}:</span> {meanwhile}
             </p>
           )}
         </section>

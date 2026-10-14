@@ -36,7 +36,9 @@ public class SlaPolicy {
      *   <li>patient identity review ({@code PATIENT_IDENTITY_REVIEW}; no work item yet, read for the patient copy): 2;</li>
      *   <li>Operations' travel package and travel plan ({@code PREPARE_TRAVEL_PACKAGE}, {@code UPDATE_TRAVEL_PLAN}): 2;</li>
      *   <li>the Consultant's clinical review ({@code CLINICAL_REVIEW}): 2;</li>
-     *   <li>the coordinator's intake review ({@code ASSIGN_CONSULTANT}, {@code REVIEW_PATIENT_RESPONSE}): 1.</li>
+     *   <li>the coordinator's intake review ({@code ASSIGN_CONSULTANT}, {@code REVIEW_PATIENT_RESPONSE}): 1;</li>
+     *   <li>the coordinator's proposal ({@code PREPARE_PROPOSAL}): 2 (session 2, so the patient's "preparing your
+     *       proposal" has a window too).</li>
      * </ul>
      */
     static final Map<String, Integer> QUEUE_WORKING_DAYS = Map.of(
@@ -46,7 +48,31 @@ public class SlaPolicy {
             "UPDATE_TRAVEL_PLAN", 2,
             "CLINICAL_REVIEW", 2,
             "ASSIGN_CONSULTANT", 1,
-            "REVIEW_PATIENT_RESPONSE", 1);
+            "REVIEW_PATIENT_RESPONSE", 1,
+            "PREPARE_PROPOSAL", 2);
+
+    /**
+     * P1-6 session 2 (D-02): the queue each waiting state waits on, so "usually within N working days" is read from the
+     * table above and never stated twice. Patient waits ({@code WAIT_COORDINATOR_REVIEW} … {@code WAIT_COORDINATION}) and
+     * the staff panel's waits on another team ({@code WAIT_CONSULTANT}, {@code WAIT_OPERATIONS}). A wait missing here
+     * (treatment dates, the patient's own decision or payment) has no window: it is not the team's clock.
+     */
+    static final Map<String, String> WAIT_QUEUES = Map.of(
+            "WAIT_COORDINATOR_REVIEW", "ASSIGN_CONSULTANT",
+            "WAIT_CONSULTANT_REVIEW", "CLINICAL_REVIEW",
+            "WAIT_PROPOSAL", "PREPARE_PROPOSAL",
+            "WAIT_PAYMENT_CHECK", "DEPOSIT_RECORD",
+            "WAIT_COORDINATION", "UPDATE_TRAVEL_PLAN",
+            "WAIT_CONSULTANT", "CLINICAL_REVIEW",
+            "WAIT_OPERATIONS", "UPDATE_TRAVEL_PLAN");
+
+    /** The same for the coarse phases of the patient's status link ({@code PublicCaseAccessService.patientPhase}). */
+    static final Map<String, String> PHASE_QUEUES = Map.of(
+            "received", "ASSIGN_CONSULTANT",
+            "coordinator", "ASSIGN_CONSULTANT",
+            "consultant", "CLINICAL_REVIEW",
+            "proposal", "PREPARE_PROPOSAL",
+            "treatment", "UPDATE_TRAVEL_PLAN");
 
     private final ZoneId zone;
     private final WorkingSchedule week;
@@ -93,6 +119,12 @@ public class SlaPolicy {
 
     /** The working days the queue of {@code workType} has, or null when the type carries no service level. */
     public Integer workingDays(String workType) { return workType == null ? null : QUEUE_WORKING_DAYS.get(workType); }
+
+    /** How many working days a waiting state usually takes, or null when it has no window ({@link #WAIT_QUEUES}). */
+    public Integer waitWorkingDays(String waitCode) { return waitCode == null ? null : workingDays(WAIT_QUEUES.get(waitCode)); }
+
+    /** The same for a status-link phase ({@link #PHASE_QUEUES}). */
+    public Integer phaseWorkingDays(String phase) { return phase == null ? null : workingDays(PHASE_QUEUES.get(phase)); }
 
     /** When work of {@code workType} opened at {@code from} is due, or null when the type carries no service level. */
     public Instant dueAt(String workType, Instant from) {

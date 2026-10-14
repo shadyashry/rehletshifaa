@@ -119,6 +119,14 @@ class ConsultantOfferExpiryServiceTest {
         assertThat(offers.shortenOpenOffer(other)).isNull();
     }
 
+    @Test void theCoordinatorWaitingOnTheConsultantSeesHowLongItUsuallyTakes() throws Exception {
+        Offer offer = pendingOffer("+254700000836", false);
+        authenticate(COORDINATOR, Role.COORDINATOR);
+        var current = journey.workspace(offer.caseId()).actions().currentAction();
+        assertThat(current.code()).isEqualTo("WAIT_CONSULTANT");
+        assertThat(current.expectedWorkingDays()).isEqualTo(sla.waitWorkingDays("WAIT_CONSULTANT")).isEqualTo(2);
+    }
+
     // ---------- fixture ----------
 
     private record Offer(UUID caseId, UUID assignmentId) {}

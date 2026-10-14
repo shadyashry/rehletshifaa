@@ -173,6 +173,7 @@ class NotificationOutboxProcessorTest {
     @Test void everyPatientMessageIsWrittenInThePatientsLanguage() {
         String[][] templates = {
                 {"case-status-link", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"patient-action-link", "{\"token\":\"t1\",\"lang\":\"%s\"}"},
+                {"patient-action-reminder", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"information-request-closed", "{\"lang\":\"%s\"}"},
                 {"secure-message", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"proposal-ready", "{\"token\":\"t1\",\"lang\":\"%s\"}"},
                 {"final-quote-ready", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"onboarding-activation", "{\"token\":\"t1\",\"lang\":\"%s\"}"},
                 {"account-link-continue", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"deposit-settled-patient", "{\"lang\":\"%s\"}"},

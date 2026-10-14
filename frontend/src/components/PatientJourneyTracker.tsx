@@ -69,6 +69,23 @@ export function PatientJourneyTracker({ locale, phase, waitingOnPatient = false,
  * ever receiving an internal status. Deliberately says nothing about who is handling it: this page is
  * reached with a one-time code rather than a sign-in.
  */
+/**
+ * P1-6 (D-02): what the patient can usefully do while the team has the step, per phase; nothing while they owe the step
+ * themselves, or once the journey is in follow-up.
+ */
+export function phaseMeanwhile(phase: string | null | undefined, actionRequired: boolean, locale: Locale): string | null {
+  if (actionRequired) return null;
+  const copy: Record<string, { en: string; ar: string }> = {
+    received: { en: "Gather any recent reports, scans or prescriptions you have, in case your coordinator asks for them.", ar: "اجمع ما لديك من تقارير أو صور أشعة أو وصفات حديثة، فقد يطلبها منسّقك." },
+    coordinator: { en: "Keep your recent reports to hand, and message your coordinator if anything about your condition changes.", ar: "احتفظ بتقاريرك الحديثة في متناول يدك، وراسل منسّقك إن تغيّر شيء في حالتك." },
+    consultant: { en: "Keep following your own doctor's advice, and tell your coordinator if your symptoms change.", ar: "واصل اتباع نصائح طبيبك، وأخبر منسّقك إن تغيّرت أعراضك." },
+    proposal: { en: "Check that your passport is valid and think about who would travel with you.", ar: "تأكّد من صلاحية جواز سفرك، وفكّر فيمن سيرافقك في السفر." },
+    treatment: { en: "Keep your passport and phone to hand; your coordinator will message you with dates.", ar: "احتفظ بجواز سفرك وهاتفك في متناول يدك؛ سيراسلك منسّقك بالمواعيد." },
+  };
+  const entry = phase ? copy[phase] : undefined;
+  return entry ? (locale === "ar" ? entry.ar : entry.en) : null;
+}
+
 export function phaseExplanation(phase: string | null | undefined, actionRequired: boolean, locale: Locale) {
   const ar = locale === "ar";
   if (actionRequired) return {

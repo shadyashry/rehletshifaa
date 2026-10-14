@@ -24,6 +24,8 @@ created under the same template name.
 | `rs_case_received` | `case-status-link` | View case status / متابعة حالة الطلب → `status` |
 | `rs_secure_message` | `secure-message` | Open message / فتح الرسالة → `status` |
 | `rs_patient_action` | `patient-action-link` | Respond securely / الرد بأمان → `status` |
+| `rs_patient_action_reminder` | `patient-action-reminder` | Respond securely / الرد بأمان → `status` (P1-6: day 2 and day 5 of an unanswered request) |
+| `rs_information_request_closed` | `information-request-closed` | none (P1-6: the case closed after 30 days without an answer) |
 | `rs_proposal_ready` | `proposal-ready` | Review proposal / مراجعة المقترح → `proposal` |
 | `rs_final_quote_ready` | `final-quote-ready` | Review final quote / مراجعة العرض النهائي → `proposal` |
 | `rs_onboarding` | `onboarding-activation` | Complete my profile / إكمال ملفي → `activate` |
@@ -94,6 +96,14 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 - en: Hello, {{1}} from RehletShifaa will be your coordinator from now on and will continue your conversation here.
 - ar: مرحباً، سيكون {{1}} من رحلة شفاء منسّقك من الآن وسيتابع محادثتك هنا.
 - Sample value for review: `Omar Ali` / `عمر علي`.
+
+**`rs_patient_action_reminder`** (P1-6: an information request still unanswered on day 2 and day 5; each carries a fresh link, the earlier one is revoked)
+- en: Your RehletShifaa coordinator is still waiting for the information they asked for, so your case can continue. Please respond securely using the button below.
+- ar: ما زال منسّقك في رحلة شفاء بانتظار المعلومات التي طلبها لمتابعة حالتك. يُرجى الرد بأمان عبر الزر أدناه.
+
+**`rs_information_request_closed`** (P1-6: the case was cancelled after 30 days without an answer)
+- en: We closed your RehletShifaa case because we did not hear back about the information your coordinator asked for. If you still need care, reply to this message or send your case again.
+- ar: أغلقنا حالتك في رحلة شفاء لأننا لم نتلقَّ ردّك على المعلومات التي طلبها منسّقك. إن كنت ما زلت بحاجة إلى العلاج، فردّ على هذه الرسالة أو أرسل حالتك من جديد.
 
 **`rs_out_of_hours`** (S5: first message in a closed period from someone without a case; once per closed period)
 - en: Thank you for contacting RehletShifaa. Our coordinators are available Saturday to Thursday, 10:00–20:00 Cairo time, and will reply when we open.

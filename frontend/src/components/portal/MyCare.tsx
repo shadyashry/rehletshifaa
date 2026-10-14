@@ -6,7 +6,7 @@ import { ArrowRight, Check, FileText, MessageCircle, MessageSquareText, Plus, Us
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { EmergencyGuidance } from "@/components/EmergencyGuidance";
-import { careAreaLabel, fillTemplate } from "@/lib/portal-labels";
+import { careAreaLabel, fillTemplate, plural } from "@/lib/portal-labels";
 import { ConfirmDialog, UnreadCount } from "@/components/portal/portal-ui";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { CareAreaMark, CaseSwitcher, phaseIndex, takeArrivalFocus } from "@/components/portal/CaseSwitcher";
@@ -36,7 +36,8 @@ export type DepositSummaryData = { status: string; currency: string; totalDispla
 export type CaseDocument = { documentId: string; fileName: string; status: string; createdAt: string };
 export type CareView = "care" | "documents" | "messages";
 
-type StepText = { title: string; body: string; next?: string };
+/** `meanwhile`: P1-6 (D-02), on a waiting step, what the patient can usefully do while the team works. */
+type StepText = { title: string; body: string; next?: string; meanwhile?: string };
 /** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. Paying it is the payment step's own panel. */
 const MONEY_STEPS = new Set(["PAY_DEPOSIT", "WAIT_PAYMENT_CHECK"]);
 
@@ -74,6 +75,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
   const showDeposit = !!deposit && deposit.status !== "CANCELLED";
   const depositInStep = showDeposit && MONEY_STEPS.has(code);
   const focus = actions.currentAction.kind === "FOCUS";
+  const expectedDays = actions.currentAction.expectedWorkingDays ?? null;
   const showSwitcher = cases.length > 1;
 
   // Arriving from the case switcher: the card that was pressed is gone, so the new case's heading takes focus.
@@ -142,6 +144,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
             <p className="eyebrow">{t.step.eyebrow}</p>
             <h2 id="current-step-title" className="statement mt-2.5 text-brand-900">{step.title}</h2>
             <p className="mt-3 max-w-[65ch] text-ink-600" dir="auto">{body}</p>
+            {/* P1-6 (D-02): how long the team usually takes, from the one SLA table, only while the team has the step. */}
+            {!focus && expectedDays ? <p className="mt-2 text-[0.9375rem] text-ink-700">{fillTemplate(t.step.usuallyWithin, { duration: plural(locale, expectedDays, work.plural.workingDays) })}</p> : null}
 
             {code === "PROVIDE_INFORMATION" && patientAction && (c.coordinatorName || patientAction.dueAt) && (
               <p className="mt-2 text-[0.875rem] text-ink-600">
@@ -190,6 +194,12 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
               <div className="mt-5 border-t border-line pt-4 text-[0.9375rem] leading-7">
                 <p className="font-semibold text-ink-800">{t.step.next}</p>
                 <p className="text-ink-600">{step.next}</p>
+              </div>
+            )}
+            {!focus && step.meanwhile && (
+              <div className="mt-4 text-[0.9375rem] leading-7">
+                <p className="font-semibold text-ink-800">{t.step.meanwhile}</p>
+                <p className="text-ink-600">{step.meanwhile}</p>
               </div>
             )}
           </section>

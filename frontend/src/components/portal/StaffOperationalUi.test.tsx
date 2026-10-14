@@ -517,6 +517,11 @@ describe("consultant workspace", () => {
     expect(onDecline).not.toHaveBeenCalled();
   });
 
+  it("says how long a wait on another team usually takes (P1-6)", () => {
+    renderWithWork(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "WAIT_CONSULTANT", kind: "WAIT", expectedWorkingDays: 2 }}/>);
+    expect(screen.getByText("Usually within 2 working days")).toBeTruthy();
+  });
+
   it("names the offer deadline, with its time, on the accept/decline card (P1-6)", () => {
     renderWithWork(<CurrentActionPanel locale="en" role="doctor" action={{ code: "ACCEPT_ASSIGNMENT", kind: "ACCEPT", dueAt: "2026-10-20T12:00:00Z" }}
                                respondBy="2026-10-20T12:00:00Z" onAcceptAssignment={vi.fn()} onDeclineAssignment={vi.fn()}/>);

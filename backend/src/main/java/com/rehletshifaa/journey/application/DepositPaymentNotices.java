@@ -28,14 +28,17 @@ public class DepositPaymentNotices {
     }
 
     /** Queue one message, once per idempotency key; false when the patient has no channel on record. */
-    boolean send(UUID caseId, String template, String key) {
+    boolean send(UUID caseId, String template, String key) { return send(caseId, "DEPOSIT_PAYMENT", template, key); }
+
+    /** As above under another outbox category (P1-6: the information-request closure, {@code PATIENT_ACTION}). */
+    boolean send(UUID caseId, String category, String template, String key) {
         var c = cases.findPatientContact(caseId).orElse(null);
         if (c == null) return false;
         boolean whatsapp = c.getWhatsappNumber() != null && !c.getWhatsappNumber().isBlank();
         String destination = whatsapp ? c.getWhatsappNumber() : c.getEmail();
         if (destination == null || destination.isBlank()) return false;
         String lang = "ar".equals(c.getPreferredLanguage()) ? "ar" : "en";
-        outbox.enqueueOnce("DEPOSIT_PAYMENT", whatsapp ? "WHATSAPP" : "EMAIL", destination, template,
+        outbox.enqueueOnce(category, whatsapp ? "WHATSAPP" : "EMAIL", destination, template,
                 intake.encryptedJson("{\"lang\":\"" + lang + "\",\"case\":\"" + caseId + "\"}"), key, clock.instant());
         return true;
     }

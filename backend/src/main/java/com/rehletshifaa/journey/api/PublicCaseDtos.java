@@ -23,7 +23,8 @@ public final class PublicCaseDtos {
      * {@code phase} is the coarse patient-facing journey phase; the internal case status is never sent.
      * {@code proposal} is the same patient-visibility answer the signed-in case page renders from.
      */
-    public record PublicCaseStatus(String caseNumber,String statusEn,String statusAr,String phase,boolean actionRequired,WorkDtos.PatientActionView action,JourneyDtos.PatientProposalState proposal) {}
+    /** {@code expectedWorkingDays}: P1-6, how long the team usually takes over this phase (SlaPolicy); null when the patient owes the step or no level applies. */
+    public record PublicCaseStatus(String caseNumber,String statusEn,String statusAr,String phase,boolean actionRequired,WorkDtos.PatientActionView action,JourneyDtos.PatientProposalState proposal,Integer expectedWorkingDays) {}
     /** The note stays optional once structured items carry the answer; the backend requires at least one. */
     public record InformationResponseRequest(@NotBlank @Size(max=256)String grant,@Size(max=10000)String message,@Pattern(regexp="en|ar")String language,java.util.List<WorkDtos.ItemResponse> items) {}
 }

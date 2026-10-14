@@ -342,6 +342,41 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
             where t.id = :id""")
     int adoptOwner(@Param("id") UUID id, @Param("owner") String owner, @Param("now") Instant now);
 
+    interface InformationRequestCycle { UUID getId(); UUID getCaseId(); Instant getReminderCycleAt(); Integer getReminderStep(); }
+
+    /** P1-6: open information requests with a reminder cycle (InformationRequestReminders.sweep). */
+    @Query("""
+            select t.id as id, t.caseId as caseId, t.reminderCycleAt as reminderCycleAt, t.reminderStep as reminderStep from CaseTask t
+            where t.taskType = 'INFORMATION_REQUEST' and t.visibilityScope = 'PATIENT_ACTION' and t.status in ('OPEN', 'IN_PROGRESS')
+            and t.reminderCycleAt is not null
+            order by t.reminderCycleAt, t.id""")
+    java.util.List<InformationRequestCycle> findOpenInformationRequestCycles();
+
+    /** P1-6: one open information request and its cycle. */
+    @Query("""
+            select t.id as id, t.caseId as caseId, t.reminderCycleAt as reminderCycleAt, t.reminderStep as reminderStep from CaseTask t
+            where t.id = :id and t.taskType = 'INFORMATION_REQUEST' and t.visibilityScope = 'PATIENT_ACTION' and t.status in ('OPEN', 'IN_PROGRESS')""")
+    java.util.Optional<InformationRequestCycle> findOpenInformationRequestCycle(@Param("id") UUID id);
+
+    /** P1-6: the cycle moves on once; a concurrent sweep that read the same step changes nothing. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update CaseTask t set t.reminderStep = :to where t.id = :id and t.reminderStep = :from and t.status in ('OPEN', 'IN_PROGRESS')""")
+    int advanceReminderStep(@Param("id") UUID id, @Param("from") int from, @Param("to") int to);
+
+    /** P1-6: the coordinator asked again, so the reminder days start over. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update CaseTask t set t.reminderCycleAt = :now, t.reminderStep = 0 where t.id = :id")
+    int restartReminderCycle(@Param("id") UUID id, @Param("now") Instant now);
+
+    /** P1-6: an unanswered patient action is withdrawn (the case continues without it). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update CaseTask t set t.status = 'CANCELLED', t.cancelledAt = :now, t.cancellationReason = :reason, t.updatedAt = :now,
+                t.version = t.version + 1
+            where t.id = :id and t.visibilityScope = 'PATIENT_ACTION' and t.status in ('OPEN', 'IN_PROGRESS')""")
+    int cancelPatientAction(@Param("id") UUID id, @Param("reason") String reason, @Param("now") Instant now);
+
     /** A patient action asked for again: a new message (if any) replaces the old one. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

@@ -75,6 +75,7 @@ public class CaseActionService {
     private final CustomerReadinessService readiness;
     private final PaymentService payment;
     private final StaffWorkService work;
+    private final SlaPolicy sla;
     private final PatientActionQueryService patientActions;
     private final ProposalAccessService proposals;
     private final Authority authority;
@@ -88,8 +89,8 @@ public class CaseActionService {
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
                              com.rehletshifaa.workforce.application.WorkforceDirectory workforce, CaseExitReasonRepository exitReasons,
-                             TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges) {
-        this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges;
+                             TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla) {
+        this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges; this.sla = sla;
         this.workforce = workforce;
         this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
         this.patientActions = patientActions; this.proposals = proposals; this.authority = authority; this.clock = clock;
@@ -127,7 +128,7 @@ public class CaseActionService {
         List<String> available = new ArrayList<>(owned ? availableActions(f, proposal, patientAction, blockers)
                 : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of());
         available.addAll(sends);
-        return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), current, blockers, available, "STAFF", waitingReason.code());
+        return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), withWindow(current), blockers, available, "STAFF", waitingReason.code());
     }
 
     // ---------------- the patient's own answer ----------------
@@ -158,7 +159,7 @@ public class CaseActionService {
         // P0-2: the patient's own way out, until travel is confirmed; from then on their coordinator records it for them.
         if (CaseTransitionPolicy.patientMayWithdraw(f.status(), () -> travelPlans.findStatusByCaseId(caseId).orElse(null))) available.add("WITHDRAW");
         CurrentActionView current = patientCurrentAction(caseId, f.status(), patientAction, mine);
-        return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), current, mine, available, viewer, waitingReason.code());
+        return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), withWindow(current), mine, available, viewer, waitingReason.code());
     }
 
     private CurrentActionView patientCurrentAction(UUID caseId, String status, PatientActionView patientAction, List<BlockerView> mine) {
@@ -558,6 +559,11 @@ public class CaseActionService {
      * the deposit, which the stage gate checks itself. A missing onboarding is owed by staff but still gates (CL3).
      */
     static boolean coordinationGate(BlockerView b) { return b.gating() && !"DEPOSIT_UNPAID".equals(b.code()); }
+    /** P1-6 (D-02): a waiting state carries how long the team usually takes over it, from the one SLA table. */
+    private CurrentActionView withWindow(CurrentActionView view) {
+        return "WAIT".equals(view.kind()) ? view.withExpectedWorkingDays(sla.waitWorkingDays(view.code())) : view;
+    }
+
     private static CurrentActionView simple(String code, String kind) { return new CurrentActionView(code, kind, null, null, null, null, null, null, false, null); }
     private static CurrentActionView none() { return simple("NONE", "NONE"); }
 }

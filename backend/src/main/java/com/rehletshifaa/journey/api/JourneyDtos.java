@@ -190,9 +190,17 @@ public final class JourneyDtos {
      * {@code exit}: for a NONE action on a case that left its journey, the calm word the portal says it with
      * (WITHDRAWN, CANCELLED, EXPIRED, COMPLETED, CLOSED); null while the case is live or ended before acceptance.
      */
-    public record CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode,WorkDtos.WorkCopy copy,String exit) {
+    /** {@code expectedWorkingDays}: P1-6 (D-02), on a waiting state, how long the team usually takes (SlaPolicy); null otherwise. */
+    public record CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode,WorkDtos.WorkCopy copy,String exit,Integer expectedWorkingDays) {
+        public CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode,WorkDtos.WorkCopy copy,String exit){
+            this(code,kind,title,context,workItemId,workItemVersion,workType,dueAt,overdue,blockerCode,copy,exit,null);
+        }
         public CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode,WorkDtos.WorkCopy copy){
-            this(code,kind,title,context,workItemId,workItemVersion,workType,dueAt,overdue,blockerCode,copy,null);
+            this(code,kind,title,context,workItemId,workItemVersion,workType,dueAt,overdue,blockerCode,copy,null,null);
+        }
+        /** The same view with its waiting window (null leaves it without one). */
+        public CurrentActionView withExpectedWorkingDays(Integer days){
+            return new CurrentActionView(code,kind,title,context,workItemId,workItemVersion,workType,dueAt,overdue,blockerCode,copy,exit,days);
         }
         public CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode){
             this(code,kind,title,context,workItemId,workItemVersion,workType,dueAt,overdue,blockerCode,null,null);
