@@ -28,11 +28,11 @@ public interface PatientProfileRepository extends BaseRepository<PatientProfile,
             from PatientProfile p where p.id = :id""")
     Optional<OnboardingProfile> findOnboardingProfile(@Param("id") UUID id);
 
-    /** The number is the verified personal mobile of another patient who already has an account. */
+    /** The number (by its blind-index token, see {@code PhoneIndexListener}) is the verified personal mobile of another patient who already has an account. */
     @Query("""
-            select count(p) > 0 from PatientProfile p where p.id <> :id and p.whatsappNumber = :phone and p.phoneVerifiedAt is not null
+            select count(p) > 0 from PatientProfile p where p.id <> :id and p.whatsappHmac = :token and p.phoneVerifiedAt is not null
             and p.externalSubject is not null""")
-    boolean isVerifiedMobileOfAnotherAccount(@Param("id") UUID id, @Param("phone") String phone);
+    boolean isVerifiedMobileOfAnotherAccount(@Param("id") UUID id, @Param("token") String token);
 
     /** The patient's sign-in account as the account rules read it. */
     interface Account {

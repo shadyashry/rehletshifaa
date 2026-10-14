@@ -112,7 +112,7 @@ class PatientActivationJourneyTest {
         var ctx = accepted();
         var result = activation.activate(ctx.token, grant(ctx), request("محمد عبد الله"));
         assertThat(result.profileActive()).isTrue();
-        assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId(ctx.caseId)))
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId(ctx.caseId))))
                 .isEqualTo("محمد عبد الله");
     }
 

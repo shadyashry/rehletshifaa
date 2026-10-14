@@ -62,7 +62,7 @@ public class PatientChannelService {
     public Optional<ChannelCase> caseFor(String senderPhone) {
         String digits = PhoneDigits.of(senderPhone);
         if (digits == null) return Optional.empty();
-        return cases.findChannelCases(digits, NOT_OPEN).stream().findFirst()
+        return cases.findChannelCases(crypto.hmac(digits), NOT_OPEN).stream().findFirst()
                 .map(c -> new ChannelCase(c.getCaseId(), c.getSenderRole(), c.getLanguage()));
     }
 

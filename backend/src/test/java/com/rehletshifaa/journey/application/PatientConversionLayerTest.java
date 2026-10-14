@@ -167,8 +167,8 @@ class PatientConversionLayerTest {
         assertThat(view.caseNumber()).isEqualTo(ctx.caseNumber);
         assertThat(view.completedConsentTypes()).containsExactlyInAnyOrder("CROSS_BORDER_CARE", "PRIVACY_DATA_PROCESSING");
         var p = jdbc.queryForMap("SELECT given_name,family_name,country,whatsapp_number,email FROM patient_profiles WHERE id=?", patientId);
-        String name = (p.get("given_name") + " " + (p.get("family_name") == null ? "" : p.get("family_name"))).trim();
-        assertThat(view.profile()).isEqualTo(new PatientProfileSummary(name, (String) p.get("country"), (String) p.get("whatsapp_number"), (String) p.get("email"), true, false));
+        String name = (crypto.decrypt((String) p.get("given_name")) + " " + (p.get("family_name") == null ? "" : crypto.decrypt((String) p.get("family_name")))).trim();
+        assertThat(view.profile()).isEqualTo(new PatientProfileSummary(name, (String) p.get("country"), crypto.decrypt((String) p.get("whatsapp_number")), (String) p.get("email"), true, false));
         var row = jdbc.queryForMap("SELECT id,state,subject_type,version FROM patient_onboardings WHERE case_id=?", ctx.caseId);
         assertThat(view.id()).isEqualTo(row.get("id"));
         assertThat(view.state()).isEqualTo(row.get("state"));

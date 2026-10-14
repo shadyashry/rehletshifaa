@@ -78,6 +78,15 @@ class CleanPatientSchemaMigrationTest {
         assertThat(columns(jdbc, "patient_profiles")).doesNotContain("mobile_owner");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE LOWER(table_name)='case_claim_challenges'", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM medical_cases WHERE id=?", Integer.class, caseId)).isOne();
+        // V86 encrypted the pre-existing plaintext rows in place with key version 1 and built the phone blind index.
+        assertThat(columns(jdbc, "patient_profiles")).contains("whatsapp_hmac").doesNotContain("whatsapp_digits");
+        var encrypted = jdbc.queryForMap("SELECT given_name, whatsapp_number, whatsapp_hmac FROM patient_profiles WHERE whatsapp_hmac IS NOT NULL");
+        assertThat((String) encrypted.get("given_name")).startsWith("v1:").doesNotContain("Patient");
+        assertThat((String) encrypted.get("whatsapp_number")).startsWith("v1:").doesNotContain("254700000001");
+        String key = System.getenv("PII_ENCRYPTION_KEY") == null ? com.rehletshifaa.shared.crypto.CryptoService.DEV_KEY : System.getenv("PII_ENCRYPTION_KEY");
+        String indexKey = System.getenv("PII_INDEX_KEY") == null ? com.rehletshifaa.shared.crypto.CryptoService.DEV_INDEX_KEY : System.getenv("PII_INDEX_KEY");
+        assertThat(com.rehletshifaa.shared.crypto.PiiCipher.decrypt(com.rehletshifaa.shared.crypto.PiiCipher.aesKey(key), ((String) encrypted.get("given_name")).substring(3))).isEqualTo("Patient");
+        assertThat(encrypted.get("whatsapp_hmac")).isEqualTo(com.rehletshifaa.shared.crypto.PiiCipher.hmac(com.rehletshifaa.shared.crypto.PiiCipher.hmacKey(indexKey), "254700000001"));
         assertThatThrownBy(() -> jdbc.update("INSERT INTO medical_cases(id,case_number,country,preferred_language,status,consent_timestamp,created_at,updated_at,version) "
                 + "VALUES(?,'RS-NOPATIENT','Kenya','en','DRAFT',?,?,?,0)", UUID.randomUUID(), now, now, now)).hasMessageContaining("patient_id");
     }

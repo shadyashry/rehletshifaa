@@ -21,5 +21,11 @@ public final class PatientNames {
         return (given + " " + family).trim();
     }
 
+    /** The display name, or null when there is no given name (an outer-joined row with no patient). */
+    public static String displayOrNull(String givenName, String familyName) {
+        String given = clean(givenName);
+        return given.isEmpty() ? null : (given + " " + clean(familyName)).trim();
+    }
+
     public static String clean(String value) { return value == null ? "" : value.trim().replaceAll("\\s+", " "); }
 }

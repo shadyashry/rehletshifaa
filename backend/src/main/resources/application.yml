@@ -142,7 +142,14 @@ app:
     restore-id: ${APP_IDENTITY_RESTORE_ID:}
   cors.allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000}
   crypto:
+    # Versioned field-level encryption (P0-1). Key 1 is PII_ENCRYPTION_KEY; add pii-keys.<N> for a new version and point
+    # active-pii-key-version at it; the rotation job rewrites values still on an older version. The index key signs the
+    # blind indexes (whatsapp_hmac) and is kept separate so a data-key rotation never invalidates a lookup.
     pii-key: ${PII_ENCRYPTION_KEY:rehletshifaa-local-dev-only-change-me}
+    pii-index-key: ${PII_INDEX_KEY:rehletshifaa-local-dev-only-index-key}
+    active-pii-key-version: ${PII_ACTIVE_KEY_VERSION:0}
+    # Cron for the key-rotation sweep; "-" leaves it off (run it after adding a key version).
+    rotation-cron: ${PII_ROTATION_CRON:-}
   storage:
     mode: ${STORAGE_MODE:mock}
     bucket: ${S3_BUCKET:}

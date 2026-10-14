@@ -1,11 +1,13 @@
 package com.rehletshifaa.casemanagement.domain;
 
-import com.rehletshifaa.shared.PhoneDigits;
+import com.rehletshifaa.shared.crypto.EncryptedStringConverter;
+import com.rehletshifaa.shared.crypto.PhoneIndexListener;
+import com.rehletshifaa.shared.crypto.PhoneIndexed;
 import com.rehletshifaa.shared.persistence.AssignedIdEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -19,15 +21,16 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  */
 @Entity
 @Table(name = "case_submission_contacts")
-public class CaseSubmissionContact extends AssignedIdEntity {
+@EntityListeners(PhoneIndexListener.class)
+public class CaseSubmissionContact extends AssignedIdEntity implements PhoneIndexed {
     @Column(name = "case_id", nullable = false, unique = true) private UUID caseId;
     @Column(name = "patient_id", nullable = false) private UUID patientId;
     @Column(name = "contact_role", nullable = false, length = 20) private String contactRole;
-    @Column(name = "contact_name", length = 160) private String contactName;
+    @Convert(converter = EncryptedStringConverter.class) @Column(name = "contact_name", length = 600) private String contactName;
     @Column(name = "relationship_to_patient", length = 40) private String relationshipToPatient;
     @Column(length = 254) private String email;
-    @Column(name = "whatsapp_number", length = 32) private String whatsappNumber;
-    @Column(name = "whatsapp_digits", length = 20) private String whatsappDigits;
+    @Convert(converter = EncryptedStringConverter.class) @Column(name = "whatsapp_number", length = 600) private String whatsappNumber;
+    @Column(name = "whatsapp_hmac", length = 64) private String whatsappHmac;
     @Column(name = "preferred_language", length = 8) private String preferredLanguage;
     @Column(name = "created_at", nullable = false) private Instant createdAt;
 
@@ -46,7 +49,6 @@ public class CaseSubmissionContact extends AssignedIdEntity {
     public String getWhatsappNumber() { return whatsappNumber; }
     public String getEmail() { return email; }
 
-    /** Keeps the digits an inbound WhatsApp {@code wa_id} is matched on in step with the number as entered. */
-    @PrePersist @PreUpdate
-    void syncWhatsappDigits() { whatsappDigits = PhoneDigits.of(whatsappNumber); }
+    @Override public String whatsappNumberForIndex() { return whatsappNumber; }
+    @Override public void setWhatsappHmac(String hmac) { this.whatsappHmac = hmac; }
 }

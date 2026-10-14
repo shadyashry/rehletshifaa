@@ -51,7 +51,7 @@ class AuthorityIntegrationTest {
         Instant now = clock.instant();
         UUID patient = UUID.randomUUID();
         jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,country,whatsapp_number,preferred_language,created_at,updated_at,version) "
-                + "VALUES(?,?,?,?,?,'en',?,?,0)", patient, "a-patient", "Patient", "Kenya", "+254700000555", now, now);
+                + "VALUES(?,?,?,?,?,'en',?,?,0)", patient, "a-patient", crypto.encrypt("Patient"), "Kenya", crypto.encrypt("+254700000555"), now, now);
         caseId = UUID.randomUUID();
         jdbc.update("INSERT INTO medical_cases(id,case_number,country,preferred_language,status,consent_timestamp,created_at,updated_at,version,patient_id) "
                 + "VALUES(?,?,?,'en','INTAKE_REVIEW',?,?,?,0,?)", caseId, "RS-A1-" + caseId.toString().substring(0, 6),

@@ -1,11 +1,13 @@
 package com.rehletshifaa.directory.domain;
 
-import com.rehletshifaa.shared.PhoneDigits;
+import com.rehletshifaa.shared.crypto.EncryptedStringConverter;
+import com.rehletshifaa.shared.crypto.PhoneIndexListener;
+import com.rehletshifaa.shared.crypto.PhoneIndexed;
 import com.rehletshifaa.shared.persistence.AssignedIdEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -21,14 +23,16 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  * identity-provider account binding. Each mutator mirrors one guarded state change and reports whether its guard
  * held, so callers keep their "changed or not" decisions. Callers hold the row lock ({@code lockById}).
  * {@code version} is the record revision; only the changes that bumped it before bump it now.
+ * Names and the WhatsApp number are encrypted at rest; the number is found through {@code whatsapp_hmac}.
  */
 @Entity
 @Table(name = "patient_profiles")
-public class PatientProfile extends AssignedIdEntity {
+@EntityListeners(PhoneIndexListener.class)
+public class PatientProfile extends AssignedIdEntity implements PhoneIndexed {
     @Column(name = "external_subject") private String externalSubject;
     @Column(nullable = false, length = 80) private String country;
-    @Column(name = "whatsapp_number", length = 32) private String whatsappNumber;
-    @Column(name = "whatsapp_digits", length = 20) private String whatsappDigits;
+    @Convert(converter = EncryptedStringConverter.class) @Column(name = "whatsapp_number", length = 600) private String whatsappNumber;
+    @Column(name = "whatsapp_hmac", length = 64) private String whatsappHmac;
     @Column(length = 254) private String email;
     @Column(name = "preferred_language", nullable = false, length = 8) private String preferredLanguage;
     @Column(name = "time_zone", length = 80) private String timeZone;
@@ -42,9 +46,9 @@ public class PatientProfile extends AssignedIdEntity {
     @Column(length = 16) private String sex;
     @Column(name = "profile_status", nullable = false, length = 24) private String profileStatus;
     @Column(name = "activated_at") private Instant activatedAt;
-    @Column(name = "given_name", nullable = false, length = 80) private String givenName;
-    @Column(name = "family_name", length = 80) private String familyName;
-    @Column(name = "preferred_name", length = 80) private String preferredName;
+    @Convert(converter = EncryptedStringConverter.class) @Column(name = "given_name", nullable = false, length = 600) private String givenName;
+    @Convert(converter = EncryptedStringConverter.class) @Column(name = "family_name", length = 600) private String familyName;
+    @Convert(converter = EncryptedStringConverter.class) @Column(name = "preferred_name", length = 600) private String preferredName;
     @Column(name = "account_status", nullable = false, length = 24) private String accountStatus;
     @Column(name = "account_setup_requested_at") private Instant accountSetupRequestedAt;
     @Column(name = "account_activated_at") private Instant accountActivatedAt;
@@ -196,7 +200,6 @@ public class PatientProfile extends AssignedIdEntity {
     public UUID getMergedIntoPatientId() { return mergedIntoPatientId; }
     public boolean sameEmail(String other) { return Objects.equals(email, other); }
 
-    /** Keeps the digits an inbound WhatsApp {@code wa_id} is matched on in step with the number as entered. */
-    @PrePersist @PreUpdate
-    void syncWhatsappDigits() { whatsappDigits = PhoneDigits.of(whatsappNumber); }
+    @Override public String whatsappNumberForIndex() { return whatsappNumber; }
+    @Override public void setWhatsappHmac(String hmac) { this.whatsappHmac = hmac; }
 }

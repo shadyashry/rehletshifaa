@@ -23,6 +23,8 @@
 - Notifications use a transactional outbox with bounded retries and dead-letter handling.
 - OTP, secure-link, and activation payloads are encrypted inside the outbox; templates include only minimal wording and secure links, never clinical narrative or message bodies.
 - Task titles/descriptions/evidence and secure-message bodies are encrypted at rest. Per-user read receipts prevent one staff member from marking a message read for everyone.
+- Patient and submitter names and WhatsApp numbers are encrypted at rest (AES-256-GCM, versioned keys: `PII_ENCRYPTION_KEY` is version 1, `app.crypto.pii-keys.<N>` adds a version, a rotation sweep rewrites older values). Phone lookups (inbound WhatsApp, status-link recovery, verified-mobile checks) use an HMAC blind index signed with the separate `PII_INDEX_KEY`; no query composes or matches on plaintext. Patient email is not yet encrypted (tracked in the review plan).
+- The production profile refuses to start with a development encryption or index key, a key shorter than 32 characters, or placeholder bank-transfer details.
 - Practitioner credentials are checked for status and expiry at assignment time, and an hourly expiry job removes practitioners whose verified credentials are no longer current from availability.
 - Consents, assignment history, case transitions, proposal versions, and audit events are retained as append-oriented evidence.
 - Secrets are environment supplied and example values are non-sensitive.

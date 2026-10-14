@@ -12,7 +12,9 @@ import com.rehletshifaa.journey.application.PatientActivationQueryService.Submis
 import com.rehletshifaa.journey.infrastructure.PatientOnboardingRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.api.FieldValidationException;
+import com.rehletshifaa.shared.PhoneDigits;
 import com.rehletshifaa.shared.audit.AuditTrail;
+import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.shared.util.Countries;
 import com.rehletshifaa.shared.util.PatientNames;
 
@@ -62,13 +64,14 @@ public class PatientActivationService {
     private final PatientAccountService account;
     private final CaseActionService caseActions;
     private final Clock clock;
+    private final CryptoService crypto;
 
     public PatientActivationService(PatientActivationQueryService views, PublicCaseAccessService access, DepositQueryService deposits,
                                     CustomerReadinessService readiness, CaseHandoffService handoff,
                                     PatientAccountService account,
-                                    CaseActionService caseActions, Clock clock, AuditTrail auditTrail, PatientProfileRepository patients, CaseSubmissionContactRepository contacts, ConsentRecordRepository consentRecords, PatientOnboardingRepository onboardings, MedicalCaseRepository cases) { this.onboardings = onboardings; this.consentRecords = consentRecords; this.contacts = contacts; this.patients = patients; this.auditTrail = auditTrail;
+                                    CaseActionService caseActions, Clock clock, CryptoService crypto, AuditTrail auditTrail, PatientProfileRepository patients, CaseSubmissionContactRepository contacts, ConsentRecordRepository consentRecords, PatientOnboardingRepository onboardings, MedicalCaseRepository cases) { this.onboardings = onboardings; this.consentRecords = consentRecords; this.contacts = contacts; this.patients = patients; this.auditTrail = auditTrail;
         this.cases = cases; this.views = views; this.access = access; this.deposits = deposits; this.readiness = readiness;
-        this.handoff = handoff; this.account = account; this.caseActions = caseActions; this.clock = clock;
+        this.handoff = handoff; this.account = account; this.caseActions = caseActions; this.clock = clock; this.crypto = crypto;
     }
 
     /**
@@ -143,7 +146,8 @@ public class PatientActivationService {
         boolean phoneChanged = !Objects.equals(current.phone(), clean.phone());
         // A number that is another active account's VERIFIED personal mobile is never silently re-verified for
         // a different patient: it stays an unverified contact here until resolved through a controlled path.
-        boolean phoneClaimedElsewhere = clean.phone() != null && patients.isVerifiedMobileOfAnotherAccount(patientId, clean.phone());
+        String phoneToken = clean.phone() == null ? null : crypto.hmac(PhoneDigits.of(clean.phone()));
+        boolean phoneClaimedElsewhere = phoneToken != null && patients.isVerifiedMobileOfAnotherAccount(patientId, phoneToken);
         if (profile.complete(new PatientProfile.Completion(clean.givenName(), clean.familyName(), clean.preferredName(), clean.email(), clean.phone(),
                         clean.countryName(), clean.nationality(), clean.dateOfBirth(), clean.sex(), clean.language()),
                 emailChanged, phoneChanged || phoneClaimedElsewhere, now))

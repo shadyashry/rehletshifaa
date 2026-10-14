@@ -57,8 +57,8 @@ class PatientIdentityAndAccountTest {
     @Test void sendMyCaseStoresStructuredNamesAndNeverAFullNameAsIdentity() {
         var created = cases.create(new CreateCaseRequest("Mohamed Ahmed", "El Sayed", "Egypt", "+201000000001", "Reports", "en", true, null));
         UUID patientId = patientId(created.caseId());
-        assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("Mohamed Ahmed");
-        assertThat(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("El Sayed");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId))).isEqualTo("Mohamed Ahmed");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId))).isEqualTo("El Sayed");
         // The patient row is the identity; the case row carries no copy of the name or number.
         assertThat(jdbc.queryForObject("SELECT contact_role FROM case_submission_contacts WHERE case_id=?", String.class, created.caseId())).isEqualTo("PATIENT");
         assertThat(jdbc.queryForObject("SELECT whatsapp_number FROM patient_profiles WHERE id=?", String.class, patientId)).isNotNull();
@@ -68,7 +68,7 @@ class PatientIdentityAndAccountTest {
         assertThatThrownBy(() -> cases.create(new CreateCaseRequest("MYSELF", "Ayaan", "", null, null, "Kenya", "+254700000002", null, "en", true, null, null, null, null, null)))
                 .isInstanceOf(FieldValidationException.class);
         var created = cases.create(new CreateCaseRequest("MYSELF", "Ayaan", "", true, null, "Kenya", "+254700000002", null, "en", true, null, null, null, null, null));
-        assertThat(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId(created.caseId()))).isNull();
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId(created.caseId())))).isNull();
     }
 
     @Test void emailStaysOptionalAtSendMyCase() {
@@ -81,11 +81,11 @@ class PatientIdentityAndAccountTest {
                 "Egypt", "+201000000004", "Paediatric cardiology", "en", true, null, "omar@local.test", null, "cardiology", null));
         UUID patientId = patientId(created.caseId());
         // The patient is Layla: her profile has NO email and NO mobile — those belong to Omar.
-        assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("Layla");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId))).isEqualTo("Layla");
         assertThat(jdbc.queryForObject("SELECT email FROM patient_profiles WHERE id=?", String.class, patientId)).isNull();
         assertThat(jdbc.queryForObject("SELECT whatsapp_number FROM patient_profiles WHERE id=?", String.class, patientId)).isNull();
         assertThat(jdbc.queryForObject("SELECT contact_role FROM case_submission_contacts WHERE case_id=?", String.class, created.caseId())).isEqualTo("REPRESENTATIVE");
-        assertThat(jdbc.queryForObject("SELECT contact_name FROM case_submission_contacts WHERE case_id=?", String.class, created.caseId())).isEqualTo("Omar Hassan");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT contact_name FROM case_submission_contacts WHERE case_id=?", String.class, created.caseId()))).isEqualTo("Omar Hassan");
         assertThat(jdbc.queryForObject("SELECT relationship_to_patient FROM case_submission_contacts WHERE case_id=?", String.class, created.caseId())).isEqualTo("PARENT");
         assertThat(jdbc.queryForObject("SELECT email FROM case_submission_contacts WHERE case_id=?", String.class, created.caseId())).isEqualTo("omar@local.test");
         // Communication still works — it goes to the submitter's channel.
@@ -97,7 +97,7 @@ class PatientIdentityAndAccountTest {
         var first = cases.create(new CreateCaseRequest("Father", "Family", "Egypt", "+201000000005", "Reports", "en", true, null));
         var second = cases.create(new CreateCaseRequest("Son", "Family", "Egypt", "+201000000005", "Reports", "en", true, null));
         assertThat(patientId(first.caseId())).isNotEqualTo(patientId(second.caseId()));
-        assertThat(count("SELECT count(*) FROM patient_profiles WHERE whatsapp_number=?", "+201000000005")).isEqualTo(2);
+        assertThat(count("SELECT count(*) FROM patient_profiles WHERE whatsapp_hmac=?", crypto.hmac(com.rehletshifaa.shared.PhoneDigits.of("+201000000005")))).isEqualTo(2);
     }
 
     @Test void aRepresentativesSharedNumberIsNeverStampedAsThePatientsVerifiedMobile() throws Exception {
@@ -177,8 +177,8 @@ class PatientIdentityAndAccountTest {
         String concernBefore = jdbc.queryForObject("SELECT condition_description FROM medical_cases WHERE id=?", String.class, ctx.caseId);
         activation.activate(ctx.token, g, profile("Link", "Patient", "fix14@local.test", "+254700000014", "PATIENT")); em.flush();
         UUID patientId = patientId(ctx.caseId);
-        assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("Link");
-        assertThat(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("Patient");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId))).isEqualTo("Link");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId))).isEqualTo("Patient");
         // Case data is read-only for the profile step and the case list shows the canonical (corrected) name.
         assertThat(jdbc.queryForObject("SELECT condition_description FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo(concernBefore);
         assertThat(jdbc.queryForObject("SELECT care_category FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("cardiology");
@@ -195,7 +195,7 @@ class PatientIdentityAndAccountTest {
         assertThat(jdbc.queryForObject("SELECT whatsapp_number FROM patient_profiles WHERE id=?", String.class, patientId)).isNull();
         assertThat(jdbc.queryForObject("SELECT phone_verified_at FROM patient_profiles WHERE id=?", Object.class, patientId)).isNull();
         assertThat(jdbc.queryForObject("SELECT contact_role FROM case_submission_contacts WHERE case_id=?", String.class, ctx.caseId)).isEqualTo("REPRESENTATIVE");
-        assertThat(jdbc.queryForObject("SELECT whatsapp_number FROM case_submission_contacts WHERE case_id=?", String.class, ctx.caseId)).isEqualTo("+254700000015");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT whatsapp_number FROM case_submission_contacts WHERE case_id=?", String.class, ctx.caseId))).isEqualTo("+254700000015");
         // Case communication still reaches the family member's number.
         String g2 = grant(ctx);
         assertThat(g2).isNotBlank();
@@ -203,13 +203,13 @@ class PatientIdentityAndAccountTest {
 
     @Test void aNumberVerifiedAsAnotherAccountsPersonalMobileIsNeverSilentlyReVerified() throws Exception {
         UUID other = UUID.randomUUID();
-        jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,family_name,country,whatsapp_number,phone_verified_at,preferred_language,account_status,profile_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0)",
-                other, "other-active-subject", "Other", "Person", "Kenya", "+254700000016", Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now());
+        jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,family_name,country,whatsapp_number,whatsapp_hmac,phone_verified_at,preferred_language,account_status,profile_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
+                other, "other-active-subject", crypto.encrypt("Other"), crypto.encrypt("Person"), "Kenya", crypto.encrypt("+254700000016"), crypto.hmac(com.rehletshifaa.shared.PhoneDigits.of("+254700000016")), Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now());
         var ctx = accepted(request("Link", "Patient", "+254700000016", null));
         String g = grant(ctx); // OTP on the shared number: possession, not exclusive identity
         activation.activate(ctx.token, g, profile("Link", "Patient", "sec16@local.test", "+254700000016", "PATIENT")); em.flush();
         UUID patientId = patientId(ctx.caseId);
-        assertThat(jdbc.queryForObject("SELECT whatsapp_number FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("+254700000016");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT whatsapp_number FROM patient_profiles WHERE id=?", String.class, patientId))).isEqualTo("+254700000016");
         assertThat(jdbc.queryForObject("SELECT phone_verified_at FROM patient_profiles WHERE id=?", Object.class, patientId)).isNull();
         // The other account keeps its verified status and nothing about it leaked into this patient's result.
         assertThat(jdbc.queryForObject("SELECT phone_verified_at FROM patient_profiles WHERE id=?", Object.class, other)).isNotNull();
@@ -236,7 +236,7 @@ class PatientIdentityAndAccountTest {
         var created = cases.create(new CreateCaseRequest("Mohamed", "Hassan", "Egypt", "+201000000021", "Reports", "en", true, null, "ahmed21@local.test", null));
         cases.submit(created.caseId()); em.flush();
         assertThat(patientId(created.caseId())).isNotEqualTo(existing);
-        assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, existing)).isEqualTo("Ahmed");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, existing))).isEqualTo("Ahmed");
         assertThat(count("SELECT count(*) FROM medical_cases WHERE patient_id=?", existing)).isZero();
     }
 
@@ -531,8 +531,8 @@ class PatientIdentityAndAccountTest {
         var pre = activation.prefill(ctx.token, g);
         assertThat(pre.givenName()).isEqualTo("Link"); assertThat(pre.familyName()).isEqualTo("Patient");
         activation.activate(ctx.token, g, profile("Maria", "da Silva Santos", "maria40@local.test", "+254700000040", "PATIENT")); em.flush();
-        assertThat(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("Maria");
-        assertThat(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId)).isEqualTo("da Silva Santos");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT given_name FROM patient_profiles WHERE id=?", String.class, patientId))).isEqualTo("Maria");
+        assertThat(crypto.decrypt(jdbc.queryForObject("SELECT family_name FROM patient_profiles WHERE id=?", String.class, patientId))).isEqualTo("da Silva Santos");
     }
 
     // ================= helpers =================
@@ -548,7 +548,7 @@ class PatientIdentityAndAccountTest {
     private UUID seedLinkedPatient(String subject, String given, String family, String email) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO patient_profiles(id,external_subject,given_name,family_name,country,whatsapp_number,email,email_verified_at,preferred_language,account_status,profile_status,profile_completed_at,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
-                id, subject, given, family, "Egypt", "+201000009999", email, Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now(), Instant.now());
+                id, subject, crypto.encrypt(given), crypto.encrypt(family), "Egypt", crypto.encrypt("+201000009999"), email, Instant.now(), "en", "ACTIVE", "ACTIVE", Instant.now(), Instant.now(), Instant.now());
         return id;
     }
     private String linkToken(UUID patientId) throws Exception {

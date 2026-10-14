@@ -213,7 +213,8 @@ class ArchitectureRulesTest {
      */
     private static final Set<String> JDBC_NOT_YET_CONVERTED = Set.of(
             "com.rehletshifaa.casemanagement.application.CaseNumberGenerator", // nextval: JPQL has no sequence function
-            "com.rehletshifaa.devdata.LocalDemoDataSeeder"); // @Profile("local") only; its own top-level package so shared depends on nothing
+            "com.rehletshifaa.devdata.LocalDemoDataSeeder", // @Profile("local") only; its own top-level package so shared depends on nothing
+            "com.rehletshifaa.shared.crypto.PiiKeyRotationService"); // key-rotation sweep over columns found in information_schema: no fixed entity
 
     /**
      * No plain-SQL API ({@code org.springframework.jdbc..}: JdbcClient, RowMapper, …; {@code java.sql..}: ResultSet,

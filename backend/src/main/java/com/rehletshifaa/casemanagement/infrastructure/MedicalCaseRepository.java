@@ -3,6 +3,7 @@ package com.rehletshifaa.casemanagement.infrastructure;
 import com.rehletshifaa.casemanagement.domain.CaseStatus;
 import com.rehletshifaa.casemanagement.domain.MedicalCase;
 import com.rehletshifaa.shared.persistence.BaseRepository;
+import com.rehletshifaa.shared.util.PatientNameParts;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -75,9 +76,11 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select p.preferredLanguage from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
     Optional<String> findPatientPreferredLanguage(@Param("id") UUID id);
 
-    /** The patient's display name for the case (given name + family name). */
-    @Query("select trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
-    Optional<String> findPatientName(@Param("id") UUID id);
+    /** The patient's display name for the case (given name + family name), composed from the decrypted parts. */
+    @Query("select p.givenName as givenName, p.familyName as familyName from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id")
+    Optional<PatientNameParts> findPatientNameParts(@Param("id") UUID id);
+
+    default Optional<String> findPatientName(UUID id) { return findPatientNameParts(id).map(PatientNameParts::getPatientName); }
 
     /** What routing needs from the case itself. */
     interface RoutingFacts { String getCareCategory(); String getPreferredLanguage(); CaseStatus getStatus(); }
@@ -128,13 +131,14 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     java.util.List<AuthorisedRepresentativeRow> findAuthorisedRepresentativesOf(@Param("id") UUID id, @Param("now") Instant now);
 
     /** The case and its patient as the onboarding page heads them (display name: the {@code CASE_ROW} rule). */
-    interface OnboardingHeader {
-        String getCaseNumber(); UUID getPatientId(); String getFullName(); String getCountry(); String getWhatsappNumber(); String getEmail();
+    interface OnboardingHeader extends PatientNameParts {
+        String getCaseNumber(); UUID getPatientId(); String getCountry(); String getWhatsappNumber(); String getEmail();
         Instant getPhoneVerifiedAt(); Instant getEmailVerifiedAt();
+        default String getFullName() { return getPatientName(); }
     }
 
     @Query("""
-            select c.caseNumber as caseNumber, p.id as patientId, trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as fullName,
+            select c.caseNumber as caseNumber, p.id as patientId, p.givenName as givenName, p.familyName as familyName,
                 p.country as country, p.whatsappNumber as whatsappNumber, p.email as email, p.phoneVerifiedAt as phoneVerifiedAt,
                 p.emailVerifiedAt as emailVerifiedAt
             from MedicalCase c join PatientProfile p on p.id = c.patientId where c.id = :id""")
@@ -192,15 +196,15 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     boolean isPatientOf(@Param("id") UUID id, @Param("subject") String subject);
 
     /** One case as the case lists show it: the case facts and the patient's display name. */
-    interface CaseRow {
-        UUID getId(); String getCaseNumber(); CaseStatus getStatus(); String getPatientName(); String getCountry();
+    interface CaseRow extends PatientNameParts {
+        UUID getId(); String getCaseNumber(); CaseStatus getStatus(); String getCountry();
         String getPreferredLanguage(); String getCareCategory(); Instant getCreatedAt(); Instant getUpdatedAt(); Long getVersion();
         Boolean getTravelPackageRequested(); String getWaitingOn(); String getWaitingReason();
     }
 
     String CASE_ROW = """
             select c.id as id, c.caseNumber as caseNumber, c.status as status,
-                trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as patientName, c.country as country,
+                p.givenName as givenName, p.familyName as familyName, c.country as country,
                 c.preferredLanguage as preferredLanguage, c.careCategory as careCategory, c.createdAt as createdAt,
                 c.updatedAt as updatedAt, c.version as version, c.travelPackageRequested as travelPackageRequested,
                 c.waitingOn as waitingOn, c.waitingReason as waitingReason
@@ -279,28 +283,29 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
                 c.waitingSince = case when c.waitingOn = :on then coalesce(c.waitingSince, cast(:now as Instant)) else cast(:now as Instant) end
             where c.id = :id""")
     int waitOn(@Param("id") UUID id, @Param("on") String on, @Param("reason") String reason, @Param("code") String code, @Param("now") Instant now);
-    /** The WhatsApp digits of the case's patient and of whoever submitted it (either may be absent). */
+    /** The WhatsApp number of the case's patient and of whoever submitted it (either may be absent), decrypted. */
     @Query("""
-            select p.whatsappDigits from MedicalCase c join PatientProfile p on p.id = c.patientId
-            where c.id = :caseId and p.whatsappDigits is not null""")
-    java.util.List<String> findPatientWhatsappDigits(@Param("caseId") UUID caseId);
+            select p.whatsappNumber from MedicalCase c join PatientProfile p on p.id = c.patientId
+            where c.id = :caseId and p.whatsappNumber is not null""")
+    java.util.List<String> findPatientWhatsappNumbers(@Param("caseId") UUID caseId);
 
-    @Query("select s.whatsappDigits from CaseSubmissionContact s where s.caseId = :caseId and s.whatsappDigits is not null")
-    java.util.List<String> findSubmitterWhatsappDigits(@Param("caseId") UUID caseId);
+    @Query("select s.whatsappNumber from CaseSubmissionContact s where s.caseId = :caseId and s.whatsappNumber is not null")
+    java.util.List<String> findSubmitterWhatsappNumbers(@Param("caseId") UUID caseId);
 
     /** A case a WhatsApp sender belongs to, and whether they are the patient or the person who submitted it. */
     interface ChannelCase { UUID getCaseId(); String getSenderRole(); String getLanguage(); }
 
     /**
-     * The cases, not in {@code excluded}, whose patient or submitter has these WhatsApp digits; most recently active first.
-     * The patient's own number wins over a submitter's when both match.
+     * The cases, not in {@code excluded}, whose patient or submitter has this WhatsApp index token (the HMAC of the
+     * sender's digits, see {@code PhoneIndexListener}); most recently active first. The patient's own number wins
+     * over a submitter's when both match.
      */
     @Query("""
             select c.id as caseId, c.preferredLanguage as language,
-                case when p.whatsappDigits = :digits then 'PATIENT' else 'PATIENT_REPRESENTATIVE' end as senderRole
+                case when p.whatsappHmac = :token then 'PATIENT' else 'PATIENT_REPRESENTATIVE' end as senderRole
             from MedicalCase c join PatientProfile p on p.id = c.patientId
                 left join CaseSubmissionContact s on s.caseId = c.id
-            where c.status not in :excluded and (p.whatsappDigits = :digits or s.whatsappDigits = :digits)
+            where c.status not in :excluded and (p.whatsappHmac = :token or s.whatsappHmac = :token)
             order by c.updatedAt desc, c.id""")
-    java.util.List<ChannelCase> findChannelCases(@Param("digits") String digits, @Param("excluded") java.util.Collection<CaseStatus> excluded);
+    java.util.List<ChannelCase> findChannelCases(@Param("token") String token, @Param("excluded") java.util.Collection<CaseStatus> excluded);
 }

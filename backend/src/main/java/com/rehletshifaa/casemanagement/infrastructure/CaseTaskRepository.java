@@ -2,6 +2,7 @@ package com.rehletshifaa.casemanagement.infrastructure;
 
 import com.rehletshifaa.casemanagement.domain.CaseTask;
 import com.rehletshifaa.shared.persistence.BaseRepository;
+import com.rehletshifaa.shared.util.PatientNameParts;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -97,11 +98,11 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
                                                          @Param("type") String type, org.springframework.data.domain.Limit limit);
 
     /** One row of a staff member's work queue: the task with the case facts needed to act on it. */
-    interface OpenWorkRow {
+    interface OpenWorkRow extends PatientNameParts {
         UUID getId(); UUID getCaseId(); String getTaskType(); String getTitle(); String getDescription(); String getPriority();
         String getStatus(); Boolean getBlocking(); Instant getDueAt(); Instant getCreatedAt(); Long getVersion();
         String getCaseNumber(); com.rehletshifaa.casemanagement.domain.CaseStatus getCaseStatus(); String getWaitingOn();
-        String getCareCategory(); String getPatientName(); String getCopyCode(); String getCopyParams();
+        String getCareCategory(); String getCopyCode(); String getCopyParams();
     }
 
     /** Open work owned by the subject: most urgent first, then soonest due (undated last), then oldest. */
@@ -109,7 +110,7 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
             select t.id as id, t.caseId as caseId, t.taskType as taskType, t.title as title, t.description as description,
                 t.priority as priority, t.status as status, t.blocking as blocking, t.dueAt as dueAt, t.createdAt as createdAt,
                 t.version as version, c.caseNumber as caseNumber, c.status as caseStatus, c.waitingOn as waitingOn,
-                c.careCategory as careCategory, trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as patientName,
+                c.careCategory as careCategory, p.givenName as givenName, p.familyName as familyName,
                 t.copyCode as copyCode, t.copyParams as copyParams
             from CaseTask t join MedicalCase c on c.id = t.caseId left join PatientProfile p on p.id = c.patientId
             where t.ownerSubject = :owner and t.status in ('OPEN', 'IN_PROGRESS')
@@ -122,7 +123,7 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
             select t.id as id, t.caseId as caseId, t.taskType as taskType, t.title as title, t.description as description,
                 t.priority as priority, t.status as status, t.blocking as blocking, t.dueAt as dueAt, t.createdAt as createdAt,
                 t.version as version, c.caseNumber as caseNumber, c.status as caseStatus, c.waitingOn as waitingOn,
-                c.careCategory as careCategory, trim(concat(p.givenName, ' ', coalesce(p.familyName, ''))) as patientName,
+                c.careCategory as careCategory, p.givenName as givenName, p.familyName as familyName,
                 t.copyCode as copyCode, t.copyParams as copyParams
             from CaseTask t join MedicalCase c on c.id = t.caseId left join PatientProfile p on p.id = c.patientId
             where t.ownerSubject is null and t.ownerRole = :role and t.taskType = :type and t.visibilityScope = 'INTERNAL'

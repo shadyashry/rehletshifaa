@@ -114,6 +114,7 @@ services:
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/rehletshifaa/protocol/openid-connect/certs
       CLAIM_TOKEN_PEPPER: local-only-claim-pepper-change-in-production
       PII_ENCRYPTION_KEY: local-only-pii-key-change-in-production
+      PII_INDEX_KEY: local-only-pii-index-key-change-in-production
       STORAGE_MODE: s3
       AWS_ACCESS_KEY_ID: rehletshifaa
       AWS_SECRET_ACCESS_KEY: RehletShifaaLocal123!

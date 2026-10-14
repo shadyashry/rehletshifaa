@@ -44,7 +44,7 @@ must complete those required actions; `/api/v1/me/activation` then performs the 
 state and MFA checks before workforce authority becomes effective. Never copy the temporary password, recovery
 codes, OTP seed, session cookie or token into source, documentation, commands, screenshots or test output.
 
-The local Compose file supplies development-only `CLAIM_TOKEN_PEPPER`, `PII_ENCRYPTION_KEY`, and `APP_WEB_BASE_URL` values. Production must use distinct random secrets and the public HTTPS web origin.
+The local Compose file supplies development-only `CLAIM_TOKEN_PEPPER`, `PII_ENCRYPTION_KEY`, `PII_INDEX_KEY`, and `APP_WEB_BASE_URL` values. Production must use distinct random secrets and the public HTTPS web origin.
 
 The realm file is imported only into a new Keycloak data volume. To re-import changed seed data, remove only the named Compose development volumes after confirming no local data must be retained.
 

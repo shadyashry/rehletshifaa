@@ -41,6 +41,24 @@ phases.
   refuses each default; rotation re-encrypts and bumps `key_version`.
 - **Acceptance:** no plaintext name/phone column; `prod` profile fails to start with any default secret.
 - **Sessions:** 2. **Model:** Fable 5.1, xhigh.
+- **Status (2026-10-14, branch `feat/review-p0`):** delivered.
+  - Delivered: `PiiCipher` primitive; `CryptoService` with versioned keys (`v<N>:` prefix, unprefixed = key 1,
+    `app.crypto.pii-keys.<N>`, `active-pii-key-version`), separate HMAC index key, `isCurrent`/`reencrypt`;
+    `EncryptedStringConverter` on `patient_profiles.given_name/family_name/preferred_name/whatsapp_number` and
+    `case_submission_contacts.contact_name/whatsapp_number`; `whatsapp_digits` replaced by the `whatsapp_hmac` blind index
+    kept by `PhoneIndexListener`; inbound WhatsApp matching, verified-mobile check and intake-conversation lookup use the
+    index; display names composed in Java (`PatientNameParts`) instead of JPQL `concat`; `V86__encrypt_patient_pii`
+    encrypts existing rows in place; `PiiKeyRotationService` sweep (`app.crypto.rotation-cron`, off by default; batches
+    by `id` or `subject`); `ProductionSafetyValidator` refuses dev keys, short keys and placeholder bank details;
+    compose/deploy env and docs carry `PII_INDEX_KEY`.
+  - Tests: full offline suite 744 run / 0 failures after fixes; `CryptoServiceTest`, `PatientPiiAtRestTest`,
+    `PiiKeyRotationServiceTest`, `ProductionSafetyValidatorTest`, `CleanPatientSchemaMigrationTest` (V86 on H2),
+    `PostgresJpaMappingTest` against a PostgreSQL 17 container.
+  - Open gaps: patient `email` and submitter `email` are still plaintext (blind index pattern is ready; needs the
+    Keycloak email-resolution paths reviewed first); intake conversations and inbound WhatsApp rows keep plaintext
+    sender digits (operational key; decide in P1-7 with retention); the rotation sweep has run on H2 only; the dev
+    database must be started with `PII_INDEX_KEY` set (compose files updated) before V86 runs there.
+  - Next exact action: P0-2 (lifecycle exits) in a new session; rebuild the dev stack first so V86 runs on dev data.
 
 ### P0-2  Lifecycle exits  (A-01, V6)
 - **Scope:** `CaseTransitionPolicy`: `ACCEPTED → EXPIRED` (after the deposit reminder cycle ends) and

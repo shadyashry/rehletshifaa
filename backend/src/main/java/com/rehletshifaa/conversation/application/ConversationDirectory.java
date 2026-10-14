@@ -6,6 +6,7 @@ import com.rehletshifaa.conversation.domain.IntakeConversation;
 import com.rehletshifaa.conversation.infrastructure.IntakeConversationRepository;
 import com.rehletshifaa.coordination.application.IntakeContinuity;
 import com.rehletshifaa.coordination.application.IntakeRoutingService;
+import com.rehletshifaa.shared.PhoneDigits;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
@@ -56,10 +57,12 @@ public class ConversationDirectory implements ConversationRelationships, IntakeR
      * own number first, then the number of whoever submitted it.
      */
     public Optional<IntakeConversation> conversationFor(UUID caseId) {
-        List<String> numbers = new ArrayList<>(cases.findPatientWhatsappDigits(caseId));
-        numbers.addAll(cases.findSubmitterWhatsappDigits(caseId));
+        List<String> numbers = new ArrayList<>(cases.findPatientWhatsappNumbers(caseId));
+        numbers.addAll(cases.findSubmitterWhatsappNumbers(caseId));
         var since = micros(clock.instant().minus(IntakeConversationService.RETURN_WINDOW));
-        for (String digits : numbers) {
+        for (String number : numbers) {
+            String digits = PhoneDigits.of(number);
+            if (digits == null) continue;
             var found = conversations.findCurrentFor(digits, since, Limit.of(1)).stream().findFirst();
             if (found.isPresent()) return found;
         }

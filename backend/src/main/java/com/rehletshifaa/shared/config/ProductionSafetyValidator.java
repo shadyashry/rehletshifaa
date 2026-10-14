@@ -1,5 +1,6 @@
 package com.rehletshifaa.shared.config;
 
+import com.rehletshifaa.shared.crypto.CryptoService;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -31,7 +32,14 @@ public class ProductionSafetyValidator implements ApplicationRunner {
         require(failures, "OIDC_ISSUER_URI", true);
         require(failures, "OIDC_JWK_SET_URI", true);
         require(failures, "CLAIM_TOKEN_PEPPER", false);
-        require(failures, "PII_ENCRYPTION_KEY", false);
+        requireSecret(failures, "PII_ENCRYPTION_KEY", CryptoService.DEV_KEY, "local-only-pii-key-change-in-production");
+        requireSecret(failures, "PII_INDEX_KEY", CryptoService.DEV_INDEX_KEY);
+        // DEP-3: the account patients are told to pay into. The development placeholders must never reach a patient.
+        requireNotPlaceholder(failures, "PAYMENT_BANK_ACCOUNT_NAME", "test account");
+        requireNotPlaceholder(failures, "PAYMENT_BANK_NAME", "test bank", "dummy");
+        requireNotPlaceholder(failures, "PAYMENT_BANK_ACCOUNT_NUMBER", "0000000");
+        requireNotPlaceholder(failures, "PAYMENT_BANK_IBAN", "eg0000000");
+        requireNotPlaceholder(failures, "PAYMENT_BANK_SWIFT", "testeg");
         String whatsappMode=environment.getProperty("app.whatsapp.mode", "");
         if ("webhook".equals(whatsappMode)) {
             require(failures, "WHATSAPP_WEBHOOK_URL", true);
@@ -58,6 +66,22 @@ public class ProductionSafetyValidator implements ApplicationRunner {
         if (!environment.getProperty("app.security.enabled", Boolean.class, false)) failures.add("APP_SECURITY_ENABLED must resolve to true");
         if (!environment.getProperty("app.turnstile.enabled", Boolean.class, false)) failures.add("TURNSTILE_ENABLED must resolve to true");
         if (!failures.isEmpty()) throw new IllegalStateException("Unsafe production configuration: " + String.join("; ", failures));
+    }
+
+    /** A secret that must be set, long enough to matter, and none of the development defaults. */
+    private void requireSecret(List<String> failures, String key, String... developmentDefaults) {
+        String value = environment.getProperty(key);
+        if (value == null || value.isBlank() || "change-me".equalsIgnoreCase(value)) { failures.add(key + " is required"); return; }
+        if (value.length() < 32) failures.add(key + " must be at least 32 characters");
+        for (String dev : developmentDefaults) if (dev.equals(value)) failures.add(key + " is the development default");
+    }
+
+    /** A value that must be set and must not be one of the development placeholders (matched case-insensitively). */
+    private void requireNotPlaceholder(List<String> failures, String key, String... placeholders) {
+        String value = environment.getProperty(key);
+        if (value == null || value.isBlank()) { failures.add(key + " is required"); return; }
+        String lowered = value.toLowerCase();
+        for (String placeholder : placeholders) if (lowered.contains(placeholder)) failures.add(key + " contains a placeholder value");
     }
 
     private void require(List<String> failures, String key, boolean publicUrl) {

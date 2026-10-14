@@ -1,67 +1,109 @@
 package com.rehletshifaa.shared.crypto;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
-import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
- * AES-256-GCM field-level encryption for stored PII (e.g. staff names).
- * The configured key is any passphrase; the AES key is its SHA-256 digest.
- * Stored value is Base64(iv[12] || ciphertext+tag).
+ * Field-level encryption for stored PII (patient and staff names, contact numbers, reasons, payloads) with
+ * versioned keys, and the blind index used to look encrypted values up by equality.
+ *
+ * <p>Stored format: {@code v<N>:<Base64(iv || ciphertext || tag)>}, where {@code N} is the key version the value
+ * was encrypted with. A value with no version prefix was written before keys were versioned and is read with
+ * key 1. New values always carry the active version, so {@link #isCurrent} tells a rotation job what to rewrite.
+ *
+ * <p>Keys: version 1 is {@code app.crypto.pii-key} (env {@code PII_ENCRYPTION_KEY}); further versions come from
+ * {@code app.crypto.pii-keys.<N>}; {@code app.crypto.active-pii-key-version} picks the one new values use (default:
+ * the highest configured). The index key ({@code app.crypto.pii-index-key}) is separate on purpose: rotating the
+ * data key must not invalidate every blind index.
  */
 @Component
 public class CryptoService {
-    private static final int IV_LENGTH = 12;
-    private static final int TAG_BITS = 128;
-    private final SecretKeySpec key;
-    private final SecureRandom random = new SecureRandom();
+    private static final String VERSION_PREFIX = "v";
+    private static final String ENVELOPE_PREFIX = "enc:";
+    /** Development defaults; {@code ProductionSafetyValidator} refuses both outside dev. */
+    public static final String DEV_KEY = "rehletshifaa-local-dev-only-change-me";
+    public static final String DEV_INDEX_KEY = "rehletshifaa-local-dev-only-index-key";
 
-    public CryptoService(@Value("${app.crypto.pii-key:rehletshifaa-local-dev-only-change-me}") String configuredKey) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(configuredKey.getBytes(StandardCharsets.UTF_8));
-            this.key = new SecretKeySpec(digest, "AES");
-        } catch (Exception e) {
-            throw new IllegalStateException("Unable to initialise PII cipher", e);
-        }
+    private final Map<Integer, SecretKeySpec> keys = new HashMap<>();
+    private final int activeVersion;
+    private final SecretKeySpec indexKey;
+
+    @Autowired
+    public CryptoService(Environment environment) {
+        this(environment.getProperty("app.crypto.pii-key", DEV_KEY),
+                Binder.get(environment).bind("app.crypto.pii-keys", Bindable.mapOf(Integer.class, String.class)).orElse(Map.of()),
+                environment.getProperty("app.crypto.active-pii-key-version", Integer.class, 0),
+                environment.getProperty("app.crypto.pii-index-key", DEV_INDEX_KEY));
     }
+
+    /** One key, version 1, for tests and tools. */
+    public CryptoService(String keyV1) { this(keyV1, Map.of(), 0, DEV_INDEX_KEY); }
+
+    public CryptoService(String keyV1, Map<Integer, String> furtherKeys, int configuredActiveVersion, String indexPassphrase) {
+        keys.put(1, PiiCipher.aesKey(keyV1));
+        if (furtherKeys != null) furtherKeys.forEach((version, passphrase) -> {
+            if (version == null || version < 2) throw new IllegalStateException("app.crypto.pii-keys versions start at 2");
+            if (passphrase == null || passphrase.isBlank()) throw new IllegalStateException("app.crypto.pii-keys." + version + " is blank");
+            keys.put(version, PiiCipher.aesKey(passphrase));
+        });
+        int highest = new TreeMap<>(keys).lastKey();
+        this.activeVersion = configuredActiveVersion > 0 ? configuredActiveVersion : highest;
+        if (!keys.containsKey(activeVersion)) throw new IllegalStateException("app.crypto.active-pii-key-version " + activeVersion + " has no key");
+        this.indexKey = PiiCipher.hmacKey(indexPassphrase);
+    }
+
+    public int activeVersion() { return activeVersion; }
 
     public String encrypt(String plaintext) {
         if (plaintext == null) return null;
-        try {
-            byte[] iv = new byte[IV_LENGTH];
-            random.nextBytes(iv);
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, iv));
-            byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-            byte[] combined = new byte[iv.length + ciphertext.length];
-            System.arraycopy(iv, 0, combined, 0, iv.length);
-            System.arraycopy(ciphertext, 0, combined, iv.length, ciphertext.length);
-            return Base64.getEncoder().encodeToString(combined);
-        } catch (Exception e) {
-            throw new IllegalStateException("Encryption failed", e);
-        }
+        return VERSION_PREFIX + activeVersion + ":" + PiiCipher.encrypt(keys.get(activeVersion), plaintext);
     }
 
     public String decrypt(String stored) {
         if (stored == null) return null;
-        try {
-            byte[] combined = Base64.getDecoder().decode(stored);
-            byte[] iv = new byte[IV_LENGTH];
-            System.arraycopy(combined, 0, iv, 0, IV_LENGTH);
-            byte[] ciphertext = new byte[combined.length - IV_LENGTH];
-            System.arraycopy(combined, IV_LENGTH, ciphertext, 0, ciphertext.length);
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, iv));
-            return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            throw new IllegalStateException("Decryption failed", e);
+        Parsed parsed = parse(stored);
+        SecretKeySpec key = keys.get(parsed.version());
+        if (key == null) throw new IllegalStateException("No key for PII key version " + parsed.version());
+        return PiiCipher.decrypt(key, parsed.payload());
+    }
+
+    /** Equality-only lookup token for an encrypted value (phone digits, email); null for null. */
+    public String hmac(String value) { return value == null ? null : PiiCipher.hmac(indexKey, value); }
+
+    /** True when the value (with or without the {@code enc:} envelope) is already on the active key version. */
+    public boolean isCurrent(String stored) {
+        if (stored == null) return true;
+        return parse(stripEnvelope(stored)).version() == activeVersion;
+    }
+
+    /** The same value re-encrypted with the active key, keeping an {@code enc:} envelope when it has one. */
+    public String reencrypt(String stored) {
+        if (stored == null) return null;
+        boolean enveloped = stored.startsWith(ENVELOPE_PREFIX);
+        String fresh = encrypt(decrypt(stripEnvelope(stored)));
+        return enveloped ? ENVELOPE_PREFIX + fresh : fresh;
+    }
+
+    private static String stripEnvelope(String stored) { return stored.startsWith(ENVELOPE_PREFIX) ? stored.substring(ENVELOPE_PREFIX.length()) : stored; }
+
+    private record Parsed(int version, String payload) {}
+
+    private static Parsed parse(String stored) {
+        if (stored.startsWith(VERSION_PREFIX)) {
+            int colon = stored.indexOf(':');
+            if (colon > 1) {
+                try { return new Parsed(Integer.parseInt(stored.substring(1, colon)), stored.substring(colon + 1)); }
+                catch (NumberFormatException ignored) { /* not a version prefix: a Base64 value that happens to start with v */ }
+            }
         }
+        return new Parsed(1, stored);
     }
 }

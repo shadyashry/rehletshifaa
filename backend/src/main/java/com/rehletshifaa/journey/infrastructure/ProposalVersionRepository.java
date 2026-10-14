@@ -2,6 +2,7 @@ package com.rehletshifaa.journey.infrastructure;
 
 import com.rehletshifaa.journey.domain.ProposalVersion;
 import com.rehletshifaa.shared.persistence.BaseRepository;
+import com.rehletshifaa.shared.util.PatientNameParts;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -74,8 +75,8 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
     java.util.Optional<DocumentRow> findDocument(@Param("id") UUID id);
 
     /** What the patient's secure view adds to the document: case, patient, clinical recommendation, totals and rate snapshot. */
-    interface PatientDocument {
-        String getCaseNumber(); String getPatientName(); String getDocumentType(); Integer getVersionNumber(); String getCurrency();
+    interface PatientDocument extends PatientNameParts {
+        String getCaseNumber(); String getDocumentType(); Integer getVersionNumber(); String getCurrency();
         Instant getValidUntil(); String getRecommendedTreatment(); String getRisksAndLimitations(); String getAssumptions();
         String getScopeChangeReason(); String getPaymentTerms(); String getRefundTerms(); String getDisclaimers(); String getIncludedServices();
         String getExcludedServices(); BigDecimal getPatientTotalMinEgp(); BigDecimal getPatientTotalExpectedEgp();
@@ -83,7 +84,7 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
     }
 
     @Query("""
-            select c.caseNumber as caseNumber, trim(concat(pt.givenName, ' ', coalesce(pt.familyName, ''))) as patientName,
+            select c.caseNumber as caseNumber, pt.givenName as givenName, pt.familyName as familyName,
                 v.documentType as documentType, v.versionNumber as versionNumber, v.currency as currency, v.validUntil as validUntil,
                 cr.recommendedTreatment as recommendedTreatment, cr.risksAndLimitations as risksAndLimitations, v.assumptions as assumptions,
                 v.scopeChangeReason as scopeChangeReason, v.paymentTerms as paymentTerms, v.refundTerms as refundTerms,
