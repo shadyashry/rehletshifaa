@@ -23,6 +23,8 @@ public class CommercialPolicy extends AssignedIdEntity {
     @Column(nullable = false, length = 160) private String name;
     @Column(name = "care_category", length = 60) private String careCategory;
     @Column(name = "margin_rate", nullable = false, precision = 6, scale = 4) private BigDecimal marginRate;
+    /** P0-5 (A-07): a manual line priced at or below this EGP figure needs no Finance approval; null means every manual line does. */
+    @Column(name = "manual_band_egp", precision = 14, scale = 2) private BigDecimal manualBandEgp;
     @Column(nullable = false) private boolean active;
     @Column(nullable = false) private int version;
     @Column(name = "created_by", length = 120) private String createdBy;
@@ -31,9 +33,9 @@ public class CommercialPolicy extends AssignedIdEntity {
 
     protected CommercialPolicy() {}
 
-    public CommercialPolicy(String name, String careCategory, BigDecimal marginRate, int version, String createdBy, LocalDate validFrom, Instant createdAt) {
+    public CommercialPolicy(String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version, String createdBy, LocalDate validFrom, Instant createdAt) {
         super(UUID.randomUUID());
-        this.name = name; this.careCategory = careCategory; this.marginRate = marginRate; this.active = true;
+        this.name = name; this.careCategory = careCategory; this.marginRate = marginRate; this.manualBandEgp = manualBandEgp; this.active = true;
         this.version = version; this.createdBy = createdBy; this.validFrom = validFrom; this.createdAt = micros(createdAt);
     }
 
@@ -42,6 +44,7 @@ public class CommercialPolicy extends AssignedIdEntity {
     public String getName() { return name; }
     public String getCareCategory() { return careCategory; }
     public BigDecimal getMarginRate() { return marginRate; }
+    public BigDecimal getManualBandEgp() { return manualBandEgp; }
     public boolean isActive() { return active; }
     public int getVersion() { return version; }
     public String getCreatedBy() { return createdBy; }

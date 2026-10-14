@@ -51,14 +51,14 @@ class CacheSerializationTest {
 
     @Test
     void theCommercialPolicyRoundTrips() {
-        Policy policy = new Policy(UUID.randomUUID(), "Default margin", null, new BigDecimal("0.1200"), 3);
+        Policy policy = new Policy(UUID.randomUUID(), "Default margin", null, new BigDecimal("0.1200"), new BigDecimal("50000.00"), 3);
         assertThat(roundTrip(CacheNames.COMMERCIAL_POLICY, policy)).isEqualTo(policy);
     }
 
     @Test
     void storedJsonCarriesNoClassNamesAndCannotSelectOne() {
         RedisSerializer<Object> serializer = serializer(CacheNames.COMMERCIAL_POLICY);
-        String json = new String(serializer.serialize(new Policy(UUID.randomUUID(), "n", "c", BigDecimal.ONE, 1)), StandardCharsets.UTF_8);
+        String json = new String(serializer.serialize(new Policy(UUID.randomUUID(), "n", "c", BigDecimal.ONE, null, 1)), StandardCharsets.UTF_8);
         assertThat(json).doesNotContain("com.rehletshifaa").doesNotContain("@class");
         // A writer with Redis access must not be able to make the backend instantiate another class.
         byte[] gadget = "[\"javax.swing.JLabel\",{}]".getBytes(StandardCharsets.UTF_8);

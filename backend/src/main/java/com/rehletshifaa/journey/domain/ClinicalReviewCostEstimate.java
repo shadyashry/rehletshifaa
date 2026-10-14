@@ -22,6 +22,7 @@ public class ClinicalReviewCostEstimate extends AssignedIdEntity {
     @Column(name = "requires_finance_approval", nullable = false) private boolean requiresFinanceApproval;
     @Column(name = "price_egp_min") private BigDecimal priceEgpMin;
     @Column(name = "price_egp_max") private BigDecimal priceEgpMax;
+    @Column(name = "facility_package_id") private UUID facilityPackageId;
 
     protected ClinicalReviewCostEstimate() {}
 
@@ -31,5 +32,13 @@ public class ClinicalReviewCostEstimate extends AssignedIdEntity {
         this.clinicalReviewId = clinicalReviewId; this.serviceDescription = serviceDescription; this.estimatedCost = estimatedCost;
         this.currency = currency; this.sortOrder = sortOrder; this.catalogServiceId = catalogServiceId; this.priceEgp = priceEgp;
         this.requiresFinanceApproval = requiresFinanceApproval;
+    }
+
+    /** A line priced from a Finance-approved facility package (P0-5): the expected EGP figure inside the package range, which travels with it. */
+    public ClinicalReviewCostEstimate(UUID clinicalReviewId, String serviceDescription, BigDecimal estimatedCost, String currency, int sortOrder,
+                                      UUID catalogServiceId, BigDecimal priceEgp, boolean requiresFinanceApproval, UUID facilityPackageId,
+                                      BigDecimal priceEgpMin, BigDecimal priceEgpMax) {
+        this(clinicalReviewId, serviceDescription, estimatedCost, currency, sortOrder, catalogServiceId, priceEgp, requiresFinanceApproval);
+        this.facilityPackageId = facilityPackageId; this.priceEgpMin = priceEgpMin; this.priceEgpMax = priceEgpMax;
     }
 }

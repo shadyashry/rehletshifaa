@@ -45,6 +45,7 @@ export function FinanceApproval({ locale, commercial, busy, approveLabel, onAppr
                 <td className="py-2 pe-3">
                   {line.source === "MANUAL"
                     ? <span className="rounded bg-status-warning-surface px-1.5 py-0.5 text-[0.8125rem] font-bold text-status-warning-fg">{t.manual}</span>
+                    : line.source === "FACILITY_PACKAGE" ? <span className="text-[0.8125rem] text-ink-600">{t.facilityPackage}</span>
                     : <span className="text-[0.8125rem] text-ink-600">{t.catalogue}</span>}
                 </td>
                 <td className="py-2 pe-3 text-end whitespace-nowrap"><bdi dir="ltr">{egp(line.baseEgp)}</bdi></td>
@@ -83,7 +84,7 @@ const copy = {
     introManual: "{count} lines are priced by the Consultant outside their approved list — check their prices before you approve.",
     caption: "Proposal lines with the Consultant's base price and the patient's price",
     service: "Service", source: "Price source", base: "Consultant price (EGP)", patient: "Patient price (EGP)", inCurrency: "In {currency}",
-    manual: "Manual — needs your approval", catalogue: "Approved list",
+    manual: "Manual — needs your approval", catalogue: "Approved list", facilityPackage: "Approved facility package",
     baseTotal: "Consultant price total", margin: "Platform margin", patientTotal: "Patient total (EGP)",
     policy: "Policy: {name} (version {version})", noPolicy: "No margin policy applies to this care area — no margin is added.",
     rateLater: "At today's rate; the rate is fixed when the proposal is sent to the patient.",
@@ -95,7 +96,7 @@ const copy = {
     introManual: "بنود سعّرها الاستشاري خارج قائمته المعتمدة ({count}) — راجع أسعارها قبل الموافقة.",
     caption: "بنود العرض بسعر الاستشاري وسعر المريض",
     service: "الخدمة", source: "مصدر السعر", base: "سعر الاستشاري (ج.م)", patient: "سعر المريض (ج.م)", inCurrency: "بعملة {currency}",
-    manual: "يدوي — يحتاج موافقتك", catalogue: "القائمة المعتمدة",
+    manual: "يدوي — يحتاج موافقتك", catalogue: "القائمة المعتمدة", facilityPackage: "باقة منشأة معتمدة",
     baseTotal: "إجمالي سعر الاستشاري", margin: "هامش المنصة", patientTotal: "إجمالي المريض (ج.م)",
     policy: "السياسة: {name} (الإصدار {version})", noPolicy: "لا تنطبق سياسة هامش على مجال الرعاية هذا — لا يُضاف هامش.",
     rateLater: "بسعر صرف اليوم؛ ويُثبَّت السعر عند إرسال العرض إلى المريض.",

@@ -43,7 +43,21 @@ describe("Commercial › Margin & Deposit", () => {
     expect(within(dialog).getByText(/used for preliminary estimates created from now on/)).toBeVisible();
     expect(apiFetchAs).not.toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15 }) })));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null }) })));
+  });
+
+  it("states the pre-approved manual band with every margin revision (P0-5)", async () => {
+    auth.me = meWith(["COMMERCIAL_POLICY_READ", "COMMERCIAL_POLICY_MANAGE", "REFERENCE_DATA_READ"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...policies, "/finance/commercial-policies": [{ id: "m0", marginRate: 0.15, manualBandEgp: 20000, active: true, version: 1 }] }));
+    render(<MarginDeposit locale="en" />);
+    expect(await screen.findByText("Manual lines up to EGP 20000 release without Finance")).toBeVisible();
+    fireEvent.change(screen.getByLabelText("Margin %"), { target: { value: "15" } });
+    fireEvent.change(screen.getByLabelText(/Pre-approved manual band/), { target: { value: "25000" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Review new version" })[0]);
+    const dialog = screen.getByRole("dialog", { name: "Confirm new version" });
+    expect(dialog).toHaveTextContent("Manual lines up to EGP 25000 release without Finance");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ body: JSON.stringify({ marginRate: 0.15, manualBandEgp: 25000 }) })));
   });
 
   it("sets the deposit as a share of the estimate (W-1: 15%)", async () => {

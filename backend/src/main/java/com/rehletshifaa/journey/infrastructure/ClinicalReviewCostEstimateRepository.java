@@ -24,13 +24,13 @@ public interface ClinicalReviewCostEstimateRepository extends BaseRepository<Cli
     /** An estimate line with the prices a proposal is calculated from. */
     interface PricedLine {
         String getServiceDescription(); BigDecimal getEstimatedCost(); String getCurrency(); UUID getCatalogServiceId(); BigDecimal getPriceEgp();
-        BigDecimal getPriceEgpMin(); BigDecimal getPriceEgpMax(); Boolean getRequiresFinanceApproval();
+        BigDecimal getPriceEgpMin(); BigDecimal getPriceEgpMax(); Boolean getRequiresFinanceApproval(); UUID getFacilityPackageId();
     }
 
     @Query("""
             select e.serviceDescription as serviceDescription, e.estimatedCost as estimatedCost, e.currency as currency,
                 e.catalogServiceId as catalogServiceId, e.priceEgp as priceEgp, e.priceEgpMin as priceEgpMin, e.priceEgpMax as priceEgpMax,
-                e.requiresFinanceApproval as requiresFinanceApproval
+                e.requiresFinanceApproval as requiresFinanceApproval, e.facilityPackageId as facilityPackageId
             from ClinicalReviewCostEstimate e where e.clinicalReviewId = :reviewId order by e.sortOrder, e.id""")
     List<PricedLine> findPricedLinesOf(@Param("reviewId") UUID reviewId);
 }

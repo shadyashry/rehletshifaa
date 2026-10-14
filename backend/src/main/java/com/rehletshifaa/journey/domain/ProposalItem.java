@@ -22,6 +22,7 @@ public class ProposalItem extends AssignedIdEntity {
     @Column(nullable = false, length = 20) private String source;
     @Column(name = "unit_price_egp") private BigDecimal unitPriceEgp;
     @Column(name = "catalog_service_id") private UUID catalogServiceId;
+    @Column(name = "facility_package_id") private UUID facilityPackageId;
     @Column(name = "provider_price_egp") private BigDecimal providerPriceEgp;
     @Column(name = "unit_price_min_egp") private BigDecimal unitPriceMinEgp;
     @Column(name = "unit_price_max_egp") private BigDecimal unitPriceMaxEgp;
@@ -36,11 +37,17 @@ public class ProposalItem extends AssignedIdEntity {
     /** A mandatory medical line of one unit. */
     public static ProposalItem medical(UUID proposalVersionId, String description, BigDecimal displayUnitPrice, int sortOrder, String source,
                                        Prices prices, UUID catalogServiceId) {
+        return medical(proposalVersionId, description, displayUnitPrice, sortOrder, source, prices, catalogServiceId, null);
+    }
+
+    /** A mandatory medical line whose price source may be a catalogue service or a Finance-approved facility package (P0-5). */
+    public static ProposalItem medical(UUID proposalVersionId, String description, BigDecimal displayUnitPrice, int sortOrder, String source,
+                                       Prices prices, UUID catalogServiceId, UUID facilityPackageId) {
         ProposalItem i = new ProposalItem(UUID.randomUUID());
         i.proposalVersionId = proposalVersionId; i.category = "MEDICAL"; i.description = description; i.quantity = BigDecimal.ONE;
         i.unitPrice = displayUnitPrice; i.sortOrder = sortOrder; i.source = source; i.unitPriceEgp = prices.unitPriceEgp();
         i.providerPriceEgp = prices.providerPriceEgp(); i.unitPriceMinEgp = prices.unitPriceMinEgp(); i.unitPriceMaxEgp = prices.unitPriceMaxEgp();
-        i.catalogServiceId = catalogServiceId;
+        i.catalogServiceId = catalogServiceId; i.facilityPackageId = facilityPackageId;
         return i;
     }
 

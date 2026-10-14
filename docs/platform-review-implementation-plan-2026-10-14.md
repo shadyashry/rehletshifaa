@@ -281,6 +281,45 @@ phases.
     new session (Fable 5.1, high): proposal line source `FACILITY_PACKAGE` (approved, in validity, facility ACTIVE) that
     releases without a Finance work item, `manual_band_egp` per care area on the commercial policy, gate computation in
     `JourneyService.createProposal`, gate matrix tests. V91 is the next free Flyway version.
+- **Status (2026-10-14, session 2 of 3, Fable 5.1 high, same session as session 1 at the owner's "go ahead"; committed on
+  `claude/elegant-dewdney-e89e74` on top of 86f18ec, so the owner fast-forwards `feat/review-p0` again):**
+  - Delivered: `V91__facility_package_lines_and_manual_band.sql`: `commercial_policies.manual_band_egp` (CHECK >= 0, null =
+    every manual line waits for Finance), `clinical_review_cost_estimates.facility_package_id` and
+    `proposal_items.facility_package_id` (FK to `facility_packages`), and `proposal_items.source` widened to
+    CATALOG/MANUAL/FACILITY_PACKAGE: V11's inline unnamed CHECK cannot be dropped by name on both PostgreSQL and H2, so the
+    column is rebuilt through a scratch column (values kept) and the new constraints are named (`ck_proposal_items_source`,
+    `ck_proposal_items_package`: package ⇔ facility_package_id). New `FacilityPackagePricing` (facility module, no
+    authorization) answers "priceable now": APPROVED, today inside validity, facility ACTIVE. Consultant cost estimates
+    accept `facilityPackageId` (`CostEstimateItem`, old constructors kept): the package must be priceable
+    (`FACILITY_PACKAGE_INVALID`) and the expected EGP figure must sit inside its range (`FACILITY_PACKAGE_RANGE`); the line
+    stores the package and its min/max, `requires_finance_approval=false`. The gate in `JourneyService.createProposal` and
+    in the final quote is now decided per line by `lineNeedsFinance`: a package line is re-checked at proposal time (a
+    package retired since the review falls back to Finance), a catalogue line keeps its stored answer, a manual line
+    releases without Finance only when its EGP price is at or below the care area policy's band; a missing policy still
+    forces Finance. Line source `FACILITY_PACKAGE` is written on the proposal item with the package id. Commercial policy:
+    `configure` takes `manualBandEgp` (`MANUAL_BAND_INVALID` when negative; audited), `Policy`/`CommercialPolicyView` carry
+    it (cache record widened; `CacheSerializationTest` updated). Frontend: Control Center › Margin & Deposit shows the band
+    per active margin policy and takes it with every margin revision (prefilled from the platform default; empty = none);
+    Finance approval screen labels a `FACILITY_PACKAGE` line "Approved facility package" (EN/AR); `portal-model.ts` type
+    widened. No new copy keys: both screens carry inline EN/AR.
+  - Tests: new `FacilityPackageLineGateTest` (5: approved package line releases without Finance and no Finance work item,
+    package retired before the proposal falls back to `FINANCE_APPROVAL_REQUIRED`, price outside range / unapproved package
+    refused, manual inside band releases while just outside does not, no band means every manual line waits and a negative
+    band is refused); `CoordinatorCaseActionsTest` (35), `JourneyHappyPathParityTest` (6), `JourneyServiceIntegrationTest`
+    (21), `PricingCatalogServiceTest`, `ReferenceDataCachingTest`, `CacheSerializationTest`, `FacilityCatalogServiceTest`,
+    `ArchitectureRulesTest` (22, no cycles with journey → facility) all green in the focused run; frontend
+    `PageHeaders.test.tsx` gains "states the pre-approved manual band with every margin revision" (11/11 with
+    `FinanceApproval.test.tsx`). Verification: `mvn -o -q test` 789 tests, 0 failures, 3 pre-existing skips (784 after session 1 + 5 new); `pnpm typecheck` clean; eslint clean on touched
+    files; `PostgresJpaMappingTest` on postgres:17-alpine with V91 applied green (1/1; the rebuilt `proposal_items.source` carries only the two named checks).
+  - Open gaps: no UI yet to pick a facility package on the consultant's clinical review or to see the facility name on a
+    proposal line (session 3: `ClinicalReview.tsx` line picker; the API already accepts `facilityPackageId`). The band is
+    read from the care area's active policy at proposal time, not snapshotted on the version (the margin is); acceptable
+    because the band only decides the gate, never a price. Package lines are EGP-only (a figure in another currency without
+    an FX rate is refused). Finance's commercial view does not yet show the package range or facility name.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack so V91 runs; then P0-5
+    session 3 (Fable 5.1, high): facility picker replacing the free-text facility field on the travel plan and treatment
+    record (`TravelPlan`, `TreatmentEpisode`, journey/domain), the `ClinicalReview.tsx` line picker for facility packages,
+    `FACILITY_READ` for Operations and coordinators where the pickers need it. V92 is the next free Flyway version.
 
 ---
 

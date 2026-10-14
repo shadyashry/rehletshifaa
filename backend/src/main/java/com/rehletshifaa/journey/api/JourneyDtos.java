@@ -90,9 +90,11 @@ public final class JourneyDtos {
     // null => a manually entered service (Finance approval required before the quote can reach the patient).
     // quotedCost/quotedCurrency are read-side only: the same line expressed in the recommendation's proposal
     // currency at today's effective rate (null when no rate is available — never a silent base-currency stand-in).
-    public record CostEstimateItem(@NotBlank @Size(max=500)String serviceDescription,@NotNull @DecimalMin("0.00")BigDecimal estimatedCost,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,UUID catalogServiceId,BigDecimal quotedCost,String quotedCurrency) {
-        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency){this(serviceDescription,estimatedCost,currency,null,null,null);}
-        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency,UUID catalogServiceId){this(serviceDescription,estimatedCost,currency,catalogServiceId,null,null);}
+        /** {@code facilityPackageId} (P0-5): a Finance-approved facility package as the price source; the EGP figure must sit inside its range. */
+    public record CostEstimateItem(@NotBlank @Size(max=500)String serviceDescription,@NotNull @DecimalMin("0.00")BigDecimal estimatedCost,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,UUID catalogServiceId,BigDecimal quotedCost,String quotedCurrency,UUID facilityPackageId) {
+        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency){this(serviceDescription,estimatedCost,currency,null,null,null,null);}
+        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency,UUID catalogServiceId){this(serviceDescription,estimatedCost,currency,catalogServiceId,null,null,null);}
+        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency,UUID catalogServiceId,BigDecimal quotedCost,String quotedCurrency){this(serviceDescription,estimatedCost,currency,catalogServiceId,quotedCost,quotedCurrency,null);}
     }
     // proposalCurrency is the currency the consultant prepares the recommendation in; it becomes the
     // patient proposal's currency downstream. Null means "unstated" and leaves the base currency in place.
@@ -211,8 +213,10 @@ public final class JourneyDtos {
     public record FxOverrideRequest(@NotNull @DecimalMin("0.00000001")BigDecimal rate,LocalDate date) {}
     /** providerCredentialing: the practitioner is enrolled under provider credentialing (ProviderCredentialEligibility.adopted), so Direct approval writes are refused. */
     public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus,String email,String accountStatus,Instant invitedAt) {}
-    public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,boolean active,int version,String createdBy,LocalDate validFrom) {}
-    public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate) {}
+    public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,boolean active,int version,String createdBy,LocalDate validFrom) {}
+    public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate,@DecimalMin("0.0")BigDecimal manualBandEgp) {
+        public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate){this(name,careCategory,marginRate,null);}
+    }
     // Deposit + payment sub-workflow (offline record-only in this build).
     public record DepositComponentView(String beneficiary,String purpose,BigDecimal amountEgp,BigDecimal amountDisplay,String refundability,String cancellationTerms,boolean creditedToFinal) {}
     public record PaymentEventView(String eventType,BigDecimal amountDisplay,String currency,String method,String provider,String providerReference,String status,String reason,Instant occurredAt) {}
