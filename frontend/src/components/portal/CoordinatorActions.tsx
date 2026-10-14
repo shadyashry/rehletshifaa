@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { ClipboardList, Handshake, Link2, MessageSquareText, Plane, Send, UserRoundPlus, Users, X, XCircle } from "lucide-react";
+import { ClipboardList, Gauge, Handshake, Link2, MessageSquareText, Plane, Send, UserRoundPlus, Users, X, XCircle } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 import { EligibleConsultantPicker, ReferralConfirmation, type Load } from "@/components/portal/ConsultantRouting";
@@ -137,13 +137,15 @@ function TeamAssignment({ locale, caseId, role, staff, busy, mutate }: { locale:
  * "More actions": the state-valid utilities and exceptions the backend listed, one line each, in a drawer.
  * Nothing here is a workflow step, and nothing appears that the backend did not offer for this state.
  */
-export function MoreActions({ locale, caseId, available, travelPackage, version, busy, mutate, onRequestInformation, onRecordResponse, onRecordDecision, onAdministration, onCancelCase, proposalVersionId }: {
+export function MoreActions({ locale, caseId, available, travelPackage, version, busy, mutate, onRequestInformation, onRecordResponse, onRecordDecision, onAdministration, onCancelCase, onSetUrgency, proposalVersionId }: {
   locale: Locale; caseId: string; available: string[]; travelPackage: boolean; version: number; busy: boolean; mutate: Mutate;
   onRequestInformation: () => void; onRecordResponse: () => void; onAdministration?: () => void; proposalVersionId?: string;
   /** The patient decided on a call (Arabic assisted path) and nobody asked through the page first. */
   onRecordDecision?: () => void;
   /** Opens the cancellation dialog (typed reason after acceptance, P0-2); the action is offered only with it. */
   onCancelCase?: () => void;
+  /** Opens the urgency dialog (P0-3); the action is offered only with it. */
+  onSetUrgency?: () => void;
 }) {
   const ar = locale === "ar";
   const work = useWorkCopy();
@@ -158,6 +160,7 @@ export function MoreActions({ locale, caseId, available, travelPackage, version,
   if (has("SEND_PAYMENT_LINK")) items.push({ code: "SEND_PAYMENT_LINK", icon: <Send size={16} aria-hidden/>, label: work.depositTransfer.sendLink, hint: work.depositTransfer.sendLinkHint, onClick: () => void mutate(`/coordinator/cases/${caseId}/deposit/payment-link`) });
   if (has("MOVE_TO_INTAKE_REVIEW")) items.push({ code: "MOVE_TO_INTAKE_REVIEW", icon: <UserRoundPlus size={16} aria-hidden/>, label: ar ? "العودة إلى مراجعة الاستقبال" : "Move back to intake review", hint: ar ? "دون انتظار رد المريض." : "Without waiting for the patient's reply.", onClick: () => void mutate(`/coordinator/cases/${caseId}/transition`, { targetStatus: "INTAKE_REVIEW", expectedVersion: version }) });
   if (has("SET_TRAVEL_PACKAGE")) items.push({ code: "SET_TRAVEL_PACKAGE", icon: <Plane size={16} aria-hidden/>, label: travelPackage ? (ar ? "إلغاء باقة السفر المتكاملة" : "Turn off the full travel package") : (ar ? "تفعيل باقة السفر المتكاملة" : "Turn on the full travel package"), hint: ar ? "تشمل الطيران والتأشيرة والإقامة والوصول؛ عند التفعيل يُشرَك فريق العمليات قبل إرسال العرض." : "Flight, visa, accommodation and arrival; when on, Operations prepares the plan before the proposal is sent.", onClick: () => void mutate(`/coordinator/cases/${caseId}/travel-package`, { requested: !travelPackage }, "PUT") });
+  if (has("SET_URGENCY") && onSetUrgency) items.push({ code: "SET_URGENCY", icon: <Gauge size={16} aria-hidden/>, label: work.urgency.title, hint: work.urgency.moreHint, onClick: onSetUrgency });
   if (onAdministration) items.push({ code: "ADMINISTRATION", icon: <Users size={16} aria-hidden/>, label: ar ? "نقل ملكية الحالة" : "Transfer case ownership", hint: ar ? "سلّم هذه الحالة إلى منسق آخر في فريقك." : "Hand this case to another coordinator on your team.", onClick: onAdministration });
   if (has("CANCEL_CASE") && onCancelCase) items.push({ code: "CANCEL_CASE", tone: "danger", icon: <XCircle size={16} aria-hidden/>, label: work.cancelCase.title, hint: work.cancelCase.hint, onClick: onCancelCase });
 
@@ -238,6 +241,82 @@ export function CancelCaseDialog({ caseId, version, status, busy, mutate, onClos
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button type="button" className="btn-secondary" onClick={() => dialog.current?.close()}>{t.keep}</button>
           <button type="submit" className="btn-primary bg-alert-700 hover:bg-alert-800" disabled={busy}>{t.confirm}</button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+export const URGENCY_LEVELS = ["ROUTINE", "PRIORITY", "URGENT"] as const;
+export type Urgency = typeof URGENCY_LEVELS[number];
+
+/**
+ * The coordinator's urgency judgement (P0-3, A-02): one of three levels, always with a reason. The reason is stored
+ * encrypted and never shown to the patient; URGENT raises the case's work and alerts the coordinator's lead. The backend
+ * refuses an unchanged level or a blank reason too.
+ */
+export function UrgencyDialog({ caseId, urgency, busy, mutate, onClose }: {
+  caseId: string; urgency: Urgency; busy: boolean; mutate: Mutate; onClose: () => void;
+}) {
+  const t = useWorkCopy().urgency;
+  const dialog = useRef<HTMLDialogElement>(null);
+  const id = useId();
+  const [level, setLevel] = useState<Urgency>(urgency);
+  const [reason, setReason] = useState("");
+  const [touched, setTouched] = useState(false);
+  useEffect(() => { dialog.current?.showModal(); }, []);
+  const unchanged = level === urgency;
+  const missingReason = !reason.trim();
+
+  function save(event: FormEvent) {
+    event.preventDefault();
+    setTouched(true);
+    if (unchanged || missingReason) return;
+    void mutate(`/coordinator/cases/${caseId}/urgency`, { urgency: level, reason: reason.trim() }, "PUT")
+      .then(result => { if (result) dialog.current?.close(); });
+  }
+
+  return (
+    <dialog ref={dialog} className="account-dialog" aria-labelledby={`${id}-title`} onClose={onClose}>
+      <div className="flex items-start justify-between gap-4">
+        <h2 id={`${id}-title`} className="title">{t.title}</h2>
+        <button type="button" className="icon-button" aria-label={t.keep} onClick={() => dialog.current?.close()}><X size={20}/></button>
+      </div>
+      <p className="mt-2 text-[0.9rem] leading-6 text-ink-600">{t.hint}</p>
+      <form className="mt-5 space-y-5" onSubmit={save} noValidate>
+        <fieldset aria-describedby={touched && unchanged ? `${id}-unchanged` : undefined}>
+          <legend className="text-[0.8rem] font-bold text-ink-800">{t.label}</legend>
+          <p className="mt-0.5 text-[0.8rem] text-ink-500">{fillTemplate(t.current, { level: t.levels[urgency].label })}</p>
+          <ul className="mt-2.5 space-y-2">
+            {URGENCY_LEVELS.map(code => (
+              <li key={code}>
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1">
+                  <input type="radio" name={`${id}-level`} value={code} checked={level === code} onChange={() => setLevel(code)}
+                         aria-describedby={`${id}-${code}-hint`} className="mt-1 h-4 w-4 accent-brand-700"/>
+                  <span>
+                    <span className="block text-[0.9375rem] font-semibold text-ink-800">{t.levels[code].label}</span>
+                    <span id={`${id}-${code}-hint`} className="block text-[0.8rem] leading-5 text-ink-500">{t.levels[code].hint}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {touched && unchanged && <p id={`${id}-unchanged`} role="alert" className="mt-2 text-[0.85rem] font-semibold text-alert-700">{t.unchanged}</p>}
+        </fieldset>
+        <div>
+          <label htmlFor={`${id}-reason`} className="text-[0.8rem] font-bold text-ink-800">
+            {t.reasonLabel}<span aria-hidden className="ms-1 text-alert-600">*</span><span className="sr-only"> (required)</span>
+          </label>
+          <p id={`${id}-reason-hint`} className="mt-0.5 text-[0.8rem] text-ink-500">{t.reasonHint}</p>
+          <textarea id={`${id}-reason`} className="field mt-2 min-h-24" maxLength={500} required value={reason}
+                    aria-invalid={touched && missingReason ? true : undefined}
+                    aria-describedby={`${id}-reason-hint${touched && missingReason ? ` ${id}-reason-error` : ""}`}
+                    onChange={event => setReason(event.target.value)}/>
+          {touched && missingReason && <p id={`${id}-reason-error`} role="alert" className="mt-2 text-[0.85rem] font-semibold text-alert-700">{t.reasonRequired}</p>}
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button type="button" className="btn-secondary" onClick={() => dialog.current?.close()}>{t.keep}</button>
+          <button type="submit" className="btn-primary" disabled={busy}>{t.confirm}</button>
         </div>
       </form>
     </dialog>

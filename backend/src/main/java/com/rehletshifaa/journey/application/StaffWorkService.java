@@ -2,6 +2,7 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
 import com.rehletshifaa.casemanagement.domain.CaseTask;
+import com.rehletshifaa.casemanagement.domain.CaseUrgency;
 import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
@@ -112,7 +113,7 @@ public class StaffWorkService {
             return existing;
         }
         UUID id = UUID.randomUUID();
-        CaseTask task = new CaseTask(id, item.caseId(), item.type(), encrypt(item.title()), encryptNullable(item.context()), item.ownerSubject(), item.ownerRole(), "INTERNAL", derivePriority(item.blocking(), item.dueAt(), now), item.blocking(), item.dueAt(), item.createdBy(), now);
+        CaseTask task = new CaseTask(id, item.caseId(), item.type(), encrypt(item.title()), encryptNullable(item.context()), item.ownerSubject(), item.ownerRole(), "INTERNAL", derivePriority(item.blocking(), item.dueAt(), urgency(item.caseId()), now), item.blocking(), item.dueAt(), item.createdBy(), now);
         if (item.copy() != null) task.withCopy(item.copy().code(), encrypt(writeParams(item.copy().params())));
         tasks.saveAndFlush(task);
         audit(item.caseId(), "CASE_WORK_ITEM_OPENED", id, item.type());
@@ -164,14 +165,33 @@ public class StaffWorkService {
 
     /**
      * The only source of a work item's priority. It is a reading of real conditions, never a default:
-     * work that blocks the patient's journey, or work that is already overdue or due within a day, is HIGH;
-     * everything else — including brand-new assignments — is NORMAL. A person may still raise it
-     * explicitly through the task API; nothing here can.
+     * work on a case its coordinator marked URGENT, work that blocks the patient's journey, or work that is already
+     * overdue or due within a day, is HIGH; everything else — including brand-new assignments and PRIORITY cases — is
+     * NORMAL. A person may still raise it explicitly through the task API; nothing here can. {@code urgency} null reads
+     * as ROUTINE.
      */
-    public static String derivePriority(boolean blocking, Instant dueAt, Instant now) {
+    public static String derivePriority(boolean blocking, Instant dueAt, CaseUrgency urgency, Instant now) {
+        if (urgency == CaseUrgency.URGENT) return "HIGH";
         if (blocking) return "HIGH";
         if (dueAt != null && !dueAt.isAfter(now.plus(DUE_SOON))) return "HIGH";
         return "NORMAL";
+    }
+
+    /** The case's current urgency, for {@link #derivePriority}; ROUTINE when the case is unknown. */
+    public CaseUrgency urgency(UUID caseId) { return caseId == null ? CaseUrgency.ROUTINE : cases.findUrgency(caseId).orElse(CaseUrgency.ROUTINE); }
+
+    /**
+     * The case became URGENT: its open work (staff items and patient actions) is re-read through {@link #derivePriority},
+     * which only ever raises it here. Lowering urgency later re-derives nothing: an item keeps HIGH until it is done,
+     * because a person may have raised it by hand and nothing here can tell the two apart.
+     *
+     * @return how many open items were raised
+     */
+    @Transactional
+    public int raiseOpenWorkForUrgency(UUID caseId) {
+        int raised = tasks.raiseOpenPriority(caseId, "HIGH", Set.of("LOW", "NORMAL"), micros(clock.instant()));
+        if (raised > 0) changed(caseId);
+        return raised;
     }
 
     private void notify(NewWorkItem item, UUID taskId, Instant now) {

@@ -101,10 +101,10 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
                     .orElseThrow(() -> new ApiException(403, "INELIGIBLE_COORDINATOR", "The target Coordinator is not eligible for this case"));
             UUID team = command.team() == null ? target.teams().getFirst() : command.team();
             if (!target.teams().contains(team)) throw new ApiException(403, "TEAM_SCOPE_DENIED", "The target is not an eligible member of this team");
-            selection = new Selection(target.subject(), team, "MANUAL_" + action, scoring.score(candidates, p.configuration()));
+            selection = new Selection(target.subject(), team, "MANUAL_" + action, scoring.score(candidates, p.configuration(), c.urgent()));
         } else if (action.equals("QUEUE")) {
             config.validTeam(command.team());
-            selection = new Selection(null, command.team(), "MANUAL_QUEUE", scoring.score(candidates, p.configuration()));
+            selection = new Selection(null, command.team(), "MANUAL_QUEUE", scoring.score(candidates, p.configuration(), c.urgent()));
         }
         return persist(c, p, preference, candidates, selection, command, actor.subject(), payload, now);
     }
@@ -146,7 +146,7 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
         Candidate target = candidates.stream().filter(x -> x.subject().equals(actor.subject()) && x.exclusions().isEmpty()).findFirst()
                 .orElseThrow(() -> new ApiException(403, "INELIGIBLE_COORDINATOR", "You are not eligible to coordinate this case"));
         Preference preference = config.effectivePreference(c.consultantId(), now);
-        Selection selection = new Selection(actor.subject(), target.teams().getFirst(), "COORDINATOR_CLAIM", scoring.score(candidates, p.configuration()));
+        Selection selection = new Selection(actor.subject(), target.teams().getFirst(), "COORDINATOR_CLAIM", scoring.score(candidates, p.configuration(), c.urgent()));
         Command command = new Command("claim:" + caseId, c.revision(), "ASSIGN", actor.subject(), selection.team(), "Coordinator accepted eligible intake", "COORDINATOR_CLAIM");
         persist(c, p, preference, candidates, selection, command, actor.subject(), repo.encode(command), now);
         return repo.ownerAssignmentId(caseId);
@@ -168,7 +168,7 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
         List<Candidate> candidates = eligibility.evaluate(c, p, now);
         Candidate selected = candidates.stream().filter(x -> x.subject().equals(target) && x.exclusions().isEmpty()).findFirst()
                 .orElseThrow(() -> new ApiException(403, "INELIGIBLE_COORDINATOR", "The target Coordinator is not eligible for this case"));
-        Selection selection = new Selection(target, selected.teams().getFirst(), "MANUAL_REASSIGN", scoring.score(candidates, p.configuration()));
+        Selection selection = new Selection(target, selected.teams().getFirst(), "MANUAL_REASSIGN", scoring.score(candidates, p.configuration(), c.urgent()));
         Command command = new Command(UUID.randomUUID().toString(), c.revision(), "REASSIGN", target, selection.team(), reason, "COORDINATOR_REASSIGNMENT");
         persist(c, p, config.effectivePreference(c.consultantId(), now), candidates, selection, command, actor, repo.encode(command), now);
         return repo.ownerAssignmentId(caseId);
@@ -310,7 +310,7 @@ public class AssignmentEngine implements CoordinatorRoutingPort {
             Optional<String> intakeOwner = intake.intakeOwnerForCase(c.id());
             if (intakeOwner.isPresent()) for (Candidate x : candidates)
                 if (x.subject().equals(intakeOwner.get()) && x.exclusions().isEmpty() && !x.teams().isEmpty())
-                    return new Selection(x.subject(), x.teams().getFirst(), "INTAKE_CONTINUITY", scoring.score(candidates, p.configuration()));
+                    return new Selection(x.subject(), x.teams().getFirst(), "INTAKE_CONTINUITY", scoring.score(candidates, p.configuration(), c.urgent()));
         }
         Map<UUID, UUID> fallbacks = new HashMap<>();
         repo.teams().forEach(t -> { if (t.fallbackTeam() != null) fallbacks.put(t.id(), t.fallbackTeam()); });

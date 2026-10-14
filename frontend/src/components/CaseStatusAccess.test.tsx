@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import { CaseStatusAccess } from "./CaseStatusAccess";
+import en from "@/messages/en.json";
+import ar from "@/messages/ar.json";
 
 // The page navigates to the proposal with the App Router; vitest has no router context, so it is a spy.
 const push = vi.fn();
@@ -59,6 +61,18 @@ async function reachAction(overrides: Record<string, () => Promise<Response>> = 
 describe("CaseStatusAccess", () => {
   beforeEach(() => vi.resetAllMocks());
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  // A-02 (P0-3): the emergency instruction is on the page before and after verification, in the patient's language.
+  it("tells the patient to seek local care in an emergency, in English and Arabic", async () => {
+    vi.stubGlobal("fetch", stub({ "tok-1": () => json(summary) }));
+    const { unmount } = render(<CaseStatusAccess locale="en" token="tok-1" emergency={en.common.emergencyNotice}/>);
+    await screen.findByRole("button", { name: /send verification code/i });
+    const note = screen.getByRole("note", { name: en.common.emergencyNotice.title });
+    expect(note.textContent).toContain(en.common.emergencyNotice.body);
+    unmount();
+    render(<CaseStatusAccess locale="ar" token="tok-1" emergency={ar.common.emergencyNotice}/>);
+    expect(await screen.findByRole("note", { name: ar.common.emergencyNotice.title })).toBeTruthy();
+  });
 
   it("never shows case data before the one-time code is verified", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json(summary) }));

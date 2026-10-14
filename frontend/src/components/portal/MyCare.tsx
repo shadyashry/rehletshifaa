@@ -5,6 +5,7 @@ import { ArrowRight, Check, FileText, MessageCircle, MessageSquareText, Plus, Us
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
+import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 import { careAreaLabel, fillTemplate } from "@/lib/portal-labels";
 import { ConfirmDialog, UnreadCount } from "@/components/portal/portal-ui";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
@@ -111,6 +112,9 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
           </p>
         </div>
       </header>
+
+      {/* A-02: whatever stage the case is at, an emergency is local care now, never a message to the team. */}
+      {view === "care" && <EmergencyGuidance className="mt-5" title={t.emergency.title} body={t.emergency.body}/>}
 
       {view === "documents" && (
         <section aria-labelledby="documents-title" className="card mt-5 p-5 sm:p-6">

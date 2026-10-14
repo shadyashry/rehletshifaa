@@ -84,7 +84,7 @@ public class PatientActionService {
         UUID taskId = openRequestId(caseId);
         if (taskId == null) {
             taskId = UUID.randomUUID();
-            tasks.saveAndFlush(new CaseTask(taskId, caseId, TASK_TYPE, encrypt(title(language)), encryptNullable(message), null, "PATIENT", "PATIENT_ACTION", StaffWorkService.derivePriority(command.blocking(), command.dueAt(), now), command.blocking(), command.dueAt(), actorSubject, now));
+            tasks.saveAndFlush(new CaseTask(taskId, caseId, TASK_TYPE, encrypt(title(language)), encryptNullable(message), null, "PATIENT", "PATIENT_ACTION", StaffWorkService.derivePriority(command.blocking(), command.dueAt(), work.urgency(caseId), now), command.blocking(), command.dueAt(), actorSubject, now));
         } else {
             tasks.renewPatientAction(taskId, encryptNullable(message), command.blocking(), micros(command.dueAt()), micros(now));
         }
@@ -140,7 +140,7 @@ public class PatientActionService {
         if (TERMINAL.contains(status)) throw new ApiException(409, "CASE_NOT_ACTIONABLE", "This patient action is no longer available");
         Instant now = clock.instant();
         UUID id = UUID.randomUUID();
-        tasks.saveAndFlush(new CaseTask(id, caseId, type, encrypt(label), null, null, "PATIENT", "PATIENT_ACTION", StaffWorkService.derivePriority(blocking, null, now), blocking, null, actorSubject, now));
+        tasks.saveAndFlush(new CaseTask(id, caseId, type, encrypt(label), null, null, "PATIENT", "PATIENT_ACTION", StaffWorkService.derivePriority(blocking, null, work.urgency(caseId), now), blocking, null, actorSubject, now));
         work.setWaitingOn(caseId, "PATIENT", WaitingReason.of("PATIENT_JOURNEY_ACTION", "Waiting for the patient's current Journey action"));
         audit(caseId, "JOURNEY_PATIENT_ACTION_OPENED", actorSubject, "SYSTEM", id, type);
         return id;

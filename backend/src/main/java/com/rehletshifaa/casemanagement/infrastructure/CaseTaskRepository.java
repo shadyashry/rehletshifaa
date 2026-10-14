@@ -287,6 +287,14 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
     int cancelOpenOnCase(@Param("caseId") UUID caseId, @Param("kept") java.util.Collection<String> kept, @Param("reason") String reason,
                          @Param("now") Instant now);
 
+    /** The case became URGENT: its open items of the lower priorities are raised (never lowered; see StaffWorkService). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update CaseTask t set t.priority = :to, t.updatedAt = :now, t.version = t.version + 1
+            where t.caseId = :caseId and t.status in ('OPEN', 'IN_PROGRESS') and t.priority in :from""")
+    int raiseOpenPriority(@Param("caseId") UUID caseId, @Param("to") String to, @Param("from") java.util.Collection<String> from,
+                          @Param("now") Instant now);
+
     /** Gives the task to another owner; it starts again as OPEN. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

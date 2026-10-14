@@ -8,10 +8,21 @@ import java.util.*;
 @Service
 public class CoordinatorScoringService {
     public static final String ALGORITHM="coordination-v1";
-    public List<Scored> score(List<Candidate> candidates,PolicyConfig p){return candidates.stream().filter(c->c.exclusions().isEmpty()).map(c->{BigDecimal capacity=BigDecimal.valueOf(c.maximum()-c.workload()).divide(BigDecimal.valueOf(c.maximum()),8,RoundingMode.HALF_UP);BigDecimal language=c.languageMatch()?BigDecimal.ONE:BigDecimal.ZERO;return new Scored(c,capacity,language,capacity.multiply(BigDecimal.valueOf(p.capacityWeight())).add(language.multiply(BigDecimal.valueOf(p.languageWeight()))));}).sorted(Comparator.comparing(Scored::score).reversed().thenComparing(s->ratio(s.candidate())).thenComparing(s->s.candidate().lastAssignment(),Comparator.nullsFirst(Comparator.naturalOrder())).thenComparing(s->s.candidate().subject())).toList();}
+    public List<Scored> score(List<Candidate> candidates,PolicyConfig p){return score(candidates,p,false);}
+    /**
+     * Eligible candidates, best first. The weighted score decides; ties go to the lower load ratio, then the longest wait
+     * since a last assignment, then the subject. For an URGENT case (review 2026-10-14, A-02) two tie-breaks come first
+     * among equal scores: an on-duty Coordinator before an off-duty one, then the fewest cases held now, so the case
+     * lands with someone who can act today. Urgency never changes a score, eligibility or the routing precedence.
+     */
+    public List<Scored> score(List<Candidate> candidates,PolicyConfig p,boolean urgent){
+        Comparator<Scored> order=Comparator.comparing(Scored::score).reversed();
+        if(urgent)order=order.thenComparing(s->!s.candidate().onDuty()).thenComparingLong(s->s.candidate().workload());
+        order=order.thenComparing(s->ratio(s.candidate())).thenComparing(s->s.candidate().lastAssignment(),Comparator.nullsFirst(Comparator.naturalOrder())).thenComparing(s->s.candidate().subject());
+        return candidates.stream().filter(c->c.exclusions().isEmpty()).map(c->{BigDecimal capacity=BigDecimal.valueOf(c.maximum()-c.workload()).divide(BigDecimal.valueOf(c.maximum()),8,RoundingMode.HALF_UP);BigDecimal language=c.languageMatch()?BigDecimal.ONE:BigDecimal.ZERO;return new Scored(c,capacity,language,capacity.multiply(BigDecimal.valueOf(p.capacityWeight())).add(language.multiply(BigDecimal.valueOf(p.languageWeight()))));}).sorted(order).toList();}
     private BigDecimal ratio(Candidate c){return BigDecimal.valueOf(c.workload()).divide(BigDecimal.valueOf(c.maximum()),8,RoundingMode.HALF_UP);}
     public Selection select(CaseFacts c,Policy p,Preference preference,List<Candidate> candidates){return select(c,p,preference,candidates,Map.of());}
-    public Selection select(CaseFacts c,Policy p,Preference preference,List<Candidate> candidates,Map<UUID,UUID> teamFallbacks){List<Scored> scored=score(candidates,p.configuration());
+    public Selection select(CaseFacts c,Policy p,Preference preference,List<Candidate> candidates,Map<UUID,UUID> teamFallbacks){List<Scored> scored=score(candidates,p.configuration(),c.urgent());
         for(String path:List.of("CONTINUITY","PREFERRED_COORDINATOR")){String subject=path.equals("CONTINUITY")?c.owner():preference==null?null:preference.coordinator();if(subject!=null)for(Scored s:scored)if(s.candidate().subject().equals(subject))return new Selection(subject,s.candidate().teams().getFirst(),path,scored);}
         List<UUID> pools=new ArrayList<>();List<String> paths=new ArrayList<>();add(pools,paths,preference==null?null:preference.team(),"PREFERRED_TEAM");add(pools,paths,c.careArea()==null?null:p.configuration().careAreaTeams().get(c.careArea()),"CARE_AREA_TEAM");add(pools,paths,p.configuration().defaultTeam(),"DEFAULT_TEAM");add(pools,paths,preference==null?null:preference.fallbackTeam(),"CONSULTANT_FALLBACK_TEAM");add(pools,paths,p.configuration().fallbackTeam(),"FALLBACK_TEAM");
         for(UUID pool:List.copyOf(pools))add(pools,paths,teamFallbacks.get(pool),"TEAM_FALLBACK");

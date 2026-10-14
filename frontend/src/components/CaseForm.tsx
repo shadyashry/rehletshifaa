@@ -11,6 +11,7 @@ import { COUNTRIES, flagEmoji, type Country } from "@/lib/countries";
 import { apiUrl, apiFetchAs } from "@/lib/api";
 import { ADDITIONAL_CARE_AREAS, additionalCareAreas } from "@/lib/additional-care-areas";
 import { useAuth } from "@/components/AuthProvider";
+import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 
 type CaseFor = "MYSELF" | "SOMEONE_ELSE";
 type FormValues = {
@@ -255,6 +256,9 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     finally { setBusy(false); }
   }
 
+  // A-02: anyone describing symptoms is told first that this is not emergency care.
+  const emergency = <EmergencyGuidance title={d.common.emergencyNotice.title} body={d.common.emergencyNotice.body}/>;
+
   if (caseNumber) {
     const statusHref = statusToken ? `/${locale}/status/${statusToken}` : undefined;
     return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{isPatient && session?.linked ? t.successReturning : d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><div className="mt-7 flex flex-wrap gap-3">{isPatient && session?.linked ? <a className="btn-primary" href={`/${locale}/portal`}>{t.goToPortal}</a> : statusHref && <a className="btn-primary" href={statusHref}>{ar ? "متابعة حالة الطلب" : "Track your case"}</a>}<a className="btn-secondary" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappEntry(locale, caseNumber)}>{d.form.continue}</a></div></section>;
@@ -262,7 +266,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   // ---- Returning, signed-in patient: saved details reused, only the new case is entered ----
   if (isPatient && session?.linked) {
-    return <form className="card overflow-hidden" onSubmit={submitReturning} noValidate>
+    return <div className="grid min-w-0 gap-5">{emergency}<form className="card overflow-hidden" onSubmit={submitReturning} noValidate>
       <div className="border-b border-line bg-brand-50/70 px-6 py-5 md:px-9">
         <p className="text-sm text-ink-500">{t.signedInAs}</p>
         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1"><strong className="text-lg text-brand-900">{session.displayName}</strong><a className="text-sm font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/portal`}>{t.goToPortal}</a></p>
@@ -284,7 +288,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
         <button className="btn-primary mt-6 w-full transition-opacity disabled:opacity-50 disabled:saturate-[.6] disabled:cursor-not-allowed" disabled={busy || !values.consent || !valid.files} type="submit">{busy ? d.form.sending : t.startNew}</button>
         <p className="mt-4 flex items-center justify-center gap-2 text-sm text-ink-600"><LockKeyhole size={15} aria-hidden />{d.form.secureNote}</p>
       </div>
-    </form>;
+    </form></div>;
   }
 
   // Plain render helpers (not components): a component defined inside render remounts on every keystroke.
@@ -349,11 +353,12 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   function consentField() {
     return <>
       {/* Travel support is not asked here: no proposal exists yet. The coordinator asks while preparing it and records it in the portal. */}
-      <label className="mt-6 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={values.consent} onChange={e => { update("consent", e.target.checked); touch("consent"); }} /><span className="text-sm leading-6 text-ink-700">{d.form.consent} <a className="font-bold text-brand-700 underline" href={`/${locale}/privacy`}>{d.common.privacy}</a></span></label>{fieldError("consent") && <p className="error-text mt-2">{fieldError("consent")}</p>}
+      <label className="mt-6 flex cursor-pointer items-start gap-3"><input className="mt-1 h-5 w-5 accent-brand-600" type="checkbox" checked={values.consent} onChange={e => { update("consent", e.target.checked); touch("consent"); }} /><span className="text-sm leading-6 text-ink-700">{d.form.consent} <a className="font-bold text-brand-700 underline" href={`/${locale}/privacy`}>{d.common.privacy}</a><span className="mt-1.5 block">{d.form.medicalDisclaimer}</span></span></label>{fieldError("consent") && <p className="error-text mt-2">{fieldError("consent")}</p>}
     </>;
   }
 
-  return <>
+  return <div className="grid min-w-0 gap-5">
+    {emergency}
     {siteKey && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" />}
     <form className="card overflow-hidden" onSubmit={submit} noValidate>
       <div className="border-b border-line bg-brand-50/70 px-6 py-5 md:px-9">
@@ -435,7 +440,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       </div>
       </div>
     </form>
-  </>;
+  </div>;
 }
 
 function Field({ label, required, requiredMark, valid, error, hint, children }: { label: string; required?: boolean; requiredMark?: string; valid?: boolean; error?: string; hint?: string; children: React.ReactElement<{ "aria-invalid"?: boolean; "aria-describedby"?: string }> }) {

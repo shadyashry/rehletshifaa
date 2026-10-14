@@ -97,7 +97,7 @@ public class JourneyCaseQueryService {
     private static CaseView forPatient(CaseView view, String viewer) {
         return new CaseView(view.id(), view.caseNumber(), view.status(), view.patientName(), view.country(), view.preferredLanguage(),
                 view.careCategory(), view.createdAt(), view.updatedAt(), view.version(), null, null, view.coordinatorName(), view.doctorName(),
-                view.travelPackageRequested(), view.waitingOn(), view.waitingReason(), viewer);
+                view.travelPackageRequested(), view.waitingOn(), view.waitingReason(), viewer, null); // urgency is a staff judgement
     }
 
     /**
@@ -221,7 +221,8 @@ public class JourneyCaseQueryService {
             return new CaseView(row.getId(), row.getCaseNumber(), row.getStatus().name(), row.getPatientName(), row.getCountry(),
                     row.getPreferredLanguage(), row.getCareCategory(), row.getCreatedAt(), row.getUpdatedAt(), row.getVersion(), coordinator,
                     activeDoctors.get(row.getId()), names.staff(coordinator), names.consultant(namedDoctors.get(row.getId())),
-                    Boolean.TRUE.equals(row.getTravelPackageRequested()), row.getWaitingOn(), row.getWaitingReason(), null);
+                    Boolean.TRUE.equals(row.getTravelPackageRequested()), row.getWaitingOn(), row.getWaitingReason(), null,
+                    row.getUrgency() == null ? "ROUTINE" : row.getUrgency().name());
         }).toList();
     }
 }

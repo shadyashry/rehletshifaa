@@ -3,10 +3,10 @@
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { createContext, use, useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Check, MessageSquare, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Check, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
-import { CancelCaseDialog, CoordinatorActionForm, MoreActions } from "@/components/portal/CoordinatorActions";
+import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
 import { RecordProposalDecision } from "@/components/portal/RecordProposalDecision";
 import { CaseMessages } from "@/components/portal/CaseMessages";
 import { IntakeHistory } from "@/components/portal/IntakeHistory";
@@ -60,7 +60,7 @@ function useCaseWorkspace():CaseWorkspace{
 /** A proposal or final quote's validity end, read when it is sent (never while rendering). */
 const validUntilInDays=(days:number)=>new Date(Date.now()+days*86400000).toISOString();
 
-type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"|"decline"|"recordResponse"|"recordDecision"|"cancel";
+type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"|"decline"|"recordResponse"|"recordDecision"|"cancel"|"urgency";
 
 /**
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
@@ -168,6 +168,8 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
      <h2 id="case-heading" tabIndex={-1} className="mt-0.5 text-[1.35rem] font-bold leading-7 text-brand-900 outline-none">{c.patientName||(locale==="ar"?"مراجعة طلب الرعاية":"Review care request")}</h2>
      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.8rem]">
       <Status value={c.status} locale={locale}/>
+      {/* P0-3: the coordinator's urgency, for staff only; routine says nothing. */}
+      {c.urgency&&c.urgency!=="ROUTINE"&&<span className={`inline-flex items-center gap-1 font-semibold ${c.urgency==="URGENT"?"text-alert-700":"text-ink-800"}`}><Gauge size={13} aria-hidden/><span className="font-normal text-ink-500">{work.urgency.label}:</span>{work.urgency.levels[c.urgency as Urgency]?.label??c.urgency}</span>}
       {actions.waitingOn&&actions.waitingOn!=="NONE"&&<HeaderFact label={work.waiting.label} value={waitingLabel(actions.waitingOn,work.waiting,{role,ownsCase:!!mySubject&&c.coordinatorSubject===mySubject,action:value.actions?current:null})}/>}
       <HeaderFact label={t.coordinatorLabel} value={coordinatorLabel(c,mySubject,work.queue)}/>
       {consultantOnCase&&<HeaderFact label={locale==="ar"?"الاستشاري":"Consultant"} value={consultantOnCase}/>}
@@ -271,8 +273,9 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
    <MoreActions locale={locale} caseId={c.id} available={moreAvailable} travelPackage={!!c.travelPackageRequested} version={c.version} busy={busy} mutate={mutate}
     onRequestInformation={()=>setOverlay("requestInfo")} onRecordResponse={()=>setOverlay("recordResponse")}
     onRecordDecision={value.proposal?()=>setOverlay("recordDecision"):undefined}
-    onAdministration={canRebalance?()=>setOverlay("transfer"):undefined} onCancelCase={()=>setOverlay("cancel")}/>
+    onAdministration={canRebalance?()=>setOverlay("transfer"):undefined} onCancelCase={()=>setOverlay("cancel")} onSetUrgency={()=>setOverlay("urgency")}/>
   </CaseDrawer>}
+  {overlay==="urgency"&&<UrgencyDialog caseId={c.id} urgency={(c.urgency??"ROUTINE") as Urgency} busy={busy} mutate={mutate} onClose={()=>closeOverlay("urgency")}/>}
   {overlay==="cancel"&&<CancelCaseDialog caseId={c.id} version={c.version} status={c.status} busy={busy} mutate={mutate} onClose={()=>closeOverlay("cancel")}/>}
   {/* Recording a WhatsApp/phone answer opens its own dialog; the trigger is hidden and driven from More actions so the page carries one control per business action. */}
   {isCoordinator&&owned&&available.includes("RECORD_PATIENT_RESPONSE")&&<RecordPatientResponse locale={locale} caseId={c.id} action={value.patientAction} mutate={mutate} open={overlay==="recordResponse"} onOpenChange={open=>{if(open)setOverlay("recordResponse");else closeOverlay("recordResponse");}} hideTrigger/>}

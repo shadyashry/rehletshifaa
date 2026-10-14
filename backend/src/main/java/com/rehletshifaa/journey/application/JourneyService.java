@@ -138,7 +138,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     }
     // Pre-ownership triage exposes the patient name and routing facts (name requested visible from intake),
     // but still withholds coordinator/doctor assignment identity until ownership is taken.
-    private CaseView routingSummary(CaseView view){return new CaseView(view.id(),view.caseNumber(),view.status(),view.patientName(),view.country(),view.preferredLanguage(),view.careCategory(),view.createdAt(),view.updatedAt(),view.version(),null,null,null,null,view.travelPackageRequested(),view.waitingOn(),view.waitingReason(),null);}
+    private CaseView routingSummary(CaseView view){return new CaseView(view.id(),view.caseNumber(),view.status(),view.patientName(),view.country(),view.preferredLanguage(),view.careCategory(),view.createdAt(),view.updatedAt(),view.version(),null,null,null,null,view.travelPackageRequested(),view.waitingOn(),view.waitingReason(),null,view.urgency());}
     @Transactional public IntakePreview intakePreview(UUID caseId){
         var actor=authority.authorize(Permission.COORDINATION_QUEUE);
         // Only this explicit read-only preview permits pre-ownership intake review.

@@ -258,6 +258,18 @@ describe("MyCare", () => {
     expect(screen.queryByRole("button", { name: /withdraw/i })).toBeNull();
   });
 
+  // A-02 (P0-3): one static note, never a live alert, telling the patient that an emergency is local care now.
+  it("tells the patient to seek local care in an emergency, as a note in the care view only", () => {
+    renderCare({ actions: wait("WAIT_COORDINATION") });
+    const notes = screen.getAllByRole("note", { name: "If this is an emergency, seek local care now" });
+    expect(notes).toHaveLength(1);
+    expect(notes[0].textContent).toMatch(/local emergency number/);
+    expect(notes[0].closest("[role=alert]")).toBeNull();
+    cleanup();
+    renderCare({ actions: wait("WAIT_COORDINATION"), view: "documents" });
+    expect(screen.queryByRole("note", { name: /emergency/i })).toBeNull();
+  });
+
   it("a closed case shows no step of its journey as reached or current", () => {
     renderCare({ caseSummary: { ...base, status: "CLOSED" }, actions: wait("NONE"), deposit: null, patientProposal: null, proposal: null });
     const journey = screen.getByRole("region", { name: "Your care journey" });

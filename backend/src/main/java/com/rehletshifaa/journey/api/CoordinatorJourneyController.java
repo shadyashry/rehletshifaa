@@ -1,8 +1,8 @@
 package com.rehletshifaa.journey.api;
-import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.PricingCatalogService;import com.rehletshifaa.journey.application.ProposalAssistanceService;import jakarta.validation.Valid;import org.springframework.format.annotation.DateTimeFormat;import org.springframework.web.bind.annotation.*;import java.time.LocalDate;import java.util.*;
+import com.rehletshifaa.journey.application.CaseUrgencyService;import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.PricingCatalogService;import com.rehletshifaa.journey.application.ProposalAssistanceService;import jakarta.validation.Valid;import org.springframework.format.annotation.DateTimeFormat;import org.springframework.web.bind.annotation.*;import java.time.LocalDate;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/coordinator") public class CoordinatorJourneyController{
- private final JourneyService service;private final PricingCatalogService pricing;private final ProposalAssistanceService assistance;public CoordinatorJourneyController(JourneyService service,PricingCatalogService pricing,ProposalAssistanceService assistance){this.service=service;this.pricing=pricing;this.assistance=assistance;}
+ private final JourneyService service;private final PricingCatalogService pricing;private final ProposalAssistanceService assistance;private final CaseUrgencyService urgency;public CoordinatorJourneyController(JourneyService service,PricingCatalogService pricing,ProposalAssistanceService assistance,CaseUrgencyService urgency){this.service=service;this.pricing=pricing;this.assistance=assistance;this.urgency=urgency;}
  @GetMapping("/me")public StaffProfileView me(){return service.myCoordinatorProfile();}
  @GetMapping("/fx-rates")public List<FxRateView>fxRates(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return pricing.fxRates(date);}
  @GetMapping("/cases/{caseId}/deposit")public DepositView deposit(@PathVariable UUID caseId){return service.depositView(caseId);}
@@ -20,6 +20,9 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  /** Record what the patient provided over WhatsApp/phone, preserving provenance. */
  @PostMapping("/cases/{caseId}/information-requests/on-behalf")public IdResponse recordInformation(@PathVariable UUID caseId,@Valid @RequestBody WorkDtos.OnBehalfRequest request){return service.recordPatientInformation(caseId,request);}
  @PutMapping("/cases/{caseId}/care-category")public CaseView careCategory(@PathVariable UUID caseId,@Valid @RequestBody CareCategoryUpdateRequest request){return service.updateCareCategory(caseId,request);}
+ /** The coordinator's urgency judgement (A-02): read it with its reason, or change it with a mandatory reason. */
+ @GetMapping("/cases/{caseId}/urgency")public UrgencyView urgency(@PathVariable UUID caseId){return urgency.current(caseId);}
+ @PutMapping("/cases/{caseId}/urgency")public UrgencyView setUrgency(@PathVariable UUID caseId,@Valid @RequestBody UrgencyUpdateRequest request){return urgency.set(caseId,request);}
  @PutMapping("/cases/{caseId}/travel-package")public CaseView travelPackage(@PathVariable UUID caseId,@Valid @RequestBody TravelPackageRequest request){return service.setTravelPackage(caseId,request.requested());}
  @PostMapping("/cases/{caseId}/assignments")public IdResponse assign(@PathVariable UUID caseId,@Valid @RequestBody AssignmentRequest request){return service.assign(caseId,request);}
  /** Assignment history: who has been responsible for this case and its work, including ended assignments. */

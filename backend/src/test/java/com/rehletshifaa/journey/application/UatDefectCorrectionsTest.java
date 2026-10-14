@@ -4,6 +4,7 @@ import com.rehletshifaa.authority.domain.Role;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rehletshifaa.casemanagement.domain.CaseUrgency;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.application.CaseService;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
@@ -256,10 +257,23 @@ class UatDefectCorrectionsTest {
 
     @Test void priorityComesFromRealConditionsOnly() {
         Instant now = Instant.now();
-        assertThat(StaffWorkService.derivePriority(false, null, now)).isEqualTo("NORMAL");
-        assertThat(StaffWorkService.derivePriority(true, null, now)).isEqualTo("HIGH");     // blocks the journey
-        assertThat(StaffWorkService.derivePriority(false, now.plusSeconds(3600), now)).isEqualTo("HIGH"); // due within a day
-        assertThat(StaffWorkService.derivePriority(false, now.plusSeconds(7 * 86400), now)).isEqualTo("NORMAL");
+        assertThat(StaffWorkService.derivePriority(false, null, null, now)).isEqualTo("NORMAL");
+        assertThat(StaffWorkService.derivePriority(true, null, null, now)).isEqualTo("HIGH");     // blocks the journey
+        assertThat(StaffWorkService.derivePriority(false, now.plusSeconds(3600), null, now)).isEqualTo("HIGH"); // due within a day
+        assertThat(StaffWorkService.derivePriority(false, now.plusSeconds(7 * 86400), null, now)).isEqualTo("NORMAL");
+    }
+
+    /** P0-3 (A-02): the coordinator's urgency is one more real condition of the same derivation, not a parallel rule. */
+    @Test void urgentCaseMakesItsWorkHighAndNothingElseDoes() {
+        Instant now = Instant.now();
+        Instant nextWeek = now.plusSeconds(7 * 86400);
+        assertThat(StaffWorkService.derivePriority(false, null, CaseUrgency.URGENT, now)).isEqualTo("HIGH");
+        assertThat(StaffWorkService.derivePriority(false, nextWeek, CaseUrgency.URGENT, now)).isEqualTo("HIGH");
+        assertThat(StaffWorkService.derivePriority(true, null, CaseUrgency.URGENT, now)).isEqualTo("HIGH");
+        // PRIORITY is a staff signal only; ROUTINE and an unknown level read the other conditions as before.
+        assertThat(StaffWorkService.derivePriority(false, nextWeek, CaseUrgency.PRIORITY, now)).isEqualTo("NORMAL");
+        assertThat(StaffWorkService.derivePriority(false, nextWeek, CaseUrgency.ROUTINE, now)).isEqualTo("NORMAL");
+        assertThat(StaffWorkService.derivePriority(true, null, CaseUrgency.ROUTINE, now)).isEqualTo("HIGH");
     }
 
     // ================= H — clinical recommendation is required server-side =================

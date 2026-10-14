@@ -280,6 +280,8 @@ public class CaseActionService {
         if ("PROPOSAL_PREPARATION".equals(s) && p != null && p.requiresFinance() && !p.financeDone()) actions.add("ASSIGN_FINANCE");
         if ("INFORMATION_REQUIRED".equals(s)) actions.add("MOVE_TO_INTAKE_REVIEW");
         if (!TRAVEL_PACKAGE_LOCKED.contains(s)) actions.add("SET_TRAVEL_PACKAGE");
+        // P0-3: the coordinator's urgency judgement, at intake and through review, while the case is in its journey.
+        if (!TERMINAL.contains(s)) actions.add("SET_URGENCY");
         // P0-2: after acceptance the cancellation is typed (the coordinator's exit; Consultants never cancel a whole case).
         if (CONSULTANT_ASSIGNABLE.contains(s) || CaseTransitionPolicy.TYPED_CANCELLATION_STAGES.contains(s)) actions.add("CANCEL_CASE");
         return actions;

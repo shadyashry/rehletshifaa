@@ -67,6 +67,21 @@ public class IntakeLifecycleService {
         return patientId;
     }
 
+    /** The intake consent's policy version: v2 adds the medical disclaimer (review 2026-10-14, A-02). */
+    public static final String INTAKE_CONSENT_VERSION = "intake-v2";
+    /** The consent sentence and the medical disclaimer beside it, in the words Send my case shows (form.consent, form.medicalDisclaimer). */
+    static final String CONSENT_EN = "I consent to RehletShifaa processing the information I submit for the purpose of coordinating my medical case.";
+    static final String DISCLAIMER_EN = "I understand that RehletShifaa coordinates access to medical review and care, is not an emergency service and does not replace a clinical assessment. In an emergency I will seek local care now.";
+    static final String CONSENT_AR = "أوافق على معالجة رحلة شفاء للمعلومات التي أقدمها لغرض تنسيق حالتي الطبية.";
+    static final String DISCLAIMER_AR = "أفهم أن رحلة شفاء تنسّق الوصول إلى المراجعة والرعاية الطبية، وأنها ليست خدمة طوارئ ولا تحلّ محل التقييم السريري. في حالة الطوارئ سأطلب الرعاية المحلية فورًا.";
+
+    /** What the patient agreed to at intake, in their language: data processing plus the medical disclaimer. */
+    static ConsentRecord.Terms intakeConsentTerms(String language) {
+        boolean ar = "ar".equals(language);
+        String text = ar ? CONSENT_AR + " " + DISCLAIMER_AR : CONSENT_EN + " " + DISCLAIMER_EN;
+        return new ConsentRecord.Terms("DATA_PROCESSING", INTAKE_CONSENT_VERSION, ar ? "ar" : "en", text, "Medical case coordination", "Submitted case data");
+    }
+
     /**
      * Records who submitted the draft case and their consent. No verification challenge (OTP) is generated here: a
      * draft may still be receiving document uploads, and we must not start an expiry clock before the case is
@@ -81,8 +96,7 @@ public class IntakeLifecycleService {
         boolean self=!request.forSomeoneElse();
         var rep=request.representative();
         contacts.saveAndFlush(new CaseSubmissionContact(medicalCase.getId(),patientId,self?"PATIENT":"REPRESENTATIVE",self?displayName:PatientNames.clean(rep==null?null:rep.name()), self?null:(rep==null?null:rep.relationship()),blankToNull(request.email()),request.whatsappNumber().trim(),request.preferredLanguage(),now));
-        String consentText="ar".equals(request.preferredLanguage()) ? "أوافق على معالجة المعلومات التي أقدمها لغرض تنسيق حالتي الطبية." : "I consent to processing the information I submit for the purpose of coordinating my medical case.";
-        consents.saveAndFlush(new ConsentRecord(UUID.randomUUID(),patientId,medicalCase.getId(),new ConsentRecord.Terms("DATA_PROCESSING","intake-v1",request.preferredLanguage(),consentText,"Medical case coordination","Submitted case data"),"WEB",actor,now));
+        consents.saveAndFlush(new ConsentRecord(UUID.randomUUID(),patientId,medicalCase.getId(),intakeConsentTerms(request.preferredLanguage()),"WEB",actor,now));
         audit("CASE_INTAKE_CREATED",actor,actorRole,medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"CREATE","SUCCESS",null,now);
     }
 
@@ -94,8 +108,7 @@ public class IntakeLifecycleService {
         Instant now=clock.instant(); UUID patientId=medicalCase.getPatientId();
         PatientProfile p=patients.findById(patientId).orElseThrow();
         contacts.saveAndFlush(new CaseSubmissionContact(medicalCase.getId(),patientId,"PATIENT",p.getDisplayName(),null,p.getEmail(),p.getWhatsappNumber(),p.getPreferredLanguage(),now));
-        String consentText="ar".equals(consentLanguage) ? "أوافق على معالجة المعلومات التي أقدمها لغرض تنسيق حالتي الطبية." : "I consent to processing the information I submit for the purpose of coordinating my medical case.";
-        consents.saveAndFlush(new ConsentRecord(UUID.randomUUID(),patientId,medicalCase.getId(),new ConsentRecord.Terms("DATA_PROCESSING","intake-v1",consentLanguage,consentText,"Medical case coordination","Submitted case data"),"WEB","patient",now));
+        consents.saveAndFlush(new ConsentRecord(UUID.randomUUID(),patientId,medicalCase.getId(),intakeConsentTerms(consentLanguage),"WEB","patient",now));
         audit("CASE_INTAKE_CREATED","patient","PATIENT",medicalCase.getId(),"MedicalCase",medicalCase.getId().toString(),"CREATE","SUCCESS","Returning patient",now);
     }
 

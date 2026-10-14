@@ -20,8 +20,15 @@ public final class Routing {
     public record Policy(UUID id, int version, Instant effectiveFrom, Instant effectiveTo, PolicyConfig configuration) {}
     public record Preference(UUID id, UUID consultantId, int version, Instant effectiveFrom, Instant effectiveTo,
                              String coordinator, UUID team, UUID fallbackTeam) {}
-    /** Routing facts of a case; {@code revision} is the number of routing decisions recorded for it. */
-    public record CaseFacts(UUID id, UUID consultantId, String careArea, String language, String owner, long revision, String status) {}
+    /**
+     * Routing facts of a case; {@code revision} is the number of routing decisions recorded for it. {@code urgent}: the
+     * coordinator marked the case URGENT, which only breaks ties between equally scored Coordinators.
+     */
+    public record CaseFacts(UUID id, UUID consultantId, String careArea, String language, String owner, long revision, String status, boolean urgent) {
+        public CaseFacts(UUID id, UUID consultantId, String careArea, String language, String owner, long revision, String status) {
+            this(id, consultantId, careArea, language, owner, revision, status, false);
+        }
+    }
     public record Candidate(String subject, List<UUID> teams, int maximum, long workload, boolean onDuty,
                             boolean languageMatch, Instant lastAssignment, List<String> exclusions) {}
     public record Scored(Candidate candidate, BigDecimal capacityFactor, BigDecimal languageFactor, BigDecimal score) {}

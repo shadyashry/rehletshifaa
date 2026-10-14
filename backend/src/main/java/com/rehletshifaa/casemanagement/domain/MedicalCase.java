@@ -36,6 +36,7 @@ public class MedicalCase extends AssignedIdEntity {
     @Column(name="waiting_reason", length=240) private String waitingReason;
     @Column(name="waiting_reason_code", length=120) private String waitingReasonCode;
     @Column(name="waiting_since") private Instant waitingSince;
+    @Enumerated(EnumType.STRING) @Column(nullable=false, length=20) private CaseUrgency urgency;
 
     protected MedicalCase() {}
     /**
@@ -47,7 +48,7 @@ public class MedicalCase extends AssignedIdEntity {
         this.caseNumber = caseNumber; this.patientId = java.util.Objects.requireNonNull(patientId, "patientId"); this.country = country.trim();
         this.conditionDescription = conditionDescription == null || conditionDescription.isBlank() ? null : conditionDescription.trim();
         this.careCategory = careCategory;
-        this.preferredLanguage = preferredLanguage; this.status = CaseStatus.DRAFT; this.waitingOn = "STAFF";
+        this.preferredLanguage = preferredLanguage; this.status = CaseStatus.DRAFT; this.waitingOn = "STAFF"; this.urgency = CaseUrgency.ROUTINE;
         this.consentTimestamp = micros(now); this.createdAt = micros(now); this.updatedAt = micros(now);
     }
     public void submit(Instant now) { if (status != CaseStatus.DRAFT) throw new IllegalStateException("Case is not in draft state"); status = CaseStatus.RECEIVED; submittedAt = micros(now); updatedAt = micros(now); version++; }
@@ -59,4 +60,10 @@ public class MedicalCase extends AssignedIdEntity {
     public long getVersion() { return version; }
     public boolean isTravelPackageRequested() { return travelPackageRequested; }
     public void setTravelPackageRequested(boolean value) { this.travelPackageRequested = value; }
+    public CaseUrgency getUrgency() { return urgency; }
+    /**
+     * The coordinator's urgency judgement. Bookkeeping like the waiting-on marker, not a case revision: it never bumps
+     * {@code version}, so a coordinator raising urgency never invalidates someone else's open form.
+     */
+    public void changeUrgency(CaseUrgency to, Instant now) { this.urgency = java.util.Objects.requireNonNull(to, "urgency"); this.updatedAt = micros(now); }
 }

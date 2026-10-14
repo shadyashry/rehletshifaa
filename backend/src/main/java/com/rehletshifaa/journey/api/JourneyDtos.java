@@ -26,6 +26,10 @@ public final class JourneyDtos {
     public record AssignmentRequest(@NotBlank @Size(max=255)String assigneeSubject,@NotBlank String assigneeRole,@NotBlank @Pattern(regexp="PRIMARY|SECONDARY")String assignmentType,@Size(max=100)String pod,@NotBlank @Size(max=500)String reason) {}
     public record CoordinatorReassignmentRequest(@NotBlank @Size(max=255)String assigneeSubject,@NotBlank @Size(max=500)String reason) {}
     public record TravelPackageRequest(@NotNull Boolean requested) {}
+    /** A coordinator's urgency judgement: ROUTINE, PRIORITY or URGENT, always with a reason (stored encrypted). */
+    public record UrgencyUpdateRequest(@NotBlank @Size(max=20)String urgency,@NotBlank @Size(max=500)String reason) {}
+    /** The case's current urgency and the change that set it ({@code reason}, {@code setByRole}, {@code setAt} null until changed). */
+    public record UrgencyView(String urgency,String reason,String setByRole,Instant setAt) {}
     public record CareCategoryUpdateRequest(@NotBlank @Size(max=80)String careCategory,@NotNull Long expectedVersion,@Size(max=500)String reason) {}
     public record MessageRequest(@NotBlank @Pattern(regexp="PATIENT_COORDINATOR|COORDINATOR_DOCTOR|COORDINATOR_OPERATIONS|COORDINATOR_FINANCE")String threadType,@NotBlank @Size(max=10000)String body,@Pattern(regexp="en|ar")String language,boolean internalOnly) {}
     public record TaskRequest(@NotBlank @Size(max=80)String taskType,@NotBlank @Size(max=240)String title,@Size(max=10000)String description,@Size(max=255)String ownerSubject,@Size(max=40)String ownerRole,@NotBlank String priority,boolean blocking,Instant dueAt) {}
@@ -76,7 +80,7 @@ public final class JourneyDtos {
      * {@code waitingOn} answers "who must act next", which is deliberately not the same as the stage. {@code viewer} is set
      * only on the patient's own case list: SELF for their own case, REPRESENTATIVE for a relative's (null for staff).
      */
-    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason,String viewer) {}
+    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason,String viewer,String urgency) {}
     /**
      * Operational signals for a case card. All derived read-only from open work items — the case itself
      * carries no priority or attention status, so nothing here is persisted for the UI's benefit.

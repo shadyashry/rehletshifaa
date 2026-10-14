@@ -17,5 +17,27 @@ class CoordinatorScoringTest {
         assertThat(select(facts,new PolicyConfig(80,20,true,false,Map.of(),team,null,24),List.of(a,b)).path()).isEqualTo("DEFAULT_TEAM");
         Selection scored=select(facts,config,List.of(a,b));assertThat(scored.path()).isEqualTo("SCORED_POOL");assertThat(scored.subject()).isEqualTo("b");
     }
+    /** P0-3 (A-02): among equal scores an URGENT case goes to an on-duty Coordinator first, then to the fewest cases held. */
+    @Test void urgentCaseBreaksTiesTowardsOnDutyThenFewestCases(){
+        PolicyConfig languageOnly=new PolicyConfig(0,100,false,false,Map.of(),null,null,24);
+        Candidate offDuty=new Candidate("a",List.of(team),10,0,false,true,null,List.of());
+        Candidate fourCases=new Candidate("b",List.of(team),10,4,true,true,null,List.of());
+        Candidate threeOfFive=new Candidate("c",List.of(team),5,3,true,true,null,List.of());
+        Candidate threeOfTen=new Candidate("d",List.of(team),10,3,true,true,null,List.of());
+        List<Candidate> all=List.of(offDuty,fourCases,threeOfFive,threeOfTen);
+        // Routine: the load ratio decides, so the idle off-duty Coordinator is first.
+        assertThat(service.score(all,languageOnly,false)).extracting(s->s.candidate().subject()).containsExactly("a","d","b","c");
+        // Urgent: on duty first, then fewest cases held, then the usual ratio (d before c at three cases each).
+        assertThat(service.score(all,languageOnly,true)).extracting(s->s.candidate().subject()).containsExactly("d","c","b","a");
+        CaseFacts routine=new CaseFacts(UUID.randomUUID(),null,null,"en",null,0,"RECEIVED");
+        CaseFacts urgent=new CaseFacts(routine.id(),null,null,"en",null,0,"RECEIVED",true);
+        assertThat(select(routine,languageOnly,all).subject()).isEqualTo("a");
+        assertThat(select(urgent,languageOnly,all).subject()).isEqualTo("d");
+    }
+    @Test void urgencyNeverOutranksAHigherScore(){
+        Candidate offDutyMatch=new Candidate("a",List.of(team),10,5,false,true,null,List.of());
+        Candidate onDutyNoLanguage=new Candidate("b",List.of(team),10,5,true,false,null,List.of());
+        assertThat(service.score(List.of(onDutyNoLanguage,offDutyMatch),config,true)).extracting(s->s.candidate().subject()).containsExactly("a","b");
+    }
     private Selection select(CaseFacts c,PolicyConfig config,List<Candidate> candidates){return service.select(c,new Policy(UUID.randomUUID(),1,Instant.EPOCH,null,config),null,candidates);}
 }

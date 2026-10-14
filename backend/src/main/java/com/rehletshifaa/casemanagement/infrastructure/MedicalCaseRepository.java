@@ -1,6 +1,7 @@
 package com.rehletshifaa.casemanagement.infrastructure;
 
 import com.rehletshifaa.casemanagement.domain.CaseStatus;
+import com.rehletshifaa.casemanagement.domain.CaseUrgency;
 import com.rehletshifaa.casemanagement.domain.MedicalCase;
 import com.rehletshifaa.shared.persistence.BaseRepository;
 import com.rehletshifaa.shared.util.PatientNameParts;
@@ -83,10 +84,14 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     default Optional<String> findPatientName(UUID id) { return findPatientNameParts(id).map(PatientNameParts::getPatientName); }
 
     /** What routing needs from the case itself. */
-    interface RoutingFacts { String getCareCategory(); String getPreferredLanguage(); CaseStatus getStatus(); }
+    interface RoutingFacts { String getCareCategory(); String getPreferredLanguage(); CaseStatus getStatus(); CaseUrgency getUrgency(); }
 
-    @Query("select c.careCategory as careCategory, c.preferredLanguage as preferredLanguage, c.status as status from MedicalCase c where c.id = :id")
+    @Query("select c.careCategory as careCategory, c.preferredLanguage as preferredLanguage, c.status as status, c.urgency as urgency from MedicalCase c where c.id = :id")
     Optional<RoutingFacts> findRoutingFacts(@Param("id") UUID id);
+
+    /** The coordinator's current urgency judgement of the case (an input to work priority). */
+    @Query("select c.urgency from MedicalCase c where c.id = :id")
+    Optional<CaseUrgency> findUrgency(@Param("id") UUID id);
 
     /** A submitted case nobody has claimed yet: RECEIVED with no active primary coordinator. */
     @Query("""
@@ -199,7 +204,7 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     interface CaseRow extends PatientNameParts {
         UUID getId(); String getCaseNumber(); CaseStatus getStatus(); String getCountry();
         String getPreferredLanguage(); String getCareCategory(); Instant getCreatedAt(); Instant getUpdatedAt(); Long getVersion();
-        Boolean getTravelPackageRequested(); String getWaitingOn(); String getWaitingReason();
+        Boolean getTravelPackageRequested(); String getWaitingOn(); String getWaitingReason(); CaseUrgency getUrgency();
     }
 
     String CASE_ROW = """
@@ -207,7 +212,7 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
                 p.givenName as givenName, p.familyName as familyName, c.country as country,
                 c.preferredLanguage as preferredLanguage, c.careCategory as careCategory, c.createdAt as createdAt,
                 c.updatedAt as updatedAt, c.version as version, c.travelPackageRequested as travelPackageRequested,
-                c.waitingOn as waitingOn, c.waitingReason as waitingReason
+                c.waitingOn as waitingOn, c.waitingReason as waitingReason, c.urgency as urgency
             from MedicalCase c join PatientProfile p on p.id = c.patientId
             """;
 

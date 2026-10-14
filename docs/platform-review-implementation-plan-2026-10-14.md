@@ -117,6 +117,50 @@ phases.
 - **Files:** `V88__case_urgency.sql`, `JourneyService`/`CaseService`, `StaffWorkService` priority derivation,
   `AssignmentEngine` tie-break, `CaseForm.tsx`, `CaseStatusAccess.tsx`, `MyCare.tsx`, copy.
 - **Sessions:** 1. **Model:** Opus 5.5 fast, medium.
+- **Status (2026-10-14, branch `feat/review-p0`):** delivered (Opus 5.5; the effort level is set by the owner in the app).
+  - Delivered: `V88__case_urgency.sql` adds `medical_cases.urgency` (ROUTINE default, CHECK) and the append-only
+    `case_urgency_changes` (from/to, stage, who, when, reason stored encrypted). `CaseUrgency` enum; `MedicalCase.changeUrgency`
+    is bookkeeping (no version bump). New `CaseUrgencyService` behind `GET|PUT /api/v1/coordinator/cases/{id}/urgency`
+    (CASE_COORDINATE; reason mandatory, max 500; refused on DRAFT/ended cases `URGENCY_LOCKED`, on the same level
+    `URGENCY_UNCHANGED`; row lock so the recorded "from" is real). Audit `CASE_URGENCY_CHANGED` carries only
+    `FROM -> TO`, never the reason. URGENT: `StaffWorkService.derivePriority(blocking, dueAt, urgency, now)` is still the
+    one source of priority, with urgency as a further input (new work HIGH; open LOW/NORMAL work raised once by
+    `raiseOpenWorkForUrgency`; lowering urgency lowers nothing, because a hand-raised item cannot be told apart); lead
+    alert `CASE_MARKED_URGENT` (in-app + work email) to the primary coordinator, their CARE_COORDINATION leads, else
+    the Care Coordination Managers, never to the person who set it; routing tie-break in
+    `CoordinatorScoringService.score(…, urgent)` (equal scores: on-duty first, then fewest cases held, then the usual
+    ratio / last assignment / subject; urgency never changes a score, eligibility or precedence; `CaseFacts.urgent`
+    read by `CoordinationRepository.facts`). `CaseActionService` offers `SET_URGENCY` while the case is in its journey;
+    `CaseView.urgency` for staff, null for patient and Finance-payment views. Consent: intake consent is now
+    `intake-v2`, the form's consent sentence plus the medical disclaimer, stored in the patient's language
+    (`IntakeLifecycleService.intakeConsentTerms`), and the same disclaimer line sits inside the consent checkbox on
+    Send my case. Frontend: `EmergencyGuidance` (static `role="note"`, logical `border-s`, alert tokens) on Send my case
+    (`CaseForm.tsx`, both the guest and the signed-in paths), the status link (`CaseStatusAccess.tsx`, every phase,
+    copy passed by the page from `common.emergencyNotice`) and My Care (care view, `myCare.emergency`);
+    `UrgencyDialog` behind More actions plus a staff-only urgency fact in the `StaffCaseView` header. Copy in EN/AR
+    (`common.emergencyNotice`, `form.medicalDisclaimer`, `myCare.emergency`, `portalWork.urgency`,
+    `workCopy.items.CASE_MARKED_URGENT`) by the mechanical-worker subagent; `myCare.withdraw` and `myCare.steps` kept.
+  - Tests: `UatDefectCorrectionsTest.urgentCaseMakesItsWorkHighAndNothingElseDoes` (priority derivation incl. PRIORITY
+    and ROUTINE); `CoordinatorScoringTest` urgent tie-break order and selection, and "urgency never outranks a higher
+    score"; new `CaseUrgencyServiceTest` (routine default + SET_URGENCY offered; URGENT raises open and new work, alerts
+    the lead once and not the actor, reason encrypted and absent from audit, lowering keeps history and raised work;
+    managers alerted without a lead; reason/level/locked refusals; Consultant refused); frontend
+    `CaseStatusAccess.test.tsx` (EN/AR note), `MyCare.test.tsx` (one note, care view only, not an alert),
+    `StaffOperationalUi.test.tsx` (More actions offers it only when listed; dialog needs a new level and a reason, one
+    PUT; Arabic levels). Verification: `mvn -o -q test` 769 tests, 0 failures, 3 pre-existing skips (the affected
+    classes re-run after the last backend edit); `pnpm typecheck` clean; eslint clean on touched files; 5 touched
+    vitest files 115/115; `PostgresJpaMappingTest` on postgres:17 green with V88 applied.
+  - Open gaps: the Consultant offer deadline is not halved yet, because the offer TTL does not exist; the TODO is in
+    P1-6. The urgency is not set inside the intake form itself; the coordinator sets it from More actions at intake
+    and during review. The dialog does not show the previous reason (the GET endpoint returns it). The queue cards
+    and team queue do not sort or badge by urgency yet. The routing tie-break only acts on routing after urgency is
+    set (reassignment, re-routing), since a new case starts ROUTINE when it is first routed. No Send my case unit test
+    exists, so the notice there is covered by typecheck only. Native Arabic review of the new copy is pending with
+    the rest of the Arabic copy.
+  - Next exact action: P0-4 (deposit redesign) needs the owner's three deposit decisions first (commitment-fee amount
+    per corridor currency, treatment-deposit basis, launch rails). Once they are recorded, start P0-4 in a new session
+    from its prompt block, Fable 5.1 high, after fast-forwarding `feat/review-p0` to this commit and rebuilding the dev
+    stack so V88 runs.
 
 ### P0-4  Deposit redesign: commitment fee + treatment deposit, corridor rails  (B-01, V2)
 - **Owner decisions needed first:** commitment-fee amount per corridor currency; treatment-deposit basis (doctor fees
@@ -158,6 +202,9 @@ phases.
   day 5 / coordinator / auto-cancel at 30 days; SLA table per queue (Finance verify 1 working day, identity review
   2, Operations plan 2) written into work-item due dates so HIGH derives automatically; patient-facing "usually
   within N working days" on every `WAIT_*` state plus a "meanwhile" line.
+- TODO from P0-3 (A-02): an URGENT case halves the Consultant offer deadline (24 working hours instead of 48). Read
+  the level with `StaffWorkService.urgency(caseId)` (or `CaseUrgency.urgent()`) when the offer deadline is computed,
+  and recompute an open offer's deadline when `CaseUrgencyService.set` raises a case to URGENT.
 - Files: new `ConsultantOfferExpiryService`, `DepositPaymentReminders` pattern reused for information requests,
   `StaffWorkService` due-date source, `CaseActionService` wait windows, `MyCare.tsx`, `CaseStatusAccess.tsx`, copy.
 - Sessions: 2. Model: Opus 5.5 fast, medium.

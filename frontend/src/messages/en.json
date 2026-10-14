@@ -39,6 +39,10 @@
     "profile": "View Consultant Profile",
     "emergency": "Emergency symptoms? RehletShifaa is not an emergency service. Call your local emergency number or seek urgent care now.",
     "emergencyLabel": "Emergency",
+    "emergencyNotice": {
+      "title": "If this is an emergency, seek local care now",
+      "body": "RehletShifaa is not an emergency service. Call your local emergency number or go to the nearest emergency department."
+    },
     "medicalNotice": "RehletShifaa coordinates access to medical review and care. Information provided through the platform does not replace emergency care or a complete clinical assessment. Final medical decisions are made by the treating Consultant following appropriate evaluation.",
     "privacy": "Privacy Policy",
     "terms": "Terms of Use",
@@ -553,6 +557,7 @@
     "uploadHelp": "Don't have all your reports? That's okay. Send what you have and your coordinator will help with the rest.",
     "uploadPrivacy": "Files go to private storage through short-lived links, are checked for viruses, and are opened only by the care team handling your case. PDF, JPG or PNG, up to 15 MB each.",
     "consent": "I consent to RehletShifaa processing the information I submit for the purpose of coordinating my medical case.",
+    "medicalDisclaimer": "I understand that RehletShifaa coordinates access to medical review and care, is not an emergency service and does not replace a clinical assessment. In an emergency I will seek local care now.",
     "send": "Send my case",
     "sending": "Sending securely…",
     "choose": "Choose files",
@@ -1317,6 +1322,10 @@
         "confirm": "Yes, withdraw",
         "cancel": "Keep my case open"
       },
+      "emergency": {
+        "title": "If this is an emergency, seek local care now",
+        "body": "Your care team does not monitor messages around the clock. Call your local emergency number or go to the nearest emergency department."
+      },
       "steps": {
         "PROVIDE_INFORMATION": {
           "title": "We need something from you",
@@ -1549,6 +1558,33 @@
       "confirm": "Cancel case",
       "keep": "Keep the case open",
       "reasonRequired": "Choose a reason."
+    },
+    "urgency": {
+      "title": "Set the case urgency",
+      "moreHint": "Your clinical judgement of how soon the case needs attention. Urgent raises its work and tells your lead.",
+      "hint": "Staff see it; the patient does not. The patient is always told to seek local emergency care in an emergency.",
+      "label": "Urgency",
+      "levels": {
+        "ROUTINE": {
+          "label": "Routine",
+          "hint": "The normal queue order."
+        },
+        "PRIORITY": {
+          "label": "Priority",
+          "hint": "Sooner than routine. Shown to the team; the work order does not change."
+        },
+        "URGENT": {
+          "label": "Urgent",
+          "hint": "Time-critical. All work on the case becomes high priority and your lead is alerted."
+        }
+      },
+      "reasonLabel": "Reason",
+      "reasonHint": "What you saw that sets this urgency. Kept with the case, encrypted.",
+      "reasonRequired": "Say why the case has this urgency.",
+      "unchanged": "Choose a different urgency.",
+      "current": "Now: {level}",
+      "confirm": "Save urgency",
+      "keep": "Keep as it is"
     },
     "recordDecision": {
       "title": "Record the patient's decision",
@@ -1792,6 +1828,10 @@
         "CASE_EXPIRED_UNPAID": {
           "title": "The case expired — the deposit was not paid",
           "context": "The patient was reminded, you were alerted, and the grace period passed without a transfer reference. The case is expired; re-prepare the estimate if the patient comes back."
+        },
+        "CASE_MARKED_URGENT": {
+          "title": "Case {caseNumber} was marked urgent",
+          "context": "Its coordinator judged it time-critical. Make room for its work today."
         },
         "ASSIGN_CONSULTANT": {
           "title": "Prepare the case for a Consultant",

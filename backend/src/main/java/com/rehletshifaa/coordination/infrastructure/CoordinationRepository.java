@@ -130,7 +130,8 @@ public class CoordinationRepository {
     // ---- Cases ----
     public CaseFacts facts(UUID id) {
         var c = cases.findRoutingFacts(id).orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
-        return new CaseFacts(id, consultantOf(id), c.getCareCategory(), c.getPreferredLanguage(), owner(id), revision(id), c.getStatus().name());
+        return new CaseFacts(id, consultantOf(id), c.getCareCategory(), c.getPreferredLanguage(), owner(id), revision(id), c.getStatus().name(),
+                c.getUrgency() != null && c.getUrgency().urgent());
     }
     /** The case's primary Consultant (for routing preferences), if one is assigned or offered. */
     private UUID consultantOf(UUID caseId) {

@@ -8,6 +8,7 @@ import { PatientJourneyTracker, phaseExplanation } from "@/components/PatientJou
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
+import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 
 type Summary = { caseNumber: string; destinationHint: string };
 type ActionItem = { id: string; kind: "INFORMATION" | "DOCUMENT"; code: string; label: string; required: boolean; completed: boolean; response: string | null };
@@ -82,8 +83,11 @@ const copy = {
  * is exchanged for a short-lived grant first. After that the page shows only what this case's coordinator
  * actually asked for — never the full case form, and never another case.
  */
-export function CaseStatusAccess({ locale, token }: { locale: Locale; token: string }) {
+export function CaseStatusAccess({ locale, token, emergency }: { locale: Locale; token: string;
+  /** A-02: the bilingual emergency instruction (common.emergencyNotice), passed by the page so the client bundle carries no dictionary. */
+  emergency?: { title: string; body: string } }) {
   const t = copy[locale];
+  const notice = emergency ? <EmergencyGuidance title={emergency.title} body={emergency.body} className="mb-6"/> : null;
   const router = useRouter();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
@@ -200,10 +204,10 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
     } finally { setBusy(false); }
   }
 
-  if (phase === "loading") return <Frame title={t.title}><p role="status" className="text-ink-600">{t.loading}</p></Frame>;
-  if (phase === "invalid") return <Frame title={t.title}><p role="alert" className="rounded-xl bg-alert-50 p-4 text-alert-800">{t.invalid}</p></Frame>;
+  if (phase === "loading") return <Frame title={t.title} notice={notice}><p role="status" className="text-ink-600">{t.loading}</p></Frame>;
+  if (phase === "invalid") return <Frame title={t.title} notice={notice}><p role="alert" className="rounded-xl bg-alert-50 p-4 text-alert-800">{t.invalid}</p></Frame>;
   if (phase === "done") return (
-    <Frame title={t.title}>
+    <Frame title={t.title} notice={notice}>
       <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-2xl text-white">✓</span>
       <h2 className="title mt-5">{t.doneTitle}</h2>
       <p className="mt-2 leading-7 text-ink-600">{t.doneBody}</p>
@@ -218,7 +222,7 @@ export function CaseStatusAccess({ locale, token }: { locale: Locale; token: str
     : proposalState === "PREPARING" ? { title: t.proposalPreparingTitle, body: t.proposalPreparing, next: t.proposalPreparingNext }
     : phaseExplanation(status?.phase, !!status?.actionRequired, locale);
   return (
-    <Frame title={t.title}>
+    <Frame title={t.title} notice={notice}>
       {summary && <p className="mb-5 font-bold text-brand-800">{summary.caseNumber}</p>}
 
       {phase === "summary" && <>
@@ -352,12 +356,12 @@ function proposalCopy(state: string, t: (typeof copy)["en"] | (typeof copy)["ar"
   }
 }
 
-function Frame({ title, children }: { title: string; children: React.ReactNode }) {
+function Frame({ title, notice, children }: { title: string; notice?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="section section-soft">
       <div className="container-site" style={{ maxWidth: "42rem" }}>
         <h1 className="headline">{title}</h1>
-        <div className="card mt-6 p-6 sm:p-8">{children}</div>
+        <div className="card mt-6 p-6 sm:p-8">{notice}{children}</div>
       </div>
     </section>
   );
