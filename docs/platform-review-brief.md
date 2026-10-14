@@ -142,11 +142,14 @@ pricing model, no hospital contracts and no implant catalogue.)*
 
 ### 2.5 Coordination deposit
 
-- When the patient **acknowledges the preliminary estimate**, a **coordination deposit** is created. It is **15% of the
-  total doctor (Consultant) fees** on the estimate, with no fixed amount and no threshold. The percentage is a versioned
-  setting. The deposit is paid to the platform and **credited to the final balance**.
-- In other words, the platform's commercial terms are a **15% markup** on doctor fees (hidden inside the package price)
-  plus a **15% deposit** on doctor fees, collected up front and deducted from the final bill.
+- When the patient **acknowledges the preliminary estimate**, one **coordination deposit** is created: **15% of the
+  marked-up medical total** on the estimate, bounded to **USD 200 minimum / USD 1,500 maximum** (converted at the
+  proposal's rate), rounded up, never above the total. The rate and bounds are versioned settings. The deposit is paid to
+  the platform, is refundable under the rule in §2.6, and is **credited to the final balance**.
+- In other words, the platform's commercial terms are a **15% markup** on the Consultant's fees (inside the package
+  price) plus a **15% deposit** on the marked-up total, collected up front and deducted from the final bill.
+- Rails: bank transfer (patient enters the bank reference) or **cash through a named agent** (patient enters the agent's
+  receipt number); Finance verifies either against the source. Card/online waits for the payment adapter.
 - **[Built]** Payment is **offline bank transfer** for now. The patient sees the bank details, the exact amount and the
   case number to use as the transfer reference. The patient must enter the **bank's transaction reference**: it is
   mandatory and it is the only proof asked for (no receipt upload). Finance then confirms or rejects the payment
@@ -649,6 +652,9 @@ The onboarding journey:
   `CLOSED`.
 - There is no remote-monitoring, PROMs (patient-reported outcomes), aftercare package, home-country doctor handover,
   satisfaction survey or review capture. The follow-up mode is a data field only; there is no built-in video.
+- **Proposed redesign of everything after the deposit** (admission, balance payment, treatment milestones, change
+  orders, discharge pack, reconciliation, follow-up execution, hospital-agreement audit, Egyptian legal frame):
+  `docs/post-deposit-journey-design.md`. Review it with §7.10–7.12 and §13.
 
 ### 7.13 Exit paths **[Built]**
 
@@ -1201,7 +1207,7 @@ Distinguish clearly between "must fix", "should improve" and "nice to have".
 | Final treatment quote | Proposal after in-person assessment in Egypt |
 | Commercial policy | Central, versioned markup rule (15%); markup baked into the inclusive price |
 | Catalogue line / manual line | Pre-approved Consultant price vs typed price (needs Finance) |
-| Coordination deposit | 15% of total doctor fees, due after acknowledgement, credited to the final balance |
+| Coordination deposit | 15% of the marked-up medical total (USD 200–1,500), due after acknowledgement, credited to the final balance |
 | Readiness | Backend-computed set of patient gates before non-cancellable commitments |
 | Secure link + one-time code | Purpose-scoped link plus OTP grant; proves contact possession, not identity |
 | Work item | One actionable task for one person or pool, opened by events |
