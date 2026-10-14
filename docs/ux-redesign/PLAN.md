@@ -39,8 +39,10 @@ This session's recommendation was B (evolution, keeps the logo, one or two sessi
 Impeccable `new-work` with the frontend-design plugin, challenge or extend the four candidates (at least one more
 world of its own), render the chosen world's hero, My Care card and a staff screen, and stop at an owner gate before
 any token change. Rules that survive any choice: AA on every text pair, Arabic as a first voice (type scale per
-locale), the hand-heart mark unless the owner decides otherwise, coral/copper/mint only as marks, no gradients, no
-gold, the dossier and the stamp as the signature.
+locale), accent colours only as marks, no gradients, no gold, the dossier and the stamp as the signature.
+**Owner decision 2026-10-15: the logo mark, its colours and the wordmark beside it are open to a revamp** as part
+of this exploration; the earlier "keep the hand-heart mark" rule no longer applies. The chosen world may come with a
+new mark, delivered as SVG in EN/AR lockups, with the favicon, the Keycloak theme logo and the WhatsApp profile image.
 
 ## Areas and order
 
@@ -73,7 +75,8 @@ Read AGENTS.md, CLAUDE.md ("UX redesign epic" rules), PRODUCT.md, DESIGN.md, doc
 docs/ux-redesign/STATUS.md, then open docs/ux-redesign/theme-studio.html in the browser. Run UX plan area 0: a
 visual-world exploration for an international health-travel platform, using the frontend-design plugin and
 Impeccable (new-work) together. Challenge the four candidate worlds in the Theme Studio and add at least one of your
-own; keep the hand-heart logo unless you make the case to recolour it; keep the dossier and stamp as the signature;
+own; the logo mark, its colours and the wordmark are open to a revamp (propose one with the world); keep the dossier
+and stamp as the signature;
 measure contrast on every text pair; design Arabic as the first voice. Render the chosen world as the home hero, a
 My Care card and one staff screen (EN + AR, phone + desktop) and stop at my gate before touching any token. Work in
 a new worktree on a branch from feat/ux-trust-pass; commit when green; do not push. After the gate, continue with
