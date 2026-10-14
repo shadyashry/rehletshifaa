@@ -8,10 +8,11 @@ for (const locale of ["en", "ar"] as const) {
   test(`homepage image and journey video load ${locale}`, async ({ page }) => {
     await page.setViewportSize({ width: locale === "ar" ? 390 : 1440, height: 900 });
     await page.goto(`/${locale}`);
-    const hero = page.locator("main figure img").first();
-    await expect(hero).toBeVisible();
-    await expect(hero).toHaveAttribute("src", "/media/rehletshifaa-hero-consultation.jpg");
-    await expect.poll(() => hero.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    // The hero shows the case file itself (three stamped pages), not a photograph (review 2026-10-14).
+    const dossier = page.locator("main .dossier").first();
+    await expect(dossier).toBeVisible();
+    await expect(dossier.locator(".dossier-page")).toHaveCount(3);
+    await expect(dossier.locator(".case-stamp")).toBeVisible();
     const video = page.locator("#how-it-works video");
     await expect(video).toBeVisible();
     await expect(video).toHaveAttribute("src", new RegExp(`journey-${locale}\\.mp4`));

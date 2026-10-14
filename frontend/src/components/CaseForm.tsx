@@ -11,6 +11,7 @@ import { COUNTRIES, flagEmoji, type Country } from "@/lib/countries";
 import { apiUrl, apiFetchAs } from "@/lib/api";
 import { ADDITIONAL_CARE_AREAS, additionalCareAreas } from "@/lib/additional-care-areas";
 import { useAuth } from "@/components/AuthProvider";
+import { CaseStamp } from "@/components/brand/CaseStamp";
 import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 
 type CaseFor = "MYSELF" | "SOMEONE_ELSE";
@@ -257,11 +258,27 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   }
 
   // A-02: anyone describing symptoms is told first that this is not emergency care.
-  const emergency = <EmergencyGuidance title={d.common.emergencyNotice.title} body={d.common.emergencyNotice.body}/>;
+  // One quiet line on the form's first screen (the opening words are the promise), the full banner elsewhere.
+  const emergency = <EmergencyGuidance variant="quiet" title={d.common.emergencyNotice.title} body={d.common.emergencyNotice.body} more={d.common.emergencyNotice.more}/>;
 
   if (caseNumber) {
     const statusHref = statusToken ? `/${locale}/status/${statusToken}` : undefined;
-    return <section className="card p-7 md:p-10" aria-live="polite"><CheckCircle2 className="text-accent-700" size={42} /><h2 className="mt-6 text-3xl font-bold text-brand-900">{d.form.successTitle}</h2><p className="lead mt-4">{isPatient && session?.linked ? t.successReturning : d.form.successBody}</p><div className="mt-7 rounded-lg bg-brand-50 p-5"><span className="text-sm text-ink-500">{d.form.caseNumber}</span><strong className="mt-1 block text-2xl tracking-wide text-brand-900">{caseNumber}</strong></div><div className="mt-7 flex flex-wrap gap-3">{isPatient && session?.linked ? <a className="btn-primary" href={`/${locale}/portal`}>{t.goToPortal}</a> : statusHref && <a className="btn-primary" href={statusHref}>{ar ? "متابعة حالة الطلب" : "Track your case"}</a>}<a className="btn-secondary" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappEntry(locale, caseNumber)}>{d.form.continue}</a></div></section>;
+    const received = new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short" }).format(new Date());
+    const s = d.form.success;
+    // The first page of the patient's file: the case number as its heading, stamped on the day it was received.
+    return <section className="dossier-page dossier-page-static relative card p-7 md:p-10" aria-live="polite">
+      <CaseStamp label={s.stampReceived} date={received} className="absolute end-6 top-6 md:end-9 md:top-9" />
+      <p className="text-[0.8125rem] font-semibold uppercase leading-5 tracking-[0.1em] text-ink-500 rtl:text-[0.875rem] rtl:normal-case rtl:tracking-normal">{d.form.caseNumber}</p>
+      <p className="mt-1 text-3xl font-bold tracking-wide text-brand-900" dir="ltr"><span className="inline-block">{caseNumber}</span></p>
+      <h2 className="mt-6 text-2xl font-bold text-brand-900">{d.form.successTitle}</h2>
+      <p className="lead mt-3">{isPatient && session?.linked ? t.successReturning : s.withTeam}</p>
+      <p className="mt-2 text-[0.9375rem] leading-6 text-ink-600">{s.hours}</p>
+      <p className="mt-5 flex items-start gap-2 rounded-md bg-surface-pearl px-4 py-3 text-[0.875rem] leading-6 text-ink-700"><CheckCircle2 size={17} aria-hidden className="mt-1 flex-none text-accent-700" />{s.keepNumber}</p>
+      <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
+        {isPatient && session?.linked ? <a className="btn-primary" href={`/${locale}/portal`}>{t.goToPortal}</a> : statusHref && <a className="btn-primary" href={statusHref}>{s.track}</a>}
+        <a className="link-cta" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappEntry(locale, caseNumber)}>{d.form.continue}</a>
+      </div>
+    </section>;
   }
 
   // ---- Returning, signed-in patient: saved details reused, only the new case is entered ----
@@ -346,7 +363,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     return <>
       <div className="mt-4"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} <span className="font-normal text-ink-400">({d.form.optional})</span></span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option>{additionalCareAreas(locale).map(area => <option key={area.slug} value={area.slug}>{area.title}</option>)}</select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
       <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.description} <span className="font-normal text-ink-400">({d.form.optional})</span></span><textarea className="field min-h-28 resize-y" value={values.conditionDescription} maxLength={1900} onChange={e => update("conditionDescription", e.target.value)} /></label></div>
-      <div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><span className="block text-sm font-bold text-ink-800">{d.form.files} <span className="font-normal text-ink-400">({d.form.optional})</span></span>{files.length>0&&<span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800">{files.length} {d.form.selected}</span>}</div><div className="overflow-hidden rounded-lg border border-line bg-white"><label className="flex cursor-pointer items-center gap-4 border-b border-dashed border-line-strong bg-surface-pearl p-5 transition hover:border-brand-600 hover:bg-brand-50"><span className="flex h-12 w-12 flex-none items-center justify-center rounded-lg bg-white text-brand-700 ring-1 ring-line"><FileUp aria-hidden /></span><span className="min-w-0 flex-1"><strong className="block text-brand-800">{d.form.choose}</strong><span className="mt-1 block text-sm text-ink-500">{d.form.uploadHelp}</span></span><Plus aria-hidden className="flex-none text-brand-700"/><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => { onFiles(Array.from(e.currentTarget.files ?? []));e.currentTarget.value="";touch("files"); }} /></label>{files.length>0&&<ul className="grid gap-2 p-3 sm:grid-cols-2">{files.map((file,index)=><li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-lg border border-line bg-surface-pearl p-3"><FileText aria-hidden className="flex-none text-brand-600" size={20}/><span className="min-w-0 flex-1"><strong className="block truncate text-sm" title={file.name}>{file.name}</strong><span className="text-xs text-ink-500">{new Intl.NumberFormat(intlLocale(locale),{style:"unit",unit:"megabyte",unitDisplay:"short",maximumFractionDigits:file.size<1024*1024?2:1}).format(file.size/1024/1024)}</span></span><button type="button" className="inline-grid h-11 w-11 flex-none place-items-center rounded-lg text-ink-500 hover:bg-alert-50 hover:text-alert-800" aria-label={`${ar?"حذف":"Remove"} ${file.name}`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><Trash2 aria-hidden size={17}/></button></li>)}</ul>}</div><p className="mt-2 flex items-start gap-2 text-[0.8125rem] leading-5 text-ink-600"><LockKeyhole size={14} aria-hidden className="mt-0.5 flex-none text-brand-700" />{d.form.uploadPrivacy}</p>{fieldError("files") && <p className="error-text mt-2">{fieldError("files")}</p>}</div>
+      <div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><span className="block text-sm font-bold text-ink-800">{d.form.files} <span className="font-normal text-ink-400">({d.form.optional})</span></span>{files.length>0&&<span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800">{files.length} {d.form.selected}</span>}</div><div className="overflow-hidden rounded-lg border border-line bg-white"><label className="flex cursor-pointer items-center gap-4 border-b border-dashed border-line-strong bg-surface-pearl p-5 transition hover:border-brand-600 hover:bg-brand-50"><span className="flex h-12 w-12 flex-none items-center justify-center rounded-lg bg-white text-brand-700 ring-1 ring-line"><FileUp aria-hidden /></span><span className="min-w-0 flex-1"><strong className="block text-brand-800">{d.form.choose}</strong><span className="mt-1 block text-sm text-ink-500">{d.form.uploadHelp}</span><span className="mt-1 block text-sm text-ink-500">{d.form.uploadCamera}</span></span><Plus aria-hidden className="flex-none text-brand-700"/><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => { onFiles(Array.from(e.currentTarget.files ?? []));e.currentTarget.value="";touch("files"); }} /></label>{files.length>0&&<ul className="grid gap-2 p-3 sm:grid-cols-2">{files.map((file,index)=><li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-lg border border-line bg-surface-pearl p-3"><FileText aria-hidden className="flex-none text-brand-600" size={20}/><span className="min-w-0 flex-1"><strong className="block truncate text-sm" title={file.name}>{file.name}</strong><span className="text-xs text-ink-500">{new Intl.NumberFormat(intlLocale(locale),{style:"unit",unit:"megabyte",unitDisplay:"short",maximumFractionDigits:file.size<1024*1024?2:1}).format(file.size/1024/1024)}</span></span><button type="button" className="inline-grid h-11 w-11 flex-none place-items-center rounded-lg text-ink-500 hover:bg-alert-50 hover:text-alert-800" aria-label={`${ar?"حذف":"Remove"} ${file.name}`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><Trash2 aria-hidden size={17}/></button></li>)}</ul>}</div><p className="mt-2 flex items-start gap-2 text-[0.8125rem] leading-5 text-ink-600"><LockKeyhole size={14} aria-hidden className="mt-0.5 flex-none text-brand-700" />{d.form.uploadPrivacy}</p>{fieldError("files") && <p className="error-text mt-2">{fieldError("files")}</p>}</div>
     </>;
   }
 
@@ -370,9 +387,6 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       <div className="p-6 md:p-9">
       {/* Section 1 — who the case is for, the patient's name, and how to reach the submitter */}
       {step===1&&<div className="min-w-0">
-        {/* Quiet existing-account entry: never a competing CTA, never a registration prompt. */}
-        {!authLoading && !user && <p className="mb-5 rounded-xl bg-mist px-4 py-3 text-sm text-ink-600">{t.haveAccount} <a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/portal?signin=1&returnTo=${encodeURIComponent(`/${locale}/send-my-case`)}`}>{t.signInSaved}</a></p>}
-
         {whoForField()}
 
         {patientFields()}
@@ -415,6 +429,8 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
             </Field>
           </div>
         </fieldset>
+        {/* Quiet existing-account entry, where the saved details would be used: never a competing CTA, never a registration prompt. */}
+        {!authLoading && !user && <p className="mt-6 text-sm leading-6 text-ink-600">{t.haveAccount} <a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/portal?signin=1&returnTo=${encodeURIComponent(`/${locale}/send-my-case`)}`}>{t.signInSaved}</a></p>}
       </div>}
 
       {/* Section 2 — the case */}

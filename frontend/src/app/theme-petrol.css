@@ -399,11 +399,41 @@
   translate: -3px 0;
 }
 
-/* The hero print sits inside a hairline frame, set off by a measured gap. */
-:root[data-brand-theme="petrol"] .home-hero figure > div {
-  outline: 1px solid var(--color-line-strong);
-  outline-offset: 9px;
+/* ---- The dossier: three pages of the case file, placed on the desk, the top one stamped ----
+   The stack is sized by the pages themselves (no fixed height): the back pages are pulled up over the front
+   one with negative margins and tilted, so the composition holds at every width and in both directions. */
+.dossier-stack {
+  padding-block-start: 1.5rem;
+  padding-inline-end: 0.75rem;
 }
+.dossier-page {
+  position: relative;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.5rem;
+  background: var(--color-surface-default);
+  padding: 1rem 1.125rem 1.125rem;
+  box-shadow: 0 14px 28px -24px rgba(19, 41, 46, 0.55);
+  transform: rotate(var(--page-tilt, 0deg));
+}
+.dossier-page[data-depth="3"] { --page-tilt: 2.5deg; margin-inline-start: 11%; margin-inline-end: 0; background: var(--color-surface-pearl); }
+.dossier-page[data-depth="2"] { --page-tilt: -1.5deg; margin-block-start: -2.75rem; margin-inline-start: 5%; margin-inline-end: 6%; background: var(--color-surface-pearl); }
+.dossier-page[data-depth="1"] { --page-tilt: 0deg; margin-block-start: -2.5rem; margin-inline-end: 12%; border-top: 2px solid var(--color-brand-600); padding-inline-end: 6.5rem; }
+[dir="rtl"] .dossier-page[data-depth="3"] { --page-tilt: -2.5deg; }
+[dir="rtl"] .dossier-page[data-depth="2"] { --page-tilt: 1.5deg; }
+.dossier-page[data-depth="3"] > p,
+.dossier-page[data-depth="2"] > p { padding-inline-end: 1rem; }
+/* The confirmation page is the same page, resting flat, with no stack above it. */
+.dossier-page-static { --page-tilt: 0deg; padding-inline-end: 7rem; }
+@media (max-width: 639px) {
+  .dossier-page[data-depth="1"] { padding-inline-end: 1.125rem; padding-block-start: 3.25rem; }
+  .dossier-page-static { padding-inline-end: 1.75rem; padding-block-start: 4rem; }
+}
+.case-stamp {
+  transform: rotate(var(--stamp-tilt, -8deg));
+  background: color-mix(in srgb, var(--color-surface-default) 82%, transparent);
+  letter-spacing: 0.02em;
+}
+[dir="rtl"] .case-stamp { --stamp-tilt: 8deg; }
 /* The intake card: a petrol top edge, like the tab of a clinical file. */
 :root[data-brand-theme="petrol"] .home-hero-card {
   border-top: 2px solid var(--color-brand-600);
@@ -420,7 +450,7 @@
 }
 
 /* One photographic grade, so stock and future photography read as one set. */
-:root[data-brand-theme="petrol"] :is(.home-hero figure img, #how-it-works figure img, #how-it-works figure video) {
+:root[data-brand-theme="petrol"] :is(#how-it-works figure img, #how-it-works figure video) {
   filter: saturate(0.88) contrast(1.04);
 }
 
@@ -663,20 +693,38 @@
     from { opacity: 0; }
     to { opacity: 1; }
   }
+  /* `backwards`, never `both`: the resting state is the element's own, so the words are there even if the animation
+     never runs (a tab opened in the background, a throttled phone). The rise is only ever an entrance. */
   :root[data-brand-theme="petrol"] .home-hero p:has(+ h1) {
-    animation: petrol-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: petrol-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
   :root[data-brand-theme="petrol"] .home-hero h1 ~ :is(p, div) {
-    animation: petrol-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: petrol-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
-  :root[data-brand-theme="petrol"] .home-hero h1 + p { animation-delay: 0.12s; }
-  :root[data-brand-theme="petrol"] .home-hero h1 + p + div { animation-delay: 0.22s; }
-  :root[data-brand-theme="petrol"] .home-hero h1 + p + div + div { animation-delay: 0.34s; }
-  :root[data-brand-theme="petrol"] .home-hero figure > div img {
-    animation: petrol-settle-photo 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  }
+  :root[data-brand-theme="petrol"] .home-hero h1 + p { animation-delay: 0.08s; }
+  :root[data-brand-theme="petrol"] .home-hero h1 + p + div { animation-delay: 0.14s; }
+  :root[data-brand-theme="petrol"] .home-hero h1 + p + div + div { animation-delay: 0.2s; }
   :root[data-brand-theme="petrol"] .home-hero-card {
-    animation: petrol-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.45s both;
+    animation: petrol-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.6s backwards;
+  }
+  /* The one authored moment: the file's pages are placed on the desk one after another, then the stamp is pressed. */
+  @keyframes petrol-page-place {
+    from { opacity: 0; transform: translate3d(0, 18px, 0) rotate(var(--page-tilt, 0deg)); }
+    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(var(--page-tilt, 0deg)); }
+  }
+  @keyframes petrol-stamp-press {
+    from { opacity: 0; transform: rotate(var(--stamp-tilt, -8deg)) scale(1.35); }
+    60% { opacity: 1; transform: rotate(var(--stamp-tilt, -8deg)) scale(0.96); }
+    to { opacity: 1; transform: rotate(var(--stamp-tilt, -8deg)) scale(1); }
+  }
+  :root[data-brand-theme="petrol"] .dossier-page[data-depth] {
+    animation: petrol-page-place 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  :root[data-brand-theme="petrol"] .dossier-page[data-depth="3"] { animation-delay: 0.1s; }
+  :root[data-brand-theme="petrol"] .dossier-page[data-depth="2"] { animation-delay: 0.26s; }
+  :root[data-brand-theme="petrol"] .dossier-page[data-depth="1"] { animation-delay: 0.42s; }
+  :root[data-brand-theme="petrol"] .dossier-stamp {
+    animation: petrol-stamp-press 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.95s backwards;
   }
   :root[data-brand-theme="petrol"] .home-hero-rail li {
     animation: petrol-fade 0.6s ease both;
