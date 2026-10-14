@@ -14,6 +14,8 @@ export type CurrentActionView = {
   workType?: string | null; dueAt?: string | null; overdue?: boolean; blockerCode?: string | null;
   /** For a work item: the wording code and parameters (the English `title`/`context` are the fallback). */
   copy?: WorkItemCopy | null;
+  /** NONE on a journey that ended after acceptance: the calm word it ended with (WITHDRAWN, CANCELLED, EXPIRED, COMPLETED, CLOSED). */
+  exit?: string | null;
 };
 export type BlockerView = { code: string; labelEn: string; labelAr: string; owner: "PATIENT" | "STAFF" | "LATER"; gating: boolean };
 /** `viewer`: who is looking at this case, per case — the patient (SELF), someone acting for them (REPRESENTATIVE) or STAFF. */

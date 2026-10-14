@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight, Check, FileText, MessageCircle, MessageSquareText, Plus, UserRound } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { careAreaLabel, fillTemplate } from "@/lib/portal-labels";
-import { UnreadCount } from "@/components/portal/portal-ui";
+import { ConfirmDialog, UnreadCount } from "@/components/portal/portal-ui";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { CareAreaMark, CaseSwitcher, phaseIndex, takeArrivalFocus } from "@/components/portal/CaseSwitcher";
 import { formatMoney } from "@/lib/money";
@@ -39,7 +39,7 @@ type StepText = { title: string; body: string; next?: string };
 /** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. Paying it is the payment step's own panel. */
 const MONEY_STEPS = new Set(["PAY_DEPOSIT", "WAIT_PAYMENT_CHECK"]);
 
-export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, paymentStep, messagesPanel, newCaseHref = null }: {
+export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, paymentStep, messagesPanel, newCaseHref = null, onWithdraw }: {
   locale: Locale; caseSummary: CaseSummary; actions: CaseActions; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
   proposal?: ProposalSummaryData | null; deposit?: DepositSummaryData | null; documents: CaseDocument[]; unreadMessages: number;
   /** Every case the account can open, this one included; the switcher shows from two. */
@@ -49,18 +49,23 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
   paymentStep?: ReactNode; messagesPanel: ReactNode;
   /** Where the account holder sends a new case of their own; null when it is not theirs to send from here. */
   newCaseHref?: string | null;
+  /** Withdraws from the journey (P0-2); rendered as one quiet action only while the backend offers WITHDRAW. */
+  onWithdraw?: () => Promise<unknown>;
 }) {
   const work = useWorkCopy();
   const t = work.myCare;
   const c = caseSummary;
   const code = actions.currentAction.code;
-  const step = stepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status });
+  const step = stepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status, exit: actions.currentAction.exit ?? null });
   const body = code === "PROVIDE_INFORMATION" ? patientAction?.message?.trim() || step.body : step.body;
   // A case closed or cancelled says nothing about how far it got, so its journey shows no step as reached or current.
   const phase = c.status === "CLOSED" || c.status === "CANCELLED" ? -1 : phaseIndex(c.status);
   // The account acts for the patient on this case (per case, from the backend), so the page says whose care this is.
   const representative = actions.viewer === "REPRESENTATIVE";
   const canMessage = actions.availableActions.includes("MESSAGE_COORDINATOR");
+  // The patient's own way out, offered by the backend until travel is confirmed; a confirmation, then the one call.
+  const canWithdraw = !!onWithdraw && actions.availableActions.includes("WITHDRAW");
+  const [withdrawing, setWithdrawing] = useState(false);
   const dateFormat = useMemo(() => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }), [locale]);
   const date = (iso: string) => dateFormat.format(new Date(iso));
   const proposalTotal = proposal ? proposal.items.filter(i => !i.optional).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0) : null;
@@ -263,6 +268,19 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
               <a href={newCaseHref} className="link-cta inline-flex min-h-11 items-center gap-2 text-[0.9375rem]"><Plus size={16} aria-hidden/>{t.cases.sendNew}</a>
             </p>
           )}
+
+          {/* WITHDRAW — one quiet way out, in words, away from the step's own action; never a second call to action. */}
+          {canWithdraw && (
+            <p className="text-[0.875rem] leading-6 text-ink-500 lg:col-start-1">
+              {t.withdraw.lead}{" "}
+              <button type="button" className="inline-flex min-h-11 items-center font-semibold text-ink-700 underline decoration-ink-350 underline-offset-4 hover:text-brand-800"
+                      onClick={() => setWithdrawing(true)}>{t.withdraw.action}</button>
+            </p>
+          )}
+          {withdrawing && (
+            <ConfirmDialog title={t.withdraw.title} body={t.withdraw.body} confirm={t.withdraw.confirm} cancel={t.withdraw.cancel}
+                           onConfirm={() => { setWithdrawing(false); void onWithdraw?.(); }} onCancel={() => setWithdrawing(false)}/>
+          )}
         </div>
       )}
     </div>
@@ -324,7 +342,7 @@ function depositTone(status: string): StatusTone {
  * The current step in the patient's words, keyed by the backend's action code (and, where one code reads two ways, the
  * stage or proposal state the backend also sent). Copy only — which code applies is never decided here.
  */
-function stepText(code: string, steps: LocalizedWorkCopy["myCare"]["steps"], ctx: { proposalState: string | null; status: string }): StepText {
+function stepText(code: string, steps: LocalizedWorkCopy["myCare"]["steps"], ctx: { proposalState: string | null; status: string; exit: string | null }): StepText {
   const s = steps as Record<string, StepText>;
   switch (code) {
     case "WAIT_COORDINATOR_REVIEW": return ctx.status === "RECEIVED" ? s.WAIT_CASE_RECEIVED : s.WAIT_COORDINATOR_REVIEW;
@@ -332,6 +350,8 @@ function stepText(code: string, steps: LocalizedWorkCopy["myCare"]["steps"], ctx
     case "PROVIDE_INFORMATION": case "REVIEW_PROPOSAL": case "COMPLETE_PROFILE": case "VERIFY_IDENTITY": case "WAIT_CONSULTANT_REVIEW":
     case "PAY_DEPOSIT": case "WAIT_PAYMENT_CHECK": case "WAIT_COORDINATION": case "WAIT_TREATMENT": case "IN_TREATMENT": case "FOLLOW_UP": return s[code];
     default:
+      // A journey that ended after acceptance says so with the backend's word for how (withdrawn, cancelled, expired, completed).
+      if (ctx.exit && s[ctx.exit]) return s[ctx.exit];
       if (ctx.status === "DECLINED" || ctx.status === "CLINICALLY_NOT_SUITABLE") return s[ctx.status];
       if (ctx.status === "CLOSED" || ctx.status === "CANCELLED") return s.CLOSED;
       return s.NONE;

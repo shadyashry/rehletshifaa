@@ -17,4 +17,7 @@ public interface CaseStatusChangeRepository extends BaseRepository<CaseStatusCha
             select h.toStatus as toStatus, h.createdAt as createdAt, h.actorSubject as actorSubject, h.actorRole as actorRole, h.reason as reason
             from CaseStatusChange h where h.caseId = :caseId order by h.createdAt""")
     List<TimelineRow> findTimelineOf(@Param("caseId") UUID caseId);
+
+    /** The move that put the case in its current stage. */
+    java.util.Optional<CaseStatusChange> findFirstByCaseIdOrderByCreatedAtDesc(UUID caseId);
 }

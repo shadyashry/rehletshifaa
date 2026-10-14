@@ -1309,6 +1309,14 @@
         "requestedBy": "Requested by your coordinator",
         "replyBy": "Please reply by"
       },
+      "withdraw": {
+        "lead": "Changed your mind?",
+        "action": "Withdraw from this journey",
+        "title": "Withdraw from this journey?",
+        "body": "Your case will be closed and our team will stop arranging your treatment. Your coordinator remains available if you would like to start again later.",
+        "confirm": "Yes, withdraw",
+        "cancel": "Keep my case open"
+      },
       "steps": {
         "PROVIDE_INFORMATION": {
           "title": "We need something from you",
@@ -1396,6 +1404,22 @@
         "CLINICALLY_NOT_SUITABLE": {
           "title": "This case is not clinically suitable for treatment with us",
           "body": "The Consultant reviewed your case and advised against treatment here. Your coordinator can explain what this means."
+        },
+        "WITHDRAWN": {
+          "title": "You withdrew from this journey",
+          "body": "Your case is closed at your request. Your coordinator remains available if you would like to start again."
+        },
+        "CANCELLED": {
+          "title": "This case was cancelled",
+          "body": "Your journey with us has ended. Your coordinator can explain what this means and what happens next."
+        },
+        "EXPIRED": {
+          "title": "This case has expired",
+          "body": "The coordination deposit was not received in time, so your case is on hold. Your coordinator can reopen it with you if you would like to continue."
+        },
+        "COMPLETED": {
+          "title": "Your care with us is complete",
+          "body": "Your Consultant confirmed that no follow-up is needed. Your coordinator remains available if anything changes."
         },
         "CLOSED": {
           "title": "This case is closed",
@@ -1508,6 +1532,23 @@
       "conversations": "Conversations",
       "clinic": "Virtual Clinic",
       "workingAs": "Working as"
+    },
+    "cancelCase": {
+      "title": "Cancel this case",
+      "hint": "Ends the patient's journey. This cannot be undone.",
+      "reasonLabel": "Reason",
+      "reasons": {
+        "PATIENT_WITHDREW": "The patient withdrew",
+        "HOSPITAL_REFUSED": "The hospital refused the patient",
+        "MEDICAL_CONTRAINDICATION": "Medical contraindication",
+        "PATIENT_DECEASED": "The patient passed away",
+        "NO_SHOW": "The patient did not arrive"
+      },
+      "noteLabel": "Note (optional)",
+      "noteHint": "What the patient or hospital said. Kept with the case, encrypted.",
+      "confirm": "Cancel case",
+      "keep": "Keep the case open",
+      "reasonRequired": "Choose a reason."
     },
     "recordDecision": {
       "title": "Record the patient's decision",
@@ -1747,6 +1788,10 @@
         "DEPOSIT_REFERENCE_OVERDUE": {
           "title": "No transfer reference yet — follow up with the patient",
           "context": "The patient was reminded for three days and has not entered the bank transfer reference for the coordination deposit. Contact them, and send the payment link if they need it."
+        },
+        "CASE_EXPIRED_UNPAID": {
+          "title": "The case expired — the deposit was not paid",
+          "context": "The patient was reminded, you were alerted, and the grace period passed without a transfer reference. The case is expired; re-prepare the estimate if the patient comes back."
         },
         "ASSIGN_CONSULTANT": {
           "title": "Prepare the case for a Consultant",

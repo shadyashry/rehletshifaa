@@ -13,6 +13,10 @@ import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.application.CaseActionQueryService.Facts;
 import com.rehletshifaa.journey.application.CaseActionQueryService.Proposal;
 import com.rehletshifaa.journey.application.CaseActionQueryService.WorkItem;
+import com.rehletshifaa.journey.domain.CaseExitReason;
+import com.rehletshifaa.journey.infrastructure.CaseExitReasonRepository;
+import com.rehletshifaa.journey.infrastructure.TravelPlanRepository;
+import com.rehletshifaa.casemanagement.infrastructure.CaseStatusChangeRepository;
 import com.rehletshifaa.shared.api.ApiException;
 
 import org.springframework.context.event.EventListener;
@@ -77,9 +81,15 @@ public class CaseActionService {
     private final Clock clock;
     private final com.rehletshifaa.workforce.application.WorkforceDirectory workforce;
 
+    private final CaseExitReasonRepository exitReasons;
+    private final TravelPlanRepository travelPlans;
+    private final CaseStatusChangeRepository statusChanges;
+
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
-                             com.rehletshifaa.workforce.application.WorkforceDirectory workforce) {
+                             com.rehletshifaa.workforce.application.WorkforceDirectory workforce, CaseExitReasonRepository exitReasons,
+                             TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges) {
+        this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges;
         this.workforce = workforce;
         this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
         this.patientActions = patientActions; this.proposals = proposals; this.authority = authority; this.clock = clock;
@@ -145,6 +155,8 @@ public class CaseActionService {
         List<BlockerView> mine = blockers.stream().filter(b -> "PATIENT".equals(b.owner())).toList();
         List<String> available = new ArrayList<>();
         if (!TERMINAL.contains(f.status()) && f.coordinatorSubject() != null) available.add("MESSAGE_COORDINATOR");
+        // P0-2: the patient's own way out, until travel is confirmed; from then on their coordinator records it for them.
+        if (CaseTransitionPolicy.patientMayWithdraw(f.status(), travelPlans.findStatusByCaseId(caseId).orElse(null))) available.add("WITHDRAW");
         CurrentActionView current = patientCurrentAction(caseId, f.status(), patientAction, mine);
         return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), current, mine, available, viewer, waitingReason.code());
     }
@@ -159,6 +171,8 @@ public class CaseActionService {
             Optional<BlockerView> step = mine.stream().filter(b -> code.equals(b.code())).findFirst();
             if (step.isPresent()) return new CurrentActionView(code.equals("IDENTITY_NOT_VERIFIED") ? "VERIFY_IDENTITY" : "COMPLETE_PROFILE", "FOCUS", null, null, null, null, null, null, false, code);
         }
+        String exit = exitWord(caseId, status);
+        if (exit != null) return new CurrentActionView("NONE", "NONE", null, null, null, null, null, null, false, null, null, exit);
         if (TERMINAL.contains(status) && !"EXPIRED".equals(status)) return none(); // an expired estimate is re-prepared, not closed
         if (COORDINATOR_STAGES.contains(status)) return simple("WAIT_COORDINATOR_REVIEW", "WAIT");
         if ("INFORMATION_REQUIRED".equals(status)) return simple("WAIT_COORDINATOR_REVIEW", "WAIT"); // answered, or asked on another channel
@@ -266,8 +280,28 @@ public class CaseActionService {
         if ("PROPOSAL_PREPARATION".equals(s) && p != null && p.requiresFinance() && !p.financeDone()) actions.add("ASSIGN_FINANCE");
         if ("INFORMATION_REQUIRED".equals(s)) actions.add("MOVE_TO_INTAKE_REVIEW");
         if (!TRAVEL_PACKAGE_LOCKED.contains(s)) actions.add("SET_TRAVEL_PACKAGE");
-        if (CONSULTANT_ASSIGNABLE.contains(s)) actions.add("CANCEL_CASE");
+        // P0-2: after acceptance the cancellation is typed (the coordinator's exit; Consultants never cancel a whole case).
+        if (CONSULTANT_ASSIGNABLE.contains(s) || CaseTransitionPolicy.TYPED_CANCELLATION_STAGES.contains(s)) actions.add("CANCEL_CASE");
         return actions;
+    }
+
+    /**
+     * P0-2: the calm word My Care says a finished journey with. A cancellation reads as the patient's own withdrawal or
+     * as cancelled; a closed case as completed (no follow-up needed) or closed; and EXPIRED only when it was entered from
+     * ACCEPTED — the deposit went unpaid — since an expired estimate is a live case being re-prepared. Null otherwise.
+     */
+    private String exitWord(UUID caseId, String status) {
+        return switch (status) {
+            case "CANCELLED" -> latestExit(caseId) == CaseExitReason.Reason.PATIENT_WITHDREW ? "WITHDRAWN" : "CANCELLED";
+            case "CLOSED" -> latestExit(caseId) == CaseExitReason.Reason.NO_FOLLOW_UP_NEEDED ? "COMPLETED" : "CLOSED";
+            case "EXPIRED" -> statusChanges.findFirstByCaseIdOrderByCreatedAtDesc(caseId)
+                    .filter(change -> "ACCEPTED".equals(change.getFromStatus())).map(change -> "EXPIRED").orElse(null);
+            default -> null;
+        };
+    }
+
+    private CaseExitReason.Reason latestExit(UUID caseId) {
+        return exitReasons.findFirstByCaseIdOrderByRecordedAtDesc(caseId).map(CaseExitReason::getReason).orElse(null);
     }
 
     /**
@@ -421,7 +455,10 @@ public class CaseActionService {
     public void syncStageWork(UUID caseId) {
         if (!syncing.get().add(caseId)) return;
         try {
-            Map<String, StageStep> owed = stageSteps(caseId);
+            Facts f = queries.facts(caseId);
+            // P0-2: a case that left its journey owes nobody anything — every open item on it is closed, whoever held it.
+            if (Set.of("CLOSED", "CANCELLED").contains(f.status())) { work.closeOpenWork(caseId, "Superseded — the case has left its journey"); return; }
+            Map<String, StageStep> owed = stageSteps(caseId, f);
             Map<String, String> open = work.openWorkOwners(caseId, STAGE_WORK);
             for (var item : open.entrySet()) {
                 StageStep step = owed.get(item.getKey());
@@ -446,8 +483,7 @@ public class CaseActionService {
     }
 
     /** The stage steps owed now, by step: nothing while the patient owes an answer or a step only they can take. */
-    private Map<String, StageStep> stageSteps(UUID caseId) {
-        Facts f = queries.facts(caseId);
+    private Map<String, StageStep> stageSteps(UUID caseId, Facts f) {
         if (TERMINAL.contains(f.status()) || patientActions.openAction(caseId) != null) return new HashMap<>();
         // Of the readiness stages only treatment coordination has a stage step (Operations); the others are read for nothing.
         List<BlockerView> blockers = "TRAVEL_COORDINATION".equals(f.status()) ? readinessBlockers(caseId) : List.of();

@@ -72,6 +72,38 @@ phases.
 - **Tests:** one test per new edge; "every non-terminal stage has at least one exit" property test; patient-visible
   status words for each exit in EN/AR.
 - **Sessions:** 1–2. **Model:** Fable 5.1, high.
+- **Status (2026-10-14, branch `feat/review-p0`):** delivered.
+  - Delivered: `CaseTransitionPolicy` gains `ACCEPTED → EXPIRED | CANCELLED`, `ARRIVAL_CONFIRMED | TREATMENT_IN_PROGRESS |
+    DISCHARGED | FOLLOW_UP → CANCELLED`, `DISCHARGED → CLOSED`, plus the static rules every caller shares (`TERMINAL`,
+    `TYPED_CANCELLATION_STAGES`, `exitsFrom`, `patientMayWithdraw`). New `CaseExitService` is the one writer of every
+    exit, each validated by the policy: coordinator typed cancellation (through the existing transition endpoint,
+    `TransitionRequest.cancellationReason`, mandatory from ACCEPTED onwards, 400 `CANCELLATION_REASON_REQUIRED`), patient
+    withdrawal (`POST /patient/cases/{id}/withdraw`, PATIENT_DECIDE step-up, refused with 409
+    `WITHDRAWAL_NEEDS_COORDINATOR` once the travel plan is CONFIRMED/ARRIVED), deposit expiry (`expireUnpaidDeposit`, called
+    by `DepositPaymentReminders` after day 4 + `app.payments.deposit-expiry-grace-days`, default 14; a deposit nothing was
+    received against is cancelled so a re-prepared estimate raises a fresh one), and the Consultant's "no follow-up
+    needed" (`POST /doctor/cases/{id}/follow-ups/not-needed`). Every exit writes `case_status_history`, two audit events
+    (`CASE_STATUS_CHANGED`, `CASE_EXIT_RECORDED`), a `case_exit_reasons` row (`V87__case_exit_reasons.sql`; note stored
+    encrypted), cancels every open task on the case (`StaffWorkService.closeOpenWork`, also run by `syncStageWork` on
+    CLOSED/CANCELLED), and resets `waiting_on` to NONE. `CaseActionService` returns `NONE` with `CurrentActionView.exit`
+    (WITHDRAWN / CANCELLED / EXPIRED / COMPLETED / CLOSED) and offers `WITHDRAW` to the patient and `CANCEL_CASE` to the
+    coordinator in the typed stages; Consultants still never cancel a whole case. Frontend: `CancelCaseDialog`
+    (typed reason + encrypted note) behind More actions in `StaffCaseView`, one quiet withdraw line with a confirm dialog in
+    `MyCare`, copy under `myCare.steps`, `myCare.withdraw`, `cancelCase`, `workCopy.items.CASE_EXPIRED_UNPAID` in EN/AR.
+  - Tests: `CaseTransitionPolicyTest` (property: a terminal stage is reachable from every non-terminal stage; the committed
+    stages leave directly; withdrawal rule table); `JourneyServiceIntegrationTest` one test per post-arrival edge
+    (typed reason required, Consultant refused, work closed, audit; contraindication; no-follow-up close with role and
+    stage guards; deceased; no-show); `CoordinatorCaseActionsTest` ACCEPTED typed cancel, patient withdraw until travel
+    is confirmed, reminder cycle → EXPIRED after the grace period (idempotent, coordinator told once); frontend
+    `MyCare.test.tsx` and `StaffOperationalUi.test.tsx` (exit words, one quiet withdraw action, typed dialog contract).
+  - Open gaps: no refund rule hook yet (a part-paid deposit is left as is on every exit; Finance's rule belongs to
+    P0-4); the patient gets no notification on expiry (the coordinator does; a patient template needs the notification
+    copy pass); the Consultant has no UI for "no follow-up needed" or for follow-up plans at all (backend only, as
+    before); a case re-opened from a deposit expiry keeps its cancelled deposit history and relies on the coordinator
+    re-preparing the estimate; `EMERGENCY_OVERRIDE_REVIEW` tasks are closed with the rest of the case's work on an exit
+    (decide whether governance reviews should survive a cancellation).
+  - Next exact action: P0-3 (clinical urgency and emergency guidance) in a new session from its prompt block, Opus 5.5
+    fast, after fast-forwarding `feat/review-p0` to this commit and rebuilding the dev stack so V87 runs.
 
 ### P0-3  Clinical urgency and emergency guidance  (A-02)
 - **Scope:** `urgency` on the case (ROUTINE / PRIORITY / URGENT) set by the coordinator with a reason at intake and

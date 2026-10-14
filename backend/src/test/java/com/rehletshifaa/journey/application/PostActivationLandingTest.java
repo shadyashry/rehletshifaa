@@ -65,7 +65,7 @@ class PostActivationLandingTest {
         assertThat(ws.actions().currentAction().kind()).isEqualTo("FOCUS");
         assertThat(ws.actions().waitingOn()).isEqualTo("PATIENT");
         assertThat(ws.actions().blockers()).extracting(BlockerView::code).containsExactly("DEPOSIT_UNPAID");
-        assertThat(ws.actions().availableActions()).containsExactly("MESSAGE_COORDINATOR");
+        assertThat(ws.actions().availableActions()).containsExactly("MESSAGE_COORDINATOR", "WITHDRAW"); // P0-2: the patient may still withdraw until travel is confirmed
         // Where to pay: the platform account (configuration) and the case number to write on the transfer.
         assertThat(ws.deposit().bankTransfer().iban()).isNotBlank();
         assertThat(ws.deposit().bankTransfer().paymentReference()).isEqualTo(ws.caseSummary().caseNumber());

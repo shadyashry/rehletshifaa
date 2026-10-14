@@ -226,6 +226,9 @@ app:
       swift: ${PAYMENT_BANK_SWIFT:TESTEGCXXXX}
     # How often unpaid deposits are checked for the daily reminders (patient days 1-3, coordinator day 4).
     reminder-poll-milliseconds: ${PAYMENT_REMINDER_POLL_MILLISECONDS:3600000}
+    # P0-2: after the coordinator alert (day 4 of the cycle) an unpaid deposit gets this many more days before the
+    # case expires (ACCEPTED -> EXPIRED through the lifecycle policy); the coordinator may re-prepare it later.
+    deposit-expiry-grace-days: ${PAYMENT_DEPOSIT_EXPIRY_GRACE_DAYS:14}
   turnstile:
     enabled: ${TURNSTILE_ENABLED:false}
     secret: ${TURNSTILE_SECRET:}

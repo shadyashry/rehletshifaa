@@ -1,5 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+
+// jsdom implements <dialog> only partially.
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new Event("close")); };
+});
 
 import { MyCare } from "./MyCare";
 import { renderWithWork } from "./test-copy";
@@ -215,6 +221,41 @@ describe("MyCare", () => {
     expect(screen.getByText("قيد التحقق")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /الاطلاع على العرض/ })).toHaveLength(1);
     expect(screen.getByRole("button", { name: /مراسلة/ })).toBeTruthy();
+  });
+
+  it("says how a journey ended with the backend's exit word, and offers nothing else (P0-2)", () => {
+    const ended = (status: string, exit: string): CaseActions => ({ journeyStage: status, waitingOn: "NONE", blockers: [], currentAction: { code: "NONE", kind: "NONE", exit }, availableActions: [] });
+    for (const [status, exit, title] of [["CANCELLED", "WITHDRAWN", "You withdrew from this journey"], ["CANCELLED", "CANCELLED", "This case was cancelled"],
+                                         ["EXPIRED", "EXPIRED", "This case has expired"], ["CLOSED", "COMPLETED", "Your care with us is complete"]]) {
+      renderCare({ caseSummary: { ...base, status }, actions: ended(status, exit), deposit: null, patientProposal: null, proposal: null, onWithdraw: vi.fn() });
+      expect(screen.getByRole("heading", { name: title })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /withdraw/i })).toBeNull(); // the backend no longer offers it
+      expect(within(screen.getByRole("region", { name: "Your coordinator" })).queryByRole("button")).toBeNull(); // no longer offered by the backend
+      cleanup();
+    }
+    // Without an exit word the page falls back to the stage, as before.
+    renderCare({ caseSummary: { ...base, status: "CANCELLED" }, actions: wait("NONE"), deposit: null, patientProposal: null, proposal: null });
+    expect(screen.getByRole("heading", { name: "This case is closed" })).toBeTruthy();
+  });
+
+  it("offers one quiet withdraw action only when the backend allows it, and confirms before the one call (P0-2)", async () => {
+    const onWithdraw = vi.fn().mockResolvedValue({});
+    renderCare({ actions: { ...wait("WAIT_COORDINATION"), availableActions: ["MESSAGE_COORDINATOR", "WITHDRAW"] }, onWithdraw });
+    const buttons = screen.getAllByRole("button", { name: "Withdraw from this journey" });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].className).not.toMatch(/btn-primary/); // a quiet action in words, not a second call to action
+    expect(screen.getByRole("heading", { name: "We are arranging your treatment" })).toBeTruthy();
+    fireEvent.click(buttons[0]);
+    const dialog = screen.getByRole("alertdialog", { name: "Withdraw from this journey?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Keep my case open" }));
+    expect(onWithdraw).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw from this journey" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Yes, withdraw" }));
+    expect(onWithdraw).toHaveBeenCalledTimes(1);
+    cleanup();
+    // Not offered by the backend (travel confirmed, or an earlier stage): not rendered.
+    renderCare({ actions: wait("WAIT_COORDINATION"), onWithdraw });
+    expect(screen.queryByRole("button", { name: /withdraw/i })).toBeNull();
   });
 
   it("a closed case shows no step of its journey as reached or current", () => {

@@ -11,7 +11,18 @@ import java.util.UUID;
 
 public final class JourneyDtos {
     private JourneyDtos() {}
-    public record TransitionRequest(@NotBlank String targetStatus,@Size(max=1000)String reason,@NotNull Long expectedVersion) {}
+    /**
+     * {@code cancellationReason}: the typed reason a CANCELLED target carries; required from ACCEPTED onwards
+     * ({@link com.rehletshifaa.journey.application.CaseTransitionPolicy#TYPED_CANCELLATION_STAGES}), optional before.
+     */
+    public record TransitionRequest(@NotBlank String targetStatus,@Size(max=1000)String reason,@NotNull Long expectedVersion,
+                                    @Pattern(regexp="PATIENT_WITHDREW|HOSPITAL_REFUSED|MEDICAL_CONTRAINDICATION|PATIENT_DECEASED|NO_SHOW")String cancellationReason) {
+        public TransitionRequest(String targetStatus,String reason,Long expectedVersion){this(targetStatus,reason,expectedVersion,null);}
+    }
+    /** The patient withdraws from their journey (My Care); the note is theirs to add. */
+    public record WithdrawRequest(@Size(max=1000)String note) {}
+    /** The Consultant records that the discharged patient needs no follow-up; the case closes. */
+    public record NoFollowUpRequest(@Size(max=1000)String note) {}
     public record AssignmentRequest(@NotBlank @Size(max=255)String assigneeSubject,@NotBlank String assigneeRole,@NotBlank @Pattern(regexp="PRIMARY|SECONDARY")String assignmentType,@Size(max=100)String pod,@NotBlank @Size(max=500)String reason) {}
     public record CoordinatorReassignmentRequest(@NotBlank @Size(max=255)String assigneeSubject,@NotBlank @Size(max=500)String reason) {}
     public record TravelPackageRequest(@NotNull Boolean requested) {}
@@ -165,9 +176,16 @@ public final class JourneyDtos {
     // still re-validates independently, so this is a rendering contract, never an authorization decision.
     /** {@code kind}: COMPLETE (finish the work item), FOCUS (open the form that does the work), CLAIM, ACCEPT, WAIT (somebody else's move), NONE. */
     /** {@code copy}: for a work item, the code and parameters the portal words it from (null when it has only an English title). */
-    public record CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode,WorkDtos.WorkCopy copy) {
+    /**
+     * {@code exit}: for a NONE action on a case that left its journey, the calm word the portal says it with
+     * (WITHDRAWN, CANCELLED, EXPIRED, COMPLETED, CLOSED); null while the case is live or ended before acceptance.
+     */
+    public record CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode,WorkDtos.WorkCopy copy,String exit) {
+        public CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode,WorkDtos.WorkCopy copy){
+            this(code,kind,title,context,workItemId,workItemVersion,workType,dueAt,overdue,blockerCode,copy,null);
+        }
         public CurrentActionView(String code,String kind,String title,String context,UUID workItemId,Long workItemVersion,String workType,Instant dueAt,boolean overdue,String blockerCode){
-            this(code,kind,title,context,workItemId,workItemVersion,workType,dueAt,overdue,blockerCode,null);
+            this(code,kind,title,context,workItemId,workItemVersion,workType,dueAt,overdue,blockerCode,null,null);
         }
     }
     /** {@code owner}: PATIENT, STAFF, or LATER (queued behind another blocker). {@code gating} is false for a step that must be done before a later commitment (identity before travel is confirmed) but does not hold the current stage. Labels are patient-safe, like {@link BlockingItem}. */

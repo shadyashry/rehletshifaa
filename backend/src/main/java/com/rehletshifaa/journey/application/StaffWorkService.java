@@ -138,6 +138,18 @@ public class StaffWorkService {
     }
 
     /**
+     * The case left its journey (cancelled, withdrawn, expired unpaid, closed): nothing on it is owed any more, so every
+     * open item — staff work and patient actions alike — is cancelled with the reason. Idempotent; announces nothing
+     * (the exit itself announces the change, and {@link CaseActionService#syncStageWork} calls this on a closed case).
+     *
+     * @return how many items were cancelled
+     */
+    @Transactional
+    public int closeOpenWork(UUID caseId, String reason) {
+        return tasks.cancelOpenOnCase(caseId, reason, micros(clock.instant()));
+    }
+
+    /**
      * Work or responsibility on the case just moved, so the stage's own steps follow ({@link CaseActionService#syncStageWork}).
      * Synchronous, inside the caller's transaction; a read-time correction never raises it.
      */

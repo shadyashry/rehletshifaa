@@ -45,6 +45,7 @@ class CoordinatorCaseActionsTest {
     @Autowired CaseTransitionPolicy policy; @Autowired CaseHandoffService handoff; @Autowired StaffWorkService work;
     @Autowired PatientAccountService account; @Autowired com.rehletshifaa.identity.PatientIdentityPort identityPort;
     @Autowired PoolWorkDepartureService departures; @Autowired DepositTransferService transfers; @Autowired DepositPaymentReminders reminders;
+    @Autowired CaseExitService exits;
     @org.junit.jupiter.api.BeforeEach void resetIdentity() { ((com.rehletshifaa.identity.LocalPatientIdentitySimulator) identityPort).reset(); }
     @Autowired JdbcTemplate jdbc; @Autowired com.rehletshifaa.casemanagement.application.IntakeLifecycleService intakeLifecycle; @Autowired ObjectMapper json; @Autowired CryptoService crypto; @Autowired EntityManager em;
 
@@ -147,8 +148,9 @@ class CoordinatorCaseActionsTest {
         assertThat(a.currentAction().blockerCode()).isEqualTo("PROFILE_NOT_ACTIVATED");
         assertThat(a.blockers()).extracting(BlockerView::code).containsExactly("PROFILE_NOT_ACTIVATED", "DEPOSIT_UNPAID");
         assertThat(a.blockers().get(1).owner()).isEqualTo("LATER"); // the deposit waits behind the patient
-        assertThat(a.availableActions()).contains("RESEND_ONBOARDING_LINK", "REQUEST_INFORMATION")
-                .doesNotContain("ASSIGN_OPERATIONS", "ASSIGN_CONSULTANT", "SET_TRAVEL_PACKAGE", "CANCEL_CASE");
+        // P0-2: CANCEL_CASE is offered after acceptance too, as the typed exit (ACCEPTED -> CANCELLED needs a reason).
+        assertThat(a.availableActions()).contains("RESEND_ONBOARDING_LINK", "REQUEST_INFORMATION", "CANCEL_CASE")
+                .doesNotContain("ASSIGN_OPERATIONS", "ASSIGN_CONSULTANT", "SET_TRAVEL_PACKAGE");
         // DEP-3: the deposit is the patient's to pay after their profile, so no staff item exists for it.
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND visibility_scope='INTERNAL' AND status='OPEN'", ctx.caseId)).isZero();
     }
@@ -621,6 +623,91 @@ class CoordinatorCaseActionsTest {
         // Once the patient sends the reference, nobody is chased.
         submitReference(ctx.caseId, "FT-LATE-1");
         assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("NONE");
+    }
+
+    /** P0-2: three reminder days plus the grace period without a reference expire the case through the lifecycle policy, once. */
+    @Test void theUnpaidDepositExpiresTheCaseAfterTheGracePeriodThroughTheLifecycle() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=?", UUID.class, ctx.caseId);
+
+        // Day 17 = three reminder days + fourteen grace days: still inside the grace.
+        raw("UPDATE deposits SET payable_at=? WHERE id=?", Instant.now().minus(java.time.Duration.ofDays(17)).minusSeconds(60), depositId);
+        assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("OVERDUE");
+        assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
+
+        raw("UPDATE deposits SET payable_at=? WHERE id=?", Instant.now().minus(java.time.Duration.ofDays(18)).minusSeconds(60), depositId);
+        assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("EXPIRED");
+        assertThat(status(ctx.caseId)).isEqualTo("EXPIRED");
+        assertThat(count("SELECT count(*) FROM case_exit_reasons WHERE case_id=? AND to_status='EXPIRED' AND reason='DEPOSIT_UNPAID'", ctx.caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM deposits WHERE id=?", String.class, depositId)).as("nothing received: cancelled").isEqualTo("CANCELLED");
+        assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='CASE_EXPIRED_UNPAID'", "coordinator-subject")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM case_status_history WHERE case_id=? AND from_status='ACCEPTED' AND to_status='EXPIRED'", ctx.caseId)).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS')", ctx.caseId)).as("no open work left").isZero();
+
+        // The hourly sweep again: the facts moved on, nothing more happens.
+        assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("NONE");
+        assertThat(count("SELECT count(*) FROM case_exit_reasons WHERE case_id=? AND to_status='EXPIRED' AND reason='DEPOSIT_UNPAID'", ctx.caseId)).isEqualTo(1);
+
+        authenticate(patientSubject(ctx.caseId), Role.PATIENT);
+        var current = journey.workspace(ctx.caseId).actions().currentAction();
+        assertThat(current.code()).isEqualTo("NONE");
+        assertThat(current.exit()).isEqualTo("EXPIRED");
+        SecurityContextHolder.clearContext();
+    }
+
+    /** P0-2, ACCEPTED -> CANCELLED: the coordinator's typed reason; the deposit step and every other open item close; My Care says "withdrawn". */
+    @Test void anAcceptedCaseIsCancelledWithATypedReasonAndTheDepositStepCloses() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        // Some staff work is open on the case (DEP-3 keeps the deposit itself with the patient, so seed an item explicitly).
+        raw("INSERT INTO case_tasks(id,case_id,task_type,title,owner_subject,owner_role,visibility_scope,priority,blocking,status,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
+                UUID.randomUUID(), ctx.caseId, "TRAVEL", "enc:" + crypto.encrypt("Draft the itinerary"), "operations-subject", "OPERATIONS", "INTERNAL", "NORMAL", false, "OPEN", "coordinator-subject", Instant.now(), Instant.now());
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS')", ctx.caseId)).isPositive();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        long version = journey.workspace(ctx.caseId).caseSummary().version();
+        assertThat(journey.workspace(ctx.caseId).actions().availableActions()).contains("CANCEL_CASE");
+        assertThatThrownBy(() -> journey.transition(ctx.caseId, new TransitionRequest("CANCELLED", "Called to say no", version)))
+                .isInstanceOf(ApiException.class).extracting("code").isEqualTo("CANCELLATION_REASON_REQUIRED");
+        journey.transition(ctx.caseId, new TransitionRequest("CANCELLED", "Called to say no", version, "PATIENT_WITHDREW"));
+        assertThat(status(ctx.caseId)).isEqualTo("CANCELLED");
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS')", ctx.caseId)).isZero();
+        assertThat(count("SELECT count(*) FROM case_exit_reasons WHERE case_id=? AND from_status='ACCEPTED' AND reason='PATIENT_WITHDREW'", ctx.caseId)).isEqualTo(1);
+        SecurityContextHolder.clearContext();
+        authenticate(patientSubject(ctx.caseId), Role.PATIENT);
+        var current = journey.workspace(ctx.caseId).actions().currentAction();
+        assertThat(current.code()).isEqualTo("NONE");
+        assertThat(current.exit()).isEqualTo("WITHDRAWN");
+        assertThat(journey.workspace(ctx.caseId).actions().availableActions()).doesNotContain("WITHDRAW", "MESSAGE_COORDINATOR");
+    }
+
+    /** P0-2: the patient withdraws from My Care after acceptance; once travel is confirmed they are sent to their coordinator instead. */
+    @Test void thePatientWithdrawsFromMyCareUntilTravelIsConfirmed() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        String patient = patientSubject(ctx.caseId);
+        authenticate(patient, Role.PATIENT);
+        assertThat(journey.workspace(ctx.caseId).actions().availableActions()).contains("WITHDRAW");
+
+        // Travel confirmed (Operations' plan): the withdrawal is the coordinator's to record now.
+        raw("INSERT INTO travel_plans(id,case_id,status,updated_at,version) VALUES(?,?,?,?,0)", UUID.randomUUID(), ctx.caseId, "CONFIRMED", Instant.now());
+        assertThat(journey.workspace(ctx.caseId).actions().availableActions()).doesNotContain("WITHDRAW");
+        assertThatThrownBy(() -> exits.withdraw(ctx.caseId, "I changed my mind")).isInstanceOf(ApiException.class).extracting("code").isEqualTo("WITHDRAWAL_NEEDS_COORDINATOR");
+        assertThat(status(ctx.caseId)).isEqualTo("ACCEPTED");
+
+        // Still planning: the patient's own decision stands.
+        raw("UPDATE travel_plans SET status='PLANNING' WHERE case_id=?", ctx.caseId);
+        assertThat(exits.withdraw(ctx.caseId, "I changed my mind").status()).isEqualTo("CANCELLED");
+        assertThat(status(ctx.caseId)).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT recorded_by FROM case_exit_reasons WHERE case_id=? AND reason='PATIENT_WITHDREW'", String.class, ctx.caseId)).isEqualTo(patient);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS')", ctx.caseId)).isZero();
+        var current = journey.workspace(ctx.caseId).actions().currentAction();
+        assertThat(current.code()).isEqualTo("NONE");
+        assertThat(current.exit()).isEqualTo("WITHDRAWN");
+        assertThatThrownBy(() -> exits.withdraw(ctx.caseId, "again")).as("a cancelled case cannot be withdrawn from").isInstanceOf(ApiException.class);
+        SecurityContextHolder.clearContext();
+        // Staff see the same ending; the coordinator's queue no longer holds it as waiting on anyone.
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?", String.class, ctx.caseId)).isEqualTo("NONE");
     }
 
     /** The patient asked on WhatsApp how to pay: the case's one voice sends the link, only while the patient owes the reference. */

@@ -38,7 +38,7 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
    return <div>
     <MyCare locale={locale} caseSummary={c} actions={actions} patientAction={value.patientAction} patientProposal={value.patientProposal} proposal={value.proposal??null} deposit={value.deposit??null}
      documents={documents} unreadMessages={unread} cases={allCases} newCaseHref={sendsOwnCase?localeHref(locale,"send-my-case"):null} view={careView} onView={view=>onCareView?.(view)}
-     onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)}
+     onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)} onWithdraw={()=>mutate(`/patient/cases/${c.id}/withdraw`,{})}
      identityStep={actions.currentAction.code==="VERIFY_IDENTITY"?<IdentityStep key={c.id} locale={locale} caseId={c.id} busy={busy} mutate={mutate} load={load}/>:undefined}
      paymentStep={actions.currentAction.code==="PAY_DEPOSIT"&&value.deposit?.bankTransfer?<PatientDepositPayment key={`${c.id}:${value.deposit.transfer?.id??"new"}`} locale={locale} caseId={c.id} currency={value.deposit.currency}
       amountDue={value.deposit.balanceDisplay??value.deposit.totalDisplay??null} totalDue={value.deposit.totalDisplay??null} received={value.deposit.paidDisplay??null}

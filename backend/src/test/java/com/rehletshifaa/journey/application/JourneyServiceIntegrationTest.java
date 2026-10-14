@@ -35,6 +35,7 @@ class JourneyServiceIntegrationTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto; @Autowired EntityManager entityManager; @Autowired PaymentService payment; @Autowired MockMvc mvc;
     @Autowired com.rehletshifaa.journey.application.ConsultantOnboardingService onboarding;
     @Autowired CommercialPolicyService commercialPolicies;
+    @Autowired CaseExitService exits;
     @AfterEach void clearSecurity(){SecurityContextHolder.clearContext();}
 
     @Test void credentialDecisionRequiresIndependentReviewerEvenForSystemAdministrators() {
@@ -475,6 +476,115 @@ class JourneyServiceIntegrationTest {
         journey.treatment(fq.caseId(),episode);
         assertThat(caseStatus(fq.caseId())).isEqualTo("TREATMENT_IN_PROGRESS");
     }
+
+    // ---------- P0-2 lifecycle exits (review A-01 / V6): one test per new edge ----------
+
+    /** ARRIVAL_CONFIRMED -> CANCELLED: the coordinator's typed reason is mandatory, every open item closes, and the exit is on record. */
+    @Test void anArrivedCaseIsCancelledOnlyWithATypedReasonAndEveryOpenItemCloses()throws Exception{
+        UUID caseId=arriveWithDoctor("Refused Patient","+254700000101","rf@local.test");
+        coordinate(caseId);
+        jdbc.update("INSERT INTO case_tasks(id,case_id,task_type,title,owner_subject,owner_role,visibility_scope,priority,blocking,status,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
+            UUID.randomUUID(),caseId,"TRAVEL","enc:"+crypto.encrypt("Arrange the ward"),"operations-subject","OPERATIONS","INTERNAL","NORMAL",false,"OPEN","coordinator-subject",Instant.now(),Instant.now());
+        // A Consultant never cancels a whole case.
+        authenticate("doctor-subject",Role.CONSULTANT);
+        assertThatThrownBy(()->journey.transition(caseId,new TransitionRequest("CANCELLED","Refused",version(caseId),"HOSPITAL_REFUSED")))
+            .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).extracting("status").isEqualTo(403);
+        authenticate("coordinator-subject",Role.COORDINATOR);
+        assertThatThrownBy(()->journey.transition(caseId,new TransitionRequest("CANCELLED","Refused",version(caseId))))
+            .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).extracting("code").isEqualTo("CANCELLATION_REASON_REQUIRED");
+        assertThat(caseStatus(caseId)).isEqualTo("ARRIVAL_CONFIRMED");
+
+        var view=journey.transition(caseId,new TransitionRequest("CANCELLED","No bed on the ward",version(caseId),"HOSPITAL_REFUSED"));
+        assertThat(view.status()).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT reason FROM case_exit_reasons WHERE case_id=? AND from_status='ARRIVAL_CONFIRMED' AND to_status='CANCELLED'",String.class,caseId)).isEqualTo("HOSPITAL_REFUSED");
+        assertThat(jdbc.queryForObject("SELECT note FROM case_exit_reasons WHERE case_id=?",String.class,caseId)).as("the note is stored encrypted").doesNotContain("No bed");
+        assertThat(jdbc.queryForObject("SELECT reason FROM case_status_history WHERE case_id=? AND to_status='CANCELLED'",String.class,caseId)).isEqualTo("HOSPITAL_REFUSED: No bed on the ward");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE case_id=? AND event_type='CASE_EXIT_RECORDED' AND action='HOSPITAL_REFUSED'",Integer.class,caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS')",Integer.class,caseId)).as("no open work left").isZero();
+        assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?",String.class,caseId)).isEqualTo("NONE");
+    }
+
+    /** TREATMENT_IN_PROGRESS -> CANCELLED with a medical contraindication. */
+    @Test void treatmentInProgressCancelsWithAContraindication()throws Exception{
+        UUID caseId=arriveWithDoctor("Contra Patient","+254700000102","ct@local.test");
+        coordinate(caseId);
+        authenticate("doctor-subject",Role.CONSULTANT);
+        journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("Explained; I consent.","en","v1",null,null,"Provider consent ref #201"));
+        journey.treatment(caseId,new TreatmentRequest("Cairo Heart",null,Instant.now().minusSeconds(3600),null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        assertThat(caseStatus(caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
+        authenticate("coordinator-subject",Role.COORDINATOR);
+        journey.transition(caseId,new TransitionRequest("CANCELLED",null,version(caseId),"MEDICAL_CONTRAINDICATION"));
+        assertThat(caseStatus(caseId)).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT reason FROM case_exit_reasons WHERE case_id=? AND from_status='TREATMENT_IN_PROGRESS'",String.class,caseId)).isEqualTo("MEDICAL_CONTRAINDICATION");
+        assertThat(jdbc.queryForObject("SELECT reason FROM case_status_history WHERE case_id=? AND to_status='CANCELLED'",String.class,caseId)).isEqualTo("MEDICAL_CONTRAINDICATION");
+    }
+
+    /** DISCHARGED -> CLOSED when the Consultant records "no follow-up needed"; nobody else, and not before discharge. */
+    @Test void aDischargedPatientClosesWhenTheConsultantRecordsNoFollowUp()throws Exception{
+        UUID caseId=arriveWithDoctor("Done Patient","+254700000103","dn@local.test");
+        coordinate(caseId);
+        authenticate("doctor-subject",Role.CONSULTANT);
+        journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("Explained; I consent.","en","v1",null,null,"Provider consent ref #202"));
+        Instant start=Instant.now().minusSeconds(3600);
+        journey.treatment(caseId,new TreatmentRequest("Cairo Heart",null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        assertThatThrownBy(()->exits.closeWithoutFollowUp(caseId,"Too early")).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).extracting("code").isEqualTo("CASE_STATE_CONFLICT");
+        journey.treatment(caseId,discharge(start,document(caseId,"CLEAN")));
+        assertThat(caseStatus(caseId)).isEqualTo("DISCHARGED");
+        authenticate("coordinator-subject",Role.COORDINATOR);
+        assertThatThrownBy(()->exits.closeWithoutFollowUp(caseId,"Not mine to say")).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).extracting("status").isEqualTo(403);
+        authenticate("doctor-subject",Role.CONSULTANT);
+        assertThat(exits.closeWithoutFollowUp(caseId,"Full recovery, no review needed").status()).isEqualTo("CLOSED");
+        assertThat(caseStatus(caseId)).isEqualTo("CLOSED");
+        assertThat(jdbc.queryForObject("SELECT reason FROM case_exit_reasons WHERE case_id=? AND from_status='DISCHARGED' AND to_status='CLOSED'",String.class,caseId)).isEqualTo("NO_FOLLOW_UP_NEEDED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS')",Integer.class,caseId)).isZero();
+    }
+
+    /** DISCHARGED -> CANCELLED: the patient died before follow-up. */
+    @Test void aDischargedCaseCancelsWhenThePatientDied()throws Exception{ cancelsTyped("DISCHARGED","PATIENT_DECEASED","+254700000104","ex1@local.test"); }
+
+    /** FOLLOW_UP -> CANCELLED: the patient never came back for follow-up. */
+    @Test void aFollowUpCaseCancelsAsANoShow()throws Exception{ cancelsTyped("FOLLOW_UP","NO_SHOW","+254700000105","ex2@local.test"); }
+
+    private void cancelsTyped(String stage,String reason,String phone,String email)throws Exception{
+        UUID caseId=arriveWithDoctor("Exit Patient",phone,email);
+        coordinate(caseId);
+        authenticate("doctor-subject",Role.CONSULTANT);
+        journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("Explained; I consent.","en","v1",null,null,"Provider consent ref #203"));
+        Instant start=Instant.now().minusSeconds(3600);
+        journey.treatment(caseId,new TreatmentRequest("Cairo Heart",null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        var discharged=journey.treatment(caseId,discharge(start,document(caseId,"CLEAN")));
+        if("FOLLOW_UP".equals(stage))journey.followUp(caseId,new FollowUpRequest(discharged.id(),null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest"));
+        assertThat(caseStatus(caseId)).isEqualTo(stage);
+        authenticate("coordinator-subject",Role.COORDINATOR);
+        journey.transition(caseId,new TransitionRequest("CANCELLED","Recorded by phone",version(caseId),reason));
+        assertThat(caseStatus(caseId)).as(stage).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT reason FROM case_exit_reasons WHERE case_id=? AND from_status=?",String.class,caseId,stage)).isEqualTo(reason);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS')",Integer.class,caseId)).isZero();
+    }
+
+    /** The HTTP contract: the typed reason rides on the existing transition endpoint, and is refused when missing. */
+    @Test void theTransitionEndpointCarriesTheTypedReasonOverHttp()throws Exception{
+        UUID caseId=arriveWithDoctor("Http Patient","+254700000106","http@local.test");
+        coordinate(caseId);
+        var asCoordinator=jwt().jwt(token->token.subject("coordinator-subject").claim("auth_time",Instant.now().getEpochSecond()).claim("acr","3")).authorities(new SimpleGrantedAuthority("ROLE_COORDINATOR"));
+        mvc.perform(post("/api/v1/coordinator/cases/{caseId}/transition",caseId).with(asCoordinator).contentType("application/json")
+                .content("{\"targetStatus\":\"CANCELLED\",\"reason\":\"Never arrived\",\"expectedVersion\":"+version(caseId)+"}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CANCELLATION_REASON_REQUIRED"));
+        mvc.perform(post("/api/v1/coordinator/cases/{caseId}/transition",caseId).with(asCoordinator).contentType("application/json")
+                .content("{\"targetStatus\":\"CANCELLED\",\"reason\":\"Never arrived\",\"expectedVersion\":"+version(caseId)+",\"cancellationReason\":\"NO_SHOW\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        assertThat(jdbc.queryForObject("SELECT reason FROM case_exit_reasons WHERE case_id=?",String.class,caseId)).isEqualTo("NO_SHOW");
+    }
+
+    /** The coordinator owns the case (the transition endpoint is theirs, under CASE_COORDINATE). */
+    private void coordinate(UUID caseId){
+        if(jdbc.queryForObject("SELECT COUNT(*) FROM workforce_people WHERE subject='coordinator-subject'",Integer.class)==0)
+            com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc,"coordinator-subject","COORDINATOR",crypto.encrypt("Layla Hassan"));
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc,"coordinator-subject");
+        jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+            UUID.randomUUID(),caseId,"coordinator-subject","COORDINATOR","PRIMARY","ACTIVE","Owner","system",Instant.now(),Instant.now());
+    }
+    private long version(UUID caseId){return jdbc.queryForObject("SELECT version FROM medical_cases WHERE id=?",Long.class,caseId);}
 
     private TreatmentRequest discharge(Instant start,UUID documentId){
         return new TreatmentRequest("Cairo Heart",null,start,Instant.now(),"COMPLETED","Angioplasty","Angioplasty",null,null,true,documentId);

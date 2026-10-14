@@ -25,6 +25,10 @@ import java.util.*;
  *   <li>TRAVEL_COORDINATION is entered only once the coordination deposit is settled and the patient has
  *       finished the profile steps only they can complete. Preparing a travel plan is data entry and never
  *       moves the stage; the handoff after settlement does, and only when this gate passes.</li>
+ *   <li>Every stage after acceptance has an exit (review 2026-10-14, A-01): ACCEPTED expires when the deposit
+ *       reminder cycle ends unpaid, and ACCEPTED through FOLLOW_UP cancel with a typed reason — a coordinator's
+ *       action, or the patient's own withdrawal while travel is not yet confirmed ({@link CaseExitService}).
+ *       DISCHARGED closes directly when the Consultant records that no follow-up is needed.</li>
  * </ul>
  */
 @Component
@@ -44,12 +48,35 @@ public class CaseTransitionPolicy {
         Map.entry("PATIENT_DECISION", Set.of("ACCEPTED", "DECLINED", "REVISION_REQUESTED", "EXPIRED")),
         Map.entry("REVISION_REQUESTED", Set.of("PROPOSAL_PREPARATION")),
         Map.entry("EXPIRED", Set.of("PROPOSAL_PREPARATION")),
-        Map.entry("ACCEPTED", Set.of("TRAVEL_COORDINATION")),
+        Map.entry("ACCEPTED", Set.of("TRAVEL_COORDINATION", "EXPIRED", "CANCELLED")),
         Map.entry("TRAVEL_COORDINATION", Set.of("ARRIVAL_CONFIRMED", "CANCELLED")),
-        Map.entry("ARRIVAL_CONFIRMED", Set.of("TREATMENT_IN_PROGRESS")),
-        Map.entry("TREATMENT_IN_PROGRESS", Set.of("DISCHARGED")),
-        Map.entry("DISCHARGED", Set.of("FOLLOW_UP")),
-        Map.entry("FOLLOW_UP", Set.of("CLOSED")));
+        Map.entry("ARRIVAL_CONFIRMED", Set.of("TREATMENT_IN_PROGRESS", "CANCELLED")),
+        Map.entry("TREATMENT_IN_PROGRESS", Set.of("DISCHARGED", "CANCELLED")),
+        Map.entry("DISCHARGED", Set.of("FOLLOW_UP", "CLOSED", "CANCELLED")),
+        Map.entry("FOLLOW_UP", Set.of("CLOSED", "CANCELLED")));
+    /** Stages a case never leaves (EXPIRED is not one: it re-enters proposal preparation as a recovery path). */
+    public static final Set<String> TERMINAL = Set.of("CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE");
+    /** Stages where a cancellation is an exit from a committed journey and therefore needs a typed reason. */
+    public static final Set<String> TYPED_CANCELLATION_STAGES = Set.of("ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED",
+            "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP");
+    /** Stages the patient may still withdraw from on their own; after that the coordinator cancels for them. */
+    private static final Set<String> PATIENT_WITHDRAWAL_STAGES = Set.of("ACCEPTED", "TRAVEL_COORDINATION");
+    /** Travel plan statuses past the point of no return: the patient is asked to contact their coordinator instead. */
+    private static final Set<String> TRAVEL_COMMITTED = Set.of("CONFIRMED", "ARRIVED");
+
+    /** The stages the lifecycle knows an exit from (every stage that is not terminal, DRAFT excepted: it is pre-submission). */
+    public static Set<String> stages() { return TRANSITIONS.keySet(); }
+
+    /** The stages one move may reach from {@code stage}; empty for a terminal stage. */
+    public static Set<String> exitsFrom(String stage) { return TRANSITIONS.getOrDefault(stage, Set.of()); }
+
+    /**
+     * The one rule for the patient's own "withdraw" action: allowed after acceptance until travel is confirmed
+     * (readiness/travel plan CONFIRMED or ARRIVED) — from then on it is the coordinator's typed cancellation.
+     */
+    public static boolean patientMayWithdraw(String stage, String travelPlanStatus) {
+        return PATIENT_WITHDRAWAL_STAGES.contains(stage) && (travelPlanStatus == null || !TRAVEL_COMMITTED.contains(travelPlanStatus));
+    }
     /** Forward stages: none may be entered while blocking work is still open on the case. */
     private static final Set<String> ADVANCING = Set.of("CLINICAL_RECOMMENDATION_READY", "PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL",
             "PATIENT_DECISION", "ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED");

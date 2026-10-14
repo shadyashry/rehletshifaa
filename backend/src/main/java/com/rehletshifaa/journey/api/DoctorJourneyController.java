@@ -1,8 +1,8 @@
 package com.rehletshifaa.journey.api;
-import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.PricingCatalogService;import jakarta.validation.Valid;import org.springframework.format.annotation.DateTimeFormat;import org.springframework.web.bind.annotation.*;import java.time.LocalDate;import java.util.*;
+import com.rehletshifaa.journey.application.CaseExitService;import com.rehletshifaa.journey.application.JourneyService;import com.rehletshifaa.journey.application.PricingCatalogService;import jakarta.validation.Valid;import org.springframework.format.annotation.DateTimeFormat;import org.springframework.web.bind.annotation.*;import java.time.LocalDate;import java.util.*;
 import static com.rehletshifaa.journey.api.JourneyDtos.*;
 @RestController @RequestMapping("/api/v1/doctor") public class DoctorJourneyController{
- private final JourneyService service;private final PricingCatalogService pricing;public DoctorJourneyController(JourneyService service,PricingCatalogService pricing){this.service=service;this.pricing=pricing;}
+ private final JourneyService service;private final PricingCatalogService pricing;private final CaseExitService exits;public DoctorJourneyController(JourneyService service,PricingCatalogService pricing,CaseExitService exits){this.service=service;this.pricing=pricing;this.exits=exits;}
  @GetMapping("/me")public DoctorProfileView me(){return service.myDoctorProfile();}
  @GetMapping("/catalog")public List<CatalogServiceView>catalog(){return pricing.myCatalog();}
  @GetMapping("/fx-rates")public List<FxRateView>fxRates(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate date){return pricing.fxRates(date);}
@@ -19,5 +19,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/consent")public IdResponse consent(@PathVariable UUID caseId,@Valid @RequestBody ProcedureConsentRequest request){return service.captureProcedureConsent(caseId,request);}
  @PostMapping("/cases/{caseId}/emergency-override")public IdResponse emergencyOverride(@PathVariable UUID caseId,@Valid @RequestBody EmergencyOverrideRequest request){return service.emergencyOverride(caseId,request);}
  @PostMapping("/cases/{caseId}/treatment-episodes")public IdResponse treatment(@PathVariable UUID caseId,@Valid @RequestBody TreatmentRequest request){return service.treatment(caseId,request);}
+ /** "No follow-up needed" on a discharged patient closes the case (P0-2). */
+ @PostMapping("/cases/{caseId}/follow-ups/not-needed")public IdResponse noFollowUp(@PathVariable UUID caseId,@Valid @RequestBody NoFollowUpRequest request){return exits.closeWithoutFollowUp(caseId,request.note());}
  @PostMapping("/cases/{caseId}/follow-ups")public IdResponse followUp(@PathVariable UUID caseId,@Valid @RequestBody FollowUpRequest request){return service.followUp(caseId,request);}
 }

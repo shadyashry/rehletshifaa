@@ -10,7 +10,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { JourneyPulse, FullJourneyDialog, type TimelineEvent } from "./JourneySnapshot";
 import { CurrentActionPanel, type CurrentActionView } from "./CurrentAction";
 import { CaseBlockers } from "./CaseBlockers";
-import { MoreActions } from "./CoordinatorActions";
+import { CancelCaseDialog, MoreActions } from "./CoordinatorActions";
 import { RoleDashboardSummary } from "./RoleDashboardSummary";
 import { CaseQueue, attentionRank, filterQueue, initialQueue, type QueueCase } from "./CaseQueue";
 import { MyWork, type WorkItem } from "./MyWork";
@@ -201,6 +201,40 @@ describe("MoreActions", () => {
     renderWithWork(<MoreActions locale="en" caseId="c1" version={1} travelPackage={false} busy={false} mutate={vi.fn()}
                         available={[]} onRequestInformation={vi.fn()} onRecordResponse={vi.fn()}/>);
     expect(screen.getByText(/no additional actions/i)).toBeTruthy();
+  });
+
+  it("hands a cancellation to the typed dialog instead of a browser confirm (P0-2)", () => {
+    const mutate = vi.fn().mockResolvedValue({}), onCancelCase = vi.fn();
+    renderWithWork(<MoreActions locale="en" caseId="c1" version={1} travelPackage={false} busy={false} mutate={mutate}
+                        available={["CANCEL_CASE"]} onRequestInformation={vi.fn()} onRecordResponse={vi.fn()} onCancelCase={onCancelCase}/>);
+    fireEvent.click(screen.getByRole("button", { name: /cancel this case/i }));
+    expect(onCancelCase).toHaveBeenCalledTimes(1);
+    expect(mutate).not.toHaveBeenCalled();
+  });
+});
+
+describe("CancelCaseDialog", () => {
+  afterEach(cleanup);
+
+  it("after acceptance it needs a typed reason and sends it with the note through the transition endpoint (P0-2)", async () => {
+    const mutate = vi.fn().mockResolvedValue({}), onClose = vi.fn();
+    renderWithWork(<CancelCaseDialog caseId="c1" version={4} status="TREATMENT_IN_PROGRESS" busy={false} mutate={mutate} onClose={onClose}/>);
+    expect(screen.getAllByRole("radio")).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel case" }));
+    expect(screen.getByRole("alert").textContent).toContain("Choose a reason");
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("radio", { name: "The hospital refused the patient" }));
+    fireEvent.change(screen.getByLabelText(/Note/), { target: { value: "Bed capacity" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel case" }));
+    expect(mutate).toHaveBeenCalledWith("/coordinator/cases/c1/transition", { targetStatus: "CANCELLED", expectedVersion: 4, reason: "Bed capacity", cancellationReason: "HOSPITAL_REFUSED" });
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it("before acceptance the reason is optional", () => {
+    const mutate = vi.fn().mockResolvedValue({});
+    renderWithWork(<CancelCaseDialog caseId="c1" version={2} status="INTAKE_REVIEW" busy={false} mutate={mutate} onClose={vi.fn()}/>);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel case" }));
+    expect(mutate).toHaveBeenCalledWith("/coordinator/cases/c1/transition", { targetStatus: "CANCELLED", expectedVersion: 2, reason: null, cancellationReason: null });
   });
 });
 

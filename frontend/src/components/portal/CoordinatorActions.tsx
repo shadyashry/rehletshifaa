@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
-import { ClipboardList, Handshake, Link2, MessageSquareText, Plane, Send, UserRoundPlus, Users, XCircle } from "lucide-react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { ClipboardList, Handshake, Link2, MessageSquareText, Plane, Send, UserRoundPlus, Users, X, XCircle } from "lucide-react";
 
 import type { Locale } from "@/lib/i18n";
 import { EligibleConsultantPicker, ReferralConfirmation, type Load } from "@/components/portal/ConsultantRouting";
@@ -137,11 +137,13 @@ function TeamAssignment({ locale, caseId, role, staff, busy, mutate }: { locale:
  * "More actions": the state-valid utilities and exceptions the backend listed, one line each, in a drawer.
  * Nothing here is a workflow step, and nothing appears that the backend did not offer for this state.
  */
-export function MoreActions({ locale, caseId, available, travelPackage, version, busy, mutate, onRequestInformation, onRecordResponse, onRecordDecision, onAdministration, proposalVersionId }: {
+export function MoreActions({ locale, caseId, available, travelPackage, version, busy, mutate, onRequestInformation, onRecordResponse, onRecordDecision, onAdministration, onCancelCase, proposalVersionId }: {
   locale: Locale; caseId: string; available: string[]; travelPackage: boolean; version: number; busy: boolean; mutate: Mutate;
   onRequestInformation: () => void; onRecordResponse: () => void; onAdministration?: () => void; proposalVersionId?: string;
   /** The patient decided on a call (Arabic assisted path) and nobody asked through the page first. */
   onRecordDecision?: () => void;
+  /** Opens the cancellation dialog (typed reason after acceptance, P0-2); without it the browser confirm stands in. */
+  onCancelCase?: () => void;
 }) {
   const ar = locale === "ar";
   const work = useWorkCopy();
@@ -157,7 +159,7 @@ export function MoreActions({ locale, caseId, available, travelPackage, version,
   if (has("MOVE_TO_INTAKE_REVIEW")) items.push({ code: "MOVE_TO_INTAKE_REVIEW", icon: <UserRoundPlus size={16} aria-hidden/>, label: ar ? "العودة إلى مراجعة الاستقبال" : "Move back to intake review", hint: ar ? "دون انتظار رد المريض." : "Without waiting for the patient's reply.", onClick: () => void mutate(`/coordinator/cases/${caseId}/transition`, { targetStatus: "INTAKE_REVIEW", expectedVersion: version }) });
   if (has("SET_TRAVEL_PACKAGE")) items.push({ code: "SET_TRAVEL_PACKAGE", icon: <Plane size={16} aria-hidden/>, label: travelPackage ? (ar ? "إلغاء باقة السفر المتكاملة" : "Turn off the full travel package") : (ar ? "تفعيل باقة السفر المتكاملة" : "Turn on the full travel package"), hint: ar ? "تشمل الطيران والتأشيرة والإقامة والوصول؛ عند التفعيل يُشرَك فريق العمليات قبل إرسال العرض." : "Flight, visa, accommodation and arrival; when on, Operations prepares the plan before the proposal is sent.", onClick: () => void mutate(`/coordinator/cases/${caseId}/travel-package`, { requested: !travelPackage }, "PUT") });
   if (onAdministration) items.push({ code: "ADMINISTRATION", icon: <Users size={16} aria-hidden/>, label: ar ? "نقل ملكية الحالة" : "Transfer case ownership", hint: ar ? "سلّم هذه الحالة إلى منسق آخر في فريقك." : "Hand this case to another coordinator on your team.", onClick: onAdministration });
-  if (has("CANCEL_CASE")) items.push({ code: "CANCEL_CASE", tone: "danger", icon: <XCircle size={16} aria-hidden/>, label: ar ? "إلغاء الحالة" : "Cancel case", hint: ar ? "إجراء نهائي." : "This cannot be undone.", onClick: () => { if (window.confirm(ar ? "هل تريد إلغاء الحالة؟" : "Cancel this case?")) void mutate(`/coordinator/cases/${caseId}/transition`, { targetStatus: "CANCELLED", expectedVersion: version }); } });
+  if (has("CANCEL_CASE")) items.push({ code: "CANCEL_CASE", tone: "danger", icon: <XCircle size={16} aria-hidden/>, label: work.cancelCase.title, hint: work.cancelCase.hint, onClick: () => { if (onCancelCase) onCancelCase(); else if (window.confirm(ar ? "هل تريد إلغاء الحالة؟" : "Cancel this case?")) void mutate(`/coordinator/cases/${caseId}/transition`, { targetStatus: "CANCELLED", expectedVersion: version }); } });
 
   if (!items.length) return <p className="text-sm text-ink-500">{ar ? "لا توجد إجراءات إضافية متاحة في هذه المرحلة." : "No additional actions are available at this stage."}</p>;
   return <ul className="divide-y divide-line">
@@ -174,6 +176,72 @@ export function MoreActions({ locale, caseId, available, travelPackage, version,
       </li>
     ))}
   </ul>;
+}
+
+/** Stages where a cancellation leaves a committed journey and so carries a typed reason (mirrors CaseTransitionPolicy.TYPED_CANCELLATION_STAGES). */
+export const TYPED_CANCELLATION_STAGES = new Set(["ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP"]);
+const CANCELLATION_REASONS = ["PATIENT_WITHDREW", "HOSPITAL_REFUSED", "MEDICAL_CONTRAINDICATION", "PATIENT_DECEASED", "NO_SHOW"] as const;
+
+/**
+ * The coordinator's cancellation (P0-2): after acceptance the lifecycle needs a typed reason, kept beside the status
+ * history so a cancelled case says why; before acceptance the reason is optional and the note alone is history enough.
+ * One dialog, one submit, the transition endpoint — the backend refuses a typed stage without a reason too.
+ */
+export function CancelCaseDialog({ caseId, version, status, busy, mutate, onClose }: {
+  caseId: string; version: number; status: string; busy: boolean; mutate: Mutate; onClose: () => void;
+}) {
+  const t = useWorkCopy().cancelCase;
+  const typed = TYPED_CANCELLATION_STAGES.has(status);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const id = useId();
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const [touched, setTouched] = useState(false);
+  useEffect(() => { dialog.current?.showModal(); }, []);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (typed && !reason) { setTouched(true); return; }
+    void mutate(`/coordinator/cases/${caseId}/transition`, { targetStatus: "CANCELLED", expectedVersion: version, reason: note.trim() || null, cancellationReason: reason || null })
+      .then(result => { if (result) dialog.current?.close(); });
+  }
+
+  return (
+    <dialog ref={dialog} className="account-dialog" aria-labelledby={`${id}-title`} onClose={onClose}>
+      <div className="flex items-start justify-between gap-4">
+        <h2 id={`${id}-title`} className="title">{t.title}</h2>
+        <button type="button" className="icon-button" aria-label={t.keep} onClick={() => dialog.current?.close()}><X size={20}/></button>
+      </div>
+      <p className="mt-2 text-[0.9rem] leading-6 text-ink-600">{t.hint}</p>
+      <form className="mt-5 space-y-5" onSubmit={submit} noValidate>
+        <fieldset aria-describedby={touched && !reason ? `${id}-required` : undefined}>
+          <legend className="text-[0.8rem] font-bold text-ink-800">
+            {t.reasonLabel}{typed && <><span aria-hidden className="ms-1 text-alert-600">*</span><span className="sr-only"> (required)</span></>}
+          </legend>
+          <ul className="mt-2.5 space-y-2">
+            {CANCELLATION_REASONS.map(code => (
+              <li key={code}>
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[0.9375rem] text-ink-800">
+                  <input type="radio" name={`${id}-reason`} value={code} checked={reason === code} onChange={() => setReason(code)} className="h-4 w-4 accent-brand-700"/>
+                  {t.reasons[code]}
+                </label>
+              </li>
+            ))}
+          </ul>
+          {touched && !reason && <p id={`${id}-required`} role="alert" className="mt-2 text-[0.85rem] font-semibold text-alert-700">{t.reasonRequired}</p>}
+        </fieldset>
+        <div>
+          <label htmlFor={`${id}-note`} className="text-[0.8rem] font-bold text-ink-800">{t.noteLabel}</label>
+          <p className="mt-0.5 text-[0.8rem] text-ink-500">{t.noteHint}</p>
+          <textarea id={`${id}-note`} className="field mt-2 min-h-24" maxLength={1000} value={note} onChange={event => setNote(event.target.value)}/>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button type="button" className="btn-secondary" onClick={() => dialog.current?.close()}>{t.keep}</button>
+          <button type="submit" className="btn-primary bg-alert-700 hover:bg-alert-800" disabled={busy}>{t.confirm}</button>
+        </div>
+      </form>
+    </dialog>
+  );
 }
 
 function submit(event: FormEvent<HTMLFormElement>, action: (data: FormData) => Promise<unknown>) {
