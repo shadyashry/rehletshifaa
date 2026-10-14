@@ -492,6 +492,77 @@ phases.
   `docker-compose.observability.yml`; alert rules; ShedLock on all 16 `@Scheduled` jobs; verify `SKIP LOCKED` claiming
   in outbox, identity-operation and inbound stores.
 - Sessions: 2. Model: Opus 5.5 fast, medium (ShedLock verification: Fable high, 1 short session).
+- **Status (2026-10-14, session 1 of 2, branch `feat/review-p0`):** delivered (Opus 5.5, normal mode).
+  - Owner decision at the start (one question): scheduler leadership through an in-house JPA lease table instead of ShedLock
+    (session 2, no new dependency), and no downloads now: the meters ship on micrometer-core; `micrometer-registry-prometheus`,
+    Prometheus and Grafana come later with the owner's OK. Lead-session correction during the session: the meters are not
+    served on the main port behind a token but on a separate internal port that only the Docker network reaches, so a future
+    Prometheus scrapes without tokens (built that way; the first token-gated version was removed before commit). Later the owner
+    approved one online fetch of `micrometer-registry-prometheus` (Boot 3.5.10 BOM version) and the `prom/prometheus` and
+    `grafana/grafana` pulls, and chose in this session to commit session 1 first and do the fetch in session 2.
+  - Delivered: `shared.metrics` (`CachedSnapshot`: a gauge source read at most once per time-to-live, capped at 60 s;
+    `GroupedGauges`: gauges over one grouped JPQL read, one series per low-cardinality tag set, registered the first time a
+    read sees it and kept at 0 when its rows are gone; `AfterCommit`: business counters count only committed work). One meter
+    class per module. `JourneyMetrics` (journey): `work.open.items`, `work.open.oldest.age` (seconds), `work.open.high` (HIGH or
+    URGENT), `work.open.overdue` (past the SLA due date, so overdue = older than the queue's working-day level) per `queue`
+    (work item type) and `team` (owning role), untagged `work.open.total`, from `CaseTaskRepository.summarizeOpenInternalWork`;
+    deposit verification age is `work.open.oldest.age{queue=DEPOSIT_RECORD}`; `journey.proposal.time.to.release{revision}`
+    (submitted to preliminary proposal released, recorded in `JourneyService.releaseProposal`);
+    `journey.consultant.offer.expired` (`ConsultantOfferExpiryService`); `journey.information.request.closed{outcome=case_cancelled|withdrawn}`
+    (`InformationRequestReminders`). `NotificationMetrics` (notification; workflow-builder subagent, reviewed):
+    `notification.outbox.dead.letters`, `.retrying`, `.pending`, `.oldest.pending.age` per `channel`, untagged
+    `notification.outbox.dead.letters.total`, from `QueuedNotificationRepository.summarizeByChannel`; the existing
+    `notification.delivery{channel,outcome}` counter keeps counting retries and dead letters as events. Review fix:
+    `cancelQueued` (superseded proposal resends) now marks `last_error_code = SUPERSEDED` and those rows are not counted as
+    dead letters, so the dead-letter alert means a delivery failure. `ConversationMetrics` (conversation; workflow-builder
+    subagent, reviewed): `conversation.reply.timer.breach{conversation=case|intake, step=lead|managers}`, once per escalation in
+    `ReplyTimerService.dispatch` (tag renamed from `channel` in review: an obligation does not record the transport).
+    Exposure: `management.endpoints.web.exposure.include: health,metrics`; new `security.MetricsPort` adds a second Tomcat
+    connector on `app.management.metrics-port` (`METRICS_PORT`, default 8090; 0 turns it off). `SecurityConfig` grants
+    `/actuator/metrics/**` only on that port, so the main port (8080) serves health and refuses the meters to everyone, a System
+    Administrator included; a filter answers 404 to anything but the meters on the metrics port, so it is no second way into the
+    API. Compose publishes only 8080 for the backend, and neither the gateway (health only) nor the tunnel routes to 8090. Alert rules as code:
+    `infrastructure/observability/alerts.md` (mechanical-worker subagent, reviewed): 10 rules in one YAML block with thresholds
+    from `SlaPolicy` where one exists (deposit verification overdue = 1 working day, every SLA queue overdue, any outbox dead
+    letter in 15 min, outbox stuck 15 min, reply breaches in 15 min, offers expiring, information-request cancellations,
+    proposal slower than the summed stage levels), checked against the actuator until a Prometheus registry exists. No migration.
+  - Tests: new `JourneyMetricsTest` (3: every journey meter registered with its tags; queue gauges follow open work only after
+    the 60 s snapshot and stay at 0 when the work closes; counters and the proposal timer count only what committed),
+    `NotificationMetricsTest` (2: total registered; per-channel dead letters, retrying, pending and oldest age through the
+    snapshot, superseded resends excluded), `MetricsPortTest` (3: the main port serves health and refuses `/actuator/metrics` and a meter
+    to an anonymous call and to a System Administrator with a passkey; the metrics port serves both without a token and answers
+    404 to the API, health and api-docs; env, beans, prometheus, loggers and heapdump not exposed on either port); `ReplyTimerIntegrationTest` gains the breach count per tag set and a
+    committed-only counter test. The test `application.yml` (which shadows the main one) exposes the same endpoints.
+    Verification: `mvn -o -q test` 820 tests, 0 failures, 3 pre-existing skips (811 at 7d0bbd4 + 9 new). No migration, so no
+    PostgreSQL proof was needed.
+  - Scheduler split for session 2 (lead-session correction, checked in the code; there are 22 `@Scheduled` methods, not 21):
+    claim-based workers stay unleased because every instance may run them, each taking different rows under a row lock / SKIP
+    LOCKED: `NotificationOutboxProcessor.dispatch`, `WhatsAppInboundProcessor.dispatch`, `IdentityOperationProcessor.dispatch`,
+    `ReplyTimerService.dispatch` (`ReplyObligationRepository.lockDue`) and `ReplyTimerService.closeIdle`
+    (`IntakeConversationRepository.lockIdle`). The other 17 sweeps take the lease: `AccessHygieneService.runRecertificationSchedule`
+    and `.disableDormantAccounts`, `StaffLifecycleService.expireInvitations`, `IntakeConversationService.releaseDepartedOwners`,
+    `CoordinatorDepartureService.releaseDepartedOwners`, `CoordinationQueueRetry.retry`,
+    `FacilityAccreditationExpiryService.expireAccreditations`, `IdentityReconciliationService.scheduled`,
+    `ConsultantOfferExpiryService.expireOffers`, `CredentialExpiryService.expireCredentials`, `DepositPaymentReminders.sweep`,
+    `InformationRequestReminders.sweep`, `PoolWorkDepartureService.releaseDepartedOwners`,
+    `ProposalExpiryService.expireReleasedProposals`, `StaffWorkService.raiseWorkDueSoon`, `PiiKeyRotationService.rotate`. Session 2
+    re-checks each before wrapping it. The lease time comes from the database clock (JPQL `current_timestamp`), not the instance clock.
+  - Open gaps: Prometheus cannot scrape yet (no registry); when it comes, it scrapes `backend:8090` on the Docker network.
+    Anything on that network can read the meters (counts and ages only, no case or person data). Dead letters are never archived, so the level only grows
+    and alerts read its increase. Identity review has no work item, so no queue series. `work.open.*` covers internal staff work
+    only, not patient actions. The 60 s cache is per backend instance. HIGH backlog, outbox retrying and offer-expiry thresholds
+    are starting values to tune with a month of data.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (worktree branch `claude/p1-8-metrics-0fba3f`);
+    then P1-8 session 2 in a new session: V95 `scheduler_leases` (name PK, owner instance id, `locked_until`, `locked_at`, TIMESTAMP
+    WITH TIME ZONE) taken with a guarded JPQL update on the database clock and wrapped around the 17 sweeps above (not the 5
+    claim-based workers) by one aspect or helper (the lead session's lease design is in the shared notes folder,
+    `p1-8-lease-design.md`: one guarded update on the database clock, per-job max and min hold, release stamps success or
+    failure, per-job timer, failure counter and last-success gauge; first alert: a job's last success older than twice its
+    cadence; the lead lists only the three queue workers as unleased, so decide the two reply-timer jobs), the approved
+    Prometheus fetch (`/actuator/prometheus` on port 8090 only, the alerts as a Prometheus rules file, Prometheus and Grafana in
+    `docker-compose.observability.yml`, Grafana bound to localhost), the
+    Grafana dashboard JSON (mechanical-worker, exact meter names from `alerts.md`), then the short Fable 5.1 high verification
+    session for the lease and the row-lock claiming stores.
 
 ### P1-9  Backups and restore drill  (E-09)
 - Managed Postgres PITR settings documented and scripted for the chosen host; versioned S3 with cross-region copy;
@@ -633,10 +704,17 @@ export on demand (C-07); region-per-market deployment (E-10); video consultation
 
 ---
 
+<<<<<<< HEAD
 ## Remaining work (as of 2026-10-14, after P1-6; re-prioritised with the post-deposit design and the UX review)
 
 Delivered on `feat/review-p0` (pushed at `69329b8`; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped), P0-5,
 P1-6, and the P1-8 kickoff prompt. Everything below is still to do.
+=======
+## Remaining work (as of 2026-10-14, after P1-8 session 1)
+
+Delivered on `feat/review-p0` (local, not pushed; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped), P0-5, P1-6, P1-8 session 1 (meters, internal metrics port, alert rules).
+Everything below is still to do, in the recommended order.
+>>>>>>> 5919bf1
 
 **Why the order changed.** The owner's two priorities are (1) a complete, auditable journey after the deposit —
 today nothing collects, proves or reconciles money after the 15%, and the Consultant's hospital deal is invisible —
@@ -649,6 +727,7 @@ drill (P1-9) stay launch blockers that do not shape the product.
 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
+<<<<<<< HEAD
 | 1 | P1-8 Metrics, alerts, scheduler leadership | 2 + 1 short | Opus 5.5, medium; ShedLock check Fable high | Prompt block written (`69329b8`); ShedLock now covers 19 `@Scheduled` jobs |
 | 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: D-A (platform fee line), guarantee wording, final-quote validity; counsel on the VAT rate of the fee |
 | 3 | **P1-20 Public site trust pass** (parallel track) | 3 | Fable (shape, hero), Opus (form, cards), Sonnet (copy) | Owner reads the UX review; shape-plan gate |
@@ -669,6 +748,18 @@ drill (P1-9) stay launch blockers that do not shape the product.
 
 Decision D-I (PDPL licence application; liability-fund subscription as a Consultant credential) is not a phase: start
 the licence now; the credential type is a one-line addition in P1-19.
+=======
+| 1 | P1-8 Metrics, alerts, scheduler leadership | session 1 done; session 2 + 1 short left | Opus 5.5, medium; lease check Fable high | Session 2: JPA lease table (V95, owner chose it over ShedLock, database clock) on the 17 sweep jobs, not the 5 claim-based workers; Grafana dashboard JSON; Prometheus registry and images only with the owner's OK |
+| 2 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide the retention of plaintext WhatsApp sender digits (carried from P0-1) |
+| 3 | P1-10 Commercial truth on the proposal | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: guarantee wording and final-quote validity |
+| 4 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-10, so the extracted code is final |
+| 5 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths reviewed by Fable | Owner: payer terms and partner commission |
+| 6 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — |
+| 7 | P1-9 Backups and restore drill | 1–2 | Opus 5.5, medium | — |
+| 8 | P1-14 Consultant public profiles | 1 | Sonnet 5.5; Impeccable pass by Fable | — |
+| 9 | P2-15 … P2-26 | about 20 | per the P2 table | P2-15 needs the second-destination timing decision |
+| 10 | P3 backlog | one each | Sonnet or Opus | — |
+>>>>>>> 5919bf1
 
 ### Owner decisions still open
 
@@ -681,6 +772,7 @@ the licence now; the credential type is a one-line addition in P1-19.
 - [ ] P2-15: when a second destination is added.
 - [ ] Legal review of the patient refund copy (F2); the refund rule itself is decided (P0-4).
 - [ ] Whether a case cancelled for an unanswered information request gets a reopen path (P1-6; today the patient sends it again).
+- [x] P1-8: one online fetch of `micrometer-registry-prometheus` and the Prometheus/Grafana images, approved by the owner (2026-10-14); the fetch itself runs in P1-8 session 2.
 
 ### Before production (from delivered phases)
 
@@ -696,6 +788,7 @@ the licence now; the credential type is a one-line addition in P1-19.
 - [ ] P0-3: set urgency inside the intake form; show the previous reason in the urgency dialog; sort and badge queue cards and the team queue by urgency; a Send my case unit test for the emergency notice.
 - [ ] P0-4: vetted agent list for agent cash (comes with the partner entity in P1-12); card payments through the DEP-2 adapter.
 - [ ] P0-5: notify Consultant Operations when an accreditation lapses; store accreditation evidence documents; stamp `Facility.updated_at` from the expiry job; a dev-seed facility in `LocalDemoDataSeeder`; facility name on the patient proposal; patient-facing travel view.
+- [ ] P1-8: archive or acknowledge dead letters so the level can fall; tune the starting alert thresholds after a month of data.
 - [ ] P1-6: an identity-review work item, so its 2-day level becomes a due date and a patient window; deadlines on referral offers; the offer deadline on queue cards (`CaseQueue.tsx`); email the consultant when an offer expires; an availability penalty after repeated expiry; escalate to the Finance Manager on an SLA breach (A-04); a window in the status link's deposit phase while Finance checks a transfer.
 
 ## Order of sessions (recommended, revised 2026-10-14)

@@ -402,4 +402,16 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
             and (t.ownerSubject is null or t.ownerSubject = :previous)""")
     int handOverCoordinatorWork(@Param("caseId") UUID caseId, @Param("owner") String owner, @Param("previous") String previous,
                                 @Param("now") Instant now);
+
+    interface OpenWorkQueueRow { String getQueue(); String getTeam(); long getOpen(); Instant getOldest(); long getHigh(); long getOverdue(); }
+
+    /** P1-8: open internal work per queue (type) and team (owning role): how many, the oldest, how many HIGH or URGENT, how many overdue. */
+    @Query("""
+            select t.taskType as queue, t.ownerRole as team, count(t) as open, min(t.createdAt) as oldest,
+                sum(case when t.priority in ('HIGH', 'URGENT') then 1 else 0 end) as high,
+                sum(case when t.dueAt is not null and t.dueAt < :now then 1 else 0 end) as overdue
+            from CaseTask t
+            where t.visibilityScope = 'INTERNAL' and t.status in ('OPEN', 'IN_PROGRESS')
+            group by t.taskType, t.ownerRole""")
+    java.util.List<OpenWorkQueueRow> summarizeOpenInternalWork(@Param("now") Instant now);
 }

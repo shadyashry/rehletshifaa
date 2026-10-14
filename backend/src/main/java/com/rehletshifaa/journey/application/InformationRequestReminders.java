@@ -58,19 +58,20 @@ public class InformationRequestReminders {
     private final CaseExitService exits;
     private final AuditTrail auditTrail;
     private final Clock clock;
+    private final JourneyMetrics metrics;
     private final TransactionTemplate perCase;
     private final int firstReminderDay, secondReminderDay, alertDay, cancelDay;
 
     public InformationRequestReminders(CaseTaskRepository tasks, MedicalCaseRepository cases, CaseAssignmentRepository assignments,
                                        PublicCaseAccessService publicCases, DepositPaymentNotices notices, StaffWorkService work,
-                                       CaseExitService exits, AuditTrail auditTrail, Clock clock, PlatformTransactionManager transactions,
+                                       CaseExitService exits, AuditTrail auditTrail, Clock clock, PlatformTransactionManager transactions, JourneyMetrics metrics,
                                        @Value("${app.sla.information-reminder-days:2,5}") int[] reminderDays,
                                        @Value("${app.sla.information-alert-day:7}") int alertDay,
                                        @Value("${app.sla.information-cancel-days:30}") int cancelDay) {
         if (reminderDays.length != 2 || reminderDays[0] < 1 || reminderDays[1] <= reminderDays[0] || alertDay <= reminderDays[1] || cancelDay <= alertDay)
             throw new IllegalArgumentException("app.sla.information-* must be two reminder days, then a later alert day, then a later cancel day");
         this.tasks = tasks; this.cases = cases; this.assignments = assignments; this.publicCases = publicCases; this.notices = notices;
-        this.work = work; this.exits = exits; this.auditTrail = auditTrail; this.clock = clock;
+        this.work = work; this.exits = exits; this.auditTrail = auditTrail; this.clock = clock; this.metrics = metrics;
         this.firstReminderDay = reminderDays[0]; this.secondReminderDay = reminderDays[1]; this.alertDay = alertDay; this.cancelDay = cancelDay;
         this.perCase = new TransactionTemplate(transactions);
         this.perCase.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -126,6 +127,7 @@ public class InformationRequestReminders {
             work.notifyStaff(coordinator, caseId, null, "CASE_CANCELLED_NO_INFORMATION", "The case was cancelled — the patient did not answer",
                     "The information request went unanswered for " + cancelDay + " days. The patient was told they can send their case again.",
                     "info-cancelled:" + taskId, true, WorkCopy.of("CASE_CANCELLED_NO_INFORMATION", "days", String.valueOf(cancelDay)));
+            metrics.informationRequestClosed("case_cancelled");
             return "CANCELLED";
         }
         if (tasks.cancelPatientAction(taskId, "No answer within " + cancelDay + " days", micros(now)) != 1) return "NONE";
@@ -135,6 +137,7 @@ public class InformationRequestReminders {
                 "info-withdrawn:" + taskId, true, WorkCopy.of("INFO_REQUEST_CLOSED", "days", String.valueOf(cancelDay)));
         audit(caseId, "INFORMATION_REQUEST_WITHDRAWN", taskId, "Unanswered for " + cancelDay + " days");
         work.changed(caseId);
+        metrics.informationRequestClosed("withdrawn");
         return "WITHDRAWN";
     }
 
