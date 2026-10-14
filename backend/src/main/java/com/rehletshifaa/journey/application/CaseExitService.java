@@ -36,8 +36,10 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  *       the case expires and may be re-prepared later like any expired estimate.</li>
  *   <li>{@link #closeWithoutFollowUp}: the Consultant records that the discharged patient needs no follow-up.</li>
  * </ul>
- * Every exit cancels all open work on the case (staff items and patient actions), clears who the case waits on,
- * and is audited. Money is left where it is: refunds of a deposit already received are Finance's rule (P0-4).
+ * Every exit cancels the open work on the case (staff items and patient actions; a governance review such as the
+ * emergency-override review survives, see {@link StaffWorkService#SURVIVES_EXIT}), clears who the case waits on, and is
+ * audited. The exit's note lives only in the encrypted exit row: history and audit carry the typed reason alone.
+ * Money is left where it is: refunds of a deposit already received are Finance's rule (P0-4).
  */
 @Service
 public class CaseExitService {
@@ -47,7 +49,7 @@ public class CaseExitService {
     private final CaseExitReasonRepository exits;
     private final TravelPlanRepository travelPlans;
     private final DepositRepository deposits;
-    private final DepositQueryService depositQueries;
+    private final PaymentService payment;
     private final DepositTransferService transfers;
     private final CaseTransitionPolicy policy;
     private final StaffWorkService work;
@@ -55,10 +57,10 @@ public class CaseExitService {
     private final Clock clock;
 
     public CaseExitService(Authority authority, MedicalCaseRepository cases, CaseStatusLog statusLog, CaseExitReasonRepository exits,
-                           TravelPlanRepository travelPlans, DepositRepository deposits, DepositQueryService depositQueries,
+                           TravelPlanRepository travelPlans, DepositRepository deposits, PaymentService payment,
                            DepositTransferService transfers, CaseTransitionPolicy policy, StaffWorkService work, AuditTrail auditTrail, Clock clock) {
         this.authority = authority; this.cases = cases; this.statusLog = statusLog; this.exits = exits; this.travelPlans = travelPlans;
-        this.deposits = deposits; this.depositQueries = depositQueries; this.transfers = transfers; this.policy = policy; this.work = work;
+        this.deposits = deposits; this.payment = payment; this.transfers = transfers; this.policy = policy; this.work = work;
         this.auditTrail = auditTrail; this.clock = clock;
     }
 
@@ -104,8 +106,9 @@ public class CaseExitService {
 
     /**
      * The deposit reminder cycle ended unpaid: an ACCEPTED case whose deposit is still open, with no transfer reference
-     * waiting for Finance, expires. A deposit nothing was received against is cancelled so a later re-preparation
-     * raises a fresh one; a part-paid deposit is left for Finance. Quietly a no-op when the facts moved on.
+     * waiting for Finance, expires. A deposit nothing was received against is cancelled by {@link PaymentService} so a
+     * later re-preparation raises a fresh one; a part-paid deposit is left for Finance. Quietly a no-op when the facts
+     * moved on.
      *
      * @return true when the case expired now
      */
@@ -113,8 +116,7 @@ public class CaseExitService {
     public boolean expireUnpaidDeposit(UUID caseId) {
         State current = state(caseId);
         if (!"ACCEPTED".equals(current.status()) || !deposits.isOpenOn(caseId) || !transfers.patientOwesReference(caseId)) return false;
-        DepositRepository.Quoted deposit = depositQueries.openDeposit(caseId);
-        if (deposit != null && "REQUESTED".equals(deposit.getStatus())) deposits.settleAs(deposit.getId(), "CANCELLED");
+        payment.cancelUnpaidDeposit(caseId);
         exit(caseId, current, "EXPIRED", Reason.DEPOSIT_UNPAID, null, "SYSTEM", "SYSTEM");
         return true;
     }
@@ -124,14 +126,16 @@ public class CaseExitService {
         Instant now = clock.instant();
         int changed = cases.moveStatusAtVersion(caseId, current.version(), CaseStatus.valueOf(target), micros(now));
         if (changed != 1) throw new ApiException(409, "CASE_VERSION_CONFLICT", "The case was updated by another user");
-        String history = reason == null ? note : (note == null || note.isBlank() ? reason.name() : reason.name() + ": " + note);
+        // A typed exit's note may hold clinical detail: it is stored encrypted on the exit row only. Before acceptance the
+        // free-text reason is the coordinator's history line, as it always was.
+        String history = reason == null ? note : reason.name();
         statusLog.record(caseId, current.status(), target, actorSubject, actorLabel, history, now);
         auditTrail.event("CASE_STATUS_CHANGED").actor(actorSubject, actorLabel).caseId(caseId).entity("MedicalCase", caseId)
                 .action("TRANSITION").outcome("SUCCESS").reason(history).record();
         if (reason != null) {
             CaseExitReason recorded = exits.saveAndFlush(new CaseExitReason(caseId, current.status(), target, reason, note, actorSubject, actorLabel, now));
             auditTrail.event("CASE_EXIT_RECORDED").actor(actorSubject, actorLabel).caseId(caseId).entity("CaseExitReason", recorded.getId())
-                    .action(reason.name()).outcome("SUCCESS").reason(note).record();
+                    .action(reason.name()).outcome("SUCCESS").record();
         }
         work.closeOpenWork(caseId, "The case left its journey (" + target + (reason == null ? "" : ": " + reason.name()) + ")");
         work.refreshWaitingOn(caseId, StaffWorkService.stageDefault(target), null);

@@ -137,16 +137,20 @@ public class StaffWorkService {
         return closed;
     }
 
+    /** Work that outlives the case's journey: a governance review of what was done is owed whatever became of the case. */
+    public static final java.util.Set<String> SURVIVES_EXIT = java.util.Set.of("EMERGENCY_OVERRIDE_REVIEW");
+
     /**
      * The case left its journey (cancelled, withdrawn, expired unpaid, closed): nothing on it is owed any more, so every
-     * open item — staff work and patient actions alike — is cancelled with the reason. Idempotent; announces nothing
-     * (the exit itself announces the change, and {@link CaseActionService#syncStageWork} calls this on a closed case).
+     * open item — staff work and patient actions alike, except {@link #SURVIVES_EXIT} — is cancelled with the reason.
+     * Called once, by the exit itself ({@link CaseExitService}); work opened on an ended case afterwards (a refund, a
+     * review) is deliberately left alone. Idempotent; announces nothing.
      *
      * @return how many items were cancelled
      */
     @Transactional
     public int closeOpenWork(UUID caseId, String reason) {
-        return tasks.cancelOpenOnCase(caseId, reason, micros(clock.instant()));
+        return tasks.cancelOpenOnCase(caseId, SURVIVES_EXIT, reason, micros(clock.instant()));
     }
 
     /**

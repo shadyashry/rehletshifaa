@@ -84,8 +84,10 @@ phases.
     received against is cancelled so a re-prepared estimate raises a fresh one), and the Consultant's "no follow-up
     needed" (`POST /doctor/cases/{id}/follow-ups/not-needed`). Every exit writes `case_status_history`, two audit events
     (`CASE_STATUS_CHANGED`, `CASE_EXIT_RECORDED`), a `case_exit_reasons` row (`V87__case_exit_reasons.sql`; note stored
-    encrypted), cancels every open task on the case (`StaffWorkService.closeOpenWork`, also run by `syncStageWork` on
-    CLOSED/CANCELLED), and resets `waiting_on` to NONE. `CaseActionService` returns `NONE` with `CurrentActionView.exit`
+    encrypted; history and audit carry the typed reason only), cancels every open task on the case once, at the exit
+    (`StaffWorkService.closeOpenWork`; `EMERGENCY_OVERRIDE_REVIEW` survives, and work opened on an ended case afterwards,
+    such as a refund, is left alone), and resets `waiting_on` to NONE. The unpaid deposit is cancelled by
+    `PaymentService.cancelUnpaidDeposit` (audited `DEPOSIT_CANCELLED`), never by the exit service directly. `CaseActionService` returns `NONE` with `CurrentActionView.exit`
     (WITHDRAWN / CANCELLED / EXPIRED / COMPLETED / CLOSED) and offers `WITHDRAW` to the patient and `CANCEL_CASE` to the
     coordinator in the typed stages; Consultants still never cancel a whole case. Frontend: `CancelCaseDialog`
     (typed reason + encrypted note) behind More actions in `StaffCaseView`, one quiet withdraw line with a confirm dialog in
@@ -100,8 +102,10 @@ phases.
     P0-4); the patient gets no notification on expiry (the coordinator does; a patient template needs the notification
     copy pass); the Consultant has no UI for "no follow-up needed" or for follow-up plans at all (backend only, as
     before); a case re-opened from a deposit expiry keeps its cancelled deposit history and relies on the coordinator
-    re-preparing the estimate; `EMERGENCY_OVERRIDE_REVIEW` tasks are closed with the rest of the case's work on an exit
-    (decide whether governance reviews should survive a cancellation).
+    re-preparing the estimate. A `/code-review high` pass on the diff found nine issues (note leaked plaintext into
+    history/audit, column overflow, post-exit work swept, governance reviews closed, deposit status written around
+    PaymentService, eager travel-plan read, two sources for the expiry word, dead confirm fallback, untested part-paid
+    expiry); all nine are fixed in the follow-up commit.
   - Next exact action: P0-3 (clinical urgency and emergency guidance) in a new session from its prompt block, Opus 5.5
     fast, after fast-forwarding `feat/review-p0` to this commit and rebuilding the dev stack so V87 runs.
 

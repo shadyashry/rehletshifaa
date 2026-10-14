@@ -641,6 +641,7 @@ class CoordinatorCaseActionsTest {
         assertThat(status(ctx.caseId)).isEqualTo("EXPIRED");
         assertThat(count("SELECT count(*) FROM case_exit_reasons WHERE case_id=? AND to_status='EXPIRED' AND reason='DEPOSIT_UNPAID'", ctx.caseId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT status FROM deposits WHERE id=?", String.class, depositId)).as("nothing received: cancelled").isEqualTo("CANCELLED");
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='DEPOSIT_CANCELLED'", ctx.caseId)).as("the deposit's own writer audited it").isEqualTo(1);
         assertThat(count("SELECT count(*) FROM staff_notifications WHERE recipient_subject=? AND event_type='CASE_EXPIRED_UNPAID'", "coordinator-subject")).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM case_status_history WHERE case_id=? AND from_status='ACCEPTED' AND to_status='EXPIRED'", ctx.caseId)).isEqualTo(1);
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS')", ctx.caseId)).as("no open work left").isZero();
@@ -654,6 +655,27 @@ class CoordinatorCaseActionsTest {
         assertThat(current.code()).isEqualTo("NONE");
         assertThat(current.exit()).isEqualTo("EXPIRED");
         SecurityContextHolder.clearContext();
+    }
+
+    /** P0-2: a part-paid deposit also expires the case when the balance goes unpaid, but the money received stays on record for Finance. */
+    @Test void aPartPaidDepositExpiresTheCaseButKeepsItsLedger() throws Exception {
+        var ctx = acknowledged();
+        activation.activate(ctx.token, grant(ctx), request("+254700000020")); em.flush(); finishAccountSetup(ctx.caseId);
+        raw("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                UUID.randomUUID(), ctx.caseId, "finance-subject", "FINANCE", "PRIMARY", "ACTIVE", "Commercial terms", "coordinator-subject", Instant.now(), Instant.now());
+        submitReference(ctx.caseId, "FT-PART-2");
+        UUID depositId = jdbc.queryForObject("SELECT id FROM deposits WHERE case_id=?", UUID.class, ctx.caseId);
+        authenticate("finance-subject", Role.FINANCE);
+        com.rehletshifaa.journey.DepositTestData.settle(jdbc, payment, ctx.caseId, depositId, new BigDecimal("1.00"), "part-" + ctx.caseId); em.flush();
+        SecurityContextHolder.clearContext();
+        assertThat(jdbc.queryForObject("SELECT status FROM deposits WHERE id=?", String.class, depositId)).isEqualTo("PARTIALLY_PAID");
+
+        raw("UPDATE deposits SET payable_at=? WHERE id=?", Instant.now().minus(java.time.Duration.ofDays(18)).minusSeconds(60), depositId);
+        assertThat(reminders.evaluate(ctx.caseId)).isEqualTo("EXPIRED");
+        assertThat(status(ctx.caseId)).isEqualTo("EXPIRED");
+        assertThat(count("SELECT count(*) FROM case_exit_reasons WHERE case_id=? AND reason='DEPOSIT_UNPAID'", ctx.caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM deposits WHERE id=?", String.class, depositId)).as("money received: the ledger and status stay for Finance").isEqualTo("PARTIALLY_PAID");
+        assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='DEPOSIT_CANCELLED'", ctx.caseId)).isZero();
     }
 
     /** P0-2, ACCEPTED -> CANCELLED: the coordinator's typed reason; the deposit step and every other open item close; My Care says "withdrawn". */
@@ -679,6 +701,11 @@ class CoordinatorCaseActionsTest {
         assertThat(current.code()).isEqualTo("NONE");
         assertThat(current.exit()).isEqualTo("WITHDRAWN");
         assertThat(journey.workspace(ctx.caseId).actions().availableActions()).doesNotContain("WITHDRAW", "MESSAGE_COORDINATOR");
+        // Work opened on the ended case afterwards (a refund, say) is owed and stays: the exit closed work once, not forever.
+        SecurityContextHolder.clearContext();
+        work.openWorkItem(new com.rehletshifaa.journey.api.WorkDtos.NewWorkItem(ctx.caseId, "DEPOSIT_REFUND", "Refund the deposit", "Return what was received",
+                "finance-subject", "FINANCE", false, null, "SYSTEM", "DEPOSIT_REFUND_DUE", "refund:" + ctx.caseId, false, null), false);
+        assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='DEPOSIT_REFUND' AND status='OPEN'", ctx.caseId)).isEqualTo(1);
     }
 
     /** P0-2: the patient withdraws from My Care after acceptance; once travel is confirmed they are sent to their coordinator instead. */

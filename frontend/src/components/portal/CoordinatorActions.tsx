@@ -142,7 +142,7 @@ export function MoreActions({ locale, caseId, available, travelPackage, version,
   onRequestInformation: () => void; onRecordResponse: () => void; onAdministration?: () => void; proposalVersionId?: string;
   /** The patient decided on a call (Arabic assisted path) and nobody asked through the page first. */
   onRecordDecision?: () => void;
-  /** Opens the cancellation dialog (typed reason after acceptance, P0-2); without it the browser confirm stands in. */
+  /** Opens the cancellation dialog (typed reason after acceptance, P0-2); the action is offered only with it. */
   onCancelCase?: () => void;
 }) {
   const ar = locale === "ar";
@@ -159,7 +159,7 @@ export function MoreActions({ locale, caseId, available, travelPackage, version,
   if (has("MOVE_TO_INTAKE_REVIEW")) items.push({ code: "MOVE_TO_INTAKE_REVIEW", icon: <UserRoundPlus size={16} aria-hidden/>, label: ar ? "العودة إلى مراجعة الاستقبال" : "Move back to intake review", hint: ar ? "دون انتظار رد المريض." : "Without waiting for the patient's reply.", onClick: () => void mutate(`/coordinator/cases/${caseId}/transition`, { targetStatus: "INTAKE_REVIEW", expectedVersion: version }) });
   if (has("SET_TRAVEL_PACKAGE")) items.push({ code: "SET_TRAVEL_PACKAGE", icon: <Plane size={16} aria-hidden/>, label: travelPackage ? (ar ? "إلغاء باقة السفر المتكاملة" : "Turn off the full travel package") : (ar ? "تفعيل باقة السفر المتكاملة" : "Turn on the full travel package"), hint: ar ? "تشمل الطيران والتأشيرة والإقامة والوصول؛ عند التفعيل يُشرَك فريق العمليات قبل إرسال العرض." : "Flight, visa, accommodation and arrival; when on, Operations prepares the plan before the proposal is sent.", onClick: () => void mutate(`/coordinator/cases/${caseId}/travel-package`, { requested: !travelPackage }, "PUT") });
   if (onAdministration) items.push({ code: "ADMINISTRATION", icon: <Users size={16} aria-hidden/>, label: ar ? "نقل ملكية الحالة" : "Transfer case ownership", hint: ar ? "سلّم هذه الحالة إلى منسق آخر في فريقك." : "Hand this case to another coordinator on your team.", onClick: onAdministration });
-  if (has("CANCEL_CASE")) items.push({ code: "CANCEL_CASE", tone: "danger", icon: <XCircle size={16} aria-hidden/>, label: work.cancelCase.title, hint: work.cancelCase.hint, onClick: () => { if (onCancelCase) onCancelCase(); else if (window.confirm(ar ? "هل تريد إلغاء الحالة؟" : "Cancel this case?")) void mutate(`/coordinator/cases/${caseId}/transition`, { targetStatus: "CANCELLED", expectedVersion: version }); } });
+  if (has("CANCEL_CASE") && onCancelCase) items.push({ code: "CANCEL_CASE", tone: "danger", icon: <XCircle size={16} aria-hidden/>, label: work.cancelCase.title, hint: work.cancelCase.hint, onClick: onCancelCase });
 
   if (!items.length) return <p className="text-sm text-ink-500">{ar ? "لا توجد إجراءات إضافية متاحة في هذه المرحلة." : "No additional actions are available at this stage."}</p>;
   return <ul className="divide-y divide-line">

@@ -43,13 +43,13 @@ class CaseTransitionPolicyTest {
     /** The patient's own withdrawal: after acceptance, until travel is confirmed; then it is the coordinator's. */
     @Test void thePatientMayWithdrawOnlyAfterAcceptanceAndBeforeTravelIsConfirmed() {
         for (String stage : List.of("ACCEPTED", "TRAVEL_COORDINATION")) {
-            assertThat(CaseTransitionPolicy.patientMayWithdraw(stage, null)).as(stage + " without a plan").isTrue();
+            assertThat(CaseTransitionPolicy.patientMayWithdraw(stage, (String) null)).as(stage + " without a plan").isTrue();
             assertThat(CaseTransitionPolicy.patientMayWithdraw(stage, "PLANNING")).as(stage + " while planning").isTrue();
             assertThat(CaseTransitionPolicy.patientMayWithdraw(stage, "CONFIRMED")).as(stage + " once confirmed").isFalse();
             assertThat(CaseTransitionPolicy.patientMayWithdraw(stage, "ARRIVED")).as(stage + " once arrived").isFalse();
         }
         for (String stage : List.of("PATIENT_DECISION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CANCELLED"))
-            assertThat(CaseTransitionPolicy.patientMayWithdraw(stage, null)).as(stage).isFalse();
+            assertThat(CaseTransitionPolicy.patientMayWithdraw(stage, (String) null)).as(stage).isFalse();
     }
 
     private static Set<String> reachableFrom(String stage) {

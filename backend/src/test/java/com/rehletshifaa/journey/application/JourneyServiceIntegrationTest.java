@@ -483,8 +483,9 @@ class JourneyServiceIntegrationTest {
     @Test void anArrivedCaseIsCancelledOnlyWithATypedReasonAndEveryOpenItemCloses()throws Exception{
         UUID caseId=arriveWithDoctor("Refused Patient","+254700000101","rf@local.test");
         coordinate(caseId);
-        jdbc.update("INSERT INTO case_tasks(id,case_id,task_type,title,owner_subject,owner_role,visibility_scope,priority,blocking,status,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
-            UUID.randomUUID(),caseId,"TRAVEL","enc:"+crypto.encrypt("Arrange the ward"),"operations-subject","OPERATIONS","INTERNAL","NORMAL",false,"OPEN","coordinator-subject",Instant.now(),Instant.now());
+        for(String type:List.of("TRAVEL","EMERGENCY_OVERRIDE_REVIEW"))
+            jdbc.update("INSERT INTO case_tasks(id,case_id,task_type,title,owner_subject,owner_role,visibility_scope,priority,blocking,status,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
+                UUID.randomUUID(),caseId,type,"enc:"+crypto.encrypt("Open item"),"operations-subject","OPERATIONS","INTERNAL","NORMAL",false,"OPEN","coordinator-subject",Instant.now(),Instant.now());
         // A Consultant never cancels a whole case.
         authenticate("doctor-subject",Role.CONSULTANT);
         assertThatThrownBy(()->journey.transition(caseId,new TransitionRequest("CANCELLED","Refused",version(caseId),"HOSPITAL_REFUSED")))
@@ -498,9 +499,13 @@ class JourneyServiceIntegrationTest {
         assertThat(view.status()).isEqualTo("CANCELLED");
         assertThat(jdbc.queryForObject("SELECT reason FROM case_exit_reasons WHERE case_id=? AND from_status='ARRIVAL_CONFIRMED' AND to_status='CANCELLED'",String.class,caseId)).isEqualTo("HOSPITAL_REFUSED");
         assertThat(jdbc.queryForObject("SELECT note FROM case_exit_reasons WHERE case_id=?",String.class,caseId)).as("the note is stored encrypted").doesNotContain("No bed");
-        assertThat(jdbc.queryForObject("SELECT reason FROM case_status_history WHERE case_id=? AND to_status='CANCELLED'",String.class,caseId)).isEqualTo("HOSPITAL_REFUSED: No bed on the ward");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE case_id=? AND event_type='CASE_EXIT_RECORDED' AND action='HOSPITAL_REFUSED'",Integer.class,caseId)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS')",Integer.class,caseId)).as("no open work left").isZero();
+        // The note lives only on the encrypted exit row: history and audit carry the typed reason alone.
+        assertThat(jdbc.queryForObject("SELECT reason FROM case_status_history WHERE case_id=? AND to_status='CANCELLED'",String.class,caseId)).isEqualTo("HOSPITAL_REFUSED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE case_id=? AND event_type='CASE_EXIT_RECORDED' AND action='HOSPITAL_REFUSED' AND reason IS NULL",Integer.class,caseId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE case_id=? AND reason LIKE '%No bed%'",Integer.class,caseId)).isZero();
+        // Ordinary work closes; a governance review of what was done outlives the case.
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM case_tasks WHERE case_id=? AND status IN ('OPEN','IN_PROGRESS') AND task_type<>'EMERGENCY_OVERRIDE_REVIEW'",Integer.class,caseId)).as("no ordinary work left").isZero();
+        assertThat(jdbc.queryForObject("SELECT status FROM case_tasks WHERE case_id=? AND task_type='EMERGENCY_OVERRIDE_REVIEW'",String.class,caseId)).isEqualTo("OPEN");
         assertThat(jdbc.queryForObject("SELECT waiting_on FROM medical_cases WHERE id=?",String.class,caseId)).isEqualTo("NONE");
     }
 

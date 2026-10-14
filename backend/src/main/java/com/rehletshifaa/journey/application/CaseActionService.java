@@ -156,7 +156,7 @@ public class CaseActionService {
         List<String> available = new ArrayList<>();
         if (!TERMINAL.contains(f.status()) && f.coordinatorSubject() != null) available.add("MESSAGE_COORDINATOR");
         // P0-2: the patient's own way out, until travel is confirmed; from then on their coordinator records it for them.
-        if (CaseTransitionPolicy.patientMayWithdraw(f.status(), travelPlans.findStatusByCaseId(caseId).orElse(null))) available.add("WITHDRAW");
+        if (CaseTransitionPolicy.patientMayWithdraw(f.status(), () -> travelPlans.findStatusByCaseId(caseId).orElse(null))) available.add("WITHDRAW");
         CurrentActionView current = patientCurrentAction(caseId, f.status(), patientAction, mine);
         return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), current, mine, available, viewer, waitingReason.code());
     }
@@ -286,22 +286,29 @@ public class CaseActionService {
     }
 
     /**
-     * P0-2: the calm word My Care says a finished journey with. A cancellation reads as the patient's own withdrawal or
-     * as cancelled; a closed case as completed (no follow-up needed) or closed; and EXPIRED only when it was entered from
-     * ACCEPTED — the deposit went unpaid — since an expired estimate is a live case being re-prepared. Null otherwise.
+     * P0-2: the calm word My Care says a finished journey with, read from the exit record. A cancellation reads as the
+     * patient's own withdrawal or as cancelled; a closed case as completed (no follow-up needed) or closed; and EXPIRED
+     * only while the deposit-unpaid exit is the move that put the case there — an expired estimate is a live case being
+     * re-prepared, and a case re-opened after a deposit expiry may expire again that way. Null otherwise.
      */
     private String exitWord(UUID caseId, String status) {
         return switch (status) {
             case "CANCELLED" -> latestExit(caseId) == CaseExitReason.Reason.PATIENT_WITHDREW ? "WITHDRAWN" : "CANCELLED";
             case "CLOSED" -> latestExit(caseId) == CaseExitReason.Reason.NO_FOLLOW_UP_NEEDED ? "COMPLETED" : "CLOSED";
-            case "EXPIRED" -> statusChanges.findFirstByCaseIdOrderByCreatedAtDesc(caseId)
-                    .filter(change -> "ACCEPTED".equals(change.getFromStatus())).map(change -> "EXPIRED").orElse(null);
+            case "EXPIRED" -> exitReasons.findFirstByCaseIdOrderByRecordedAtDesc(caseId)
+                    .filter(exit -> exit.getReason() == CaseExitReason.Reason.DEPOSIT_UNPAID && isCurrentMove(caseId, exit))
+                    .map(exit -> "EXPIRED").orElse(null);
             default -> null;
         };
     }
 
     private CaseExitReason.Reason latestExit(UUID caseId) {
         return exitReasons.findFirstByCaseIdOrderByRecordedAtDesc(caseId).map(CaseExitReason::getReason).orElse(null);
+    }
+
+    /** True when the exit is the move that put the case in its current stage (both are stamped with the same instant). */
+    private boolean isCurrentMove(UUID caseId, CaseExitReason exit) {
+        return statusChanges.findFirstByCaseIdOrderByCreatedAtDesc(caseId).map(change -> !exit.getRecordedAt().isBefore(change.getCreatedAt())).orElse(true);
     }
 
     /**
@@ -455,10 +462,7 @@ public class CaseActionService {
     public void syncStageWork(UUID caseId) {
         if (!syncing.get().add(caseId)) return;
         try {
-            Facts f = queries.facts(caseId);
-            // P0-2: a case that left its journey owes nobody anything — every open item on it is closed, whoever held it.
-            if (Set.of("CLOSED", "CANCELLED").contains(f.status())) { work.closeOpenWork(caseId, "Superseded — the case has left its journey"); return; }
-            Map<String, StageStep> owed = stageSteps(caseId, f);
+            Map<String, StageStep> owed = stageSteps(caseId, queries.facts(caseId));
             Map<String, String> open = work.openWorkOwners(caseId, STAGE_WORK);
             for (var item : open.entrySet()) {
                 StageStep step = owed.get(item.getKey());

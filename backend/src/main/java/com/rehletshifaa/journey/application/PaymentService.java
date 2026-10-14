@@ -259,6 +259,23 @@ public class PaymentService {
         return depositForCase(caseId);
     }
 
+    /**
+     * P0-2: the deposit reminder cycle ended unpaid and the case expired. A deposit nothing was received against is
+     * cancelled here — the one writer of deposit status — so a re-prepared estimate raises a fresh one; a part-paid
+     * deposit keeps its ledger and status for Finance (the refund rule is P0-4). A system action, audited.
+     *
+     * @return true when a deposit was cancelled now
+     */
+    @Transactional
+    public boolean cancelUnpaidDeposit(UUID caseId) {
+        DepositRepository.Quoted deposit = queries.openDeposit(caseId);
+        if (deposit == null || !"REQUESTED".equals(deposit.getStatus())) return false;
+        deposits.settleAs(deposit.getId(), "CANCELLED");
+        auditTrail.event("DEPOSIT_CANCELLED").actor("SYSTEM", "SYSTEM").caseId(caseId).entity("Deposit", deposit.getId()).action("PAYMENT")
+                .reason("The reminder cycle ended unpaid and the case expired").record();
+        return true;
+    }
+
     // ---- helpers ----
     private DepositRepository.Quoted requireDeposit(UUID caseId, UUID depositId) {
         return deposits.findOnCase(depositId, caseId)

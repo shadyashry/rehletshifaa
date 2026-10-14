@@ -278,13 +278,14 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
     int cancel(@Param("id") UUID id, @Param("caseId") UUID caseId, @Param("version") long version, @Param("reason") String reason,
                @Param("now") Instant now);
 
-    /** The case left its journey: every open item on it — staff work and patient actions alike — is cancelled with the reason. */
+    /** The case left its journey: every open item on it — staff work and patient actions alike, bar the kept types — is cancelled with the reason. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update CaseTask t set t.status = 'CANCELLED', t.cancelledAt = :now, t.cancellationReason = :reason, t.updatedAt = :now,
                 t.version = t.version + 1
-            where t.caseId = :caseId and t.status in ('OPEN', 'IN_PROGRESS')""")
-    int cancelOpenOnCase(@Param("caseId") UUID caseId, @Param("reason") String reason, @Param("now") Instant now);
+            where t.caseId = :caseId and t.status in ('OPEN', 'IN_PROGRESS') and t.taskType not in :kept""")
+    int cancelOpenOnCase(@Param("caseId") UUID caseId, @Param("kept") java.util.Collection<String> kept, @Param("reason") String reason,
+                         @Param("now") Instant now);
 
     /** Gives the task to another owner; it starts again as OPEN. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

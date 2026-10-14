@@ -77,6 +77,11 @@ public class CaseTransitionPolicy {
     public static boolean patientMayWithdraw(String stage, String travelPlanStatus) {
         return PATIENT_WITHDRAWAL_STAGES.contains(stage) && (travelPlanStatus == null || !TRAVEL_COMMITTED.contains(travelPlanStatus));
     }
+
+    /** As above, reading the travel plan only in the stages where it can matter (a read-path saving on every other stage). */
+    public static boolean patientMayWithdraw(String stage, java.util.function.Supplier<String> travelPlanStatus) {
+        return PATIENT_WITHDRAWAL_STAGES.contains(stage) && patientMayWithdraw(stage, travelPlanStatus.get());
+    }
     /** Forward stages: none may be entered while blocking work is still open on the case. */
     private static final Set<String> ADVANCING = Set.of("CLINICAL_RECOMMENDATION_READY", "PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL",
             "PATIENT_DECISION", "ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED");
