@@ -484,5 +484,5 @@ Verify: typecheck ok; eslint clean on touched files; vitest 66 files / 470; Play
 en + ar); `home-media.spec.ts` updated for the hero (intended change; needs the Chrome channel to run).
 Deferred (backlog "Public site — trust pass"): photographs and the coordinators strip (consent, P1-14), continue-later
 resume link (backend), care-area row distill, Arabic numerals/country names (B1).
-Theme decision: Petrol & Paper stays (reasoning in `plans/platform-pass-kickoff.md`).
-Next: owner review on dev after merge + rebuild; then the full-platform pass (`plans/platform-pass-kickoff.md`).
+Theme decision: Petrol & Paper stays (reasoning in `PLAN.md`).
+Next: owner review on dev after merge + rebuild; then UX plan area 1 (`PLAN.md`), in its own worktree, in parallel with the backend plan.
