@@ -664,8 +664,8 @@ phases.
     but filing is idempotent by provider message id (`ALREADY_FILED`), so a reclaimed message only repeats the media fetch; the
     three workers judge lease expiry by the instance clock, not the database clock (one VM: no skew).
   - Verification run: focused `SchedulerLeaseTest` (9), `IdentityOperationProcessorTest` (2), `IdentityOperationIntegrationTest`
-    (3), `ArchitectureRulesTest` (22): 0 failures; `PostgresJpaMappingTest` on postgres:17-alpine green with SQL logging. The
-    full `mvn -o -q test` was NOT run in this session (usage limit): run it once before fast-forwarding `feat/review-p0`.
+    (3), `ArchitectureRulesTest` (22): 0 failures; `PostgresJpaMappingTest` on postgres:17-alpine green with SQL logging;
+    full `mvn -o -q test` (JVM in UTC) 832 tests, 0 failures, 3 pre-existing skips (829 + 3 new). Commit `df40908` + this line.
   - Next: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack (V95); then P1-10 per "Remaining work".
 
 ### P1-9  Backups and restore drill  (E-09)
@@ -825,7 +825,7 @@ drill (P1-9) stay launch blockers that do not shape the product.
 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
-| 1 | P1-8 Metrics, alerts, scheduler leadership | sessions 1 and 2 done; verification done 2026-10-15 (one fix, full suite still to run) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
+| 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
 | 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: D-A (platform fee line), guarantee wording, final-quote validity; counsel on the VAT rate of the fee |
 | 3 | **P1-20 Public site trust pass** (parallel track) | 3 | Fable (shape, hero), Opus (form, cards), Sonnet (copy) | Owner reads the UX review; shape-plan gate |
 | 4 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
