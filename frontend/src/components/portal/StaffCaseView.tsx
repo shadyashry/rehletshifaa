@@ -5,6 +5,7 @@ import { createContext, use, useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Check, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
+import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageEstimate } from "@/components/portal/FacilityPackagePicker";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
 import { RecordProposalDecision } from "@/components/portal/RecordProposalDecision";
@@ -40,10 +41,10 @@ export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalC
  * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
  * `StaffCaseView` so the proposal, deposit, delivery and assessment pieces stop taking the same props one by one.
  */
-type CaseWorkspace={locale:Locale;t:typeof copy.en;role:RoleKey;c:CaseView;busy:boolean;mutate:Mutate;fxRates:FxRate[];catalog:CatalogService[];mySubject?:string};
+type CaseWorkspace={locale:Locale;t:typeof copy.en;role:RoleKey;c:CaseView;busy:boolean;mutate:Mutate;fxRates:FxRate[];catalog:CatalogService[];/** P0-5: active facilities with Finance-approved packages, for the final assessment's package lines. */facilities:DirectoryFacility[];mySubject?:string};
 const CaseWorkspaceContext=createContext<CaseWorkspace|null>(null);
 
-function CaseWorkspaceProvider({value,children}:{value:CaseWorkspace;children:ReactNode}){
+export function CaseWorkspaceProvider({value,children}:{value:CaseWorkspace;children:ReactNode}){
  return <CaseWorkspaceContext value={value}>{children}</CaseWorkspaceContext>;
 }
 
@@ -69,7 +70,7 @@ type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"
 export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
  const work=useWorkCopy();
  const c=value.caseSummary;
- const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,mySubject]);
+ const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject]);
  const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
  const doctorPhase=["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
@@ -440,26 +441,31 @@ function ProposalSendForm({estimate,onSend}:{estimate:Review;onSend:(caseId:stri
  </div>;
 }
 
-function FinalAssessment(){
- const {locale,c:{id:caseId},busy,mutate,catalog,fxRates}=useCaseWorkspace();
- const[treatment,setTreatment]=useState("");const[risks,setRisks]=useState("");const[currency,setCurrency]=useState("EGP");const[costs,setCosts]=useState([{description:"",amount:""}]);const[selected,setSelected]=useState<Set<string>>(new Set());
+export function FinalAssessment(){
+ const {locale,c:{id:caseId},busy,mutate,catalog,fxRates,facilities}=useCaseWorkspace();
+ const[treatment,setTreatment]=useState("");const[risks,setRisks]=useState("");const[currency,setCurrency]=useState("EGP");const[costs,setCosts]=useState([{description:"",amount:""}]);const[selected,setSelected]=useState<Set<string>>(new Set());const[packagePicks,setPackagePicks]=useState<Map<string,number>>(new Map());
  const g=locale==="ar"?{title:"الفحص السريري النهائي",intro:"سجّل تقييمك بعد فحص المريض. سيبني المنسق العرض النهائي من الخدمات المؤكدة.",treatment:"العلاج النهائي الموصى به",risks:"المخاطر والقيود",services:"خدماتك المعتمدة",manual:"خدمة غير مدرجة (تتطلب موافقة مالية)",currency:"عملة العرض",add:"إضافة خدمة",save:"حفظ التقييم النهائي",service:"الخدمة",amount:"المبلغ"}:{title:"Final in-person assessment",intro:"Record your assessment after examining the patient. The coordinator builds the final quote from the confirmed services.",treatment:"Final recommended treatment",risks:"Risks & limitations",services:"Your approved services",manual:"Service not on your list (needs finance approval)",currency:"Display currency",add:"Add a service",save:"Save final assessment",service:"Service",amount:"Amount"};
  const currencyOptions=["EGP",...fxRates.filter(f=>f.currency!=="EGP").map(f=>f.currency)];const rate=currency==="EGP"?1:(fxRates.find(f=>f.currency===currency)?.rate??1);
+ // P0-5: Finance-approved facility packages are approved lines here too; the expected figure must sit inside the range.
+ const pk=locale==="ar"?{title:"باقات المنشآت (معتمدة ماليًا)",hint:"باقات المستشفى وغرفة العمليات والعناية المركزة والمستلزمات التي اعتمدها الفريق المالي. حدّد الرقم المتوقع داخل النطاق؛ يُطلق البند دون موافقة مالية.",expected:"المتوقع (ج.م)",outOfRange:"الرقم خارج النطاق المعتمد"}:{title:"Facility packages (Finance-approved)",hint:"Hospital, theatre, ICU and implant packages Finance has approved. Set the expected figure inside the range; the line releases without Finance.",expected:"Expected (EGP)",outOfRange:"Outside the approved range"};
+ const packages=facilityPackages(facilities);const {lines:packageLines,inRange:packagesInRange}=facilityPackageLines(packages,packagePicks);
+ const togglePackage=(id:string,min:number)=>setPackagePicks(m=>{const n=new Map(m);if(n.has(id))n.delete(id);else n.set(id,min);return n;});const setPackageAmount=(id:string,amount:number)=>setPackagePicks(m=>new Map(m).set(id,amount));
  const toggle=(id:string)=>setSelected(s=>{const n=new Set(s);if(n.has(id))n.delete(id);else n.add(id);return n;});
  const updateCost=(i:number,f:"description"|"amount",val:string)=>setCosts(rows=>rows.map((row,idx)=>idx===i?{...row,[f]:val}:row));
  // Catalogue picks travel at their approved EGP price; the selector above only changes what is displayed.
- const save=()=>{const picks=catalog.filter(s=>selected.has(s.id)).map(s=>({serviceDescription:s.serviceName,estimatedCost:s.priceEgp,currency:"EGP",catalogServiceId:s.id}));const manual=costs.filter(row=>row.description.trim()&&row.amount!=="").map(row=>({serviceDescription:row.description.trim(),estimatedCost:Math.round((Number(row.amount)||0)*100)/100,currency}));if(!picks.length&&!manual.length)return;void mutate(`/doctor/cases/${caseId}/final-assessment`,{recommendedTreatment:treatment,risksAndLimitations:risks,costEstimates:[...picks,...manual]}).then(r=>{if(r){setTreatment("");setRisks("");setCosts([{description:"",amount:""}]);setSelected(new Set());}});};
+ const save=()=>{const picks=catalog.filter(s=>selected.has(s.id)).map(s=>({serviceDescription:s.serviceName,estimatedCost:s.priceEgp,currency:"EGP",catalogServiceId:s.id}));const manual=costs.filter(row=>row.description.trim()&&row.amount!=="").map(row=>({serviceDescription:row.description.trim(),estimatedCost:Math.round((Number(row.amount)||0)*100)/100,currency}));const packageEstimates=packageLines.map(packageEstimate);if(!picks.length&&!manual.length&&!packageEstimates.length)return;if(!packagesInRange)return;void mutate(`/doctor/cases/${caseId}/final-assessment`,{recommendedTreatment:treatment,risksAndLimitations:risks,costEstimates:[...picks,...packageEstimates,...manual]}).then(r=>{if(r){setTreatment("");setRisks("");setCosts([{description:"",amount:""}]);setSelected(new Set());setPackagePicks(new Map());}});};
  return <div className="mt-4 space-y-4 border-t border-line pt-4">
   <div><h4 className="title text-base">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.intro}</p></div>
   <label className="block text-sm font-bold">{g.treatment}<textarea className="field mt-1" value={treatment} onChange={e=>setTreatment(e.target.value)}/></label>
   <label className="block text-sm font-bold">{g.risks}<textarea className="field mt-1" value={risks} onChange={e=>setRisks(e.target.value)}/></label>
   <div className="rounded-lg border border-brand-200 bg-brand-50 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold text-brand-800">{g.services}</span><select aria-label={g.currency} className="field !mt-0 w-auto py-1" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></div>
    {catalog.length>0&&<div className="mt-2 space-y-1.5">{catalog.map(s=>{const on=selected.has(s.id);return <button type="button" key={s.id} onClick={()=>toggle(s.id)} aria-pressed={on} className={`flex w-full items-center justify-between gap-3 rounded-lg border p-2.5 text-start transition ${on?"border-brand-500 bg-white":"border-line bg-white/60"}`}><span className="flex items-center gap-2.5"><span className={`flex h-5 w-5 flex-none items-center justify-center rounded border text-[0.8125rem] ${on?"border-brand-500 bg-brand-500 text-white":"border-line"}`} aria-hidden>{on?"✓":""}</span><span className="text-sm font-semibold text-ink-800">{s.serviceName}</span></span><span className="text-sm font-bold"><bdi dir="ltr">{money(s.priceEgp*rate,currency,locale)}</bdi></span></button>;})}</div>}
+   <FacilityPackagePicker locale={locale} packages={packages} picks={packagePicks} onToggle={togglePackage} onAmount={setPackageAmount} labels={pk}/>
    <p className="mt-3 text-sm font-bold text-ink-700">{g.manual}</p>
    <div className="mt-1 space-y-2">{costs.map((row,i)=><div key={i} className="flex gap-2"><input aria-label={g.service} className="field flex-1" value={row.description} onChange={e=>updateCost(i,"description",e.target.value)} placeholder={g.service}/><input aria-label={g.amount} className="field w-32" type="number" min="0" step="0.01" value={row.amount} onChange={e=>updateCost(i,"amount",e.target.value)} placeholder={`${g.amount} (${currency})`}/>{costs.length>1&&<button type="button" className="btn-secondary" onClick={()=>setCosts(rows=>rows.filter((_,idx)=>idx!==i))} aria-label={locale==="ar"?"إزالة الخدمة":"Remove service"}>×</button>}</div>)}</div>
    <button type="button" className="btn-secondary mt-2" onClick={()=>setCosts(rows=>[...rows,{description:"",amount:""}])}>+ {g.add}</button>
   </div>
-  <button className="btn-primary w-full sm:w-auto" disabled={busy} onClick={save}>{g.save}</button>
+  <button className="btn-primary w-full sm:w-auto" disabled={busy||!packagesInRange} onClick={save}>{g.save}</button>
  </div>;
 }
 

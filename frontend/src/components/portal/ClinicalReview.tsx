@@ -7,6 +7,7 @@ import { Clock, FileText } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import type { DirectoryFacility } from "@/components/portal/portal-model";
+import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageEstimate } from "@/components/portal/FacilityPackagePicker";
 
 export type CatalogService = { id: string; serviceCode: string; serviceName: string; category?: string; priceEgp: number; active: boolean };
 export type FxRate = { currency: string; rate: number; rateDate: string; source: string };
@@ -84,10 +85,8 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, fa
   // QA #8: only catalogue lines are "approved"; anything off the list is shown apart, as awaiting Finance.
   const catalogueTotal = picks.reduce((sum, s) => sum + s.priceEgp, 0);
   // P0-5: packages are approved lines too; the expected figure must stay inside the approved range (the server refuses otherwise).
-  const packages = facilities.flatMap(f => f.packages.map(p => ({ ...p, facilityId: f.id, facilityName: f.name })));
-  const packageLines = packages.filter(p => packagePicks.has(p.id)).map(p => ({ ...p, amountEgp: packagePicks.get(p.id) ?? p.minEgp }));
-  const packageTotal = packageLines.reduce((sum, p) => sum + p.amountEgp, 0);
-  const packagesInRange = packageLines.every(p => p.amountEgp >= p.minEgp && p.amountEgp <= p.maxEgp);
+  const packages = facilityPackages(facilities);
+  const { lines: packageLines, total: packageTotal, inRange: packagesInRange } = facilityPackageLines(packages, packagePicks);
   const offListTotal = offList.reduce((sum, row) => sum + row.amountEgp, 0);
   const baseTotal = catalogueTotal + packageTotal + offListTotal;
   // QA #12, one rounding rule: each line converted and rounded to the cent, then added — the proposal's own arithmetic.
@@ -113,7 +112,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, fa
     // value the server should trust — and the server re-reads the catalogue price regardless.
     ...picks.map(s => ({ serviceDescription: s.serviceName, estimatedCost: s.priceEgp, currency: BASE, catalogServiceId: s.id })),
     // Facility packages (P0-5): the expected EGP figure inside the approved range; the server re-checks the package and the range.
-    ...packageLines.map(p => ({ serviceDescription: `${p.name} — ${p.facilityName}`, estimatedCost: p.amountEgp, currency: BASE, facilityPackageId: p.id })),
+    ...packageLines.map(packageEstimate),
     ...offList.map(row => ({ serviceDescription: row.description, estimatedCost: row.amountEgp, currency: BASE })),
   ];
 
@@ -243,38 +242,8 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, fa
               })}
             </ul>}
 
-        {packages.length > 0 && (
-          <div className="mt-4">
-            <h4 className="label-micro text-brand-700">{t.packagesTitle}</h4>
-            <p className="mt-1 text-[0.8rem] leading-6 text-ink-600">{t.packagesHint}</p>
-            <ul className="mt-2 space-y-1">
-              {packages.map(pkg => {
-                const on = packagePicks.has(pkg.id);
-                const amount = packagePicks.get(pkg.id) ?? pkg.minEgp;
-                const inRange = amount >= pkg.minEgp && amount <= pkg.maxEgp;
-                return (
-                  <li key={pkg.id} className={`rounded-lg border p-2.5 transition ${on ? "border-brand-500 bg-brand-50" : "border-line"}`}>
-                    <label className="flex cursor-pointer items-center gap-3">
-                      <input type="checkbox" className="h-4 w-4 flex-none accent-brand-600" checked={on} onChange={() => togglePackage(pkg.id, pkg.minEgp)}/>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[0.9rem] font-semibold text-ink-900">{pkg.name}</span>
-                        <span className="block text-[0.8125rem] text-ink-500">{pkg.facilityName} · <bdi dir="ltr">{pkg.procedureCode}</bdi></span>
-                      </span>
-                      <span className="flex-none whitespace-nowrap text-end text-[0.8125rem] text-ink-600"><bdi dir="ltr">{money(pkg.minEgp, BASE, locale)} – {money(pkg.maxEgp, BASE, locale)}</bdi></span>
-                    </label>
-                    {on && (
-                      <label className="mt-2 block text-[0.8rem] font-bold text-ink-700">{t.packageExpected}
-                        <input className="field mt-1" type="number" min={pkg.minEgp} max={pkg.maxEgp} step="1" value={amount} aria-invalid={!inRange}
-                               onChange={event => setPackageAmount(pkg.id, Number(event.target.value) || 0)}/>
-                        {!inRange && <span className="mt-1 block font-semibold text-alert-700">{t.packageOutOfRange}</span>}
-                      </label>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
+        <FacilityPackagePicker locale={locale} packages={packages} picks={packagePicks} onToggle={togglePackage} onAmount={setPackageAmount}
+                               labels={{ title: t.packagesTitle, hint: t.packagesHint, expected: t.packageExpected, outOfRange: t.packageOutOfRange }}/>
 
         {offList.length > 0 && (
           <ul className="mt-2 space-y-1">

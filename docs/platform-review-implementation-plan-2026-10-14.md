@@ -350,9 +350,10 @@ phases.
     (2: Operations sends the facility id, the treatment record requires one), `FinanceApproval.test.tsx` (17/17 across the
     three); every `src/components/portal` test green (24 files, 200 tests). Verification: `mvn -o -q test` 791 tests, 0 failures, 3 pre-existing skips (789 after session 2 + 2 new); `pnpm typecheck` clean;
     eslint clean on touched files; `PostgresJpaMappingTest` on postgres:17-alpine with V92 applied green (1/1; `travel_plans.facility_id` present, the text column gone).
-  - Open gaps: the final-assessment form (`StaffCaseView` → `/doctor/cases/{id}/final-assessment`) still offers catalogue and
-    manual lines only, so a final quote cannot yet add a facility package line (the backend accepts it). Closed the same day in a
-    follow-up commit: the Finance commercial view names the facility on a package line (`ProposalCommercialLine.facilityName`,
+  - Open gaps: the final-assessment form (`StaffCaseView` → `/doctor/cases/{id}/final-assessment`) offered catalogue and manual
+    lines only; closed the same day in a second follow-up commit by extracting the package section into the shared
+    `FacilityPackagePicker` (one range rule for the clinical review and the final assessment; `FinalAssessment.test.tsx`). Also
+    closed the same day in a follow-up commit: the Finance commercial view names the facility on a package line (`ProposalCommercialLine.facilityName`,
     through `FacilityDirectory.facilityNamesOfPackages`), and the workspace carries `travelPlan` and `treatmentEpisodes` read
     views with the facility named (staff only), shown on the case page as "Destination & treatment"; the travel form reopens on
     the stored facility and status. Tests: `CoordinatorCaseActionsTest` reads the plan back, `FacilityDirectoryTest` covers the
@@ -361,7 +362,7 @@ phases.
     granted (see decision above); revisit if a screen needs contacts or settlement terms outside the Control Center.
   - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack so V92 runs; P0-5 is
     complete as planned. Next phase per the sequence: P1-6 (time bounds on waits) in a new session from its prompt block,
-    taking V93. B-02 follow-ups to schedule later: package line on the final assessment; facility name on the patient proposal
+    taking V93. B-02 follow-ups to schedule later: facility name on the patient proposal
     (the consultant's line description already carries it); the patient-facing travel view once the patient journey needs it.
 
 ---
