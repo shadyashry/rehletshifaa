@@ -158,8 +158,9 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
 
   // Who is on the case: the owner first, then the clinical and operational people actually assigned.
   const team=[
-   {label:t.coordinatorLabel,name:coordinatorLabel(c,mySubject,work.queue),pending:false},
-   ...value.assignments.filter(a=>a.assigneeRole!=="COORDINATOR").map(a=>({label:a.assigneeRole==="DOCTOR"?(locale==="ar"?"الاستشاري":"Consultant"):a.assigneeRole==="OPERATIONS"?(locale==="ar"?"العمليات":"Operations"):a.assigneeRole==="FINANCE"?(locale==="ar"?"المالية":"Finance"):a.assigneeRole,name:a.assigneeName??(locale==="ar"?"عضو الفريق":"Team member"),pending:a.status==="PENDING"})),
+   {label:t.coordinatorLabel,name:coordinatorLabel(c,mySubject,work.queue),pending:false,until:null as string|null},
+   // P1-6: a pending Consultant offer stands until its deadline (working hours); the coordinator sees when it will come back.
+   ...value.assignments.filter(a=>a.assigneeRole!=="COORDINATOR").map(a=>({label:a.assigneeRole==="DOCTOR"?(locale==="ar"?"الاستشاري":"Consultant"):a.assigneeRole==="OPERATIONS"?(locale==="ar"?"العمليات":"Operations"):a.assigneeRole==="FINANCE"?(locale==="ar"?"المالية":"Finance"):a.assigneeRole,name:a.assigneeName??(locale==="ar"?"عضو الفريق":"Team member"),pending:a.status==="PENDING",until:a.status==="PENDING"?a.offerExpiresAt??null:null})),
   ];
 
   return <CaseWorkspaceProvider value={workspace}><div>
@@ -201,6 +202,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   <CurrentActionPanel locale={locale} role={role} action={current}
    response={current.workType==="REVIEW_PATIENT_RESPONSE"?{message:latestPatientMessage?.body,documentName:newestDocument?.fileName}:null}
    busy={busy} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
+   respondBy={myPending?.offerExpiresAt??null}
    onAcceptAssignment={()=>{if(!myPending)return;void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:true}).then(result=>{if(result&&isDoctor)setTab("clinical");});}}
    onDeclineAssignment={()=>setOverlay("decline")}
    form={financeApproval&&value.proposal&&value.commercial?<FinanceApproval locale={locale} commercial={value.commercial} busy={busy} approveLabel={t.financeApprove}
@@ -272,7 +274,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
      <JourneyPulse locale={locale} stage={c.status} waitingOn={actions.waitingOn} viewerRole={role} ownsCase={!!mySubject&&c.coordinatorSubject===mySubject} action={value.actions?current:null} onViewJourney={()=>setOverlay("journey")}/>
      {!value.preview&&<section aria-labelledby="case-team-title" className="card p-4">
       <h2 id="case-team-title" className="label-micro text-ink-500">{locale==="ar"?"فريق الحالة":"Case team"}</h2>
-      <dl className="mt-2 space-y-1.5 text-[0.82rem]">{team.map((member,i)=><div key={`${member.label}-${i}`} className="flex items-baseline justify-between gap-3"><dt className="text-ink-500">{member.label}</dt><dd className="text-end font-semibold text-ink-800">{member.name}{member.pending&&<span className="ms-1 text-[0.8125rem] font-semibold text-status-warning-fg">{locale==="ar"?"· بانتظار القبول":"· pending"}</span>}</dd></div>)}</dl>
+      <dl className="mt-2 space-y-1.5 text-[0.82rem]">{team.map((member,i)=><div key={`${member.label}-${i}`} className="flex items-baseline justify-between gap-3"><dt className="text-ink-500">{member.label}</dt><dd className="text-end font-semibold text-ink-800">{member.name}{member.pending&&<span className="ms-1 text-[0.8125rem] font-semibold text-status-warning-fg">{locale==="ar"?"· بانتظار القبول":"· pending"}</span>}{member.until&&<span className="block text-[0.8125rem] font-normal text-ink-500">{locale==="ar"?"العرض قائم حتى ":"Offer until "}<time dateTime={member.until}>{new Intl.DateTimeFormat(intlLocale(locale),{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(member.until))}</time></span>}</dd></div>)}</dl>
      </section>}
     </aside>
    </div>

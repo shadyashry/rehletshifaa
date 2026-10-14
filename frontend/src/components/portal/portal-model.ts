@@ -16,7 +16,8 @@ export type FxRate={currency:string;rate:number;rateDate:string;source:string};
 
 export const REFERRAL_ASSIGNMENTS=["TRANSFER","SECOND_OPINION"];export const REFERRAL_CONFIRM_WORK=["CONFIRM_TRANSFER","CONFIRM_SECOND_OPINION"];
 
-export type Assignment={id:string;assigneeSubject:string;assigneeName?:string|null;assigneeRole:string;assignmentType:string;status:string;assignedAt:string;version:number};
+/** `offerExpiresAt`: P1-6, when a pending Consultant offer expires (working hours); null on every other assignment. */
+export type Assignment={id:string;assigneeSubject:string;assigneeName?:string|null;assigneeRole:string;assignmentType:string;status:string;assignedAt:string;offerExpiresAt?:string|null;version:number};
 
 export type CaseDocument={documentId:string;fileName:string;contentType:string;sizeBytes:number;status:string;createdAt:string;confirmedAt?:string};
 

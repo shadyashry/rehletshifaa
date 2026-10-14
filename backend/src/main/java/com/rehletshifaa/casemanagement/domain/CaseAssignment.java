@@ -31,6 +31,8 @@ public class CaseAssignment extends AssignedIdEntity {
     @Column(name = "assigned_at", nullable = false) private Instant assignedAt;
     @Column(name = "accepted_at") private Instant acceptedAt;
     @Column(name = "ended_at") private Instant endedAt;
+    /** P1-6: when a PENDING Consultant offer expires (SlaPolicy working hours); null on every other assignment. */
+    @Column(name = "offer_expires_at") private Instant offerExpiresAt;
     @Column(nullable = false) private long version;
 
     protected CaseAssignment() {}
@@ -49,6 +51,14 @@ public class CaseAssignment extends AssignedIdEntity {
         return new CaseAssignment(id, caseId, subject, role, type, pod, "PENDING", reason, assignedBy, at, null);
     }
 
+    /** A Consultant offer the assignee has until {@code offerExpiresAt} to accept (P1-6). */
+    public static CaseAssignment offered(UUID id, UUID caseId, String subject, String role, String type, String pod, String reason,
+                                        String assignedBy, Instant at, Instant offerExpiresAt) {
+        CaseAssignment a = pending(id, caseId, subject, role, type, pod, reason, assignedBy, at);
+        a.offerExpiresAt = offerExpiresAt == null ? null : micros(offerExpiresAt);
+        return a;
+    }
+
     /** An assignment that is in force at once (the routing engine's coordinator ownership). */
     public static CaseAssignment active(UUID caseId, String subject, String role, String type, String reason, String assignedBy, Instant at) {
         return new CaseAssignment(UUID.randomUUID(), caseId, subject, role, type, null, "ACTIVE", reason, assignedBy, at, at);
@@ -65,5 +75,6 @@ public class CaseAssignment extends AssignedIdEntity {
     public Instant getAssignedAt() { return assignedAt; }
     public Instant getAcceptedAt() { return acceptedAt; }
     public Instant getEndedAt() { return endedAt; }
+    public Instant getOfferExpiresAt() { return offerExpiresAt; }
     public long getVersion() { return version; }
 }

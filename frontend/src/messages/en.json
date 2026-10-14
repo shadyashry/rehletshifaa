@@ -1191,7 +1191,8 @@
           "title": "Waiting for the patient to activate their profile",
           "body": "The secure profile link was sent to the patient. The coordination deposit is arranged once the profile is active."
         }
-      }
+      },
+      "respondBy": "Respond by {time}"
     },
     "myWork": {
       "title": "My work",
@@ -1755,6 +1756,14 @@
         "ASSIGNMENT_DECLINED": {
           "title": "Assignment declined — reassign the case",
           "context": "{assignee} declined this assignment. Choose another Consultant."
+        },
+        "ASSIGNMENT_OFFER_EXPIRED": {
+          "title": "Consultant offer expired — reassign the case",
+          "context": "{assignee} did not answer the offer within {hours} working hours. Choose another consultant."
+        },
+        "OFFER_EXPIRED_CONSULTANT": {
+          "title": "A clinical assignment offer expired",
+          "context": "Case {caseNumber} was offered to you for {hours} working hours and has gone back to the coordinator."
         },
         "PROPOSAL_DECLINED": {
           "title": "Patient declined the proposal",

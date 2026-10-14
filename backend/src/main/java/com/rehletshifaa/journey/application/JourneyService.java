@@ -192,7 +192,10 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         // page renders from, so a state the page would not offer is refused here too.
         if("FINANCE".equals(role)){if(!"PROPOSAL_PREPARATION".equals(currentStatus))throw new ApiException(409,"CASE_NOT_READY_FOR_ASSIGNMENT","This role is not needed at the current journey stage");}
         else caseActions.assertOperationsAssignable(caseId);
-        if(!workforceDirectory.holds(request.assigneeSubject(),role))throw new ApiException(409,"STAFF_NOT_ELIGIBLE","Select an active staff member from the staff directory");}Instant now=clock.instant();UUID id=UUID.randomUUID();assignments.endOpen(caseId,role,request.assignmentType(),micros(now));String status="PENDING";assignments.saveAndFlush(CaseAssignment.pending(id,caseId,request.assigneeSubject(),role,request.assignmentType(),request.pod(),request.reason(),actor.subject(),now));if("DOCTOR".equals(role))transitionWithoutVersion(caseId,"CONSULTANT_ASSIGNMENT_PENDING","Verified consultant assigned",actor);
+        if(!workforceDirectory.holds(request.assigneeSubject(),role))throw new ApiException(409,"STAFF_NOT_ELIGIBLE","Select an active staff member from the staff directory");}Instant now=clock.instant();UUID id=UUID.randomUUID();assignments.endOpen(caseId,role,request.assignmentType(),micros(now));String status="PENDING";
+        // P1-6: a Consultant offer has a deadline (SlaPolicy working hours, halved on an URGENT case); ConsultantOfferExpiryService declines it when it passes.
+        Instant offerExpiresAt="DOCTOR".equals(role)?work.offerDeadline(caseId,now):null;
+        assignments.saveAndFlush(CaseAssignment.offered(id,caseId,request.assigneeSubject(),role,request.assignmentType(),request.pod(),request.reason(),actor.subject(),now,offerExpiresAt));if("DOCTOR".equals(role))transitionWithoutVersion(caseId,"CONSULTANT_ASSIGNMENT_PENDING","Verified consultant assigned",actor);
         // An assignment is real work for the person receiving it: one work item, one unread notification
         // and one work email, all idempotent. A reassignment closes the superseded item first.
         work.closeWorkItems(caseId,ASSIGNMENT_WORK,"Assignment superseded");work.closeWorkItems(caseId,"REASSIGN_CONSULTANT","Consultant reassigned");
@@ -201,7 +204,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String caseNumber=cases.findCaseNumber(caseId).orElse("");
         work.openWorkItem(new NewWorkItem(caseId,ASSIGNMENT_WORK,"DOCTOR".equals(role)?"New clinical assignment":"New case assignment",
             "You have been assigned case "+caseNumber+" for "+("DOCTOR".equals(role)?"clinical review":"review")+". Accept it to start, or decline so the coordinator can reassign.",
-            request.assigneeSubject(),role,false,null,actor.subject(),"ASSIGNMENT_CREATED","assignment:"+id,true,
+            request.assigneeSubject(),role,false,offerExpiresAt,actor.subject(),"ASSIGNMENT_CREATED","assignment:"+id,true,
             WorkCopy.of("DOCTOR".equals(role)?"NEW_ASSIGNMENT_CLINICAL":"NEW_ASSIGNMENT","caseNumber",caseNumber)));
         if("DOCTOR".equals(role))work.refreshWaitingOn(caseId,"CONSULTANT",WaitingReason.of("AWAITING_CONSULTANT_ACCEPTANCE","Awaiting the consultant to accept the assignment"));
         audit("CASE_ASSIGNED",actor,caseId,"CaseAssignment",id.toString(),"ASSIGN","SUCCESS",request.reason());return new IdResponse(id,status);}

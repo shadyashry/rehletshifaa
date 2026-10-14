@@ -1,4 +1,4 @@
-package com.rehletshifaa.coordination.domain;
+package com.rehletshifaa.shared.time;
 
 import org.junit.jupiter.api.Test;
 

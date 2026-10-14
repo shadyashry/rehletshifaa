@@ -517,6 +517,15 @@ describe("consultant workspace", () => {
     expect(onDecline).not.toHaveBeenCalled();
   });
 
+  it("names the offer deadline, with its time, on the accept/decline card (P1-6)", () => {
+    renderWithWork(<CurrentActionPanel locale="en" role="doctor" action={{ code: "ACCEPT_ASSIGNMENT", kind: "ACCEPT", dueAt: "2026-10-20T12:00:00Z" }}
+                               respondBy="2026-10-20T12:00:00Z" onAcceptAssignment={vi.fn()} onDeclineAssignment={vi.fn()}/>);
+    const expected = new Intl.DateTimeFormat("en", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date("2026-10-20T12:00:00Z"));
+    expect(screen.getByText(`Respond by ${expected}`)).toBeTruthy();
+    // The day-only due chip would say the same thing twice.
+    expect(screen.queryByText(/^Due:/)).toBeNull();
+  });
+
   it("turns the accepted assignment into the clinical work and drops the acceptance controls", () => {
     renderWithWork(<CurrentActionPanel locale="en" role="doctor"
                                action={{ code: "WORK_ITEM", kind: "FOCUS", workItemId: "w1", workItemVersion: 0, workType: "CLINICAL_REVIEW", title: "Review case and provide clinical recommendation" }}

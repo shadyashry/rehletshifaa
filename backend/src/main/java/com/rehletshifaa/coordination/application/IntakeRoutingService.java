@@ -9,7 +9,7 @@ import com.rehletshifaa.coordination.domain.CoordinatorIntakeSetting;
 import com.rehletshifaa.coordination.domain.Routing.Candidate;
 import com.rehletshifaa.coordination.domain.Routing.Capacity;
 import com.rehletshifaa.coordination.domain.Routing.Policy;
-import com.rehletshifaa.coordination.domain.WorkingSchedule;
+import com.rehletshifaa.shared.time.WorkingSchedule;
 import com.rehletshifaa.coordination.infrastructure.CoordinationRepository;
 import com.rehletshifaa.coordination.infrastructure.CoordinatorIntakeSettingRepository;
 import com.rehletshifaa.journey.application.ReplyCoverService;

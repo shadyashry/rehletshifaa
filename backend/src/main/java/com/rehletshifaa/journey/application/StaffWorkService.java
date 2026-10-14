@@ -18,6 +18,7 @@ import com.rehletshifaa.workforce.infrastructure.WorkforceRoleAssignmentReposito
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,11 +70,12 @@ public class StaffWorkService {
 
     private final IntakeLifecycleService intake;
     private final CryptoService crypto;
+    private final SlaPolicy sla;
     private final Clock clock;
     private final String teamMailbox;
     private final ApplicationEventPublisher events;
 
-    public StaffWorkService(IntakeLifecycleService intake, CryptoService crypto, Clock clock,
+    public StaffWorkService(IntakeLifecycleService intake, CryptoService crypto, SlaPolicy sla, Clock clock,
                             @Value("${app.mail.coordinator}") String teamMailbox, AuditTrail auditTrail,
                             NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseTaskRepository tasks,
                             StaffNotificationRepository notifications, WorkforcePersonRepository people,
@@ -81,7 +83,7 @@ public class StaffWorkService {
                             ApplicationEventPublisher events) {
         this.notifications = notifications; this.tasks = tasks; this.cases = cases; this.notificationOutbox = notificationOutbox;
         this.auditTrail = auditTrail; this.people = people; this.roleAssignments = roleAssignments; this.practitioners = practitioners;
-        this.intake = intake; this.crypto = crypto; this.clock = clock; this.teamMailbox = teamMailbox; this.events = events;
+        this.intake = intake; this.crypto = crypto; this.sla = sla; this.clock = clock; this.teamMailbox = teamMailbox; this.events = events;
     }
 
     // ---------------- work items ----------------
@@ -92,6 +94,9 @@ public class StaffWorkService {
      * <p>Deduplicated on an already-open item of the same type for the same case, so a repeated trigger
      * (duplicate deposit confirmation, a second patient response) reactivates attention without piling up
      * identical work. Returns the existing item's id in that case.
+     *
+     * <p>An item opened without a due date gets its queue's service level from {@link SlaPolicy#dueAt} (P1-6), so
+     * {@link #derivePriority} raises it on its own as the due date nears; a type without a service level stays undated.
      */
     @Transactional
     public UUID openWorkItem(NewWorkItem item) { return openWorkItem(item, true); }
@@ -113,7 +118,8 @@ public class StaffWorkService {
             return existing;
         }
         UUID id = UUID.randomUUID();
-        CaseTask task = new CaseTask(id, item.caseId(), item.type(), encrypt(item.title()), encryptNullable(item.context()), item.ownerSubject(), item.ownerRole(), "INTERNAL", derivePriority(item.blocking(), item.dueAt(), urgency(item.caseId()), now), item.blocking(), item.dueAt(), item.createdBy(), now);
+        Instant dueAt = item.dueAt() != null ? item.dueAt() : sla.dueAt(item.type(), now);
+        CaseTask task = new CaseTask(id, item.caseId(), item.type(), encrypt(item.title()), encryptNullable(item.context()), item.ownerSubject(), item.ownerRole(), "INTERNAL", derivePriority(item.blocking(), dueAt, urgency(item.caseId()), now), item.blocking(), dueAt, item.createdBy(), now);
         if (item.copy() != null) task.withCopy(item.copy().code(), encrypt(writeParams(item.copy().params())));
         tasks.saveAndFlush(task);
         audit(item.caseId(), "CASE_WORK_ITEM_OPENED", id, item.type());
@@ -160,13 +166,17 @@ public class StaffWorkService {
      */
     public void changed(UUID caseId) { events.publishEvent(new CaseEvents.WorkChanged(caseId)); }
 
-    /** Work due within this window is escalated: it needs attention today, not in the normal queue order. */
-    private static final Duration DUE_SOON = Duration.ofHours(24);
+    /**
+     * Work due within this window is escalated: it needs attention now, not in the normal queue order. The last stretch
+     * before the due time, not a whole day: queue service levels are one or two working days ({@link SlaPolicy}), so a
+     * day-long window would make every new item HIGH at once and the signal would mean nothing (P1-6).
+     */
+    static final Duration DUE_SOON = Duration.ofHours(4);
 
     /**
      * The only source of a work item's priority. It is a reading of real conditions, never a default:
      * work on a case its coordinator marked URGENT, work that blocks the patient's journey, or work that is already
-     * overdue or due within a day, is HIGH; everything else — including brand-new assignments and PRIORITY cases — is
+     * overdue or due within {@link #DUE_SOON}, is HIGH; everything else — including brand-new assignments and PRIORITY cases — is
      * NORMAL. A person may still raise it explicitly through the task API; nothing here can. {@code urgency} null reads
      * as ROUTINE.
      */
@@ -179,6 +189,23 @@ public class StaffWorkService {
 
     /** The case's current urgency, for {@link #derivePriority}; ROUTINE when the case is unknown. */
     public CaseUrgency urgency(UUID caseId) { return caseId == null ? CaseUrgency.ROUTINE : cases.findUrgency(caseId).orElse(CaseUrgency.ROUTINE); }
+
+    /** When a Consultant offer made now on this case expires: {@link SlaPolicy#offerDeadline} at the case's current urgency (P1-6). */
+    public Instant offerDeadline(UUID caseId, Instant offeredAt) { return sla.offerDeadline(offeredAt, urgency(caseId).urgent()); }
+
+    /**
+     * The due-date half of {@link #derivePriority}, applied over time: open work whose due date has come within
+     * {@link #DUE_SOON} since it was opened is raised to HIGH, so a queue's service level ({@link SlaPolicy}) shows in the
+     * queue order on its own. Raises only, like the urgency raise; idempotent.
+     *
+     * @return how many open items were raised
+     */
+    @Scheduled(fixedDelayString = "${app.sla.due-soon-scan-ms:300000}")
+    @Transactional
+    public int raiseWorkDueSoon() {
+        Instant now = clock.instant();
+        return tasks.raiseDueSoonPriority("HIGH", Set.of("LOW", "NORMAL"), micros(now.plus(DUE_SOON)), micros(now));
+    }
 
     /**
      * The case became URGENT: its open work (staff items and patient actions) is re-read through {@link #derivePriority},

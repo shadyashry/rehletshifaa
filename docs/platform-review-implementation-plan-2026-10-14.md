@@ -380,6 +380,61 @@ phases.
 - Files: new `ConsultantOfferExpiryService`, `DepositPaymentReminders` pattern reused for information requests,
   `StaffWorkService` due-date source, `CaseActionService` wait windows, `MyCare.tsx`, `CaseStatusAccess.tsx`, copy.
 - Sessions: 2. Model: Opus 5.5 fast, medium.
+- **Status (2026-10-14, session 1 of 2, branch `feat/review-p0`):** delivered (Claude Fable 5.1 stood in for Opus 5.5).
+  - Delivered: `V93__consultant_offer_deadline.sql` adds `case_assignments.offer_expires_at` (TIMESTAMP WITH TIME ZONE, indexed
+    with `status`). The working week moved from `coordination.domain.WorkingSchedule` to `shared.time.WorkingSchedule` unchanged,
+    because `coordination` already depends on `journey` and the module-cycle rule forbids the reverse. New `SlaPolicy`
+    (`journey.application`, `@Component`) is the one place the service levels live: the working week (`app.sla.zone`, `days`,
+    `open`, `close`; defaults Cairo, Saturday–Thursday 10:00–20:00, the window the out-of-hours WhatsApp reply states), the
+    offer hours (`app.sla.offer-hours` 48, `urgent-offer-hours` 24) and the queue table in working days (one working day = one
+    window, 10 working hours): Finance verification `DEPOSIT_RECORD` 1, identity review `PATIENT_IDENTITY_REVIEW` 2, Operations
+    `PREPARE_TRAVEL_PACKAGE`/`UPDATE_TRAVEL_PLAN` 2, consultant `CLINICAL_REVIEW` 2, coordinator intake `ASSIGN_CONSULTANT` and
+    `REVIEW_PATIENT_RESPONSE` 1. `StaffWorkService.openWorkItem` gives every item opened without a due date its queue's
+    `SlaPolicy.dueAt` (one place; stage steps from `syncStageWork` and every other creator go through it), so
+    `derivePriority` reads it; the due-date half of that rule is now also applied over time by the scheduled
+    `StaffWorkService.raiseWorkDueSoon` (`app.sla.due-soon-scan-ms`, 5 min; raises LOW/NORMAL open items to HIGH, never lowers).
+    Decision, deviating from the P0-3 wording "due within a day": `DUE_SOON` is now 4 hours, not 24, because a one-working-day
+    item is due within 24 wall-clock hours the moment it opens and every new intake review would have been HIGH at once
+    (`UatDefectCorrectionsTest` G and `OperationalWorkflowTest` guard exactly that); HIGH now means the last stretch before the
+    due time or overdue. Consultant offer TTL (A-03 + the A-02 TODO): `JourneyService.assign` stores
+    `StaffWorkService.offerDeadline(caseId, now)` (= `SlaPolicy.offerDeadline(now, urgency.urgent())`, 48 working hours, 24 on
+    an URGENT case) on a DOCTOR offer through `CaseAssignment.offered` and as the `CONSULTANT_ASSIGNMENT` work item's due date.
+    New `ConsultantOfferExpiryService` (workflow-builder subagent, reviewed; `ProposalExpiryService` shape,
+    `app.sla.offer-expiry-scan-ms` 60 s): `expireOffers` declines each pending primary offer past its deadline through the
+    PENDING-guarded `CaseAssignmentRepository.decline` (idempotent), closes the consultant's offer item, moves the case
+    CONSULTANT_ASSIGNMENT_PENDING → READY_FOR_CONSULTANT with a SYSTEM status-history row, opens the coordinator's existing
+    `REASSIGN_CONSULTANT` item (event `ASSIGNMENT_DECLINED`, copy `ASSIGNMENT_OFFER_EXPIRED` with the consultant's name and the
+    hours), sets waiting-on `ASSIGNMENT_DECLINED_REASSIGN`, tells the consultant in-app (`OFFER_EXPIRED_CONSULTANT`, no email)
+    and audits `CONSULTANT_OFFER_EXPIRED`; `shortenOpenOffer(caseId)`, called by `CaseUrgencyService.set` when a case becomes
+    URGENT, recomputes the open offer's deadline at 24 working hours from when it was made (never extends; a late raise may put
+    it in the past, so the next scan expires it), re-dates the offer work item and audits `CONSULTANT_OFFER_SHORTENED`.
+    Referral offers (TRANSFER, SECOND_OPINION) never expire. `AssignmentView.offerExpiresAt` reaches the frontend: the
+    consultant's accept/decline card (`CurrentActionPanel.respondBy`, "Respond by 14 Oct, 15:00" in place of the day-only due
+    chip) and the coordinator's case page team list ("Offer until …" under a pending consultant). Copy: `portalWork.workCopy.items`
+    `ASSIGNMENT_OFFER_EXPIRED` / `OFFER_EXPIRED_CONSULTANT` and `portalWork.currentAction.respondBy` in EN/AR (mechanical-worker
+    subagent, CRLF kept); the team-list label is inline EN/AR as its siblings.
+  - Tests: new `SlaPolicyTest` (6: defaults, 48/24 working hours across Friday and out-of-hours starts, the queue table, one
+    working day = one window, configurable window, refused nonsense), `WorkServiceLevelTest` (2: SLA due date and derived
+    priority on open, undated types stay undated, explicit dates kept; the due-soon raise is idempotent and skips later and
+    completed items), `ConsultantOfferExpiryServiceTest` (5: deadline on offer and work item, URGENT deadline, expiry with every
+    side effect once and a no-op replay, future and accepted offers untouched, URGENT shortens once), `WorkingScheduleTest`
+    moved with its class; `UatDefectCorrectionsTest` G gains the one-working-day-is-NORMAL case and `OperationalWorkflowTest`
+    now expects the intake review to carry a due date. Verification: `mvn -o -q test` 804 tests, 0 failures, 3 pre-existing skips (791 at bc7c714 + 13 new);
+    `pnpm typecheck` clean; eslint clean on the four touched frontend files; `StaffOperationalUi.test.tsx` (58, incl. the new
+    respond-by case), `StaffWorkspace.test.tsx` (11) and `portal-labels.test.ts` (11) green; `PostgresJpaMappingTest` on
+    postgres:17-alpine with V93 applied green (1/1, the new `CaseAssignmentRepository` and `CaseTaskRepository` queries executed).
+  - Open gaps: identity review has no case work item (the reviewer works from the onboarding state), so its 2-day level is
+    only in the table until session 2 reads it for the patient copy. Referral offers have no deadline. The queue cards
+    (`CaseQueue.tsx`) do not show the offer deadline, only the case page does. The consultant is not told by email that an offer
+    expired, and repeated expiry carries no availability penalty (A-03's last clause, not planned here). Escalation to the Finance
+    Manager on breach (A-04) is not built; HIGH in the queue is the only signal. Native Arabic review of the new copy pending
+    with the rest.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (made on the worktree branch
+    `claude/keen-montalcini-720fa3`) and rebuilds the dev stack (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml
+    up -d --build`) so V93 runs; then P1-6 session 2 in a new session: information-request reminders on day 2 and day 5 and a
+    coordinator alert (`DepositPaymentReminders` pattern), auto-cancel at 30 days through `CaseExitService`, and the
+    patient-facing "usually within N working days" (read `SlaPolicy.workingDays`) plus a "meanwhile" line on every `WAIT_*`
+    state in `CurrentAction.tsx`, `MyCare.tsx` and `CaseStatusAccess.tsx`.
 
 ### P1-7  Retention, purge, erasure, draft clean-up  (E-03, §7.13)
 - `retention_policies` table (record class → days, legal-hold flag); scheduled purge with audit (abandoned drafts

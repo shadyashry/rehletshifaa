@@ -12,7 +12,7 @@ import com.rehletshifaa.conversation.domain.ReplyObligation;
 import com.rehletshifaa.conversation.infrastructure.ConversationSettingsRepository;
 import com.rehletshifaa.conversation.infrastructure.IntakeConversationRepository;
 import com.rehletshifaa.conversation.infrastructure.ReplyObligationRepository;
-import com.rehletshifaa.coordination.domain.WorkingSchedule;
+import com.rehletshifaa.shared.time.WorkingSchedule;
 import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.application.PatientConversationEvents;
 import com.rehletshifaa.journey.application.ReplyCoverService;

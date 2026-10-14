@@ -12,7 +12,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 /**
  * Whether a coordinator takes intake conversations (people writing on WhatsApp before they have a case), how many at
- * once, and their working week ({@link WorkingSchedule} JSON in {@code timeZone}); no schedule means always working.
+ * once, and their working week ({@link com.rehletshifaa.shared.time.WorkingSchedule} JSON in {@code timeZone}); no schedule means always working.
  */
 @Entity
 @Table(name = "coordinator_intake_settings")

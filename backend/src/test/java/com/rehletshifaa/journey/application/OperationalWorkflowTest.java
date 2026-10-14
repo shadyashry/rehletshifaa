@@ -396,7 +396,8 @@ class OperationalWorkflowTest {
         assertThat(card.myWorkCount()).isEqualTo(1);
         assertThat(card.blockingOverdueCount()).isZero();
         assertThat(card.highPriorityCount()).isZero();
-        assertThat(card.nextDueAt()).isNull();
+        // P1-6: the intake review carries its service level (one working day), so the card knows when it is due.
+        assertThat(card.nextDueAt()).isNotNull();
         assertThat(card.patientResponsePending()).isFalse();
     }
 

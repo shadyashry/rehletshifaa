@@ -54,15 +54,41 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
     java.util.List<HeldAssignment> findHeldBy(@Param("caseIds") java.util.Collection<UUID> caseIds, @Param("subject") String subject,
                                               @Param("role") String role);
 
-    interface OpenAssignmentRow { UUID getId(); String getSubject(); String getRole(); String getType(); String getStatus(); Instant getAssignedAt(); Long getVersion(); }
+    interface OpenAssignmentRow { UUID getId(); String getSubject(); String getRole(); String getType(); String getStatus(); Instant getAssignedAt(); Instant getOfferExpiresAt(); Long getVersion(); }
 
     /** The case's pending and active assignments, oldest first. */
     @Query("""
             select a.id as id, a.assigneeSubject as subject, a.assigneeRole as role, a.assignmentType as type, a.status as status,
-                a.assignedAt as assignedAt, a.version as version from CaseAssignment a
+                a.assignedAt as assignedAt, a.offerExpiresAt as offerExpiresAt, a.version as version from CaseAssignment a
             where a.caseId = :caseId and a.status in ('PENDING', 'ACTIVE')
             order by a.assignedAt""")
     java.util.List<OpenAssignmentRow> findOpenRowsOn(@Param("caseId") UUID caseId);
+
+    interface ConsultantOffer { UUID getId(); UUID getCaseId(); String getSubject(); Instant getAssignedAt(); Instant getOfferExpiresAt(); }
+
+    /** P1-6: pending primary Consultant offers whose deadline has passed, oldest deadline first (never referral offers). */
+    @Query("""
+            select a.id as id, a.caseId as caseId, a.assigneeSubject as subject, a.assignedAt as assignedAt, a.offerExpiresAt as offerExpiresAt
+            from CaseAssignment a
+            where a.status = 'PENDING' and a.assigneeRole = 'DOCTOR' and a.assignmentType not in ('TRANSFER', 'SECOND_OPINION')
+            and a.offerExpiresAt is not null and a.offerExpiresAt <= :now
+            order by a.offerExpiresAt, a.id""")
+    java.util.List<ConsultantOffer> findExpiredConsultantOffers(@Param("now") Instant now);
+
+    /** P1-6: the case's open primary Consultant offer, if one is pending (at most one: a new offer ends the old one). */
+    @Query("""
+            select a.id as id, a.caseId as caseId, a.assigneeSubject as subject, a.assignedAt as assignedAt, a.offerExpiresAt as offerExpiresAt
+            from CaseAssignment a
+            where a.caseId = :caseId and a.status = 'PENDING' and a.assigneeRole = 'DOCTOR' and a.assignmentType not in ('TRANSFER', 'SECOND_OPINION')
+            order by a.assignedAt desc""")
+    java.util.List<ConsultantOffer> findOpenConsultantOffer(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
+    /** P1-6: a still-pending offer gets a new deadline (the case became URGENT). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update CaseAssignment a set a.offerExpiresAt = :expiresAt, a.version = a.version + 1
+            where a.id = :id and a.status = 'PENDING'""")
+    int setOfferExpiry(@Param("id") UUID id, @Param("expiresAt") Instant expiresAt);
 
     interface HistoryRow { String getSubject(); String getRole(); String getStatus(); String getReason(); String getAssignedBy(); Instant getAssignedAt(); Instant getEndedAt(); }
 

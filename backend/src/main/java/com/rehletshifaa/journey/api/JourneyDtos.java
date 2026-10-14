@@ -144,7 +144,8 @@ public final class JourneyDtos {
             String policyName,String policyCareArea,Integer policyVersion,BigDecimal marginRate,BigDecimal baseTotalEgp,BigDecimal marginEgp,
             BigDecimal patientTotalEgp,BigDecimal displayTotal,List<ProposalCommercialLine> lines) {}
     /** {@code assigneeName} is resolved server-side so no interface ever renders an identity subject. */
-    public record AssignmentView(UUID id,String assigneeSubject,String assigneeName,String assigneeRole,String assignmentType,String status,Instant assignedAt,long version) {}
+    /** {@code offerExpiresAt}: P1-6, when a pending Consultant offer expires; null on every other assignment. */
+    public record AssignmentView(UUID id,String assigneeSubject,String assigneeName,String assigneeRole,String assignmentType,String status,Instant assignedAt,Instant offerExpiresAt,long version) {}
 
     /** Accept or decline an assignment. Sent in the body so the decision is never a URL parameter. */
     public record AssignmentDecisionRequest(boolean accept,@Size(max=500)String reason) {}

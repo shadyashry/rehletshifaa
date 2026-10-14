@@ -259,7 +259,8 @@ class UatDefectCorrectionsTest {
         Instant now = Instant.now();
         assertThat(StaffWorkService.derivePriority(false, null, null, now)).isEqualTo("NORMAL");
         assertThat(StaffWorkService.derivePriority(true, null, null, now)).isEqualTo("HIGH");     // blocks the journey
-        assertThat(StaffWorkService.derivePriority(false, now.plusSeconds(3600), null, now)).isEqualTo("HIGH"); // due within a day
+        assertThat(StaffWorkService.derivePriority(false, now.plusSeconds(3600), null, now)).isEqualTo("HIGH"); // due within the last stretch (P1-6: 4h)
+        assertThat(StaffWorkService.derivePriority(false, now.plusSeconds(10 * 3600), null, now)).isEqualTo("NORMAL"); // a one-working-day item is not HIGH when opened
         assertThat(StaffWorkService.derivePriority(false, now.plusSeconds(7 * 86400), null, now)).isEqualTo("NORMAL");
     }
 

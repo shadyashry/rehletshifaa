@@ -35,10 +35,11 @@ import java.util.UUID;
  *   <li>a lead alert: the coordinator's team leads and manager (else the Care Coordination Managers) and the
  *       coordinator, when someone else raised it, are told in-app and by work email. The reason never leaves the
  *       encrypted change row, so neither the alert nor the audit carries clinical detail;</li>
- *   <li>a routing tie-break among equally scored Coordinators ({@code CoordinatorScoringService}).</li>
+ *   <li>a routing tie-break among equally scored Coordinators ({@code CoordinatorScoringService});</li>
+ *   <li>a shorter Consultant offer: an open offer's deadline is recomputed at the URGENT working hours
+ *       ({@link ConsultantOfferExpiryService#shortenOpenOffer}, P1-6).</li>
  * </ul>
- * The level is never shown to the patient, who is told to seek local emergency care whatever it is. Halving the
- * Consultant offer deadline waits for the offer deadline itself (P1-6).
+ * The level is never shown to the patient, who is told to seek local emergency care whatever it is.
  */
 @Service
 public class CaseUrgencyService {
@@ -51,14 +52,15 @@ public class CaseUrgencyService {
     private final CaseUrgencyChangeRepository changes;
     private final CaseAssignmentRepository assignments;
     private final StaffWorkService work;
+    private final ConsultantOfferExpiryService offers;
     private final WorkforceDirectory workforce;
     private final AuditTrail auditTrail;
     private final Clock clock;
 
     public CaseUrgencyService(Authority authority, MedicalCaseRepository cases, CaseUrgencyChangeRepository changes,
-                              CaseAssignmentRepository assignments, StaffWorkService work, WorkforceDirectory workforce,
-                              AuditTrail auditTrail, Clock clock) {
-        this.authority = authority; this.cases = cases; this.changes = changes; this.assignments = assignments; this.work = work;
+                              CaseAssignmentRepository assignments, StaffWorkService work, ConsultantOfferExpiryService offers,
+                              WorkforceDirectory workforce, AuditTrail auditTrail, Clock clock) {
+        this.authority = authority; this.cases = cases; this.changes = changes; this.assignments = assignments; this.work = work; this.offers = offers;
         this.workforce = workforce; this.auditTrail = auditTrail; this.clock = clock;
     }
 
@@ -91,6 +93,7 @@ public class CaseUrgencyService {
                 .action(to.name()).outcome("SUCCESS").reason(from.name() + " -> " + to.name()).record();
         if (to.urgent()) {
             work.raiseOpenWorkForUrgency(caseId);
+            offers.shortenOpenOffer(caseId);
             alertLeads(caseId, c.getCaseNumber(), actor.subject(), change.getId());
         }
         return view(to, change);

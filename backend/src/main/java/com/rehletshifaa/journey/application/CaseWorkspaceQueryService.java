@@ -154,7 +154,7 @@ public class CaseWorkspaceQueryService {
                     m.getChannel(), m.getAttachmentDocumentId(), m.getAttachmentStatus());
         }).toList();
         List<AssignmentView> assignmentViews = assignmentRows.stream().map(a -> new AssignmentView(a.getId(), a.getSubject(),
-                names.actor(a.getSubject(), a.getRole()), a.getRole(), a.getType(), a.getStatus(), a.getAssignedAt(), a.getVersion())).toList();
+                names.actor(a.getSubject(), a.getRole()), a.getRole(), a.getType(), a.getStatus(), a.getAssignedAt(), a.getOfferExpiresAt(), a.getVersion())).toList();
 
         List<ClinicalReviewView> reviewViews = clinicalReviews(caseId);
         if (patientActor) reviewViews = reviewViews.stream().filter(r -> "APPROVED".equals(r.status())).map(CaseWorkspaceQueryService::forPatient).toList();

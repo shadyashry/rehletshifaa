@@ -33,11 +33,13 @@ export type SecondaryAction = { label: string; onClick: () => void };
  * <p>Everything here comes from the backend's action contract. Future workflow steps are absent until
  * they become the current action, and nothing is offered that the backend would refuse.
  */
-export function CurrentActionPanel({ locale, role, action, response, busy, secondary = [], form, onComplete, onFocusAction, onClaim, onAcceptAssignment, onDeclineAssignment }: {
+export function CurrentActionPanel({ locale, role, action, response, busy, secondary = [], form, respondBy, onComplete, onFocusAction, onClaim, onAcceptAssignment, onDeclineAssignment }: {
   locale: Locale; role: string; action: CurrentActionView; response?: ResponseContext | null; busy?: boolean;
   secondary?: SecondaryAction[];
   /** The form that does a FOCUS step, shown here instead of a button that scrolls to it: one entry point per action. */
   form?: ReactNode;
+  /** P1-6: when the offer this panel accepts or declines expires (ISO instant); shown with the time, in place of the day-only due date. */
+  respondBy?: string | null;
   onComplete?: (evidence: string) => void; onFocusAction?: () => void; onClaim?: () => void;
   onAcceptAssignment?: () => void; onDeclineAssignment?: () => void;
 }) {
@@ -53,13 +55,19 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
   const primary: Primary = form && found.kind === "focus" ? { label: "", kind: "none" } : found;
   const showResponse = !!response && (!!response.message || !!response.documentName);
   const waiting = action.kind === "WAIT" || action.kind === "NONE";
+  const deadline = primary.kind === "accept" && respondBy ? respondBy : null;
 
   return (
     <section id="current-action" aria-labelledby="current-action-title"
              className={`mt-4 rounded-lg border bg-white p-4 shadow-[0_1px_2px_rgba(28,51,58,0.04)] sm:p-5 ${waiting ? "border-line" : "border-brand-200"}`}>
       <div className="flex flex-wrap items-center gap-2">
         <p className="label-micro text-brand-700 rtl:normal-case rtl:tracking-normal">{t.label}</p>
-        {action.dueAt && (
+        {deadline ? (
+          <span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500">
+            <CalendarClock size={13} aria-hidden/>
+            {t.respondBy.replace("{time}", new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(deadline)))}
+          </span>
+        ) : action.dueAt && (
           <span className={`inline-flex items-center gap-1 text-[0.8125rem] ${action.overdue ? "font-bold text-alert-700" : "text-ink-500"}`}>
             {action.overdue ? <CircleAlert size={13} aria-hidden/> : <CalendarClock size={13} aria-hidden/>}
             {action.overdue ? t.overdue : t.due}{": "}

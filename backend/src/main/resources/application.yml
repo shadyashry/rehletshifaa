@@ -178,6 +178,20 @@ app:
     poll-milliseconds: ${NOTIFICATION_POLL_MILLISECONDS:5000}
   credentials:
     reminder-days: ${CREDENTIAL_REMINDER_DAYS:30,7,1}
+  # P1-6: service levels (SlaPolicy). The working week every staff clock is counted in: Cairo time, Saturday to
+  # Thursday 10:00-20:00 by default, the window the out-of-hours WhatsApp reply states. A working day is one window.
+  sla:
+    zone: ${SLA_ZONE:Africa/Cairo}
+    days: ${SLA_DAYS:SATURDAY,SUNDAY,MONDAY,TUESDAY,WEDNESDAY,THURSDAY}
+    open: ${SLA_OPEN:10:00}
+    close: ${SLA_CLOSE:20:00}
+    # Working hours a Consultant has to answer an offer before it is declined for them (ConsultantOfferExpiryService);
+    # the shorter figure applies to an URGENT case.
+    offer-hours: ${SLA_OFFER_HOURS:48}
+    urgent-offer-hours: ${SLA_URGENT_OFFER_HOURS:24}
+    offer-expiry-scan-ms: ${SLA_OFFER_EXPIRY_SCAN_MS:60000}
+    # How often open work that is now in the last stretch before its due time (StaffWorkService.DUE_SOON) is raised to HIGH.
+    due-soon-scan-ms: ${SLA_DUE_SOON_SCAN_MS:300000}
   facilities:
     # Accreditation renewal reminders to the facility contact, days before expiry (FacilityAccreditationExpiryService).
     reminder-days: ${FACILITY_ACCREDITATION_REMINDER_DAYS:60,30,7}

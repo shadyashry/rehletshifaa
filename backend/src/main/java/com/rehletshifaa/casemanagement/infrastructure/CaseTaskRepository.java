@@ -295,6 +295,21 @@ public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
     int raiseOpenPriority(@Param("caseId") UUID caseId, @Param("to") String to, @Param("from") java.util.Collection<String> from,
                           @Param("now") Instant now);
 
+    /** P1-6: open items of the lower priorities that are due by {@code dueBy} are raised (StaffWorkService.raiseWorkDueSoon). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update CaseTask t set t.priority = :to, t.updatedAt = :now, t.version = t.version + 1
+            where t.status in ('OPEN', 'IN_PROGRESS') and t.priority in :from and t.dueAt is not null and t.dueAt <= :dueBy""")
+    int raiseDueSoonPriority(@Param("to") String to, @Param("from") java.util.Collection<String> from, @Param("dueBy") Instant dueBy,
+                             @Param("now") Instant now);
+
+    /** P1-6: the open items of a type on a case get a new due date (a Consultant offer shortened by urgency). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update CaseTask t set t.dueAt = :dueAt, t.updatedAt = :now, t.version = t.version + 1
+            where t.caseId = :caseId and t.taskType = :type and t.status in ('OPEN', 'IN_PROGRESS')""")
+    int setOpenDueAt(@Param("caseId") UUID caseId, @Param("type") String type, @Param("dueAt") Instant dueAt, @Param("now") Instant now);
+
     /** Gives the task to another owner; it starts again as OPEN. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
