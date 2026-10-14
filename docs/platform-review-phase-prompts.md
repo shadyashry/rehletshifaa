@@ -98,6 +98,74 @@ green, do not push, update the P0-5 plan entry.
 
 ---
 
+## P1-6 — Time bounds on waits
+Model: Opus 5.5 · Effort: medium · Fast: on · Sessions: 2
+
+```
+Implement phase P1-6, session 1 of 2, of docs/platform-review-implementation-plan-2026-10-14.md (findings A-03, A-04,
+A-10, D-02 in docs/platform-review-2026-10-14.md, plus the A-02 TODO recorded under P1-6). Intended model: Opus 5.5,
+effort medium, fast mode on. If you are a different model, say so in your first line and continue.
+
+Before you start: read AGENTS.md, then the P1-6 entry in the plan file and the P0-3 and P0-5 Status entries just above
+it (urgency vocabulary, migration numbering, verification shape). Do not re-discover the architecture.
+
+Branch: work on top of feat/review-p0, whose HEAD is bc7c714 (local, not pushed). If this session runs in a worktree on
+another branch, first run `git merge --ff-only bc7c714`, do the work there, commit, and say so in your final report so
+the owner can fast-forward feat/review-p0.
+
+Session 1 scope (the staff-side clocks):
+1. Consultant offer TTL: an offered assignment expires after 48 working hours (24 when the case is URGENT, read with
+   StaffWorkService.urgency(caseId) or CaseUrgency.urgent()); on expiry the offer is auto-declined with an audited
+   reason, the coordinator gets the existing "offer declined" work item, and CaseUrgencyService.set recomputes an open
+   offer's deadline when it raises a case to URGENT. Store the deadline on the assignment row (V93, TIMESTAMP WITH TIME
+   ZONE, one ADD COLUMN per ALTER) and show it on the consultant's offer card and the coordinator's case page.
+2. SLA table per queue written into work-item due dates so HIGH priority derives automatically through
+   StaffWorkService.derivePriority: Finance verification 1 working day, identity review 2, Operations plan 2, consultant
+   review 2, coordinator intake review 1. Put the table in one place (a small SlaPolicy class with the working-hours
+   rule next to it) and read it where StaffWorkService.openWorkItem / syncStageWork create items.
+3. Working hours: Cairo time, Saturday to Thursday 10:00-20:00, the same window the out-of-hours notification already
+   states; look for an existing business-hours helper before writing one, and make the window configurable under
+   app.sla.* with those defaults.
+Session 2 (later, not now): information-request reminders on day 2 and day 5, a coordinator alert, auto-cancel at 30
+days through CaseExitService; patient-facing "usually within N working days" plus a "meanwhile" line on every WAIT_*
+state in CurrentAction.tsx, MyCare.tsx and CaseStatusAccess.tsx.
+
+Facts the plan predates:
+- The next free Flyway version is V93. V90-V92 are P0-5 (facilities). Migrations stay H2-safe: TIMESTAMP WITH TIME
+  ZONE, one ADD COLUMN per ALTER, no partial indexes; CHECK constraints named.
+- Persistence is JPA only: no plain SQL, no native queries, repositories extend BaseRepository, entities in ..domain..,
+  repositories in ..infrastructure.., controllers call application services only. ArchitectureRulesTest must stay
+  green (no cycles). Prove mappings with PostgresJpaMappingTest.
+- Expiry-job patterns to copy: ProposalExpiryService, CredentialExpiryService, FacilityAccreditationExpiryService
+  (all @Scheduled fixedDelayString, @Transactional, idempotent, audited). Reminder pattern: DepositPaymentReminders.
+- Source files are CRLF (some LF). Git Bash `sed -i` strips CR, and heredocs containing apostrophes break the Bash tool:
+  write Python edit scripts to the scratchpad that normalise newlines before matching and restore the file's endings.
+- The worktree starts without node_modules: run `pnpm install --offline --frozen-lockfile` in frontend (about two
+  minutes from the store).
+- Patient-facing copy lives in frontend/src/messages/en.json and ar.json (CRLF; edit surgically, never re-serialise);
+  staff screens under components/portal carry inline en/ar objects. Logical CSS only, WCAG 2.2 AA.
+
+Delegation (you own scope, the migration, the lifecycle and authority rules, integration and all verification):
+- Delegate the offer-expiry job and its test to the workflow-builder subagent after you have written the V93 column,
+  the entity field and the SlaPolicy class; tell it the deadline rule and the audit event name; review its diff.
+- Delegate the EN/AR copy for the deadline labels to the mechanical-worker subagent with exact strings and key paths.
+- Subagents never run Maven or pnpm. You run every build and test yourself, one at a time, never two in parallel.
+- Anything that touches CaseTransitionPolicy, CaseExitService or PaymentService stays with you.
+
+Verification: `cd backend && mvn -o -q test` stays at 0 failures (3 pre-existing skips; the suite was 791/0 at bc7c714).
+Frontend: `pnpm typecheck`, the unit tests of the touched components, eslint on touched files. Then the PostgreSQL
+proof: `docker run -d --name rs-jpa-mapping-pg -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=jpa_mapping_test -p
+127.0.0.1:55439:5432 postgres:17-alpine`, wait for pg_isready, run `mvn -o -q -Dtest=PostgresJpaMappingTest
+-Djpa.postgres.test-url=jdbc:postgresql://127.0.0.1:55439/jpa_mapping_test test`, then `docker rm -f rs-jpa-mapping-pg`.
+
+Finish: when green, commit with a conventional message (feat(p1-6): ...) ending in "Co-Authored-By: <your model name>
+<noreply@anthropic.com>". Do not push. Update the P1-6 entry in the plan file with a Status block in the same shape as
+the P0-5 entries: delivered work, tests and verification numbers, open gaps, and the next exact action (P1-6 session 2,
+and that the owner must fast-forward feat/review-p0 and rebuild the dev stack so V93 runs).
+```
+
+---
+
 ## Delegation inside a session
 
 A Fable session can hand bounded work to the project subagents in `.claude/agents/`:
