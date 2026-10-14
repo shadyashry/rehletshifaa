@@ -704,17 +704,10 @@ export on demand (C-07); region-per-market deployment (E-10); video consultation
 
 ---
 
-<<<<<<< HEAD
-## Remaining work (as of 2026-10-14, after P1-6; re-prioritised with the post-deposit design and the UX review)
+## Remaining work (as of 2026-10-14, after P1-8 session 1; re-prioritised with the post-deposit design and the UX review)
 
-Delivered on `feat/review-p0` (pushed at `69329b8`; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped), P0-5,
-P1-6, and the P1-8 kickoff prompt. Everything below is still to do.
-=======
-## Remaining work (as of 2026-10-14, after P1-8 session 1)
-
-Delivered on `feat/review-p0` (local, not pushed; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped), P0-5, P1-6, P1-8 session 1 (meters, internal metrics port, alert rules).
-Everything below is still to do, in the recommended order.
->>>>>>> 5919bf1
+Delivered on `feat/review-p0` (pushed at `e68dbc5`, local beyond that; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped),
+P0-5, P1-6, and P1-8 session 1 (meters, internal metrics port, alert rules; `5919bf1`). Everything below is still to do.
 
 **Why the order changed.** The owner's two priorities are (1) a complete, auditable journey after the deposit —
 today nothing collects, proves or reconciles money after the 15%, and the Consultant's hospital deal is invisible —
@@ -727,8 +720,7 @@ drill (P1-9) stay launch blockers that do not shape the product.
 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
-<<<<<<< HEAD
-| 1 | P1-8 Metrics, alerts, scheduler leadership | 2 + 1 short | Opus 5.5, medium; ShedLock check Fable high | Prompt block written (`69329b8`); ShedLock now covers 19 `@Scheduled` jobs |
+| 1 | P1-8 Metrics, alerts, scheduler leadership | session 1 done; session 2 + 1 short left | Opus 5.5, medium; lease check Fable high | Session 2 (running): JPA lease table (V95, owner chose it over ShedLock; database clock) on the sweep, expiry and cron jobs, not the claim-based queue workers (session 2 lists the exact split); approved fetch of `micrometer-registry-prometheus` and the Prometheus/Grafana images; dashboard JSON and rule files |
 | 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: D-A (platform fee line), guarantee wording, final-quote validity; counsel on the VAT rate of the fee |
 | 3 | **P1-20 Public site trust pass** (parallel track) | 3 | Fable (shape, hero), Opus (form, cards), Sonnet (copy) | Owner reads the UX review; shape-plan gate |
 | 4 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
@@ -748,18 +740,6 @@ drill (P1-9) stay launch blockers that do not shape the product.
 
 Decision D-I (PDPL licence application; liability-fund subscription as a Consultant credential) is not a phase: start
 the licence now; the credential type is a one-line addition in P1-19.
-=======
-| 1 | P1-8 Metrics, alerts, scheduler leadership | session 1 done; session 2 + 1 short left | Opus 5.5, medium; lease check Fable high | Session 2: JPA lease table (V95, owner chose it over ShedLock, database clock) on the 17 sweep jobs, not the 5 claim-based workers; Grafana dashboard JSON; Prometheus registry and images only with the owner's OK |
-| 2 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide the retention of plaintext WhatsApp sender digits (carried from P0-1) |
-| 3 | P1-10 Commercial truth on the proposal | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: guarantee wording and final-quote validity |
-| 4 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-10, so the extracted code is final |
-| 5 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths reviewed by Fable | Owner: payer terms and partner commission |
-| 6 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — |
-| 7 | P1-9 Backups and restore drill | 1–2 | Opus 5.5, medium | — |
-| 8 | P1-14 Consultant public profiles | 1 | Sonnet 5.5; Impeccable pass by Fable | — |
-| 9 | P2-15 … P2-26 | about 20 | per the P2 table | P2-15 needs the second-destination timing decision |
-| 10 | P3 backlog | one each | Sonnet or Opus | — |
->>>>>>> 5919bf1
 
 ### Owner decisions still open
 
