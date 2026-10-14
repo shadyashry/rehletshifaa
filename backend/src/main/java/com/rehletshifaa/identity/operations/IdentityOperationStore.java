@@ -13,7 +13,9 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 
 @Service
 public class IdentityOperationStore {
-    static final long LEASE_SECONDS = 120;
+    /** How long a claimed operation stays invisible; a process that dies mid-call releases it by expiry. Leaves
+     *  {@link IdentityOperationProcessor#EXECUTE_MARGIN} plus a working window for a batch of twenty. */
+    static final long LEASE_SECONDS = 300;
     private static final long MAX_BACKOFF_SECONDS = 3600;
     private final IdentityOperationRepository operations;
     private final Clock clock;

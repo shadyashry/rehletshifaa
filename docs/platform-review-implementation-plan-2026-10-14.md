@@ -634,6 +634,39 @@ phases.
     claiming in `QueuedNotificationRepository`, `WhatsAppInboundMessageRepository`, `IdentityOperationRepository`,
     `ReplyObligationRepository`, `IntakeConversationRepository` and `BaseRepositoryImpl`; then the next phase in the
     re-prioritised "Remaining work" list (P1-10).
+- **Verification (2026-10-15, Fable 5.1 high, branch `claude/p1-8-verify-125954`, cut from 1074125):** lease and row-lock
+  claiming reviewed for correctness under concurrency; one defect fixed.
+  - Scheduler lease: no defect. The take is one guarded UPDATE, so under READ COMMITTED the loser re-evaluates the row after
+    the winner's commit and no longer matches (`locked_until` moved, holder changed); the holder-retake disjunct matches only
+    a released take (`last_*_at >= locked_at`; a takeover moves `locked_at` forward, so a stale stamp never re-opens a running
+    lease); the first-row insert race ends in a unique-key violation that `tryTake` reports as "not taken"; release is guarded
+    by holder + `locked_at`, both from the database clock truncated to the column's microseconds. The advisor is
+    `@Role(INFRASTRUCTURE)` at `HIGHEST_PRECEDENCE`, so the auto-proxy creator applies it outermost and the transaction advisor
+    (lowest precedence) runs inside it, for beans with and without `@Transactional`; the scheduler calls the proxy. Max holds:
+    every EXPIRY_SCAN and SWEEP job is database-only (batched or per-case); DAILY covers `IdentityReconciliationService` (one
+    Keycloak call per staff member, stops at the first unavailable) and `PiiKeyRotationService` (off by default). A job that
+    outlives its hold can overlap another instance and its late release is a logged no-op (known gap, kept). A skipped call
+    returns 0 / false / nothing. 18 `@LeasedJob` = 21 `@Scheduled` minus the 3 claim-based workers, confirmed by grep. New
+    `SchedulerLeaseTest.theLeaseAdviceIsTheOutermostAdviceOnEveryLeasedJobBean`: every leased bean is a proxy, the lease advisor
+    is outermost, beans with and without the transaction advisor are both covered, every leased method is public and not
+    final and matched by the pointcut, all 17 test-context jobs present. Low, not changed: a `tryTake` that fails on a database
+    outage is not counted in `scheduler.job.failures` (the stale-success alert covers it); a cron lease's minimum hold is
+    `maxHold` (60 min), so two instances whose clocks differ by more than an hour would both run a daily job.
+  - Row-lock claiming: `PESSIMISTIC_WRITE` + `jakarta.persistence.lock.timeout=-2` renders as `for update skip locked` on
+    PostgreSQL for all five claim queries (`lockDue` x4, `lockIdle`; seen in the SQL log of the proof run); in each store the
+    lock, the status change and the lease stamp commit in one transaction, so a second instance never sees a claimed row as
+    due before its lease expires. **Fixed (Medium): `IdentityOperationProcessor` executed every claimed operation however
+    little of its 120 s lease was left**, so with two instances and a slow Keycloak a batch of twenty could outlive its lease
+    and the other instance re-claim a RUNNING operation by expiry and execute it twice (a second invitation or reset e-mail;
+    the outcome write stays guarded by `attempts`). Fix, as the outbox's `SEND_MARGIN`: `EXECUTE_MARGIN` = 120 s hands back
+    uncharged (`store.release`) any operation whose lease is nearly spent, and `LEASE_SECONDS` 120 -> 300 (as the outbox and
+    inbound stores). New `IdentityOperationProcessorTest` (2). Low, not changed: `WhatsAppInboundProcessor` has no such margin,
+    but filing is idempotent by provider message id (`ALREADY_FILED`), so a reclaimed message only repeats the media fetch; the
+    three workers judge lease expiry by the instance clock, not the database clock (one VM: no skew).
+  - Verification run: focused `SchedulerLeaseTest` (9), `IdentityOperationProcessorTest` (2), `IdentityOperationIntegrationTest`
+    (3), `ArchitectureRulesTest` (22): 0 failures; `PostgresJpaMappingTest` on postgres:17-alpine green with SQL logging. The
+    full `mvn -o -q test` was NOT run in this session (usage limit): run it once before fast-forwarding `feat/review-p0`.
+  - Next: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack (V95); then P1-10 per "Remaining work".
 
 ### P1-9  Backups and restore drill  (E-09)
 - Managed Postgres PITR settings documented and scripted for the chosen host; versioned S3 with cross-region copy;
@@ -792,7 +825,7 @@ drill (P1-9) stay launch blockers that do not shape the product.
 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
-| 1 | P1-8 Metrics, alerts, scheduler leadership | sessions 1 and 2 done; 1 short verification left | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
+| 1 | P1-8 Metrics, alerts, scheduler leadership | sessions 1 and 2 done; verification done 2026-10-15 (one fix, full suite still to run) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
 | 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: D-A (platform fee line), guarantee wording, final-quote validity; counsel on the VAT rate of the fee |
 | 3 | **P1-20 Public site trust pass** (parallel track) | 3 | Fable (shape, hero), Opus (form, cards), Sonnet (copy) | Owner reads the UX review; shape-plan gate |
 | 4 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |

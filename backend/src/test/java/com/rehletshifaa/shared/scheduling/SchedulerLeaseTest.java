@@ -1,6 +1,7 @@
 package com.rehletshifaa.shared.scheduling;
 
 import com.rehletshifaa.journey.application.ConsultantOfferExpiryService;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import com.rehletshifaa.shared.scheduling.application.SchedulerJobMetrics;
 import com.rehletshifaa.shared.scheduling.application.SchedulerLeases;
 import com.rehletshifaa.shared.scheduling.application.SchedulerLeases.Terms;
@@ -9,13 +10,26 @@ import com.rehletshifaa.shared.scheduling.infrastructure.SchedulerLeaseRepositor
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.Advisor;
+import org.springframework.aop.PointcutAdvisor;
+import org.springframework.aop.framework.Advised;
+import org.springframework.aop.interceptor.ExposeInvocationInterceptor;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.MethodIntrospector;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.interceptor.BeanFactoryTransactionAttributeSourceAdvisor;
+import org.springframework.util.ClassUtils;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -24,6 +38,8 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -44,6 +60,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 class SchedulerLeaseTest {
     static final Instant SKEWED = Instant.parse("2001-01-01T00:00:00Z");
+    /** The leased jobs present in the test context (CoordinationQueueRetry exists only with the coordination queue switched on). */
+    static final List<String> LEASED_JOBS = List.of("AccessHygieneService.runRecertificationSchedule", "AccessHygieneService.disableDormantAccounts",
+            "StaffLifecycleService.expireInvitations", "IntakeConversationService.releaseDepartedOwners",
+            "ReplyTimerService.dispatch", "ReplyTimerService.closeIdle", "CoordinatorDepartureService.releaseDepartedOwners",
+            "FacilityAccreditationExpiryService.expireAccreditations", "IdentityReconciliationService.scheduled",
+            "ConsultantOfferExpiryService.expireOffers", "CredentialExpiryService.expireCredentials", "DepositPaymentReminders.sweep",
+            "InformationRequestReminders.sweep", "PoolWorkDepartureService.releaseDepartedOwners",
+            "ProposalExpiryService.expireReleasedProposals", "StaffWorkService.raiseWorkDueSoon", "PiiKeyRotationService.rotate");
 
     @TestConfiguration
     static class SkewedClock {
@@ -62,6 +86,7 @@ class SchedulerLeaseTest {
     @Autowired SchedulerLeaseRepository repository; @Autowired PlatformTransactionManager transactions;
     @Autowired SchedulerJobMetrics metrics; @Autowired SchedulerLeases contextLeases; @Autowired MeterRegistry registry;
     @Autowired ConsultantOfferExpiryService offers; @Autowired SettableClock clock;
+    @Autowired ConfigurableListableBeanFactory beans; @Autowired @Qualifier("leasedJobAdvisor") Advisor leasedJobAdvisor;
 
     SchedulerLeases instance(String holder) { return new SchedulerLeases(repository, transactions, metrics, holder); }
 
@@ -183,14 +208,44 @@ class SchedulerLeaseTest {
                 .isEqualTo(ran.getLastSucceededAt().plus(Duration.ofSeconds(60)));
     }
 
+    /**
+     * P1-8 verification: the lease advice is the outermost advice on every bean with a {@link LeasedJob} method, whether the
+     * bean is transactional (the transaction advisor comes after it, so the job's transaction opens after the take and commits
+     * before the release) or carries no other advice at all (the advisor alone makes it a proxy); every leased method is
+     * public and not final, so the proxy can intercept it, and the pointcut matches each one.
+     */
+    @Test void theLeaseAdviceIsTheOutermostAdviceOnEveryLeasedJobBean() {
+        Set<String> leased = new TreeSet<>();
+        int transactional = 0, plain = 0;
+        for (String name : beans.getBeanDefinitionNames()) {
+            Class<?> type = beans.getType(name, false);
+            if (type == null) continue;
+            Class<?> user = ClassUtils.getUserClass(type);
+            if (!user.getName().startsWith("com.rehletshifaa.")) continue;
+            Set<Method> methods = MethodIntrospector.selectMethods(user, (MethodIntrospector.MetadataLookup<LeasedJob>) method ->
+                    AnnotatedElementUtils.findMergedAnnotation(method, LeasedJob.class)).keySet();
+            if (methods.isEmpty()) continue;
+            Object bean = beans.getBean(name);
+            assertThat(AopUtils.isAopProxy(bean)).as(name + " is proxied").isTrue();
+            List<Advisor> advisors = List.of(((Advised) bean).getAdvisors());
+            int lease = advisors.indexOf(leasedJobAdvisor);
+            assertThat(lease).as(name + " carries the lease advisor").isNotNegative();
+            for (Advisor outer : advisors.subList(0, lease))
+                assertThat(outer.getAdvice()).as(name + ": only AspectJ invocation exposure may wrap the lease").isInstanceOf(ExposeInvocationInterceptor.class);
+            if (advisors.stream().anyMatch(a -> a instanceof BeanFactoryTransactionAttributeSourceAdvisor)) transactional++; else plain++;
+            for (Method method : methods) {
+                assertThat(Modifier.isPublic(method.getModifiers()) && !Modifier.isFinal(method.getModifiers())).as(method + " can be proxied").isTrue();
+                assertThat(((PointcutAdvisor) leasedJobAdvisor).getPointcut().getMethodMatcher().matches(method, user)).as(method + " matches the pointcut").isTrue();
+                leased.add(user.getSimpleName() + "." + method.getName());
+            }
+        }
+        assertThat(leased).containsAll(LEASED_JOBS);
+        assertThat(transactional).as("leased beans that also carry the transaction advisor").isPositive();
+        assertThat(plain).as("leased beans proxied by the lease advisor alone").isPositive();
+    }
+
     @Test void everyLeasedJobHasItsMetersFromStartup() {
-        for (String job : List.of("AccessHygieneService.runRecertificationSchedule", "AccessHygieneService.disableDormantAccounts",
-                "StaffLifecycleService.expireInvitations", "IntakeConversationService.releaseDepartedOwners",
-                "ReplyTimerService.dispatch", "ReplyTimerService.closeIdle", "CoordinatorDepartureService.releaseDepartedOwners",
-                "FacilityAccreditationExpiryService.expireAccreditations", "IdentityReconciliationService.scheduled",
-                "ConsultantOfferExpiryService.expireOffers", "CredentialExpiryService.expireCredentials", "DepositPaymentReminders.sweep",
-                "InformationRequestReminders.sweep", "PoolWorkDepartureService.releaseDepartedOwners",
-                "ProposalExpiryService.expireReleasedProposals", "StaffWorkService.raiseWorkDueSoon", "PiiKeyRotationService.rotate")) {
+        for (String job : LEASED_JOBS) {
             assertThat(registry.find("scheduler.job.last.success").tag("task", job).gauge()).as(job).isNotNull();
             assertThat(registry.find("scheduler.job.duration").tag("task", job).timer()).as(job).isNotNull();
             assertThat(registry.find("scheduler.job.failures").tag("task", job).counter()).as(job).isNotNull();
