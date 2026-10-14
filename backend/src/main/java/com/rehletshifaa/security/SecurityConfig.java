@@ -5,13 +5,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 @Configuration
 public class SecurityConfig {
-    @Bean SecurityFilterChain security(HttpSecurity http,@Value("${app.security.enabled:false}")boolean securityEnabled,CorsConfigurationSource corsConfigurationSource,DatabaseAuthenticationConverter databaseRoles,RestoreSignInBlockFilter restoreSignInBlock)throws Exception{http.csrf(csrf->csrf.disable()).cors(cors->cors.configurationSource(corsConfigurationSource)).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).authorizeHttpRequests(auth->auth
+    @Bean SecurityFilterChain security(HttpSecurity http,@Value("${app.security.enabled:false}")boolean securityEnabled,CorsConfigurationSource corsConfigurationSource,DatabaseAuthenticationConverter databaseRoles,RestoreSignInBlockFilter restoreSignInBlock,MetricsPort metricsPort)throws Exception{http.csrf(csrf->csrf.disable()).cors(cors->cors.configurationSource(corsConfigurationSource)).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).authorizeHttpRequests(auth->auth
         .requestMatchers(HttpMethod.POST,"/api/v1/cases").permitAll()
         .requestMatchers(HttpMethod.POST,"/api/v1/cases/*/documents/presign","/api/v1/cases/*/documents/confirm","/api/v1/cases/*/submit").permitAll()
         .requestMatchers(HttpMethod.PUT,"/api/v1/local-uploads/*").permitAll()
         .requestMatchers(HttpMethod.GET,"/api/v1/local-downloads/*").permitAll()
         .requestMatchers("/api/v1/public/**").permitAll()
         .requestMatchers("/actuator/health/**","/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
+        // P1-8: the operational meters, on the internal metrics port only (never the main port, the gateway or the tunnel).
+        .requestMatchers("/actuator/metrics","/actuator/metrics/**").access(metricsPort)
                 // Every business path requires authentication only; the authority core decides each request from the database.
         .requestMatchers("/api/v1/patient/**","/api/v1/coordinator/**","/api/v1/doctor/**","/api/v1/operations/**","/api/v1/finance/**","/api/v1/identity-review/**").authenticated()
         .requestMatchers("/api/v1/account/preferences").authenticated()

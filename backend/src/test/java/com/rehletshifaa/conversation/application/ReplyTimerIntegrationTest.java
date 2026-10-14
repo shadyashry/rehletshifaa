@@ -10,6 +10,7 @@ import com.rehletshifaa.journey.application.JourneyService;
 import com.rehletshifaa.journey.application.PatientChannelService;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.workforce.WorkforceTestData;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +20,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -29,6 +34,9 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 /**
  * S5: a waiting patient reminds their replier after 30 working minutes and alerts the replier's lead (or, with nobody
@@ -62,6 +70,9 @@ class ReplyTimerIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired CryptoService crypto;
     @Autowired EntityManager em;
+    @Autowired MeterRegistry registry;
+    @Autowired PlatformTransactionManager transactions;
+    @MockitoSpyBean ConversationMetrics metrics;
 
     SettableClock time() { return (SettableClock) clock; }
 
@@ -110,6 +121,9 @@ class ReplyTimerIntegrationTest {
         tick(Duration.ofHours(1));
         assertThat(notifications(OWNER, "REPLY_REMINDER")).as("once").isEqualTo(1);
         assertThat(notifications(LEAD, "REPLY_ESCALATED")).as("once").isEqualTo(1);
+        // P1-8: one breach, counted once; the later sweep that escalates nothing counts nothing.
+        verify(metrics, times(1)).replyTimerBreached(anyString(), anyString());
+        verify(metrics).replyTimerBreached("intake", "lead");
     }
 
     @Test void anAnswerStopsTheClock() {
@@ -129,6 +143,31 @@ class ReplyTimerIntegrationTest {
 
         tick(Duration.ofMinutes(61));
         assertThat(notifications(MANAGER, "REPLY_ESCALATED")).isEqualTo(1);
+        verify(metrics).replyTimerBreached("intake", "managers");
+    }
+
+    @Test void theBreachCounterCountsOnlyWhatCommitted() {
+        for (String channel : new String[] {"case", "intake"}) for (String step : new String[] {"lead", "managers"})
+            assertThat(registry.find("conversation.reply.timer.breach").tag("conversation", channel).tag("step", step).counter()).isNotNull();
+        double before = breaches("intake", "lead");
+
+        // This test's own transaction never commits: nothing is counted.
+        metrics.replyTimerBreached("intake", "lead");
+        assertThat(breaches("intake", "lead")).isEqualTo(before);
+
+        TransactionTemplate committed = new TransactionTemplate(transactions);
+        committed.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        committed.executeWithoutResult(status -> metrics.replyTimerBreached("intake", "lead"));
+        assertThat(breaches("intake", "lead")).isEqualTo(before + 1);
+
+        TransactionTemplate rolledBack = new TransactionTemplate(transactions);
+        rolledBack.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        rolledBack.executeWithoutResult(status -> { metrics.replyTimerBreached("intake", "lead"); status.setRollbackOnly(); });
+        assertThat(breaches("intake", "lead")).isEqualTo(before + 1);
+    }
+
+    double breaches(String channel, String step) {
+        return registry.get("conversation.reply.timer.breach").tag("conversation", channel).tag("step", step).counter().count();
     }
 
     @Test void aCasePatientWaitsUntilTheCoordinatorRepliesInTheSecureThread() {

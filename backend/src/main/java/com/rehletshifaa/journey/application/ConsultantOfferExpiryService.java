@@ -42,12 +42,13 @@ public class ConsultantOfferExpiryService {
     private final SlaPolicy sla;
     private final AuditTrail auditTrail;
     private final Clock clock;
+    private final JourneyMetrics metrics;
 
     public ConsultantOfferExpiryService(CaseAssignmentRepository assignments, CaseTaskRepository tasks, MedicalCaseRepository cases,
                                         CaseStatusLog statusLog, StaffWorkService work, JourneyCaseQueryService caseQueries,
-                                        SlaPolicy sla, AuditTrail auditTrail, Clock clock) {
+                                        SlaPolicy sla, AuditTrail auditTrail, Clock clock, JourneyMetrics metrics) {
         this.assignments = assignments; this.tasks = tasks; this.cases = cases; this.statusLog = statusLog; this.work = work;
-        this.caseQueries = caseQueries; this.sla = sla; this.auditTrail = auditTrail; this.clock = clock;
+        this.caseQueries = caseQueries; this.sla = sla; this.auditTrail = auditTrail; this.clock = clock; this.metrics = metrics;
     }
 
     /** Declines every pending primary Consultant offer whose deadline has passed; returns how many it declined. */
@@ -86,6 +87,7 @@ public class ConsultantOfferExpiryService {
                 WorkCopy.of("OFFER_EXPIRED_CONSULTANT", "caseNumber", caseNumber, "hours", String.valueOf(hours)));
         auditTrail.event("CONSULTANT_OFFER_EXPIRED").actor("SYSTEM", "SYSTEM").caseId(caseId).entity("CaseAssignment", assignmentId)
                 .action("DECLINE").outcome("SUCCESS").reason("Offer not answered within " + hours + " working hours").at(now).record();
+        metrics.offerExpired();
         return true;
     }
 

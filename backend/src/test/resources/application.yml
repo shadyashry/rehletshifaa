@@ -9,6 +9,8 @@ spring:
   flyway.enabled: true
 # Readable console output for test runs; the application itself emits ECS JSON.
 logging.structured.format.console: ""
+# As the application: the operational meters, on the internal metrics port only (MetricsPort).
+management.endpoints.web.exposure.include: health,metrics
 app:
   # No Redis in the test JVM. ReferenceDataCachingTest re-enables caching with a map cache manager to prove
   # the @Cacheable/@CacheEvict wiring; every other test exercises the uncached, authoritative path.

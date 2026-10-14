@@ -57,3 +57,5 @@ with audit evidence kept in PostgreSQL (`audit_events`), not in logs. Separate e
 This overlay is a development tool (single node, HTTP without TLS). For a deployed environment use a
 managed Elastic deployment or a TLS-enabled cluster, keep the same data stream name, template and
 writer-role shape, and point Filebeat (or Elastic Agent) at it.
+
+Alert rules (checked by hand or script until a Prometheus registry exists): [alerts.md](alerts.md)

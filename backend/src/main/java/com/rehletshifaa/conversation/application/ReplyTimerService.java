@@ -60,13 +60,14 @@ public class ReplyTimerService {
     private final AuditTrail auditTrail;
     private final ObjectMapper json;
     private final Clock clock;
+    private final ConversationMetrics metrics;
 
     public ReplyTimerService(ReplyObligationRepository obligations, ConversationSettingsRepository settings, IntakeConversationRepository conversations,
                              CaseAssignmentRepository assignments, ReplyCoverService covers, WorkforceDirectory workforce, StaffWorkService work,
-                             Authority authority, AuditTrail auditTrail, ObjectMapper json, Clock clock) {
+                             Authority authority, AuditTrail auditTrail, ObjectMapper json, Clock clock, ConversationMetrics metrics) {
         this.obligations = obligations; this.settings = settings; this.conversations = conversations; this.assignments = assignments;
         this.covers = covers; this.workforce = workforce; this.work = work; this.authority = authority; this.auditTrail = auditTrail;
-        this.json = json; this.clock = clock;
+        this.json = json; this.clock = clock; this.metrics = metrics;
     }
 
     /** The team's working week and service levels, parsed. */
@@ -120,6 +121,7 @@ public class ReplyTimerService {
             }
             if (o.getEscalatedAt() == null && !o.getEscalateAt().isAfter(now)) {
                 Set<String> recipients = new LinkedHashSet<>(owner == null ? Set.of() : workforce.leadsOf(owner, "CARE_COORDINATION"));
+                String step = recipients.isEmpty() ? ConversationMetrics.MANAGERS : ConversationMetrics.LEAD;
                 if (recipients.isEmpty()) workforce.activeHolders("CARE_COORDINATION_MANAGER").forEach(m -> recipients.add(m.subject()));
                 String who = replier == null ? null : workforce.contact(replier).map(WorkforceDirectory.Contact::displayName).orElse(null);
                 for (String recipient : recipients)
@@ -128,6 +130,7 @@ public class ReplyTimerService {
                             "reply-escalated:" + key + ":" + recipient, true, WorkCopy.of("REPLY_ESCALATED", "coordinator", who));
                 o.escalated(now);
                 auditTrail.event("REPLY_ESCALATED").actor("SYSTEM", "REPLY_TIMER").caseId(caseId).entity("ReplyObligation", o.getId()).action("ESCALATE").record();
+                metrics.replyTimerBreached(caseId != null ? ConversationMetrics.CASE : ConversationMetrics.INTAKE, step);
             }
             obligations.save(o);
         }

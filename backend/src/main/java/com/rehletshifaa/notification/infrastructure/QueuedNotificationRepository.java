@@ -63,9 +63,9 @@ public interface QueuedNotificationRepository extends BaseRepository<QueuedNotif
     int failed(@Param("id") UUID id, @Param("attempt") int attempt, @Param("status") String status,
                @Param("nextAttemptAt") Instant nextAttemptAt, @Param("code") String code);
 
-    /** Queued resends of a superseded proposal version are not sent any more. */
+    /** Queued resends of a superseded proposal version are not sent any more; marked SUPERSEDED, so no delivery alert counts them. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("update QueuedNotification m set m.status = 'DEAD_LETTER' where m.idempotencyKey like :pattern and m.status in ('PENDING', 'RETRY')")
+    @Query("update QueuedNotification m set m.status = 'DEAD_LETTER', m.lastErrorCode = 'SUPERSEDED' where m.idempotencyKey like :pattern and m.status in ('PENDING', 'RETRY')")
     int cancelQueued(@Param("pattern") String pattern);
 
     /** Provider delivery receipts arrive out of order; an older receipt never overwrites a newer one. */
@@ -75,4 +75,24 @@ public interface QueuedNotificationRepository extends BaseRepository<QueuedNotif
             where m.providerReference = :reference and (m.providerStatusAt is null or m.providerStatusAt <= :at)""")
     int recordProviderStatus(@Param("reference") String reference, @Param("status") String status, @Param("at") Instant at,
                              @Param("errorCode") String errorCode);
+
+    interface OutboxChannelRow { String getChannel(); long getDeadLetters(); long getRetrying(); long getPending(); Instant getOldestPending(); }
+
+    /**
+     * P1-8: the outbox per channel. Dead letters are delivery failures only (superseded resends excluded). Waiting to be sent is PENDING, RETRY or PROCESSING (claimed by a worker, not yet
+     * delivered); retrying is a waiting message with at least one finished attempt (a PROCESSING message's count already
+     * includes the attempt in flight, and a released message goes back to RETRY with the unmade attempt uncharged). No time
+     * parameter: nothing here depends on the clock, and Spring Data rejects a named parameter the query does not use.
+     */
+    @Query("""
+            select m.channel as channel,
+                sum(case when m.status = 'DEAD_LETTER' and coalesce(m.lastErrorCode, '') <> 'SUPERSEDED' then 1 else 0 end) as deadLetters,
+                sum(case when (m.status in ('PENDING', 'RETRY') and m.attempts > 0) or (m.status = 'PROCESSING' and m.attempts > 1)
+                    then 1 else 0 end) as retrying,
+                sum(case when m.status in ('PENDING', 'RETRY', 'PROCESSING') then 1 else 0 end) as pending,
+                min(case when m.status in ('PENDING', 'RETRY', 'PROCESSING') then m.createdAt else null end) as oldestPending
+            from QueuedNotification m
+            where m.status in ('PENDING', 'RETRY', 'PROCESSING', 'DEAD_LETTER')
+            group by m.channel""")
+    java.util.List<OutboxChannelRow> summarizeByChannel();
 }
