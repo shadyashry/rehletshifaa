@@ -25,9 +25,13 @@ class KeycloakRealmContractTest {
         JsonNode realm = new ObjectMapper().readTree(REALM_EXPORT.toFile());
 
         assertThat(realm.path("defaultRoles")).isEmpty();
-        assertThat(realm.has("roles")).as("business realm roles are not exported").isFalse();
-        assertThat(realm.path("users")).allSatisfy(user ->
-                assertThat(user.has("realmRoles")).as("%s has no business realm assignment", user.path("username").asText()).isFalse());
+        // A2b: the only realm role is the sign-in marker rs-staff; it never reaches a token (no roles scope or mapper below).
+        assertThat(realm.path("roles").path("realm")).extracting(role -> role.path("name").asText())
+                .as("no business realm roles").containsExactly("rs-staff");
+        assertThat(realm.path("users")).allSatisfy(user -> assertThat(user.path("realmRoles")).extracting(JsonNode::asText)
+                .as("%s carries at most the sign-in marker", user.path("username").asText()).isSubsetOf("rs-staff"));
+        assertThat(findBy(realm.path("users"), "username", "coordinator").path("realmRoles")).extracting(JsonNode::asText).containsExactly("rs-staff");
+        assertThat(findBy(realm.path("users"), "username", "patient").has("realmRoles")).as("patients carry no staff marker").isFalse();
 
         JsonNode web = findBy(realm.path("clients"), "clientId", "rehletshifaa-web");
         assertThat(web.path("defaultClientScopes")).extracting(JsonNode::asText)
@@ -41,28 +45,50 @@ class KeycloakRealmContractTest {
                 .extracting(JsonNode::asText).containsExactlyInAnyOrderElementsOf(IDENTITY_ADMIN_ROLES);
     }
 
+    /** A2b: Keycloak itself enforces the second factor — in both realm files, so production never drifts from dev. */
     @Test
-    void realmExportProvidesOrderedPasswordOtpAndWebAuthnLevels() throws IOException {
-        assertStepUpLevels(new ObjectMapper().readTree(REALM_EXPORT.toFile()));
-        assertStepUpLevels(new ObjectMapper().readTree(PRODUCTION_REALM.toFile()));
+    void keycloakItselfRequiresTheSecondFactorAndIssuesNoPasswordOnlyTokens() throws IOException {
+        assertSignIn(new ObjectMapper().readTree(REALM_EXPORT.toFile()));
+        assertSignIn(new ObjectMapper().readTree(PRODUCTION_REALM.toFile()));
     }
 
-    private void assertStepUpLevels(JsonNode realm) {
-
-        assertThat(realm.path("browserFlow").asText()).isEqualTo("rehletshifaa-browser-step-up");
+    private void assertSignIn(JsonNode realm) {
+        assertThat(realm.path("browserFlow").asText()).isEqualTo("rehletshifaa-browser");
+        assertThat(realm.path("directGrantFlow").asText()).isEqualTo("rehletshifaa-direct-grant-denied");
+        assertThat(realm.path("resetCredentialsFlow").asText()).isEqualTo("rehletshifaa-reset-credentials");
+        assertThat(realm.path("bruteForceProtected").asBoolean()).isTrue();
+        assertThat(realm.path("eventsEnabled").asBoolean()).as("credential changes are recorded").isTrue();
+        assertThat(realm.path("enabledEventTypes")).extracting(JsonNode::asText).contains("UPDATE_CREDENTIAL", "REMOVE_CREDENTIAL", "UPDATE_TOTP", "REMOVE_TOTP");
         assertThat(realm.path("webAuthnPolicyUserVerificationRequirement").asText()).isEqualTo("required");
-        assertThat(realm.path("webAuthnPolicyAvoidSameAuthenticatorRegister").asBoolean()).isTrue();
+        assertThat(realm.path("authenticatorConfig")).as("no step-up levels: acr can never vouch for a second factor")
+                .noneSatisfy(config -> assertThat(config.path("config").has("loa-condition-level")).isTrue());
 
-        assertLoa(realm, "rehletshifaa-loa-1", "1", "36000", "rehletshifaa-loa-1-flow", "auth-username-password-form");
-        // D1: the second step lasts the sign-in session; a sensitive action still forces a fresh sign-in (prompt=login, max_age=0).
-        assertLoa(realm, "rehletshifaa-loa-2", "2", "36000", "rehletshifaa-loa-2-flow", "auth-otp-form");
-        assertLoa(realm, "rehletshifaa-loa-3", "3", "36000", "rehletshifaa-loa-3-flow", "webauthn-authenticator");
+        // Password, then the second factor anyone has, from every client; staff without one enrol at that sign-in.
+        assertThat(executions(realm, "rehletshifaa-sign-in")).containsExactly("auth-username-password-form:REQUIRED",
+                "rehletshifaa-second-factor:CONDITIONAL", "rehletshifaa-staff-enrolment:CONDITIONAL");
+        assertThat(executions(realm, "rehletshifaa-second-factor")).containsExactly("conditional-user-configured:REQUIRED",
+                "webauthn-authenticator:ALTERNATIVE", "auth-otp-form:ALTERNATIVE", "auth-recovery-authn-code-form:ALTERNATIVE");
+        assertThat(executions(realm, "rehletshifaa-staff-enrolment")).containsExactly("conditional-user-role:REQUIRED",
+                "conditional-sub-flow-executed:REQUIRED", "auth-otp-form:REQUIRED");
+        assertThat(findBy(realm.path("authenticatorConfig"), "alias", "rs-cond-staff").path("config").path("condUserRole").asText()).isEqualTo("rs-staff");
+        // A reset proves the second factor before the new password; no password-only tokens at all.
+        assertThat(executions(realm, "rehletshifaa-reset-credentials")).containsExactly("reset-credentials-choose-user:REQUIRED",
+                "reset-credential-email:REQUIRED", "rehletshifaa-reset-second-factor:CONDITIONAL", "reset-password:REQUIRED");
+        assertThat(executions(realm, "rehletshifaa-direct-grant-denied")).containsExactly("deny-access-authenticator:REQUIRED");
+        // Tokens say how the person signed in, and carry the API audience and the sign-in time the backend requires.
+        JsonNode web = findBy(realm.path("clients"), "clientId", "rehletshifaa-web");
+        assertThat(web.path("directAccessGrantsEnabled").asBoolean()).isFalse();
+        assertThat(web.path("protocolMappers")).extracting(mapper -> mapper.path("protocolMapper").asText())
+                .contains("oidc-amr-mapper", "oidc-audience-mapper", "oidc-usersessionmodel-note-mapper");
+        for (String reference : List.of("pwd", "otp", "hwk"))
+            assertThat(realm.path("authenticatorConfig")).anySatisfy(config ->
+                    assertThat(config.path("config").path("default.reference.value").asText()).isEqualTo(reference));
+    }
 
-        JsonNode ordered = findBy(realm.path("authenticationFlows"), "alias", "rehletshifaa-browser-authentication")
-                .path("authenticationExecutions");
-        assertThat(ordered).extracting(execution -> execution.path("flowAlias").asText())
-                .containsExactly("rehletshifaa-loa-1-flow", "rehletshifaa-loa-2-flow", "rehletshifaa-loa-3-flow");
-        assertThat(ordered).allSatisfy(execution -> assertThat(execution.path("requirement").asText()).isEqualTo("CONDITIONAL"));
+    private List<String> executions(JsonNode realm, String flowAlias) {
+        return findBy(realm.path("authenticationFlows"), "alias", flowAlias).path("authenticationExecutions").valueStream()
+                .map(e -> (e.path("authenticatorFlow").asBoolean() ? e.path("flowAlias").asText() : e.path("authenticator").asText())
+                        + ":" + e.path("requirement").asText()).toList();
     }
 
     @Test
@@ -82,17 +108,5 @@ class KeycloakRealmContractTest {
     private JsonNode findBy(JsonNode array, String field, String value) {
         return array.valueStream().filter(node -> value.equals(node.path(field).asText())).findFirst()
                 .orElseThrow(() -> new AssertionError("Missing " + field + "=" + value));
-    }
-
-    private void assertLoa(JsonNode realm, String configAlias, String level, String maxAge, String flowAlias,
-            String requiredAuthenticator) {
-        JsonNode config = findBy(realm.path("authenticatorConfig"), "alias", configAlias).path("config");
-        assertThat(config.path("loa-condition-level").asText()).isEqualTo(level);
-        assertThat(config.path("loa-max-age").asText()).isEqualTo(maxAge);
-
-        JsonNode executions = findBy(realm.path("authenticationFlows"), "alias", flowAlias).path("authenticationExecutions");
-        assertThat(executions).extracting(execution -> execution.path("authenticator").asText())
-                .containsExactly("conditional-level-of-authentication", requiredAuthenticator);
-        assertThat(executions).allSatisfy(execution -> assertThat(execution.path("requirement").asText()).isEqualTo("REQUIRED"));
     }
 }

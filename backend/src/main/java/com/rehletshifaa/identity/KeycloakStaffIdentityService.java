@@ -16,7 +16,9 @@ import java.util.*;
 /** Least-privilege Keycloak integration for staff lifecycle; passwords never pass through this application. */
 @Service
 public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
-    private static final List<String> INVITE_ACTIONS=List.of("VERIFY_EMAIL","UPDATE_PASSWORD","CONFIGURE_TOTP");
+    private static final List<String> INVITE_ACTIONS=List.of("VERIFY_EMAIL","UPDATE_PASSWORD","CONFIGURE_TOTP","CONFIGURE_RECOVERY_AUTHN_CODES");
+    /** A2b: Keycloak requires a second factor at every sign-in of a user holding this realm role (and enrols one if missing). */
+    static final String STAFF_ROLE="rs-staff";
     private final RestClient http;
     private final String baseUrl,realm,clientId,clientSecret,webClientId,webBaseUrl;
     private final int inviteLifespan;
@@ -59,7 +61,7 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
         try {
             ResponseEntity<Void> response=http.post().uri(admin("/users")).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON).body(user).retrieve().toBodilessEntity();
             String subject=subjectFrom(response.getHeaders().getLocation());
-            try {sendInvite(subject,locale);}
+            try {ensureStaffMarker(subject);sendInvite(subject,locale);}
             catch(RuntimeException failure){if(operationMarker==null||operationMarker.isBlank())deleteQuietly(subject);throw failure;}
             return new IdentityAccount(subject,normalized,"INVITED",Instant.now());
         } catch(RestClientResponseException e) {throw identityFailure(e,"Unable to create the staff identity account");}
@@ -68,6 +70,17 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
     @Override public Optional<IdentityAccount> recover(String operationMarker){requireConfigured();URI uri=UriComponentsBuilder.fromUriString(admin("/users")).queryParam("q","rehletshifaaProvisioningOperation:"+operationMarker).build().encode().toUri();try{List<Map<String,Object>> found=http.get().uri(uri).header("Authorization",bearer()).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});if(found==null||found.isEmpty())return Optional.empty();if(found.size()!=1)throw new ApiException(409,"AMBIGUOUS_IDENTITY_RECOVERY","Identity recovery returned more than one account");Map<String,Object> user=found.get(0);return Optional.of(new IdentityAccount(String.valueOf(user.get("id")),String.valueOf(user.get("email")),"INVITED",Instant.now()));}catch(RestClientResponseException e){throw identityFailure(e,"Unable to reconcile the identity account");}}
 
     public void resend(String subject,String locale){requireConfigured();sendInvite(subject,locale);}
+
+    /** Idempotent: adding a realm role the user already holds changes nothing. */
+    @Override public void ensureStaffMarker(String subject){
+        requireConfigured();
+        try {
+            Map<String,Object> role=http.get().uri(admin("/roles/"+STAFF_ROLE)).header("Authorization",bearer())
+                    .retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});
+            http.post().uri(admin("/users/"+encode(subject)+"/role-mappings/realm")).header("Authorization",bearer())
+                    .contentType(MediaType.APPLICATION_JSON).body(List.of(role)).retrieve().toBodilessEntity();
+        } catch(RestClientResponseException e){throw identityFailure(e,"The staff sign-in rule could not be applied to this account");}
+    }
 
     public void setEnabled(String subject,boolean enabled){
         requireConfigured();
@@ -140,11 +153,12 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
                 .retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});
             for(Map<String,Object> credential:credentials==null?List.<Map<String,Object>>of():credentials){
                 String type=String.valueOf(credential.get("type"));
-                if(type.equals("otp")||type.startsWith("webauthn"))
+                // A2b: recovery codes are a second factor too — a reset leaves none of the old ones behind.
+                if(type.equals("otp")||type.startsWith("webauthn")||type.equals("recovery-authn-codes"))
                     http.delete().uri(admin("/users/"+encode(subject)+"/credentials/"+encode(String.valueOf(credential.get("id"))))).header("Authorization",bearer()).retrieve().toBodilessEntity();
             }
             http.put().uri(admin("/users/"+encode(subject))).header("Authorization",bearer()).contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("requiredActions",List.of("CONFIGURE_TOTP"))).retrieve().toBodilessEntity();
+                .body(Map.of("requiredActions",List.of("CONFIGURE_TOTP","CONFIGURE_RECOVERY_AUTHN_CODES"))).retrieve().toBodilessEntity();
         } catch(RestClientResponseException e){throw identityFailure(e,"The MFA reset could not be completed");}
     }
 

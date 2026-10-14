@@ -7,7 +7,8 @@
  */
 export const REAUTHENTICATION_REQUIRED = "REAUTHENTICATION_REQUIRED";
 /** Governance actions (owner decisions, owner transfer) ask specifically for a passkey sign-in; the remedy is the same. */
-export const isReauthenticationCode = (code: unknown) => code === REAUTHENTICATION_REQUIRED || code === "PHISHING_RESISTANT_AUTHENTICATION_REQUIRED";
+export const PASSKEY_REQUIRED = "PHISHING_RESISTANT_AUTHENTICATION_REQUIRED";
+export const isReauthenticationCode = (code: unknown) => code === REAUTHENTICATION_REQUIRED || code === PASSKEY_REQUIRED;
 const KEY = "rs:reauthentication-requested";
 const PENDING_KEY = "rs:reauthentication-pending-change";
 /** A refused change kept for re-sending after the sign-in; older than this it is dropped (the person has moved on). */
@@ -27,6 +28,10 @@ export const reauthenticationCopy = {
     abandoned: "The security check was not completed. Nothing was changed.",
     requiredRead: "To see this, confirm it's you with your second step. Nothing was changed.",
     requiredReadList: "Confirm it's you to see:",
+    passkeyRequired: "This action needs your passkey. Nothing was changed.",
+    passkeyHow: "Sign in again and use your passkey — if the code is asked first, choose “Try another way”. No passkey yet? Set one up first.",
+    confirmPasskey: "Confirm with my passkey",
+    setUpPasskey: "Set up a passkey",
     actionRead: "Confirm it's you",
     returnedPending: "You signed in again. Your change has not been sent yet.",
     resend: "Send it now",
@@ -41,6 +46,10 @@ export const reauthenticationCopy = {
     abandoned: "لم يكتمل التحقق الأمني. لم يتغيّر شيء.",
     requiredRead: "لعرض هذا، أكّد هويتك بخطوتك الثانية. لم يتغيّر شيء.",
     requiredReadList: "أكّد هويتك لعرض:",
+    passkeyRequired: "يحتاج هذا الإجراء إلى مفتاح المرور. لم يتغيّر شيء.",
+    passkeyHow: "سجّل الدخول مجددًا واستخدم مفتاح المرور — وإن طُلب الرمز أولًا فاختر «تجربة طريقة أخرى». لا تملك مفتاح مرور بعد؟ أعدّه أولًا.",
+    confirmPasskey: "التأكيد بمفتاح المرور",
+    setUpPasskey: "إعداد مفتاح مرور",
     actionRead: "أكّد هويتك",
     returnedPending: "سجّلت الدخول مجددًا. لم يُرسَل تغييرك بعد.",
     resend: "أرسله الآن",

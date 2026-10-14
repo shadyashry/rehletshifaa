@@ -48,8 +48,9 @@ services:
   # --import-realm runs once per keycloak-data volume, so users added to the realm file later never reach an existing
   # stack (QA W-51: the invited QA accounts were missing and their invitations failed). On every `up` this one-shot
   # partial import adds whatever the realm file has and Keycloak lacks; anything that exists is left untouched (SKIP),
-  # so passwords, authenticators and passkeys set during testing survive. It then sets the realm-level second-step validity
-  # (D1: the LoA 2/3 max-age lasts the sign-in session) on the existing flows. Dev only (local bootstrap admin).
+  # so passwords, authenticators and passkeys set during testing survive. It then brings the sign-in to the realm file's
+  # (A2b: second factor enforced by Keycloak, no password-only tokens, resets prove the second factor) with
+  # sync-authentication.sh, generated from the same specification. Dev only (local bootstrap admin).
   keycloak-sync:
     image: quay.io/keycloak/keycloak:26.7.3
     depends_on:
@@ -59,6 +60,7 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: Admin123!
     volumes:
       - ./infrastructure/keycloak/realm-rehletshifaa.json:/opt/sync/realm-rehletshifaa.json:ro
+      - ./infrastructure/keycloak/sync-authentication.sh:/opt/sync/sync-authentication.sh:ro
     entrypoint: ["/bin/bash", "-c"]
     command:
       - >-
@@ -69,12 +71,7 @@ services:
         sleep 5; done &&
         /opt/keycloak/bin/kcadm.sh create partialImport --config /tmp/kcadm.config -r rehletshifaa
         -s ifResourceExists=SKIP -f /opt/sync/realm-rehletshifaa.json -o | head -c 300; echo;
-        for loa in 2 3; do
-        for id in $$(/opt/keycloak/bin/kcadm.sh get authentication/flows/rehletshifaa-loa-$$loa-flow/executions --config /tmp/kcadm.config
-        -r rehletshifaa --fields authenticationConfig --format csv --noquotes); do
-        /opt/keycloak/bin/kcadm.sh update authentication/config/$$id --config /tmp/kcadm.config -r rehletshifaa
-        -s 'config."loa-max-age"=36000' && echo "keycloak-sync: LoA $$loa second step lasts the sign-in session";
-        done; done
+        bash /opt/sync/sync-authentication.sh
 
   minio-init:
     image: minio/mc:RELEASE.2025-07-21T05-28-08Z

@@ -52,7 +52,7 @@ export function ErrorNotice({ error, locale, action = "save", onRetry }: { error
   const code = error instanceof ControlCenterError ? error.code : undefined;
   const raw = error instanceof Error ? error.message : String(error);
   if (isReauthenticationCode(code)) return (
-    <div role="alert" className="cc-notice cc-notice-info"><Info size={18} aria-hidden /><div><ReauthenticationPrompt locale={locale} read={action === "load"} /></div></div>
+    <div role="alert" className="cc-notice cc-notice-info"><Info size={18} aria-hidden /><div><ReauthenticationPrompt locale={locale} read={action === "load"} passkey={code === "PHISHING_RESISTANT_AUTHENTICATION_REQUIRED"} /></div></div>
   );
   return (
     <div role="alert" className="cc-notice cc-notice-error">

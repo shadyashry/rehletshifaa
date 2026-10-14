@@ -31,24 +31,22 @@ export function guardsSecondStep(pathname: string) {
 }
 
 export const secondStepCopy: Record<Locale, {
-  title: string; app: string; passkey: string; firstTime: string; continue: string; useApp: string; signOut: string;
+  title: string; app: string; passkey: string; firstTime: string; continue: string; signOut: string;
 }> = {
   en: {
     title: "Finish signing in",
     app: "Staff accounts use a second step: the code from your authenticator app. Nothing opens until you complete it.",
-    passkey: "Your role uses a passkey — your fingerprint, face or device PIN — as its second step. Nothing opens until you complete it.",
+    passkey: "Your role signs in with a second step — your passkey (fingerprint, face or device PIN) or authenticator app — and confirms sensitive actions with the passkey. Nothing opens until you complete it.",
     firstTime: "If you haven't set it up yet, you'll be guided through it now. It takes about a minute.",
     continue: "Continue",
-    useApp: "Use my authenticator app instead",
     signOut: "Sign out",
   },
   ar: {
     title: "أكمل تسجيل الدخول",
     app: "تستخدم حسابات الفريق خطوة ثانية: الرمز من تطبيق المصادقة. لن يُفتح شيء قبل إكمالها.",
-    passkey: "يستخدم دورك مفتاح مرور — البصمة أو الوجه أو رمز الجهاز — خطوةً ثانية. لن يُفتح شيء قبل إكمالها.",
+    passkey: "يسجّل دورك الدخول بخطوة ثانية — مفتاح المرور (البصمة أو الوجه أو رمز الجهاز) أو تطبيق المصادقة — ويؤكّد الإجراءات الحساسة بمفتاح المرور. لن يُفتح شيء قبل إكمالها.",
     firstTime: "إن لم تُعدّها بعد، فسنرشدك إلى إعدادها الآن. يستغرق ذلك نحو دقيقة.",
     continue: "متابعة",
-    useApp: "استخدام تطبيق المصادقة بدلًا من ذلك",
     signOut: "تسجيل الخروج",
   },
 };

@@ -452,7 +452,7 @@ class PlatformUsersDeepQaTest {
         new WorkforceTestData(jdbc, crypto, clock.instant()).person("qa-ccm4", "CARE_COORDINATION_MANAGER");
         Instant now = clock.instant();
         assertThat(authority.decide(new Principal(ADMIN_A, now, "2"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code())
-                .as("administrators need a passkey (LoA 3)").isEqualTo("REAUTHENTICATION_REQUIRED");
+                .as("administrators need a passkey (LoA 3)").isEqualTo("PHISHING_RESISTANT_AUTHENTICATION_REQUIRED");
         assertThat(authority.decide(new Principal(ADMIN_A, now, "1"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code()).isEqualTo("MFA_REQUIRED");
         assertThat(authority.decide(new Principal(ADMIN_A, now.minusSeconds(1201), "3"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code()).isEqualTo("REAUTHENTICATION_REQUIRED");
         assertThat(authority.decide(new Principal(ADMIN_A, now.plusSeconds(120), "3"), Permission.WORKFORCE_ADMINISTER, Resource.platform()).code())
@@ -472,7 +472,7 @@ class PlatformUsersDeepQaTest {
         signIn(ADMIN_A, "2");
         ApiException e = catchThrowableOfType(ApiException.class, () -> staff.invite(new Invite("Z", "z@qa.test", "en", List.of("FINANCE"), "r")));
         assertThat(e.status()).isEqualTo(401);
-        assertThat(e.code()).isEqualTo("REAUTHENTICATION_REQUIRED");
+        assertThat(e.code()).as("an administrator confirms with the passkey").isEqualTo("PHISHING_RESISTANT_AUTHENTICATION_REQUIRED");
     }
 
     // ---------------------------------------------------------------- 4. lifecycle × effective authority

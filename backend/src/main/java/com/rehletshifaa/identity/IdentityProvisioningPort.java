@@ -16,6 +16,8 @@ public interface IdentityProvisioningPort {
     void logout(String subject);
     String status(String subject, String storedStatus);
     default IdentityState identityState(String subject) { return IdentityState.unavailable(); }
+    /** A2b: the provider's staff marker, which makes the provider itself require a second factor at every sign-in. */
+    default void ensureStaffMarker(String subject) {}
     /** Exact server-side resolution; an unavailable directory is never evidence that an address is free. */
     default EmailResolution resolveEmail(String email) { return EmailResolution.unavailable(); }
     /** SUP-02: the standard self-service password reset email. */

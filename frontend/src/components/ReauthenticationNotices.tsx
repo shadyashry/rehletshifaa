@@ -6,9 +6,18 @@ import type { Locale } from "@/lib/i18n";
 import { reauthenticationCopy, requestReauthentication, takeReauthenticationReturn, type PendingChange } from "@/lib/reauthentication";
 
 /** The action was refused only because the sign-in is not recent: say so, and let the person choose when to sign in. */
-export function ReauthenticationPrompt({ locale, read = false, className = "cc-secondary cc-small" }: { locale: Locale; read?: boolean; className?: string }) {
-  const { signIn } = useAuth();
+export function ReauthenticationPrompt({ locale, read = false, passkey = false, className = "cc-secondary cc-small" }: { locale: Locale; read?: boolean; passkey?: boolean; className?: string }) {
+  const { signIn, setUpPasskey } = useAuth();
   const t = reauthenticationCopy[locale];
+  // A2b: a privileged action confirms with the passkey; someone who has none sets one up first (never an endless re-check).
+  if (passkey) return (
+    <>
+      <p>{t.passkeyRequired}</p>
+      <p>{t.passkeyHow}</p>
+      <button type="button" className={className} onClick={() => void requestReauthentication(signIn)}>{t.confirmPasskey}</button>{" "}
+      <button type="button" className={className} onClick={() => void setUpPasskey()}>{t.setUpPasskey}</button>
+    </>
+  );
   // QA W-38: a read is not a change — it is shown after confirming, and nothing typed is at stake.
   return (
     <>
@@ -33,6 +42,28 @@ export function ReauthenticationReturnNotice({ locale, className = "cc-notice cc
     <div role="status" className={className}>
       <span>{shown === "abandoned" ? t.abandoned : t.returned}</span>{" "}
       <button type="button" className="cc-link" onClick={() => setShown(null)}>{t.dismiss}</button>
+    </div>
+  );
+}
+
+/**
+ * A2b: a privileged change the backend refused for want of a passkey. Confirming signs in again (the kept change is offered on
+ * return, as for any re-check); someone without a passkey sets one up first instead of being sent round again.
+ */
+export function PortalPasskeyNotice({ locale, pending, className, onClose }: {
+  locale: Locale; pending: PendingChange | null; className: string; onClose: () => void;
+}) {
+  const { signIn, setUpPasskey } = useAuth();
+  const t = reauthenticationCopy[locale];
+  return (
+    <div role="alert" className={className}>
+      <p className="font-semibold">{t.passkeyRequired}</p>
+      <p className="mt-1">{t.passkeyHow}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-primary !min-h-9 !px-3 !text-[0.85rem]" onClick={() => void requestReauthentication(signIn, pending ?? undefined)}>{t.confirmPasskey}</button>
+        <button type="button" className="btn-secondary !min-h-9 !px-3 !text-[0.85rem]" onClick={() => void setUpPasskey()}>{t.setUpPasskey}</button>
+        <button type="button" className="font-semibold underline underline-offset-4" onClick={onClose}>{t.dismiss}</button>
+      </div>
     </div>
   );
 }

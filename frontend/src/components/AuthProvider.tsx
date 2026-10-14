@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { User } from "oidc-client-ts";
 import { authManager, rememberSignInLocale } from "@/lib/auth-client";
 import { apiFetchAs } from "@/lib/api";
-import { reauthenticationAcr, type Me } from "@/lib/access";
+import type { Me } from "@/lib/access";
 import { guardsSecondStep, lastSecondStepAttempt, rememberSecondStepAttempt, secondStepPlan } from "@/lib/second-step";
 import { SecondStepGate } from "@/components/SecondStepGate";
 
@@ -17,7 +17,7 @@ import { SecondStepGate } from "@/components/SecondStepGate";
  * granted roles take effect. A refusal (e.g. `MFA_ENROLMENT_REQUIRED`) is kept as `activationIssue`; `refreshMe` retries.
  */
 export type ActivationIssue={code:string;message:string};
-type AuthValue={user:User|null;me:Me|null;roles:string[];loading:boolean;meFailed:boolean;activationIssue:ActivationIssue|null;refreshMe:()=>void;signIn:(reauthenticate?:boolean,returnTo?:string)=>Promise<void>;signOut:()=>Promise<void>};
+type AuthValue={user:User|null;me:Me|null;roles:string[];loading:boolean;meFailed:boolean;activationIssue:ActivationIssue|null;refreshMe:()=>void;signIn:(reauthenticate?:boolean,returnTo?:string)=>Promise<void>;signOut:()=>Promise<void>;/** A2b: Keycloak's own passkey registration (application-initiated action), then back to this page. */setUpPasskey:()=>Promise<void>};
 const Context=createContext<AuthValue|null>(null);
 export function AuthProvider({children}:{children:React.ReactNode}){
   const [user,setUser]=useState<User|null>(null);const[loading,setLoading]=useState(true);
@@ -53,20 +53,23 @@ export function AuthProvider({children}:{children:React.ReactNode}){
   const meRef=useRef(me);
   useEffect(()=>{meRef.current=me;},[me]);
   // returnTo defaults to the current page; callers that arrive via a one-shot flag (?signin=1, ?continue=1) strip it first so a cancelled sign-in cannot loop.
-  const signIn=useCallback(async(reauthenticate=false,returnTo?:string)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";rememberSignInLocale(locale);return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,...(reauthenticate?{acr_values:reauthenticationAcr(meRef.current)}:{})},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[]);
+  const signIn=useCallback(async(reauthenticate=false,returnTo?:string)=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";rememberSignInLocale(locale);return authManager().signinRedirect({state:{returnTo:returnTo??`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale},...(reauthenticate?{prompt:"login",max_age:0}:{})});},[]);
+  const setUpPasskey=useCallback(async()=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";rememberSignInLocale(locale);
+    return authManager().signinRedirect({state:{returnTo:`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,kc_action:"webauthn-register"}});},[]);
   const signOut=useCallback(async()=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";await authManager().signoutRedirect({post_logout_redirect_uri:`${window.location.origin}/${locale}/portal`});},[]);
-  const value=useMemo(()=>({user,me,roles:me?.roles??[],loading:loading||meLoading,meFailed,activationIssue,refreshMe,signIn,signOut}),[user,me,loading,meLoading,meFailed,activationIssue,refreshMe,signIn,signOut]);
+  const value=useMemo(()=>({user,me,roles:me?.roles??[],loading:loading||meLoading,meFailed,activationIssue,refreshMe,signIn,signOut,setUpPasskey}),[user,me,loading,meLoading,meFailed,activationIssue,refreshMe,signIn,signOut,setUpPasskey]);
   // D1: a staff session without its second factor finishes the sign-in (Keycloak asks only for the second step) before any
   // staff page renders; coming back without it shows the explanation instead of redirecting again.
   const pathname=usePathname()??"";
   const secondStepAcr=me?.secondFactorRequired&&me.signInAcr&&guardsSecondStep(pathname)?me.signInAcr:null;
   const[secondStepGate,setSecondStepGate]=useState(false);
-  const completeSecondStep=useCallback((acr:"2"|"3")=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";rememberSecondStepAttempt();
-    void authManager().signinRedirect({state:{returnTo:`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale,acr_values:acr}});},[]);
+  const completeSecondStep=useCallback(()=>{const locale=window.location.pathname.split("/")[1]==="ar"?"ar":"en";rememberSecondStepAttempt();
+    // A2b: a full sign-in, so Keycloak asks for (or enrols) the second factor; a silent one would return the same session.
+    void authManager().signinRedirect({state:{returnTo:`${window.location.pathname}${window.location.search}${window.location.hash}`},extraQueryParams:{ui_locales:locale},prompt:"login"});},[]);
   useEffect(()=>{
     if(!secondStepAcr)return;
     const plan=secondStepPlan(meRef.current,lastSecondStepAttempt());
-    if(plan==="redirect")completeSecondStep(secondStepAcr);
+    if(plan==="redirect")completeSecondStep();
     else if(plan==="gate")setSecondStepGate(true);
   },[secondStepAcr,completeSecondStep]);
   const locale=pathname.split("/")[1]==="ar"?"ar":"en";

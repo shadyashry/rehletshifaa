@@ -5,14 +5,13 @@ import { SecondStepGate } from "./SecondStepGate";
 describe("SecondStepGate", () => {
   afterEach(cleanup);
 
-  it("offers a passkey role its authenticator app as the backup", () => {
+  it("explains the passkey role's sign-in and offers one way forward", () => {
     const onContinue = vi.fn();
     render(<SecondStepGate locale="en" acr="3" onContinue={onContinue} onSignOut={vi.fn()}/>);
     expect(screen.getByRole("heading", { level: 1, name: "Finish signing in" })).toBeTruthy();
+    expect(screen.getByText(/confirms sensitive actions with the passkey/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(onContinue).toHaveBeenLastCalledWith("3");
-    fireEvent.click(screen.getByRole("button", { name: "Use my authenticator app instead" }));
-    expect(onContinue).toHaveBeenLastCalledWith("2");
+    expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
   it("asks for the app code in Arabic, with a way out", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { holds, leadsTeam, opensControlCenter, portalViews, reauthenticationAcr, satisfiesReauthenticationAcr, type Me } from "@/lib/access";
+import { holds, leadsTeam, opensControlCenter, portalViews, reauthenticationAcr, satisfiesReauthenticationAcr, sessionAssurance, type Me } from "@/lib/access";
 
 const me = (extra: Partial<Me>): Me => ({ subject: "s", roles: [], permissions: [], reauthenticate: [], workspaces: [], managedFunctions: [], platformAccountOwner: false, workforce: null, pendingActions: [], ...extra });
 
@@ -32,9 +32,12 @@ describe("access from /api/v1/me", () => {
     expect(reauthenticationAcr(administrator)).toBe("3");
     expect(reauthenticationAcr(owner)).toBe("3");
     expect(reauthenticationAcr(null)).toBe("3");
-    expect(satisfiesReauthenticationAcr(worker, "pwd")).toBe(false);
-    expect(satisfiesReauthenticationAcr(worker, "2")).toBe(true);
-    expect(satisfiesReauthenticationAcr(administrator, "2")).toBe(false);
-    expect(satisfiesReauthenticationAcr(administrator, 3)).toBe(true);
+    expect(satisfiesReauthenticationAcr(worker, sessionAssurance(["pwd"], "1"))).toBe(false);
+    expect(satisfiesReauthenticationAcr(worker, sessionAssurance(["pwd", "otp"], "1"))).toBe(true);
+    expect(satisfiesReauthenticationAcr(administrator, sessionAssurance(["pwd", "otp"], "1"))).toBe(false);
+    expect(satisfiesReauthenticationAcr(administrator, sessionAssurance(["pwd", "hwk"], "0"))).toBe(true);
+    // A2b: how the person signed in decides; a stated level counts only when the token carries no amr.
+    expect(sessionAssurance(["pwd"], "3")).toBe(1);
+    expect(sessionAssurance(undefined, "2")).toBe(2);
   });
 });

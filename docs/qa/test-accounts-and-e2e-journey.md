@@ -64,18 +64,20 @@ abandoned sign-in is still in that browser: open the link in a private (Incognit
 and skips everything that exists (passwords, authenticators and passkeys set during testing survive). Check it with
 `docker logs rehletshifaa-keycloak-sync-1` (it prints the added/skipped counts) — QA W-51.
 
-**Second factor per account (D1 / MFA-1, owner 2026-10-14).** Every staff sign-in now includes the second step — the
-app asks for it right after the password, and nothing staff-side opens without it. A sensitive action (record a payment,
-an identity decision, an invitation, approvals) still asks for a fresh sign-in after 20 minutes ("Sign in again").
-Privileged roles (System Administrator, credentialing, Finance, Finance Manager) use a **passkey**; their authenticator
-app is the backup sign-in, but their sensitive actions always confirm with the passkey. Keycloak sets up whatever is
-missing at that sign-in (never mid-task).
+**Second factor per account (D1 / MFA-1 / A2b, owner 2026-10-14).** Keycloak itself asks for the second factor: at every
+sign-in, from every page (the app, Keycloak's account page, a password reset), anyone who has an authenticator app, a
+passkey or recovery codes must use one; a staff account (`rs-staff` realm role) without one sets up the authenticator app
+at that sign-in. There are no password-only tokens (the password grant is refused). A sensitive action asks for a fresh
+full sign-in after 20 minutes. Privileged roles (System Administrator, credentialing, Finance, Finance Manager) confirm
+sensitive actions with a **passkey**: the first such action offers **Set up a passkey** (Keycloak's own registration);
+later, if the code is asked first, choose "Try another way". Recovery codes are offered when an account is invited or
+its MFA is reset.
 
 | Account | Second factor | Where the secret lives | Reset route |
 |---|---|---|---|
 | `doctor`, `coordinator`, `operations`, invited non-privileged staff, `doctor-orthopedics` | Authenticator app (TOTP codes), set up at first sign-in | Owner's authenticator app + password manager | Control Center › People › MFA reset (approved by a second administrator), or Keycloak admin console › Users › Credentials (dev only) |
-| `finance`, `finance-manager`, `credential-admin` (System Administrator), `credentialing-manager` | **Passkey** (WebAuthn) at sign-in — after this change `finance` registers one at its next sign-in; authenticator app kept as backup | Owner's device (Windows Hello / security key) | Keycloak admin console › Users › Credentials (dev only) |
-| `patient` and activated patients | None at sign-in; patients act mostly through secure links + one-time codes | Owner's app | Account settings, or Keycloak admin console (dev only) |
+| `finance`, `finance-manager`, `credential-admin` (System Administrator), `credentialing-manager` | Authenticator app at sign-in; **passkey** for sensitive actions — set up from the first one ("Set up a passkey") | Owner's device (Windows Hello / phone / security key) + authenticator app | Control Center › People › MFA reset (second administrator), or Keycloak admin console (dev only) |
+| `patient` and activated patients | None unless they set one up — then Keycloak asks for it at every sign-in | Owner's app | Account settings, or Keycloak admin console (dev only) |
 
 Passkey registration no longer opens a browser pop-up for the passkey's name (W-40: the theme names it "RehletShifaa
 passkey"), so it works in browsers that block `window.prompt()`; a device with Windows Hello or a phone is still needed.

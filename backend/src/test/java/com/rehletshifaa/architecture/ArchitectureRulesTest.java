@@ -268,13 +268,18 @@ class ArchitectureRulesTest {
             offenders = files.filter(f -> f.toString().endsWith(".java")).filter(f -> {
                 try {
                     String text = Files.readString(f);
-                    return text.contains("role-mappings") || text.contains("realm_access") || text.contains("resource_access");
+                    if (text.contains("realm_access") || text.contains("resource_access")) return true;
+                    if (!text.contains("role-mappings")) return false;
+                    // A2b: the one permitted mapping is the sign-in marker rs-staff, added (never read) by the staff identity adapter.
+                    return !(f.endsWith(Path.of("identity", "KeycloakStaffIdentityService.java"))
+                            && text.split("role-mappings", -1).length == 2 && text.contains("STAFF_ROLE=\"rs-staff\"")
+                            && text.contains("admin(\"/roles/\"+STAFF_ROLE)"));
                 } catch (IOException e) {
                     throw new IllegalStateException(e);
                 }
             }).map(Path::toString).sorted().toList();
         }
-        assertThat(offenders).as("sources that touch Keycloak role mappings or role claims").isEmpty();
+        assertThat(offenders).as("sources that touch Keycloak role mappings or role claims (beyond the rs-staff sign-in marker)").isEmpty();
     }
 
     // ---- no compatibility remnants -------------------------------------------------------------------------------

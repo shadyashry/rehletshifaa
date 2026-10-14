@@ -65,10 +65,19 @@ export function reauthenticationAcr(me: Me | null): "2" | "3" {
   return !me || me.platformAccountOwner || me.signInAcr === "3" || me.roles.includes("SYSTEM_ADMINISTRATOR") ? "3" : "2";
 }
 
-/** Whether the token proves at least the LoA the platform requires for this actor. */
-export function satisfiesReauthenticationAcr(me: Me | null, acr: unknown): boolean {
+/**
+ * A2b: how strongly the session signed in, from how it happened (`amr`, RFC 8176) — 3 a passkey, 2 another second factor,
+ * 1 a password only; the plain `acr` only when a token carries no `amr`. The backend reads it the same way and decides.
+ */
+export function sessionAssurance(amr: unknown, acr: unknown): number {
+  if (Array.isArray(amr)) return amr.includes("hwk") || amr.includes("swk") ? 3 : amr.includes("otp") || amr.includes("mfa") ? 2 : 1;
   const level = typeof acr === "number" ? acr : typeof acr === "string" && /^\d+$/.test(acr) ? Number(acr) : NaN;
-  return Number.isInteger(level) && level >= Number(reauthenticationAcr(me));
+  return Number.isInteger(level) ? level : 0;
+}
+
+/** Whether the session proves at least the strength the platform requires of this actor's sensitive actions. */
+export function satisfiesReauthenticationAcr(me: Me | null, assurance: number): boolean {
+  return assurance >= Number(reauthenticationAcr(me));
 }
 
 /** The caller leads a team of this workforce function (a fact for showing supervisory tools; the backend decides). */

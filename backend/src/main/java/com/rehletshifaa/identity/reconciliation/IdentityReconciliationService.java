@@ -45,6 +45,8 @@ public class IdentityReconciliationService {
         for(var person:store.people()){
             var state=identities.identityState(person.subject());
             if(!state.available())return store.fail(id,observations.size(),clock.instant());
+            // A2b: every workforce account carries the provider's staff marker, so the provider itself asks for the second factor.
+            if(state.exists())identities.ensureStaffMarker(person.subject());
             observations.add(new IdentityReconciliationStore.Observation(person,state));
         }
         return store.apply(id,observations,clock.instant());

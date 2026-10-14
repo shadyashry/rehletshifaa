@@ -37,19 +37,64 @@
   },
   "roles": {
     "realm": [
-      {"name": "PATIENT"},
-      {"name": "PATIENT_REPRESENTATIVE"},
-      {"name": "COORDINATOR"},
-      {"name": "COORDINATOR_LEAD"},
-      {"name": "DOCTOR"},
-      {"name": "OPERATIONS"},
-      {"name": "OPERATIONS_LEAD", "composite": true, "composites": {"realm": ["OPERATIONS"]}},
-      {"name": "FINANCE"},
-      {"name": "FINANCE_LEAD", "composite": true, "composites": {"realm": ["FINANCE"]}},
-      {"name": "CREDENTIALING_ADMIN"},
-      {"name": "SYSTEM_ADMIN"},
-      {"name": "AUDITOR"},
-      {"name": "PATIENT_IDENTITY_REVIEWER", "description": "Reviews patient legal-identity proofing (distinct from practitioner CREDENTIALING_ADMIN)"}
+      {
+        "name": "PATIENT"
+      },
+      {
+        "name": "PATIENT_REPRESENTATIVE"
+      },
+      {
+        "name": "COORDINATOR"
+      },
+      {
+        "name": "COORDINATOR_LEAD"
+      },
+      {
+        "name": "DOCTOR"
+      },
+      {
+        "name": "OPERATIONS"
+      },
+      {
+        "name": "OPERATIONS_LEAD",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "OPERATIONS"
+          ]
+        }
+      },
+      {
+        "name": "FINANCE"
+      },
+      {
+        "name": "FINANCE_LEAD",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "FINANCE"
+          ]
+        }
+      },
+      {
+        "name": "CREDENTIALING_ADMIN"
+      },
+      {
+        "name": "SYSTEM_ADMIN"
+      },
+      {
+        "name": "AUDITOR"
+      },
+      {
+        "name": "PATIENT_IDENTITY_REVIEWER",
+        "description": "Reviews patient legal-identity proofing (distinct from practitioner CREDENTIALING_ADMIN)"
+      },
+      {
+        "name": "rs-staff",
+        "description": "Works on cases or the platform: signs in with a second factor (D1). Set by the platform when staff are invited.",
+        "composite": false,
+        "clientRole": false
+      }
     ]
   },
   "accessTokenLifespan": 300,
@@ -70,34 +115,68 @@
   "webAuthnPolicyCreateTimeout": 60,
   "webAuthnPolicyAvoidSameAuthenticatorRegister": true,
   "webAuthnPolicyAcceptableAaguids": [],
-  "browserFlow": "rehletshifaa-browser-step-up",
+  "browserFlow": "rehletshifaa-browser",
   "authenticatorConfig": [
     {
-      "alias": "rehletshifaa-loa-1",
+      "alias": "rs-amr-pwd",
       "config": {
-        "loa-condition-level": "1",
-        "loa-max-age": "36000"
+        "default.reference.value": "pwd",
+        "default.reference.maxAge": "36000"
       }
     },
     {
-      "alias": "rehletshifaa-loa-2",
+      "alias": "rs-amr-hwk",
       "config": {
-        "loa-condition-level": "2",
-        "loa-max-age": "36000"
+        "default.reference.value": "hwk",
+        "default.reference.maxAge": "36000"
       }
     },
     {
-      "alias": "rehletshifaa-loa-3",
+      "alias": "rs-amr-otp",
       "config": {
-        "loa-condition-level": "3",
-        "loa-max-age": "36000"
+        "default.reference.value": "otp",
+        "default.reference.maxAge": "36000"
+      }
+    },
+    {
+      "alias": "rs-amr-recovery",
+      "config": {
+        "default.reference.value": "mfa",
+        "default.reference.maxAge": "36000"
+      }
+    },
+    {
+      "alias": "rs-amr-otp-enrol",
+      "config": {
+        "default.reference.value": "otp",
+        "default.reference.maxAge": "36000"
+      }
+    },
+    {
+      "alias": "rs-cond-staff",
+      "config": {
+        "condUserRole": "rs-staff",
+        "negate": "false"
+      }
+    },
+    {
+      "alias": "rs-cond-no-second-factor",
+      "config": {
+        "flow_to_check": "rehletshifaa-second-factor",
+        "check_result": "not-executed"
+      }
+    },
+    {
+      "alias": "rs-deny-direct-grant",
+      "config": {
+        "denyErrorMessage": "Sign in through the RehletShifaa website."
       }
     }
   ],
   "authenticationFlows": [
     {
-      "alias": "rehletshifaa-browser-step-up",
-      "description": "Browser sign-in with password, OTP MFA and WebAuthn passkey step-up levels",
+      "alias": "rehletshifaa-browser",
+      "description": "Sign-in: password, then the second factor the person has (passkey, authenticator app or recovery code); staff without one enrol now",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -112,91 +191,47 @@
           "authenticatorFlow": true,
           "requirement": "ALTERNATIVE",
           "priority": 20,
-          "flowAlias": "rehletshifaa-browser-authentication"
+          "flowAlias": "rehletshifaa-sign-in"
         }
       ]
     },
     {
-      "alias": "rehletshifaa-browser-authentication",
-      "description": "Ordered cumulative levels of authentication",
+      "alias": "rehletshifaa-sign-in",
+      "description": "Password and second factor",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
-          "authenticatorFlow": true,
-          "requirement": "CONDITIONAL",
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
           "priority": 10,
-          "flowAlias": "rehletshifaa-loa-1-flow"
+          "authenticatorConfig": "rs-amr-pwd"
         },
         {
           "authenticatorFlow": true,
           "requirement": "CONDITIONAL",
           "priority": 20,
-          "flowAlias": "rehletshifaa-loa-2-flow"
+          "flowAlias": "rehletshifaa-second-factor"
         },
         {
           "authenticatorFlow": true,
           "requirement": "CONDITIONAL",
           "priority": 30,
-          "flowAlias": "rehletshifaa-loa-3-flow"
+          "flowAlias": "rehletshifaa-staff-enrolment"
         }
       ]
     },
     {
-      "alias": "rehletshifaa-loa-1-flow",
-      "description": "LoA 1: username and password",
+      "alias": "rehletshifaa-second-factor",
+      "description": "Anyone who has a second factor uses it, at every sign-in, from every client: passkey, authenticator app or a recovery code",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
-          "authenticator": "conditional-level-of-authentication",
-          "authenticatorConfig": "rehletshifaa-loa-1",
-          "authenticatorFlow": false,
-          "requirement": "REQUIRED",
-          "priority": 10
-        },
-        {
-          "authenticator": "auth-username-password-form",
-          "authenticatorFlow": false,
-          "requirement": "REQUIRED",
-          "priority": 20
-        }
-      ]
-    },
-    {
-      "alias": "rehletshifaa-loa-2-flow",
-      "description": "LoA 2: time-based one-time password MFA",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "conditional-level-of-authentication",
-          "authenticatorConfig": "rehletshifaa-loa-2",
-          "authenticatorFlow": false,
-          "requirement": "REQUIRED",
-          "priority": 10
-        },
-        {
-          "authenticator": "auth-otp-form",
-          "authenticatorFlow": false,
-          "requirement": "REQUIRED",
-          "priority": 20
-        }
-      ]
-    },
-    {
-      "alias": "rehletshifaa-loa-3-flow",
-      "description": "LoA 3: WebAuthn passkey after password and OTP",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "conditional-level-of-authentication",
-          "authenticatorConfig": "rehletshifaa-loa-3",
+          "authenticator": "conditional-user-configured",
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "priority": 10
@@ -204,15 +239,203 @@
         {
           "authenticator": "webauthn-authenticator",
           "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "authenticatorConfig": "rs-amr-hwk"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "authenticatorConfig": "rs-amr-otp"
+        },
+        {
+          "authenticator": "auth-recovery-authn-code-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 40,
+          "authenticatorConfig": "rs-amr-recovery"
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-staff-enrolment",
+      "description": "Staff without a second factor set one up at this sign-in",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-role",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorConfig": "rs-cond-staff"
+        },
+        {
+          "authenticator": "conditional-sub-flow-executed",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "authenticatorConfig": "rs-cond-no-second-factor"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 30,
+          "authenticatorConfig": "rs-amr-otp-enrol"
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-direct-grant-denied",
+      "description": "No password-only tokens: every token comes from the browser sign-in",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "deny-access-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorConfig": "rs-deny-direct-grant"
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-reset-credentials",
+      "description": "Password reset proves the second factor before the new password",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "reset-credentials-choose-user",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10
+        },
+        {
+          "authenticator": "reset-credential-email",
+          "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "priority": 20
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 30,
+          "flowAlias": "rehletshifaa-reset-second-factor"
+        },
+        {
+          "authenticator": "reset-password",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 40
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-reset-second-factor",
+      "description": "A reset never bypasses a second factor the person has",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10
+        },
+        {
+          "authenticator": "webauthn-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30
+        },
+        {
+          "authenticator": "auth-recovery-authn-code-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 40
         }
       ]
     }
   ],
+  "directGrantFlow": "rehletshifaa-direct-grant-denied",
+  "resetCredentialsFlow": "rehletshifaa-reset-credentials",
+  "eventsEnabled": true,
+  "eventsExpiration": 7776000,
+  "enabledEventTypes": [
+    "LOGIN_ERROR",
+    "UPDATE_CREDENTIAL",
+    "REMOVE_CREDENTIAL",
+    "UPDATE_TOTP",
+    "REMOVE_TOTP",
+    "UPDATE_PASSWORD",
+    "RESET_PASSWORD",
+    "RESET_PASSWORD_ERROR",
+    "CUSTOM_REQUIRED_ACTION",
+    "EXECUTE_ACTIONS",
+    "SEND_RESET_PASSWORD",
+    "CODE_TO_TOKEN_ERROR",
+    "USER_DISABLED_BY_TEMPORARY_LOCKOUT",
+    "USER_DISABLED_BY_PERMANENT_LOCKOUT"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": false,
   "clients": [
     {
       "clientId": "rehletshifaa-web",
+      "protocolMappers": [
+        {
+          "name": "auth-time",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "AUTH_TIME",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "auth_time",
+            "jsonType.label": "long"
+          }
+        },
+        {
+          "name": "rehletshifaa-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "rehletshifaa-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "amr",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-amr-mapper",
+          "consentRequired": false,
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
       "name": "RehletShifaa Web",
       "enabled": true,
       "publicClient": true,

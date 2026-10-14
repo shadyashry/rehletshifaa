@@ -2,10 +2,10 @@
 
 import { useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { satisfiesReauthenticationAcr, type Me } from "@/lib/access";
+import { satisfiesReauthenticationAcr, sessionAssurance, type Me } from "@/lib/access";
 
-/** The backend's step-up window is 10 minutes; warn a little before it runs out. */
-const FRESH_SIGN_IN_MS = 9 * 60_000;
+/** The backend's step-up window is 20 minutes; warn a little before it runs out. */
+const FRESH_SIGN_IN_MS = 19 * 60_000;
 
 /** True when the current sign-in is older than the step-up window (or its time is unknown). */
 export function signInIsStale(authTime: unknown, now = Date.now()) {
@@ -34,8 +34,8 @@ export function useControlCenterAccess(): ControlCenterAccess {
   const can = useCallback((permission: string) => !!me?.permissions.includes(permission), [me]);
   const canAny = useCallback((permissions: string[]) => permissions.some((p) => can(p)), [can]);
   const authTime = user?.profile?.auth_time;
-  const acr = user?.profile?.acr;
+  const assurance = sessionAssurance(user?.profile?.amr, user?.profile?.acr);
   const needsFreshSignIn = useCallback((permission: string) => !!me?.reauthenticate.includes(permission)
-    && (signInIsStale(authTime) || !satisfiesReauthenticationAcr(me, acr)), [me, authTime, acr]);
+    && (signInIsStale(authTime) || !satisfiesReauthenticationAcr(me, assurance)), [me, authTime, assurance]);
   return { loading, failed: meFailed, retry: refreshMe, me, can, canAny, needsFreshSignIn };
 }

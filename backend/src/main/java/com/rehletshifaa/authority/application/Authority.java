@@ -51,7 +51,7 @@ public class Authority {
 
     /** {@code granted=false} carries the refusal code and the reason; {@code role}/{@code scope} name the grant used. */
     /** Refusals answered by signing in (again), not by different access: 401 rather than 403. */
-    private static final Set<String> SIGN_IN_AGAIN = Set.of("REAUTHENTICATION_REQUIRED", "MFA_REQUIRED");
+    private static final Set<String> SIGN_IN_AGAIN = Set.of("REAUTHENTICATION_REQUIRED", "MFA_REQUIRED", "PHISHING_RESISTANT_AUTHENTICATION_REQUIRED");
 
     public record Decision(boolean granted, Permission permission, Role role, Scope scope, String code, String reason) {}
 
@@ -82,6 +82,20 @@ public class Authority {
     }
 
     public Principal require(Permission permission) { return require(permission, Resource.platform()); }
+
+    /**
+     * A2b: the request-level guard behind every API call (see {@code SecondFactorGuard}). A staff session — any role that signs
+     * in with a second factor — that proved only a password is refused here, before any controller runs, so an endpoint that
+     * resolves its caller without a permission check still cannot serve it. Patients and anonymous calls pass through.
+     */
+    public void requireSecondFactorForStaff() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (!(auth instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken)) return;
+        Principal principal = Principal.current();
+        boolean staff = roles.roles(principal.subject(), clock.instant()).stream().anyMatch(Role::secondFactorAtSignIn);
+        if (staff && !authenticationStrength.mfa(principal))
+            throw new ApiException(401, "MFA_REQUIRED", "Finish signing in with your second step (authenticator app or passkey)");
+    }
 
     /** As {@link #require} but returns the authorized actor with the granting role and all effective roles. */
     public Actor authorize(Permission permission, Resource resource) {
@@ -142,7 +156,7 @@ public class Authority {
                 return new Decision(false, permission, matched.role(), matched.scope(), "REAUTHENTICATION_REQUIRED",
                         "Use multi-factor authentication to confirm this sensitive action");
             if (effective.stream().anyMatch(Role::privileged) && !authenticationStrength.phishingResistant(principal))
-                return new Decision(false, permission, matched.role(), matched.scope(), "REAUTHENTICATION_REQUIRED",
+                return new Decision(false, permission, matched.role(), matched.scope(), "PHISHING_RESISTANT_AUTHENTICATION_REQUIRED",
                         "Use your passkey to confirm this sensitive action");
         }
         return new Decision(true, permission, matched.role(), matched.scope(), "GRANTED", "Granted by " + matched.role() + " (" + matched.scope() + ")");

@@ -152,6 +152,30 @@ covers both files), passkey registration without `prompt()`, EN + AR wording for
 signed-in different user. W-30, W-38, W-35 (list without fresh re-check: `Authority.requireToList`), G-5. Recovery codes and a
 themed sign-out button on Keycloak's "different user" page are not done.
 
+### A2b — Second factor enforced by Keycloak, no gaps (2026-10-14, owner: "a full fix for MFA without any gap")
+
+The A2 review found that only the app enforced the second factor: Keycloak still issued password-only sessions (its
+account page could register an attacker's authenticator), `admin-cli` issued password-only tokens, and a password reset
+skipped the second factor. Fixed in Keycloak itself, from one specification (`infrastructure/keycloak/sign_in_spec.py` →
+both realm files and `sync-authentication.sh`, which `keycloak-sync` runs on dev):
+
+| Gap | Fix | Proof (throwaway realm, local Keycloak) |
+|---|---|---|
+| Password-only Keycloak session for someone who has a second factor | Browser flow: password, then the second factor anyone has (passkey, app, recovery code) — every client, the account page included | Staff with app: password → code; token `amr: [pwd, otp]` |
+| Staff without a second factor | `rs-staff` realm role (set at invite, by reconciliation and on seeded users) → app set-up at that sign-in | Password → set-up page; next sign-in asks the code |
+| Password-only tokens (`admin-cli` password grant) | Direct-grant flow = deny; `admin-cli` direct grants off | Password grant → 401, no token |
+| Password reset skips the second factor | Reset flow proves the second factor before the new password | Email link → code → new password |
+| Backend trusted a stated level (`acr`) | Backend reads how the person signed in (`amr`: pwd/otp/hwk), fail closed; no step-up levels remain | Unit test; contract test asserts no LoA config |
+| Endpoints that resolve their caller without `Authority` | `SecondFactorGuard` on every `/api/v1/**` request; a coverage test calls every endpoint with a password-only staff token | Found 3 (notifications, clinics/mine, owner-transfers) → now refused |
+| Privileged re-check loop without a passkey | `PHISHING_RESISTANT_AUTHENTICATION_REQUIRED` → "Confirm with my passkey" / "Set up a passkey" (Keycloak AIA) | Frontend tests |
+| Recovery | Recovery codes at invite and MFA reset; reset removes old codes too | Identity adapter tests |
+| Audit | Keycloak events on (credential added/removed, login errors, resets; 90 days) + admin events; brute-force protection on dev too | Contract test |
+| Production realm drift | Production realm gains the same flows, the API audience and `auth_time` mappers it lacked, and `amr` | Contract test checks both files |
+
+Checked and not a gap: an admin-issued email link (set a new password) creates no Keycloak session; a later credential
+change asks for password and second factor. A new tab's silent sign-in keeps `amr: [pwd, otp]`.
+Gates: backend 731/0/2 (+ coverage, contract, amr tests), vitest 63 files / 439, typecheck, lint 0 errors, Playwright 37.
+
 ### A3 — Work items and "waiting on" from one source (1 session)
 
 | ID | Fix |

@@ -41,34 +41,68 @@
   "webAuthnPolicyCreateTimeout": 60,
   "webAuthnPolicyAvoidSameAuthenticatorRegister": true,
   "webAuthnPolicyAcceptableAaguids": [],
-  "browserFlow": "rehletshifaa-browser-step-up",
+  "browserFlow": "rehletshifaa-browser",
   "authenticatorConfig": [
     {
-      "alias": "rehletshifaa-loa-1",
+      "alias": "rs-amr-pwd",
       "config": {
-        "loa-condition-level": "1",
-        "loa-max-age": "36000"
+        "default.reference.value": "pwd",
+        "default.reference.maxAge": "36000"
       }
     },
     {
-      "alias": "rehletshifaa-loa-2",
+      "alias": "rs-amr-hwk",
       "config": {
-        "loa-condition-level": "2",
-        "loa-max-age": "36000"
+        "default.reference.value": "hwk",
+        "default.reference.maxAge": "36000"
       }
     },
     {
-      "alias": "rehletshifaa-loa-3",
+      "alias": "rs-amr-otp",
       "config": {
-        "loa-condition-level": "3",
-        "loa-max-age": "36000"
+        "default.reference.value": "otp",
+        "default.reference.maxAge": "36000"
+      }
+    },
+    {
+      "alias": "rs-amr-recovery",
+      "config": {
+        "default.reference.value": "mfa",
+        "default.reference.maxAge": "36000"
+      }
+    },
+    {
+      "alias": "rs-amr-otp-enrol",
+      "config": {
+        "default.reference.value": "otp",
+        "default.reference.maxAge": "36000"
+      }
+    },
+    {
+      "alias": "rs-cond-staff",
+      "config": {
+        "condUserRole": "rs-staff",
+        "negate": "false"
+      }
+    },
+    {
+      "alias": "rs-cond-no-second-factor",
+      "config": {
+        "flow_to_check": "rehletshifaa-second-factor",
+        "check_result": "not-executed"
+      }
+    },
+    {
+      "alias": "rs-deny-direct-grant",
+      "config": {
+        "denyErrorMessage": "Sign in through the RehletShifaa website."
       }
     }
   ],
   "authenticationFlows": [
     {
-      "alias": "rehletshifaa-browser-step-up",
-      "description": "Browser sign-in with password, OTP MFA and WebAuthn passkey step-up levels",
+      "alias": "rehletshifaa-browser",
+      "description": "Sign-in: password, then the second factor the person has (passkey, authenticator app or recovery code); staff without one enrol now",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -83,91 +117,47 @@
           "authenticatorFlow": true,
           "requirement": "ALTERNATIVE",
           "priority": 20,
-          "flowAlias": "rehletshifaa-browser-authentication"
+          "flowAlias": "rehletshifaa-sign-in"
         }
       ]
     },
     {
-      "alias": "rehletshifaa-browser-authentication",
-      "description": "Ordered cumulative levels of authentication",
+      "alias": "rehletshifaa-sign-in",
+      "description": "Password and second factor",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
-          "authenticatorFlow": true,
-          "requirement": "CONDITIONAL",
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
           "priority": 10,
-          "flowAlias": "rehletshifaa-loa-1-flow"
+          "authenticatorConfig": "rs-amr-pwd"
         },
         {
           "authenticatorFlow": true,
           "requirement": "CONDITIONAL",
           "priority": 20,
-          "flowAlias": "rehletshifaa-loa-2-flow"
+          "flowAlias": "rehletshifaa-second-factor"
         },
         {
           "authenticatorFlow": true,
           "requirement": "CONDITIONAL",
           "priority": 30,
-          "flowAlias": "rehletshifaa-loa-3-flow"
+          "flowAlias": "rehletshifaa-staff-enrolment"
         }
       ]
     },
     {
-      "alias": "rehletshifaa-loa-1-flow",
-      "description": "LoA 1: username and password",
+      "alias": "rehletshifaa-second-factor",
+      "description": "Anyone who has a second factor uses it, at every sign-in, from every client: passkey, authenticator app or a recovery code",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
-          "authenticator": "conditional-level-of-authentication",
-          "authenticatorConfig": "rehletshifaa-loa-1",
-          "authenticatorFlow": false,
-          "requirement": "REQUIRED",
-          "priority": 10
-        },
-        {
-          "authenticator": "auth-username-password-form",
-          "authenticatorFlow": false,
-          "requirement": "REQUIRED",
-          "priority": 20
-        }
-      ]
-    },
-    {
-      "alias": "rehletshifaa-loa-2-flow",
-      "description": "LoA 2: time-based one-time password MFA",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "conditional-level-of-authentication",
-          "authenticatorConfig": "rehletshifaa-loa-2",
-          "authenticatorFlow": false,
-          "requirement": "REQUIRED",
-          "priority": 10
-        },
-        {
-          "authenticator": "auth-otp-form",
-          "authenticatorFlow": false,
-          "requirement": "REQUIRED",
-          "priority": 20
-        }
-      ]
-    },
-    {
-      "alias": "rehletshifaa-loa-3-flow",
-      "description": "LoA 3: WebAuthn passkey after password and OTP",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "conditional-level-of-authentication",
-          "authenticatorConfig": "rehletshifaa-loa-3",
+          "authenticator": "conditional-user-configured",
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "priority": 10
@@ -175,12 +165,179 @@
         {
           "authenticator": "webauthn-authenticator",
           "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "authenticatorConfig": "rs-amr-hwk"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "authenticatorConfig": "rs-amr-otp"
+        },
+        {
+          "authenticator": "auth-recovery-authn-code-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 40,
+          "authenticatorConfig": "rs-amr-recovery"
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-staff-enrolment",
+      "description": "Staff without a second factor set one up at this sign-in",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-role",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorConfig": "rs-cond-staff"
+        },
+        {
+          "authenticator": "conditional-sub-flow-executed",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "authenticatorConfig": "rs-cond-no-second-factor"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 30,
+          "authenticatorConfig": "rs-amr-otp-enrol"
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-direct-grant-denied",
+      "description": "No password-only tokens: every token comes from the browser sign-in",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "deny-access-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorConfig": "rs-deny-direct-grant"
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-reset-credentials",
+      "description": "Password reset proves the second factor before the new password",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "reset-credentials-choose-user",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10
+        },
+        {
+          "authenticator": "reset-credential-email",
+          "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "priority": 20
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 30,
+          "flowAlias": "rehletshifaa-reset-second-factor"
+        },
+        {
+          "authenticator": "reset-password",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 40
+        }
+      ]
+    },
+    {
+      "alias": "rehletshifaa-reset-second-factor",
+      "description": "A reset never bypasses a second factor the person has",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10
+        },
+        {
+          "authenticator": "webauthn-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 30
+        },
+        {
+          "authenticator": "auth-recovery-authn-code-form",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 40
         }
       ]
     }
   ],
+  "directGrantFlow": "rehletshifaa-direct-grant-denied",
+  "resetCredentialsFlow": "rehletshifaa-reset-credentials",
+  "eventsEnabled": true,
+  "eventsExpiration": 7776000,
+  "enabledEventTypes": [
+    "LOGIN_ERROR",
+    "UPDATE_CREDENTIAL",
+    "REMOVE_CREDENTIAL",
+    "UPDATE_TOTP",
+    "REMOVE_TOTP",
+    "UPDATE_PASSWORD",
+    "RESET_PASSWORD",
+    "RESET_PASSWORD_ERROR",
+    "CUSTOM_REQUIRED_ACTION",
+    "EXECUTE_ACTIONS",
+    "SEND_RESET_PASSWORD",
+    "CODE_TO_TOKEN_ERROR",
+    "USER_DISABLED_BY_TEMPORARY_LOCKOUT",
+    "USER_DISABLED_BY_PERMANENT_LOCKOUT"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "roles": {
+    "realm": [
+      {
+        "name": "rs-staff",
+        "description": "Works on cases or the platform: signs in with a second factor (D1). Set by the platform when staff are invited.",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  },
   "clients": [
     {
       "clientId": "rehletshifaa-web",
@@ -232,6 +389,18 @@
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
+        },
+        {
+          "name": "amr",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-amr-mapper",
+          "consentRequired": false,
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
         }
       ]
     },
@@ -266,6 +435,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000102",
       "username": "coordinator",
+      "realmRoles": ["rs-staff"],
       "email": "coordinator@local.test",
       "firstName": "Layla",
       "lastName": "Hassan",
@@ -282,6 +452,7 @@
     {
       "id": "06d5980a-76fe-4e34-9900-89aef8a9d87a",
       "username": "coordinator2",
+      "realmRoles": ["rs-staff"],
       "email": "coordinator2@local.test",
       "firstName": "Omar",
       "lastName": "Nasser",
@@ -298,6 +469,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000103",
       "username": "doctor",
+      "realmRoles": ["rs-staff"],
       "email": "doctor@local.test",
       "firstName": "Ahmed",
       "lastName": "AlAshry",
@@ -314,6 +486,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000202",
       "username": "doctor-orthopedics",
+      "realmRoles": ["rs-staff"],
       "email": "doctor-orthopedics@local.test",
       "firstName": "Hossam",
       "lastName": "Kibba",
@@ -328,6 +501,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000104",
       "username": "operations",
+      "realmRoles": ["rs-staff"],
       "email": "operations@local.test",
       "firstName": "Mariam",
       "lastName": "Soliman",
@@ -344,6 +518,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000105",
       "username": "finance",
+      "realmRoles": ["rs-staff"],
       "email": "finance@local.test",
       "firstName": "Youssef",
       "lastName": "Adel",
@@ -360,6 +535,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000106",
       "username": "credential-admin",
+      "realmRoles": ["rs-staff"],
       "email": "credential-admin@local.test",
       "firstName": "Maya",
       "lastName": "Farid",
@@ -376,6 +552,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000301",
       "username": "journey-manager",
+      "realmRoles": ["rs-staff"],
       "email": "journey-manager@local.test",
       "firstName": "Journey",
       "lastName": "Manager",
@@ -386,6 +563,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000302",
       "username": "journey-approver",
+      "realmRoles": ["rs-staff"],
       "email": "journey-approver@local.test",
       "firstName": "Journey",
       "lastName": "Approver",
@@ -396,6 +574,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000303",
       "username": "compliance-auditor",
+      "realmRoles": ["rs-staff"],
       "email": "compliance-auditor@local.test",
       "firstName": "Compliance",
       "lastName": "Auditor",
@@ -406,6 +585,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000304",
       "username": "support-officer",
+      "realmRoles": ["rs-staff"],
       "email": "support-officer@local.test",
       "firstName": "Support",
       "lastName": "Officer",
@@ -416,6 +596,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000305",
       "username": "patient-identity-reviewer",
+      "realmRoles": ["rs-staff"],
       "email": "patient-identity-reviewer@local.test",
       "firstName": "Patient Identity",
       "lastName": "Reviewer",
@@ -426,6 +607,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000306",
       "username": "operations-manager",
+      "realmRoles": ["rs-staff"],
       "email": "operations-manager@local.test",
       "firstName": "Operations",
       "lastName": "Manager",
@@ -436,6 +618,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000307",
       "username": "finance-manager",
+      "realmRoles": ["rs-staff"],
       "email": "finance-manager@local.test",
       "firstName": "Finance",
       "lastName": "Manager",
@@ -446,6 +629,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000308",
       "username": "credentialing-manager",
+      "realmRoles": ["rs-staff"],
       "email": "credentialing-manager@local.test",
       "firstName": "Credentialing",
       "lastName": "Manager",
@@ -456,6 +640,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000309",
       "username": "support-manager",
+      "realmRoles": ["rs-staff"],
       "email": "support-manager@local.test",
       "firstName": "Support",
       "lastName": "Manager",
@@ -466,6 +651,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000310",
       "username": "care-manager",
+      "realmRoles": ["rs-staff"],
       "email": "care-manager@local.test",
       "firstName": "Care Coordination",
       "lastName": "Manager",
@@ -476,6 +662,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000311",
       "username": "consultant-operations-manager",
+      "realmRoles": ["rs-staff"],
       "email": "consultant-operations-manager@local.test",
       "firstName": "Consultant Operations",
       "lastName": "Manager",
@@ -486,6 +673,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000312",
       "username": "coordinator-scope",
+      "realmRoles": ["rs-staff"],
       "email": "coordinator-scope@local.test",
       "firstName": "Scope Test",
       "lastName": "Coordinator",
@@ -496,6 +684,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000313",
       "username": "care-manager-scope",
+      "realmRoles": ["rs-staff"],
       "email": "care-manager-scope@local.test",
       "firstName": "Scope Test Care",
       "lastName": "Manager",

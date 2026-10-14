@@ -2,8 +2,8 @@
 
 import { NoPortalWorkspace } from "./NoPortalWorkspace";
 import { useVirtualClinics, virtualClinicHref } from "@/components/virtual-clinic/virtual-clinic-model";
-import { PortalReauthenticationNotice } from "@/components/ReauthenticationNotices";
-import { REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication, takePendingChange, takeReauthenticationReturn, type PendingChange } from "@/lib/reauthentication";
+import { PortalPasskeyNotice, PortalReauthenticationNotice } from "@/components/ReauthenticationNotices";
+import { PASSKEY_REQUIRED, REAUTHENTICATION_REQUIRED, reauthenticationCopy, requestReauthentication, takePendingChange, takeReauthenticationReturn, type PendingChange } from "@/lib/reauthentication";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import type { CaseViewProps } from "@/components/portal/StaffCaseView";
 import dynamic from "next/dynamic";
@@ -118,7 +118,9 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   // retry instead of rendering under a role this person may no longer hold.
   const caseRole=currentRole&&!["admin","identity"].includes(currentRole)?currentRole:null;
   const CaseViewFor=useCaseView(!caseRole?null:caseRole==="patient"?"patient":"staff");
-  const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));if(body.code===REAUTHENTICATION_REQUIRED){const method=(init?.method??"GET").toUpperCase();await requestReauthentication(signIn,method==="GET"?undefined:{path,method,body:typeof init?.body==="string"?init.body:undefined});throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn,locale]);
+  const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));// A2b: a privileged change wants the passkey — explain and offer it (or its setup) instead of re-signing-in blindly.
+      if(body.code===PASSKEY_REQUIRED){const method=(init?.method??"GET").toUpperCase();throw Object.assign(new Error(reauthenticationCopy[locale].passkeyRequired),{passkeyPending:method==="GET"?null:{path,method,body:typeof init?.body==="string"?init.body:undefined}});}
+      if(body.code===REAUTHENTICATION_REQUIRED){const method=(init?.method??"GET").toUpperCase();await requestReauthentication(signIn,method==="GET"?undefined:{path,method,body:typeof init?.body==="string"?init.body:undefined});throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn,locale]);
   // Busy counts the operations in flight, so one finishing cannot clear it while another still runs. A refresh answers
   // only if it is still the latest one for this role: an older one, or one from before a role switch, is dropped.
   const refreshing=useRef(0);
@@ -226,6 +228,8 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   useEffect(()=>{const back=takeReauthenticationReturn(typeof user?.profile?.auth_time==="number"?user.profile.auth_time:undefined);const pending=takePendingChange();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if(back)setReauthReturn({pending:back==="completed"?pending:null,abandoned:back==="abandoned"});},[]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A2b: a privileged change the backend refused for want of a passkey (with the change, to send again after confirming).
+  const[passkeyNeeded,setPasskeyNeeded]=useState<{pending:PendingChange|null}|null>(null);
   async function mutate(path:string,body?:unknown,method="POST"):Promise<MutationResult|null|undefined>{
     // Another action is still running: nothing was sent, which is not a failure (null, not undefined).
     if(mutationPending.current)return null;mutationPending.current=true;setBusyCount(n=>n+1);setError("");setNotice("");
@@ -235,7 +239,8 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
       // What the form that acted now shows is what was saved, once the reloaded case has rendered.
       requestAnimationFrame(()=>rebaseline(origin));
       return result??{status:"SAVED"};
-    }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);await refreshAfterRejectedAction(path,workspace,refresh,openCase);setError(message);return undefined;}
+    }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);
+      if(e instanceof Error&&"passkeyPending" in e){setPasskeyNeeded({pending:(e as Error&{passkeyPending:PendingChange|null}).passkeyPending});return undefined;}await refreshAfterRejectedAction(path,workspace,refresh,openCase);setError(message);return undefined;}
     finally{mutationPending.current=false;setBusyCount(n=>n-1);}
   }
   // Staff views (My work, My cases, Team queue) in one place: the header navigation, the inline phone navigation and
@@ -318,6 +323,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
       roles={available.length>1?{label:work.nav.workingAs,current:currentRole,options:available.map(role=>({key:role,label:roleLabel(role,locale)})),onSelect:key=>switchRole(key as RoleKey)}:null}/>
     {/* A patient-side account that also manages a clinic keeps its one way in; staff reach it from the navigation. */}
     {isPatientRole&&clinicLink&&<p className="mb-6"><a className="btn-secondary" href={clinicLink.href}>{clinicLink.label}</a></p>}
+    {passkeyNeeded&&<PortalPasskeyNotice locale={locale} pending={passkeyNeeded.pending} className="mb-4 rounded-lg bg-brand-50 p-4 text-brand-800" onClose={()=>setPasskeyNeeded(null)}/>}
     {reauthReturn&&<PortalReauthenticationNotice locale={locale} pending={reauthReturn.pending} abandoned={reauthReturn.abandoned} busy={busy} className="mb-4 rounded-lg bg-brand-50 p-4 text-brand-800"
       onClose={()=>setReauthReturn(null)} onResend={change=>{void mutate(change.path,change.body===undefined?undefined:JSON.parse(change.body),change.method);}}/>}
     {!available.length&&<NoPortalWorkspace locale={locale}/>}

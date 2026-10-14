@@ -36,15 +36,22 @@ class IdentityProvisioningPortTest {
                 .andExpect(method(HttpMethod.GET)).andRespond(withSuccess("[]",MediaType.APPLICATION_JSON));
         token();
         var expectation=server.expect(requestTo(ADMIN+"/users")).andExpect(method(HttpMethod.POST))
-                .andExpect(content().json("{\"email\":\"new@example.test\",\"enabled\":true,\"requiredActions\":[\"VERIFY_EMAIL\",\"UPDATE_PASSWORD\",\"CONFIGURE_TOTP\"]}"))
+                .andExpect(content().json("{\"email\":\"new@example.test\",\"enabled\":true,\"requiredActions\":[\"VERIFY_EMAIL\",\"UPDATE_PASSWORD\",\"CONFIGURE_TOTP\",\"CONFIGURE_RECOVERY_AUTHN_CODES\"]}"))
                 ;
         if(marker!=null)expectation.andExpect(content().json("{\"attributes\":{\"rehletshifaaProvisioningOperation\":[\""+marker+"\"]}}"));
         expectation.andRespond(withCreatedEntity(URI.create(ADMIN+"/users/stable-subject")));
+        // A2b: the sign-in marker, so Keycloak itself requires the second factor of this account.
+        token();
+        server.expect(requestTo(ADMIN+"/roles/rs-staff")).andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"id\":\"role-id\",\"name\":\"rs-staff\"}",MediaType.APPLICATION_JSON));
+        token();
+        server.expect(requestTo(ADMIN+"/users/stable-subject/role-mappings/realm")).andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("[{\"name\":\"rs-staff\"}]")).andRespond(withNoContent());
     }
     void email(boolean success) {
         token();
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(ADMIN+"/users/stable-subject/execute-actions-email?")))
-                .andExpect(method(HttpMethod.PUT)).andExpect(content().json("[\"VERIFY_EMAIL\",\"UPDATE_PASSWORD\",\"CONFIGURE_TOTP\"]"))
+                .andExpect(method(HttpMethod.PUT)).andExpect(content().json("[\"VERIFY_EMAIL\",\"UPDATE_PASSWORD\",\"CONFIGURE_TOTP\",\"CONFIGURE_RECOVERY_AUTHN_CODES\"]"))
                 .andRespond(success?withNoContent():withServerError());
     }
     @Test void businessInvitationReturnsStableSubjectWithoutReadingOrWritingRealmRoles() {
