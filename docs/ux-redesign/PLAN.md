@@ -21,7 +21,7 @@ One shape plan per area under `plans/`. Runs **in parallel** with the backend pl
 - Backend coupling: where a backend phase delivers a screen, it ships the minimum working UI; the UX area designs the
   final one on the real data. Areas marked "after P1-xx" do not start before that phase is merged.
 
-## Theme: open — area 0, visual-world exploration (2026-10-15)
+## Theme: decided — area 0 closed, Petrol & Paper stays (owner, 2026-10-15)
 
 The owner asked for a genuinely distinctive theme for international health travel and wants the exploration run in a
 **new session with the `frontend-design` plugin and Impeccable together**. Starting point: the Theme Studio page
@@ -48,7 +48,7 @@ new mark, delivered as SVG in EN/AR lockups, with the favicon, the Keycloak them
 
 | # | Area | Entry points | Depends on | Sessions | Status |
 |---|---|---|---|---|---|
-| 0 | **Visual world** (theme) exploration and decision — new session, frontend-design plugin + Impeccable; token proposal and Arabic type scale for the chosen world | `theme-petrol.css`, `globals.css` @theme, `DESIGN.md`, Keycloak theme | — | 2–3 | **At the owner gate** (2026-10-15): `theme-studio-v2.html` regenerates the studio with the frontend-design tells removed, adds world E (Letterhead & Seal, recommended) with the new mark, EN/AR phone + desktop comp and the token proposal; no token changed |
+| 0 | **Visual world** (theme) exploration and decision — new session, frontend-design plugin + Impeccable; token proposal and Arabic type scale for the chosen world | `theme-petrol.css`, `globals.css` @theme, `DESIGN.md`, Keycloak theme | — | 2–3 | **Decided 2026-10-15: Petrol & Paper stays** (owner, after `theme-studio-v2.html`: A–D re-rendered, world E Letterhead & Seal proposed and declined). No token change; the mark stays the hand-and-heart; the studio's findings (eyebrow, dots, arrow, uppercase labels, coral below 3:1 as a ring) go to backlog as optional polish, not as a theme change |
 | 0b | Public site trust pass (hero, Send my case opening, confirmation, home order) | `home/Hero.tsx`, `CaseForm.tsx`, `send-my-case/page.tsx` | — | 1 | **Built** `b2b9f3e` (`plans/public-site-trust.md`); deferred: photos strip, continue-later link, care-area row, Arabic numerals |
 | 1 | **Patient portal as the file**: My Care, status link, proposal link, profile activation, deposit step; signature moments "case sent", "specialist reviewing", "estimate ready" (ex P2-20) | `portal/MyCare.tsx`, `CaseStatusAccess.tsx`, `ProposalSign.tsx`, `ProfileActivation.tsx`, `portal/PatientDepositPayment.tsx` | — | 3 | Next |
 | 1b | Consultant public profile page and cards with photographs (consent), "Credentials reviewed · current", practice locations, languages (ex P1-14 UI) | `consultants/*`, `home/CareSystemsGrid.tsx` | P1-14 data; photo consent | 1 | Blocked on consent |
