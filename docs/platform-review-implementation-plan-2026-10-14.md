@@ -235,6 +235,52 @@ phases.
 - **Tests:** gate matrix with the new source; band inside/outside; facility accreditation expiry job (reuse
   `CredentialExpiryService` pattern).
 - **Sessions:** 3. **Model:** Fable 5.1, high.
+- **Status (2026-10-14, session 1 of 3, Fable 5.1 high; committed on `claude/elegant-dewdney-e89e74`, a worktree fast-forwarded
+  from `feat/review-p0` bc4c0b9, so the owner fast-forwards `feat/review-p0` to this commit):**
+  - Delivered: `V90__facilities_and_packages.sql`: `facilities` (name, city, kind, status ACTIVE/SUSPENDED, derived
+    `accreditation_status` NONE/CURRENT/EXPIRED, contact name/email/phone, settlement terms PREPAID/ON_DISCHARGE/NET_15/30/60
+    + notes, UNIQUE(name, city)), `facility_accreditations` (body, reference, issued/expires dates, CURRENT/EXPIRED/WITHDRAWN)
+    and `facility_packages` (procedure code, care area FK, EGP min/max, inclusions/exclusions, valid from/to, append-only
+    `version` per facility+code, PENDING_FINANCE/APPROVED/REJECTED/RETIRED with decided-by/at/note; CHECK: pending ⇔ undecided).
+    New top-level module `com.rehletshifaa.facility` (api/application/domain/infrastructure; depends on shared, authority,
+    notification and `clinic.infrastructure.CareCategoryRepository` only, so `journey` can depend on it in sessions 2–3 without
+    a cycle; ArchUnit 22/22 green). `FacilityCatalogService` + `FacilityAdminController` (`/api/v1/admin/facilities`, under the
+    existing `/api/v1/admin/**` authenticated rule): create/update/suspend facility, record/withdraw accreditation (refuses an
+    already-expired record, recomputes the derived state), propose package (code upper-cased; one waiting version per code;
+    care area must exist; range and validity checked; suspended facility refused), Finance approve/reject (reject needs a
+    note), Consultant Operations retire; approving retires the previously approved version of that code in the same
+    transaction. Authority: new `FACILITY_READ` (Consultant Operations Manager, Finance Manager, Finance, Compliance Auditor),
+    `FACILITY_MANAGE` (Consultant Operations Manager), `FACILITY_PACKAGE_APPROVE` (Finance Manager, step-up); maker/checker
+    `PACKAGE_SELF_APPROVAL` refuses the proposer approving their own version even when holding both roles; System
+    Administrators keep no facility power (SOD-07). Facilities never become users: no account, role, assignment or work item is
+    created anywhere in the module. `FacilityAccreditationExpiryService` (workflow-builder subagent, reviewed) mirrors
+    `CredentialExpiryService`: hourly scan expires lapsed CURRENT records, recomputes the facility state with one
+    `FACILITY_ACCREDITATION_LAPSED` audit event, and emails the facility contact at 60/30/7 days (`app.facilities.*`,
+    template `facility-accreditation-expiry`, idempotent outbox keys). Audit events for every write. Frontend: Control Center
+    › Commercial › Facilities & Packages (`FacilityCatalog.tsx`, route `/commercial/facilities`, nav visible on
+    `FACILITY_READ`): Finance queue with approve/reject confirmation dialogs (note; reason mandatory on reject), facility
+    list → detail with edit, suspend/reactivate, accreditation records with "expires in N days" and withdraw, package
+    versions with EGP range and status, propose form; copy in `facility-copy.ts` (EN + draft AR by the mechanical-worker
+    subagent; the Control Center carries no en.json/ar.json keys, so none were added).
+  - Tests: `FacilityCatalogServiceTest` (5: ownership + validation codes, approve-once/supersede/reject, self-approval,
+    readers vs. coordinator/admin denied, withdraw + suspend audited), `FacilityAccreditationExpiryServiceTest` (4: lapse,
+    mixed stays current, reminders once per window, no contact → no reminder), `RolePolicyTest`, `ArchitectureRulesTest`
+    (no cycles with the new module), `PasswordOnlySessionCoverageTest` covers the new endpoints automatically; frontend
+    `FacilityCatalog.test.tsx` (6: ops proposes with exact body, Finance confirms before approve, reject needs reason,
+    read-only, denied, Arabic). Verification: `mvn -o -q test` 784 tests, 0 failures, 3 pre-existing skips (775 at bc4c0b9 + 9 new); `pnpm typecheck` clean; eslint clean on touched
+    files; vitest 46/46 across the six Control Center files touched or neighbouring; `PostgresJpaMappingTest` on
+    postgres:17-alpine with V90 applied green (1/1; every repository query, the three new facility repositories included, parsed and planned by PostgreSQL).
+  - Open gaps: no staff notification or work item to Consultant Operations when an accreditation lapses (only the audit
+    event, the screen badge and the contact email; a notification port outside `journey` is needed first). Accreditation
+    evidence documents are not stored (the credential pattern binds to case documents). `Facility.updated_at` is not stamped
+    by the expiry job. Arabic copy is a draft pending native review. Operations/coordinators get `FACILITY_READ` only in
+    session 3 with the picker. No dev-seed facility yet (`LocalDemoDataSeeder`), so live verification needs one created
+    through the screen as consultant-operations-manager@local.test.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack
+    (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`) so V90 runs; then P0-5 session 2 in a
+    new session (Fable 5.1, high): proposal line source `FACILITY_PACKAGE` (approved, in validity, facility ACTIVE) that
+    releases without a Finance work item, `manual_band_egp` per care area on the commercial policy, gate computation in
+    `JourneyService.createProposal`, gate matrix tests. V91 is the next free Flyway version.
 
 ---
 

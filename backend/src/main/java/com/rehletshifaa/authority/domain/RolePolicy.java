@@ -67,6 +67,12 @@ public final class RolePolicy {
             g(CONSULTANT_OPERATIONS_MANAGER, CONSULTANT_CATALOG_MANAGE, PLATFORM),
             g(CONSULTANT_OPERATIONS_MANAGER, CREDENTIAL_READ, PLATFORM), g(CONSULTANT_OPERATIONS_MANAGER, TEAM_MANAGE, PLATFORM),
             g(CONSULTANT_OPERATIONS_MANAGER, STAFFING_REQUEST, PLATFORM),
+            // P0-5 (B-02): facilities are a pricing source and a destination, never users. Consultant Operations owns the records
+            // and proposes package prices; Finance Managers approve a price once (never their own proposal); Finance staff and
+            // the auditor read. System Administrators keep no commercial power (SOD-07).
+            g(CONSULTANT_OPERATIONS_MANAGER, FACILITY_READ, PLATFORM), g(CONSULTANT_OPERATIONS_MANAGER, FACILITY_MANAGE, PLATFORM),
+            g(FINANCE_MANAGER, FACILITY_READ, PLATFORM), g(FINANCE_MANAGER, FACILITY_PACKAGE_APPROVE, PLATFORM),
+            g(FINANCE, FACILITY_READ, PLATFORM), g(COMPLIANCE_AUDITOR, FACILITY_READ, PLATFORM),
             g(CREDENTIAL_VERIFIER, CREDENTIAL_READ, PLATFORM), g(CREDENTIAL_VERIFIER, CREDENTIAL_DECIDE, PLATFORM), g(CREDENTIAL_VERIFIER, CAPABILITY_DECIDE, PLATFORM),
             g(PATIENT_IDENTITY_REVIEWER, PATIENT_IDENTITY_REVIEW, PLATFORM), g(PATIENT_IDENTITY_REVIEWER, PATIENT_IDENTITY_READ, PLATFORM),
             // Care coordination management

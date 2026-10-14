@@ -178,6 +178,10 @@ app:
     poll-milliseconds: ${NOTIFICATION_POLL_MILLISECONDS:5000}
   credentials:
     reminder-days: ${CREDENTIAL_REMINDER_DAYS:30,7,1}
+  facilities:
+    # Accreditation renewal reminders to the facility contact, days before expiry (FacilityAccreditationExpiryService).
+    reminder-days: ${FACILITY_ACCREDITATION_REMINDER_DAYS:60,30,7}
+    expiry-scan-ms: ${FACILITY_ACCREDITATION_EXPIRY_SCAN_MS:3600000}
   whatsapp:
     mode: ${WHATSAPP_MODE:noop}
     inbound:
