@@ -21,20 +21,33 @@ One shape plan per area under `plans/`. Runs **in parallel** with the backend pl
 - Backend coupling: where a backend phase delivers a screen, it ships the minimum working UI; the UX area designs the
   final one on the real data. Areas marked "after P1-xx" do not start before that phase is merged.
 
-## Theme decision (2026-10-15)
+## Theme: open — area 0, visual-world exploration (2026-10-15)
 
-The owner invited a theme change. Recommendation, accepted: **keep the palette, finish its use.** Petrol on warm paper
-is the differentiated choice in a category of cold blue on white; it reads calm, clinical and warm, which is the
-promise; the paper canvas and near-black ink give the best Arabic legibility on phones; the critique's problems were
-imagery, unnamed people and a warning as the opening line, not colour; a new palette would reopen 60+ tokens, the
-Keycloak theme and every screenshot baseline. To finish: converge the Control Center (D-07), coral as a mark only, one
-accent per view, Arabic type scale and numerals per locale.
+The owner asked for a genuinely distinctive theme for international health travel and wants the exploration run in a
+**new session with the `frontend-design` plugin and Impeccable together**. Starting point: the Theme Studio page
+(four worlds, same hero and case-file pages in EN/AR, measured contrast, a recommendation) published from this
+session; its source is `docs/ux-redesign/theme-studio.html`. Candidates:
+
+| World | Idea | Logo | Cost |
+|---|---|---|---|
+| A Petrol & Paper | the incumbent as built today | fits | none |
+| B Petrol Night | dark petrol desk for the openings, ivory case-file pages, light app behind; zero new tokens | fits | low |
+| C Nile Ink & Limestone | passport ink, limestone, copper stamp, Readex Pro; "official, international" | needs a recolour | high |
+| D Kufi & Chalk | near-black on chalk, one mint mark, Kufi headlines; modern Gulf register | fits | medium |
+
+This session's recommendation was B (evolution, keeps the logo, one or two sessions). The new session should: run
+Impeccable `new-work` with the frontend-design plugin, challenge or extend the four candidates (at least one more
+world of its own), render the chosen world's hero, My Care card and a staff screen, and stop at an owner gate before
+any token change. Rules that survive any choice: AA on every text pair, Arabic as a first voice (type scale per
+locale), the hand-heart mark unless the owner decides otherwise, coral/copper/mint only as marks, no gradients, no
+gold, the dossier and the stamp as the signature.
 
 ## Areas and order
 
 | # | Area | Entry points | Depends on | Sessions | Status |
 |---|---|---|---|---|---|
-| 0 | Public site trust pass (hero, Send my case opening, confirmation, home order) | `home/Hero.tsx`, `CaseForm.tsx`, `send-my-case/page.tsx` | — | 1 | **Built** `b2b9f3e` (`plans/public-site-trust.md`); deferred: photos strip, continue-later link, care-area row, Arabic numerals |
+| 0 | **Visual world** (theme) exploration and decision — new session, frontend-design plugin + Impeccable; token proposal and Arabic type scale for the chosen world | `theme-petrol.css`, `globals.css` @theme, `DESIGN.md`, Keycloak theme | — | 2–3 | **Next** (see "Theme: open") |
+| 0b | Public site trust pass (hero, Send my case opening, confirmation, home order) | `home/Hero.tsx`, `CaseForm.tsx`, `send-my-case/page.tsx` | — | 1 | **Built** `b2b9f3e` (`plans/public-site-trust.md`); deferred: photos strip, continue-later link, care-area row, Arabic numerals |
 | 1 | **Patient portal as the file**: My Care, status link, proposal link, profile activation, deposit step; signature moments "case sent", "specialist reviewing", "estimate ready" (ex P2-20) | `portal/MyCare.tsx`, `CaseStatusAccess.tsx`, `ProposalSign.tsx`, `ProfileActivation.tsx`, `portal/PatientDepositPayment.tsx` | — | 3 | Next |
 | 1b | Consultant public profile page and cards with photographs (consent), "Credentials reviewed · current", practice locations, languages (ex P1-14 UI) | `consultants/*`, `home/CareSystemsGrid.tsx` | P1-14 data; photo consent | 1 | Blocked on consent |
 | 2 | **Coordinator workspace**: staff home, My work, queue, case page, current action, messages, conversations; keyboard flow and one-next-action strip (ex P2-22) | `portal/Portal.tsx`, `StaffCaseView.tsx`, `CurrentAction.tsx`, `MyWork.tsx`, `CaseQueue.tsx`, `CaseMessages.tsx`, `ConversationsView.tsx` | — | 3 | — |
@@ -57,11 +70,12 @@ Recommended sequence: 1 → 2 → 3 → 7 → X → 6 → (after P1-15) 5 → (a
 
 ```text
 Read AGENTS.md, CLAUDE.md ("UX redesign epic" rules), PRODUCT.md, DESIGN.md, docs/ux-redesign/PLAN.md and
-docs/ux-redesign/STATUS.md. Run UX plan area 1 (patient portal as the file) through the /redesign-area pipeline. Use
-the frontend-design plugin and Impeccable for design decisions, the Vercel skills for code, and the ui-ux-pro-max
-checklist before delivery. The theme stays Petrol & Paper. Continue the "dossier" direction: every patient screen is
-a page of the same case file, with the CaseStamp on real events only. Work in a new worktree on a branch from
-feat/ux-trust-pass; one area per session; commit when green; do not push. Start by critiquing the area in the
-built-in browser on https://dev.rehletshifaa.com (I type the sign-ins and codes), write the shape plan under
-docs/ux-redesign/plans/, and stop at the gate for my approval.
+docs/ux-redesign/STATUS.md, then open docs/ux-redesign/theme-studio.html in the browser. Run UX plan area 0: a
+visual-world exploration for an international health-travel platform, using the frontend-design plugin and
+Impeccable (new-work) together. Challenge the four candidate worlds in the Theme Studio and add at least one of your
+own; keep the hand-heart logo unless you make the case to recolour it; keep the dossier and stamp as the signature;
+measure contrast on every text pair; design Arabic as the first voice. Render the chosen world as the home hero, a
+My Care card and one staff screen (EN + AR, phone + desktop) and stop at my gate before touching any token. Work in
+a new worktree on a branch from feat/ux-trust-pass; commit when green; do not push. After the gate, continue with
+area 1 (patient portal as the file) through the /redesign-area pipeline.
 ```
