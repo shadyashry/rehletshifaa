@@ -165,14 +165,17 @@ public class CaseWorkspaceQueryService {
         // P1-10 (D-A): the fee is the platform's charge to the patient; a Consultant (or their practice manager) sees their own prices only.
         if (latest != null && (actor.role() == Role.CONSULTANT || actor.role() == Role.PRACTICE_MANAGER)) latest = withoutPlatformFee(latest);
         DeliveryStatus delivery = latest != null && DELIVERED_STATUSES.contains(latest.status()) ? proposals.deliveryStatus(latest.versionId()) : null;
+        var patientProposal = proposalAccess.state(caseId);
         return new CaseWorkspace(summary, timeline, taskViews, messageViews, assignmentViews, reviewViews, latest, proposals.gates(caseId, latest),
                 delivery, depositFor(caseId, actor), cases.findConditionDescription(caseId).orElse(null), patientActions.openAction(caseId),
-                actions, proposalAccess.state(caseId), actor.role() == Role.COORDINATOR ? representatives(caseId) : List.of(),
+                actions, patientProposal, actor.role() == Role.COORDINATOR ? representatives(caseId) : List.of(),
                 patientActor ? null : patientReply(caseId, actor), false,
                 // QA #19: the commercial calculation only for whoever may approve it (Finance on the case).
                 latest != null && !patientActor && authority.allowed(Permission.FINANCE_SETTLE, onCase) ? proposals.commercial(latest.versionId()) : null,
                 // P0-5: the destination and the episodes, each with its facility named; staff only for now.
-                patientActor ? null : travelPlan(caseId), patientActor ? List.of() : treatmentEpisodes(caseId));
+                patientActor ? null : travelPlan(caseId), patientActor ? List.of() : treatmentEpisodes(caseId),
+                // D-1: the patient's stamp dates, read from the same history the patient timeline shows.
+                patientActor ? CaseMilestoneService.from(timelineRows, patientProposal) : null);
     }
 
     /**
@@ -208,7 +211,7 @@ public class CaseWorkspaceQueryService {
         var actor = authority.authorize(Permission.CASE_DEPOSIT_READ, Resource.ofCase(caseId));
         CaseActionsView actions = caseActions.resolve(caseId, actor);
         return new CaseWorkspace(JourneyCaseQueryService.withoutStaffSubjects(caseQueries.caseView(caseId)), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null,
-                deposits.depositForCase(caseId), null, null, actions, null, List.of(), null, true, null, null, List.of());
+                deposits.depositForCase(caseId), null, null, actions, null, List.of(), null, true, null, null, List.of(), null);
     }
 
     /** Who answers the patient now, as the staff viewer needs it: whether they may, and who covers the owner until when. */

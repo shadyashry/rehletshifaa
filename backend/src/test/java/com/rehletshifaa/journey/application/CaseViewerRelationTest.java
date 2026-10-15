@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.rehletshifaa.journey.api.JourneyDtos.AssignmentView;
+import com.rehletshifaa.journey.api.JourneyDtos.CaseMilestones;
 import com.rehletshifaa.journey.api.JourneyDtos.CaseView;
 import com.rehletshifaa.journey.api.JourneyDtos.TimelineEvent;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,6 +93,8 @@ class CaseViewerRelationTest {
         var staff = journey.workspace(caseId);
         assertThat(staff.assignments()).extracting(AssignmentView::assigneeSubject).contains("coordinator-subject");
         assertThat(staff.timeline()).extracting(TimelineEvent::actorRole).contains("COORDINATOR");
+        assertThat(staff.milestones()).isNull();
+        var received = staff.timeline().stream().filter(e -> "RECEIVED".equals(e.status())).findFirst().orElseThrow().occurredAt();
 
         linkPatient(caseId, "viewer-self-i");
         represent(caseId, "viewer-rep-i", null, null);
@@ -99,6 +102,7 @@ class CaseViewerRelationTest {
             authenticate((String) viewer[0], (Role) viewer[1]);
             var page = journey.workspace(caseId);
             assertThat(page.assignments()).isEmpty();
+            assertThat(page.milestones()).isEqualTo(new CaseMilestones(received, null, null));
             assertThat(page.timeline()).hasSameSizeAs(staff.timeline())
                     .extracting(TimelineEvent::status, TimelineEvent::occurredAt)
                     .containsExactlyElementsOf(staff.timeline().stream().map(e -> tuple(e.status(), e.occurredAt())).toList());
