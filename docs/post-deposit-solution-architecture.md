@@ -333,6 +333,17 @@ milestone with a 24-working-hour due date; it closes when the next milestone arr
 - `SettlementService` (P1-12) consumes the admission split and the reconciliation to produce the facility and
   Consultant settlement statement and "mark paid".
 
+*As built (P1-17 session 1, 2026-10-16, Flyway V101):* no PDF renderer is available offline, so statements and the handover letter
+are **immutable structured records** the portal renders and prints (open point 1): `statements` holds every total (schema-checked
+identities) and the encrypted lines; the handover letter is an encrypted `HANDOVER_LETTER` ledger row with the EN and AR text. The
+pack items are typed by their ledger row (`medical_documents` has no type column); fit to fly gates the **return flight**
+(`RETURN_CONFIRMED`, D-F), not discharge, and the travel plan's free-text flight field is left alone. The follow-up plan is made before
+discharge (the pack's last item); `DISCHARGED -> FOLLOW_UP` (and `-> CLOSED`) waits for the settled reconciliation (`RECONCILIATION`
+ledger row, closed or closed with a facility dispute). Reconciliation lines match `PACKAGE` / `CHANGE_ORDER_LINE` / `NONE` (Finance
+enters the invoice lines; no automatic description matching yet); `REFUND_CREDIT` is a Finance work item that the existing deposit
+refund records, not an automatic `PaymentService.recordRefund`. The facility's quarterly dispute counter and the Compliance item are
+not built (P1-19).
+
 ### 5.6 `FollowUpService` (journey)
 
 - Scheduling: on `FOLLOW_UP` entry create `follow_up_contacts` from the plan; `FOLLOW_UP_CONTACT` work item per

@@ -17,6 +17,7 @@ import com.rehletshifaa.journey.domain.CaseEvidence.Fact;
 import com.rehletshifaa.journey.domain.CaseEvidence.Kind;
 import com.rehletshifaa.journey.domain.CaseIncident;
 import com.rehletshifaa.shared.api.ApiException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +39,7 @@ import java.util.UUID;
  *       with a fresh sign-in ({@code COUNTERSIGN_MILESTONE}, 24 working hours) and until then the patient reads "reported by the care
  *       team".</li>
  *   <li><b>The clock</b>: {@code RECORD_MILESTONE} opens for the Consultant when treatment starts and after every milestone, due 24
- *       working hours later; the next milestone closes it. A planned discharge stops it (the discharge pack is P1-17's).</li>
+ *       working hours later; the next milestone closes it. A planned discharge stops it and makes the discharge pack due ({@link DischargeService}, P1-17).</li>
  *   <li><b>A complication</b> also opens an adverse-event incident (P1-13) with the summary; the summary lives in the incident, the
  *       patient's line reads "care update" and no message is sent (the Consultant tells the patient in person).</li>
  * </ul>
@@ -61,12 +62,14 @@ public class TreatmentMilestoneService {
     private final IncidentService incidents;
     private final DepositPaymentNotices notices;
     private final ObjectMapper json;
+    private final DischargeService discharge;
+    private final ApplicationEventPublisher events;
 
     public TreatmentMilestoneService(Authority authority, Clock clock, EvidenceLedger ledger, TreatmentViews views, MedicalCaseRepository cases,
                                      CaseAssignmentRepository assignments, StaffWorkService work, SlaPolicy sla, IncidentService incidents,
-                                     DepositPaymentNotices notices, ObjectMapper json) {
+                                     DepositPaymentNotices notices, ObjectMapper json, DischargeService discharge, ApplicationEventPublisher events) {
         this.authority = authority; this.clock = clock; this.ledger = ledger; this.views = views; this.cases = cases; this.assignments = assignments;
-        this.work = work; this.sla = sla; this.incidents = incidents; this.notices = notices; this.json = json;
+        this.work = work; this.sla = sla; this.incidents = incidents; this.notices = notices; this.json = json; this.discharge = discharge; this.events = events;
     }
 
     /** The Consultant, or Operations on the Consultant's behalf (then countersigned), records a milestone while the patient is in treatment. */
@@ -126,6 +129,9 @@ public class TreatmentMilestoneService {
                         "The care team recorded a complication; a manager reviews it as an incident.", "complication:" + row.getId() + ":" + coordinator, false,
                         WorkCopy.of("TREATMENT_COMPLICATION", "caseNumber", caseNumber(caseId)));
         } else notices.send(caseId, "TREATMENT", "treatment-update", "treatment-update:" + row.getId());
+        // P1-17: a planned discharge makes the pack (Consultant) and the final invoice (Operations) due that day.
+        if (kind == Kind.MILESTONE_DISCHARGE_PLANNED) discharge.onDischargePlanned(caseId, request.plannedDischargeOn());
+        events.publishEvent(new CaseEvents.DischargeEvidenceChanged(caseId));
         return views.staffView(caseId);
     }
 
@@ -140,6 +146,7 @@ public class TreatmentMilestoneService {
         boolean allSigned = views.milestoneRows(caseId).stream().filter(e -> !ledger.superseded(e.getId()))
                 .allMatch(e -> !TreatmentViews.needsCountersign(e) || e.countersigned());
         if (allSigned) work.closeWorkItems(caseId, COUNTERSIGN_MILESTONE, "Milestones countersigned");
+        events.publishEvent(new CaseEvents.DischargeEvidenceChanged(caseId));
         return views.staffView(caseId);
     }
 

@@ -102,6 +102,15 @@ public final class RolePolicy {
             // patient's acceptance is PATIENT_DECIDE; the staff treatment view is ADMISSION_READ.
             g(CONSULTANT, MILESTONE_RECORD, CASE_ASSIGNED), g(OPERATIONS, MILESTONE_RECORD, CASE_ASSIGNED), g(CONSULTANT, MILESTONE_COUNTERSIGN, CASE_ASSIGNED),
             g(CONSULTANT, CHANGE_ORDER_PROPOSE, CASE_ASSIGNED), g(FINANCE, CHANGE_ORDER_PRICE, CASE_ASSIGNED), g(FINANCE, CHANGE_ORDER_PRICE, CASE_MONEY_OPEN),
+            // P1-17 (D-F): the discharge pack by the case's Consultant (Operations records the final invoice, the return and the
+            // departure under ADMISSION_MANAGE); Finance reconciles (the case's, or any while its money is open); a Finance Manager
+            // countersigns a variance above the band and settles a facility dispute (no case access beyond the settlement view);
+            // the e-invoice reference is Finance's on any statement, since it arrives after the case's money has closed.
+            g(CONSULTANT, DISCHARGE_RECORD, CASE_ASSIGNED),
+            g(FINANCE, RECONCILE, CASE_ASSIGNED), g(FINANCE, RECONCILE, CASE_MONEY_OPEN), g(FINANCE_MANAGER, RECONCILE_COUNTERSIGN, PLATFORM),
+            g(FINANCE, SETTLEMENT_READ, CASE_ASSIGNED), g(FINANCE, SETTLEMENT_READ, CASE_MONEY_OPEN), g(FINANCE_MANAGER, SETTLEMENT_READ, PLATFORM),
+            g(COORDINATOR, SETTLEMENT_READ, CASE_ASSIGNED), g(OPERATIONS, SETTLEMENT_READ, CASE_ASSIGNED),
+            g(FINANCE, STATEMENT_ISSUE, PLATFORM),
             // Other function managers: hierarchy and staffing only; no execution, clinical or decision authority.
             g(OPERATIONS_MANAGER, TEAM_MANAGE, PLATFORM), g(OPERATIONS_MANAGER, STAFFING_REQUEST, PLATFORM),
             g(FINANCE_MANAGER, TEAM_MANAGE, PLATFORM), g(FINANCE_MANAGER, STAFFING_REQUEST, PLATFORM),

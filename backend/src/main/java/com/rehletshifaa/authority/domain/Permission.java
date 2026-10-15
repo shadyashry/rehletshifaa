@@ -34,6 +34,10 @@ public enum Permission {
     // P1-16 (D-E): treatment evidence. The Consultant (or Operations on their behalf) records milestones and the Consultant
     // countersigns Operations' with a fresh sign-in; the Consultant proposes change orders and Finance prices them (fresh sign-in).
     MILESTONE_RECORD(false), MILESTONE_COUNTERSIGN(true), CHANGE_ORDER_PROPOSE(false), CHANGE_ORDER_PRICE(true),
+    // P1-17 (D-F): the Consultant records the discharge pack (and generates the handover letter); Finance reconciles the hospital's
+    // final invoice with a fresh sign-in, a Finance Manager countersigns a variance above the band and settles a facility dispute;
+    // the case team and Finance read the settlement; Finance records the platform e-invoice reference on a statement.
+    DISCHARGE_RECORD(false), RECONCILE(true), RECONCILE_COUNTERSIGN(true), SETTLEMENT_READ(false), STATEMENT_ISSUE(true),
     // consultants, credentials, identity
     CONSULTANT_ONBOARD(true), CREDENTIAL_READ(false), CREDENTIAL_DECIDE(true), PATIENT_IDENTITY_REVIEW(true), PATIENT_IDENTITY_READ(false),
     CLINIC_MANAGE(false), CLINIC_APPROVE(true), CAPABILITY_DECIDE(true),

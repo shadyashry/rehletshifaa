@@ -33,6 +33,8 @@ import java.util.*;
  *   <li>Pay to admit (P1-15, owner decisions D-C and D-D): ARRIVAL_CONFIRMED moves only to ADMISSION_READY, entered once the
  *       final quote, the procedure consent and the balance are evidenced (or the Consultant's emergency admission override is
  *       on file); only ADMISSION_READY opens treatment, and only with the hospital's admission number.</li>
+ *   <li>Discharge (P1-17, D-F): TREATMENT_IN_PROGRESS moves to DISCHARGED only with the treatment evidence, the discharge pack, the
+ *       follow-up plan and the hospital's final invoice on file; DISCHARGED moves on only once that invoice is reconciled.</li>
  * </ul>
  */
 @Component
@@ -58,6 +60,8 @@ public class CaseTransitionPolicy {
         // (AdmissionReadiness); the admission number then opens treatment. An emergency walks the same two edges.
         Map.entry("ARRIVAL_CONFIRMED", Set.of("ADMISSION_READY", "CANCELLED")),
         Map.entry("ADMISSION_READY", Set.of("TREATMENT_IN_PROGRESS", "CANCELLED")),
+        // P1-17 (D-F): discharge once the pack, the treatment evidence and the final invoice are in (DischargeReadiness); a
+        // discharged case moves on (follow-up, or closed with none needed) once its final invoice is reconciled.
         Map.entry("TREATMENT_IN_PROGRESS", Set.of("DISCHARGED", "CANCELLED")),
         Map.entry("DISCHARGED", Set.of("FOLLOW_UP", "CLOSED", "CANCELLED")),
         Map.entry("FOLLOW_UP", Set.of("CLOSED", "CANCELLED")),
@@ -103,10 +107,11 @@ public class CaseTransitionPolicy {
     private final PaymentService payment;
     private final CaseActionService caseActions;
     private final AdmissionReadiness admission;
+    private final DischargeReadiness discharge;
 
     public CaseTransitionPolicy(PaymentService payment, CaseActionService caseActions, ProposalVersionRepository proposalVersions, CaseTaskRepository tasks,
-                                AdmissionReadiness admission) { this.tasks = tasks; this.proposalVersions = proposalVersions;
-        this.payment = payment; this.caseActions = caseActions; this.admission = admission;
+                                AdmissionReadiness admission, DischargeReadiness discharge) { this.tasks = tasks; this.proposalVersions = proposalVersions;
+        this.payment = payment; this.caseActions = caseActions; this.admission = admission; this.discharge = discharge;
     }
 
     /** Refuses a move the lifecycle or a stage's entry invariant does not allow. Conflicts are 409s the client can act on. */
@@ -116,11 +121,17 @@ public class CaseTransitionPolicy {
         if (!ADVANCING.contains(target)) return;
         if (blockingWorkOpen(caseId))
             throw new ApiException(409, "BLOCKING_TASKS_OPEN", "Complete or cancel blocking tasks before advancing this case");
+        // P1-17: a discharged patient moves on (follow-up, or closed) only once the hospital's final invoice is reconciled.
+        if ("DISCHARGED".equals(current)) {
+            List<String> settlement = discharge.settlementBlockers(caseId).stream().map(DischargeReadiness::label).toList();
+            if (!settlement.isEmpty()) throw new ApiException(409, "SETTLEMENT_PENDING", "The case cannot move on from discharge yet: " + String.join("; ", settlement));
+        }
         List<String> gate = entryBlockers(caseId, target);
         if (gate.isEmpty()) return;
         switch (target) {
             case "ADMISSION_READY" -> throw new ApiException(409, "ADMISSION_NOT_READY", "The patient cannot be cleared for admission yet: " + String.join("; ", gate));
             case "TREATMENT_IN_PROGRESS" -> throw new ApiException(409, "ADMISSION_NUMBER_REQUIRED", "Treatment cannot start yet: " + String.join("; ", gate));
+            case "DISCHARGED" -> throw new ApiException(409, "DISCHARGE_NOT_READY", "The patient cannot be discharged yet: " + String.join("; ", gate));
             default -> throw new ApiException(409, "COORDINATION_NOT_READY", "Treatment coordination cannot start yet: " + String.join("; ", gate));
         }
     }
@@ -134,11 +145,13 @@ public class CaseTransitionPolicy {
      * What still stands between the case and the target stage; empty when it may enter. TRAVEL_COORDINATION needs an accepted
      * proposal, a settled deposit where one is due, and no gating readiness step outstanding — a profile step owed by the
      * patient, or an onboarding staff have not started. Every case needs current onboarding evidence; there is no deposit-only
-     * gate (CL3). ADMISSION_READY and TREATMENT_IN_PROGRESS read the evidence ledger ({@link AdmissionReadiness}, P1-15).
+     * gate (CL3). ADMISSION_READY and TREATMENT_IN_PROGRESS read the evidence ledger ({@link AdmissionReadiness}, P1-15), DISCHARGED too
+     * ({@link DischargeReadiness}, P1-17).
      */
     public List<String> entryBlockers(UUID caseId, String target) {
         if ("ADMISSION_READY".equals(target)) return admission.admissionBlockers(caseId).stream().map(AdmissionReadiness::label).toList();
         if ("TREATMENT_IN_PROGRESS".equals(target)) return admission.treatmentBlockers(caseId).stream().map(AdmissionReadiness::label).toList();
+        if ("DISCHARGED".equals(target)) return discharge.dischargeBlockers(caseId).stream().map(DischargeReadiness::label).toList();
         if (!"TRAVEL_COORDINATION".equals(target)) return List.of();
         List<String> out = new ArrayList<>();
         if (!proposalVersions.hasAcceptedForCase(caseId)) out.add("no accepted proposal is on record");

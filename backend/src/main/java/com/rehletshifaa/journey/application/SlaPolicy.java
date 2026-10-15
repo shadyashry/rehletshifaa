@@ -66,7 +66,14 @@ public class SlaPolicy {
             // P1-16 (architecture §9): Finance reviews and prices an emergency change order in two working days. The milestone clock
             // and its countersign (24 working hours), a change order's price and an interim bill's countersign (4 working hours) and
             // the coordinator's follow-up of the patient's decision (24 hours) are dated by the caller.
-            Map.entry("EMERGENCY_CHANGE_ORDER_REVIEW", 2));
+            Map.entry("EMERGENCY_CHANGE_ORDER_REVIEW", 2),
+            // P1-17 (architecture §9): Finance reconciles the hospital's final invoice in two working days and refunds a patient's
+            // credit in two; a Finance Manager countersigns a variance above the band in one and settles a facility dispute in five.
+            // The Consultant's discharge pack and Operations' final invoice are due on the planned discharge day (dated by the caller).
+            Map.entry("RECONCILE_INVOICE", 2),
+            Map.entry("REFUND_CREDIT", 2),
+            Map.entry("COUNTERSIGN_RECONCILIATION", 1),
+            Map.entry("FACILITY_DISPUTE", 5));
 
     /**
      * P1-6 session 2 (D-02): the queue each waiting state waits on, so "usually within N working days" is read from the

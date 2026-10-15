@@ -30,6 +30,7 @@ import com.rehletshifaa.journey.infrastructure.ChangeOrderRepository;
 import com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.AuditTrail;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -87,11 +88,13 @@ public class ChangeOrderService {
     private final DepositPaymentNotices notices;
     private final PublicCaseAccessService publicAccess;
     private final ObjectMapper json;
+    private final ApplicationEventPublisher events;
 
     public ChangeOrderService(Authority authority, Clock clock, AuditTrail auditTrail, EvidenceLedger ledger, TreatmentViews views, AdmissionReadiness readiness,
                               ChangeOrderRepository orders, ChangeOrderLineRepository lines, FacilityAdmissionRepository admissions, MedicalCaseRepository cases,
                               CaseAssignmentRepository assignments, StaffWorkService work, FinanceWork financeWork, SlaPolicy sla, DepositPaymentNotices notices,
-                              PublicCaseAccessService publicAccess, ObjectMapper json) {
+                              PublicCaseAccessService publicAccess, ObjectMapper json, ApplicationEventPublisher events) {
+        this.events = events;
         this.authority = authority; this.clock = clock; this.auditTrail = auditTrail; this.ledger = ledger; this.views = views; this.readiness = readiness;
         this.orders = orders; this.lines = lines; this.admissions = admissions; this.cases = cases; this.assignments = assignments; this.work = work;
         this.financeWork = financeWork; this.sla = sla; this.notices = notices; this.publicAccess = publicAccess; this.json = json;
@@ -268,6 +271,7 @@ public class ChangeOrderService {
             if (work.closeWorkItems(caseId, PATIENT_DECISION_WORK, "The patient decided") > 0)
                 work.refreshWaitingOn(caseId, StaffWorkService.stageDefault(cases.findStageAndVersion(caseId).map(s -> s.getStatus().name()).orElse("")), null);
         }
+        events.publishEvent(new CaseEvents.DischargeEvidenceChanged(caseId)); // P1-17: the discharge gate reads "change orders settled"
     }
 
     private void tellConsultant(UUID caseId, ChangeOrder order, String type, String title, String context, String caseNumber) {

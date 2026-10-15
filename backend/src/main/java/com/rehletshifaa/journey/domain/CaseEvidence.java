@@ -26,7 +26,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 @Entity
 @Table(name = "case_evidence")
 public class CaseEvidence extends AssignedIdEntity {
-    /** P1-15's and P1-16's kinds; later phases add theirs (the discharge pack, the final invoice, outcomes). */
+    /** P1-15's, P1-16's and P1-17's kinds; later phases add theirs (outcomes). */
     public enum Kind {
         /** The hospital's pro-forma or admission letter with the quoted package price (Operations; Finance countersigns). */
         FACILITY_ADMISSION_LETTER,
@@ -55,14 +55,31 @@ public class CaseEvidence extends AssignedIdEntity {
         /** The hospital's interim bill during the stay (Operations; Finance countersigns with a fresh sign-in). */
         INTERIM_BILL,
         /** The decision on a change order: the patient's above the band, Finance's within it, the Consultant's emergency. */
-        CHANGE_ORDER;
+        CHANGE_ORDER,
+        // P1-17 (design §5 stage 5): the discharge pack, each the Consultant's typed clean document (the row is the type).
+        DISCHARGE_SUMMARY, MEDICATION_LIST, OPERATIVE_NOTE, IMPLANT_RECORD,
+        /** Fit to fly, dated by its examination (effective at); valid for a flight within the policy's hours of it (D-F). */
+        FIT_TO_FLY,
+        /** The EN/AR letter for the patient's home doctor, generated from the pack (the text is the encrypted payload). */
+        HANDOVER_LETTER,
+        /** The hospital's final invoice (Operations; Finance countersigns it when it opens the reconciliation). */
+        FINAL_INVOICE,
+        /** The reconciliation settled (closed, or closed with a facility dispute open); recorded by the settlement module. */
+        RECONCILIATION,
+        /** Operations confirmed the return travel (flight with a valid fit-to-fly, or ground); effective at = departure time. */
+        RETURN_CONFIRMED,
+        /** Operations confirmed the patient left. */
+        DEPARTURE_CONFIRMED;
 
         public boolean milestone() { return name().startsWith("MILESTONE_"); }
+
+        /** The discharge pack's document kinds (the Consultant's). */
+        public boolean packDocument() { return this == DISCHARGE_SUMMARY || this == MEDICATION_LIST || this == OPERATIVE_NOTE || this == IMPLANT_RECORD || this == FIT_TO_FLY; }
     }
 
     /** The kinds whose fact only counts once Finance has countersigned it (architecture §4.1a). */
     public static final Set<Kind> COUNTERSIGNED_BY_FINANCE = Set.of(Kind.FACILITY_ADMISSION_LETTER, Kind.BALANCE_EVIDENCED, Kind.POINT_OF_NO_RETURN,
-            Kind.INTERIM_BILL);
+            Kind.INTERIM_BILL, Kind.FINAL_INVOICE);
 
     /** What the row says and on what document or reference; one value object keeps the constructor short. */
     public record Fact(Kind kind, UUID documentId, String reference, BigDecimal amountEgp, Instant effectiveAt, String payload) {

@@ -32,6 +32,8 @@ public class CommercialPolicy extends AssignedIdEntity {
     /** P1-16 (D-E): the change-order band is the lower of this rate of the facility package and {@link #changeOrderBandEgp}. */
     @Column(name = "change_order_band_rate", nullable = false, precision = 6, scale = 4) private BigDecimal changeOrderBandRate = DEFAULT_CHANGE_ORDER_BAND_RATE;
     @Column(name = "change_order_band_egp", nullable = false, precision = 14, scale = 2) private BigDecimal changeOrderBandEgp = DEFAULT_CHANGE_ORDER_BAND_EGP;
+    /** P1-17 (D-F): a fit-to-fly certificate is valid for a flight within this many hours of its examination. */
+    @Column(name = "fit_to_fly_hours", nullable = false) private int fitToFlyHours = DEFAULT_FIT_TO_FLY_HOURS;
     @Column(nullable = false) private boolean active;
     @Column(nullable = false) private int version;
     @Column(name = "created_by", length = 120) private String createdBy;
@@ -42,6 +44,8 @@ public class CommercialPolicy extends AssignedIdEntity {
     public static final BigDecimal DEFAULT_FX_TOLERANCE_RATE = new BigDecimal("0.0300");
     /** D-E as recommended (design §12): 10% of the facility package or EGP 15,000, whichever is lower. */
     public static final BigDecimal DEFAULT_CHANGE_ORDER_BAND_RATE = new BigDecimal("0.1000"), DEFAULT_CHANGE_ORDER_BAND_EGP = new BigDecimal("15000.00");
+    /** D-F as recommended (design §12): 72 hours before the flight. */
+    public static final int DEFAULT_FIT_TO_FLY_HOURS = 72;
 
     protected CommercialPolicy() {}
 
@@ -61,6 +65,9 @@ public class CommercialPolicy extends AssignedIdEntity {
         this.changeOrderBandRate = rate; this.changeOrderBandEgp = egp; return this;
     }
 
+    /** P1-17: the fit-to-fly window this version carries. */
+    public CommercialPolicy withFitToFlyHours(int hours) { this.fitToFlyHours = hours; return this; }
+
     public void retire() { this.active = false; }
 
     public String getName() { return name; }
@@ -71,6 +78,7 @@ public class CommercialPolicy extends AssignedIdEntity {
     public BigDecimal getFxToleranceRate() { return fxToleranceRate; }
     public BigDecimal getChangeOrderBandRate() { return changeOrderBandRate; }
     public BigDecimal getChangeOrderBandEgp() { return changeOrderBandEgp; }
+    public int getFitToFlyHours() { return fitToFlyHours; }
     public boolean isActive() { return active; }
     public int getVersion() { return version; }
     public String getCreatedBy() { return createdBy; }

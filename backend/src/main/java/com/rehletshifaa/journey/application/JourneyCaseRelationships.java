@@ -3,6 +3,7 @@ package com.rehletshifaa.journey.application;
 import com.rehletshifaa.authority.application.CaseRelationships;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
+import com.rehletshifaa.journey.infrastructure.CaseEvidenceRepository;
 import com.rehletshifaa.journey.infrastructure.DepositRepository;
 import com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.ReplyCoverRepository;
@@ -26,11 +27,12 @@ public class JourneyCaseRelationships implements CaseRelationships {
     private final ReplyCoverRepository covers;
     private final DepositRepository deposits;
     private final FacilityAdmissionRepository admissions;
+    private final CaseEvidenceRepository evidence;
     private final Clock clock;
 
     public JourneyCaseRelationships(CaseAssignmentRepository assignments, MedicalCaseRepository cases, ReplyCoverRepository covers,
-                                    DepositRepository deposits, FacilityAdmissionRepository admissions, Clock clock) {
-        this.admissions = admissions;
+                                    DepositRepository deposits, FacilityAdmissionRepository admissions, CaseEvidenceRepository evidence, Clock clock) {
+        this.admissions = admissions; this.evidence = evidence;
         this.assignments = assignments;
         this.deposits = deposits;
         this.covers = covers;
@@ -72,9 +74,11 @@ public class JourneyCaseRelationships implements CaseRelationships {
 
     @Override
     public boolean moneyOpen(UUID caseId) {
-        // P1-16: during treatment Finance prices change orders and countersigns the hospital's interim bills.
+        // P1-16: during treatment Finance prices change orders and countersigns the hospital's interim bills. P1-17: from the hospital's
+        // final invoice until its reconciliation is settled, Finance reconciles it (whatever the stage, discharge included).
         return deposits.isOpenOn(caseId) || admissions.isOpenOn(caseId)
-                || cases.findStageAndVersion(caseId).map(s -> s.getStatus() == com.rehletshifaa.casemanagement.domain.CaseStatus.TREATMENT_IN_PROGRESS).orElse(false);
+                || cases.findStageAndVersion(caseId).map(s -> s.getStatus() == com.rehletshifaa.casemanagement.domain.CaseStatus.TREATMENT_IN_PROGRESS).orElse(false)
+                || evidence.existsLive(caseId, "FINAL_INVOICE", false) && !evidence.existsLive(caseId, "RECONCILIATION", false);
     }
 
     @Override

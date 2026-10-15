@@ -312,23 +312,6 @@ class TreatmentEvidenceServiceTest extends AdmissionFixture {
 
     // ---------- fixture ----------
 
-    /** {@link #arrived} with the final quote accepted, the letter checked, consent, the receipt countersigned and the episode opened. */
-    Arrived inTreatment() {
-        Arrived c = arrivedWithFinalQuote("17250.00");
-        admissions.arrivalAttested(c.caseId, Instant.now().minusSeconds(7200), OPS);
-        reserveAndCheckLetter(c, "100000.00");
-        acceptFinalQuote(c);
-        consent(c.caseId);
-        asOps();
-        UUID receipt = latest(admissions.recordBalance(c.caseId, receipt("97750.00")), "BALANCE_EVIDENCED");
-        asFinance();
-        admissions.countersign(c.caseId, receipt);
-        asDoctor();
-        journey.treatment(c.caseId, episode(c, "ADM-7001"));
-        assertThat(caseStatus(c.caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
-        return c;
-    }
-
     void acceptedWithinBand(Arrived c, String egp) {
         asDoctor();
         ChangeOrderView o = changeOrders.propose(c.caseId, order("Second stent", "1")).changeOrders().get(0);

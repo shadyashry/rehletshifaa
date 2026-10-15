@@ -449,7 +449,9 @@ class JourneyServiceIntegrationTest {
     }
 
     // UC-12: the clinical end of the journey. Written from the protocol (docs/qa-test-protocol.md UC-12), not from the code.
-    @Test void dischargeNeedsACleanDocumentOfThisCaseAndFollowUpOnlyComesAfterDischarge()throws Exception{
+    // P1-17: discharge also waits for the treatment evidence, the pack and the final invoice (written directly here; the gate is
+    // DischargeServiceTest's); the follow-up plan is part of the pack, and follow-up starts once the final invoice is reconciled.
+    @Test void dischargeNeedsACleanDocumentOfThisCaseAndFollowUpOnlyComesAfterTheReconciledDischarge()throws Exception{
         UUID caseId=arriveWithDoctor("Discharge Patient","+254700000091","dc@local.test");
         UUID otherCase=cases.create(new CreateCaseRequest("Other","Patient","Kenya","+254700000092","Reports","en",true,null,"dc2@local.test","Africa/Nairobi","cardiology")).caseId();
         authenticate("doctor-subject",Role.CONSULTANT);
@@ -460,7 +462,9 @@ class JourneyServiceIntegrationTest {
         assertThat(caseStatus(caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
 
         var followUp=new FollowUpRequest(null,null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest for a week");
-        assertThatThrownBy(()->journey.followUp(caseId,followUp)).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
+        journey.followUp(caseId,followUp);
+        assertThat(caseStatus(caseId)).as("the plan is part of the pack; it moves nothing").isEqualTo("TREATMENT_IN_PROGRESS");
+        dischargeable(caseId);
 
         UUID unscanned=document(caseId,"PENDING");
         UUID quarantined=document(caseId,"QUARANTINED");
@@ -473,6 +477,9 @@ class JourneyServiceIntegrationTest {
         var discharged=journey.treatment(caseId,discharge(start,document(caseId,"CLEAN")));
         assertThat(caseStatus(caseId)).isEqualTo("DISCHARGED");
 
+        journey.followUp(caseId,new FollowUpRequest(discharged.id(),null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest for a week"));
+        assertThat(caseStatus(caseId)).as("the final invoice is not reconciled yet").isEqualTo("DISCHARGED");
+        reconciled(caseId);
         journey.followUp(caseId,new FollowUpRequest(discharged.id(),null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest for a week"));
         assertThat(caseStatus(caseId)).isEqualTo("FOLLOW_UP");
     }
@@ -553,8 +560,11 @@ class JourneyServiceIntegrationTest {
         Instant start=Instant.now().minusSeconds(3600);
         journey.treatment(caseId,new TreatmentRequest(facility(),null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null,"ADM-1"));
         assertThatThrownBy(()->exits.closeWithoutFollowUp(caseId,"Too early")).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).extracting("code").isEqualTo("CASE_STATE_CONFLICT");
+        journey.followUp(caseId,new FollowUpRequest(null,null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Review only if needed"));
+        dischargeable(caseId);
         journey.treatment(caseId,discharge(start,document(caseId,"CLEAN")));
         assertThat(caseStatus(caseId)).isEqualTo("DISCHARGED");
+        reconciled(caseId);
         authenticate("coordinator-subject",Role.COORDINATOR);
         assertThatThrownBy(()->exits.closeWithoutFollowUp(caseId,"Not mine to say")).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).extracting("status").isEqualTo(403);
         authenticate("doctor-subject",Role.CONSULTANT);
@@ -578,8 +588,10 @@ class JourneyServiceIntegrationTest {
         clearedToAdmit(caseId);
         Instant start=Instant.now().minusSeconds(3600);
         journey.treatment(caseId,new TreatmentRequest(facility(),null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null,"ADM-1"));
+        journey.followUp(caseId,new FollowUpRequest(null,null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest"));
+        dischargeable(caseId);
         var discharged=journey.treatment(caseId,discharge(start,document(caseId,"CLEAN")));
-        if("FOLLOW_UP".equals(stage))journey.followUp(caseId,new FollowUpRequest(discharged.id(),null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest"));
+        if("FOLLOW_UP".equals(stage)){reconciled(caseId);journey.followUp(caseId,new FollowUpRequest(discharged.id(),null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest"));}
         assertThat(caseStatus(caseId)).isEqualTo(stage);
         authenticate("coordinator-subject",Role.COORDINATOR);
         journey.transition(caseId,new TransitionRequest("CANCELLED","Recorded by phone",version(caseId),reason));
@@ -620,6 +632,21 @@ class JourneyServiceIntegrationTest {
             UUID.randomUUID(),caseId,"ARRIVAL_CONFIRMED","EMERGENCY_ADMISSION_OVERRIDE",null,"doctor-subject","CONSULTANT",Instant.now());
     }
     private long version(UUID caseId){return jdbc.queryForObject("SELECT version FROM medical_cases WHERE id=?",Long.class,caseId);}
+    /**
+     * P1-17: these tests are about the episode, follow-up and exits, not the pack or money. The treatment milestones, the pack
+     * documents and the hospital's final invoice the discharge gate reads are written directly (the gate is DischargeServiceTest's).
+     */
+    private void dischargeable(UUID caseId){
+        for(String kind:List.of("MILESTONE_PROCEDURE_STARTED","MILESTONE_PROCEDURE_COMPLETED","MILESTONE_DISCHARGE_PLANNED","DISCHARGE_SUMMARY","MEDICATION_LIST","OPERATIVE_NOTE"))
+            evidence(caseId,kind,null);
+        evidence(caseId,"FINAL_INVOICE",new java.math.BigDecimal("100000.00"));
+    }
+    /** P1-17: the settlement module's ledger row for a reconciled final invoice (ReconciliationService is SettlementServiceTest's). */
+    private void reconciled(UUID caseId){ evidence(caseId,"RECONCILIATION",new java.math.BigDecimal("100000.00")); }
+    private void evidence(UUID caseId,String kind,java.math.BigDecimal amount){
+        jdbc.update("INSERT INTO case_evidence(id,case_id,stage,kind,amount_egp,recorded_by,recorded_role,recorded_at,version) VALUES(?,?,?,?,?,?,?,?,0)",
+            UUID.randomUUID(),caseId,"TREATMENT_IN_PROGRESS",kind,amount,"doctor-subject","CONSULTANT",Instant.now());
+    }
 
     private TreatmentRequest discharge(Instant start,UUID documentId){
         return new TreatmentRequest(facility(),null,start,Instant.now(),"COMPLETED","Angioplasty","Angioplasty",null,null,true,documentId,null);

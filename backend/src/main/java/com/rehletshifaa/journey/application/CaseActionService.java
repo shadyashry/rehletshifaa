@@ -87,13 +87,15 @@ public class CaseActionService {
     private final CaseStatusChangeRepository statusChanges;
     private final AdmissionReadiness admission;
     private final com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders;
+    private final DischargeReadiness discharge;
+    private final EvidenceLedger ledger;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
                              com.rehletshifaa.workforce.application.WorkforceDirectory workforce, CaseExitReasonRepository exitReasons,
                              TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla, AdmissionReadiness admission,
-                             com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders) {
-        this.admission = admission; this.changeOrders = changeOrders;
+                             com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders, DischargeReadiness discharge, EvidenceLedger ledger) {
+        this.admission = admission; this.changeOrders = changeOrders; this.discharge = discharge; this.ledger = ledger;
         this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges; this.sla = sla;
         this.workforce = workforce;
         this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
@@ -203,7 +205,9 @@ public class CaseActionService {
         // P1-16: a change order above the band waits for the patient's decision (My Care, fresh sign-in).
         if ("TREATMENT_IN_PROGRESS".equals(status))
             return changeOrders.existsByCaseIdAndStatusIn(caseId, Set.of("AWAITING_PATIENT")) ? simple("REVIEW_CHANGE_ORDER", "FOCUS") : simple("IN_TREATMENT", "WAIT");
-        if (Set.of("DISCHARGED", "FOLLOW_UP").contains(status)) return simple("FOLLOW_UP", "WAIT");
+        // P1-17: discharged, the patient reads "Going home" (the pack, the statement, the follow-up date) until follow-up starts.
+        if ("DISCHARGED".equals(status)) return simple("GOING_HOME", "WAIT");
+        if ("FOLLOW_UP".equals(status)) return simple("FOLLOW_UP", "WAIT");
         return none();
     }
 
@@ -247,13 +251,22 @@ public class CaseActionService {
         }
         if (role == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
         // P1-16: in treatment the Consultant records the milestones (their RECORD_MILESTONE item carries the due date).
-        if (role == Role.CONSULTANT && "TREATMENT_IN_PROGRESS".equals(s)) return simple("RECORD_MILESTONE", "FOCUS");
+        // P1-17: once the discharge is planned, the Consultant completes the discharge pack instead.
+        if (role == Role.CONSULTANT && "TREATMENT_IN_PROGRESS".equals(s))
+            return ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.MILESTONE_DISCHARGE_PLANNED).isPresent()
+                    && !discharge.packBlockers(caseId).isEmpty() ? simple("COMPLETE_DISCHARGE_PACK", "FOCUS") : simple("RECORD_MILESTONE", "FOCUS");
         if (role == Role.OPERATIONS) {
             if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
             // P1-15: after arrival Operations records the cashier's receipt against the voucher; once cleared, the admission number.
             if ("ARRIVAL_CONFIRMED".equals(s) && admission.currentVoucher(caseId).isPresent() && !admission.paidToAdmit(caseId)
                     && !admission.balanceAwaitingCountersign(caseId)) return simple("RECORD_HOSPITAL_BALANCE", "FOCUS");
             if ("ADMISSION_READY".equals(s)) return simple("RECORD_ADMISSION_NUMBER", "FOCUS");
+            // P1-17: the hospital's final invoice once the discharge is planned; after discharge the return travel, then the departure.
+            if ("TREATMENT_IN_PROGRESS".equals(s) && ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.MILESTONE_DISCHARGE_PLANNED).isPresent()
+                    && ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.FINAL_INVOICE).isEmpty()) return simple("RECORD_FINAL_INVOICE", "FOCUS");
+            if (Set.of("DISCHARGED", "FOLLOW_UP").contains(s) && ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.DEPARTURE_CONFIRMED).isEmpty())
+                return ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.RETURN_CONFIRMED).isEmpty()
+                        ? simple("CONFIRM_RETURN", "FOCUS") : simple("CONFIRM_DEPARTURE", "FOCUS");
             // Before release Operations prices and plans the travel package for the proposal (QA #27); arranging travel
             // and arrival (UPDATE_TRAVEL_PLAN) only starts once the deposit is settled.
             if ("PROPOSAL_PREPARATION".equals(s) && f.travelPackage() && proposal != null && !proposal.operationsDone()
@@ -552,8 +565,12 @@ public class CaseActionService {
         if (!"ACCEPTED".equals(status))
             work.closeWorkItems(caseId, CaseHandoffService.DEPOSIT_RECORD_WORK, "Superseded — the case is past the deposit stage", false);
         // P1-16: the milestone clock runs only while the patient is in treatment.
-        if (!"TREATMENT_IN_PROGRESS".equals(status))
+        if (!"TREATMENT_IN_PROGRESS".equals(status)) {
             work.closeWorkItems(caseId, TreatmentMilestoneService.RECORD_MILESTONE, "Superseded — the patient is no longer in treatment", false);
+            // P1-17: the pack and the final invoice are owed only before discharge.
+            work.closeWorkItems(caseId, DischargeService.PACK_WORK, "Superseded — the patient is no longer in treatment", false);
+            work.closeWorkItems(caseId, DischargeService.FINAL_INVOICE_WORK, "Superseded — the patient is no longer in treatment", false);
+        }
     }
 
     /** My work on the case: an item I own, else unowned work in my role's pool (Finance: the deposit to record). */

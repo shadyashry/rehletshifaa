@@ -42,9 +42,10 @@ public class CommercialPolicyService {
      * cached entry written before they existed reads back as the defaults.
      */
     public record Policy(UUID id, String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version,
-                         Integer finalQuoteValidityDays, BigDecimal fxToleranceRate, BigDecimal changeOrderBandRate, BigDecimal changeOrderBandEgp) {
+                         Integer finalQuoteValidityDays, BigDecimal fxToleranceRate, BigDecimal changeOrderBandRate, BigDecimal changeOrderBandEgp,
+                         Integer fitToFlyHours) {
         public Policy(UUID id, String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version) {
-            this(id, name, careCategory, marginRate, manualBandEgp, version, null, null, null, null);
+            this(id, name, careCategory, marginRate, manualBandEgp, version, null, null, null, null, null);
         }
         public int quoteValidityDays() { return finalQuoteValidityDays == null ? CommercialPolicy.DEFAULT_FINAL_QUOTE_VALIDITY_DAYS : finalQuoteValidityDays; }
         public BigDecimal fxTolerance() { return fxToleranceRate == null ? CommercialPolicy.DEFAULT_FX_TOLERANCE_RATE : fxToleranceRate; }
@@ -56,6 +57,8 @@ public class CommercialPolicyService {
             BigDecimal byRate = (packageEgp == null ? BigDecimal.ZERO : packageEgp).multiply(bandRate()).setScale(2, java.math.RoundingMode.HALF_UP);
             return byRate.min(bandCapEgp());
         }
+        /** P1-17 (D-F): the fit-to-fly window in hours; boxed for the same cache reason. */
+        public int fitToFlyWindowHours() { return fitToFlyHours == null ? CommercialPolicy.DEFAULT_FIT_TO_FLY_HOURS : fitToFlyHours; }
     }
 
     /** The band with no policy configured: the D-E defaults. */
@@ -84,7 +87,7 @@ public class CommercialPolicyService {
                 : policies.findFirstByActiveTrueAndCareCategoryOrderByVersionDesc(careCategory))
                 .or(policies::findFirstByActiveTrueAndCareCategoryIsNullOrderByVersionDesc)
                 .map(p -> new Policy(p.getId(), p.getName(), p.getCareCategory(), p.getMarginRate(), p.getManualBandEgp(), p.getVersion(),
-                        p.getFinalQuoteValidityDays(), p.getFxToleranceRate(), p.getChangeOrderBandRate(), p.getChangeOrderBandEgp()))
+                        p.getFinalQuoteValidityDays(), p.getFxToleranceRate(), p.getChangeOrderBandRate(), p.getChangeOrderBandEgp(), p.getFitToFlyHours()))
                 .orElse(null);
     }
 
@@ -129,21 +132,24 @@ public class CommercialPolicyService {
         BigDecimal bandEgp = request.changeOrderBandEgp() != null ? request.changeOrderBandEgp().setScale(2, java.math.RoundingMode.HALF_UP)
                 : current != null ? current.getChangeOrderBandEgp() : CommercialPolicy.DEFAULT_CHANGE_ORDER_BAND_EGP;
         if (bandEgp.signum() < 0) throw new ApiException(400, "CHANGE_ORDER_BAND_INVALID", "The change-order band cap must be zero or more EGP");
+        // P1-17 (D-F): the fit-to-fly window carries over the same way.
+        int fitToFly = request.fitToFlyHours() != null ? request.fitToFlyHours() : current != null ? current.getFitToFlyHours() : CommercialPolicy.DEFAULT_FIT_TO_FLY_HOURS;
+        if (fitToFly < 24 || fitToFly > 168) throw new ApiException(400, "FIT_TO_FLY_WINDOW_INVALID", "The fit-to-fly window must be between 24 and 168 hours");
         active.forEach(CommercialPolicy::retire);
         policies.saveAllAndFlush(active);
         String name = request.name() == null || request.name().isBlank() ? "Coordinated-care margin" : request.name().trim();
         CommercialPolicy policy = policies.saveAndFlush(new CommercialPolicy(name, careCategory, rate, band, previous + 1, actor.subject(),
-                LocalDate.now(clock), clock.instant()).withQuoteRules(validityDays, fxTolerance).withChangeOrderBand(bandRate, bandEgp));
+                LocalDate.now(clock), clock.instant()).withQuoteRules(validityDays, fxTolerance).withChangeOrderBand(bandRate, bandEgp).withFitToFlyHours(fitToFly));
         audit.event("COMMERCIAL_POLICY_CONFIGURED").actor(actor.subject(), actor.label()).entity("CommercialPolicy", policy.getId())
                 .action("CONFIGURE").reason("rate=" + rate + " careCategory=" + careCategory + " manualBandEgp=" + band
                         + " finalQuoteValidityDays=" + validityDays + " fxToleranceRate=" + fxTolerance
-                        + " changeOrderBandRate=" + bandRate + " changeOrderBandEgp=" + bandEgp).record();
+                        + " changeOrderBandRate=" + bandRate + " changeOrderBandEgp=" + bandEgp + " fitToFlyHours=" + fitToFly).record();
         return view(policy);
     }
 
     private static CommercialPolicyView view(CommercialPolicy p) {
         return new CommercialPolicyView(p.getId(), p.getName(), p.getCareCategory(), p.getMarginRate(), p.getManualBandEgp(), p.isActive(), p.getVersion(),
                 p.getCreatedBy(), p.getValidFrom(), p.getFinalQuoteValidityDays(), p.getFxToleranceRate(),
-                p.getChangeOrderBandRate(), p.getChangeOrderBandEgp());
+                p.getChangeOrderBandRate(), p.getChangeOrderBandEgp(), p.getFitToFlyHours());
     }
 }

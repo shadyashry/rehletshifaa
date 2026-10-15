@@ -40,6 +40,8 @@ created under the same template name.
 | `rs_treatment_update` | `treatment-update` | My treatment / علاجي → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
 | `rs_change_order_review` | `change-order-review` | Review the change / مراجعة التغيير → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
 | `rs_change_order_applied` | `change-order-applied` | My treatment / علاجي → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
+| `rs_discharge_pack_ready` | `discharge-pack-ready` | Going home / العودة إلى البلد → portal (as above). **New (P1-17), to be created and approved in WhatsApp Manager** |
+| `rs_statement_ready` | `statement-ready` | My statement / كشف حسابي → portal (as above). **New (P1-17), to be created and approved in WhatsApp Manager** |
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
 | `rs_followup_window_closed` | `intake-followup` | none |
 | `rs_coordinator_intro` | `coordinator-intro` | none (1 body variable: the coordinator's name) |
@@ -117,6 +119,14 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 **`rs_change_order_applied`** (P1-16: a change within the band was accepted by Finance, or an emergency change was made)
 - en: Your care team made a change to your treatment. The reason and, once priced, the cost are on your case page, using the button below.
 - ar: أجرى فريق رعايتك تغييرًا في علاجك. السبب والتكلفة بعد تسعيرها في صفحة حالتك عبر الزر أدناه.
+
+**`rs_discharge_pack_ready`** (P1-17: the patient was discharged; the pack is on their case page)
+- en: You have been discharged. Your discharge documents, your medicines, the warning signs to watch for and your follow-up date are on your case page, using the button below.
+- ar: تمّ خروجك من المستشفى. وثائق الخروج وأدويتك وعلامات الخطر التي يجب الانتباه لها وموعد متابعتك في صفحة حالتك عبر الزر أدناه.
+
+**`rs_statement_ready`** (P1-17: the hospital's final invoice is reconciled and the DISCHARGE statement is issued; no amount in the message)
+- en: Your statement is ready: what you were charged, what you paid and any balance or credit. See it on your case page, using the button below.
+- ar: كشف حسابك جاهز: ما احتُسب عليك وما دفعته وأي رصيد مستحق أو مبلغ مسترد. اطّلع عليه في صفحة حالتك عبر الزر أدناه.
 
 **`rs_followup_window_closed`** (S3: sent once after WhatsApp's 24-hour window has closed)
 - en: Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation.

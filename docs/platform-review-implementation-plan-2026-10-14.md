@@ -1318,6 +1318,80 @@ phases.
   `rs_discharge_pack_ready`, `rs_statement_ready`.
 - Sessions: 2. Model: Fable 5.1, high. Needs: P1-12's settlement statement for the payout leg (the reconciliation
   itself does not).
+- **Status (2026-10-16, session 1 of 2 = backend, Opus 5.5 stood in for Fable 5.1; committed on `claude/p1-17-s1-discharge`, cut from
+  `98958c3` = `claude/p1-16-s2-ui-aca50e`):** delivered; no screen. Flyway **V101** (`V101__discharge_reconciliation_and_statements.sql`; the
+  `V98` name above was stale) is now the newest; V102 is the next free.
+  - Decision recorded (owner's standing rule: decide by the recommendation, do not ask): **D-F applied as recommended**: a fit-to-fly is
+    valid for a flight that leaves after the examination and within 72 hours of it (`commercial_policies.fit_to_fly_hours`, 24-168, Finance
+    Managers change it per care area; left out it carries over); Operations cannot confirm a return flight without one (a ground return
+    needs none). Further choices made here, each the design's best-practice reading: fit to fly is a pack item owed **before the return
+    flight, not before discharge** (patients often fly days after discharge, outside any 72-hour window from it); the **discharge summary
+    is the Consultant's discharge decision** (no separate "discharge ready" flag; the treatment episode's completion only triggers the
+    check); the follow-up plan is made **before** discharge (the pack's last item) and the case moves `DISCHARGED -> FOLLOW_UP` (or closes
+    with no follow-up) only once the final invoice is **reconciled** (closed, or closed with a facility dispute recorded), so the patient
+    sees "Going home" until their statement is issued; the final invoice need only be **recorded** for discharge (Finance countersigns it
+    when it opens the reconciliation: money never holds a patient in hospital); statements and the handover letter are **immutable
+    structured records** the portal renders and prints (no PDF library resolves offline; architecture open point 1). The P1-15 money rule
+    (deposit covers the fee first) is untouched and still awaits the owner.
+  - Delivered: **(1) Discharge pack** (`DischargeService`, journey): the Consultant records the discharge summary (diagnosis, procedures,
+    pending results, warning signs), the medication list (name, dose, frequency, duration), the operative note (the completed-procedure
+    milestone's document also counts), the implant record (required when implants are on that milestone or a counted change-order line)
+    and fit to fly (examination time), each a **typed clean document** (the `case_evidence` row is the type; `medical_documents` has no
+    type) with its facts encrypted; recording a kind again corrects it. A planned discharge (P1-16 milestone) opens `DISCHARGE_PACK`
+    (Consultant) and `RECORD_FINAL_INVOICE` (Operations), due 18:00 Cairo on that day. **Handover letter**: generated EN and AR from the
+    pack (summary, medicines, implants, operative-note reference, pending results, warning signs, follow-up date and mode, facility and
+    dates, patient and case), an encrypted `HANDOVER_LETTER` row; generating again replaces it. **(2) The discharge gate**
+    (`DischargeReadiness`, read by `CaseTransitionPolicy`): `DISCHARGED` needs P1-16's TREATMENT checklist complete, the summary, the
+    medication list, the operative note (after a completed procedure), the implant record (when implants were used), the follow-up plan
+    and the final invoice recorded (codes `TREATMENT_CHECKLIST_INCOMPLETE`, `*_MISSING`); the move is automatic on any change of that
+    evidence (`CaseEvents.DischargeEvidenceChanged`: a pack item, the plan, the invoice, a countersigned milestone or interim bill, a
+    settled change order, the episode's completion); the coordinator's generic transition never discharges. Leaving `DISCHARGED` (follow-up
+    or closed) needs the settled reconciliation (`SETTLEMENT_PENDING`). On discharge the patient gets `discharge-pack-ready`, the
+    coordinator and Operations `PATIENT_DISCHARGED`. **(3) Final invoice, return, departure** (Operations, `ADMISSION_MANAGE`): the final
+    invoice (clean document, number, EGP, issued at; corrections supersede until reconciled) opens Finance's `RECONCILE_INVOICE` (2 working
+    days); the return travel (`FLIGHT` with a valid fit-to-fly, `GROUND`) and then the departure (`PATIENT_DEPARTED` to the coordinator).
+    **(4) New module `settlement`**: `ReconciliationService` — Finance opens it (fresh sign-in; countersigns the invoice; authorised =
+    voucher package + counted change orders; band = the case's D-E band), submits the invoice lines matched to `PACKAGE` / a counted
+    `CHANGE_ORDER_LINE` / `NONE` with the amount the invoice shows the patient paid the hospital (at least the countersigned admission
+    receipts); variance codes `WITHIN_BAND`, `CHANGE_ORDER`, `CREDIT` (billed below), `BILLING_ERROR` (billed above the price: the excess,
+    or an unmatched mistake) and `UNAPPROVED_EXTRA`, the last two **never charged to the patient** (schema-enforced); a variance above the
+    band waits for a Finance Manager (`COUNTERSIGN_RECONCILIATION`, 1 working day; approve or return; never the submitter); settling writes
+    the `RECONCILIATION` ledger row (which ends Finance's open money on the case), issues the statement, opens `FACILITY_DISPUTE` (Finance
+    Manager, 5 working days, survives exit; outcomes `FACILITY_WITHDREW` / `PLATFORM_ABSORBED`) when anything was not charged and
+    `REFUND_CREDIT` (Finance, 2 working days, survives exit) when the patient paid more than charged. `StatementService` — the `DISCHARGE`
+    statement (`RS-ST-<case>-<rev>`): package, change orders, medical charged (reconciled), platform fee, total; deposit paid, fee balance
+    paid, paid at the hospital, refunded; balance due or credit due (schema-checked identities), EGP and the patient's currency at the
+    voucher's frozen rate, encrypted lines; immutable, a correction is a new revision; the **e-invoice reference slot** set once by Finance
+    (`STATEMENT_ISSUE`, fresh sign-in); the patient gets `statement-ready`. **(5) Access**: permissions `DISCHARGE_RECORD` (Consultant),
+    `RECONCILE` (Finance, step-up), `RECONCILE_COUNTERSIGN` (Finance Manager @ platform, step-up), `SETTLEMENT_READ` (Finance, Finance
+    Manager, the case's coordinator and Operations), `STATEMENT_ISSUE` (Finance @ platform, step-up); `CASE_MONEY_OPEN` also covers a
+    recorded final invoice until it is reconciled. `SettlementBasis` is the journey's one door for the settlement module (no cycle).
+    **(6) Patient and staff states**: patient `GOING_HOME` in `DISCHARGED`; Consultant `COMPLETE_DISCHARGE_PACK`; Operations
+    `RECORD_FINAL_INVOICE`, `CONFIRM_RETURN`, `CONFIRM_DEPARTURE`. **API**: journey `DischargeController` — `GET .../{operations|finance|
+    coordinator|doctor}/cases/{id}/discharge`; `POST /doctor/cases/{id}/discharge/pack`, `/doctor/cases/{id}/discharge/handover-letter`;
+    `POST /operations/cases/{id}/discharge/{final-invoice|return|departure}`; patient `GET /patient/cases/{id}/discharge`, link `POST
+    /public/cases/{token}/discharge`; the existing `POST /doctor/cases/{id}/follow-ups` now also in treatment. Settlement
+    `SettlementController` — `GET .../{finance|coordinator|operations}/cases/{id}/reconciliation`; `POST /finance/cases/{id}/reconciliation`
+    (+ `/submit`, `/countersign`, `/dispute/resolve`), `/finance/cases/{id}/statements/{statementId}/e-invoice`; patient `GET
+    /patient/cases/{id}/statements`, link `POST /public/cases/{token}/statements`. Control Center: `fitToFlyHours` on the commercial policy.
+  - Tests and numbers: new `DischargeServiceTest` (5: the gate waits for the pack, the plan and the invoice then tells the patient, with
+    the typed-document and encryption checks and Finance's non-clinical read; fit-to-fly window on a return flight incl. the policy's 96
+    hours and the departure; a ground return; the EN/AR handover letter and "Going home"; an uncountersigned interim bill holding
+    discharge until Finance countersigns) and `SettlementServiceTest` (4: an invoice at the quoted price closes, issues the statement and
+    starts follow-up, with the e-invoice slot, the schema's totals check and the patient's lines; an unapproved extra never charged,
+    disputed and refunded as a credit, the dispute settled by a Finance Manager; a variance above the band returned then approved; the
+    submitter never countersigns), both on the shared `DischargeFixture`; `JourneyServiceIntegrationTest`'s four discharge and exit tests
+    now write the pack evidence first (the gate is `DischargeServiceTest`'s); `NotificationOutboxProcessorTest` covers the two new patient
+    messages. Backend `mvn -o -q test`: 933 tests, 3 skips (924 before, 9 new); green except 5 facility-package tests that fail only between 00:00 and 04:00 local time (+04: the tests take the machine's date, the services UTC/Cairo; pre-existing, untouched here, green with `-Duser.timezone=UTC`). `ArchitectureRulesTest` and `RolePolicyTest` green (JPA only, no native query, no
+    module cycle). `PostgresJpaMappingTest` green on a disposable PostgreSQL 17 (V101 applied, Hibernate validated, every repository query executed, the settlement repositories included). No frontend change.
+  - Not done here (session 2 and later): **no screens or copy**: Consultant pack and letter, Operations invoice, return and departure, the
+    Finance reconciliation workbench (two columns), statements and the e-invoice field, the Finance Manager's countersign and dispute, My
+    Care "Going home" and the statement, the status link's equivalents, the Control Center fit-to-fly field; staff work copy for the six
+    new work types. No PDF; no automatic invoice-line matching; `REFUND_CREDIT` is a work item (the refund is recorded with the existing
+    deposit refund); no facility quarterly dispute counter or Compliance item (P1-19); no payout statement (P1-12); VAT stays inside the
+    platform fee figure. Templates `rs_discharge_pack_ready`, `rs_statement_ready` need Meta approval.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `98958c3`) and rebuilds the dev backend for V101;
+    then P1-17 session 2 (UI and copy, started in a new session; contract in the shared notes folder, `p1-17-session-1-handover.md`).
 
 ### P1-18  Follow-up execution and outcomes  (design §5 stage 6; architecture §5.6)
 - `FollowUpService`: scheduled contacts from the plan, `FOLLOW_UP_CONTACT` items and reminders, coordinator

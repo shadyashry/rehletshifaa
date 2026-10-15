@@ -13,6 +13,7 @@ import com.rehletshifaa.journey.domain.CaseEvidence;
 import com.rehletshifaa.journey.domain.CaseEvidence.Fact;
 import com.rehletshifaa.journey.domain.CaseEvidence.Kind;
 import com.rehletshifaa.shared.api.ApiException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,7 @@ import java.util.UUID;
  * clean case document, the bill number, the EGP amount, when it was issued) and Finance countersigns it with a fresh sign-in
  * ({@code COUNTERSIGN_INTERIM_BILL}, four working hours). An interim bill is the hospital's running statement to date, so the
  * latest countersigned one is "billed to date" against the authorised total (package plus counted change orders) on the
- * treatment panel ({@link TreatmentViews#money}); the final invoice and its reconciliation are P1-17's.
+ * treatment panel ({@link TreatmentViews#money}); the final invoice and its reconciliation are P1-17's ({@link DischargeService}, the settlement module).
  */
 @Service
 public class InterimBillService {
@@ -38,11 +39,12 @@ public class InterimBillService {
     private final StaffWorkService work;
     private final FinanceWork financeWork;
     private final SlaPolicy sla;
+    private final ApplicationEventPublisher events;
 
     public InterimBillService(Authority authority, Clock clock, EvidenceLedger ledger, TreatmentViews views, MedicalCaseRepository cases,
-                              StaffWorkService work, FinanceWork financeWork, SlaPolicy sla) {
+                              StaffWorkService work, FinanceWork financeWork, SlaPolicy sla, ApplicationEventPublisher events) {
         this.authority = authority; this.clock = clock; this.ledger = ledger; this.views = views; this.cases = cases; this.work = work;
-        this.financeWork = financeWork; this.sla = sla;
+        this.financeWork = financeWork; this.sla = sla; this.events = events;
     }
 
     /** Operations records the hospital's interim bill; Finance is asked to countersign it. */
@@ -69,6 +71,7 @@ public class InterimBillService {
         ledger.countersign(caseId, evidenceId, actor.subject(), EvidenceLedger.roleOf(actor.role()));
         if (ledger.live(caseId, Kind.INTERIM_BILL).stream().allMatch(CaseEvidence::countersigned))
             work.closeWorkItems(caseId, COUNTERSIGN_WORK, "Interim bills countersigned");
+        events.publishEvent(new CaseEvents.DischargeEvidenceChanged(caseId)); // P1-17: the discharge gate reads the treatment checklist
         return views.staffView(caseId);
     }
 

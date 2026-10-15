@@ -46,6 +46,14 @@ public final class CaseEvents {
     public record TreatmentStarted(UUID caseId, String subject) {}
 
     /**
+     * P1-17: evidence the discharge gate or the settlement gate reads changed (a pack item, the follow-up plan, the final invoice,
+     * a countersigned milestone or interim bill, a settled change order, the settled reconciliation). {@link DischargeService} tries
+     * TREATMENT_IN_PROGRESS -> DISCHARGED and then DISCHARGED -> FOLLOW_UP, each only when its gate passes. Synchronous: it runs
+     * inside the publisher's transaction.
+     */
+    public record DischargeEvidenceChanged(UUID caseId) {}
+
+    /**
      * Work, an assignment, the proposal's sign-offs or who has the ball changed on the case: the stage's own steps are
      * re-derived ({@link CaseActionService#syncStageWork}) so every step someone owes is in their My work (QA A3).
      */
