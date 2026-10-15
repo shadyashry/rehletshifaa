@@ -589,3 +589,16 @@ Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + d
 | LOW | Combobox: Escape does not restore the previous query text, and Enter on "No matching country" gives no feedback. | web guidelines | `ProfileActivation.tsx` `CountrySelect` | /impeccable polish |
 | LOW | `resolveAction` still separates `NONE` from `CONTINUE_IN_PORTAL` (both land on the ready page); the local `Deposit` type keeps `amountPaid`; the pre-existing `window.location.assign` lint warning in `openPortal`. | React | `ProfileActivation.tsx` | /impeccable optimize |
 | Blocked (legal) | On /ar the deposit terms render in English under the pending notice and `DEPOSIT_CONSENT.ar` sits under them, until the legal review delivers the Arabic. | RTL/i18n | `CoordinationDepositTerms`, `ProfileActivation.tsx` | legal |
+
+## Area 1 — slice E, deferred review findings (2026-10-15)
+
+Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + detector (0; the side-stripe finding from the critique is gone). Fixed in the same pass: 4 HIGH (slip rows wrapped unevenly and the IBAN broke mid-number on phones; the page grew because the "where to find it" help was always open; the payment reference broke at its hyphen in the agent sentence; a set-state-in-effect lint error from the clipboard check, which also shifted the form after hydration) and the MEDIUMs listed in STATUS. Open:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| Blocked (business) | D-5: an "This is the only account we use" assurance line on the slip is still not added; it needs the business's yes. | plan D-5 | `PatientDepositPayment.tsx`, `portalWork.myCare.payment` | business |
+| LOW | On a phone the whole My Care page is still about 3,600px while the deposit is due, because the coordinator, journey and estimate cards follow the step (the field itself now sits right after the bank rows). Folding the journey on phones while a payment is due is an owner call. | Pro Max | `portal/MyCare.tsx` | owner decision |
+| LOW | The rejected-transfer notice keeps `role="alert"` though it is present on load (not always announced); a heading or one focus move would suit a standing notice better. | web guidelines | `PatientDepositPayment.tsx` | /impeccable polish |
+| LOW | Choice cards (activation, payment) use Tailwind `bg-white` rather than the surface token, and have no pressed state on touch. | Pro Max, web guidelines | `ProfileActivation.tsx`, `PatientDepositPayment.tsx` | /impeccable polish |
+| LOW | §7 "checking" for an agent payment is covered by copy ("Keep your transfer or agent receipt") but not captured; My Care's `deposit-checking` fixture is a bank transfer. | Pro Max | `e2e/patient-fixture.ts` | tests |
+| LOW | Slice F's My Care screenshots predate the quiet emergency notice (D-4) applied to My Care in E. | slice E | `screenshots/area-1/after/f-*` | info |

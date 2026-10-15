@@ -131,7 +131,7 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
       </header>
 
       {/* A-02: whatever stage the case is at, an emergency is local care now, never a message to the team. */}
-      {view === "care" && <EmergencyGuidance className="mt-5" title={t.emergency.title} body={t.emergency.body}/>}
+      {view === "care" && <EmergencyGuidance variant="quiet" className="mt-5" title={t.emergency.title} body={t.emergency.body} more={t.emergency.more}/>}
 
       {view === "documents" && (
         <section aria-labelledby="documents-title" className="card mt-5 p-5 sm:p-6">
@@ -189,7 +189,7 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
             )}
 
             {/* The money this step is about, inside the step: one place for the amount, on the facts panel. */}
-            {depositInStep && deposit && !(code === "PAY_DEPOSIT" && paymentStep) && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 rounded-md bg-mist p-4 sm:p-5"/>}
+            {depositInStep && deposit && !(code === "PAY_DEPOSIT" && paymentStep) && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 border-t border-line pt-4"/>}
             {code === "PAY_DEPOSIT" && focus && paymentStep}
 
             {/* Exactly one primary action, and only when the backend says the patient owes something. */}
@@ -265,7 +265,8 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
               </div>
               {proposalTotal != null && <p className="statement mt-3 text-brand-900 tabular-nums"><bdi dir="ltr">{formatMoney(proposalTotal, proposal.currency, locale)}</bdi></p>}
               {proposal.versionNumber > 1 && <p className="mt-1 text-[0.875rem] text-ink-500">{t.estimate.updated}</p>}
-              {proposal.documentType === "PRELIMINARY_ESTIMATE" && <p className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-ink-600">{t.estimate.basis}</p>}
+              {/* While the deposit is being paid, the payment step already says this; it is said once. */}
+              {proposal.documentType === "PRELIMINARY_ESTIMATE" && code !== "PAY_DEPOSIT" && <p className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-ink-600">{t.estimate.basis}</p>}
               {showDeposit && !depositInStep && deposit && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 border-t border-line pt-4"/>}
               {/* One control for one outcome: reviewing is already the current step's action, so only the settled document gets a link here. */}
               {patientProposal.action === "VIEW_PROPOSAL" && (

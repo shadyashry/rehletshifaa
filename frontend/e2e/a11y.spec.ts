@@ -61,6 +61,8 @@ const PORTAL: Target[] = [
   { name: "portal-doctor", path: "/portal", prepare: page => setupPortal(page, "DOCTOR"), ready: page => expect(page.locator("#work-panel")).toBeVisible() },
   { name: "my-care", path: "/portal", prepare: page => setupPatient(page, "deposit-checking"), ready: page => expect(page.locator("#current-step-title")).toBeVisible() },
   { name: "my-care-cases", path: "/portal", prepare: page => setupPatient(page, "deposit-checking", { multipleCases: true, roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] }), ready: page => expect(page.locator("#your-cases-title")).toBeVisible() },
+  // The deposit payment step (plan section 10): the slip with its Copy controls and the reference field.
+  { name: "my-care-payment", path: "/portal", prepare: page => setupPatient(page, "pay-deposit"), ready: page => expect(page.locator("input[name=transferReference]")).toBeVisible() },
 ];
 
 for (const locale of ["en", "ar"] as const) {

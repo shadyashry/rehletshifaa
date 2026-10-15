@@ -16,10 +16,13 @@ const proposal = { proposalId: "p1", versionId: "v1", versionNumber: 1, status: 
 const deposit = { id: "dep-1", status: "REQUESTED", currency: "USD", totalEgp: 25000, totalDisplay: 500, paidDisplay: 0, balanceDisplay: 500, components: [], events: [] };
 /** `deposit-checking`: the patient entered the bank's transfer reference (DEP-3) and Finance is matching it. */
 const transfer = { id: "tr-1", method: "BANK_TRANSFER", reference: "FT26091200481", status: "SUBMITTED", submittedAt: "2026-09-12T08:30:00Z" };
+/** `pay-deposit`: the deposit is the patient's step (PAY_DEPOSIT) with the platform account (dummy details); `pay-deposit-rejected`: part was received and the last reference was not confirmed. */
+const bankTransfer = { accountName: "RehletShifaa Test Account", bankName: "Test Bank (dummy details)", accountNumber: "0000000000000", iban: "EG000000000000000000000000000", swift: "TESTEGCXXXX", paymentReference: "RS-2026-000081" };
+const rejected = { id: "tr-2", method: "BANK_TRANSFER", reference: "FT0000", status: "REJECTED", submittedAt: "2026-09-12T08:30:00Z", reason: "No transfer with this reference reached the account." };
 
 /** `proposal-recorded`: the coordinator recorded the patient's acknowledgement after an Arabic call (assisted path). */
 /** `case-received` / `consultant-review`: the case waits for the coordinator / is with a Consultant (stamped moments, D-1). */
-export type Scenario = "deposit-checking" | "deposit-paid" | "proposal-ready" | "proposal-recorded" | "case-received" | "consultant-review" | "no-case";
+export type Scenario = "deposit-checking" | "deposit-paid" | "proposal-ready" | "proposal-recorded" | "case-received" | "consultant-review" | "no-case" | "pay-deposit" | "pay-deposit-rejected";
 
 /** D-1: when the three stamped moments happened, as the backend sends them on the patient workspace. */
 const received = "2026-09-01T09:00:00Z", consultantReview = "2026-09-04T09:00:00Z";
@@ -38,6 +41,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
   }, { authority: OIDC_AUTHORITY });
   const ready = scenario === "proposal-ready";
   const paid = scenario === "deposit-paid";
+  const paying = scenario === "pay-deposit" || scenario === "pay-deposit-rejected";
   // Before an estimate exists: no proposal, no deposit, and only the milestones reached so far.
   const early = scenario === "case-received" ? "RECEIVED" : scenario === "consultant-review" ? "CONSULTANT_REVIEW" : null;
   const caseSummary = early ? { ...summary, status: early, doctorName: early === "RECEIVED" ? null : summary.doctorName }
@@ -48,6 +52,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     : ready
     ? { journeyStage: "PATIENT_DECISION", waitingOn: "PATIENT", blockers: [], currentAction: { code: "REVIEW_PROPOSAL", kind: "FOCUS" }, availableActions: ["MESSAGE_COORDINATOR"] }
     : paid ? { journeyStage: "TRAVEL_COORDINATION", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_COORDINATION", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] }
+    : paying ? { journeyStage: "ACCEPTED", waitingOn: "PATIENT", blockers: [], currentAction: { code: "PAY_DEPOSIT", kind: "FOCUS" }, availableActions: ["MESSAGE_COORDINATOR"] }
     : { journeyStage: "ACCEPTED", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_PAYMENT_CHECK", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] };
   const actions = { ...states, viewer, ...(identity !== undefined ? { currentAction: { code: "VERIFY_IDENTITY", kind: "FOCUS", blocker: "IDENTITY_NOT_VERIFIED" } } : {}) };
   const workspace = {
@@ -57,7 +62,10 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     proposal: early ? null : { ...proposal, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
       ? { requestedAt: "2026-09-10T09:00:00Z", decisionSource: "RECORDED_ON_BEHALF", recordedByName: "Sara Ahmed", channel: "WHATSAPP_CALL", confirmedBy: "PATIENT", conversationAt: "2026-09-11T09:00:00Z", decidedAt: "2026-09-11T09:05:00Z" }
       : null as null | Record<string, string> },
-    deposit: ready || early ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0 } : { ...deposit, transfer },
+    deposit: ready || early ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0 }
+      : scenario === "pay-deposit" ? { ...deposit, bankTransfer, transfer: null }
+      : scenario === "pay-deposit-rejected" ? { ...deposit, status: "PARTIALLY_PAID", paidDisplay: 200, balanceDisplay: 300, bankTransfer, transfer: rejected }
+      : { ...deposit, transfer },
     actions, milestones,
     patientProposal: early ? null : ready ? { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: null }
       : { state: "ACCEPTED", action: "VIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: stamp },

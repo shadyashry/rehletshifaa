@@ -1377,7 +1377,8 @@
       },
       "emergency": {
         "title": "If this is an emergency, seek local care now",
-        "body": "Your care team does not monitor messages around the clock. Call your local emergency number or go to the nearest emergency department."
+        "body": "Your care team does not monitor messages around the clock. Call your local emergency number or go to the nearest emergency department.",
+        "more": "Read more"
       },
       "steps": {
         "PROVIDE_INFORMATION": {
@@ -1443,14 +1444,14 @@
         },
         "PAY_DEPOSIT": {
           "title": "Pay your coordination deposit",
-          "body": "Your profile is complete. Pay the deposit by bank transfer, then enter the transaction reference your bank gives you.",
+          "body": "Your profile is complete. Pay the deposit by bank transfer or through an agent, then enter the reference or receipt number you are given.",
           "next": "Once our finance team confirms your payment, your coordinator starts arranging your treatment."
         },
         "WAIT_PAYMENT_CHECK": {
           "title": "We're checking your payment",
-          "body": "Thank you. Our finance team is matching your transfer with the reference you sent, and we'll let you know as soon as it's confirmed.",
+          "body": "Thank you. Our finance team is matching your payment with the number you sent, and we'll let you know as soon as it's confirmed.",
           "next": "Once your payment is confirmed, your coordinator starts arranging your treatment.",
-          "meanwhile": "Keep your bank's transfer receipt. There is no need to pay again."
+          "meanwhile": "Keep your transfer or agent receipt. There is no need to pay again."
         },
         "WAIT_COORDINATION": {
           "title": "We are arranging your treatment",
@@ -1508,12 +1509,24 @@
       },
       "payment": {
         "amountDue": "Amount to pay now",
+        "rejectedReference": "The number you sent",
+        "referenceMissing": "Enter the reference number your bank gave you.",
+        "receiptMissing": "Enter the receipt number the agent gave you.",
+        "referenceWhereToggle": "Where do I find it?",
+        "sending": "Sending…",
+        "stepAgent": "Pay through an agent",
+        "stepReference": "Enter your bank's reference",
+        "stepReceipt": "Enter the agent's receipt",
+        "copy": "Copy",
+        "copied": "Copied",
+        "copiedAnnounce": "{label} copied.",
+        "copyFailed": "Could not copy {label}. Select it and copy it yourself.",
         "total": "Coordination deposit",
         "received": "Already received",
         "estimateNote": "This deposit is based on your preliminary estimate. Your treatment and its final price may change after your doctor examines you in person; the deposit is deducted from your final treatment plan and quote.",
         "method": "How would you like to pay?",
         "online": "Online payment",
-        "onlineSoon": "Coming soon — not available yet.",
+        "onlineSoon": "Coming soon",
         "bankTransfer": "Bank transfer",
         "bankTransferHint": "Transfer the amount to our account below.",
         "agentCash": "Cash through an agent",
@@ -1557,7 +1570,7 @@
           "CANCELLED": "Cancelled"
         },
         "note": {
-          "REQUESTED": "Pay by bank transfer and send us the transaction reference.",
+          "REQUESTED": "Pay by bank transfer or through an agent, then send us the reference or receipt number you are given.",
           "PARTIALLY_PAID": "The remaining amount is due.",
           "PAID": "Thank you — it will be deducted from the price in your final treatment plan and quote.",
           "WAIVED": "No deposit is needed for your case.",

@@ -79,7 +79,7 @@ describe("MyCare", () => {
     expect(screen.getByRole("status").textContent).toContain("No action is required from you right now.");
     expect(screen.getByText(/Once your payment is confirmed/)).toBeTruthy();
     // The patient acknowledged an estimate; nothing says a proposal was accepted.
-    expect(screen.getByText(/matching your transfer with the reference you sent/)).toBeTruthy();
+    expect(screen.getByText(/matching your payment with the number you sent/)).toBeTruthy();
     expect(screen.queryByText(/has been accepted/)).toBeNull();
     // No fake workflow CTA of any kind.
     expect(screen.queryByRole("button", { name: /continue|pay|check status|refresh/i })).toBeNull();
