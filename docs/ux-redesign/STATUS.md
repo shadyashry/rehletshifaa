@@ -437,6 +437,13 @@ Update at the end of every phase.
 
 ## Next exact action
 
+**UX area 1 — patient portal as the file** (`plans/patient-portal-file.md`, branch `feat/ux-area-1-portal-file`, worktree
+`zealous-kapitsa-ee74d4`): critique **23/40** and shape plan written, **at the owner gate — not approved, no code**. Next: the
+owner approves the plan and decides D-1 (stamp dates: backend milestones, recommended), D-2 (Copy on the payment slip), D-3
+(no fourth stamp, recommended), D-4 (quiet emergency notice on the patient pages) and D-5 (only-account assurance, business);
+then slices T → A → F → B → C → D → E in about three sessions. Correction: "My Care + multiple cases" below **is committed**
+(`0d743b2`, 2026-10-13) and is an ancestor of this branch; it is reused, not rebuilt.
+
 **My Care + multiple cases** (`plans/patient-my-care.md`, owner-approved 2026-10-13) built by `/redesign-area` on
 `feat/ux-redesign-my-care` (worktree `ux-my-care`), **not committed — awaiting owner approval**. Delivered: case switcher
 (`CaseSwitcher.tsx`: grouped by person, "Needs you", past cases folded, "Send a new case" for the account's own), case header
@@ -497,3 +504,19 @@ Delivered, docs only: `theme-studio-v2.html` (regenerated studio) and `screensho
 - Recommendation: adopt E with the new mark; fallback A-prime (A with the tells removed, white bond). Token proposal lists every `@theme` token, the `theme-petrol.css` re-points, component tokens, fonts.ts, the Keycloak login CSS variables and images, favicon/app icons, WhatsApp profile picture and the film posters. **Nothing changed in code.**
 - Verify: detector 0 findings after one fix (future journey-step text was 2.3:1, now ink-400); narrow file-scoped ignores recorded in `.impeccable/config.json` for the proposed fonts, the dossier tab edge and clamp() padding; no horizontal overflow at 390/375/320 after wrapping long code tokens and the staff bar; Pro Max checklist (44px targets, visible 3px focus, reduced motion, no emoji icons, 375–1440) applied.
 - **Owner decision (2026-10-15): Petrol & Paper stays** ("still the best is petrol and paper"). World E, the new mark and the token proposal are declined and kept on the page as a record. No token, component or asset changes; Western digits on `/ar` stay until the native review (pass-3 decision). Area 0 is closed; next is area 1 (patient portal as the file) per PLAN.md.
+
+## UX area 1 — patient portal as the file (2026-10-15, worktree `zealous-kapitsa-ee74d4`, branch `feat/ux-area-1-portal-file` from `claude/zen-blackwell-6af461` @ `aba2635`)
+
+Docs only. Critique (dual-agent: design review + `impeccable detect`, 84 before screenshots in `screenshots/area-1/before/`):
+**23/40** (`.impeccable/critique/2026-10-15T00-27-32Z__frontend-src-components.md`). Findings: P1 deposit copy contradicts DEP-3
+(activation done page ticks "Deposit received" on a reload; status-link deposit phase says the coordinator shares payment details);
+P1 no stamped page for specialist reviewing or estimate ready; P1 three visual languages across five doors (82 off-ladder sizes,
+24 off-scale radii, 18 tinted panels, two journey trackers); P1 Arabic parity at the decision; P2 deposit step overloads a phone.
+Detector: 1 finding (side stripe, `PatientDepositPayment.tsx:70`).
+Plan: `plans/patient-portal-file.md` — one dossier page shell, one journey, one code step for the three secure links; stamps on
+case sent / specialist reviewing / estimate ready from backend event dates only; slices T (truth) → A (foundations) → F (My Care)
+→ B (status link) → C (proposal link) → D (activation) → E (payment slip). Reuses `0d743b2` (switcher, current step, coordinator,
+journey) unchanged. Owner decisions D-1…D-5 open; legal L-6 (payment-instruction lines in `commercial-terms.ts`) added to the
+legal list. Found out of scope: the patient workspace returns the staff timeline (actor names, reasons) and open assignments
+(staff subjects) — backend data-minimisation follow-up.
+**Status: at the owner gate.**

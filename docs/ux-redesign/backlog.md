@@ -494,3 +494,14 @@ Review: `docs/ux-redesign/patient-site-review-2026-10-14.md` (24/32). Plan slot:
 | Done (order only: privacy before travel); care-area row and rail fold still open | Home order and length: privacy before travel; care areas as one quiet row; five-icon rail folded into the hero card. | Review 2026-10-14 | `app/[locale]/page.tsx` | distill, layout |
 | Done (trust pass A') | Hero entrance animation leaves the lead and card invisible until it runs; shorten delays and use `backwards` fill. | Review 2026-10-14 | `theme-petrol.css` 666–687 | animate |
 | P3 | Header: demote the Coordinator link to the language-switch weight; footer disclaimer shortened; emergency card out of the trust palette. | Review 2026-10-14 | `Header.tsx`, `Footer.tsx`, `TrustSection.tsx` | polish |
+
+## UX area 1 — patient portal as the file (critique 2026-10-15)
+
+Critique 23/40; plan `plans/patient-portal-file.md` (at the owner gate). In-area findings are the plan's slices T, A–F. Outside the area:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P1 | Patient workspace returns the full staff `timeline` (actor names, roles, free-text reasons) and open `assignments` (staff identity subjects); the patient UI renders neither. Strip both for patient actors (or a patient-safe milestone projection, plan D-1). | area 1 critique (source read) | backend `CaseWorkspaceQueryService.workspace` | backend |
+| Blocked (legal L-6) | `commercial-terms.ts` 41, 68, 81: "your coordinator sends you the payment instructions" contradicts DEP-3 (patient pays the platform account in My Care). Wording for legal. | area 1 critique | `lib/commercial-terms.ts` | legal |
+| Blocked (legal / native) | Arabic `ackShortFinal` ("I understand accepting this offer is a financial agreement") differs in meaning from the English acceptance statement. | area 1 critique | `ProposalSign.tsx` copy | legal, native review |
+| P2 | The portal proposal drawer (`PatientProposal.tsx`) and the proposal link (`ProposalSign.tsx`) are two implementations of one document; converge after area 1. | area 1 plan | both | /impeccable shape |
