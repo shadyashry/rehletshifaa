@@ -35,6 +35,15 @@ describe("Finance's exchange-rate re-approval", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
+  it("shows today's total and rate beside the frozen ones when the view carries them", () => {
+    render(<FxReapproval locale="en" copy={price.fxReapproval} caseId="c1" versionId="v2" currency="USD" total={1200}
+      commercial={{ versionId: "v2", currency: "USD", fxRate: 0.0204, fxRateDate: "2026-10-01", fxReapprovalRate: 0.019, fxReapprovalTotal: 1116, requiresFinanceApproval: false, displayTotal: 1200, lines: [] }} busy={false} mutate={vi.fn()} />);
+    expect(screen.getByText("$1,116")).toBeInTheDocument();
+    expect(screen.getByText(/7%/)).toBeInTheDocument();
+    expect(screen.getByText("0.019")).toBeInTheDocument();
+    expect(screen.getByText("$1,200")).toBeInTheDocument();
+  });
+
   it("keeps the frozen rate through its own confirmation", () => {
     const mutate = setup();
     fireEvent.click(screen.getByRole("button", { name: price.fxReapproval.keep }));

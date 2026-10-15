@@ -778,9 +778,9 @@ phases.
     `ProposalSign.tsx` and the homepage (EN/AR, one key each, logical CSS, WCAG 2.2 AA), the fee line's patient wording, the
     cooling-period and FX-pause states, and the minimum Finance UI for the FX re-approval item. V97 is the next free Flyway version.
 - **Status (2026-10-15, session 2 of 2, Sonnet 5.5 as the plan names it; committed on `claude/p1-10-s2-ui-bf8b61`, cut from `feat/review-p0` at
-  b4ab584, so the owner fast-forwards `feat/review-p0` to this commit):** the patient-facing and Finance UI and the copy are delivered, no backend
-  change, no migration (V97 is still the next free Flyway version). The frontend needs a rebuild of the dev stack
-  (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`, frontend only is enough).
+  b4ab584, so the owner fast-forwards `feat/review-p0` to this commit):** the patient-facing and Finance UI and the copy are delivered; the only backend change is
+  two read-only fields on Finance's commercial view (below), no migration (V97 is still the next free Flyway version). The backend and the frontend need a rebuild of the dev stack
+  (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`).
   - Delivered: **Fee line wording.** A `PLATFORM_FEE` item (`lib/price-transparency.ts` `isPlatformFee`) is worded from `portalProposal.price.feeLabel` /
     `feeNote` ("Coordination and guarantee fee", what it covers) on the public proposal (`ProposalSign.tsx`: after the medical lines, not grouped under a raw
     category, not counted as a service), the signed-in proposal (`PatientProposal.tsx`), the staff proposal card, and Finance's approval table (tagged "Platform
@@ -808,14 +808,17 @@ phases.
     notes and the refusal contract) and `portal/FinalQuotePricing.test.tsx` (8: both Finance confirmations call exactly their endpoint, cancelling sends
     nothing, Arabic, the coordinator form sends no `validUntil` when empty and the chosen date otherwise, both field errors). `PageHeaders.test.tsx` updated
     (the margin body now carries the two fields) plus one new test (prefilled, confirmed, sent). Verification: `pnpm typecheck` clean; eslint clean on every
-    touched file; `vitest run` 69 files / 504 tests green; Playwright (production build) on a11y, home-quality, home-visual, pre8c-commercial-copy,
-    proposal-responsive, arabic-proposal-decision, proposal-otp, my-care: 98 of 106 pass; the 8 failures are 6 in `my-care.spec.ts` that look for a "Deposit arrangements" heading which My Care never rendered at b4ab584 (stale since the deposit step moved, pre-existing and unrelated) and the 2 Arabic-decision specs my home/price panel broke by being the first `ol li` on the page, fixed by scoping the locator to the "What happens next" section (then 10/10). Checked in the browser pane with a throwaway harness (not committed): the
+    touched file; `vitest run` 69 files / 505 tests green; backend `mvn -o -q test` (JVM in UTC) 853 tests, 0 failures, 3 skips, ArchitectureRulesTest green; Playwright (production build) on a11y, home-quality, home-visual, pre8c-commercial-copy,
+    proposal-responsive, arabic-proposal-decision, proposal-otp, my-care (+ my-care-new-case, my-care-polish, final-quote-holds): green. The first run had 8 failures: 6 in `my-care.spec.ts`, stale since DEP-3 (they expected a "Deposit arrangements" step My Care no longer renders; fixture and strings updated), and 2 Arabic-decision specs my price panel broke by being the first `ol li` on the page (locator scoped to "What happens next"). Checked in the browser pane with a throwaway harness (not committed): the
     estimate in en and ar (RTL: step numbers at the start, amounts at the end, fee row), the cooling note with its time and the disabled accept, the
     Arabic rate-check note, and the Arabic home section.
+  - Closed after the first review: Finance's panel now also shows the total and rate at today's rate and the difference
+    (`ProposalCommercialView.fxReapprovalRate` / `fxReapprovalTotal`, filled only while the re-approval is PENDING, from the rate stored when the patient
+    tried to accept; `FinalQuoteRulesTest` asserts both and that they clear on confirmation); the signed-in refusal wiring is proved through the real `Portal` in
+    `e2e/final-quote-holds.spec.ts` (cooling note, both refusals, no banner); the six stale `my-care.spec.ts` failures are repaired (the fixture's default step is
+    now DEP-3's "We're checking your payment" with a submitted transfer).
   - Open gaps: the Arabic guarantee and every new Arabic string are drafts, pending native review (UX plan area X) and counsel (the English is the
-    owner's placeholder). Finance's panel shows the **frozen** figure and rate only; today's figure is not on any view, so Finance chooses without
-    seeing the new number (a `fxReapprovalTodayTotal` on `ProposalView` is the small backend change if wanted). The signed-in refusal wiring is covered
-    at the component contract (`FeedbackContext`), not through the whole `Portal` (no existing harness for it). Not built: the Finance-side
+    owner's placeholder). Not built: the Finance-side
     notification copy codes beyond the two work titles, a coordinator-facing control for `FINAL_QUOTE_EXPIRED` (it opens a normal item), the
     scope-change reason on the Consultant's final assessment (still entered by the coordinator, as session 1 noted), the guarantee on the final quote
     (a final quote is past the promise; it shows the reason and the hold instead). Final look is the UX plan's (areas 1 and 4), this is the faithful minimum.

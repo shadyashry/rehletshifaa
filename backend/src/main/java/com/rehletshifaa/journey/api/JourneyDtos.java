@@ -142,7 +142,9 @@ public final class JourneyDtos {
     /** The version's commercial calculation for Finance: base total, margin (rate, amount, policy), patient total in EGP and in the proposal currency. */
     public record ProposalCommercialView(UUID versionId,String currency,BigDecimal fxRate,java.time.LocalDate fxRateDate,boolean requiresFinanceApproval,
             String policyName,String policyCareArea,Integer policyVersion,BigDecimal marginRate,BigDecimal baseTotalEgp,BigDecimal marginEgp,
-            BigDecimal patientTotalEgp,BigDecimal displayTotal,List<ProposalCommercialLine> lines) {}
+            BigDecimal patientTotalEgp,BigDecimal displayTotal,List<ProposalCommercialLine> lines,
+            /** P1-10: while Finance re-approves a final quote's rate, the rate that was in force when the patient tried to accept and the quote total at it (null otherwise). */
+            BigDecimal fxReapprovalRate,BigDecimal fxReapprovalTotal) {}
     /** {@code assigneeName} is resolved server-side so no interface ever renders an identity subject. */
     /** {@code offerExpiresAt}: P1-6, when a pending Consultant offer expires; null on every other assignment. */
     public record AssignmentView(UUID id,String assigneeSubject,String assigneeName,String assigneeRole,String assignmentType,String status,Instant assignedAt,Instant offerExpiresAt,long version) {}

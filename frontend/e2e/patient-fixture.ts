@@ -13,7 +13,8 @@ const summary = { id: "case-1", caseNumber: "RS-2026-000081", status: "ACCEPTED"
   createdAt: "2026-09-01T09:00:00Z", updatedAt: stamp, version: 6, coordinatorName: "Sara Ahmed", doctorName: "Dr Ahmed Alashry", waitingOn: "STAFF", travelPackageRequested: false };
 const proposal = { proposalId: "p1", versionId: "v1", versionNumber: 1, status: "ACCEPTED", language: "en", currency: "USD", validUntil: "2026-12-31T00:00:00Z", documentType: "PRELIMINARY_ESTIMATE",
   items: [{ id: "i1", category: "MEDICAL", description: "Dual chamber pacemaker implant", quantity: 1, unitPrice: 4850, optional: false }], coordinatorNotes: null };
-const deposit = { id: "dep-1", status: "REQUESTED", currency: "USD", totalEgp: 25000, totalDisplay: 500, paidDisplay: 0, balanceDisplay: 500, components: [], events: [] };
+const deposit = { id: "dep-1", status: "REQUESTED", currency: "USD", totalEgp: 25000, totalDisplay: 500, paidDisplay: 0, balanceDisplay: 500, components: [], events: [], transfer: { id: "tr-1", status: "SUBMITTED", reference: "TRX-2026-0042" } };
+// DEP-3: the patient has sent the bank transfer reference; Finance is matching it, so the step is "we're checking your payment" (no action for the patient).
 
 /** `proposal-recorded`: the coordinator recorded the patient's acknowledgement after an Arabic call (assisted path). */
 export type Scenario = "deposit-arranging" | "deposit-paid" | "proposal-ready" | "proposal-recorded" | "no-case";
@@ -23,9 +24,11 @@ export type Scenario = "deposit-arranging" | "deposit-paid" | "proposal-ready" |
 /** `multipleCases`: the account also represents a relative (Omar, whose case waits on them — the session opens it) and has a closed case of its own. */
 export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: string[]; identity?: { status: string; rejectionReason?: string } | null; multipleCases?: boolean;
   /** The server refuses a new case with this error code (e.g. a limit on cases sent for others). */
-  newCaseRefusal?: { status: number; code: string } };
+  newCaseRefusal?: { status: number; code: string };
+  /** With "proposal-ready": the proposal is a final quote in this state, and a decision on it may be refused with this code (P1-10). */
+  finalQuote?: { scopeChangeReason?: string; acceptableFrom?: string; fxReapprovalStatus?: string; decisionRefusal?: { status: number; code: string } } };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal }: PatientOptions = {}) {
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
       profile: { sub: "patient-1", name: "Maya Example", email: "maya@example.test", roles: ["PATIENT"] }, expires_at: Math.floor(Date.now() / 1000) + 3600 }));
@@ -36,7 +39,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
   const states = ready
     ? { journeyStage: "PATIENT_DECISION", waitingOn: "PATIENT", blockers: [], currentAction: { code: "REVIEW_PROPOSAL", kind: "FOCUS" }, availableActions: ["MESSAGE_COORDINATOR"] }
     : paid ? { journeyStage: "TRAVEL_COORDINATION", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_COORDINATION", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] }
-    : { journeyStage: "ACCEPTED", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_DEPOSIT_ARRANGEMENT", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] };
+    : { journeyStage: "ACCEPTED", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_PAYMENT_CHECK", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] };
   const actions = { ...states, viewer, ...(identity !== undefined ? { currentAction: { code: "VERIFY_IDENTITY", kind: "FOCUS", blocker: "IDENTITY_NOT_VERIFIED" } } : {}) };
   const workspace = {
     caseSummary, timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: "2026-09-01T09:00:00Z" }, { type: "STATUS", label: caseSummary.status, status: caseSummary.status, occurredAt: stamp }],
@@ -45,7 +48,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     proposal: { ...proposal, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
       ? { requestedAt: "2026-09-10T09:00:00Z", decisionSource: "RECORDED_ON_BEHALF", recordedByName: "Sara Ahmed", channel: "WHATSAPP_CALL", confirmedBy: "PATIENT", conversationAt: "2026-09-11T09:00:00Z", decidedAt: "2026-09-11T09:05:00Z" }
       : null as null | Record<string, string> },
-    deposit: ready ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0 } : deposit,
+    deposit: ready ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0, transfer: null } : deposit,
     actions,
     patientProposal: ready ? { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: null }
       : { state: "ACCEPTED", action: "VIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: stamp },
@@ -74,6 +77,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (request.method() === "GET" && path.endsWith("/api/v1/me")) calls.me++;
     if (path.includes("/api/v1/undefined/")) calls.roleless++;
   });
+  if (finalQuote) Object.assign(workspace.proposal, { documentType: "FINAL_TREATMENT_QUOTE", scopeChangeReason: finalQuote.scopeChangeReason ?? null, acceptableFrom: finalQuote.acceptableFrom ?? null, fxReapprovalStatus: finalQuote.fxReapprovalStatus ?? null });
   await page.route("**/api/v1/**", async route => {
     const request = route.request(), api = new URL(request.url()).pathname.replace("/api/v1", "");
     const reply = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
@@ -93,6 +97,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (multipleCases && api === "/patient/cases/case-3") return reply(closedWorkspace);
     if (api === "/patient/cases/case-1") return reply(workspace);
     if (api === "/patient/cases/case-1/onboarding") return reply({ identity: identity ?? null });
+    if (api === "/patient/cases/case-1/proposals/v1/decision" && finalQuote?.decisionRefusal) return reply({ code: finalQuote.decisionRefusal.code, message: "Server wording in English (must not reach the patient)" }, finalQuote.decisionRefusal.status);
     if (api === "/patient/cases/case-1/proposals/v1/decision") return reply({ ...proposal, status: "ACCEPTED" });
     // The Arabic assisted path: asking once opens the coordinator's work; the page then says it was asked.
     if (api === "/patient/cases/case-1/proposals/v1/assistance") { workspace.proposal.assistance = { requestedAt: "2026-10-08T09:00:00Z" }; return reply(workspace.proposal.assistance); }

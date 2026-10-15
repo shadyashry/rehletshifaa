@@ -10,12 +10,12 @@ import { setupPatient } from "./patient-fixture";
  */
 const noOverflow = async (page: Page) => expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1), "no horizontal overflow").toBe(false);
 
-test("lands on the current case with the deposit being arranged: one step, no fake action, authoritative money", async ({ page }) => {
+test("lands on the current case with the deposit payment being checked: one step, no fake action, authoritative money", async ({ page }) => {
   await setupPatient(page, "deposit-arranging");
   await page.goto("/en/portal");
   // Straight into the care journey — no dashboard, no list, no welcome card.
   await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Deposit arrangements" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
   await expect(page).toHaveURL(/case=case-1/);
   await expect(page.getByRole("tab")).toHaveCount(0);
   await expect(page.getByText("No action is required from you right now.")).toBeVisible();
@@ -26,7 +26,7 @@ test("lands on the current case with the deposit being arranged: one step, no fa
   await expect(page.getByRole("button", { name: /^message( \(\d+ unread messages?\))?$/i })).toHaveCount(1); // the coordinator block's one control (with its unread badge)
   const depositBlock = page.getByRole("region", { name: "Coordination deposit", exact: true });
   await expect(depositBlock).toContainText("$500");
-  await expect(depositBlock).toContainText("Arranging");
+  await expect(depositBlock).toContainText("Being checked");
   await expect(depositBlock.getByRole("button")).toHaveCount(0);
   await expect(page.getByText(/EGP|E£/)).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Preliminary care estimate" })).toContainText("$4,850");
@@ -47,7 +47,7 @@ test("lands on the current case with the deposit being arranged: one step, no fa
 test("a linked patient registers the session once and the page settles instead of reloading", async ({ page }) => {
   const { calls } = await setupPatient(page, "deposit-arranging");
   await page.goto("/en/portal");
-  await expect(page.getByRole("heading", { name: "Deposit arrangements" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
   await page.waitForTimeout(1500);
   const settled = { ...calls };
   // One registration per signed-in subject; /me is read on sign-in and refreshed once because the session is linked.
@@ -56,14 +56,14 @@ test("a linked patient registers the session once and the page settles instead o
   expect(settled.roleless, "no role-scoped URL is built while /me reloads").toBe(0);
   await page.waitForTimeout(1000);
   expect(calls, "nothing is re-requested once the page has settled").toEqual(settled);
-  await expect(page.getByRole("heading", { name: "Deposit arrangements" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
 });
 
 test("on a phone the current step comes before everything else, and nothing overflows", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await setupPatient(page, "deposit-arranging");
   await page.goto("/en/portal");
-  await expect(page.getByRole("heading", { name: "Deposit arrangements" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
   await noOverflow(page);
   const order = await page.evaluate(() => {
     const top = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().top ?? Infinity;
@@ -82,7 +82,7 @@ test("on a phone the current step comes before everything else, and nothing over
 test("the deposit is stated once, inside the step it is about, and the coral reading hairline stays off the app page", async ({ page }) => {
   await setupPatient(page, "deposit-arranging");
   await page.goto("/en/portal");
-  const step = page.getByRole("region", { name: "Deposit arrangements" });
+  const step = page.getByRole("region", { name: "We're checking your payment" });
   await expect(step.getByRole("region", { name: "Coordination deposit", exact: true })).toContainText("$500");
   await expect(page.getByText("$500")).toHaveCount(1);
   await expect(page.locator(".card.file-tab")).toHaveCount(1);
@@ -111,7 +111,7 @@ test("several cases: the one waiting on the patient opens first, grouped by pers
   // Switching replaces the file in place and moves focus to its heading.
   await switcher.getByRole("link", { name: /RS-2026-000081/ }).click();
   await expect(page).toHaveURL(/case=case-1/);
-  await expect(page.getByRole("heading", { name: "Deposit arrangements" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
   await expect(page.locator("#case-heading")).toBeFocused();
   await expect(page.getByRole("region", { name: "Your cases" }).getByRole("link", { name: /RS-2026-000081/ })).toHaveAttribute("aria-current", "page");
   await page.setViewportSize({ width: 390, height: 844 });
@@ -199,7 +199,7 @@ test("Arabic is right-to-left with the same single-action discipline", async ({ 
   await page.goto("/ar/portal");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByRole("heading", { level: 1, name: "رعايتي" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "ترتيبات الوديعة" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "نتحقق من دفعتك" })).toBeVisible();
   await expect(page.getByText("لا يلزم منك أي إجراء الآن.")).toBeVisible();
   await expect(page.getByRole("button", { name: /الاطلاع على العرض/ })).toHaveCount(1);
   await noOverflow(page);
