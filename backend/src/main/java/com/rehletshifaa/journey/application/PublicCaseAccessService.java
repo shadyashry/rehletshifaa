@@ -131,6 +131,18 @@ public class PublicCaseAccessService {
     /** Case + patient a verified ONBOARDING grant is bound to. */
     public record OnboardingLinkContext(UUID caseId, UUID patientId) {}
 
+    /** P1-16: the case and patient a verified grant on any of the case's secure links is bound to. */
+    public record CaseLinkContext(UUID caseId, UUID patientId) {}
+
+    /**
+     * P1-16: resolve a verified grant on the case's secure link (the one-time code went to the patient's registered contact, the
+     * same fresh proof the proposal decision rests on) for the treatment page and a change-order decision.
+     */
+    @Transactional(readOnly=true) public CaseLinkContext requireCaseGrant(String token,String grant){
+        Link link=requireGrant(token,grant);
+        return new CaseLinkContext(link.caseId(),link.patientId());
+    }
+
     /** Resolve a verified information-response grant without exposing the link's internal id. */
     @Transactional(readOnly=true) public InformationLinkContext requireInformationGrant(String token,String grant){
         Link link=requireGrant(token,grant);

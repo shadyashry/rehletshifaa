@@ -21,7 +21,7 @@ import java.util.UUID;
 
 /**
  * Central commercial policy: the coordination and guarantee fee rate (shown to the patient as its own line since P1-10), the
- * pre-approved manual band, the final-quote validity and the FX tolerance band. Configured
+ * pre-approved manual band, the final-quote validity, the FX tolerance band and the change-order band (P1-16, D-E). Configured
  * centrally by a senior FINANCE user (never a per-case slider); selected and
  * snapshotted by the backend when a proposal is prepared. The intended standard
  * band is ~10-15% but the value is a centrally approved formula, not per-case.
@@ -42,12 +42,25 @@ public class CommercialPolicyService {
      * cached entry written before they existed reads back as the defaults.
      */
     public record Policy(UUID id, String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version,
-                         Integer finalQuoteValidityDays, BigDecimal fxToleranceRate) {
+                         Integer finalQuoteValidityDays, BigDecimal fxToleranceRate, BigDecimal changeOrderBandRate, BigDecimal changeOrderBandEgp) {
         public Policy(UUID id, String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version) {
-            this(id, name, careCategory, marginRate, manualBandEgp, version, null, null);
+            this(id, name, careCategory, marginRate, manualBandEgp, version, null, null, null, null);
         }
         public int quoteValidityDays() { return finalQuoteValidityDays == null ? CommercialPolicy.DEFAULT_FINAL_QUOTE_VALIDITY_DAYS : finalQuoteValidityDays; }
         public BigDecimal fxTolerance() { return fxToleranceRate == null ? CommercialPolicy.DEFAULT_FX_TOLERANCE_RATE : fxToleranceRate; }
+        /** P1-16 (D-E): the band rate and cap; boxed so a cached entry written before they existed reads back as the defaults. */
+        public BigDecimal bandRate() { return changeOrderBandRate == null ? CommercialPolicy.DEFAULT_CHANGE_ORDER_BAND_RATE : changeOrderBandRate; }
+        public BigDecimal bandCapEgp() { return changeOrderBandEgp == null ? CommercialPolicy.DEFAULT_CHANGE_ORDER_BAND_EGP : changeOrderBandEgp; }
+        /** The change-order band for a facility package: the lower of the rate of the package and the cap (D-E). */
+        public BigDecimal changeOrderBand(BigDecimal packageEgp) {
+            BigDecimal byRate = (packageEgp == null ? BigDecimal.ZERO : packageEgp).multiply(bandRate()).setScale(2, java.math.RoundingMode.HALF_UP);
+            return byRate.min(bandCapEgp());
+        }
+    }
+
+    /** The band with no policy configured: the D-E defaults. */
+    public static BigDecimal defaultChangeOrderBand(BigDecimal packageEgp) {
+        return new Policy(null, null, null, null, null, 0).changeOrderBand(packageEgp);
     }
 
     public CommercialPolicyService(CommercialPolicyRepository policies, Authority authority, AuditTrail audit, Clock clock, CareCategoryCatalog careAreas) {
@@ -71,7 +84,7 @@ public class CommercialPolicyService {
                 : policies.findFirstByActiveTrueAndCareCategoryOrderByVersionDesc(careCategory))
                 .or(policies::findFirstByActiveTrueAndCareCategoryIsNullOrderByVersionDesc)
                 .map(p -> new Policy(p.getId(), p.getName(), p.getCareCategory(), p.getMarginRate(), p.getManualBandEgp(), p.getVersion(),
-                        p.getFinalQuoteValidityDays(), p.getFxToleranceRate()))
+                        p.getFinalQuoteValidityDays(), p.getFxToleranceRate(), p.getChangeOrderBandRate(), p.getChangeOrderBandEgp()))
                 .orElse(null);
     }
 
@@ -108,19 +121,29 @@ public class CommercialPolicyService {
                 : current != null ? current.getFxToleranceRate() : CommercialPolicy.DEFAULT_FX_TOLERANCE_RATE;
         if (fxTolerance.signum() < 0 || fxTolerance.compareTo(MAX_MARGIN) > 0)
             throw new ApiException(400, "FX_TOLERANCE_INVALID", "The exchange-rate band must be between 0 and 0.5");
+        // P1-16 (D-E): the change-order band carries over the same way.
+        BigDecimal bandRate = request.changeOrderBandRate() != null ? request.changeOrderBandRate().setScale(4, java.math.RoundingMode.HALF_UP)
+                : current != null ? current.getChangeOrderBandRate() : CommercialPolicy.DEFAULT_CHANGE_ORDER_BAND_RATE;
+        if (bandRate.signum() < 0 || bandRate.compareTo(MAX_MARGIN) > 0)
+            throw new ApiException(400, "CHANGE_ORDER_BAND_INVALID", "The change-order band rate must be between 0 and 0.5");
+        BigDecimal bandEgp = request.changeOrderBandEgp() != null ? request.changeOrderBandEgp().setScale(2, java.math.RoundingMode.HALF_UP)
+                : current != null ? current.getChangeOrderBandEgp() : CommercialPolicy.DEFAULT_CHANGE_ORDER_BAND_EGP;
+        if (bandEgp.signum() < 0) throw new ApiException(400, "CHANGE_ORDER_BAND_INVALID", "The change-order band cap must be zero or more EGP");
         active.forEach(CommercialPolicy::retire);
         policies.saveAllAndFlush(active);
         String name = request.name() == null || request.name().isBlank() ? "Coordinated-care margin" : request.name().trim();
         CommercialPolicy policy = policies.saveAndFlush(new CommercialPolicy(name, careCategory, rate, band, previous + 1, actor.subject(),
-                LocalDate.now(clock), clock.instant()).withQuoteRules(validityDays, fxTolerance));
+                LocalDate.now(clock), clock.instant()).withQuoteRules(validityDays, fxTolerance).withChangeOrderBand(bandRate, bandEgp));
         audit.event("COMMERCIAL_POLICY_CONFIGURED").actor(actor.subject(), actor.label()).entity("CommercialPolicy", policy.getId())
                 .action("CONFIGURE").reason("rate=" + rate + " careCategory=" + careCategory + " manualBandEgp=" + band
-                        + " finalQuoteValidityDays=" + validityDays + " fxToleranceRate=" + fxTolerance).record();
+                        + " finalQuoteValidityDays=" + validityDays + " fxToleranceRate=" + fxTolerance
+                        + " changeOrderBandRate=" + bandRate + " changeOrderBandEgp=" + bandEgp).record();
         return view(policy);
     }
 
     private static CommercialPolicyView view(CommercialPolicy p) {
         return new CommercialPolicyView(p.getId(), p.getName(), p.getCareCategory(), p.getMarginRate(), p.getManualBandEgp(), p.isActive(), p.getVersion(),
-                p.getCreatedBy(), p.getValidFrom(), p.getFinalQuoteValidityDays(), p.getFxToleranceRate());
+                p.getCreatedBy(), p.getValidFrom(), p.getFinalQuoteValidityDays(), p.getFxToleranceRate(),
+                p.getChangeOrderBandRate(), p.getChangeOrderBandEgp());
     }
 }

@@ -72,7 +72,9 @@ public class JourneyCaseRelationships implements CaseRelationships {
 
     @Override
     public boolean moneyOpen(UUID caseId) {
-        return deposits.isOpenOn(caseId) || admissions.isOpenOn(caseId);
+        // P1-16: during treatment Finance prices change orders and countersigns the hospital's interim bills.
+        return deposits.isOpenOn(caseId) || admissions.isOpenOn(caseId)
+                || cases.findStageAndVersion(caseId).map(s -> s.getStatus() == com.rehletshifaa.casemanagement.domain.CaseStatus.TREATMENT_IN_PROGRESS).orElse(false);
     }
 
     @Override

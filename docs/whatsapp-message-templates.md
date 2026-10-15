@@ -37,6 +37,9 @@ created under the same template name.
 | `rs_document_cleared` | `document-cleared` | See my documents / عرض مستنداتي → portal (as above). **New, to be created and approved in WhatsApp Manager**; until it exists Meta refuses the send and the outbox retries it into a dead letter (email to patients without WhatsApp still works) |
 | `rs_admission_voucher` | `admission-balance-due` | See what to pay / ما عليّ دفعه → portal (as above). **New (P1-15), to be created and approved in WhatsApp Manager** |
 | `rs_cleared_for_admission` | `cleared-for-admission` | My admission / دخولي إلى المستشفى → portal (as above). **New (P1-15), to be created and approved in WhatsApp Manager** |
+| `rs_treatment_update` | `treatment-update` | My treatment / علاجي → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
+| `rs_change_order_review` | `change-order-review` | Review the change / مراجعة التغيير → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
+| `rs_change_order_applied` | `change-order-applied` | My treatment / علاجي → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
 | `rs_followup_window_closed` | `intake-followup` | none |
 | `rs_coordinator_intro` | `coordinator-intro` | none (1 body variable: the coordinator's name) |
@@ -102,6 +105,18 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 **`rs_cleared_for_admission`** (P1-15, D-C/D-D: the balance is evidenced and the case entered ADMISSION_READY)
 - en: Your payment is confirmed and you are cleared for admission. Your admission details are on your case page, using the button below.
 - ar: تأكّد سدادك وأصبحت جاهزًا للدخول إلى المستشفى. تفاصيل دخولك في صفحة حالتك عبر الزر أدناه.
+
+**`rs_treatment_update`** (P1-16: a treatment milestone was recorded; never sent for a complication)
+- en: Your care team has added an update to your treatment timeline. See it on your case page, using the button below.
+- ar: أضاف فريق رعايتك تحديثًا إلى سجل علاجك. اطّلع عليه في صفحة حالتك عبر الزر أدناه.
+
+**`rs_change_order_review`** (P1-16, D-E: a change order above the band waits for the patient's decision)
+- en: Your doctor proposes a change to your treatment that is outside your accepted quote. Review the reason and the price, then accept or decline it on your case page, using the button below.
+- ar: يقترح طبيبك تغييرًا في علاجك خارج عرض السعر الذي قبلته. راجِع السبب والسعر، ثم اقبله أو ارفضه في صفحة حالتك عبر الزر أدناه.
+
+**`rs_change_order_applied`** (P1-16: a change within the band was accepted by Finance, or an emergency change was made)
+- en: Your care team made a change to your treatment. The reason and, once priced, the cost are on your case page, using the button below.
+- ar: أجرى فريق رعايتك تغييرًا في علاجك. السبب والتكلفة بعد تسعيرها في صفحة حالتك عبر الزر أدناه.
 
 **`rs_followup_window_closed`** (S3: sent once after WhatsApp's 24-hour window has closed)
 - en: Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation.

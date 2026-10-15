@@ -1176,6 +1176,75 @@ phases.
   `MyCare.tsx` timeline; Finance pricing screen; templates `rs_treatment_update`, `rs_change_order_review`.
 - Sessions: 2. Model: Fable 5.1, high (money and consent-adjacent); milestone forms by Opus 5.5. Needs: P1-13
   incidents (can be built in the same session order: P1-13 first).
+- **Status (2026-10-15, session 1 of 2 = backend, Opus 5.5 stood in for Fable 5.1; committed on `claude/p1-16-s1-treatment-d2acd9`, cut from
+  `2aacb41` = `claude/p1-15-s2-ui`):** delivered; no screen. Flyway **V100** (`V100__treatment_milestones_and_change_orders.sql`; the
+  `V97` name above was stale) is now the newest; V101 is the next free.
+  - Decision recorded (owner's standing rule 2026-10-15: decide by the recommendation, do not ask): **D-E applied as recommended**: the
+    band is the lower of 10% of the facility package and EGP 15,000 (`commercial_policies.change_order_band_rate` /
+    `change_order_band_egp`; Finance Managers change them per care area; left out they carry over); Finance alone within it, the patient
+    above it, emergency path with a Finance review. Further choices made here, each the design's best-practice reading: the band is
+    **cumulative** over the case's accepted and emergency change orders (splitting a change never avoids the patient); the facility package
+    is the current voucher's (else the accepted version's provider net, for an emergency admission without a voucher); an **interim bill is
+    the hospital's running statement to date** (the latest countersigned one is "billed to date", not a sum); a **complication** opens a
+    P1-13 adverse-event incident with the summary, reads `CARE_UPDATE` on the patient's timeline and sends no message (the Consultant tells
+    the patient in person; the incident is the review, so no separate `REVIEW_COMPLICATION` item); the patient decides on the **verified
+    secure status link** too (the one-time code to the registered contact is the fresh proof, as for the proposal decision). The P1-15
+    money rule (deposit covers the fee first) is untouched and still awaits the owner.
+  - Delivered: **(1) Milestones** (`TreatmentMilestoneService`): the eight kinds as `case_evidence` rows (`MILESTONE_ADMITTED` to
+    `MILESTONE_DISCHARGE_PLANNED`; payload encrypted: operative note reference, implants, note, planned discharge date, incident id),
+    recorded by the case's Consultant or by its Operations person on the Consultant's behalf; Operations' rows open
+    `COUNTERSIGN_MILESTONE` for the Consultant (24 working hours) and the Consultant countersigns with a fresh sign-in
+    (`MILESTONE_COUNTERSIGN`); until then the patient reads "reported by the care team". Rules: only in `TREATMENT_IN_PROGRESS`, not in
+    the future; the completed procedure needs the operative note (reference or clean document), a complication a summary and severity, a
+    planned discharge a date not in the past; ADMITTED / PROCEDURE_STARTED / PROCEDURE_COMPLETED / DISCHARGE_PLANNED are single facts
+    (recording again supersedes). **The clock**: the treatment episode that opens treatment publishes `CaseEvents.TreatmentStarted`; the
+    ADMITTED milestone is recorded for the Consultant with the admission number and `RECORD_MILESTONE` opens (24 working hours); every
+    milestone rotates it, a planned discharge stops it, leaving treatment closes it (read-time repair in `CaseActionService`). Each
+    milestone except a complication sends the patient `treatment-update`. **(2) Change orders** (`ChangeOrderService`, `change_orders` +
+    `change_order_lines`): the Consultant proposes (encrypted clinical reason, 1-20 lines of kind PROCEDURE / IMPLANT / EXTRA_NIGHT /
+    MEDICATION / OTHER), number `RS-CO-<case>-<n>`; Finance prices every line with a fresh sign-in (`CHANGE_ORDER_PRICE`,
+    `PRICE_CHANGE_ORDER` 4 working hours); within the band it is `ACCEPTED` by Finance, above it `AWAITING_PATIENT` (patient
+    `change-order-review`, coordinator `CHANGE_ORDER_PATIENT_DECISION` due in 24 h, waiting on PATIENT); the patient or representative
+    accepts or declines in My Care (`PATIENT_DECIDE`, step-up) or on the secure link; the Consultant may withdraw an undecided order.
+    **Emergency**: done first (`EMERGENCY`, the Consultant's decision is the record), Finance prices and reviews it after
+    (`EMERGENCY_CHANGE_ORDER_REVIEW`, 2 working days, survives the case's exit), the patient is told (`change-order-applied`). Every
+    decision is also a `CHANGE_ORDER` ledger row; amounts in EGP and at the voucher's frozen rate. A check constraint makes the band the
+    only path to acceptance. **(3) Interim bills** (`InterimBillService`): Operations records the hospital's bill (clean document, number,
+    EGP, billed at) as `INTERIM_BILL`; Finance countersigns it with a fresh sign-in (`COUNTERSIGN_INTERIM_BILL`, 4 working hours).
+    **(4) Views** (`TreatmentViews`): the staff panel `TreatmentView` (milestones with countersign state, next milestone due, change
+    orders, running money = package + counted change orders vs billed to date, variance, band and band used, interim bills, and the
+    **evidence checklist per stage**: ADMISSION = reserved, letter checked, arrival, final quote, consent, voucher, balance, admission
+    number; TREATMENT = the four required milestones, milestones countersigned, change orders settled, interim bills countersigned);
+    clinical details and the change-order reason only for a reader of the clinical record. The patient's `PatientTreatmentView`: facility,
+    calm timeline, priced (and emergency) change orders, the one awaiting their decision. **(5) Access**: permissions `MILESTONE_RECORD`,
+    `MILESTONE_COUNTERSIGN` (step-up), `CHANGE_ORDER_PROPOSE`, `CHANGE_ORDER_PRICE` (step-up); the staff panel reuses `ADMISSION_READ`;
+    `CASE_MONEY_OPEN` now also covers a case in `TREATMENT_IN_PROGRESS` (Finance prices and countersigns without a clinical record);
+    `FinanceWork` is the one Finance router, shared with `AdmissionService`. **(6) Patient and staff states**: patient
+    `REVIEW_CHANGE_ORDER` (FOCUS) in treatment; Consultant `RECORD_MILESTONE` stage step. **API** (`TreatmentController`):
+    `GET .../{operations|finance|coordinator|doctor}/cases/{id}/treatment`; `POST /doctor|operations/cases/{id}/milestones`,
+    `/doctor/cases/{id}/milestones/{evidenceId}/countersign`; `/doctor/cases/{id}/change-orders` (+ `/emergency`, `/{orderId}/withdraw`);
+    `/finance/cases/{id}/change-orders/{orderId}/price`; `/operations/cases/{id}/treatment/interim-bills`,
+    `/finance/cases/{id}/treatment/interim-bills/{evidenceId}/countersign`; patient `GET /patient/cases/{id}/treatment`,
+    `POST /patient/cases/{id}/change-orders/{orderId}/decision`; link `POST /public/cases/{token}/treatment`,
+    `/public/cases/{token}/change-orders/{orderId}/decision`.
+  - Tests and numbers: new `TreatmentEvidenceServiceTest` (11: admitted on the episode and the rotating clock stopped by a planned discharge;
+    Operations on the Consultant's behalf + countersign; complication to incident, `CARE_UPDATE`, no message; only in treatment; within band
+    by Finance alone; cumulative band and the patient's fresh decision (+ the schema refusing Finance above the band); decline on the
+    verified secure link; emergency priced and reviewed after; withdraw; band from the policy and carried over; interim bills countersigned,
+    billed to date and variance). The P1-15 fixture moved to `AdmissionFixture` (shared; `AdmissionServiceTest` unchanged in substance);
+    `NotificationOutboxProcessorTest` covers the three new patient messages in both languages and their case-page link. Backend
+    `mvn -o -q test`: 924 tests, 0 failures, 3 skips (913 before, 11 new). `ArchitectureRulesTest` and `RolePolicyTest` green (JPA only,
+    no native query). `PostgresJpaMappingTest` green on a disposable PostgreSQL 17 (V100 applied, Hibernate validated, every repository
+    query executed). No frontend change.
+  - Not done here (session 2 and later): **no screens or copy**: Consultant milestone / countersign / change-order forms, Operations
+    milestone-on-behalf and interim-bill forms, Finance pricing and countersign, the staff "Treatment" panel and checklist, My Care
+    timeline and change-order decision, the status link's treatment view, Control Center band fields; staff work copy for the six new work
+    types. No assisted (coordinator-recorded) change-order decision; lines are priced by hand (no facility-package or catalogue link); the
+    checklist gates nothing yet (P1-17's discharge gate will read it); templates `rs_treatment_update`, `rs_change_order_review` need Meta
+    approval; the status link's own current step still needs a patient-safe step code on `PublicCaseStatus`.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `2aacb41`) and rebuilds the dev backend for V100;
+    then P1-16 session 2 (UI and copy, started in a new session; contract in the shared notes folder,
+    `p1-16-session-1-handover.md`).
 
 ### P1-17  Discharge pack, reconciliation and statements  (design §5 stage 5, §6; architecture §5.4–5.5)
 - `DischargeService` pack completeness (summary, medication list, operative note, implant record, fit-to-fly with the
@@ -1299,8 +1368,11 @@ the licence now; the credential type is a one-line addition in P1-19.
       credited to the hospital, a fee the capped deposit did not cover is owed to the platform before admission); the owner confirms it, or
       chooses "the whole deposit is credited to the hospital and the fee is paid to the platform separately" (the architecture's first
       worked example). Counsel confirms the hospital voucher email's content (patient name and amounts to the hospital's contact).
-- [ ] D-E…D-H from `docs/post-deposit-journey-design.md` §12 (change-order band, fit-to-fly window, free follow-up window, affiliations as
-      eligibility).
+- [x] D-E (change-order band): **applied as recommended** (2026-10-15, owner's standing rule to decide by the recommendation; P1-16
+      session 1): the lower of 10% of the facility package and EGP 15,000, cumulative over the case's change orders; Finance alone within
+      it, the patient (fresh sign-in or verified secure link) above it, emergency path with a Finance review. Finance Managers can change
+      the rate and cap per care area. The owner may still object.
+- [ ] D-F…D-H from `docs/post-deposit-journey-design.md` §12 (fit-to-fly window, free follow-up window, affiliations as eligibility).
 - [ ] D-I: start the PDPL licence application and the Law 13/2025 liability-fund subscription (owner action).
 - [x] P1-10: final-quote validity 14 days and FX band 3% (owner, 2026-10-15); guarantee wording ships as a placeholder.
 - [ ] P1-10: counsel approves the guarantee wording and the VAT rate on the platform fee; owner decides whether the

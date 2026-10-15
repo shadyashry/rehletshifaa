@@ -26,7 +26,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 @Entity
 @Table(name = "case_evidence")
 public class CaseEvidence extends AssignedIdEntity {
-    /** P1-15's kinds; later phases add theirs (milestones, the discharge pack, invoices, outcomes). */
+    /** P1-15's and P1-16's kinds; later phases add theirs (the discharge pack, the final invoice, outcomes). */
     public enum Kind {
         /** The hospital's pro-forma or admission letter with the quoted package price (Operations; Finance countersigns). */
         FACILITY_ADMISSION_LETTER,
@@ -45,11 +45,24 @@ public class CaseEvidence extends AssignedIdEntity {
         /** The moment after which travel is no longer refundable (Operations sets; Finance countersigns as approval). */
         POINT_OF_NO_RETURN,
         /** The Consultant admitted the patient in an emergency before the balance was evidenced; Finance reviews it after. */
-        EMERGENCY_ADMISSION_OVERRIDE
+        EMERGENCY_ADMISSION_OVERRIDE,
+        // P1-16 (design §5 stage 4): the treatment milestones, each one calm line on the patient's timeline. Recorded by the
+        // Consultant, or by Operations on the Consultant's behalf and then countersigned by the Consultant.
+        MILESTONE_ADMITTED, MILESTONE_PROCEDURE_STARTED, MILESTONE_PROCEDURE_COMPLETED, MILESTONE_ICU, MILESTONE_WARD,
+        /** Also opens an adverse-event incident (P1-13); never shown to the patient by that name. */
+        MILESTONE_COMPLICATION,
+        MILESTONE_STABLE, MILESTONE_DISCHARGE_PLANNED,
+        /** The hospital's interim bill during the stay (Operations; Finance countersigns with a fresh sign-in). */
+        INTERIM_BILL,
+        /** The decision on a change order: the patient's above the band, Finance's within it, the Consultant's emergency. */
+        CHANGE_ORDER;
+
+        public boolean milestone() { return name().startsWith("MILESTONE_"); }
     }
 
     /** The kinds whose fact only counts once Finance has countersigned it (architecture §4.1a). */
-    public static final Set<Kind> COUNTERSIGNED_BY_FINANCE = Set.of(Kind.FACILITY_ADMISSION_LETTER, Kind.BALANCE_EVIDENCED, Kind.POINT_OF_NO_RETURN);
+    public static final Set<Kind> COUNTERSIGNED_BY_FINANCE = Set.of(Kind.FACILITY_ADMISSION_LETTER, Kind.BALANCE_EVIDENCED, Kind.POINT_OF_NO_RETURN,
+            Kind.INTERIM_BILL);
 
     /** What the row says and on what document or reference; one value object keeps the constructor short. */
     public record Fact(Kind kind, UUID documentId, String reference, BigDecimal amountEgp, Instant effectiveAt, String payload) {

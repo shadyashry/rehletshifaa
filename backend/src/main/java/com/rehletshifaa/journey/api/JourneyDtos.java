@@ -232,11 +232,19 @@ public final class JourneyDtos {
     public record FxOverrideRequest(@NotNull @DecimalMin("0.00000001")BigDecimal rate,LocalDate date) {}
     /** providerCredentialing: the practitioner is enrolled under provider credentialing (ProviderCredentialEligibility.adopted), so Direct approval writes are refused. */
     public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus,String email,String accountStatus,Instant invitedAt) {}
-    public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,boolean active,int version,String createdBy,LocalDate validFrom,int finalQuoteValidityDays,BigDecimal fxToleranceRate) {}
-    /** P1-10: {@code finalQuoteValidityDays} and {@code fxToleranceRate} left out keep the care area's current values (default 14 days, 0.03). */
-    public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate,@DecimalMin("0.0")BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate) {
+    public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,boolean active,int version,String createdBy,LocalDate validFrom,int finalQuoteValidityDays,BigDecimal fxToleranceRate,
+                                       BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp) {}
+    /**
+     * P1-10: {@code finalQuoteValidityDays} and {@code fxToleranceRate} left out keep the care area's current values (default 14 days, 0.03).
+     * P1-16 (D-E): so do {@code changeOrderBandRate} and {@code changeOrderBandEgp} (default 0.10 of the facility package, capped at EGP 15,000).
+     */
+    public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate,@DecimalMin("0.0")BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate,
+                                          BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp) {
         public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate){this(name,careCategory,marginRate,null);}
         public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp){this(name,careCategory,marginRate,manualBandEgp,null,null);}
+        public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate){
+            this(name,careCategory,marginRate,manualBandEgp,finalQuoteValidityDays,fxToleranceRate,null,null);
+        }
     }
     // Deposit + payment sub-workflow (offline record-only in this build).
     public record DepositComponentView(String beneficiary,String purpose,BigDecimal amountEgp,BigDecimal amountDisplay,String refundability,String cancellationTerms,boolean creditedToFinal) {}

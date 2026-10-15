@@ -962,7 +962,9 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         // The one path into treatment (D-D): cleared for admission, then the hospital's admission number opens treatment.
         if("ARRIVAL_CONFIRMED".equals(state(caseId).status()))transitionWithoutVersion(caseId,"ADMISSION_READY","Cleared for admission at the start of treatment",actor);
         if(request.admissionNumber()!=null&&!request.admissionNumber().isBlank())admissions.recordAdmissionNumber(caseId,request.admissionNumber(),actor.subject(),"CONSULTANT");
-        if("ADMISSION_READY".equals(state(caseId).status()))transitionWithoutVersion(caseId,"TREATMENT_IN_PROGRESS","Treatment started",actor);if(request.endAt()!=null)transitionWithoutVersion(caseId,"DISCHARGED","Discharge completed",actor);audit("TREATMENT_EPISODE_CREATED",actor,caseId,"TreatmentEpisode",id.toString(),"CREATE","SUCCESS",null);return new IdResponse(id,request.status());}
+        boolean started="ADMISSION_READY".equals(state(caseId).status());if(started)transitionWithoutVersion(caseId,"TREATMENT_IN_PROGRESS","Treatment started",actor);if(request.endAt()!=null)transitionWithoutVersion(caseId,"DISCHARGED","Discharge completed",actor);
+        // P1-16: the ADMITTED milestone and the Consultant's milestone clock (none when the same episode already discharged).
+        if(started)events.publishEvent(new CaseEvents.TreatmentStarted(caseId,actor.subject()));audit("TREATMENT_EPISODE_CREATED",actor,caseId,"TreatmentEpisode",id.toString(),"CREATE","SUCCESS",null);return new IdResponse(id,request.status());}
     // --- Procedure-specific consent + audited emergency override (treatment-commencement gate) ---
     @Transactional public IdResponse captureProcedureConsent(UUID caseId,ProcedureConsentRequest request){
         var actor=authority.authorize(Permission.CLINICAL_REVIEW,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("ARRIVAL_CONFIRMED","ADMISSION_READY","TREATMENT_IN_PROGRESS"));

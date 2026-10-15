@@ -9,8 +9,6 @@ import com.rehletshifaa.casemanagement.application.CaseStatusLog;
 import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
 import com.rehletshifaa.casemanagement.domain.CaseStatus;
 import com.rehletshifaa.casemanagement.domain.MedicalCase;
-import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
-import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.facility.application.FacilityDirectory;
 import com.rehletshifaa.facility.domain.Facility;
@@ -44,7 +42,6 @@ import com.rehletshifaa.journey.infrastructure.TravelPlanRepository;
 import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.AuditTrail;
-import com.rehletshifaa.workforce.application.WorkforceDirectory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
@@ -53,7 +50,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,7 +88,6 @@ public class AdmissionService {
             VOUCHER_BLOCKED = "ADMISSION_VOUCHER_BLOCKED";
     /** Stages a reservation can be made or changed in. */
     private static final Set<String> RESERVABLE = Set.of("TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED");
-    private static final Set<String> OPEN_WORK = Set.of("OPEN", "IN_PROGRESS");
     static final String WITHIN = "WITHIN_ESTIMATE", VARIANCE_OPEN = "VARIANCE_OPEN", VARIANCE_ACCEPTED = "VARIANCE_ACCEPTED",
             CHECK_PENDING = "CHECK_PENDING", REFUSED = "REFUSED";
 
@@ -106,31 +101,30 @@ public class AdmissionService {
     private final ProposalVersionRepository proposalVersions;
     private final TravelPlanRepository travelPlans;
     private final MedicalCaseRepository cases;
-    private final CaseAssignmentRepository assignments;
-    private final CaseTaskRepository tasks;
     private final CaseStatusLog statusLog;
     private final FacilityDirectory facilities;
     private final PaymentService payment;
     private final StaffWorkService work;
     private final SlaPolicy sla;
-    private final WorkforceDirectory workforce;
     private final CaseTransitionPolicy policy;
     private final DepositPaymentNotices notices;
     private final NotificationOutbox outbox;
     private final IntakeLifecycleService intake;
     private final ApplicationEventPublisher events;
     private final ObjectMapper json;
+    private final FinanceWork financeWork;
 
     public AdmissionService(Authority authority, Clock clock, AuditTrail auditTrail, EvidenceLedger ledger, AdmissionReadiness readiness,
                             FacilityAdmissionRepository admissions, AdmissionVoucherRepository vouchers, ProposalVersionRepository proposalVersions,
-                            TravelPlanRepository travelPlans, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseTaskRepository tasks,
+                            TravelPlanRepository travelPlans, MedicalCaseRepository cases,
                             CaseStatusLog statusLog, FacilityDirectory facilities, PaymentService payment, StaffWorkService work, SlaPolicy sla,
-                            WorkforceDirectory workforce, CaseTransitionPolicy policy, DepositPaymentNotices notices, NotificationOutbox outbox,
-                            IntakeLifecycleService intake, ApplicationEventPublisher events, ObjectMapper json) {
+                            CaseTransitionPolicy policy, DepositPaymentNotices notices, NotificationOutbox outbox,
+                            IntakeLifecycleService intake, ApplicationEventPublisher events, ObjectMapper json, FinanceWork financeWork) {
+        this.financeWork = financeWork;
         this.authority = authority; this.clock = clock; this.auditTrail = auditTrail; this.ledger = ledger; this.readiness = readiness;
         this.admissions = admissions; this.vouchers = vouchers; this.proposalVersions = proposalVersions; this.travelPlans = travelPlans;
-        this.cases = cases; this.assignments = assignments; this.tasks = tasks; this.statusLog = statusLog; this.facilities = facilities;
-        this.payment = payment; this.work = work; this.sla = sla; this.workforce = workforce; this.policy = policy; this.notices = notices;
+        this.cases = cases; this.statusLog = statusLog; this.facilities = facilities;
+        this.payment = payment; this.work = work; this.sla = sla; this.policy = policy; this.notices = notices;
         this.outbox = outbox; this.intake = intake; this.events = events; this.json = json;
     }
 
@@ -552,20 +546,10 @@ public class AdmissionService {
 
     /** Finance's money work goes to the case's Finance person, else the least-loaded Finance holder; every holder is told. */
     private void openFinanceWork(UUID caseId, String type, String title, String context, Instant dueAt, String key, WorkCopy copy) {
-        String owner = assignee(caseId, "FINANCE");
-        if (owner == null) owner = workforce.activeHolders("FINANCE").stream().map(WorkforceDirectory.Member::subject).distinct()
-                .min(Comparator.<String>comparingLong(s -> tasks.countByOwnerSubjectAndStatusIn(s, OPEN_WORK)).thenComparing(Comparator.naturalOrder())).orElse(null);
-        work.openWorkItem(new NewWorkItem(caseId, type, title, context, owner, "FINANCE", false, dueAt, "SYSTEM", type, key, true, copy));
-        for (var holder : workforce.activeHolders("FINANCE")) {
-            if (holder.subject().equals(owner)) continue;
-            work.notifyStaff(holder.subject(), caseId, null, type, title, context, key + ":" + holder.subject(), false, copy);
-        }
+        financeWork.open(caseId, type, title, context, dueAt, key, copy);
     }
 
-    /** The case's active assignee of a role who still holds it (QA A3: a Finance person who left owns nothing new). */
-    private String assignee(UUID caseId, String role) {
-        return assignments.findActiveAssignees(caseId, role).stream().filter(s -> workforce.holds(s, role)).findFirst().orElse(null);
-    }
+    private String assignee(UUID caseId, String role) { return financeWork.assignee(caseId, role); }
 
     /** Locks the case row and returns its stage. */
     private String lockStage(UUID caseId) {

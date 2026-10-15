@@ -97,6 +97,11 @@ public final class RolePolicy {
             g(COORDINATOR, ADMISSION_READ, CASE_ASSIGNED), g(CONSULTANT, ADMISSION_READ, CASE_ASSIGNED),
             g(FINANCE, ADMISSION_READ, CASE_ASSIGNED), g(FINANCE, ADMISSION_READ, CASE_MONEY_OPEN), g(FINANCE, EVIDENCE_COUNTERSIGN, CASE_MONEY_OPEN),
             g(PATIENT, ARRIVAL_REPORT, OWN_PATIENT), g(PATIENT_REPRESENTATIVE, ARRIVAL_REPORT, OWN_PATIENT),
+            // P1-16 (D-E): milestones by the case's Consultant or its Operations person (then countersigned by the Consultant);
+            // change orders proposed by the Consultant and priced by Finance (the case's, or any while its money is open). The
+            // patient's acceptance is PATIENT_DECIDE; the staff treatment view is ADMISSION_READ.
+            g(CONSULTANT, MILESTONE_RECORD, CASE_ASSIGNED), g(OPERATIONS, MILESTONE_RECORD, CASE_ASSIGNED), g(CONSULTANT, MILESTONE_COUNTERSIGN, CASE_ASSIGNED),
+            g(CONSULTANT, CHANGE_ORDER_PROPOSE, CASE_ASSIGNED), g(FINANCE, CHANGE_ORDER_PRICE, CASE_ASSIGNED), g(FINANCE, CHANGE_ORDER_PRICE, CASE_MONEY_OPEN),
             // Other function managers: hierarchy and staffing only; no execution, clinical or decision authority.
             g(OPERATIONS_MANAGER, TEAM_MANAGE, PLATFORM), g(OPERATIONS_MANAGER, STAFFING_REQUEST, PLATFORM),
             g(FINANCE_MANAGER, TEAM_MANAGE, PLATFORM), g(FINANCE_MANAGER, STAFFING_REQUEST, PLATFORM),

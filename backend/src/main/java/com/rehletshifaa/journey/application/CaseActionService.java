@@ -86,12 +86,14 @@ public class CaseActionService {
     private final TravelPlanRepository travelPlans;
     private final CaseStatusChangeRepository statusChanges;
     private final AdmissionReadiness admission;
+    private final com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
                              com.rehletshifaa.workforce.application.WorkforceDirectory workforce, CaseExitReasonRepository exitReasons,
-                             TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla, AdmissionReadiness admission) {
-        this.admission = admission;
+                             TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla, AdmissionReadiness admission,
+                             com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders) {
+        this.admission = admission; this.changeOrders = changeOrders;
         this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges; this.sla = sla;
         this.workforce = workforce;
         this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
@@ -198,7 +200,9 @@ public class CaseActionService {
             return simple("PAY_BALANCE", "FOCUS");
         }
         if ("ADMISSION_READY".equals(status)) return simple("CLEARED_FOR_ADMISSION", "WAIT");
-        if ("TREATMENT_IN_PROGRESS".equals(status)) return simple("IN_TREATMENT", "WAIT");
+        // P1-16: a change order above the band waits for the patient's decision (My Care, fresh sign-in).
+        if ("TREATMENT_IN_PROGRESS".equals(status))
+            return changeOrders.existsByCaseIdAndStatusIn(caseId, Set.of("AWAITING_PATIENT")) ? simple("REVIEW_CHANGE_ORDER", "FOCUS") : simple("IN_TREATMENT", "WAIT");
         if (Set.of("DISCHARGED", "FOLLOW_UP").contains(status)) return simple("FOLLOW_UP", "WAIT");
         return none();
     }
@@ -242,6 +246,8 @@ public class CaseActionService {
             return none();
         }
         if (role == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
+        // P1-16: in treatment the Consultant records the milestones (their RECORD_MILESTONE item carries the due date).
+        if (role == Role.CONSULTANT && "TREATMENT_IN_PROGRESS".equals(s)) return simple("RECORD_MILESTONE", "FOCUS");
         if (role == Role.OPERATIONS) {
             if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
             // P1-15: after arrival Operations records the cashier's receipt against the voucher; once cleared, the admission number.
@@ -545,6 +551,9 @@ public class CaseActionService {
             work.closeWorkItems(caseId, "TRAVEL", "Superseded — treatment coordination is already under way", false);
         if (!"ACCEPTED".equals(status))
             work.closeWorkItems(caseId, CaseHandoffService.DEPOSIT_RECORD_WORK, "Superseded — the case is past the deposit stage", false);
+        // P1-16: the milestone clock runs only while the patient is in treatment.
+        if (!"TREATMENT_IN_PROGRESS".equals(status))
+            work.closeWorkItems(caseId, TreatmentMilestoneService.RECORD_MILESTONE, "Superseded — the patient is no longer in treatment", false);
     }
 
     /** My work on the case: an item I own, else unowned work in my role's pool (Finance: the deposit to record). */

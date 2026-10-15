@@ -62,7 +62,11 @@ public class SlaPolicy {
             Map.entry("APPROVE_POINT_OF_NO_RETURN", 1),
             Map.entry("EMERGENCY_ADMISSION_REVIEW", 2),
             Map.entry("REVISE_ADMISSION_LETTER", 1),
-            Map.entry("ADMISSION_VOUCHER_BLOCKED", 1));
+            Map.entry("ADMISSION_VOUCHER_BLOCKED", 1),
+            // P1-16 (architecture §9): Finance reviews and prices an emergency change order in two working days. The milestone clock
+            // and its countersign (24 working hours), a change order's price and an interim bill's countersign (4 working hours) and
+            // the coordinator's follow-up of the patient's decision (24 hours) are dated by the caller.
+            Map.entry("EMERGENCY_CHANGE_ORDER_REVIEW", 2));
 
     /**
      * P1-6 session 2 (D-02): the queue each waiting state waits on, so "usually within N working days" is read from the

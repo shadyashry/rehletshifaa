@@ -188,6 +188,15 @@ Band rule (`CommercialPolicyService`): new setting `change_order_band_egp` and `
 `commercial_policies` (decision D-E: 10% of the facility package or EGP 15,000, lower wins). `within_band` is computed
 at pricing time against the admission's `package_total_egp`.
 
+*As built (P1-16 session 1, 2026-10-15, Flyway V100):* `change_orders` carries `order_number` (`RS-CO-<case>-<n>`), `seq_no`,
+`emergency`, `band_limit_egp` (the band at pricing), `display_currency`/`fx_rate`/`total_display` (the voucher's frozen rate),
+`decided_role`, `decision_note` (encrypted) and a `decision_channel` of `FINANCE / MY_CARE / SECURE_LINK / CONSULTANT`; there is no
+`PRICED` status (pricing ends in `ACCEPTED` within the band or `AWAITING_PATIENT` above it; an emergency stays `EMERGENCY` once
+priced). A check constraint makes the band the only path to acceptance (within → Finance, above → the patient). `within_band` is
+**cumulative**: the case's counted orders (accepted, emergency) plus this one against the band. Lines carry a `kind` (`PROCEDURE /
+IMPLANT / EXTRA_NIGHT / MEDICATION / OTHER`) instead of a `source`; Finance prices every line (no facility-package or catalogue link
+yet). `treatment_episode_id` was left out (the episode is not the unit a change is agreed against).
+
 ### 4.4 `reconciliations` and `reconciliation_lines` (module `settlement`)
 
 `reconciliations`: case_id, admission_id, final_invoice_evidence_id, invoice_total_egp, quoted_total_egp (final quote

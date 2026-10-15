@@ -181,7 +181,10 @@ class NotificationOutboxProcessorTest {
                 {"coordinator-intro", "{\"name\":\"Layla\",\"lang\":\"%s\"}"}, {"case-access-code", "{\"code\":\"123456\",\"lang\":\"%s\"}"},
                 {"document-cleared", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
                 {"admission-balance-due", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
-                {"cleared-for-admission", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"}};
+                {"cleared-for-admission", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
+                {"treatment-update", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
+                {"change-order-review", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
+                {"change-order-applied", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"}};
         for (String[] t : templates) {
             var ar = render(t[0], t[1].formatted("ar"));
             assertThat(arabic(ar.subject()) && arabic(ar.body())).as(t[0] + " in Arabic").isTrue();
@@ -203,7 +206,7 @@ class NotificationOutboxProcessorTest {
 
     /** The patient's admission messages link to their own case page; no amount travels in the message. */
     @Test void theAdmissionMessagesLinkToTheCasePage() {
-        for (String template : List.of("admission-balance-due", "cleared-for-admission")) {
+        for (String template : List.of("admission-balance-due", "cleared-for-admission", "treatment-update", "change-order-review", "change-order-applied")) {
             var en = render(template, "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"en\"}");
             assertThat(en.linkPath()).as(template).isEqualTo("en/portal?case=0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00");
             assertThat(en.body()).as(template).doesNotContainPattern("[0-9]{3,}[.][0-9]{2}");

@@ -40,6 +40,12 @@ public final class CaseEvents {
     public record AdmissionEvidenceChanged(UUID caseId) {}
 
     /**
+     * P1-16: the treatment episode moved the case into TREATMENT_IN_PROGRESS (the Consultant, with the hospital's admission
+     * number). {@link TreatmentMilestoneService} records the {@code ADMITTED} milestone and starts the Consultant's milestone clock.
+     */
+    public record TreatmentStarted(UUID caseId, String subject) {}
+
+    /**
      * Work, an assignment, the proposal's sign-offs or who has the ball changed on the case: the stage's own steps are
      * re-derived ({@link CaseActionService#syncStageWork}) so every step someone owes is in their My work (QA A3).
      */

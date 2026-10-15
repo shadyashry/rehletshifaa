@@ -29,6 +29,9 @@ public class CommercialPolicy extends AssignedIdEntity {
     @Column(name = "final_quote_validity_days", nullable = false) private int finalQuoteValidityDays = DEFAULT_FINAL_QUOTE_VALIDITY_DAYS;
     /** P1-10 (B-05): how far the day's rate may move a non-EGP final quote's total before acceptance waits for Finance. */
     @Column(name = "fx_tolerance_rate", nullable = false, precision = 6, scale = 4) private BigDecimal fxToleranceRate = DEFAULT_FX_TOLERANCE_RATE;
+    /** P1-16 (D-E): the change-order band is the lower of this rate of the facility package and {@link #changeOrderBandEgp}. */
+    @Column(name = "change_order_band_rate", nullable = false, precision = 6, scale = 4) private BigDecimal changeOrderBandRate = DEFAULT_CHANGE_ORDER_BAND_RATE;
+    @Column(name = "change_order_band_egp", nullable = false, precision = 14, scale = 2) private BigDecimal changeOrderBandEgp = DEFAULT_CHANGE_ORDER_BAND_EGP;
     @Column(nullable = false) private boolean active;
     @Column(nullable = false) private int version;
     @Column(name = "created_by", length = 120) private String createdBy;
@@ -37,6 +40,8 @@ public class CommercialPolicy extends AssignedIdEntity {
 
     public static final int DEFAULT_FINAL_QUOTE_VALIDITY_DAYS = 14;
     public static final BigDecimal DEFAULT_FX_TOLERANCE_RATE = new BigDecimal("0.0300");
+    /** D-E as recommended (design §12): 10% of the facility package or EGP 15,000, whichever is lower. */
+    public static final BigDecimal DEFAULT_CHANGE_ORDER_BAND_RATE = new BigDecimal("0.1000"), DEFAULT_CHANGE_ORDER_BAND_EGP = new BigDecimal("15000.00");
 
     protected CommercialPolicy() {}
 
@@ -51,6 +56,11 @@ public class CommercialPolicy extends AssignedIdEntity {
         this.finalQuoteValidityDays = finalQuoteValidityDays; this.fxToleranceRate = fxToleranceRate; return this;
     }
 
+    /** P1-16: the change-order band this version carries. */
+    public CommercialPolicy withChangeOrderBand(BigDecimal rate, BigDecimal egp) {
+        this.changeOrderBandRate = rate; this.changeOrderBandEgp = egp; return this;
+    }
+
     public void retire() { this.active = false; }
 
     public String getName() { return name; }
@@ -59,6 +69,8 @@ public class CommercialPolicy extends AssignedIdEntity {
     public BigDecimal getManualBandEgp() { return manualBandEgp; }
     public int getFinalQuoteValidityDays() { return finalQuoteValidityDays; }
     public BigDecimal getFxToleranceRate() { return fxToleranceRate; }
+    public BigDecimal getChangeOrderBandRate() { return changeOrderBandRate; }
+    public BigDecimal getChangeOrderBandEgp() { return changeOrderBandEgp; }
     public boolean isActive() { return active; }
     public int getVersion() { return version; }
     public String getCreatedBy() { return createdBy; }

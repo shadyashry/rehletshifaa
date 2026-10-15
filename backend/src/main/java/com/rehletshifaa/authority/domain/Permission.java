@@ -31,6 +31,9 @@ public enum Permission {
     // admission number; Finance countersigns money evidence with a fresh sign-in; the case team reads the "Admission & money"
     // panel; the patient (or representative) confirms they have arrived.
     ADMISSION_READ(false), ADMISSION_MANAGE(false), EVIDENCE_COUNTERSIGN(true), ARRIVAL_REPORT(false),
+    // P1-16 (D-E): treatment evidence. The Consultant (or Operations on their behalf) records milestones and the Consultant
+    // countersigns Operations' with a fresh sign-in; the Consultant proposes change orders and Finance prices them (fresh sign-in).
+    MILESTONE_RECORD(false), MILESTONE_COUNTERSIGN(true), CHANGE_ORDER_PROPOSE(false), CHANGE_ORDER_PRICE(true),
     // consultants, credentials, identity
     CONSULTANT_ONBOARD(true), CREDENTIAL_READ(false), CREDENTIAL_DECIDE(true), PATIENT_IDENTITY_REVIEW(true), PATIENT_IDENTITY_READ(false),
     CLINIC_MANAGE(false), CLINIC_APPROVE(true), CAPABILITY_DECIDE(true),

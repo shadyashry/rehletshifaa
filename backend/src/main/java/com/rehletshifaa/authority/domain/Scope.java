@@ -32,8 +32,9 @@ public enum Scope {
     CASE_DEPOSIT_OPEN,
     /**
      * P1-15: the case has money Finance must act on: its coordination deposit is open, or its hospital admission is reserved or
-     * confirmed (the letter to check, the cashier receipt to countersign, the point of no return to approve). It ends when the
-     * patient is admitted or the admission is cancelled.
+     * confirmed (the letter to check, the cashier receipt to countersign, the point of no return to approve), or (P1-16) the
+     * patient is in treatment (change orders to price, interim bills to countersign). It ends when the patient is discharged,
+     * the admission is cancelled or the case leaves the journey.
      */
     CASE_MONEY_OPEN,
     /** A live assignee of the case (or the affected subject) is in a team the principal leads, or reports to them. */

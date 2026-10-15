@@ -147,7 +147,7 @@ public class StaffWorkService {
 
     /** Work that outlives the case's journey: a governance review of what was done is owed whatever became of the case. */
     public static final java.util.Set<String> SURVIVES_EXIT = java.util.Set.of("EMERGENCY_OVERRIDE_REVIEW", IncidentService.REVIEW_WORK,
-            AdmissionService.EMERGENCY_REVIEW);
+            AdmissionService.EMERGENCY_REVIEW, ChangeOrderService.EMERGENCY_REVIEW);
 
     /**
      * The case left its journey (cancelled, withdrawn, expired unpaid, closed): nothing on it is owed any more, so every
