@@ -131,7 +131,11 @@ public final class JourneyDtos {
     public record StaffDirectoryView(String subject,String name,String role) {}
     /** One responsibility record on a case (UX-7 Assignment history). assignedByKind: PERSON, ROUTING or SYSTEM; names only, never account identifiers. */
     public record AssignmentHistoryEntry(String role,String assigneeName,String status,Instant assignedAt,Instant endedAt,String assignedByKind,String assignedByName,String reason) {}
-    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason,ProposalAssistanceView assistance,Instant acceptableFrom,String fxReapprovalStatus) {}
+    // totalMin/totalExpected/totalMax (UX 1c-0) are set only on the patient's own view: the same figures as PublicProposalView, in the
+    // proposal currency at the rate frozen at release. Staff views leave them null (a Consultant's view has the fee line removed).
+    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason,ProposalAssistanceView assistance,Instant acceptableFrom,String fxReapprovalStatus,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax) {
+        public ProposalView withTotals(BigDecimal min,BigDecimal expected,BigDecimal max){return new ProposalView(proposalId,versionId,versionNumber,status,language,currency,validUntil,operationalPlan,includedServices,excludedServices,paymentTerms,refundTerms,disclaimers,items,coordinatorNotes,documentType,scopeChangeReason,assistance,acceptableFrom,fxReapprovalStatus,min,expected,max);}
+    }
     public record ProposalItemView(UUID id,String category,String description,BigDecimal quantity,BigDecimal unitPrice,boolean optional) {}
     /**
      * QA #19 (A4): what Finance approves, line by line — whether the price comes from the Consultant's approved list (CATALOG) or was

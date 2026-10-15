@@ -40,10 +40,14 @@ export type CaseSummary = {
 };
 export type PatientActionItem = { id: string; kind: string; code: string; label: string; required: boolean; completed: boolean };
 export type PatientAction = { taskId: string; title: string; message?: string | null; blocking: boolean; dueAt?: string | null; items: PatientActionItem[] };
-export type ProposalSummaryData = { versionNumber: number; status: string; currency: string; documentType?: string; validUntil?: string; items: { quantity: number; unitPrice: number; optional: boolean }[] };
+export type ProposalSummaryData = { versionNumber: number; status: string; currency: string; documentType?: string; validUntil?: string;
+  /** category is the line's category as staff entered it (PLATFORM_FEE for the coordination and guarantee fee). */
+  items: { quantity: number; unitPrice: number; optional: boolean; category?: string | null; description?: string | null }[];
+  /** The patient's lowest, expected and highest totals in the proposal currency, as the proposal link shows them (UX 1c-0); null when unknown. */
+  totalMin?: number | null; totalExpected?: number | null; totalMax?: number | null };
 export type DepositSummaryData = { status: string; currency: string; totalDisplay?: number | null; paidDisplay?: number | null; balanceDisplay?: number | null;
-  /** The latest bank-transfer reference the patient entered (DEP-3). */
-  transfer?: { reference: string; status: string; reason?: string | null } | null };
+  /** The latest bank-transfer reference the patient entered (DEP-3); decidedAt is set once Finance confirmed or rejected it. */
+  transfer?: { reference: string; status: string; reason?: string | null; submittedAt?: string | null; decidedAt?: string | null } | null };
 export type CaseDocument = { documentId: string; fileName: string; status: string; createdAt: string };
 export type CareView = "care" | "documents" | "messages";
 

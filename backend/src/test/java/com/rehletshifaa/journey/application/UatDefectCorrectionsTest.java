@@ -222,6 +222,31 @@ class UatDefectCorrectionsTest {
         assertThat(view.totalMax()).isEqualByComparingTo("40.02");
     }
 
+    /** UX 1c-0: My Care's proposal carries the same range the proposal link shows the patient; staff views carry none. */
+    @Test void thePatientsWorkspaceProposalCarriesTheSameTotalsAsTheProposalLink() throws Exception {
+        UUID caseId = ownedCase("+254700000509", "uat-e4@local.test");
+        toClinicalRecommendation(caseId, "USD");
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        var proposal = journey.createProposal(caseId, draftRequest(approvedReview(caseId)));
+        // A range on the medical line, so lowest, expected and highest differ.
+        jdbc.update("UPDATE proposal_items SET unit_price_min_egp=300000,unit_price_max_egp=450000 WHERE proposal_version_id=? AND category='MEDICAL'", proposal.versionId());
+        jdbc.update("UPDATE proposal_versions SET requires_finance_approval=FALSE WHERE id=?", proposal.versionId());
+        journey.releaseProposal(caseId, proposal.versionId()); em.flush();
+        assertThat(journey.workspace(caseId).proposal().totalExpected()).isNull(); // the coordinator's view has no patient totals
+        SecurityContextHolder.clearContext();
+
+        var ctx = openViaStatusLink(caseId, "+254700000509");
+        PublicProposalView link = journey.viewProposal(ctx.token(), ctx.grant());
+        linkPatient(caseId, "patient-e4");
+        authenticate("patient-e4", Role.PATIENT);
+        ProposalView mine = journey.workspace(caseId).proposal();
+        assertThat(mine.totalMin()).isEqualByComparingTo(link.totalMin());
+        assertThat(mine.totalExpected()).isEqualByComparingTo(link.totalExpected()).isEqualByComparingTo("8970.00");
+        assertThat(mine.totalMax()).isEqualByComparingTo(link.totalMax());
+        assertThat(mine.totalMin()).isLessThan(mine.totalExpected());
+        assertThat(mine.totalMax()).isGreaterThan(mine.totalExpected());
+    }
+
     @Test void aForeignCurrencyProposalIsNotReleasedWithoutASnapshotRate() throws Exception {
         UUID caseId = ownedCase("+254700000507", "uat-e2@local.test");
         toClinicalRecommendation(caseId, "USD");
