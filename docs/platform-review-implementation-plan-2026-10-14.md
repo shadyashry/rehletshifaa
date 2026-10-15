@@ -563,6 +563,110 @@ phases.
     `docker-compose.observability.yml`, Grafana bound to localhost), the
     Grafana dashboard JSON (mechanical-worker, exact meter names from `alerts.md`), then the short Fable 5.1 high verification
     session for the lease and the row-lock claiming stores.
+- **Status (2026-10-15, session 2 of 2, branch `claude/p1-8-lease-5e9409`, cut from 5919bf1):** delivered (Opus 5.5, normal mode).
+  - Scheduler lease (E-04), owner's in-house JPA design, no ShedLock: V95 `scheduler_leases` (name PK `pk_scheduler_leases`,
+    holder, locked_at, locked_until, last_started_at, last_succeeded_at, last_failed_at, last_error_code; TIMESTAMP WITH TIME
+    ZONE; CHECKs `ck_scheduler_leases_name|_window|_error`; a row is inserted already taken on a job's first run, so holder and
+    window are NOT NULL). Module `shared.scheduling` (domain `SchedulerLease`, infrastructure `SchedulerLeaseRepository`,
+    application `LeasedJob`, `SchedulerLeases`, `LeasedJobs`, `SchedulerJobMetrics`, `SchedulingConfig`), inside `shared` so every
+    module uses it without a cycle. `@LeasedJob(maxHold = EXPIRY_SCAN|SWEEP|DAILY)` (5, 10, 60 min) next to `@Scheduled`; an
+    infrastructure-role Spring AOP advisor (no AspectJ on the classpath) at the highest precedence wraps the call outside the
+    job's own `@Transactional`. Take: JPQL `select current_timestamp` (database clock, truncated to microseconds), then ONE
+    guarded JPQL update `where name = :name and (locked_until <= :now or (holder = :me and the lease was released))`, else insert
+    the first row (a duplicate-key race means another instance won). The extra disjunct lets the holder's own next tick run at
+    once, so the minimum hold (= the fixed delay; `maxHold` for a cron) only keeps the other instances out and a slower database
+    clock never makes the only instance skip a tick; a running lease is never re-taken, not even by its holder. Release (own
+    REQUIRES_NEW transaction, also on exception) is guarded by holder + locked_at, sets locked_until = db now + minimum hold and
+    stamps last_succeeded_at, or last_failed_at + the exception class (never the message); a lost or failed release is logged
+    (`event.code` `SCHEDULER_LEASE_LOST` / `SCHEDULER_LEASE_RELEASE_FAILED`) and the lease frees itself at its maximum hold. A
+    skipped call returns 0 / nothing. Holder = `pid@host` (one per container). Lease name = `SimpleClassName.method`.
+  - The 18/3 split (21 `@Scheduled` methods in 19 classes; session 1's "22" was a miscount). Leased (18): EXPIRY_SCAN
+    `StaffLifecycleService.expireInvitations`, `FacilityAccreditationExpiryService.expireAccreditations`,
+    `ConsultantOfferExpiryService.expireOffers`, `CredentialExpiryService.expireCredentials`,
+    `ProposalExpiryService.expireReleasedProposals`, `StaffWorkService.raiseWorkDueSoon`, `ReplyTimerService.dispatch`,
+    `ReplyTimerService.closeIdle`; SWEEP `IntakeConversationService.releaseDepartedOwners`,
+    `CoordinatorDepartureService.releaseDepartedOwners`, `PoolWorkDepartureService.releaseDepartedOwners`,
+    `CoordinationQueueRetry.retry`, `DepositPaymentReminders.sweep`, `InformationRequestReminders.sweep`; DAILY
+    `AccessHygieneService.runRecertificationSchedule`, `.disableDormantAccounts`, `IdentityReconciliationService.scheduled`,
+    `PiiKeyRotationService.rotate` (off by default, cron `-`). Unleased claim-based workers (3): `NotificationOutboxProcessor`,
+    `WhatsAppInboundProcessor`, `IdentityOperationProcessor` (PESSIMISTIC_WRITE + SKIP LOCKED). The two reply-timer jobs session 1
+    left open are leased as the lead decided (18/3); their row locks stay as a second guard.
+  - Job health meters (`SchedulerJobMetrics`, tag `task`, not `job`, which Prometheus uses as its target label), registered at
+    startup for every leased job: `scheduler.job.duration` (timer), `scheduler.job.failures` (counter),
+    `scheduler.job.last.success` (epoch seconds from `scheduler_leases`, 30 s snapshot, so any instance's success counts; the
+    instance start until a first success), `scheduler.job.cadence` (fixed delay or cron interval; none for a disabled cron), so
+    "no success within 2x cadence" is one PromQL rule.
+  - Prometheus (E-05): `micrometer-registry-prometheus` 1.15.8 (Boot 3.5.10 BOM) by the one approved online fetch, every build since
+    `mvn -o`. `/actuator/prometheus` is served on the internal metrics port only (`MetricsPort.metricsPath`, `SecurityConfig`);
+    the main port refuses it. Prometheus names: a gauge loses `.total` and gains its unit (`work.open.high` ->
+    `work_open_high_items`, `work.open.total` -> `work_open`); checked on a real scrape, no name collisions.
+  - Observability compose: `prom/prometheus:v3.5.0` (scrapes `backend:8090`, rules from `prometheus/rules/`, 15 d retention,
+    127.0.0.1:9090) and `grafana/grafana:12.1.0` (127.0.0.1:3300, admin password `GRAFANA_ADMIN_PASSWORD` from .env, no sign-up or
+    anonymous access, provisioned data source + read-only dashboard); no route through api-gateway, Caddy or the tunnel. Rule file
+    `prometheus/rules/alerts.yml` (mechanical-worker, reviewed; `promtool check rules`: 13 rules): the 10 alerts.md rules plus
+    SCHEDULER_JOB_STALE, SCHEDULER_JOB_FAILING, BACKEND_METRICS_DOWN. Dashboard `grafana/dashboards/rehletshifaa-operations.json`
+    (mechanical-worker): Queues, Service levels, Outbox, Scheduled jobs rows. alerts.md and the observability README updated.
+    Started locally (`up -d prometheus grafana` on the running dev stack's network): 13 rules loaded, dashboard provisioned without
+    error, both ports loopback-only; the scrape target showed down because the running dev backend is the pre-P1-8 image (no
+    port 8090), which changes after the next `--build`. Then stopped and removed.
+  - Tests: `app.scheduling.enabled` (default true) now gates `@EnableScheduling`; the test `application.yml` turns it off, so no
+    background tick races a test's direct call (the `spring.task.scheduling.enabled=false` some tests set was never a real
+    property). New `SchedulerLeaseTest` (8): two instances racing 10 rounds (first insert, then the guarded update) take it once;
+    success and failure both release for the minimum hold (other instance refused, holder re-takes), failure counted and coded
+    by class only; an expired lease is taken over and the late holder's release changes nothing; lease times come from the
+    database while the instance clock reads 2001; a leased bean method skips while another instance holds it and runs once it
+    expires, closed for its 60 s fixed delay; every job's meters from startup with cadence 60 s / 86,400 s / none for the
+    disabled rotation; the last-success gauge follows the database through the snapshot. `MetricsPortTest` (+1): the metrics
+    port serves the Prometheus scrape with the business and job meters; the main port refuses it to anonymous and to a System
+    Administrator. Every leased job still runs in its existing test (each now goes through the lease).
+    Verification: `mvn -o -q test` 829 tests (820 + 9 new), 3 pre-existing skips: 0 failures from this phase; the only 3 failures and 2 errors are the pre-existing facility date tests below, which pass with the JVM in UTC (`JAVA_TOOL_OPTIONS=-Duser.timezone=UTC`). PostgreSQL proof
+    `PostgresJpaMappingTest` on postgres:17-alpine with V95: green (every repository query, the lease's included).
+  - Pre-existing, not from this phase: `FacilityCatalogServiceTest`, `FacilityDirectoryTest` and `FacilityPackageLineGateTest`
+    (3 failures, 2 errors) fail at 5919bf1 too whenever the machine's local date is ahead of the UTC date (the tests build
+    validity dates with `LocalDate.now()`, the services compare with the UTC clock).
+  - Open gaps: no Alertmanager (alerts are visible in Prometheus and Grafana, notify no one); the dev backend must be rebuilt
+    for V95 and port 8090 before the dashboard shows data; a run longer than its maximum hold can overlap a second instance (the
+    late release is then a no-op, logged); the lease is per job, not per row, so the three claim-based workers still rely on
+    SKIP LOCKED alone; image tags v3.5.0 / 12.1.0 were pinned without checking for newer patch releases.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack
+    (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`, V95 runs); then a short Fable 5.1 high
+    verification session for the lease (`shared.scheduling`, V95, the advisor order versus `@Transactional`) and the row-lock
+    claiming in `QueuedNotificationRepository`, `WhatsAppInboundMessageRepository`, `IdentityOperationRepository`,
+    `ReplyObligationRepository`, `IntakeConversationRepository` and `BaseRepositoryImpl`; then the next phase in the
+    re-prioritised "Remaining work" list (P1-10).
+- **Verification (2026-10-15, Fable 5.1 high, branch `claude/p1-8-verify-125954`, cut from 1074125):** lease and row-lock
+  claiming reviewed for correctness under concurrency; one defect fixed.
+  - Scheduler lease: no defect. The take is one guarded UPDATE, so under READ COMMITTED the loser re-evaluates the row after
+    the winner's commit and no longer matches (`locked_until` moved, holder changed); the holder-retake disjunct matches only
+    a released take (`last_*_at >= locked_at`; a takeover moves `locked_at` forward, so a stale stamp never re-opens a running
+    lease); the first-row insert race ends in a unique-key violation that `tryTake` reports as "not taken"; release is guarded
+    by holder + `locked_at`, both from the database clock truncated to the column's microseconds. The advisor is
+    `@Role(INFRASTRUCTURE)` at `HIGHEST_PRECEDENCE`, so the auto-proxy creator applies it outermost and the transaction advisor
+    (lowest precedence) runs inside it, for beans with and without `@Transactional`; the scheduler calls the proxy. Max holds:
+    every EXPIRY_SCAN and SWEEP job is database-only (batched or per-case); DAILY covers `IdentityReconciliationService` (one
+    Keycloak call per staff member, stops at the first unavailable) and `PiiKeyRotationService` (off by default). A job that
+    outlives its hold can overlap another instance and its late release is a logged no-op (known gap, kept). A skipped call
+    returns 0 / false / nothing. 18 `@LeasedJob` = 21 `@Scheduled` minus the 3 claim-based workers, confirmed by grep. New
+    `SchedulerLeaseTest.theLeaseAdviceIsTheOutermostAdviceOnEveryLeasedJobBean`: every leased bean is a proxy, the lease advisor
+    is outermost, beans with and without the transaction advisor are both covered, every leased method is public and not
+    final and matched by the pointcut, all 17 test-context jobs present. Low, not changed: a `tryTake` that fails on a database
+    outage is not counted in `scheduler.job.failures` (the stale-success alert covers it); a cron lease's minimum hold is
+    `maxHold` (60 min), so two instances whose clocks differ by more than an hour would both run a daily job.
+  - Row-lock claiming: `PESSIMISTIC_WRITE` + `jakarta.persistence.lock.timeout=-2` renders as `for update skip locked` on
+    PostgreSQL for all five claim queries (`lockDue` x4, `lockIdle`; seen in the SQL log of the proof run); in each store the
+    lock, the status change and the lease stamp commit in one transaction, so a second instance never sees a claimed row as
+    due before its lease expires. **Fixed (Medium): `IdentityOperationProcessor` executed every claimed operation however
+    little of its 120 s lease was left**, so with two instances and a slow Keycloak a batch of twenty could outlive its lease
+    and the other instance re-claim a RUNNING operation by expiry and execute it twice (a second invitation or reset e-mail;
+    the outcome write stays guarded by `attempts`). Fix, as the outbox's `SEND_MARGIN`: `EXECUTE_MARGIN` = 120 s hands back
+    uncharged (`store.release`) any operation whose lease is nearly spent, and `LEASE_SECONDS` 120 -> 300 (as the outbox and
+    inbound stores). New `IdentityOperationProcessorTest` (2). Low, not changed: `WhatsAppInboundProcessor` has no such margin,
+    but filing is idempotent by provider message id (`ALREADY_FILED`), so a reclaimed message only repeats the media fetch; the
+    three workers judge lease expiry by the instance clock, not the database clock (one VM: no skew).
+  - Verification run: focused `SchedulerLeaseTest` (9), `IdentityOperationProcessorTest` (2), `IdentityOperationIntegrationTest`
+    (3), `ArchitectureRulesTest` (22): 0 failures; `PostgresJpaMappingTest` on postgres:17-alpine green with SQL logging;
+    full `mvn -o -q test` (JVM in UTC) 832 tests, 0 failures, 3 pre-existing skips (829 + 3 new). Commit `df40908` + this line.
+  - Next: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack (V95); then P1-10 per "Remaining work".
 
 ### P1-9  Backups and restore drill  (E-09)
 - Managed Postgres PITR settings documented and scripted for the chosen host; versioned S3 with cross-region copy;
@@ -578,6 +682,101 @@ phases.
 - Files: `JourneyService.createFinalQuote`, `ProposalExpiryService` (final quotes), `CommercialPolicyService`
   settings, `ProposalSign.tsx`, homepage, copy.
 - Sessions: 2. Model: Fable 5.1, high (rule) then Sonnet 5.5 (copy/UI).
+- **Decisions (owner, 2026-10-15; recommendations accepted):**
+  - **D-A, the fee: yes, before launch.** The 15% stops being a markup baked into each Consultant line. Each medical
+    line carries the provider's own price (Consultant and facility at their own prices). The platform charges the
+    patient one disclosed line, the **coordination and guarantee fee** (`PLATFORM_FEE` category on `proposal_items`),
+    equal to today's margin rate times the provider total. The rate still comes from the locked commercial policy
+    version. The patient's total, the deposit (15% of that total, `DepositCalculator`), Finance's margin figures and the
+    EGP ledger stay numerically the same; only the structure and what the patient sees change.
+  - **Guarantee wording: a placeholder until counsel approves it.** Each locale keeps it under one key so the approved
+    text is a copy change. Placeholder (EN): "Our no-surprise promise: your final quote will not be higher than the
+    maximum shown here unless your Consultant finds, when they examine you, that your treatment needs to change. If it
+    does, they will tell you why in writing, and you will have at least 24 hours to decide." It promises only what
+    the rule enforces; no refund promise until counsel and the owner decide one.
+  - **Final-quote validity: 14 days** after release, a setting on the commercial policy (`final_quote_validity_days`,
+    default 14). The coordinator may shorten it but never lengthen it. `ProposalExpiryService` expires final quotes the
+    same way it expires estimates.
+  - **FX tolerance band: 3%**, a setting on the commercial policy (`fx_tolerance_rate`, default 0.03). When a final
+    quote is accepted, its display-currency total is re-computed at the day's rate. If that total differs from the
+    frozen one by more than the band in either direction, acceptance pauses and Finance re-approves: either confirm
+    the frozen rate or re-release at the new rate. The no-surprise cap is compared in EGP (provider total plus fee),
+    so a currency move can never count as a scope change and a scope change can never hide behind one.
+  - **Still open:** counsel on the VAT rate of the fee (the design assumes 14%). P1-10 shows the fee without VAT;
+    the VAT line comes with the platform e-invoice in P1-17. The final wording of the guarantee is also open.
+- **Status (2026-10-15, session 1 of 2, Opus 5.5 high; the plan named Fable 5.1; committed on `claude/p1-10-fee-fb4348`, a
+  worktree fast-forwarded from `feat/review-p0` f938fad, so the owner fast-forwards `feat/review-p0` to this commit):** the money
+  rule, the cap, validity and the FX band delivered; the patient-facing panel and copy are session 2.
+  - Delivered: `V96__platform_fee_line_and_final_quote_rules.sql`: `proposal_items` source widened to PLATFORM (named check
+    replaced), named checks `ck_proposal_items_category` (MEDICAL/PLATFORM_FEE), `ck_proposal_items_fee_source` (fee ⇔ PLATFORM)
+    and `ck_proposal_items_fee_mandatory` (a fee line is never optional); `commercial_policies.final_quote_validity_days` (default
+    14, 1–90) and `fx_tolerance_rate` (default 0.0300, 0–0.5); `proposal_versions.above_estimate_maximum` and
+    `fx_reapproval_status` (PENDING/CONFIRMED) with rate, requested-at, decided-by/at.
+    **Fee line (D-A).** New `ProposalPricing` is the one price rule for the estimate and the final quote: medical lines carry the
+    provider's own price (`unitPriceEgp = providerPriceEgp`, min/max likewise); one `PLATFORM_FEE` line "Coordination and guarantee
+    fee" = margin rate x provider total, separately for expected, lowest and highest, sorted last, never optional, provider price 0
+    (`ProposalItem.platformFee`). `marginAmount` = the expected fee; the patient totals = provider totals + fee; the locked margin of
+    the estimate is still reused by the final quote. The "never itemized" comment is replaced; `DepositCalculator` javadoc says
+    "provider lines plus the fee". Proposal views (staff workspace, My Care, the public token view, the rendered HTML) list the fee
+    line through the existing item list; Finance's commercial view shows it as source PLATFORM; the Consultant and their practice
+    manager get the workspace proposal without the fee line, so they see only their own price.
+    **No-surprise cap (A-08).** `createFinalQuote` compares the final expected EGP total (provider + fee) with the accepted
+    estimate's EGP maximum (falling back to the latest estimate's when none is accepted) and refuses above it without a scope
+    change reason (`409 SCOPE_CHANGE_REASON_REQUIRED`); with one the version is flagged `above_estimate_maximum`, the reason is
+    stored trimmed and shown on the patient's views as before, and the audit records both totals. Such a quote cannot be accepted
+    until 24 h after release (`409 COOLING_PERIOD` naming the time it opens; `ProposalView`/`PublicProposalView.acceptableFrom`)
+    on all three decision paths: signed in, secure link, and recorded by the coordinator. Declining or asking for changes is never held.
+    **Validity (B-05).** `CommercialPolicyRequest` takes `finalQuoteValidityDays` and `fxToleranceRate` (left out: carried over from
+    the version being replaced, else the defaults; `QUOTE_VALIDITY_INVALID`, `FX_TOLERANCE_INVALID`; audited; same
+    COMMERCIAL_POLICY_MANAGE holders, System Administrator and Finance Manager); `Policy` carries them boxed so older cache entries
+    read the defaults. `FinalQuoteRequest.validUntil` is now optional; a date beyond policy days from now is refused
+    (`400 QUOTE_VALIDITY_TOO_LONG`); at release `validUntil` = min(release + policy days, coordinator's date), a passed date
+    refuses the release (`409 QUOTE_VALIDITY_PASSED`); a final quote's share token expires no later than the quote. The inline
+    expiry (decision past validity) no longer tries to move an ARRIVAL_CONFIRMED case to EXPIRED. `ProposalExpiryService`
+    (workflow-builder subagent, reviewed) expires final quotes in its scan without touching the macro case, closes a pending
+    FX re-approval and opens one coordinator work item `FINAL_QUOTE_EXPIRED` (audit `FINAL_QUOTE_EXPIRED`).
+    **FX band (B-05).** On acceptance of a non-EGP final quote the display total is re-priced at today's rate; beyond the policy band
+    in either direction (or with no rate today) the acceptance pauses: `409 FX_REAPPROVAL_REQUIRED` with a calm "our Finance team
+    is checking" message, the request recorded on the version, one blocking Finance work item `FX_REAPPROVAL` and audit
+    `FINAL_QUOTE_FX_REAPPROVAL_REQUESTED`; repeated attempts open nothing new. Finance (`FINANCE_SETTLE` on the case):
+    `POST /api/v1/finance/cases/{caseId}/final-quotes/{versionId}/fx-rate/confirm` keeps the frozen rate (the next acceptance
+    proceeds without a new check; audit `FINAL_QUOTE_FX_RATE_CONFIRMED`) or `.../fx-rate/reprice` re-releases at today's rate
+    (lines and document re-fixed, EGP figures, cap and validity unchanged, old link replaced and the patient sent the quote again;
+    audit `FINAL_QUOTE_REPRICED`). EGP quotes skip the check.
+    **Defect found and fixed:** `ProposalItemRepository.priceAt` was a JPQL `round(unitPriceEgp * :rate, 2)` that bound the rate as
+    a scale-2 decimal on H2, so a release at 0.0204 priced every line at 0.02 (the snapshot stored the right rate). It is now
+    computed in Java on the entity (`ProposalItem.priceAt`). Existing fixtures all used two-decimal rates, so nothing caught it.
+  - Tests: new `FinalQuoteRulesTest` (15: fee line arithmetic and before/after on a fixed case with totals, margin and deposit
+    equal to the old per-line markup; range and USD figures; Consultant sees only their line; released document lists the fee;
+    cap refused without reason, flagged with one, none needed at or under the maximum; cap in EGP so an FX move alone never trips
+    it; cooling period on the signed-in and the secure-link paths; validity default 14 days, shorter coordinator date kept and
+    the link with it, longer refused, a 7-day policy shortens it; policy settings refused for coordinator, Finance and Consultant,
+    allowed for System Administrator and Finance Manager, carried over when omitted, validated; FX inside the band accepts,
+    outside pauses and opens the Finance item, Finance confirms and the patient accepts at the frozen rate, Finance re-releases at
+    today's rate and the patient accepts through the new link; EGP skips the band), `FinalQuoteExpiryTest` (3, workflow-builder:
+    the scan expires a final quote, revokes its links, leaves the case ARRIVAL_CONFIRMED, opens one coordinator item and audits;
+    idempotent; closes a pending FX item), `ProposalPricingTest` (3: whole-pound totals equal the old markup; the one-cent case;
+    ranges). Updated for the fee line: `JourneyServiceIntegrationTest`, `SecureJourneyCorrectionsTest` (SEC-10 keeps the EGP base,
+    the rate and every internal field forbidden; the display line price and fee are disclosed by D-A),
+    `UatDefectCorrectionsTest`, `FacilityPackageLineGateTest`, `CoordinatorCaseActionsTest` (Finance's view shows the fee line).
+    Verification: `mvn -o -q test` (JVM in UTC) 853 tests, 0 failures, 3 pre-existing skips (832 + 21 new);
+    `PostgresJpaMappingTest` on postgres:17-alpine with V96 applied: green (1/1; Flyway at 96, the two policy columns and the five named `ck_proposal_items_*` checks present).
+  - Open gaps: the totals equal the old figures for every price whose 15% does not round (whole pounds never do); a line priced in
+    piastres can now differ by a cent, in the direction of total = provider + margin, which the old markup did not guarantee
+    (`ProposalPricingTest`). Display totals in a foreign currency are summed per line, so the fee line can move a converted total
+    by a cent against the single marked-up line. The fee line's stored description is English; the patient wording per language,
+    the "How your price works" panel, the guarantee placeholder, the cooling and FX-pause states on `ProposalSign.tsx` and the
+    minimum Finance UI for the re-approval are session 2 (the API already returns `acceptableFrom` and `fxReapprovalStatus`). The
+    scope-change reason is entered by the coordinator on the final quote (as before), not by the Consultant on the final
+    assessment. The validity and the band are read from the care area's active policy at release and acceptance, not
+    snapshotted on the version (the margin is). No SLA level for `FX_REAPPROVAL` / `FINAL_QUOTE_EXPIRED`, and no portal copy key
+    for them yet (English title only). The scheduled expiry does not close an open proposal-assistance item (the inline one does).
+    The fee shows without VAT until P1-17.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack
+    (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`) so V96 runs; then P1-10 session 2 in a new
+    session (Sonnet 5.5 for copy/UI, per the UX plan): the three-step "How your price works" panel and the guarantee placeholder on
+    `ProposalSign.tsx` and the homepage (EN/AR, one key each, logical CSS, WCAG 2.2 AA), the fee line's patient wording, the
+    cooling-period and FX-pause states, and the minimum Finance UI for the FX re-approval item. V97 is the next free Flyway version.
 
 ### P1-11  Split `JourneyService`  (E-06)
 - Extract `ConsultantAssignmentService`, `ClinicalReviewService`, `ProposalService` (create / release / decide /
@@ -703,7 +902,10 @@ export on demand (C-07); region-per-market deployment (E-10); video consultation
 ## Remaining work (as of 2026-10-14, after P1-8 session 1; re-prioritised with the post-deposit design and the UX review)
 
 Delivered on `feat/review-p0` (pushed at `e68dbc5`, local beyond that; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped),
-P0-5, P1-6, and P1-8 session 1 (meters, internal metrics port, alert rules; `5919bf1`). Everything below is still to do.
+P0-5, P1-6, and P1-8 sessions 1 and 2 (meters, internal metrics port, alert rules; `5919bf1`; scheduler lease V95, Prometheus
+registry, Prometheus + Grafana, rules file, dashboard on `claude/p1-8-lease-5e9409`) and its verification (`df40908`). P1-10 session 1
+(fee line, no-surprise cap, cooling period, validity, FX band; V96) is committed on `claude/p1-10-fee-fb4348` for the owner to
+fast-forward. Everything below is still to do.
 
 **Why the order changed.** The owner's two priorities are (1) a complete, auditable journey after the deposit —
 today nothing collects, proves or reconciles money after the 15%, and the Consultant's hospital deal is invisible —
@@ -716,8 +918,8 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
-| 1 | P1-8 Metrics, alerts, scheduler leadership | session 1 done; session 2 + 1 short left | Opus 5.5, medium; lease check Fable high | Session 2 (running): JPA lease table (V95, owner chose it over ShedLock; database clock) on the sweep, expiry and cron jobs, not the claim-based queue workers (session 2 lists the exact split); approved fetch of `micrometer-registry-prometheus` and the Prometheus/Grafana images; dashboard JSON and rule files |
-| 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: D-A (platform fee line), guarantee wording, final-quote validity; counsel on the VAT rate of the fee |
+| 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
+| 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2: session 1 done (2026-10-15, V96), session 2 next | Fable 5.1 high, then Sonnet 5.5 | Session 2 (panel, guarantee placeholder, fee wording, cooling/FX states, Finance UI) after the owner fast-forwards `feat/review-p0` and rebuilds the dev stack (V96). Counsel on the fee's VAT rate does not block it |
 | — | UI/UX (all areas) | own plan | see `docs/ux-redesign/PLAN.md` | Runs in parallel in its own worktree; Finance and Operations areas wait for P1-15 / P1-17 |
 | 3 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
 | 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |
@@ -739,16 +941,19 @@ the licence now; the credential type is a one-line addition in P1-19.
 
 ### Owner decisions still open
 
-- [ ] D-A…D-H from `docs/post-deposit-journey-design.md` §12 (fee restructuring, voucher model, pay to admit, new
-      stage, change-order band, fit-to-fly window, free follow-up window, affiliations as eligibility).
+- [x] D-A (fee restructuring): yes, before launch (owner, 2026-10-15); see the P1-10 entry.
+- [ ] D-B…D-H from `docs/post-deposit-journey-design.md` §12 (voucher model, pay to admit, new stage, change-order
+      band, fit-to-fly window, free follow-up window, affiliations as eligibility).
 - [ ] D-I: start the PDPL licence application and the Law 13/2025 liability-fund subscription (owner action).
-- [ ] P1-10: guarantee wording on the proposal and final-quote validity; counsel: VAT rate on the platform fee.
+- [x] P1-10: final-quote validity 14 days and FX band 3% (owner, 2026-10-15); guarantee wording ships as a placeholder.
+- [ ] P1-10: counsel approves the guarantee wording and the VAT rate on the platform fee; owner decides whether the
+      guarantee carries a refund when a patient declines a final quote above the preliminary maximum.
 - [ ] P1-12: payer terms and partner commission.
 - [ ] Consent for Consultant and coordinator photographs (UX plan area 1b; P1-14).
 - [ ] P2-15: when a second destination is added.
 - [ ] Legal review of the patient refund copy (F2); the refund rule itself is decided (P0-4).
 - [ ] Whether a case cancelled for an unanswered information request gets a reopen path (P1-6; today the patient sends it again).
-- [x] P1-8: one online fetch of `micrometer-registry-prometheus` and the Prometheus/Grafana images, approved by the owner (2026-10-14); the fetch itself runs in P1-8 session 2.
+- [x] P1-8: one online fetch of `micrometer-registry-prometheus` and the Prometheus/Grafana images, approved by the owner (2026-10-14); fetched in P1-8 session 2 (1.15.8); images pulled (prom/prometheus:v3.5.0, grafana/grafana:12.1.0).
 
 ### Before production (from delivered phases)
 
@@ -764,7 +969,7 @@ the licence now; the credential type is a one-line addition in P1-19.
 - [ ] P0-3: set urgency inside the intake form; show the previous reason in the urgency dialog; sort and badge queue cards and the team queue by urgency; a Send my case unit test for the emergency notice.
 - [ ] P0-4: vetted agent list for agent cash (comes with the partner entity in P1-12); card payments through the DEP-2 adapter.
 - [ ] P0-5: notify Consultant Operations when an accreditation lapses; store accreditation evidence documents; stamp `Facility.updated_at` from the expiry job; a dev-seed facility in `LocalDemoDataSeeder`; facility name on the patient proposal; patient-facing travel view.
-- [ ] P1-8: archive or acknowledge dead letters so the level can fall; tune the starting alert thresholds after a month of data.
+- [ ] P1-8: archive or acknowledge dead letters so the level can fall; tune the starting alert thresholds after a month of data; an Alertmanager route (page, ticket) for the Prometheus rules; fix the three facility tests' `LocalDate.now()` (local versus UTC date).
 - [ ] P1-6: an identity-review work item, so its 2-day level becomes a due date and a patient window; deadlines on referral offers; the offer deadline on queue cards (`CaseQueue.tsx`); email the consultant when an offer expires; an availability penalty after repeated expiry; escalate to the Finance Manager on an SLA breach (A-04); a window in the status link's deposit phase while Finance checks a transfer.
 
 ## Order of sessions (recommended, revised 2026-10-14)
@@ -778,7 +983,7 @@ Next: 7. P1-8 (metrics + ShedLock) → 8. P1-10 (commercial truth + fee restruct
 (profile data) → 20. P2-24 (refund enforcement) → P2 in table order. The UX plan runs beside this sequence in its
 own worktree (`docs/ux-redesign/PLAN.md`); its Finance and Operations areas start after P1-15 and P1-17.
 
-Owner decisions that gate a slice: D-A (P1-10), D-B/D-C/D-D (P1-15), D-E (P1-16), D-F (P1-17), D-G (P1-18), D-H
+Owner decisions that gate a slice: D-A (P1-10, decided 2026-10-15), D-B/D-C/D-D (P1-15), D-E (P1-16), D-F (P1-17), D-G (P1-18), D-H
 (P1-19), P1-12 (payer terms, partner commission), P2-15 (second destination timing).
 
 Roughly 25 sessions for the rest of P1 (including the six new phases), 19 for P2.

@@ -5,6 +5,7 @@ import com.rehletshifaa.facility.infrastructure.FacilityRepository;
 import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class FacilityAccreditationExpiryService {
         this.reminderDays = reminderDays.stream().filter(days -> days > 0).distinct().sorted(Comparator.reverseOrder()).toList();
     }
 
+    @LeasedJob(maxHold = LeasedJob.EXPIRY_SCAN)
     @Scheduled(fixedDelayString = "${app.facilities.expiry-scan-ms:3600000}")
     @Transactional
     public void expireAccreditations() {

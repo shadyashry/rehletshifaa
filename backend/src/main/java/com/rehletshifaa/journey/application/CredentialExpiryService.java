@@ -6,6 +6,7 @@ import com.rehletshifaa.directory.infrastructure.PractitionerCredentialRepositor
 import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
 import com.rehletshifaa.notification.application.NotificationOutbox;
 import com.rehletshifaa.shared.audit.AuditTrail;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class CredentialExpiryService {
         this.reminderDays = reminderDays.stream().filter(days->days>0).distinct().sorted(java.util.Comparator.reverseOrder()).toList();
     }
 
+    @LeasedJob(maxHold = LeasedJob.EXPIRY_SCAN)
     @Scheduled(fixedDelayString = "${app.credentials.expiry-scan-ms:3600000}")
     @Transactional
     public void expireCredentials() {

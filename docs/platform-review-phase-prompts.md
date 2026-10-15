@@ -241,6 +241,91 @@ the "Remaining work" section.
 
 ---
 
+## P1-10 — Commercial truth and fee restructuring
+Model: Fable 5.1 · Effort: high · Fast: off · Sessions: 2 (session 1 the rule and data; session 2 copy and minimum
+UI, Sonnet 5.5 or the mechanical-worker subagent)
+
+```
+Implement phase P1-10, session 1 of 2, of docs/platform-review-implementation-plan-2026-10-14.md (findings B-03, A-08,
+B-05, D-01 in docs/platform-review-2026-10-14.md; decision D-A and §3.1 in docs/post-deposit-journey-design.md).
+Intended model: Fable 5.1, effort high. If you are a different model, say so in your first line and continue.
+
+Before you start: read AGENTS.md, then the P1-10 entry in the plan file (its "Decisions (owner, 2026-10-15)" block is
+binding) and the P0-4 and P0-5 Status entries (DepositCalculator, line sources, manual band). Do not re-discover the
+architecture.
+
+Branch: work on top of feat/review-p0 (HEAD includes this prompt's docs commit). If this session runs in a worktree on
+another branch, first `git merge --ff-only feat/review-p0`, do the work there, commit, and say so in your final report
+so the owner can fast-forward feat/review-p0. Never commit in the main checkout while another session has it.
+
+Facts the plan predates (checked 2026-10-15):
+- JourneyService.createProposal (around line 508) and createFinalQuote (around line 765) multiply every line by
+  (1 + marginRate): each ProposalItem.medical carries unitPriceEgp = provider price x markup and providerPriceEgp =
+  provider price; Pricing stores providerNet, marginRate, marginAmount, pMin/pExp/pMax. The code comment says the margin
+  is "never itemized"; D-A reverses that.
+- proposal_items has a `category` column (always "MEDICAL" today); use category PLATFORM_FEE for the fee line rather
+  than a new table.
+- The final quote reuses the margin locked on the preliminary estimate (proposalVersions.findLockedMargin); keep that.
+- scope_change_reason exists on proposal_versions as optional free text with no rule behind it; validUntil comes from
+  the coordinator's request; the final-quote share token is a fixed 14 days (around line 822). There is no FX band.
+- FX is frozen at release (proposalItems.priceAt + proposalVersions.release with fxRate/fxDate/fxSource).
+- DepositCalculator takes 15% of the "marked-up Consultant lines"; after this phase that is provider total + fee. The
+  deposit figure must not change.
+- Next free Flyway version is V96 (V95 is scheduler_leases). Migrations stay H2-safe: one ADD COLUMN per ALTER,
+  TIMESTAMP WITH TIME ZONE, named CHECK constraints, no partial indexes. JPA only, no native queries;
+  ArchitectureRulesTest green; journey must never import coordination.
+
+Session 1 scope, in this order:
+1. Fee line (D-A). Medical lines at the provider's own price (unitPriceEgp = providerPriceEgp, ranges likewise); one
+   PLATFORM_FEE line = marginRate x provider total (expected, min and max), named "Coordination and guarantee fee",
+   sorted last, never optional. Totals, marginAmount, the deposit and the EGP ledger stay numerically equal to today
+   for the same inputs: prove it with a before/after test on a fixed case. Proposal views (staff, My Care, public
+   token view, the rendered proposal HTML) list the fee line. The Consultant's views keep showing only their own
+   price. Update the "never itemized" comment.
+2. No-surprise cap (A-08). createFinalQuote refuses (409 SCOPE_CHANGE_REASON_REQUIRED) when the final expected
+   patient total in EGP (provider + fee) exceeds the accepted preliminary estimate's maximum in EGP, unless a scope
+   change reason is recorded; the reason is shown to the patient on the final quote. A final quote above the
+   maximum cannot be accepted until 24 hours after its release (409 COOLING_PERIOD, with the time it opens); both
+   decide paths (signed-in and public token) enforce it.
+3. Validity (B-05). Commercial policy gains final_quote_validity_days (default 14) and fx_tolerance_rate (default
+   0.03), in V96, editable by the same COMMERCIAL_POLICY_MANAGE holders (SYSTEM_ADMINISTRATOR, FINANCE_MANAGER) and
+   versioned like the margin. On release a final quote's validUntil = release + validity, or the coordinator's
+   earlier date; never later. ProposalExpiryService expires final quotes too; the share token lives no longer than
+   the quote.
+4. FX band (B-05). On acceptance of a non-EGP final quote, re-price the total at the day's rate; outside the band
+   in either direction, acceptance pauses (409 FX_REAPPROVAL_REQUIRED, patient told calmly that Finance is checking)
+   and a Finance work item opens: confirm the frozen rate (acceptance then proceeds at it) or re-release at the new
+   rate. Audit both. EGP quotes skip the check.
+Session 2 (later, not now): the three-step "How your price works" panel and the guarantee placeholder on
+ProposalSign.tsx and the homepage, EN and AR in en.json/ar.json under one key each, logical CSS, WCAG 2.2 AA; the
+fee line's patient wording; the minimum Finance UI for the FX re-approval item. The final look belongs to the UX
+plan (docs/ux-redesign/PLAN.md).
+
+Delegation (you own the money rule, the migration, authority, integration and all verification):
+- Delegate the ProposalExpiryService extension and its test to the workflow-builder subagent after you have
+  written V96 and the policy fields; review its diff.
+- Delegate test scaffolds that mirror existing proposal tests to the mechanical-worker subagent.
+- Subagents never run Maven or pnpm. You run every build and test yourself, one at a time, never two in parallel.
+- Anything that touches pricing in JourneyService, DepositCalculator, PaymentService or CaseTransitionPolicy stays
+  with you.
+
+Verification: `cd backend && mvn -o -q test` stays at 0 failures (832 tests and 3 pre-existing skips at 0832d90). Tests
+at minimum: fee line arithmetic and unchanged totals/deposit; cap refused without reason and allowed with one; cap
+compared in EGP so an FX move alone never trips it; cooling period on both decide paths; validity default, shorter
+coordinator date kept, longer refused; expiry job expires final quotes; FX inside band accepts, outside pauses and
+opens the Finance item; policy settings refused for roles without COMMERCIAL_POLICY_MANAGE. Then the PostgreSQL
+proof: `docker run -d --name rs-jpa-mapping-pg -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=jpa_mapping_test -p
+127.0.0.1:55439:5432 postgres:17-alpine`, wait for pg_isready, run `mvn -o -q -Dtest=PostgresJpaMappingTest
+-Djpa.postgres.test-url=jdbc:postgresql://127.0.0.1:55439/jpa_mapping_test test`, then `docker rm -f rs-jpa-mapping-pg`.
+
+Finish: when green, commit with a conventional message (feat(p1-10): ...) ending in "Co-Authored-By: <your model
+name> <noreply@anthropic.com>". Do not push. Add a Status block to the P1-10 entry in the plan file in the same shape
+as the P1-8 entries (delivered work, tests and numbers, open gaps, next exact action: P1-10 session 2, and that the
+owner must fast-forward feat/review-p0 and rebuild the dev stack so V96 runs), and update "Remaining work".
+```
+
+---
+
 ## Delegation inside a session
 
 A Fable session can hand bounded work to the project subagents in `.claude/agents/`:

@@ -1,0 +1,232 @@
+{
+  "id": null,
+  "uid": "rehletshifaa-ops",
+  "title": "RehletShifaa operations",
+  "tags": ["rehletshifaa", "p1-8"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": true,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    { "id": 1, "type": "row", "title": "Queues", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "panels": [] },
+    {
+      "id": 2, "type": "timeseries", "title": "Open work by queue",
+      "description": "Open work items per queue, refreshed from the database at most every 60 seconds.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 9, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (queue) (work_open_items)", "legendFormat": "{{queue}}" } ]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Oldest open item by queue",
+      "description": "Age of the oldest open item in each queue.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 9, "x": 9, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max by (queue) (work_open_oldest_age_seconds)", "legendFormat": "{{queue}}" } ]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Open work, all queues",
+      "description": "Total open work items across every queue.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "area" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "work_open" } ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "HIGH and URGENT by team",
+      "description": "Open HIGH and URGENT items per team; the backlog alert fires above 10.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (team) (work_open_high_items)", "legendFormat": "{{team}}" } ]
+    },
+    { "id": 6, "type": "row", "title": "Service levels", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 }, "panels": [] },
+    {
+      "id": 7, "type": "bargauge", "title": "Overdue by queue and team",
+      "description": "Open items past their queue's service level, per queue and team.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (queue, team) (work_open_overdue_items)", "legendFormat": "{{queue}} / {{team}}" } ]
+    },
+    {
+      "id": 8, "type": "stat", "title": "Deposit verification, oldest",
+      "description": "Age of the oldest open deposit record; red past one 10-hour working day.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 5, "x": 0, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 36000 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(work_open_oldest_age_seconds{queue=\"DEPOSIT_RECORD\"})" } ]
+    },
+    {
+      "id": 9, "type": "stat", "title": "Reply timer breaches (24h)",
+      "description": "Conversation reply timer breaches in the last 24 hours, all conversations and steps.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 5, "x": 5, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(conversation_reply_timer_breach_total[24h]))" } ]
+    },
+    {
+      "id": 10, "type": "stat", "title": "Consultant offers expired (24h)",
+      "description": "Consultant offers that lapsed in the last 24 hours; red above 3.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 5, "x": 10, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 3.5 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(journey_consultant_offer_expired_total[24h]))" } ]
+    },
+    {
+      "id": 11, "type": "stat", "title": "Information requests cancelled (24h)",
+      "description": "Information requests closed as case_cancelled in the last 24 hours; each is a lost journey.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 5, "x": 15, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.5 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(journey_information_request_closed_total{outcome=\"case_cancelled\"}[24h]))" } ]
+    },
+    {
+      "id": 12, "type": "stat", "title": "Time to first proposal, 7-day mean",
+      "description": "Mean time from case submitted to first proposal released over 7 days; red at 7 calendar days.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 20, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 604800 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(increase(journey_proposal_time_to_release_seconds_sum{revision=\"first\"}[7d])) / sum(increase(journey_proposal_time_to_release_seconds_count{revision=\"first\"}[7d]))" } ]
+    },
+    { "id": 13, "type": "row", "title": "Outbox", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 }, "panels": [] },
+    {
+      "id": 14, "type": "stat", "title": "Dead letters (all)",
+      "description": "Dead-lettered notifications across all channels; the level only grows, so any value above 0 is red.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 33 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "notification_outbox_dead_letters" } ]
+    },
+    {
+      "id": 15, "type": "timeseries", "title": "Pending by channel",
+      "description": "Notifications waiting to be sent, per channel.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 9, "x": 6, "y": 33 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (channel) (notification_outbox_pending_items)", "legendFormat": "{{channel}}" } ]
+    },
+    {
+      "id": 16, "type": "timeseries", "title": "Retrying by channel",
+      "description": "Notifications waiting after a failed attempt, per channel; the alert fires above 20.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 33 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (channel) (notification_outbox_retrying_items)", "legendFormat": "{{channel}}" } ]
+    },
+    {
+      "id": 17, "type": "timeseries", "title": "Oldest pending by channel",
+      "description": "Age of the oldest pending notification per channel; the line marks 900 seconds.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 900 } ] },
+          "custom": { "thresholdsStyle": { "mode": "line" } }
+        },
+        "overrides": []
+      },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max by (channel) (notification_outbox_oldest_pending_age_seconds)", "legendFormat": "{{channel}}" } ]
+    },
+    {
+      "id": 18, "type": "timeseries", "title": "Deliveries by outcome",
+      "description": "Delivery attempts per second by outcome (sent, retry, dead letter).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (outcome) (rate(notification_delivery_total[5m]))", "legendFormat": "{{outcome}}" } ]
+    },
+    { "id": 19, "type": "row", "title": "Scheduled jobs", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 }, "panels": [] },
+    {
+      "id": 20, "type": "table", "title": "Job health",
+      "description": "One row per scheduled job: time since last success, cadence, ratio of the two (red at 2 or more) and failures in 24 hours.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 50 },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Since last success" }, "properties": [ { "id": "unit", "value": "s" } ] },
+          { "matcher": { "id": "byName", "options": "Cadence" }, "properties": [ { "id": "unit", "value": "s" } ] },
+          {
+            "matcher": { "id": "byName", "options": "Ratio" },
+            "properties": [
+              { "id": "decimals", "value": 2 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 2 } ] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Failures 24h" },
+            "properties": [
+              { "id": "decimals", "value": 0 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "cellHeight": "sm", "sortBy": [ { "displayName": "Ratio", "desc": true } ] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max by (task) (time() - scheduler_job_last_success_seconds)", "instant": true, "range": false, "format": "table" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max by (task) (scheduler_job_cadence_seconds)", "instant": true, "range": false, "format": "table" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max by (task) ((time() - scheduler_job_last_success_seconds) / scheduler_job_cadence_seconds)", "instant": true, "range": false, "format": "table" },
+        { "refId": "D", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (task) (increase(scheduler_job_failures_total[24h]))", "instant": true, "range": false, "format": "table" }
+      ],
+      "transformations": [
+        { "id": "joinByField", "options": { "byField": "task", "mode": "outer" } },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true },
+            "renameByName": {
+              "task": "Task",
+              "Value #A": "Since last success",
+              "Value #B": "Cadence",
+              "Value #C": "Ratio",
+              "Value #D": "Failures 24h"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 21, "type": "timeseries", "title": "Job run time (mean)",
+      "description": "Mean run time of each scheduled job over a 15 minute window.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 59 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (task) (rate(scheduler_job_duration_seconds_sum[15m])) / sum by (task) (rate(scheduler_job_duration_seconds_count[15m]))", "legendFormat": "{{task}}" } ]
+    },
+    {
+      "id": 22, "type": "stat", "title": "Backend scrape",
+      "description": "Whether Prometheus can scrape the backend metrics endpoint.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 59 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 0 }, "0": { "text": "DOWN", "color": "red", "index": 1 } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "up{job=\"backend\"}" } ]
+    }
+  ]
+}

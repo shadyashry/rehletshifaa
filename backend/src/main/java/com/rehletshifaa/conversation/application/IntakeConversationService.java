@@ -23,6 +23,7 @@ import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.AuditTrail;
 import com.rehletshifaa.shared.crypto.CryptoService;
 import com.rehletshifaa.shared.crypto.EncryptedText;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import com.rehletshifaa.workforce.application.WorkforceDirectory;
 import com.rehletshifaa.workforce.application.HandoverCheck;
 import com.rehletshifaa.workforce.application.WorkforceEvents;
@@ -383,6 +384,7 @@ public class IntakeConversationService implements HandoverCheck {
     }
 
     /** A role that ends on a scheduled date raises no event; this sweep releases those owners' conversations the same way. */
+    @LeasedJob(maxHold = LeasedJob.SWEEP)
     @Scheduled(fixedDelayString = "${app.conversations.idle-poll-milliseconds:900000}")
     @Transactional
     public void releaseDepartedOwners() {

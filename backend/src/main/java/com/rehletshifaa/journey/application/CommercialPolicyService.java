@@ -20,7 +20,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Central commercial policy: the internal coordinated-care margin. Configured
+ * Central commercial policy: the coordination and guarantee fee rate (shown to the patient as its own line since P1-10), the
+ * pre-approved manual band, the final-quote validity and the FX tolerance band. Configured
  * centrally by a senior FINANCE user (never a per-case slider); selected and
  * snapshotted by the backend when a proposal is prepared. The intended standard
  * band is ~10-15% but the value is a centrally approved formula, not per-case.
@@ -34,7 +35,20 @@ public class CommercialPolicyService {
     private final Clock clock;
     private final CareCategoryCatalog careAreas;
 
-    public record Policy(UUID id, String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version) {}
+    private static final int MAX_QUOTE_VALIDITY_DAYS = 90;
+
+    /**
+     * The active version as the journey reads it. {@code finalQuoteValidityDays} and {@code fxToleranceRate} (P1-10) are boxed so a
+     * cached entry written before they existed reads back as the defaults.
+     */
+    public record Policy(UUID id, String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version,
+                         Integer finalQuoteValidityDays, BigDecimal fxToleranceRate) {
+        public Policy(UUID id, String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version) {
+            this(id, name, careCategory, marginRate, manualBandEgp, version, null, null);
+        }
+        public int quoteValidityDays() { return finalQuoteValidityDays == null ? CommercialPolicy.DEFAULT_FINAL_QUOTE_VALIDITY_DAYS : finalQuoteValidityDays; }
+        public BigDecimal fxTolerance() { return fxToleranceRate == null ? CommercialPolicy.DEFAULT_FX_TOLERANCE_RATE : fxToleranceRate; }
+    }
 
     public CommercialPolicyService(CommercialPolicyRepository policies, Authority authority, AuditTrail audit, Clock clock, CareCategoryCatalog careAreas) {
         this.policies = policies; this.authority = authority; this.audit = audit; this.clock = clock; this.careAreas = careAreas;
@@ -56,7 +70,8 @@ public class CommercialPolicyService {
         return (careCategory == null ? java.util.Optional.<CommercialPolicy>empty()
                 : policies.findFirstByActiveTrueAndCareCategoryOrderByVersionDesc(careCategory))
                 .or(policies::findFirstByActiveTrueAndCareCategoryIsNullOrderByVersionDesc)
-                .map(p -> new Policy(p.getId(), p.getName(), p.getCareCategory(), p.getMarginRate(), p.getManualBandEgp(), p.getVersion()))
+                .map(p -> new Policy(p.getId(), p.getName(), p.getCareCategory(), p.getMarginRate(), p.getManualBandEgp(), p.getVersion(),
+                        p.getFinalQuoteValidityDays(), p.getFxToleranceRate()))
                 .orElse(null);
     }
 
@@ -83,18 +98,29 @@ public class CommercialPolicyService {
                 : policies.findFirstByCareCategoryOrderByVersionDesc(careCategory)).map(CommercialPolicy::getVersion).orElse(0);
         List<CommercialPolicy> active = careCategory == null ? policies.findByActiveTrueAndCareCategoryIsNull()
                 : policies.findByActiveTrueAndCareCategory(careCategory);
+        // P1-10 (B-05): left out, the validity and the FX band carry over from the version being replaced, so revising a rate never resets them.
+        CommercialPolicy current = active.stream().findFirst().orElse(null);
+        int validityDays = request.finalQuoteValidityDays() != null ? request.finalQuoteValidityDays()
+                : current != null ? current.getFinalQuoteValidityDays() : CommercialPolicy.DEFAULT_FINAL_QUOTE_VALIDITY_DAYS;
+        if (validityDays < 1 || validityDays > MAX_QUOTE_VALIDITY_DAYS)
+            throw new ApiException(400, "QUOTE_VALIDITY_INVALID", "A final quote must stay open between 1 and " + MAX_QUOTE_VALIDITY_DAYS + " days");
+        BigDecimal fxTolerance = request.fxToleranceRate() != null ? request.fxToleranceRate().setScale(4, java.math.RoundingMode.HALF_UP)
+                : current != null ? current.getFxToleranceRate() : CommercialPolicy.DEFAULT_FX_TOLERANCE_RATE;
+        if (fxTolerance.signum() < 0 || fxTolerance.compareTo(MAX_MARGIN) > 0)
+            throw new ApiException(400, "FX_TOLERANCE_INVALID", "The exchange-rate band must be between 0 and 0.5");
         active.forEach(CommercialPolicy::retire);
         policies.saveAllAndFlush(active);
         String name = request.name() == null || request.name().isBlank() ? "Coordinated-care margin" : request.name().trim();
         CommercialPolicy policy = policies.saveAndFlush(new CommercialPolicy(name, careCategory, rate, band, previous + 1, actor.subject(),
-                LocalDate.now(clock), clock.instant()));
+                LocalDate.now(clock), clock.instant()).withQuoteRules(validityDays, fxTolerance));
         audit.event("COMMERCIAL_POLICY_CONFIGURED").actor(actor.subject(), actor.label()).entity("CommercialPolicy", policy.getId())
-                .action("CONFIGURE").reason("rate=" + rate + " careCategory=" + careCategory + " manualBandEgp=" + band).record();
+                .action("CONFIGURE").reason("rate=" + rate + " careCategory=" + careCategory + " manualBandEgp=" + band
+                        + " finalQuoteValidityDays=" + validityDays + " fxToleranceRate=" + fxTolerance).record();
         return view(policy);
     }
 
     private static CommercialPolicyView view(CommercialPolicy p) {
         return new CommercialPolicyView(p.getId(), p.getName(), p.getCareCategory(), p.getMarginRate(), p.getManualBandEgp(), p.isActive(), p.getVersion(),
-                p.getCreatedBy(), p.getValidFrom());
+                p.getCreatedBy(), p.getValidFrom(), p.getFinalQuoteValidityDays(), p.getFxToleranceRate());
     }
 }

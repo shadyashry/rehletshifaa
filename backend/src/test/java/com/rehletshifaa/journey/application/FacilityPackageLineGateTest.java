@@ -103,11 +103,11 @@ class FacilityPackageLineGateTest {
         UUID caseId = reviewedCase(List.of(packageLine(pkg.packageId(), "180000")));
         ProposalView proposal = createProposal(caseId);
         assertThat(requiresFinance(proposal)).isFalse();
-        assertThat(jdbc.queryForObject("SELECT source FROM proposal_items WHERE proposal_version_id=?", String.class, proposal.versionId())).isEqualTo("FACILITY_PACKAGE");
-        assertThat(jdbc.queryForObject("SELECT provider_price_egp FROM proposal_items WHERE proposal_version_id=?", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("180000.00");
-        assertThat(jdbc.queryForObject("SELECT facility_package_id FROM proposal_items WHERE proposal_version_id=?", UUID.class, proposal.versionId())).isEqualTo(pkg.packageId());
+        assertThat(jdbc.queryForObject("SELECT source FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'", String.class, proposal.versionId())).isEqualTo("FACILITY_PACKAGE");
+        assertThat(jdbc.queryForObject("SELECT provider_price_egp FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("180000.00");
+        assertThat(jdbc.queryForObject("SELECT facility_package_id FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'", UUID.class, proposal.versionId())).isEqualTo(pkg.packageId());
         // The range travels with the line: the patient sees the marked-up band, never a bare point.
-        assertThat(jdbc.queryForObject("SELECT unit_price_min_egp < unit_price_max_egp FROM proposal_items WHERE proposal_version_id=?", Boolean.class, proposal.versionId())).isTrue();
+        assertThat(jdbc.queryForObject("SELECT unit_price_min_egp < unit_price_max_egp FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'", Boolean.class, proposal.versionId())).isTrue();
         // No Finance step: the coordinator releases straight away, with no Finance work item ever opened.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_role='FINANCE' AND status IN ('OPEN','IN_PROGRESS')", Integer.class, caseId)).isZero();
         authenticate("coordinator-subject", Role.COORDINATOR);
@@ -144,7 +144,7 @@ class FacilityPackageLineGateTest {
         UUID inside = reviewedCase(List.of(manualLine("4800")));
         ProposalView insideProposal = createProposal(inside);
         assertThat(requiresFinance(insideProposal)).isFalse();
-        assertThat(jdbc.queryForObject("SELECT source FROM proposal_items WHERE proposal_version_id=?", String.class, insideProposal.versionId())).isEqualTo("MANUAL");
+        assertThat(jdbc.queryForObject("SELECT source FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'", String.class, insideProposal.versionId())).isEqualTo("MANUAL");
 
         UUID outside = reviewedCase(List.of(manualLine("5000.01")));
         ProposalView proposal = createProposal(outside);

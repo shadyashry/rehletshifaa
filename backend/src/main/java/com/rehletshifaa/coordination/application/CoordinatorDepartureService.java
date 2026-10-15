@@ -1,6 +1,7 @@
 package com.rehletshifaa.coordination.application;
 
 import com.rehletshifaa.coordination.infrastructure.CoordinationRepository;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import com.rehletshifaa.workforce.application.WorkforceDirectory;
 import com.rehletshifaa.workforce.application.WorkforceEvents;
 import org.springframework.context.event.EventListener;
@@ -34,6 +35,7 @@ public class CoordinatorDepartureService {
     }
 
     /** A role that ends on a scheduled date raises no event; this sweep re-routes those owners' cases the same way. */
+    @LeasedJob(maxHold = LeasedJob.SWEEP)
     @Scheduled(fixedDelayString = "${app.conversations.idle-poll-milliseconds:900000}")
     @Transactional
     public void releaseDepartedOwners() {

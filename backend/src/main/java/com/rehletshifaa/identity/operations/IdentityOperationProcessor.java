@@ -11,13 +11,21 @@ import org.springframework.stereotype.Service;
 public class IdentityOperationProcessor {
     private static final Logger log = LoggerFactory.getLogger(IdentityOperationProcessor.class);
     private static final int BATCH_SIZE = 20;
+    /**
+     * No provider call may start this close to lease expiry. It must exceed the slowest single operation the configured
+     * client timeouts allow (up to about six Keycloak admin calls at connect + read), or a reclaiming instance could run
+     * the same operation, and send the same invitation or reset email, while this one is still inside its calls.
+     */
+    public static final java.time.Duration EXECUTE_MARGIN = java.time.Duration.ofSeconds(120);
     private final IdentityOperationStore store;
     private final IdentityOperationExecutor executor;
+    private final java.time.Clock clock;
     private volatile boolean stopping;
 
-    public IdentityOperationProcessor(IdentityOperationStore store, IdentityOperationExecutor executor) {
+    public IdentityOperationProcessor(IdentityOperationStore store, IdentityOperationExecutor executor, java.time.Clock clock) {
         this.store = store;
         this.executor = executor;
+        this.clock = clock;
     }
 
     @EventListener(org.springframework.context.event.ContextClosedEvent.class)
@@ -29,7 +37,8 @@ public class IdentityOperationProcessor {
     public void dispatch() {
         if (stopping) return;
         for (IdentityOperationStore.Operation operation : store.claim(BATCH_SIZE)) {
-            if (stopping) { store.release(operation); continue; }
+            // A nearly spent lease is handed back uncharged: the next tick claims it again with a fresh lease.
+            if (stopping || !clock.instant().isBefore(operation.leaseExpiresAt().minus(EXECUTE_MARGIN))) { store.release(operation); continue; }
             execute(operation);
         }
     }

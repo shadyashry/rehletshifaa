@@ -19,6 +19,7 @@ import com.rehletshifaa.journey.application.ReplyCoverService;
 import com.rehletshifaa.journey.application.StaffWorkService;
 import com.rehletshifaa.shared.api.ApiException;
 import com.rehletshifaa.shared.audit.AuditTrail;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import com.rehletshifaa.workforce.application.WorkforceDirectory;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Limit;
@@ -103,7 +104,11 @@ public class ReplyTimerService {
     @EventListener public void on(PatientConversationEvents.PatientWrote event) { awaiting(CASE, event.caseId(), event.at()); }
     @EventListener public void on(PatientConversationEvents.PatientAnswered event) { answered(CASE, event.caseId()); }
 
-    /** Reminders and escalations that have come due. Leased by row lock (SKIP LOCKED), so instances never double-send. */
+    /**
+     * Reminders and escalations that have come due. One instance per tick (scheduler lease); the obligations are also claimed
+     * by row lock (SKIP LOCKED), so even a lease that outlives its hold never double-sends.
+     */
+    @LeasedJob(maxHold = LeasedJob.EXPIRY_SCAN)
     @Scheduled(fixedDelayString = "${app.conversations.timer-poll-milliseconds:60000}")
     @Transactional
     public void dispatch() {
@@ -137,6 +142,7 @@ public class ReplyTimerService {
     }
 
     /** Open intake conversations nobody has written in for {@code idleCloseHours} are closed; a returning person reopens them. */
+    @LeasedJob(maxHold = LeasedJob.EXPIRY_SCAN)
     @Scheduled(fixedDelayString = "${app.conversations.idle-poll-milliseconds:900000}")
     @Transactional
     public void closeIdle() {

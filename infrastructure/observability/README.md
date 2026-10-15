@@ -58,4 +58,40 @@ This overlay is a development tool (single node, HTTP without TLS). For a deploy
 managed Elastic deployment or a TLS-enabled cluster, keep the same data stream name, template and
 writer-role shape, and point Filebeat (or Elastic Agent) at it.
 
-Alert rules (checked by hand or script until a Prometheus registry exists): [alerts.md](alerts.md)
+## Meters and alerts: Prometheus and Grafana (opt-in, P1-8)
+
+The backend publishes its business and job-health meters on Micrometer with the Prometheus registry, at
+`/actuator/prometheus` on its internal metrics port `backend:8090` (`METRICS_PORT`). Compose does not publish that
+port and neither the api-gateway, Caddy nor the tunnel routes to it, so the scrape needs no token; the main port
+(8080) serves health only.
+
+```
+backend:8090/actuator/prometheus ─> Prometheus (rules/alerts.yml) ─> Grafana (provisioned dashboard)
+```
+
+Add `GRAFANA_ADMIN_PASSWORD` to `.env` (any long random string), then start only these two:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.observability.yml up -d prometheus grafana
+```
+
+Compose checks every variable of the file, so the three Elastic secrets above must be set too (or exported in the
+shell for this command) even though the Elastic services stay stopped.
+
+- Grafana: http://localhost:3300 (user `admin`). Dashboard **RehletShifaa → RehletShifaa operations**: queues, service
+  levels, outbox, scheduled jobs. Provisioned read-only from `grafana/dashboards/`; edit the JSON, not the UI.
+- Prometheus: http://localhost:9090 (Alerts tab). Retention `PROMETHEUS_RETENTION`, default 15 days.
+- Both bind to 127.0.0.1 only. About 0.5 GB of memory together. Stop them with
+  `docker compose ... stop prometheus grafana`.
+
+Files: `prometheus/prometheus.yml` (scrape config), `prometheus/rules/alerts.yml` (the rules), `grafana/provisioning/`
+(data source and dashboard provider), `grafana/dashboards/rehletshifaa-operations.json`.
+
+Rules: [alerts.md](alerts.md) is the source (thresholds, owners, runbooks); `prometheus/rules/alerts.yml` translates it
+into PromQL. Change a threshold in alerts.md first, then in the rules file. There is no Alertmanager yet: alerts show in
+Prometheus and Grafana but notify no one.
+
+Prometheus names differ from the Micrometer names: dots become underscores, a gauge loses `.total` and gains its unit
+(`work.open.high` → `work_open_high_items`, `work.open.total` → `work_open`), counters gain `_total`. The job meters are
+tagged `task` (not `job`, which is Prometheus's own target label): `scheduler_job_last_success_seconds`,
+`scheduler_job_cadence_seconds`, `scheduler_job_duration_seconds_*`, `scheduler_job_failures_total`.

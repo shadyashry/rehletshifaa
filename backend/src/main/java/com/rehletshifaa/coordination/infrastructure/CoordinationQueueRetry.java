@@ -1,5 +1,6 @@
 package com.rehletshifaa.coordination.infrastructure;
 import com.rehletshifaa.coordination.application.AssignmentEngine;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,6 +18,7 @@ public class CoordinationQueueRetry {
      * Each case retries in its own transaction and fails alone. The queue is read in case-id order, so one
      * permanently failing case must not end the pass and starve every case sorted after it.
      */
+    @LeasedJob(maxHold = LeasedJob.SWEEP)
     @Scheduled(fixedDelayString="${app.coordination.queue-retry.delay-ms:60000}") public void retry(){
         for(UUID id:repo.retryableQueue()){
             try{engine.retryQueued(id);}

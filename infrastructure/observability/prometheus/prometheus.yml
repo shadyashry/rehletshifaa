@@ -1,0 +1,14 @@
+# P1-8 session 2: Prometheus scrapes the backend's internal metrics port on the Docker network. Port 8090 is not published by
+# Compose and not routed by the gateway or the tunnel, so the scrape needs no token (security.MetricsPort).
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["backend:8090"]

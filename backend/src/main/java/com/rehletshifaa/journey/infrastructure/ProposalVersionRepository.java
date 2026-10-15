@@ -63,6 +63,7 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
         UUID getProposalId(); UUID getId(); Integer getVersionNumber(); String getStatus(); String getLanguage(); String getCurrency();
         Instant getValidUntil(); String getOperationalPlan(); String getIncludedServices(); String getExcludedServices(); String getPaymentTerms();
         String getRefundTerms(); String getDisclaimers(); String getCoordinatorNotes(); String getDocumentType(); String getScopeChangeReason();
+        Instant getReleasedAt(); Boolean getAboveEstimateMaximum(); String getFxReapprovalStatus();
     }
 
     @Query("""
@@ -70,7 +71,8 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
                 v.currency as currency, v.validUntil as validUntil, v.operationalPlan as operationalPlan, v.includedServices as includedServices,
                 v.excludedServices as excludedServices, v.paymentTerms as paymentTerms, v.refundTerms as refundTerms,
                 v.disclaimers as disclaimers, v.coordinatorNotes as coordinatorNotes, v.documentType as documentType,
-                v.scopeChangeReason as scopeChangeReason
+                v.scopeChangeReason as scopeChangeReason, v.releasedAt as releasedAt, v.aboveEstimateMaximum as aboveEstimateMaximum,
+                v.fxReapprovalStatus as fxReapprovalStatus
             from ProposalVersion v where v.id = :id""")
     java.util.Optional<DocumentRow> findDocument(@Param("id") UUID id);
 
@@ -80,7 +82,7 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
         Instant getValidUntil(); String getRecommendedTreatment(); String getRisksAndLimitations(); String getAssumptions();
         String getScopeChangeReason(); String getPaymentTerms(); String getRefundTerms(); String getDisclaimers(); String getIncludedServices();
         String getExcludedServices(); BigDecimal getPatientTotalMinEgp(); BigDecimal getPatientTotalExpectedEgp();
-        BigDecimal getPatientTotalMaxEgp(); BigDecimal getFxRate(); LocalDate getFxRateDate(); String getConsultantName();
+        BigDecimal getPatientTotalMaxEgp(); BigDecimal getFxRate(); LocalDate getFxRateDate(); String getConsultantName(); Instant getReleasedAt();
     }
 
     @Query("""
@@ -90,7 +92,7 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
                 v.scopeChangeReason as scopeChangeReason, v.paymentTerms as paymentTerms, v.refundTerms as refundTerms,
                 v.disclaimers as disclaimers, v.includedServices as includedServices, v.excludedServices as excludedServices,
                 v.patientTotalMinEgp as patientTotalMinEgp, v.patientTotalExpectedEgp as patientTotalExpectedEgp,
-                v.patientTotalMaxEgp as patientTotalMaxEgp, v.fxRate as fxRate, v.fxRateDate as fxRateDate, pp.displayName as consultantName
+                v.patientTotalMaxEgp as patientTotalMaxEgp, v.fxRate as fxRate, v.fxRateDate as fxRateDate, pp.displayName as consultantName, v.releasedAt as releasedAt
             from ProposalVersion v join Proposal pr on pr.id = v.proposalId join MedicalCase c on c.id = pr.caseId
                 left join PatientProfile pt on pt.id = c.patientId
                 left join ClinicalReviewVersion cr on cr.id = v.clinicalReviewId left join PractitionerProfile pp on pp.id = cr.practitionerId
@@ -160,11 +162,72 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
     @Query("select count(v) > 0 from ProposalVersion v join Proposal p on p.id = v.proposalId where p.caseId = :caseId and v.status = 'ACCEPTED'")
     boolean hasAcceptedForCase(@Param("caseId") UUID caseId);
 
-    /** A released (or viewed) version past its validity, with its case. */
-    interface Expiring { UUID getVersionId(); UUID getCaseId(); }
+    /**
+     * P1-10 (A-08): the maximum EGP total of the estimate the patient accepted, latest first; the cap of a final quote. A case without
+     * an accepted estimate (data entered outside the journey) is capped by its latest estimate instead ({@link #findLatestEstimateMaximum}).
+     */
+    @Query("""
+            select v.patientTotalMaxEgp from ProposalVersion v join Proposal p on p.id = v.proposalId
+            where p.caseId = :caseId and v.documentType = 'PRELIMINARY_ESTIMATE' and v.status = 'ACCEPTED' and v.patientTotalMaxEgp is not null
+            order by v.versionNumber desc""")
+    List<BigDecimal> findAcceptedEstimateMaximum(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
 
     @Query("""
-            select v.id as versionId, p.caseId as caseId from ProposalVersion v join Proposal p on p.id = v.proposalId
+            select v.patientTotalMaxEgp from ProposalVersion v join Proposal p on p.id = v.proposalId
+            where p.caseId = :caseId and v.documentType = 'PRELIMINARY_ESTIMATE' and v.patientTotalMaxEgp is not null
+            order by v.versionNumber desc""")
+    List<BigDecimal> findLatestEstimateMaximum(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ProposalVersion v set v.aboveEstimateMaximum = true where v.id = :id")
+    int markAboveEstimateMaximum(@Param("id") UUID id);
+
+    /** P1-10: what decides whether a released final quote may be accepted now (cooling period, FX band). */
+    interface AcceptanceTerms {
+        String getCurrency(); BigDecimal getFxRate(); Instant getReleasedAt(); Boolean getAboveEstimateMaximum(); String getFxReapprovalStatus();
+        BigDecimal getFxReapprovalRate();
+    }
+
+    @Query("""
+            select v.currency as currency, v.fxRate as fxRate, v.releasedAt as releasedAt, v.aboveEstimateMaximum as aboveEstimateMaximum,
+                v.fxReapprovalStatus as fxReapprovalStatus, v.fxReapprovalRate as fxReapprovalRate
+            from ProposalVersion v where v.id = :id""")
+    java.util.Optional<AcceptanceTerms> findAcceptanceTerms(@Param("id") UUID id);
+
+    /** P1-10 (B-05): validity is fixed at release: the policy's days from release, or the coordinator's earlier date. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ProposalVersion v set v.validUntil = :until where v.id = :id")
+    int limitValidity(@Param("id") UUID id, @Param("until") Instant until);
+
+    /** P1-10 (B-05): an acceptance outside the FX band opens one Finance re-approval; a pending or confirmed one is left as it is. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ProposalVersion v set v.fxReapprovalStatus = 'PENDING', v.fxReapprovalRate = :rate, v.fxReapprovalRequestedAt = :now,
+                v.fxReapprovalDecidedBy = null, v.fxReapprovalDecidedAt = null
+            where v.id = :id and v.fxReapprovalStatus is null and v.status in ('RELEASED', 'VIEWED')""")
+    int requestFxReapproval(@Param("id") UUID id, @Param("rate") BigDecimal rate, @Param("now") Instant now);
+
+    /** Finance keeps the frozen rate: acceptance then proceeds at it without a new band check. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ProposalVersion v set v.fxReapprovalStatus = 'CONFIRMED', v.fxReapprovalDecidedBy = :by, v.fxReapprovalDecidedAt = :now
+            where v.id = :id and v.fxReapprovalStatus = 'PENDING' and v.status in ('RELEASED', 'VIEWED')""")
+    int confirmFxRate(@Param("id") UUID id, @Param("by") String by, @Param("now") Instant now);
+
+    /** Finance re-releases at the day's rate: a new snapshot and document; the request is answered (status cleared). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ProposalVersion v set v.fxRate = :fxRate, v.fxRateDate = :fxDate, v.fxSource = 'SNAPSHOT', v.htmlSnapshot = :html,
+                v.fxReapprovalStatus = null, v.fxReapprovalDecidedBy = :by, v.fxReapprovalDecidedAt = :now
+            where v.id = :id and v.fxReapprovalStatus = 'PENDING' and v.status in ('RELEASED', 'VIEWED')""")
+    int repriceAtRate(@Param("id") UUID id, @Param("fxRate") BigDecimal fxRate, @Param("fxDate") LocalDate fxDate, @Param("html") String html,
+                      @Param("by") String by, @Param("now") Instant now);
+
+    /** A released (or viewed) version past its validity, with its case. */
+    interface Expiring { UUID getVersionId(); UUID getCaseId(); String getDocumentType(); }
+
+    @Query("""
+            select v.id as versionId, p.caseId as caseId, v.documentType as documentType from ProposalVersion v join Proposal p on p.id = v.proposalId
             where v.status in ('RELEASED', 'VIEWED') and v.validUntil is not null and v.validUntil <= :now""")
     List<Expiring> findExpiring(@Param("now") Instant now);
 

@@ -8,6 +8,7 @@ import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
 import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.shared.audit.AuditTrail;
+import com.rehletshifaa.shared.scheduling.application.LeasedJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -78,6 +79,7 @@ public class InformationRequestReminders {
     }
 
     /** Every open information request, each in its own transaction. */
+    @LeasedJob(maxHold = LeasedJob.SWEEP)
     @Scheduled(fixedDelayString = "${app.sla.information-reminder-scan-ms:3600000}")
     public void sweep() {
         for (InformationRequestCycle request : tasks.findOpenInformationRequestCycles()) {

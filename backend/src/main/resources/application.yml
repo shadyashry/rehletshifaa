@@ -72,8 +72,9 @@ server:
     include-stacktrace: never
   forward-headers-strategy: framework
 management:
-  # P1-8: metrics is served on the internal metrics port only (app.management.metrics-port, MetricsPort); the main port serves health.
-  endpoints.web.exposure.include: health,metrics
+  # P1-8: metrics and the Prometheus scrape are served on the internal metrics port only (app.management.metrics-port,
+  # MetricsPort); the main port serves health.
+  endpoints.web.exposure.include: health,metrics,prometheus
   endpoint:
     health:
       show-details: never
@@ -89,7 +90,8 @@ springdoc:
   api-docs.enabled: ${OPENAPI_ENABLED:true}
   swagger-ui.enabled: ${OPENAPI_ENABLED:true}
 app:
-  # P1-8: the internal port that serves /actuator/metrics (not published by Compose, not routed by the gateway); 0 turns it off.
+  # P1-8: the internal port that serves /actuator/metrics and /actuator/prometheus (not published by Compose, not routed by the
+  # gateway); 0 turns it off.
   management.metrics-port: ${METRICS_PORT:8090}
   # No case cutover is implied. Keep off until the complete Phase 4B parity gate passes.
   journey.runtime.enabled: ${JOURNEY_RUNTIME_ENABLED:false}

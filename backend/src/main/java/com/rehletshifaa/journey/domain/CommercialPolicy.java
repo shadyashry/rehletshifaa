@@ -25,11 +25,18 @@ public class CommercialPolicy extends AssignedIdEntity {
     @Column(name = "margin_rate", nullable = false, precision = 6, scale = 4) private BigDecimal marginRate;
     /** P0-5 (A-07): a manual line priced at or below this EGP figure needs no Finance approval; null means every manual line does. */
     @Column(name = "manual_band_egp", precision = 14, scale = 2) private BigDecimal manualBandEgp;
+    /** P1-10 (B-05): days a released final quote stays open; the coordinator may shorten it, never lengthen it. */
+    @Column(name = "final_quote_validity_days", nullable = false) private int finalQuoteValidityDays = DEFAULT_FINAL_QUOTE_VALIDITY_DAYS;
+    /** P1-10 (B-05): how far the day's rate may move a non-EGP final quote's total before acceptance waits for Finance. */
+    @Column(name = "fx_tolerance_rate", nullable = false, precision = 6, scale = 4) private BigDecimal fxToleranceRate = DEFAULT_FX_TOLERANCE_RATE;
     @Column(nullable = false) private boolean active;
     @Column(nullable = false) private int version;
     @Column(name = "created_by", length = 120) private String createdBy;
     @Column(name = "valid_from") private LocalDate validFrom;
     @Column(name = "created_at", nullable = false) private Instant createdAt;
+
+    public static final int DEFAULT_FINAL_QUOTE_VALIDITY_DAYS = 14;
+    public static final BigDecimal DEFAULT_FX_TOLERANCE_RATE = new BigDecimal("0.0300");
 
     protected CommercialPolicy() {}
 
@@ -39,12 +46,19 @@ public class CommercialPolicy extends AssignedIdEntity {
         this.version = version; this.createdBy = createdBy; this.validFrom = validFrom; this.createdAt = micros(createdAt);
     }
 
+    /** P1-10: the final-quote validity and FX band this version carries. */
+    public CommercialPolicy withQuoteRules(int finalQuoteValidityDays, BigDecimal fxToleranceRate) {
+        this.finalQuoteValidityDays = finalQuoteValidityDays; this.fxToleranceRate = fxToleranceRate; return this;
+    }
+
     public void retire() { this.active = false; }
 
     public String getName() { return name; }
     public String getCareCategory() { return careCategory; }
     public BigDecimal getMarginRate() { return marginRate; }
     public BigDecimal getManualBandEgp() { return manualBandEgp; }
+    public int getFinalQuoteValidityDays() { return finalQuoteValidityDays; }
+    public BigDecimal getFxToleranceRate() { return fxToleranceRate; }
     public boolean isActive() { return active; }
     public int getVersion() { return version; }
     public String getCreatedBy() { return createdBy; }
