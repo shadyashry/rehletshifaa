@@ -14,6 +14,10 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 
 import { ProposalSign } from "./ProposalSign";
 import { composeProposalComment } from "./ProposalDecisionDialog";
+import { getDictionary } from "@/lib/dictionary";
+import type { Locale } from "@/lib/i18n";
+
+const proposalCopy = (locale: Locale) => { const d = getDictionary(locale); return { ...d.secureLink.proposal, assisted: d.portalProposal.assisted, services: d.portalWork.plural.services }; };
 
 const summary = { caseNumber: "RS-2026-000030", channel: "WHATSAPP", destinationHint: "•••• 7898", whatsappHint: "•••• 7898", emailHint: null };
 
@@ -51,7 +55,7 @@ function mockApi({ decisionStatus = 200 }: { decisionStatus?: number } = {}) {
 
 /** Walk the OTP gate so the tests can assert against the proposal itself. */
 async function openProposal() {
-  render(<ProposalSign locale="en" token="tok-1" />);
+  render(<ProposalSign locale="en" token="tok-1" copy={proposalCopy("en")} />);
   fireEvent.click(await screen.findByRole("button", { name: "Send code" }));
   const code = await screen.findByLabelText("Enter the 6-digit code");
   fireEvent.change(code, { target: { value: "123456" } });
@@ -200,7 +204,7 @@ describe("ProposalSign", () => {
 
   it("opens straight to the proposal with the grant handed over from Check Case Status, once", async () => {
     sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "handed-grant", expiresAt: "2099-01-01T00:00:00Z" }));
-    render(<ProposalSign locale="en" token="tok-1" />);
+    render(<ProposalSign locale="en" token="tok-1" copy={proposalCopy("en")} />);
     await screen.findByRole("heading", { name: "Your preliminary care estimate" });
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     const paths = fetchMock.mock.calls.map(call => String(call[0]));
@@ -212,7 +216,7 @@ describe("ProposalSign", () => {
 
   it("in Arabic, isolates each amount, counts services in Arabic plural forms and uses one long date style", async () => {
     sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "handed-grant", expiresAt: "2099-01-01T00:00:00Z" }));
-    render(<ProposalSign locale="ar" token="tok-1" />);
+    render(<ProposalSign locale="ar" token="tok-1" copy={proposalCopy("ar")} />);
     const amounts = await screen.findAllByText(/8,200/);
     // "$US 8,200" came from an un-isolated figure in a right-to-left line.
     expect(amounts.every((el) => el.closest("bdi[dir='ltr']") !== null)).toBe(true);
@@ -228,7 +232,7 @@ describe("ProposalSign", () => {
       return { ok: true, status: 200, json: async () => summary } as Response;
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<ProposalSign locale="en" token="tok-1" />);
+    render(<ProposalSign locale="en" token="tok-1" copy={proposalCopy("en")} />);
     expect(await screen.findByRole("button", { name: "Send code" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Your preliminary care estimate" })).toBeNull();
   });
@@ -243,7 +247,7 @@ async function openDocument(doc: Record<string, unknown>, locale: "en" | "ar" = 
   });
   vi.stubGlobal("fetch", fetchMock);
   sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "g", expiresAt: "2099-01-01T00:00:00Z" }));
-  render(<ProposalSign locale={locale} token="tok-1" />);
+  render(<ProposalSign locale={locale} token="tok-1" copy={proposalCopy(locale)} />);
   await screen.findByRole("heading", { level: 1 });
   return fetchMock;
 }

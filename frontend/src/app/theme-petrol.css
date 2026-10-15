@@ -423,10 +423,18 @@
 .dossier-page[data-depth="3"] > p,
 .dossier-page[data-depth="2"] > p { padding-inline-end: 1rem; }
 /* The confirmation page is the same page, resting flat, with no stack above it. */
-.dossier-page-static { --page-tilt: 0deg; padding-inline-end: 7rem; }
+.dossier-page-static { --page-tilt: 0deg; }
+/* A stamped page keeps the end-top corner clear for the stamp (DossierPage); an unstamped one uses the full width. */
+.dossier-page-static[data-stamped] { padding-inline-end: 7rem; }
+.dossier-page-stamp { position: absolute; inset-inline-end: 1.5rem; inset-block-start: 1.5rem; }
+/* The page that matters now carries the file's petrol tab on its top edge. */
+.dossier-page-static[data-edge="tab"] { border-block-start: 2px solid var(--color-brand-600); }
+@media (min-width: 768px) {
+  .dossier-page-stamp { inset-inline-end: 2.25rem; inset-block-start: 2.25rem; }
+}
 @media (max-width: 639px) {
   .dossier-page[data-depth="1"] { padding-inline-end: 1.125rem; padding-block-start: 3.25rem; }
-  .dossier-page-static { padding-inline-end: 1.75rem; padding-block-start: 4rem; }
+  .dossier-page-static[data-stamped] { padding-inline-end: 1.75rem; padding-block-start: 4rem; }
 }
 .case-stamp {
   transform: rotate(var(--stamp-tilt, -8deg));

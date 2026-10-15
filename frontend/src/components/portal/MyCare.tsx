@@ -6,6 +6,7 @@ import { ArrowRight, Check, FileText, MessageCircle, MessageSquareText, Plus, Us
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { EmergencyGuidance } from "@/components/EmergencyGuidance";
+import { CaseJourney } from "@/components/CaseJourney";
 import { careAreaLabel, fillTemplate, plural } from "@/lib/portal-labels";
 import { ConfirmDialog, UnreadCount } from "@/components/portal/portal-ui";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
@@ -236,23 +237,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
           </section>
 
           {/* JOURNEY — orientation only; nothing here is a control. The markers fill as the case moves. */}
-          <section aria-labelledby="journey-title" className="card care-journey p-5 sm:p-6 lg:col-start-1 lg:row-start-2">
-            <h2 id="journey-title" className="eyebrow">{t.journey.title}</h2>
-            <ol className="mt-5 grid md:grid-cols-7">
-              {t.journey.phases.map((label, index) => {
-                const state = index < phase ? "reached" : index === phase ? "current" : "upcoming";
-                return (
-                  <li key={label} className="journey-step" aria-current={state === "current" ? "step" : undefined}>
-                    {index < t.journey.phases.length - 1 && <span aria-hidden className="journey-link" data-reached={index < phase || undefined}/>}
-                    <span aria-hidden className="journey-marker relative z-10 flex-none" data-state={state}>{index + 1}</span>
-                    <span className={`text-[0.875rem] leading-5 ${state === "current" ? "font-semibold text-brand-900" : "text-ink-600"}`}>
-                      {label}{state === "reached" && <span className="sr-only"> ({t.journey.done})</span>}{state === "current" && <span className="sr-only"> ({t.journey.current})</span>}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
+          <CaseJourney id="journey-title" title={t.journey.title} steps={t.journey.phases} current={phase}
+                       completedLabel={t.journey.done} currentLabel={t.journey.current} className="card p-5 sm:p-6 lg:col-start-1 lg:row-start-2"/>
 
           {/* ESTIMATE — the document's summary and, once settled, one way to open it. */}
           {showProposal && proposal && patientProposal && (

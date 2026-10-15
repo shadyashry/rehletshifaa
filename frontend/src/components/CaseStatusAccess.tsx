@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileUp, LockKeyhole, ShieldCheck, X } from "lucide-react";
 
-import { PatientJourneyTracker, phaseExplanation, phaseMeanwhile, type JourneyCopy } from "@/components/PatientJourneyTracker";
+import { phaseExplanation, phaseLabels, phaseMeanwhile, phasePosition, type JourneyCopy } from "@/lib/patient-journey";
+import { CaseJourney } from "@/components/CaseJourney";
+import { OneTimeCodeStep } from "@/components/OneTimeCodeStep";
+import type { Dictionary } from "@/lib/dictionary";
 import { plural } from "@/lib/portal-labels";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
@@ -24,64 +27,8 @@ export const PROPOSAL_HANDOFF_KEY = (token: string) => `rs-proposal-grant:${toke
 type Presign = { documentId: string; uploadUrl: string; requiredHeaders: Record<string, string> };
 
 
-const copy = {
-  en: {
-    title: "Track your case securely", loading: "Checking your secure link…",
-    send: "Send verification code", sent: "We sent a 6-digit code to", code: "Verification code", verify: "Verify and continue",
-    private: "Your medical information is shown only after contact verification.",
-    status: "Current update", action: "Your response", now: "What happens now", next: "Next",
-    noAction: "No action is required from you right now.", journey: "Your case",
-    usuallyWithin: "This usually takes up to {duration}.", meanwhile: "Meanwhile",
-    workingDays: { one: "{count} working day", other: "{count} working days" },
-    noItems: "Add anything you would like your coordinator to know.",
-    required: "Required", optional: "Optional", already: "Already provided",
-    choose: "Choose a file", chosen: "file selected", replace: "Choose a different file", remove: "Remove",
-    note: "Anything else we should know?", submit: "Send information", sending: "Sending…",
-    doneTitle: "Thank you — your information was sent.", doneBody: "Your coordinator has been notified and will continue your case.",
-    invalid: "This secure link is invalid or has expired.", error: "The request could not be completed. Please try again.",
-    fix: "Please complete the highlighted items.", missing: "Please provide this information.", missingFile: "Please upload the requested document.",
-    due: "Needed by",
-    proposalTitle: "Your proposal",
-    proposalPreparing: "Your proposal is being prepared. We will send you a secure link as soon as it is ready.",
-    proposalReadyTitle: "Your proposal is ready to review", proposalReady: "Your treatment plan and its estimated cost are ready. Take the time you need — nothing happens until you decide.",
-    proposalReadyNext: "If you accept, we start arranging your care.", proposalPreparingTitle: "We are preparing your proposal", proposalPreparingNext: "You will receive a secure link to review it in your own time.",
-    proposalReview: "Review proposal", proposalOpening: "Opening…",
-    proposalAccepted: "You acknowledged your estimate. Your coordinator is arranging the next steps, and your proposal stays available in your secure portal.",
-    proposalDeclined: "You declined the proposal. Your coordinator remains available if anything changes.",
-    proposalRevision: "You asked for changes. Your coordinator is preparing a revised proposal and will send you a new secure link.",
-    proposalExpired: "This proposal has expired. Your coordinator can prepare an updated one for you.",
-    proposalVersion: (n: number) => (n > 1 ? "Updated version" : ""), proposalValid: "Valid until",
-    proposalUnavailable: "This proposal is no longer available to review. Please refresh to see the latest status.",
-  },
-  ar: {
-    title: "متابعة حالتك بأمان", loading: "جارٍ التحقق من الرابط الآمن…",
-    send: "إرسال رمز التحقق", sent: "أرسلنا رمزًا مكوّنًا من 6 أرقام إلى", code: "رمز التحقق", verify: "تحقق وتابع",
-    private: "لا تظهر معلوماتك الطبية إلا بعد التحقق من جهة الاتصال.",
-    status: "آخر تحديث", action: "ردّك", now: "ما يحدث الآن", next: "الخطوة التالية",
-    noAction: "لا يلزم منك أي إجراء الآن.", journey: "مسار حالتك",
-    usuallyWithin: "يستغرق هذا عادةً مدة تصل إلى {duration}.", meanwhile: "في الأثناء",
-    workingDays: { zero: "{count} يوم عمل", one: "يوم عمل واحد", two: "يومَي عمل", few: "{count} أيام عمل", many: "{count} يوم عمل", other: "{count} يوم عمل" },
-    noItems: "أضف أي معلومة تودّ أن يعرفها منسقك.",
-    required: "مطلوب", optional: "اختياري", already: "تم تقديمه",
-    choose: "اختيار ملف", chosen: "ملف محدد", replace: "اختيار ملف آخر", remove: "إزالة",
-    note: "هل من شيء آخر تودّ إخبارنا به؟", submit: "إرسال المعلومات", sending: "جارٍ الإرسال…",
-    doneTitle: "شكرًا — تم إرسال معلوماتك.", doneBody: "تم إشعار منسق حالتك وسيتابع حالتك.",
-    invalid: "هذا الرابط الآمن غير صالح أو انتهت صلاحيته.", error: "تعذر إكمال الطلب. يرجى المحاولة مرة أخرى.",
-    fix: "يرجى إكمال العناصر المحددة.", missing: "يرجى تقديم هذه المعلومة.", missingFile: "يرجى رفع المستند المطلوب.",
-    due: "مطلوب قبل",
-    proposalTitle: "عرضك",
-    proposalPreparing: "يجري إعداد عرضك. سنرسل لك رابطًا آمنًا فور جاهزيته.",
-    proposalReadyTitle: "عرضك جاهز للمراجعة", proposalReady: "خطة علاجك وتكلفتها التقديرية جاهزة. خذ وقتك — لن يحدث شيء قبل أن تقرر.",
-    proposalReadyNext: "إذا وافقت، نبدأ ترتيب رعايتك.", proposalPreparingTitle: "نجهّز عرضك", proposalPreparingNext: "ستصلك رابطًا آمنًا لمراجعته في وقتك.",
-    proposalReview: "مراجعة العرض", proposalOpening: "جارٍ الفتح…",
-    proposalAccepted: "أقررت بتقديرك. يرتّب منسقك الخطوات التالية، ويبقى عرضك متاحًا في بوابتك الآمنة.",
-    proposalDeclined: "رفضت العرض. يبقى منسقك متاحًا إن تغيّر شيء.",
-    proposalRevision: "طلبت تعديلات. يجهّز منسقك عرضًا معدّلًا وسيرسل لك رابطًا آمنًا جديدًا.",
-    proposalExpired: "انتهت صلاحية هذا العرض. يمكن لمنسقك إعداد عرض محدّث لك.",
-    proposalVersion: (n: number) => (n > 1 ? "نسخة محدّثة" : ""), proposalValid: "صالح حتى",
-    proposalUnavailable: "لم يعد هذا العرض متاحًا للمراجعة. يرجى التحديث للاطلاع على آخر حالة.",
-  },
-};
+/** The page's words, from messages/{en,ar}.json (`secureLink.status`, and the shared working-days plural), passed by the server page. */
+export type StatusCopy = Dictionary["secureLink"]["status"] & { workingDays: Dictionary["portalWork"]["plural"]["workingDays"] };
 
 /**
  * The patient's secure, no-login action page.
@@ -90,18 +37,17 @@ const copy = {
  * is exchanged for a short-lived grant first. After that the page shows only what this case's coordinator
  * actually asked for — never the full case form, and never another case.
  */
-export function CaseStatusAccess({ locale, token, emergency, journeyCopy }: { locale: Locale; token: string;
+export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCopy }: { locale: Locale; token: string;
+  copy: StatusCopy;
   /** A-02: the bilingual emergency instruction (common.emergencyNotice), passed by the page so the client bundle carries no dictionary. */
   emergency?: { title: string; body: string };
   /** The journey's words (secureLink.journey), passed by the page for the same reason. */
   journeyCopy: JourneyCopy }) {
-  const t = copy[locale];
   const notice = emergency ? <EmergencyGuidance title={emergency.title} body={emergency.body} className="mb-6"/> : null;
   const router = useRouter();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [phase, setPhase] = useState<"loading" | "summary" | "code" | "view" | "done" | "invalid">("loading");
-  const [code, setCode] = useState("");
   const [grant, setGrant] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Record<string, File>>({});
@@ -143,7 +89,7 @@ export function CaseStatusAccess({ locale, token, emergency, journeyCopy }: { lo
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   }
 
-  async function verify() {
+  async function verify(code: string) {
     setBusy(true); setError("");
     try {
       const access = await post<{ grant: string }>(`/verify`, { code: code.trim() });
@@ -241,21 +187,13 @@ export function CaseStatusAccess({ locale, token, emergency, journeyCopy }: { lo
     <Frame title={t.title} notice={notice}>
       {summary && <p className="mb-5 font-bold text-brand-800">{summary.caseNumber}</p>}
 
-      {phase === "summary" && <>
-        <p className="flex items-start gap-2 leading-7 text-ink-600"><LockKeyhole className="mt-1 flex-none" size={17} aria-hidden/>{t.private}</p>
-        <button className="btn-primary mt-6 w-full sm:w-auto" disabled={busy} onClick={() => void request()}>{t.send}</button>
+      {(phase === "summary" || phase === "code") && <>
+        {phase === "summary" && <p className="mb-5 flex items-start gap-2 leading-7 text-ink-600"><LockKeyhole className="mt-1 flex-none" size={17} aria-hidden/>{t.private}</p>}
+        {/* The status endpoint takes no channel: the code goes to the contact the backend chose, named before it is sent. */}
+        <OneTimeCodeStep copy={{ sendTo: t.sendTo, sentTo: t.sent, send: t.send, sending: t.sending, codeLabel: t.code, verify: t.verify, verifying: t.verify, resend: t.resend }}
+                         destination={summary?.destinationHint} sent={phase === "code"} busy={busy}
+                         onSend={() => void request()} onVerify={code => void verify(code)}/>
       </>}
-
-      {phase === "code" && (
-        <form onSubmit={event => { event.preventDefault(); void verify(); }}>
-          <p className="mb-4 text-ink-600">{t.sent} <strong dir="ltr">{summary?.destinationHint}</strong></p>
-          <label className="block text-sm font-bold">{t.code}
-            <input className="field mt-2 max-w-[16rem] text-center text-2xl tracking-[0.4em]" dir="ltr" inputMode="numeric"
-                   autoComplete="one-time-code" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))}/>
-          </label>
-          <button className="btn-primary mt-5 w-full sm:w-auto" disabled={busy || code.length !== 6}>{t.verify}</button>
-        </form>
-      )}
 
       {phase === "view" && status && <>
         {/* Where the case is, in the patient's own language, before anything is asked of them. */}
@@ -278,9 +216,9 @@ export function CaseStatusAccess({ locale, token, emergency, journeyCopy }: { lo
           )}
         </section>
 
-        <div className="mt-5">
-          <PatientJourneyTracker copy={journeyCopy} phase={status.phase} waitingOnPatient={status.actionRequired || depositStep} label={t.journey}/>
-        </div>
+        <CaseJourney id="status-journey" title={t.journey} steps={phaseLabels(journeyCopy)} current={phasePosition(status.phase)}
+                     completedLabel={journeyCopy.done} currentLabel={journeyCopy.current}
+                     yoursLabel={status.actionRequired || depositStep ? journeyCopy.yours : null} className="mt-6 border-t border-line pt-5"/>
 
         <p className="mt-5 text-[0.82rem] text-ink-500">
           {t.status}: <span className="font-semibold text-ink-700">{locale === "ar" ? status.statusAr : status.statusEn}</span>
@@ -296,7 +234,7 @@ export function CaseStatusAccess({ locale, token, emergency, journeyCopy }: { lo
             {/* No technical version number for the patient: only whether this is an updated document, and its validity. */}
             {status.proposal.state !== "REVISION_REQUESTED" && ((status.proposal.versionNumber ?? 0) > 1 || (status.proposal.validUntil && status.proposal.state === "READY")) && (
               <p className="mt-1 text-[0.82rem] text-ink-500">
-                {[t.proposalVersion(status.proposal.versionNumber ?? 0), status.proposal.validUntil && status.proposal.state === "READY" ? `${t.proposalValid} ${new Date(status.proposal.validUntil).toLocaleDateString(intlLocale(locale), { day: "numeric", month: "short", year: "numeric" })}` : ""].filter(Boolean).join(" · ")}
+                {[(status.proposal.versionNumber ?? 0) > 1 ? t.updatedVersion : "", status.proposal.validUntil && status.proposal.state === "READY" ? `${t.proposalValid} ${new Date(status.proposal.validUntil).toLocaleDateString(intlLocale(locale), { day: "numeric", month: "short", year: "numeric" })}` : ""].filter(Boolean).join(" · ")}
               </p>
             )}
             {status.proposal.action === "REVIEW_PROPOSAL" && (
@@ -368,7 +306,7 @@ export function CaseStatusAccess({ locale, token, emergency, journeyCopy }: { lo
   );
 }
 
-function proposalCopy(state: string, t: (typeof copy)["en"] | (typeof copy)["ar"]) {
+function proposalCopy(state: string, t: StatusCopy) {
   switch (state) {
     case "READY": return t.proposalReady;
     case "ACCEPTED": return t.proposalAccepted;

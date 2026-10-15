@@ -7,6 +7,7 @@ import ar from "@/messages/ar.json";
 
 // The page navigates to the proposal with the App Router; vitest has no router context, so it is a spy.
 const push = vi.fn();
+const statusCopy = (d: typeof en) => ({ ...d.secureLink.status, workingDays: d.portalWork.plural.workingDays });
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 /**
@@ -47,7 +48,7 @@ async function reachAction(overrides: Record<string, () => Promise<Response>> = 
     "tok-1": () => json(summary),
   });
   vi.stubGlobal("fetch", fetchMock);
-  render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
+  render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
   fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
   const code = await screen.findByLabelText(/verification code/i);
   fireEvent.change(code, { target: { value: "123456" } });
@@ -65,18 +66,18 @@ describe("CaseStatusAccess", () => {
   // A-02 (P0-3): the emergency instruction is on the page before and after verification, in the patient's language.
   it("tells the patient to seek local care in an emergency, in English and Arabic", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json(summary) }));
-    const { unmount } = render(<CaseStatusAccess locale="en" token="tok-1" emergency={en.common.emergencyNotice} journeyCopy={en.secureLink.journey}/>);
+    const { unmount } = render(<CaseStatusAccess locale="en" token="tok-1" emergency={en.common.emergencyNotice} copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
     await screen.findByRole("button", { name: /send verification code/i });
     const note = screen.getByRole("note", { name: en.common.emergencyNotice.title });
     expect(note.textContent).toContain(en.common.emergencyNotice.body);
     unmount();
-    render(<CaseStatusAccess locale="ar" token="tok-1" emergency={ar.common.emergencyNotice} journeyCopy={ar.secureLink.journey}/>);
+    render(<CaseStatusAccess locale="ar" token="tok-1" emergency={ar.common.emergencyNotice} copy={statusCopy(ar)} journeyCopy={ar.secureLink.journey}/>);
     expect(await screen.findByRole("note", { name: ar.common.emergencyNotice.title })).toBeTruthy();
   });
 
   it("never shows case data before the one-time code is verified", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json(summary) }));
-    render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
     expect(await screen.findByRole("button", { name: /send verification code/i })).toBeTruthy();
     expect(screen.queryByText(/current medication/i)).toBeNull();
     // No sign-in or registration step exists on this page.
@@ -123,7 +124,7 @@ describe("CaseStatusAccess", () => {
 
   it("reports an invalid or expired link without revealing anything", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json({ code: "CASE_LINK_INVALID" }, false, 404) }));
-    render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
     expect(await screen.findByText(/invalid or has expired/i)).toBeTruthy();
   });
 });
@@ -142,7 +143,7 @@ describe("CaseStatusAccess journey", () => {
       "/view": () => json(view),
       "tok-1": () => json(summary),
     }));
-    render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
     fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
     fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
@@ -156,7 +157,9 @@ describe("CaseStatusAccess journey", () => {
 
     const tracker = screen.getByRole("list");
     const labels = [...tracker.querySelectorAll("li")].map(li => (li.textContent ?? "").trim());
-    expect(labels).toEqual(["Case received", "Coordinator review", "Consultant review", "Your proposal", "Coordination deposit", "Treatment", "Follow-up"]);
+    // One numbered journey; each step says its state in words for screen readers, and the current one is marked.
+    expect(labels).toEqual(["1Case received (completed)", "2Coordinator review (completed)", "3Consultant review (current)", "4Your proposal", "5Coordination deposit", "6Treatment", "7Follow-up"]);
+    expect(tracker.querySelector("[aria-current=step]")?.textContent).toContain("Consultant review");
     // The internal case status is never sent to this page, so it can never be rendered.
     expect(screen.queryByText(/CONSULTANT_REVIEW/)).toBeNull();
   });
@@ -203,7 +206,7 @@ describe("CaseStatusAccess journey", () => {
       "tok-1": () => json(summary),
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
     fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
     fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));

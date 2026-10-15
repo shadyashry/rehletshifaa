@@ -7,7 +7,8 @@ import { ProposalDecisionDialog } from "@/components/ProposalDecisionDialog";
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
 import { apiUrl } from "@/lib/api";
 import { ARABIC_TERMS_APPROVED, estimateTerms, exchangeRateStatement, finalQuoteTerms, generalDisclaimers, isForeignCurrency, LEGACY_PLACEHOLDER_TERMS } from "@/lib/commercial-terms";
-import { getDictionary } from "@/lib/dictionary";
+import type { Dictionary } from "@/lib/dictionary";
+import { OneTimeCodeStep } from "@/components/OneTimeCodeStep";
 import { fillTemplate, plural } from "@/lib/portal-labels";
 import { formatMoney } from "@/lib/money";
 import { scrollIntoView } from "@/lib/scroll";
@@ -32,122 +33,29 @@ type Decision = "ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED";
 type Blocked = "EXPIRED" | "SUPERSEDED" | "DECIDED" | null;
 
 
-const copy = {
+/**
+ * The page's words, from messages/{en,ar}.json (`secureLink.proposal`, plus the assisted path and the services plural),
+ * passed by the server page so this client bundle carries no dictionary.
+ */
+export type ProposalCopy = Dictionary["secureLink"]["proposal"] & {
+  assisted: Dictionary["portalProposal"]["assisted"];
+  services: Dictionary["portalWork"]["plural"]["services"];
+};
+
+/**
+ * Legal wording stays beside lib/commercial-terms and out of the messages: English is read from there, the Arabic is
+ * kept verbatim until the legal and native review (L1–L5) approves it.
+ */
+const TERMS = {
   en: {
-    greeting: "Prepared for", caseRef: "Case reference", versionLabel: "Document", updatedVersion: "Updated version", validUntil: "Valid until",
-    servicesLabel: "Recommended services", treatmentLabel: "Your consultant's recommendation",
-    risksLabel: "Risks & limitations", notesLabel: "Notes from your coordinator",
-    verifyTitle: "Verify it's you", verifyIntroWhatsapp: "To protect your information, we'll send a 6-digit code to your WhatsApp",
-    verifyIntroEmail: "To protect your information, we'll send a 6-digit code to your email",
-    emailInstead: "Use email instead", whatsappInstead: "Use WhatsApp instead",
-    sendCode: "Send code", sending: "Sending…", codeSent: "We sent a code to", resend: "Resend code",
-    codeLabel: "Enter the 6-digit code", codePlaceholder: "______", verify: "Verify", verifying: "Verifying…",
-    requestRevision: "Request changes", decline: "Decline estimate", moreOptions: "More options",
-    deciding: "Submitting…",
-    invalid: "This proposal link is invalid or has expired.", error: "The request could not be completed.",
-    tooMany: "Too many requests. Please try again later.", loading: "Loading…",
-    prelimBadge: "Preliminary care estimate", prelimTitle: "Your preliminary care estimate",
-    assumptionsLabel: "Important assumptions", changeLabel: "What may change after your physical assessment",
-    includedLabel: "Included in this estimate", excludedLabel: "Not included",
-    excludedFallback: "Services not listed in this estimate are not included, and would be discussed with you before being added.",
-    rangeLabel: "Estimated range", totalLabel: "Estimated total", expectedLabel: "Expected", rangeSep: "to",
     estimateBasis: `${estimateTerms.nonBinding} ${estimateTerms.mayChange}`,
     coordinationNote: estimateTerms.coordinationIncluded as string,
-    servicesTotal: "Estimated total",
-    payNow: "What you pay now", payNowNote: "Coordination deposit, deducted from the price in your final treatment plan and quote. Its terms are shown before you continue.",
-    alreadyPaid: "Already paid (credited to this quote)",
-    nextTitle: "What happens next",
-    nextPrelim: [
-      "You acknowledge this estimate to continue.",
-      "We send you a secure link to complete your profile.",
-      "You pay the coordination deposit. We start coordinating your care once it is received.",
-      "Your coordinator arranges your treatment and travel.",
-      "After your in-person assessment you receive a final treatment plan and quote to accept or decline.",
-    ],
-    nextFinal: [
-      "You accept this treatment plan and quote.",
-      "Your coordinator confirms your schedule and arrangements.",
-      "Your treating doctor takes separate medical consent before treatment.",
-    ],
-    beforeTitle: "Before you continue",
-    ackShort: "I understand this is a preliminary estimate based on remote review.",
-    ackStatement: "The final treatment plan and price may increase or decrease after the treating doctor examines me. I will receive and decide on a final quote before non-emergency treatment.",
-    ackShortFinal: "I accept this final treatment plan and quote for the confirmed services listed, at the price shown.",
     finalConsentStatement: finalQuoteTerms.notMedicalConsent as string,
-    ackRequired: "Please confirm you understand before continuing.",
-    acknowledge: "Acknowledge & continue",
-    finalBadge: "Final treatment plan and quote", finalTitle: "Your final treatment plan and quote",
-    assessmentLabel: "Physical-assessment summary", scopeLabel: "What changed since your estimate",
-    confirmedLabel: "Confirmed services", finalPriceLabel: "Final package price", acceptFinal: "Accept & continue",
-    ackDoneTitle: "Thank you — your estimate is acknowledged", ackDoneMsg: "We've sent you a secure link to complete your profile.", ackDoneDeposit: "We start coordinating your care once your coordination deposit is received.",
-    acceptedTitle: "Thank you — you accepted your treatment plan", acceptedMsg: "Your coordinator will confirm the next steps with you.",
-    declinedTitle: "Your response was recorded", declinedMsg: "You have declined. Your coordinator remains available if anything changes.",
-    revisionTitle: "Your request was sent", revisionMsg: "Your coordinator will prepare a revised document and send you a new secure link.",
-    blockedExpired: "This estimate has expired and can no longer be acknowledged. Contact your coordinator for an updated version. A later version may have different prices and exchange rate.",
-    blockedExpiredFinal: "This quote has expired and can no longer be accepted. Contact your coordinator for an updated version. A later version may have different prices and exchange rate.",
-    blockedSuperseded: "A newer version of this document is available, so this one can no longer be used.",
-    blockedDecided: "A decision has already been recorded for this document.",
-    contactCoordinator: "Your coordinator will be in touch. You can reply to the message that brought you here.",
-    summaryHeading: "Estimate summary", quoteSummaryHeading: "Quote summary", aboutQuote: "About this quote", scopeHeading: "What this estimate covers",
-    reviewedBy: "Reviewed by",
   },
   ar: {
-    greeting: "أُعدّ لصالح", caseRef: "رقم الحالة", versionLabel: "المستند", updatedVersion: "نسخة محدّثة", validUntil: "صالح حتى",
-    servicesLabel: "الخدمات الموصى بها", treatmentLabel: "توصية استشاريك",
-    risksLabel: "المخاطر والقيود", notesLabel: "ملاحظات من منسّق حالتك",
-    verifyTitle: "لنتأكد أنه أنت", verifyIntroWhatsapp: "لحماية معلوماتك، سنرسل رمزًا من 6 أرقام إلى واتساب الخاص بك",
-    verifyIntroEmail: "لحماية معلوماتك، سنرسل رمزًا من 6 أرقام إلى بريدك الإلكتروني",
-    emailInstead: "استخدم البريد الإلكتروني بدلًا من ذلك", whatsappInstead: "استخدم واتساب بدلًا من ذلك",
-    sendCode: "إرسال الرمز", sending: "جارٍ الإرسال…", codeSent: "أرسلنا رمزًا إلى", resend: "إعادة إرسال الرمز",
-    codeLabel: "أدخل الرمز المكوّن من 6 أرقام", codePlaceholder: "______", verify: "تحقّق", verifying: "جارٍ التحقق…",
-    requestRevision: "طلب تعديلات", decline: "رفض التقدير", moreOptions: "خيارات أخرى",
-    deciding: "جارٍ الإرسال…",
-    invalid: "رابط العرض غير صالح أو منتهي الصلاحية.", error: "تعذر إكمال الطلب.",
-    tooMany: "طلبات كثيرة جدًا. يُرجى المحاولة لاحقًا.", loading: "جارٍ التحميل…",
-    prelimBadge: "تقدير مبدئي للرعاية", prelimTitle: "تقديرك المبدئي للرعاية",
-    assumptionsLabel: "افتراضات مهمة", changeLabel: "ما قد يتغيّر بعد الفحص السريري",
-    includedLabel: "المشمول في هذا التقدير", excludedLabel: "غير المشمول",
-    excludedFallback: "الخدمات غير المدرجة في هذا التقدير ليست مشمولة، وسيتم مناقشتها معك قبل إضافتها.",
-    rangeLabel: "باقة الرعاية المنسّقة التقديرية", totalLabel: "باقة الرعاية المنسّقة التقديرية", expectedLabel: "المتوقع", rangeSep: "إلى",
     estimateBasis: "هذا تقدير مبدئي غير ملزم، وليس سعرًا نهائيًا ولا ضمانًا للسعر. قد تتغيّر خطة علاجك ويرتفع سعرها أو ينخفض بعد أن يفحصك طبيبك المعالج حضوريًا.",
     coordinationNote: "يشمل سعر الباقة تنسيق الحالة وترتيبات مقدّمي الخدمة والجدولة وخدمات دعم المريض من رحلة شفاء.",
-    servicesTotal: "إجمالي الخدمات التقديري",
-    payNow: "ما تدفعه الآن", payNowNote: "وديعة تنسيق للبدء — تُخصم من رصيدك النهائي.",
-    alreadyPaid: "مدفوع مسبقًا (يُخصم من هذا العرض)",
-    nextTitle: "ما الذي يحدث بعد ذلك",
-    nextPrelim: [
-      "تُقرّ بهذا التقدير للمتابعة.",
-      "نرسل لك رابطًا آمنًا لاستكمال ملفك الشخصي.",
-      "تسدّد وديعة التنسيق، وتُخصم من رصيدك النهائي.",
-      "يرتّب منسّق حالتك علاجك وسفرك.",
-      "بعد فحصك الحضوري تستلم عرضًا نهائيًا لتقرّره.",
-    ],
-    nextFinal: [
-      "تقبل خطة العلاج والعرض النهائي.",
-      "يؤكد منسّق حالتك جدولك وترتيباتك.",
-      "يأخذ طبيبك المعالج موافقة طبية منفصلة قبل العلاج.",
-    ],
-    beforeTitle: "قبل أن تتابع",
-    ackShort: "أفهم أن هذا تقدير مبدئي يستند إلى مراجعة عن بُعد.",
-    ackStatement: "قد ترتفع أو تنخفض خطة العلاج النهائية وسعرها بعد فحص الطبيب المعالج لي. سأستلم عرضًا نهائيًا وأقرّره قبل أي علاج غير طارئ.",
-    ackShortFinal: "أفهم أن قبول هذا العرض اتفاق مالي.",
     finalConsentStatement: "يشمل القبول باقة الرعاية المنسّقة وليس موافقة طبية خاصة بالإجراء؛ وسيأخذ طبيبي موافقة مستنيرة منفصلة قبل العلاج.",
-    ackRequired: "يرجى تأكيد فهمك قبل المتابعة.",
-    acknowledge: "الإقرار والمتابعة",
-    finalBadge: "خطة العلاج والعرض النهائي", finalTitle: "خطة علاجك وعرضك النهائي",
-    assessmentLabel: "ملخّص الفحص السريري", scopeLabel: "ما الذي تغيّر منذ تقديرك",
-    confirmedLabel: "الخدمات المؤكدة", finalPriceLabel: "سعر الباقة النهائي", acceptFinal: "القبول والمتابعة",
-    ackDoneTitle: "شكرًا لك — تم الإقرار بتقديرك", ackDoneMsg: "أرسلنا دعوة لتفعيل حسابك.", ackDoneDeposit: "",
-    acceptedTitle: "شكرًا لك — لقد قبلت خطة علاجك", acceptedMsg: "سيؤكد منسّق حالتك الخطوات التالية معك.",
-    declinedTitle: "تم تسجيل ردك", declinedMsg: "لقد رفضت. يبقى منسّق حالتك متاحًا إذا تغيّر أي شيء.",
-    revisionTitle: "تم إرسال طلبك", revisionMsg: "سيقوم منسّق حالتك بإعداد مستند معدّل وإرسال رابط آمن جديد إليك.",
-    blockedExpired: "انتهت صلاحية هذا التقدير. يمكن لمنسّق حالتك إعداد تقدير محدّث لك.",
-    blockedExpiredFinal: "انتهت صلاحية هذا المستند. يمكن لمنسّق حالتك إعداد نسخة محدّثة لك.",
-    blockedSuperseded: "يتوفر إصدار أحدث من هذا المستند، لذا لم يعد بالإمكان استخدام هذا الإصدار.",
-    blockedDecided: "تم بالفعل تسجيل قرار لهذا المستند.",
-    contactCoordinator: "سيتواصل معك منسّق حالتك. يمكنك الرد على الرسالة التي وصلتك.",
-    summaryHeading: "ملخّص التقدير", quoteSummaryHeading: "ملخّص التقدير", aboutQuote: "", scopeHeading: "ما يغطيه هذا التقدير",
-    reviewedBy: "راجعها",
   },
 };
 
@@ -164,6 +72,11 @@ function Prose({ label, text, id }: { label: string; text?: string; id?: string 
   );
 }
 
+/** Whether a validity date has passed; read when a response arrives (an event), never during render. */
+function hasLapsed(validUntil?: string): boolean {
+  return !!validUntil && new Date(validUntil).getTime() <= Date.now();
+}
+
 /** The grant Check Case Status stored for this token, removed on first read so it cannot be replayed from storage. */
 function takeHandoffGrant(token: string): string | null {
   try {
@@ -177,14 +90,13 @@ function takeHandoffGrant(token: string): string | null {
   } catch { return null; }
 }
 
-export function ProposalSign({ locale, token }: { locale: Locale; token: string }) {
-  const t = copy[locale];
+export function ProposalSign({ locale, token, copy }: { locale: Locale; token: string; copy: ProposalCopy }) {
+  const t = { ...copy, ...TERMS[locale] };
   const [phase, setPhase] = useState<Phase>("loading");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [grant, setGrant] = useState("");
   const [channel, setChannel] = useState<"WHATSAPP" | "EMAIL">("WHATSAPP");
-  const [code, setCode] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
   const [ackError, setAckError] = useState(false);
   const [outcome, setOutcome] = useState<Decision | null>(null);
@@ -200,7 +112,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   // Until the terms have approved Arabic wording, an Arabic page asks the coordinator to go through them with the
   // patient in Arabic and record the decision (owner decision, GATE P2-1) instead of asking for an acknowledgement.
   const assisted = locale === "ar" && !ARABIC_TERMS_APPROVED;
-  const assistedCopy = getDictionary(locale).portalProposal.assisted;
+  const assistedCopy = copy.assisted;
 
   /** Asks the coordinator for the Arabic conversation; the page then says it was asked, also after a reload. */
   async function requestAssistance() {
@@ -230,7 +142,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
     const full = (await r.json()) as Proposal;
     setGrant(g); setProposal(full);
     if (full.decided) setBlocked("DECIDED");
-    else if (full.validUntil && new Date(full.validUntil).getTime() <= Date.now()) setBlocked("EXPIRED");
+    else if (hasLapsed(full.validUntil)) setBlocked("EXPIRED");
     setPhase("view");
     return true;
   }
@@ -271,7 +183,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
     } catch (e) { setError(e instanceof Error && e.message ? e.message : t.error); } finally { setBusy(false); }
   }
 
-  async function verify() {
+  async function verify(code: string) {
     if (code.trim().length !== 6) return;
     setBusy(true); setError("");
     try {
@@ -282,7 +194,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
         .then(async (r) => { if (!r.ok) throw new Error(t.error); return r.json() as Promise<Proposal>; });
       setProposal(full);
       if (full.decided) setBlocked("DECIDED");
-      else if (full.validUntil && new Date(full.validUntil).getTime() <= Date.now()) setBlocked("EXPIRED");
+      else if (hasLapsed(full.validUntil)) setBlocked("EXPIRED");
       setPhase("view");
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   }
@@ -367,30 +279,19 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
           <div className="card mx-auto max-w-xl p-6 sm:p-8">
             <p className="eyebrow">RehletShifaa · {summary.caseNumber}</p>
             <h1 className="headline mt-2">{t.verifyTitle}</h1>
-            <p className="mt-3 text-ink-700">{channel === "WHATSAPP" ? t.verifyIntroWhatsapp : t.verifyIntroEmail} <strong dir="ltr">{(channel === "WHATSAPP" ? summary.whatsappHint : summary.emailHint) ?? summary.destinationHint}</strong>.</p>
-            {(() => {
-              const other = channel === "WHATSAPP" ? "EMAIL" : "WHATSAPP";
-              const otherAvailable = other === "EMAIL" ? !!summary.emailHint : !!summary.whatsappHint;
-              return otherAvailable ? (
-                <button type="button" className="mt-3 text-sm font-bold text-brand-700 underline disabled:opacity-50" disabled={busy}
-                  onClick={() => { setChannel(other); setCode(""); if (phase === "code") void requestAccess(other); }}>
-                  {other === "EMAIL" ? t.emailInstead : t.whatsappInstead}
-                </button>
-              ) : null;
-            })()}
-            {phase === "intro" ? (
-              <button className="btn-primary mt-6 w-full" disabled={busy} onClick={() => void requestAccess()}>{busy ? t.sending : t.sendCode}</button>
-            ) : (
-              <>
-                <p className="mt-4 text-sm text-ink-600">{t.codeSent} <strong dir="ltr">{(channel === "WHATSAPP" ? summary.whatsappHint : summary.emailHint) ?? summary.destinationHint}</strong></p>
-                <label className="mt-4 block text-sm font-bold">{t.codeLabel}
-                  <input className="field mt-2 text-center tracking-[0.5em]" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder={t.codePlaceholder} aria-label={t.codeLabel} />
-                </label>
-                {error && <p role="alert" className="mt-4 rounded-xl bg-alert-50 p-3 text-alert-800">{error}</p>}
-                <button className="btn-primary mt-6 w-full" disabled={busy || code.trim().length !== 6} onClick={() => void verify()}>{busy ? t.verifying : t.verify}</button>
-                <button className="mt-3 w-full text-sm font-bold text-brand-700 underline disabled:opacity-50" disabled={busy} onClick={() => void requestAccess()}>{t.resend}</button>
-              </>
-            )}
+            <div className="mt-3">
+              <OneTimeCodeStep
+                copy={{ sendTo: channel === "WHATSAPP" ? t.verifyIntroWhatsapp : t.verifyIntroEmail, sentTo: t.codeSent, send: t.sendCode, sending: t.sending,
+                        codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend }}
+                destination={(channel === "WHATSAPP" ? summary.whatsappHint : summary.emailHint) ?? summary.destinationHint}
+                sent={phase === "code"} busy={busy} onSend={() => void requestAccess()} onVerify={code => void verify(code)}
+                channelSwitch={(channel === "WHATSAPP" ? summary.emailHint : summary.whatsappHint) ? {
+                  label: channel === "WHATSAPP" ? t.emailInstead : t.whatsappInstead,
+                  // Before a code is sent the switch only changes where it will go; after, it sends one there.
+                  onSwitch: () => { const other = channel === "WHATSAPP" ? "EMAIL" : "WHATSAPP"; setChannel(other); if (phase === "code") void requestAccess(other); },
+                } : null}
+                error={error ? <p role="alert" className="rounded-xl bg-alert-50 p-3 text-alert-800">{error}</p> : null}/>
+            </div>
           </div>
         )}
 
@@ -620,7 +521,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                   <dl className="mt-3 space-y-1.5 text-[0.85rem]">
                     <div className="flex justify-between gap-4">
                       <dt className="text-ink-600">{t.servicesLabel}</dt>
-                      <dd className="font-semibold text-ink-800">{plural(locale, items.length, getDictionary(locale).portalWork.plural.services)}</dd>
+                      <dd className="font-semibold text-ink-800">{plural(locale, items.length, copy.services)}</dd>
                     </div>
                     {proposal.validUntil && (
                       <div className="flex justify-between gap-4">

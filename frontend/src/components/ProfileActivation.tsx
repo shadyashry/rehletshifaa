@@ -10,6 +10,7 @@ import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms"
 import { DEPOSIT_TERMS_CONSENT } from "@/lib/commercial-terms";
 import type { Dictionary } from "@/lib/dictionary";
 import { fillTemplate } from "@/lib/portal-labels";
+import { OneTimeCodeStep } from "@/components/OneTimeCodeStep";
 
 type Summary = { caseNumber: string; purpose: string; channel: string; destinationHint: string };
 type Deposit = {
@@ -38,32 +39,11 @@ type Form = {
 /** The page's words, from messages/{en,ar}.json (`secureLink.activation`), passed by the server page. */
 export type ActivationCopy = Dictionary["secureLink"]["activation"];
 
-const CONSENT_TEXT: Record<string, { en: string; ar: string }> = {
-  PRIVACY_DATA_PROCESSING: {
-    en: "I agree that RehletShifaa may process my personal and health information to coordinate my care.",
-    ar: "أوافق على أن تعالج رحلة شفاء بياناتي الشخصية والصحية لتنسيق رعايتي.",
-  },
-  CROSS_BORDER_CARE: {
-    en: "I agree that my information may be shared across borders with the treating providers.",
-    ar: "أوافق على مشاركة معلوماتي عبر الحدود مع مقدمي الرعاية المعالجين.",
-  },
-  DEPOSIT_CANCELLATION_TERMS: {
-    en: DEPOSIT_TERMS_CONSENT,
-    ar: "قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد.",
-  },
-  MEDICAL_INFORMATION_SHARING: {
-    en: "I agree that my medical information may be shared with the treating consultants.",
-    ar: "أوافق على مشاركة معلوماتي الطبية مع الاستشاريين المعالجين.",
-  },
-  TELECONSULTATION: {
-    en: "I agree to remote consultation where it is clinically appropriate.",
-    ar: "أوافق على الاستشارة عن بُعد عندما يكون ذلك مناسبًا سريريًا.",
-  },
-  REPRESENTATIVE_AUTHORIZATION: {
-    en: "I confirm I am authorized to act for the patient in coordinating this care.",
-    ar: "أؤكد أنني مفوّض للتصرف نيابة عن المريض في تنسيق هذه الرعاية.",
-  },
-};
+/**
+ * The deposit consent is legal wording: English is read from lib/commercial-terms, the Arabic kept verbatim beside it
+ * until the legal review. Every other consent's words are `secureLink.activation.consents`.
+ */
+const DEPOSIT_CONSENT = { en: DEPOSIT_TERMS_CONSENT, ar: "قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد." };
 
 type PatientAction = "COMPLETE_PROFILE" | "SET_UP_ACCOUNT" | "NONE" | "CONTINUE_IN_PORTAL";
 type JourneyStage = "PROFILE" | "ACCOUNT_SETUP" | "DEPOSIT" | "CARE_COORDINATION";
@@ -95,7 +75,6 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
   const [summary, setSummary] = useState<Summary | null>(null);
   const [channel, setChannel] = useState<"WHATSAPP" | "EMAIL">("WHATSAPP");
   const [codeSent, setCodeSent] = useState(false);
-  const [code, setCode] = useState("");
   const [grant, setGrant] = useState<string | null>(null);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [deposit, setDeposit] = useState<Deposit | null>(null);
@@ -148,12 +127,11 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
     try {
       const chosen = next ?? channel;
       const data: Summary = await call("/request-access", { channel: chosen });
-      setSummary(data); setChannel(chosen); setCodeSent(true); setCode("");
+      setSummary(data); setChannel(chosen); setCodeSent(true);
     } catch (e) { setNotice(describe(e)); } finally { setBusy(false); }
   }
 
-  async function verify(event: React.FormEvent) {
-    event.preventDefault();
+  async function verify(code: string) {
     if (busy || code.length !== 6) return;
     setBusy(true); setNotice(null);
     try {
@@ -233,7 +211,7 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
         setNotice(t.fixFields);
       } else if (err?.status === 401) {
         // The short-lived grant expired while the form was open: re-verify, keeping everything typed.
-        setGrant(null); setCodeSent(false); setCode(""); setStage("verify"); setNotice(t.sessionExpired);
+        setGrant(null); setCodeSent(false); setStage("verify"); setNotice(t.sessionExpired);
       } else setNotice(describe(e));
     } finally { setBusy(false); }
   }
@@ -299,37 +277,13 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
         <section className="card p-6 md:p-8">
           <p className="eyebrow">{t.eyebrow}</p>
           <h1 ref={headingRef} tabIndex={-1} className="headline mt-2 outline-none">{t.verifyTitle}</h1>
-          <p className="lead mt-3">
-            {t.verifyIntro} <strong className="text-ink-900" dir="ltr">{summary?.destinationHint}</strong>
-          </p>
-          {!codeSent ? (
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button type="button" className="btn-primary w-full sm:w-auto" disabled={busy} onClick={() => void sendCode()}>
-                {busy ? t.sending : t.sendCode}
-              </button>
-              <button type="button" className="link-cta self-start text-sm" disabled={busy}
-                      onClick={() => void sendCode(channel === "WHATSAPP" ? "EMAIL" : "WHATSAPP")}>
-                {channel === "WHATSAPP" ? t.useEmail : t.useWhatsapp}
-              </button>
-            </div>
-          ) : (
-            <form className="mt-7" onSubmit={verify} noValidate>
-              <label className="block">
-                <span className="mb-2 block text-sm font-bold text-ink-800">{t.codeLabel}</span>
-                <input
-                  className="field max-w-[16rem] text-center text-2xl tracking-[0.5em]" dir="ltr"
-                  inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus
-                  value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                />
-              </label>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button className="btn-primary w-full sm:w-auto" disabled={busy || code.length !== 6}>
-                  {busy ? t.verifying : t.verify}
-                </button>
-                <button type="button" className="link-cta self-start text-sm" disabled={busy} onClick={() => void sendCode()}>{t.resend}</button>
-              </div>
-            </form>
-          )}
+          <div className="mt-3">
+            {/* This endpoint accepts a channel: before a code is sent the other one is offered (and sends there). */}
+            <OneTimeCodeStep copy={{ sendTo: t.verifyIntro, sentTo: t.codeSent, send: t.sendCode, sending: t.sending, codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend }}
+                             destination={summary?.destinationHint} sent={codeSent} busy={busy}
+                             onSend={() => void sendCode()} onVerify={code => void verify(code)}
+                             channelSwitch={codeSent ? null : { label: channel === "WHATSAPP" ? t.useEmail : t.useWhatsapp, onSwitch: () => void sendCode(channel === "WHATSAPP" ? "EMAIL" : "WHATSAPP") }}/>
+          </div>
         </section>
       )}
 
@@ -477,7 +431,7 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
                       <input type="checkbox" className="mt-1 h-5 w-5 flex-none accent-brand-600" checked={checked}
                              aria-describedby={depositTermsConsent ? "activation-deposit-terms" : undefined}
                              onChange={e => setConsents(v => e.target.checked ? [...v, type] : v.filter(x => x !== type))} />
-                      <span className="text-sm leading-6 text-ink-700">{CONSENT_TEXT[type]?.[locale] ?? type}</span>
+                      <span className="text-sm leading-6 text-ink-700">{type === "DEPOSIT_CANCELLATION_TERMS" ? DEPOSIT_CONSENT[locale] : (t.consents as Record<string, string>)[type] ?? type}</span>
                     </label>
                   </li>
                 );

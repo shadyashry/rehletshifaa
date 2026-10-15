@@ -1,6 +1,6 @@
 import { CaseStamp } from "@/components/brand/CaseStamp";
 import type { Dictionary } from "@/lib/dictionary";
-import { intlLocale, type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
 /**
  * What the patient receives, shown as the thing itself: three pages of the case file placed on the desk one after
@@ -10,7 +10,8 @@ import { intlLocale, type Locale } from "@/lib/i18n";
  */
 export function DossierPreview({ locale, d, children }: { locale: Locale; d: Dictionary; children?: React.ReactNode }) {
   const t = d.home.dossier;
-  const today = new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short" }).format(new Date());
+  // The one synthetic stamp date on the platform: this sample page is labelled "Example".
+  const today = new Date().toISOString();
   const pages = [
     { kicker: t.page3Kicker, title: t.page3Title, body: t.page3Body },
     { kicker: t.page2Kicker, title: t.page2Title, body: t.page2Body },
@@ -30,7 +31,7 @@ export function DossierPreview({ locale, d, children }: { locale: Locale; d: Dic
                 <p className="mt-1 text-[1.0625rem] font-semibold leading-6 text-brand-900 [text-wrap:balance] sm:text-[1.125rem]" dir={depth === 1 ? "ltr" : undefined}>{page.title}</p>
                 {/* Only the page on top is fully readable; the pages behind it show their heading, as a real stack does. */}
                 {depth === 1 ? <p className="mt-1 text-[0.875rem] leading-6 text-ink-600">{page.body}</p> : <p className="sr-only">{page.body}</p>}
-                {depth === 1 && <CaseStamp label={t.stamp} date={today} className="dossier-stamp absolute end-4 top-4" />}
+                {depth === 1 && <CaseStamp label={t.stamp} date={today} locale={locale} className="dossier-stamp absolute end-4 top-4" />}
               </li>
             );
           })}
