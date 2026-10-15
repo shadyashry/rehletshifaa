@@ -584,3 +584,50 @@ deposit-paid) × en/ar × 390/1440, synthetic fixtures.
 owner's later review. Follow-ups: the payment reference wraps at its hyphens beside its hint from 640px (pre-existing, slice E;
 same in `area-1/after/e-payment-bank-en-1440.png`). **Next:** slice 1c-2 (estimate range bar + legend shared by `ProposalSign`
 and My Care's estimate card; V-4/V-5 still open).
+
+## UX area 1c — slice 1c-2: the estimate range bar (2026-10-15, worktree `ux-1c-2-range-bar-b09feb`, branch `claude/ux-1c-2-range-bar-b09feb` from 1c-1 @ `66505a6`)
+
+Direction and data rule: `PLAN.md` "Area 1c" (on `claude/festive-blackburn-b86c62` @ `39ffb38`). Enhances the accepted area 1 layouts;
+theme unchanged. No range, no bracket; category split only from two categories; no V-5 spread sentence (still open).
+
+**Built.**
+- **`EstimateRangeBar`** (`components/EstimateRangeBar.tsx`, one shared component + its legend): one scale from zero to the top of
+  the range on a Deep Paper track — the expected total filled and split by `items[].category` (petrol 700 / 400 / 200, 2px white
+  gaps), a Petrol Ink marker at the expected figure, the range bracketed above (only when `totalMin < totalMax`), the coordination
+  deposit bracketed below in coral as a mark (only where its amount is known). The bar is `role="img"` with one sentence (parts joined
+  with `Intl.ListFormat`); the legend (`<dl>`) is its readable twin: categories, Expected (or the total's name), Estimated range,
+  Coordination deposit with its note; every amount in `<bdi dir="ltr">`, tabular. Arrival: the fill scales from the start edge
+  (mirrored in RTL via `transform-origin`, PaidBar's `pay-fill`), off under reduced motion; marks are present from the start. A
+  container query drops the range mark's figures below 17.5rem so a long EGP range never widens a 320px page (the legend keeps them).
+- **Proposal link** (`ProposalSign`): the bar + legend replace the old total / expected lines under the services list, deposit
+  bracketed from `depositDueDisplay` (estimates only). Service groups now show the category in words (they showed the raw code).
+- **My Care** (`MyCare` estimate card): the bar under the expected figure, range from the workspace totals (1c-0); the headline
+  figure is `totalExpected` when sent. **No deposit bracket here:** area 1's rule (spec "the deposit is stated once") keeps the deposit
+  in its own facts; the first build bracketed it and the spec caught the repetition.
+- Copy (en + ar) `portalWork.myCare.estimate.bar` (passed to the link as `copy.estimateBar` from the server page): expected, total,
+  finalTotal (a final quote's total is its price, never "estimated"), range, to, deposit, depositNote, marks, `categories.MEDICAL/
+  PLATFORM_FEE`, chart sentences.
+
+**Finding (V-4).** Since V96 `proposal_items.category` is constrained to `MEDICAL | PLATFORM_FEE` (no staff free text). Totals
+(`ProposalQueryService.displayTotals`) count every non-optional priced line, the fee line included, so the split on real data is
+care vs. the coordination and guarantee fee. The bar words the two schema codes and shows any other value as entered; it splits at
+most three categories and never a line without one. V-4 (fixed bilingual list vs free text) is still the owner's, but its "free text
+today" premise is outdated. Merge note: P1-10 s2 (`10f5389`, on `feat/review-p0` lineage) separates the fee line in `ProposalSign`
+(`isPlatformFee`, `price.feeLabel`); when the lines merge, keep its fee row and drop this slice's group heading for the fee.
+
+**Reviews** (Impeccable polish with a visual pass on the screenshots, web-interface-guidelines, react-best-practices,
+composition-patterns; design hook 0 findings): fixed — the deposit repeated on My Care (above); the range mark could overflow a
+320px phone with long EGP figures (container query + spec); the final quote's total read "Estimated total" (`kind="quote"` →
+"Final package price"); the services list printed `MEDICAL` / `PLATFORM_FEE`; a de-duplicated fee heading made the fee read as a
+care line (reverted: the heading stays). Component is pure (no hooks), copy injected, one explicit `kind` variant instead of a label prop.
+
+**Verify.** typecheck ok; eslint 0 on touched files; vitest 69 files / 538 (7 new in `EstimateRangeBar.test.tsx`, 1 new in MyCare,
+two MyCare assertions scoped to the bar's arrival); Playwright estimate-range-bar (new, 7), status-proposal, proposal-otp,
+proposal-responsive, arabic-proposal-decision, my-care, my-care-polish, my-care-visuals and a11y (en + ar) 117/117, then the
+proposal-side set again after the last fix 60/60. Tracked screenshots the specs overwrite were restored.
+Screenshots `screenshots/1c-2/` — proposal link (services + bar), My Care estimate card (proposal ready) and with the deposit paid,
+each en/ar × 390/1440, synthetic fixtures (fee line, range, deposit).
+
+**Gate:** owner instruction 2026-10-15 — continue without asking; shots above for the owner's later review. **Area 1c is complete**
+(1c-0, 1c-1, 1c-2). Open: V-4 (category labels), V-5 (spread sentence). Follow-ups: the fee-line merge note above; the payment
+reference wrap (1c-1). **Next:** area 2 — coordinator workspace (PLAN.md recommended sequence 1 → 1c → 2).

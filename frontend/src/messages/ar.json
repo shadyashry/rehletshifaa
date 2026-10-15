@@ -1655,6 +1655,27 @@
           "ACCEPTED": "تم الإقرار به",
           "DECLINED": "مرفوض",
           "EXPIRED": "منتهي الصلاحية"
+        },
+        "bar": {
+          "expected": "المتوقَّع",
+          "total": "الإجمالي التقديري",
+          "finalTotal": "سعر الباقة النهائي",
+          "range": "النطاق التقديري",
+          "to": "إلى",
+          "deposit": "وديعة التنسيق",
+          "depositNote": "تُدفع أولًا، ثم تُخصم من السعر في خطة العلاج والعرض النهائي.",
+          "rangeMark": "النطاق",
+          "depositMark": "الوديعة",
+          "categories": {
+            "MEDICAL": "الرعاية الطبية",
+            "PLATFORM_FEE": "رسوم التنسيق والضمان"
+          },
+          "chart": {
+            "range": "النطاق التقديري من {min} إلى {max}، والمتوقَّع {expected}.",
+            "total": "{label} {expected}.",
+            "parts": "ويتكوّن من {parts}.",
+            "deposit": "وديعة التنسيق {deposit} تُدفع أولًا."
+          }
         }
       },
       "people": {

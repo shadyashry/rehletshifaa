@@ -8,6 +8,7 @@ import { ProposalDecisionDialog } from "@/components/ProposalDecisionDialog";
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
 import { CaseStamp } from "@/components/brand/CaseStamp";
 import { DossierPage } from "@/components/brand/DossierPage";
+import { categoryLabel, EstimateRangeBar, type EstimateBarCopy } from "@/components/EstimateRangeBar";
 import { apiUrl } from "@/lib/api";
 import { ARABIC_TERMS_APPROVED, estimateTerms, exchangeRateStatement, finalQuoteTerms, generalDisclaimers, isForeignCurrency, LEGACY_PLACEHOLDER_TERMS } from "@/lib/commercial-terms";
 import type { Dictionary } from "@/lib/dictionary";
@@ -48,6 +49,7 @@ export type ProposalCopy = Dictionary["secureLink"]["proposal"] & {
   assisted: Dictionary["portalProposal"]["assisted"];
   services: Dictionary["portalWork"]["plural"]["services"];
   stampEstimateReady: string;
+  estimateBar: EstimateBarCopy;
 };
 
 /**
@@ -315,9 +317,10 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
   // Only group when the data genuinely carries more than one category — never invent clinical sections.
   const groups = useMemo(() => {
     const distinct = new Set(items.map((i) => i.category).filter(Boolean));
-    if (distinct.size < 2) return [{ category: null as string | null, rows: items }];
-    return [...distinct].map((category) => ({ category, rows: items.filter((i) => i.category === category) }));
-  }, [items]);
+    if (distinct.size < 2) return [{ category: null as string | null, heading: null as string | null, rows: items }];
+    // A category is named in words, never the backend's code (the fee line keeps its heading, so it never reads as care).
+    return [...distinct].map((category) => ({ category, heading: categoryLabel(category, copy.estimateBar), rows: items.filter((i) => i.category === category) }));
+  }, [items, copy.estimateBar]);
 
   const primaryLabel = isFinal ? t.acceptFinal : t.acknowledge;
   const ackShort = isFinal ? t.ackShortFinal : t.ackShort;
@@ -430,7 +433,7 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                   <h2 id="services-heading" className="label-micro text-brand-700">{isFinal ? t.confirmedLabel : t.servicesLabel}</h2>
                   {groups.map((group) => (
                     <div key={group.category ?? "all"} className="mt-3">
-                      {group.category && <p className="border-b border-line pb-1.5 text-[0.8125rem] font-bold text-ink-600">{group.category}</p>}
+                      {group.heading && <p dir="auto" className="border-b border-line pb-1.5 text-[0.8125rem] font-bold text-ink-600">{group.heading}</p>}
                       <ul>
                         {group.rows.map((item) => (
                           <li key={item.id} className="flex items-baseline justify-between gap-6 border-b border-line py-3 last:border-0">
@@ -441,19 +444,11 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                       </ul>
                     </div>
                   ))}
-                  {/* A stored range is always shown as a range, with the expected figure beside it — never "expected" alone. */}
-                  <div className="mt-3 border-t border-line-strong pt-3">
-                    <p className="flex items-baseline justify-between gap-6">
-                      <span className="text-[0.9375rem] font-bold text-ink-800">{isFinal ? t.finalPriceLabel : hasRange ? t.rangeLabel : t.totalLabel}</span>
-                      <span className="whitespace-nowrap text-[1.0625rem] font-bold tabular-nums text-brand-900">{rangeText ?? <bdi dir="ltr">{money(expected)}</bdi>}</span>
-                    </p>
-                    {hasRange && (
-                      <p className="mt-1 flex items-baseline justify-between gap-6">
-                        <span className="text-[0.9375rem] text-ink-700">{t.expectedLabel}</span>
-                        <span className="whitespace-nowrap text-[0.9375rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(expected)}</bdi></span>
-                      </p>
-                    )}
-                  </div>
+                  {/* UX 1c-2: the totals as one scale (the range bracketed, the deposit in coral) over its legend, the readable
+                      table: a stored range is always shown as a range, with the expected figure beside it. */}
+                  <EstimateRangeBar className="mt-3 border-t border-line-strong pt-4" items={items} expected={expected} min={proposal.totalMin} max={proposal.totalMax}
+                                    deposit={depositDue ? proposal.depositDueDisplay : null} kind={isFinal ? "quote" : "estimate"}
+                                    currency={currency} locale={locale} copy={copy.estimateBar}/>
                 </section>
 
                 <section aria-labelledby="scope-of-cover" className="mt-8 grid gap-5 sm:grid-cols-2">

@@ -34,9 +34,11 @@ const received = "2026-09-01T09:00:00Z", consultantReview = "2026-09-04T09:00:00
 /** `multipleCases`: the account also represents a relative (Omar, whose case waits on them — the session opens it) and has a closed case of its own. */
 export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: string[]; identity?: { status: string; rejectionReason?: string } | null; multipleCases?: boolean;
   /** The server refuses a new case with this error code (e.g. a limit on cases sent for others). */
-  newCaseRefusal?: { status: number; code: string } };
+  newCaseRefusal?: { status: number; code: string };
+  /** UX 1c-2: the proposal's lines and totals as the workspace sends them since 1c-0 (range, categories, fee line). */
+  estimate?: { items: unknown[]; totalMin?: number; totalExpected?: number; totalMax?: number } };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal }: PatientOptions = {}) {
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, estimate }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
       profile: { sub: "patient-1", name: "Maya Example", email: "maya@example.test", roles: ["PATIENT"] }, expires_at: Math.floor(Date.now() / 1000) + 3600 }));
@@ -61,7 +63,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     caseSummary, timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: "2026-09-01T09:00:00Z" }, { type: "STATUS", label: caseSummary.status, status: caseSummary.status, occurredAt: stamp }],
     tasks: [], messages: [{ id: "m1", threadType: "PATIENT_COORDINATOR", senderRole: "COORDINATOR", senderName: "Sara Ahmed", direction: "INBOUND", body: "Welcome — I will send the deposit details shortly.", createdAt: stamp, internalOnly: false, read: false }],
     assignments: [], clinicalReviews: [], gates: null, delivery: null,
-    proposal: early ? null : { ...proposal, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
+    proposal: early ? null : { ...proposal, ...estimate, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
       ? { requestedAt: "2026-09-10T09:00:00Z", decisionSource: "RECORDED_ON_BEHALF", recordedByName: "Sara Ahmed", channel: "WHATSAPP_CALL", confirmedBy: "PATIENT", conversationAt: "2026-09-11T09:00:00Z", decidedAt: "2026-09-11T09:05:00Z" }
       : null as null | Record<string, string> },
     deposit: ready || early ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0, transfer: confirmed }

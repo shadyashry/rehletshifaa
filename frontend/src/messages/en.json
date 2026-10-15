@@ -1624,6 +1624,27 @@
           "ACCEPTED": "Acknowledged",
           "DECLINED": "Declined",
           "EXPIRED": "Expired"
+        },
+        "bar": {
+          "expected": "Expected",
+          "total": "Estimated total",
+          "finalTotal": "Final package price",
+          "range": "Estimated range",
+          "to": "to",
+          "deposit": "Coordination deposit",
+          "depositNote": "Paid first, then deducted from the price in your final treatment plan and quote.",
+          "rangeMark": "Range",
+          "depositMark": "Deposit",
+          "categories": {
+            "MEDICAL": "Medical care",
+            "PLATFORM_FEE": "Coordination and guarantee fee"
+          },
+          "chart": {
+            "range": "Estimated range {min} to {max}, expected {expected}.",
+            "total": "{label} {expected}.",
+            "parts": "Made up of {parts}.",
+            "deposit": "Coordination deposit {deposit}, paid first."
+          }
         }
       },
       "people": {

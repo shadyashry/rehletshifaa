@@ -11,6 +11,7 @@ import { CaseStamp, stampDate } from "@/components/brand/CaseStamp";
 import { DossierPage } from "@/components/brand/DossierPage";
 import { CaseFileStack, type FileSheet } from "@/components/portal/CaseFileStack";
 import { PaidBar, PaymentReceipt, PaymentTrack, paymentStep } from "@/components/portal/DepositVisuals";
+import { EstimateRangeBar } from "@/components/EstimateRangeBar";
 import { careViewHref, isPlainClick } from "@/components/portal/care-view";
 import { careAreaLabel, fillTemplate, plural } from "@/lib/portal-labels";
 import { ConfirmDialog, UnreadCount } from "@/components/portal/portal-ui";
@@ -90,7 +91,8 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
   const [withdrawing, setWithdrawing] = useState(false);
   const dateFormat = useMemo(() => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }), [locale]);
   const date = (iso: string) => dateFormat.format(new Date(iso));
-  const proposalTotal = proposal ? proposal.items.filter(i => !i.optional).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0) : null;
+  // The backend's expected total (UX 1c-0) when it sent one, else the sum of the lines that count (optional ones never do).
+  const proposalTotal = proposal ? proposal.totalExpected ?? proposal.items.filter(i => !i.optional).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0) : null;
   const showProposal = !!patientProposal && ["READY", "ACCEPTED", "DECLINED", "EXPIRED"].includes(patientProposal.state) && !!proposal;
   const showDeposit = !!deposit && deposit.status !== "CANCELLED";
   const depositInStep = showDeposit && MONEY_STEPS.has(code);
@@ -287,6 +289,13 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
               </div>
               {proposalTotal != null && <p className="statement mt-3 text-brand-900 tabular-nums"><bdi dir="ltr">{formatMoney(proposalTotal, proposal.currency, locale)}</bdi></p>}
               {proposal.versionNumber > 1 && <p className="mt-1 text-[0.875rem] text-ink-500">{t.estimate.updated}</p>}
+              {/* UX 1c-2: the same scale as the proposal link. The deposit is not bracketed here: My Care states it once, in
+                  its own facts (inside the step while it is the step's subject). */}
+              {proposalTotal != null && (
+                <EstimateRangeBar className="mt-4" items={proposal.items} expected={proposalTotal} min={proposal.totalMin} max={proposal.totalMax}
+                                  kind={finalQuote ? "quote" : "estimate"}
+                                  currency={proposal.currency} locale={locale} copy={t.estimate.bar}/>
+              )}
               {/* While the deposit is being paid, the payment step already says this; it is said once. */}
               {proposal.documentType === "PRELIMINARY_ESTIMATE" && code !== "PAY_DEPOSIT" && <p className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-ink-600">{t.estimate.basis}</p>}
               {showDeposit && !depositInStep && deposit && <DepositFacts deposit={deposit} locale={locale} level={3} className="mt-5 border-t border-line pt-4"/>}

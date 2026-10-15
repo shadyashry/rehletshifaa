@@ -533,6 +533,48 @@
   :root[data-brand-theme="petrol"] .case-file-sheet[data-depth="3"] { animation-delay: 0.12s; }
   :root[data-brand-theme="petrol"] .pay-paid-bar > span { animation: pay-fill 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s backwards; }
 }
+
+/* ---- UX 1c-2: the estimate range bar. One scale from zero to the top of the range on a Deep Paper track: the expected
+   total filled and split by category (petrol 700 / 400 / 200, 2px white gaps), a Petrol Ink marker at the expected figure,
+   the range bracketed above in Supporting Ink, the deposit bracketed below in coral (a mark, never text). The labels on the
+   bar repeat the legend for sighted readers; the legend is the readable twin. No spacing on .est itself: callers own it. */
+.est { container-type: inline-size; }
+.est-bar { padding-block: 0.375rem; }
+.est-bar[data-range] { padding-block-start: 2.25rem; }
+.est-bar[data-deposit] { padding-block-end: 2.5rem; }
+.est-scale { position: relative; }
+.est-track { display: flex; height: 1rem; overflow: hidden; border-radius: 0.25rem; background: var(--paper-deep); }
+.est-fill { display: flex; height: 100%; transform-origin: 0% 50%; }
+[dir="rtl"] .est-fill { transform-origin: 100% 50%; }
+.est-seg { height: 100%; border-inline-end: 2px solid var(--color-surface-default); }
+.est-seg:last-child { border-inline-end: 0; }
+:is(.est-seg, .est-key)[data-shade="0"] { background: var(--color-brand-700); }
+:is(.est-seg, .est-key)[data-shade="1"] { background: var(--color-brand-400); }
+:is(.est-seg, .est-key)[data-shade="2"] { background: var(--color-brand-200); }
+.est-key[data-shade="2"] { box-shadow: inset 0 0 0 1px var(--color-brand-400); }
+.est-expected { position: absolute; inset-block: -0.3125rem; width: 2px; margin-inline-start: -1px; background: var(--color-brand-900); }
+.est-range { position: absolute; inset-block-end: calc(100% + 0.25rem); height: 0.5625rem; border: 1.5px solid var(--color-ink-500); border-block-end: 0; }
+.est-deposit { position: absolute; inset-inline-start: 0; inset-block-start: calc(100% + 0.3125rem); min-inline-size: 0.5rem; height: 0.5625rem; border: 2px solid var(--color-coral); border-block-start: 0; }
+.est-mark { position: absolute; white-space: nowrap; font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600; color: var(--color-ink-700); }
+.est-mark-range { inset-block-end: calc(100% + 1rem); inset-inline-end: 0; }
+.est-mark-deposit { inset-block-start: calc(100% + 1.125rem); inset-inline-start: 0; }
+/* On the narrowest phones a long range (EGP, two decimals) would outgrow the card: the mark keeps its word, the legend the figures. */
+@container (max-width: 17.5rem) { .est-mark-figures { display: none; } }
+.est-legend { display: grid; font-size: 0.9375rem; line-height: 1.5rem; }
+.est-legend > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-block: 0.5rem; border-block-end: 1px solid var(--color-line); }
+.est-legend > div:last-child { border-block-end: 0; }
+.est-legend dt { display: grid; grid-template-columns: 0.875rem minmax(0, 1fr); column-gap: 0.625rem; min-width: 0; color: var(--color-ink-700); }
+.est-legend dd { flex: none; white-space: nowrap; font-weight: 600; color: var(--color-ink-900); }
+.est-legend > [data-strong] :is(dt, dd) { font-weight: 700; color: var(--color-brand-900); }
+.est-note { display: block; font-size: 0.8125rem; line-height: 1.25rem; font-weight: 400; color: var(--color-ink-500); }
+.est-key { inline-size: 0.75rem; block-size: 0.75rem; margin-block-start: 0.375rem; border-radius: 3px; }
+.est-key-expected { inline-size: 2px; block-size: 0.875rem; margin-block-start: 0.3125rem; margin-inline-start: 0.3125rem; border-radius: 0; background: var(--color-brand-900); }
+.est-key-range { block-size: 0.5rem; margin-block-start: 0.5rem; border: 1.5px solid var(--color-ink-500); border-block-end: 0; border-radius: 0; }
+.est-key-deposit { block-size: 0.5rem; margin-block-start: 0.375rem; border: 2px solid var(--color-coral); border-block-start: 0; border-radius: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  /* The expected total fills from the start edge as the estimate arrives (mirrored in Arabic); the marks are already there. */
+  :root[data-brand-theme="petrol"] .est-fill { animation: pay-fill 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s backwards; }
+}
 /* The intake card: a petrol top edge, like the tab of a clinical file. */
 :root[data-brand-theme="petrol"] .home-hero-card {
   border-top: 2px solid var(--color-brand-600);

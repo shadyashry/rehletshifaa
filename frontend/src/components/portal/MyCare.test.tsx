@@ -90,7 +90,7 @@ describe("MyCare", () => {
     expect(within(deposit).queryByRole("button")).toBeNull();
     // Proposal: amount, status, exactly one action.
     const proposalBlock = screen.getByRole("region", { name: "Your proposal" });
-    expect(within(proposalBlock).getByText("$4,850")).toBeTruthy();
+    expect(proposalBlock.querySelector(".statement")?.textContent).toBe("$4,850");
     expect(within(proposalBlock).getByText(/Acknowledged/)).toBeTruthy();
     const viewButtons = screen.getAllByRole("button", { name: /view proposal/i });
     expect(viewButtons).toHaveLength(1);
@@ -415,6 +415,23 @@ describe("MyCare", () => {
     expect(document.querySelector(".care-journey time")).toBeNull();
   });
 
+  it("draws the estimate on one scale: the workspace's range bracketed, the fee line split out, the deposit left to its own facts", () => {
+    renderCare({ proposal: { ...proposal, documentType: "PRELIMINARY_ESTIMATE", totalMin: 4500, totalExpected: 4850, totalMax: 5600,
+      items: [{ quantity: 1, unitPrice: 4250, optional: false, category: "MEDICAL" }, { quantity: 1, unitPrice: 600, optional: false, category: "PLATFORM_FEE" }] } });
+    const estimate = screen.getByRole("region", { name: "Preliminary care estimate" });
+    expect(within(estimate).getByRole("img").getAttribute("aria-label")).toBe(
+      "Estimated range $4,500 to $5,600, expected $4,850. Made up of Medical care $4,250 and Coordination and guarantee fee $600.");
+    expect(estimate.querySelector(".est-range")).toBeTruthy();
+    // The deposit is stated once, in its own facts; the bar does not repeat it.
+    expect(estimate.querySelector(".est-deposit")).toBeNull();
+    cleanup();
+    // Before 1c-0's totals reach a workspace: no range, no bracket; a final quote's total is its price.
+    renderCare({ proposal: { ...proposal, documentType: "FINAL_TREATMENT_QUOTE" }, patientProposal: { state: "ACCEPTED", action: "VIEW_PROPOSAL", documentType: "FINAL_TREATMENT_QUOTE" } });
+    const quote = screen.getByRole("region", { name: "Final treatment plan and quote" });
+    expect(within(quote).getByRole("img").getAttribute("aria-label")).toBe("Final package price $4,850.");
+    expect(quote.querySelector(".est-range, .est-deposit")).toBeNull();
+  });
+
   it("tracks the deposit: checking with a Sent stamp, then received with Finance's date, and a bar only for a part payment", () => {
     const thisYear = new Date().getFullYear();
     renderCare({ deposit: { status: "REQUESTED", currency: "USD", totalDisplay: 500, transfer: { reference: "FT123456", status: "SUBMITTED", submittedAt: `${thisYear}-09-12T08:30:00Z` } } });
@@ -423,7 +440,7 @@ describe("MyCare", () => {
     expect(document.querySelector(".pay-receipt")?.textContent).toContain("Sent, Sep 12");
     expect(screen.getByText("FT123456")).toBeTruthy();
     // A sent reference has no amount: nothing fills a bar while it is checked.
-    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByRole("img", { name: /deposit received/ })).toBeNull();
     cleanup();
     renderCare({ actions: wait("WAIT_COORDINATION"), deposit: { status: "PAID", currency: "USD", totalDisplay: 500, paidDisplay: 500,
       transfer: { reference: "FT123456", status: "CONFIRMED", submittedAt: `${thisYear}-09-12T08:30:00Z`, decidedAt: `${thisYear}-09-14T10:00:00Z` } } });
