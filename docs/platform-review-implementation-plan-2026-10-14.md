@@ -1045,6 +1045,81 @@ phases.
 - Tests: architecture §14 rows for the policy, admission and money split; `PasswordOnlySessionCoverageTest`;
   `PostgresJpaMappingTest` on V95–V96.
 - Sessions: 2. Model: Fable 5.1, high (lifecycle and money). Needs: D-B, D-C, D-D decided; P1-10 fee line first.
+- **Status (2026-10-15, session 1 of 2 = backend, Opus 5.5 stood in for Fable 5.1; committed on `claude/magical-edison-f4f675`):** delivered;
+  no screen. Owner decisions recorded 2026-10-15: **D-B yes**, **D-C yes**, **D-D applied as recommended** (the owner agreed to "both
+  recommendations" and asked to implement; D-D was not asked separately and may still be objected to). Flyway **V99**
+  (`V99__admission_evidence_and_voucher.sql`; the `V95`/`V96` names above were stale) is now the newest; V100 is the next free.
+  - **Integration merge first (step 0).** `feat/review-p0` had diverged (P1-10 session 1 + 21 UX commits), so this branch was cut from
+    `claude/guardian-upload` (`9d0309b`: P1-10 session 2, P1-13 backend + UI, V97, My Care upload, sweeper, V98), merged
+    `claude/amazing-jepsen-cb80d9` (`269d1b2`, P1-9, scripts and docs) and then `feat/review-p0` (`1a3ed8f`): merge `2287ae1` + fix `635ae46`.
+    Conflicts were frontend only (ProfileActivation, ProposalSign, MyCare, the patient e2e fixture and two specs): the UX side's structure was
+    kept and the P1-10/P1-13 behaviour re-applied (guardian consent words, acceptance holds, guardian step, final-quote step, fixture options;
+    ProposalSign's price copy now comes from the page instead of `getDictionary` in the client). Verified on the merge: backend `mvn -o -q test`
+    891 tests, 0 failures, 3 skips; `pnpm typecheck` clean; vitest of the touched components 336 green. So this branch contains
+    `feat/review-p0`, and the owner can fast-forward `feat/review-p0` to it.
+  - Delivered: **(1) `ADMISSION_READY`** in `CaseStatus`, the status check and `CaseTransitionPolicy`: `ARRIVAL_CONFIRMED -> ADMISSION_READY |
+    CANCELLED`, `ADMISSION_READY -> TREATMENT_IN_PROGRESS | CANCELLED` (no edge around it), typed cancellation, advancing, `stageDefault`
+    HOSPITAL, the status link's treatment phase and label. Entry blockers come from **`AdmissionReadiness`** (one answer for the gate, the
+    treatment episode and the views): final quote accepted when one exists, procedure consent (or the consent override), and the balance
+    evidenced against the voucher (cashier receipt countersigned by Finance for the hospital part, the platform's receipt for any fee balance)
+    or the Consultant's emergency admission override; `TREATMENT_IN_PROGRESS` needs the hospital's admission number. Errors
+    `ADMISSION_NOT_READY` and `ADMISSION_NUMBER_REQUIRED` list the missing pieces. **(2) Evidence ledger** `case_evidence` +
+    `EvidenceLedger`: append-only rows (kind, stage, document of the case and clean, reference, amount, effective time, encrypted payload),
+    countersigned once and never by the recorder (`SELF_COUNTERSIGN_REFUSED`, also a check constraint), corrections supersede; P1-15 kinds
+    `FACILITY_ADMISSION_LETTER`, `PRICE_VARIANCE_CHECK`, `ARRIVAL_ATTESTED`, `PATIENT_ARRIVED`, `BALANCE_EVIDENCED`, `FEE_BALANCE_RECEIVED`,
+    `ADMISSION_NUMBER`, `POINT_OF_NO_RETURN`, `EMERGENCY_ADMISSION_OVERRIDE`. **(3) `facility_admissions`** (one per case; Operations
+    reserves facility + planned date in treatment coordination or after arrival; a new hospital supersedes the voucher; cancelled with the case).
+    **(4) Letter and price check**: Operations records the hospital's letter with its quoted package (EGP); within the accepted version's provider
+    maximum → Finance `CHECK_PROFORMA` (1 working day), above it → `PRICE_VARIANCE` (4 working hours) that Finance accepts with a reason
+    (`PRICE_VARIANCE_CHECK` row) or refuses (back to Operations, `REVISE_ADMISSION_LETTER`); travel cannot be `CONFIRMED` while a variance is
+    open (`PRICE_VARIANCE_OPEN`). **(5) Voucher (D-B)** `admission_vouchers` (immutable, revision `RS-V-<case>-<n>`, no sequence needed),
+    issued by the system when the final quote is accepted and the letter is checked (both orders), or by Operations for a case with no final
+    quote (then priced from the accepted estimate). Money rule `AdmissionMoney`, schema-checked: the deposit covers the platform fee first, the
+    rest is credited to the hospital, the patient pays the hospital the package less that credit, a fee the capped deposit did not cover is
+    owed to the platform. Hospital emailed (`admission-voucher-facility`, EN+AR, to `facilities.contact_email`), patient told
+    (`admission-balance-due`). A voucher that cannot be issued (deposit above package + fee) never undoes the acceptance: it becomes Finance
+    work `ADMISSION_VOUCHER_BLOCKED`. **(6) Balance (D-C)**: Operations records the cashier receipt (receipt number, EGP amount, paid at,
+    method, optional document and paid currency; never above what is owed, `AMOUNT_EXCEEDS_BALANCE`), Finance countersigns with a fresh
+    sign-in (`COUNTERSIGN_BALANCE`, 4 working hours); Finance records the fee balance (`PAYMENT_RECORD`). When the last gate passes,
+    `CaseHandoffService.onAdmissionEvidenceChanged` moves the case to `ADMISSION_READY` and tells the patient (`cleared-for-admission`), the
+    coordinator and Operations. **(7) Pay to admit**: `JourneyService.treatment` refuses the first episode without the balance
+    (`BALANCE_EVIDENCE_REQUIRED`), walks `ADMISSION_READY` then `TREATMENT_IN_PROGRESS`, and takes the admission number
+    (`TreatmentRequest.admissionNumber`, new optional field; Operations can record it too). **(8) Emergency**: the Consultant records an
+    emergency admission with a reason (encrypted; audit carries no text); Finance gets `EMERGENCY_ADMISSION_REVIEW` (2 working days,
+    survives the case's exit); it never stands in for the quote or the consent. **(9) Arrival**: Operations' confirmed arrival writes
+    `ARRIVAL_ATTESTED`; the patient confirms "I have arrived" (`POST /patient/cases/{id}/arrived`, travel `CONFIRMED`), which records
+    `PATIENT_ARRIVED` and moves the case under the policy. **(10) Point of no return**: Operations sets it, Finance approves (countersign).
+    **(11) Patient states** (`CaseActionService`): `CONFIRM_ARRIVAL` (focus, arrival within a day), `PAY_BALANCE` (focus),
+    `WAIT_BALANCE_CHECK`, `CLEARED_FOR_ADMISSION`; Operations' current action `RECORD_HOSPITAL_BALANCE` / `RECORD_ADMISSION_NUMBER`.
+    **(12) Access**: permissions `ADMISSION_READ`, `ADMISSION_MANAGE`, `EVIDENCE_COUNTERSIGN` (step-up), `ARRIVAL_REPORT`; new scope
+    `CASE_MONEY_OPEN` (deposit open or admission reserved/confirmed; reads audited like deposit reads) so any Finance member reads and
+    countersigns an open admission without a clinical record. Finance's admission work goes to the case's Finance person, else the least-loaded
+    Finance holder, and every Finance holder is told (the pool queries only cover deposits). **API** (`AdmissionController`):
+    `GET …/{operations|finance|coordinator|doctor}/cases/{id}/admission`; Operations `POST /operations/cases/{id}/admission`, `…/letter`,
+    `…/voucher`, `…/balance`, `…/point-of-no-return`, `…/number`; Finance `POST /finance/cases/{id}/admission/letter/decision`,
+    `/finance/cases/{id}/evidence/{evidenceId}/countersign`, `…/admission/fee-balance`; Consultant `POST /doctor/cases/{id}/emergency-admission`;
+    patient `GET /patient/cases/{id}/admission`, `POST /patient/cases/{id}/arrived`.
+  - Tests and numbers: new `AdmissionServiceTest` (14: frozen split and replay, new hospital supersedes, estimate-only voucher by hand,
+    blocked voucher never undoes acceptance, variance holds travel and needs a reason, refused letter back to Operations, countersigned receipts
+    clear for admission then the admission number opens treatment, no self-countersign, capped deposit fee balance, pay to admit + emergency
+    override + Finance review, override never replaces quote or consent, patient arrival, Finance scope and Operations assignment, cancellation
+    cancels the admission), `AdmissionMoneyTest` (5, the worked examples), `CaseTransitionPolicyTest` +1, `NotificationOutboxProcessorTest` +2
+    (and the two patient messages in the language test); `JourneyServiceIntegrationTest` updated for the new gate (episodes carry an admission
+    number; a fixture emergency-admission row stands in for the receipt). Backend `mvn -o -q test` (JVM in UTC): 913 tests, 0 failures, 3 skips (891 after the merge, 22 new).
+    `ArchitectureRulesTest` and `RolePolicyTest` green (JPA only, no native query). `PostgresJpaMappingTest` green on a disposable PostgreSQL 17 (V99 applied,
+    Hibernate validated, every new repository query executed). No frontend code changed in this session after the merge.
+  - Not done here (session 2 and later): **no screens or copy** — My Care / status-link blocks (`CONFIRM_ARRIVAL`, `PAY_BALANCE` with the voucher
+    number and amounts, `WAIT_BALANCE_CHECK`, `CLEARED_FOR_ADMISSION`, "Your dates"), the staff "Admission & money" panel and forms, Finance
+    letter decision / countersign / fee balance, the Consultant's emergency admission and admission number on the treatment form, the
+    `ADMISSION_READY` label, staff work copy for the new work types. No voucher PDF (no renderer resolvable offline; the voucher is a record,
+    an API view and the hospital email — architecture open point 1). No `PROVIDER` deposit component (the credit to settle is on the voucher;
+    P1-12's settlement consumes it). `CaseExitService` does not read the point of no return for a refund class yet. No `RESERVE_ADMISSION`
+    work item (Operations' `UPDATE_TRAVEL_PLAN` step covers the stage). Arrival is not gated on the letter (the voucher is), to keep existing
+    flows. Templates `rs_your_dates` and `rs_arrival_card` not added; `rs_admission_voucher` and `rs_cleared_for_admission` need Meta approval.
+    A date-only change of the reservation keeps the voucher (its email shows the old date).
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `feat/review-p0`) and rebuilds the dev stack backend
+    for V99 (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`); confirm the money rule (Owner decisions still
+    open); then P1-15 session 2 (UI and copy).
 
 ### P1-16  Treatment evidence: milestones and change orders  (design §5 stage 4; architecture §5.2–5.3)
 - `TreatmentMilestoneService` (eight milestone kinds, Consultant or Operations-with-countersign, 24-working-hour
@@ -1165,8 +1240,21 @@ the licence now; the credential type is a one-line addition in P1-19.
 ### Owner decisions still open
 
 - [x] D-A (fee restructuring): yes, before launch (owner, 2026-10-15); see the P1-10 entry.
-- [ ] D-B…D-H from `docs/post-deposit-journey-design.md` §12 (voucher model, pay to admit, new stage, change-order
-      band, fit-to-fly window, free follow-up window, affiliations as eligibility).
+- [x] D-B (voucher model): yes (owner, 2026-10-15). Phase 1: the patient pays the medical balance at the hospital cashier against an
+      admission voucher the platform issues to the hospital (case, patient, package reference and price, inclusions, the deposit credit
+      the platform will settle, the amount paid at the cashier, the frozen FX rate); the platform never holds hospital money; the hospital
+      returns the cashier receipt. Phase 2 (later): platform collection through a licensed PSP. Built in P1-15 session 1.
+- [x] D-C (pay to admit): yes (owner, 2026-10-15). No treatment episode opens without balance evidence on file (hospital receipt now, PSP
+      confirmation in phase 2); emergency override by the Consultant with a reason plus a Finance review task, as for consent. Built in P1-15
+      session 1.
+- [x] D-D (`ADMISSION_READY` macro state): **applied as recommended** (2026-10-15; the owner agreed to "both recommendations" D-B and D-C and
+      asked to implement — D-D was not asked separately, so the owner may still object). Built in P1-15 session 1.
+- [ ] P1-15: the voucher's money rule was applied as recommended (design §6 rule 1: the deposit covers the platform fee first, the rest is
+      credited to the hospital, a fee the capped deposit did not cover is owed to the platform before admission); the owner confirms it, or
+      chooses "the whole deposit is credited to the hospital and the fee is paid to the platform separately" (the architecture's first
+      worked example). Counsel confirms the hospital voucher email's content (patient name and amounts to the hospital's contact).
+- [ ] D-E…D-H from `docs/post-deposit-journey-design.md` §12 (change-order band, fit-to-fly window, free follow-up window, affiliations as
+      eligibility).
 - [ ] D-I: start the PDPL licence application and the Law 13/2025 liability-fund subscription (owner action).
 - [x] P1-10: final-quote validity 14 days and FX band 3% (owner, 2026-10-15); guarantee wording ships as a placeholder.
 - [ ] P1-10: counsel approves the guarantee wording and the VAT rate on the platform fee; owner decides whether the
@@ -1180,7 +1268,8 @@ the licence now; the credential type is a one-line addition in P1-19.
 
 ### Before production (from delivered phases)
 
-- [ ] Submit the new WhatsApp templates to Meta for approval: `rs_patient_action_reminder`, `rs_information_request_closed` (P1-6), and the deposit templates if not yet approved (P0-4).
+- [ ] Submit the new WhatsApp templates to Meta for approval: `rs_patient_action_reminder`, `rs_information_request_closed` (P1-6), `rs_admission_voucher`, `rs_cleared_for_admission` (P1-15), and the deposit templates if not yet approved (P0-4).
+- [ ] P1-15: every facility that admits patients has an admissions contact email (`facilities.contact_email`): the voucher is emailed there; without one nothing is sent and Operations hands it over.
 - [ ] Set the real bank-transfer details (`PAYMENT_BANK_*`); the defaults are dummy values (DEP-3).
 - [ ] Start every environment with `PII_INDEX_KEY` set before V86 runs (P0-1).
 - [ ] Apply PITR and bucket versioning/replication on the chosen host (`scripts/dr/`), start the nightly realm export, and run the production restore drill; record its time in `docs/deployment.md` (P1-9).

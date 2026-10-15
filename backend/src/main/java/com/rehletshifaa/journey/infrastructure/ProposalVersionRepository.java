@@ -142,6 +142,30 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
     @Query("select v.releasedAt from ProposalVersion v where v.id = :id")
     java.util.Optional<Instant> findReleasedAt(@Param("id") UUID id);
 
+    /** P1-15: what an admission voucher prices: an accepted version's EGP figures and its frozen rate. */
+    interface VoucherBasis {
+        UUID getId(); String getDocumentType(); String getCurrency(); BigDecimal getProviderNetEgp(); BigDecimal getMarginAmountEgp();
+        BigDecimal getTaxEgp(); BigDecimal getFxRate(); LocalDate getFxRateDate();
+    }
+
+    /**
+     * The case's accepted versions, the final quote first (FINAL_TREATMENT_QUOTE sorts before PRELIMINARY_ESTIMATE), newest
+     * first within each; pass {@code Limit.of(1)} for the one a voucher prices.
+     */
+    @Query("""
+            select v.id as id, v.documentType as documentType, v.currency as currency, v.providerNetEgp as providerNetEgp,
+                v.marginAmountEgp as marginAmountEgp, v.taxEgp as taxEgp, v.fxRate as fxRate, v.fxRateDate as fxRateDate
+            from ProposalVersion v join Proposal p on p.id = v.proposalId
+            where p.caseId = :caseId and v.status = 'ACCEPTED'
+            order by v.documentType asc, v.versionNumber desc""")
+    List<VoucherBasis> findAcceptedBases(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
+
+    /** P1-15: the highest provider (medical, non-optional) EGP total of a version: what a hospital's quoted package is checked against. */
+    @Query("""
+            select coalesce(sum(i.quantity * coalesce(i.unitPriceMaxEgp, i.unitPriceEgp)), 0) from ProposalItem i
+            where i.proposalVersionId = :versionId and i.category = 'MEDICAL' and i.optional = false""")
+    BigDecimal providerMaximumEgp(@Param("versionId") UUID versionId);
+
     /** The commercial policy rate locked on the case's latest preliminary estimate. */
     interface LockedMargin { BigDecimal getMarginRate(); UUID getCommercialPolicyId(); Integer getCommercialPolicyVersion(); }
 

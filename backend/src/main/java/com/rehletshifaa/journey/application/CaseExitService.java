@@ -55,10 +55,13 @@ public class CaseExitService {
     private final StaffWorkService work;
     private final AuditTrail auditTrail;
     private final Clock clock;
+    private final com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository admissions;
 
     public CaseExitService(Authority authority, MedicalCaseRepository cases, CaseStatusLog statusLog, CaseExitReasonRepository exits,
                            TravelPlanRepository travelPlans, DepositRepository deposits, PaymentService payment,
-                           DepositTransferService transfers, CaseTransitionPolicy policy, StaffWorkService work, AuditTrail auditTrail, Clock clock) {
+                           DepositTransferService transfers, CaseTransitionPolicy policy, StaffWorkService work, AuditTrail auditTrail, Clock clock,
+                           com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository admissions) {
+        this.admissions = admissions;
         this.authority = authority; this.cases = cases; this.statusLog = statusLog; this.exits = exits; this.travelPlans = travelPlans;
         this.deposits = deposits; this.payment = payment; this.transfers = transfers; this.policy = policy; this.work = work;
         this.auditTrail = auditTrail; this.clock = clock;
@@ -152,6 +155,11 @@ public class CaseExitService {
             auditTrail.event("CASE_EXIT_RECORDED").actor(actorSubject, actorLabel).caseId(caseId).entity("CaseExitReason", recorded.getId())
                     .action(reason.name()).outcome("SUCCESS").record();
         }
+        // P1-15: a hospital admission not yet admitted is cancelled with the case (its voucher stays on record for Finance).
+        if ("CANCELLED".equals(target)) admissions.findByCaseId(caseId)
+                .filter(a -> a.getStatus() == com.rehletshifaa.journey.domain.FacilityAdmission.Status.RESERVED
+                        || a.getStatus() == com.rehletshifaa.journey.domain.FacilityAdmission.Status.CONFIRMED)
+                .ifPresent(a -> { a.cancel(actorSubject, now); admissions.saveAndFlush(a); });
         work.closeOpenWork(caseId, "The case left its journey (" + target + (reason == null ? "" : ": " + reason.name()) + ")");
         work.refreshWaitingOn(caseId, StaffWorkService.stageDefault(target), null);
         work.changed(caseId);

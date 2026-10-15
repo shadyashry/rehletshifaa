@@ -54,7 +54,15 @@ public class SlaPolicy {
             // P1-13: a manager takes up an incident (complaint, dispute, adverse event, death) within two working days.
             Map.entry("INCIDENT_REVIEW", 2),
             // P1-13: the Consultant of a reopened case reviews it within two working days.
-            Map.entry("FOLLOW_UP_REVIEW", 2));
+            Map.entry("FOLLOW_UP_REVIEW", 2),
+            // P1-15 (architecture §9): Finance checks a hospital letter in one working day (a price variance and a cashier receipt in
+            // four working hours, dated by the caller), approves the point of no return in one, reviews an emergency admission in
+            // two; Operations asks the hospital again for a refused letter in one.
+            Map.entry("CHECK_PROFORMA", 1),
+            Map.entry("APPROVE_POINT_OF_NO_RETURN", 1),
+            Map.entry("EMERGENCY_ADMISSION_REVIEW", 2),
+            Map.entry("REVISE_ADMISSION_LETTER", 1),
+            Map.entry("ADMISSION_VOUCHER_BLOCKED", 1));
 
     /**
      * P1-6 session 2 (D-02): the queue each waiting state waits on, so "usually within N working days" is read from the

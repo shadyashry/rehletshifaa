@@ -205,6 +205,7 @@ public class Authority {
             case CONVERSATION_UNCLAIMED -> isConversation(resource) && conversations.unclaimedConversation(resource.id());
             case CASE_UNCLAIMED -> isCase(resource) && cases.unclaimedIntake(resource.id());
             case CASE_DEPOSIT_OPEN -> isCase(resource) && cases.depositOpen(resource.id());
+            case CASE_MONEY_OPEN -> isCase(resource) && cases.moneyOpen(resource.id());
             case OWN_PATIENT -> isCase(resource) && cases.ownPatientCase(resource.id(), subject);
             case SUPERVISED -> supervised(subject, role, resource);
             case OWN_CLINIC -> resource.kind() == Resource.Kind.CLINIC && roles.ownsClinic(resource.id(), subject);
@@ -234,7 +235,7 @@ public class Authority {
         if (permission == Permission.CASE_READ && decision.scope() == Scope.SUPERVISED && isCase(resource))
             audit.supervisoryRead(principal.subject(), resource.id().toString(), permission.name());
         // A read granted by the open deposit alone (no assignment) reaches any such case on the platform: it leaves evidence too.
-        if (decision.scope() == Scope.CASE_DEPOSIT_OPEN && isCase(resource))
+        if ((decision.scope() == Scope.CASE_DEPOSIT_OPEN || decision.scope() == Scope.CASE_MONEY_OPEN) && isCase(resource))
             audit.depositRead(principal.subject(), resource.id().toString(), permission.name());
     }
 }

@@ -179,13 +179,34 @@ class NotificationOutboxProcessorTest {
                 {"account-link-continue", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"deposit-settled-patient", "{\"lang\":\"%s\"}"},
                 {"out-of-hours", "{\"lang\":\"%s\"}"}, {"intake-followup", "{\"lang\":\"%s\"}"},
                 {"coordinator-intro", "{\"name\":\"Layla\",\"lang\":\"%s\"}"}, {"case-access-code", "{\"code\":\"123456\",\"lang\":\"%s\"}"},
-                {"document-cleared", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"}};
+                {"document-cleared", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
+                {"admission-balance-due", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
+                {"cleared-for-admission", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"}};
         for (String[] t : templates) {
             var ar = render(t[0], t[1].formatted("ar"));
             assertThat(arabic(ar.subject()) && arabic(ar.body())).as(t[0] + " in Arabic").isTrue();
             assertThat(ar.language()).as(t[0]).isEqualTo("ar");
             var en = render(t[0], t[1].formatted("en"));
             assertThat(arabic(en.subject()) || arabic(en.body())).as(t[0] + " in English").isFalse();
+        }
+    }
+
+    /** P1-15 (D-B): the hospital receives the voucher with the money split it admits and bills against, in English and Arabic, no clinical detail. */
+    @Test void theHospitalVoucherCarriesTheFrozenSplitInBothLanguages() {
+        assertThat(render("admission-voucher-facility", "{\"lang\":\"en\",\"voucher\":\"RS-V-1\"}")).as("a voucher missing its amounts is never sent").isNull();
+        var mail = render("admission-voucher-facility", "{\"lang\":\"en\",\"voucher\":\"RS-V-2026-000081-1\",\"caseNumber\":\"RS-2026-000081\",\"patient\":\"Maya Example\","
+                + "\"facility\":\"Cairo Heart\",\"admission\":\"2026-11-02T08:00:00Z\",\"package\":\"100000.00\",\"credit\":\"2250.00\",\"atFacility\":\"97750.00\"}");
+        assertThat(mail.subject()).contains("RS-V-2026-000081-1");
+        assertThat(mail.body()).contains("Package price (EGP): 100000.00", "(EGP): 2250.00", "before admission (EGP): 97750.00", "Maya Example", "RS-2026-000081");
+        assertThat(arabic(mail.body())).as("the Arabic half follows the English").isTrue();
+    }
+
+    /** The patient's admission messages link to their own case page; no amount travels in the message. */
+    @Test void theAdmissionMessagesLinkToTheCasePage() {
+        for (String template : List.of("admission-balance-due", "cleared-for-admission")) {
+            var en = render(template, "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"en\"}");
+            assertThat(en.linkPath()).as(template).isEqualTo("en/portal?case=0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00");
+            assertThat(en.body()).as(template).doesNotContainPattern("[0-9]{3,}[.][0-9]{2}");
         }
     }
 

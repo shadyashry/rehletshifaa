@@ -30,6 +30,15 @@ public final class CaseEvents {
     /** A step only the patient could complete (profile, contact, consents, onboarding) just changed. */
     public record PatientReadinessChanged(UUID caseId) {}
 
+    /** P1-15: the patient accepted a final treatment quote; the admission voucher is issued against it when the letter is checked. */
+    public record FinalQuoteAccepted(UUID caseId, UUID versionId) {}
+
+    /**
+     * P1-15: something the admission gate reads changed (a voucher issued, a receipt countersigned, the fee balance received,
+     * procedure consent captured, an emergency override): the handoff tries ARRIVAL_CONFIRMED to ADMISSION_READY under the policy.
+     */
+    public record AdmissionEvidenceChanged(UUID caseId) {}
+
     /**
      * Work, an assignment, the proposal's sign-offs or who has the ball changed on the case: the stage's own steps are
      * re-derived ({@link CaseActionService#syncStageWork}) so every step someone owes is in their My work (QA A3).

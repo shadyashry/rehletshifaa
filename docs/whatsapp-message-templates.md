@@ -35,6 +35,8 @@ created under the same template name.
 | `rs_deposit_transfer_rejected` | `deposit-transfer-rejected` | Check my payment / مراجعة دفعتي → portal (as above) |
 | `rs_deposit_balance_due` | `deposit-balance-due` | Pay the balance / دفع المتبقي → portal (as above) |
 | `rs_document_cleared` | `document-cleared` | See my documents / عرض مستنداتي → portal (as above). **New, to be created and approved in WhatsApp Manager**; until it exists Meta refuses the send and the outbox retries it into a dead letter (email to patients without WhatsApp still works) |
+| `rs_admission_voucher` | `admission-balance-due` | See what to pay / ما عليّ دفعه → portal (as above). **New (P1-15), to be created and approved in WhatsApp Manager** |
+| `rs_cleared_for_admission` | `cleared-for-admission` | My admission / دخولي إلى المستشفى → portal (as above). **New (P1-15), to be created and approved in WhatsApp Manager** |
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
 | `rs_followup_window_closed` | `intake-followup` | none |
 | `rs_coordinator_intro` | `coordinator-intro` | none (1 body variable: the coordinator's name) |
@@ -92,6 +94,14 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 **`rs_document_cleared`** (a file uploaded while the virus check was down passed it later, in the sweep; no file name in the message)
 - en: A file you sent us could not be checked for viruses at the time. It has now passed the check and is on your case. See it on your case page using the button below.
 - ar: تعذّر فحص ملف أرسلته إلينا من الفيروسات في حينه. وقد اجتاز الفحص الآن وأصبح ضمن حالتك. اطّلع عليه في صفحة حالتك عبر الزر أدناه.
+
+**`rs_admission_voucher`** (P1-15, D-B: the platform issued the hospital its admission voucher; the patient pays the balance at the hospital cashier)
+- en: Your hospital has your admission voucher. Pay the balance at the hospital cashier before admission: the amount and your voucher number are on your case page, using the button below.
+- ar: تسلّم المستشفى قسيمة دخولك. ادفع الرصيد المتبقي في خزينة المستشفى قبل الدخول: المبلغ ورقم القسيمة في صفحة حالتك عبر الزر أدناه.
+
+**`rs_cleared_for_admission`** (P1-15, D-C/D-D: the balance is evidenced and the case entered ADMISSION_READY)
+- en: Your payment is confirmed and you are cleared for admission. Your admission details are on your case page, using the button below.
+- ar: تأكّد سدادك وأصبحت جاهزًا للدخول إلى المستشفى. تفاصيل دخولك في صفحة حالتك عبر الزر أدناه.
 
 **`rs_followup_window_closed`** (S3: sent once after WhatsApp's 24-hour window has closed)
 - en: Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation.

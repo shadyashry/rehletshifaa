@@ -240,6 +240,8 @@ app:
         deposit-transfer-rejected: ${WHATSAPP_TEMPLATE_DEPOSIT_TRANSFER_REJECTED:rs_deposit_transfer_rejected}
         deposit-balance-due: ${WHATSAPP_TEMPLATE_DEPOSIT_BALANCE_DUE:rs_deposit_balance_due}
         document-cleared: ${WHATSAPP_TEMPLATE_DOCUMENT_CLEARED:rs_document_cleared}
+        admission-balance-due: ${WHATSAPP_TEMPLATE_ADMISSION_VOUCHER:rs_admission_voucher}
+        cleared-for-admission: ${WHATSAPP_TEMPLATE_CLEARED_FOR_ADMISSION:rs_cleared_for_admission}
         proposal-decision-recorded: ${WHATSAPP_TEMPLATE_DECISION_RECORDED:rs_decision_recorded}
         intake-followup: ${WHATSAPP_TEMPLATE_FOLLOWUP:rs_followup_window_closed}
         coordinator-intro: ${WHATSAPP_TEMPLATE_COORDINATOR_INTRO:rs_coordinator_intro}

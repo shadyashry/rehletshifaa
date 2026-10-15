@@ -67,7 +67,7 @@ public class CaseActionService {
      * take the case back or push it forward; the endpoints refuse those independently.
      */
     public static final Set<String> CONSULTANT_OWNED = Set.of("CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW");
-    private static final Set<String> TRAVEL_PACKAGE_LOCKED = Set.of("PATIENT_DECISION", "ACCEPTED", "DECLINED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED");
+    private static final Set<String> TRAVEL_PACKAGE_LOCKED = Set.of("PATIENT_DECISION", "ACCEPTED", "DECLINED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED");
     /** Readiness steps the onboarding link completes in one go; shown as a single "activate your profile" blocker. */
     private static final Set<String> PROFILE_CODES = Set.of("ACCOUNT_NOT_ACTIVATED", "CONSENTS_INCOMPLETE", "ONBOARDING_INCOMPLETE", "REPRESENTATIVE_AUTH_MISSING");
 
@@ -85,11 +85,13 @@ public class CaseActionService {
     private final CaseExitReasonRepository exitReasons;
     private final TravelPlanRepository travelPlans;
     private final CaseStatusChangeRepository statusChanges;
+    private final AdmissionReadiness admission;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
                              com.rehletshifaa.workforce.application.WorkforceDirectory workforce, CaseExitReasonRepository exitReasons,
-                             TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla) {
+                             TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla, AdmissionReadiness admission) {
+        this.admission = admission;
         this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges; this.sla = sla;
         this.workforce = workforce;
         this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
@@ -186,8 +188,16 @@ public class CaseActionService {
             if (payment.transferPending(caseId)) return simple("WAIT_PAYMENT_CHECK", "WAIT");
             return simple("WAIT_COORDINATION", "WAIT");
         }
-        if ("TRAVEL_COORDINATION".equals(status)) return simple("WAIT_COORDINATION", "WAIT");
-        if ("ARRIVAL_CONFIRMED".equals(status)) return simple("WAIT_TREATMENT", "WAIT");
+        // P1-15: the patient says when they have arrived (travel confirmed, arrival within a day); then pays the hospital balance
+        // at the cashier against the voucher (phase 1) and any platform fee balance; then waits to be admitted.
+        if ("TRAVEL_COORDINATION".equals(status)) return admission.arrivalDue(caseId) ? simple("CONFIRM_ARRIVAL", "FOCUS") : simple("WAIT_COORDINATION", "WAIT");
+        if ("ARRIVAL_CONFIRMED".equals(status)) {
+            var voucher = admission.currentVoucher(caseId).orElse(null);
+            if (voucher == null || admission.paidToAdmit(caseId)) return simple("WAIT_TREATMENT", "WAIT");
+            if (admission.feeBalanceOwed(caseId, voucher).signum() == 0 && admission.balanceAwaitingCountersign(caseId)) return simple("WAIT_BALANCE_CHECK", "WAIT");
+            return simple("PAY_BALANCE", "FOCUS");
+        }
+        if ("ADMISSION_READY".equals(status)) return simple("CLEARED_FOR_ADMISSION", "WAIT");
         if ("TREATMENT_IN_PROGRESS".equals(status)) return simple("IN_TREATMENT", "WAIT");
         if (Set.of("DISCHARGED", "FOLLOW_UP").contains(status)) return simple("FOLLOW_UP", "WAIT");
         return none();
@@ -234,6 +244,10 @@ public class CaseActionService {
         if (role == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
         if (role == Role.OPERATIONS) {
             if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
+            // P1-15: after arrival Operations records the cashier's receipt against the voucher; once cleared, the admission number.
+            if ("ARRIVAL_CONFIRMED".equals(s) && admission.currentVoucher(caseId).isPresent() && !admission.paidToAdmit(caseId)
+                    && !admission.balanceAwaitingCountersign(caseId)) return simple("RECORD_HOSPITAL_BALANCE", "FOCUS");
+            if ("ADMISSION_READY".equals(s)) return simple("RECORD_ADMISSION_NUMBER", "FOCUS");
             // Before release Operations prices and plans the travel package for the proposal (QA #27); arranging travel
             // and arrival (UPDATE_TRAVEL_PLAN) only starts once the deposit is settled.
             if ("PROPOSAL_PREPARATION".equals(s) && f.travelPackage() && proposal != null && !proposal.operationsDone()

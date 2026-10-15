@@ -29,11 +29,11 @@ class CaseTransitionPolicyTest {
     /** The stages the review found stuck now leave directly, each with the exit the phase defined. */
     @Test void theCommittedStagesLeaveDirectly() {
         assertThat(CaseTransitionPolicy.exitsFrom("ACCEPTED")).contains("EXPIRED", "CANCELLED");
-        for (String stage : List.of("TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP"))
+        for (String stage : List.of("TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP"))
             assertThat(CaseTransitionPolicy.exitsFrom(stage)).as(stage).contains("CANCELLED");
         assertThat(CaseTransitionPolicy.exitsFrom("DISCHARGED")).contains("CLOSED", "FOLLOW_UP");
         assertThat(CaseTransitionPolicy.TYPED_CANCELLATION_STAGES)
-                .containsExactlyInAnyOrder("ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP");
+                .containsExactlyInAnyOrder("ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP");
         // Unchanged: the consultant-review states still never allow a whole-case cancel; EXPIRED still recovers.
         assertThat(CaseTransitionPolicy.exitsFrom("CONSULTANT_REVIEW")).doesNotContain("CANCELLED");
         assertThat(CaseTransitionPolicy.exitsFrom("CONSULTANT_ASSIGNMENT_PENDING")).doesNotContain("CANCELLED");
@@ -41,6 +41,19 @@ class CaseTransitionPolicyTest {
         // P1-13 (A-06): a closed case reopens into FOLLOW_UP and nowhere else; it is no longer a final stage.
         assertThat(CaseTransitionPolicy.exitsFrom("CLOSED")).containsExactly("FOLLOW_UP");
         assertThat(TERMINAL).doesNotContain("CLOSED").contains("CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE");
+    }
+
+    /**
+     * P1-15 (owner decisions D-C and D-D): one new stage between arrival and treatment. An arrived patient is cleared for admission
+     * before treatment can start; there is no edge around it (an emergency walks the same two edges with the override as evidence).
+     */
+    @Test void treatmentIsReachedOnlyThroughAdmissionReady() {
+        assertThat(CaseTransitionPolicy.exitsFrom("ARRIVAL_CONFIRMED")).containsExactlyInAnyOrder("ADMISSION_READY", "CANCELLED");
+        assertThat(CaseTransitionPolicy.exitsFrom("ADMISSION_READY")).containsExactlyInAnyOrder("TREATMENT_IN_PROGRESS", "CANCELLED");
+        for (String stage : CaseTransitionPolicy.stages())
+            if (CaseTransitionPolicy.exitsFrom(stage).contains("TREATMENT_IN_PROGRESS")) assertThat(stage).as("only ADMISSION_READY opens treatment").isEqualTo("ADMISSION_READY");
+        assertThat(TERMINAL).doesNotContain("ADMISSION_READY");
+        assertThat(CaseTransitionPolicy.patientMayWithdraw("ADMISSION_READY", (String) null)).as("the coordinator cancels for the patient from here").isFalse();
     }
 
     /** The patient's own withdrawal: after acceptance, until travel is confirmed; then it is the coordinator's. */

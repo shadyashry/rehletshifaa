@@ -48,6 +48,7 @@ public class CaseHandoffService {
     private final WorkforceDirectory workforce;
     private final DepositPaymentReminders reminders;
     private final DepositPaymentNotices notices;
+    private final AdmissionService admissions;
     /** Finance work: verify the patient's bank transfer against the reference they entered, then confirm or reject (DEP-3). */
     static final String DEPOSIT_RECORD_WORK = "DEPOSIT_RECORD";
 
@@ -59,7 +60,9 @@ public class CaseHandoffService {
 
     public CaseHandoffService(IntakeLifecycleService intake, StaffWorkService work, CaseTransitionPolicy policy, Clock clock,
                               @Value("${app.mail.coordinator}") String coordinatorEmail, AuditTrail auditTrail, AuditEventRepository audits, NotificationOutbox notificationOutbox, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseStatusLog statusLog,
-                              DepositRepository deposits, WorkforceDirectory workforce, DepositPaymentReminders reminders, DepositPaymentNotices notices) {
+                              DepositRepository deposits, WorkforceDirectory workforce, DepositPaymentReminders reminders, DepositPaymentNotices notices,
+                              AdmissionService admissions) {
+        this.admissions = admissions;
         this.deposits = deposits; this.workforce = workforce; this.reminders = reminders; this.notices = notices; this.statusLog = statusLog; this.assignments = assignments; this.cases = cases; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail; this.audits = audits;
         this.intake = intake; this.work = work; this.policy = policy; this.clock = clock; this.coordinatorEmail = coordinatorEmail;
     }
@@ -186,6 +189,34 @@ public class CaseHandoffService {
         return moved;
     }
 
+    /**
+     * P1-15: the evidence the admission gate reads changed. An arrived patient whose final quote, procedure consent and balance
+     * are now all evidenced (or whose Consultant recorded an emergency admission) is cleared for admission under the shared
+     * policy; the patient, the coordinator and Operations are told once. Safe to repeat: only the first move does anything.
+     *
+     * @return true when this call moved the case to ADMISSION_READY
+     */
+    @Transactional
+    public boolean onAdmissionEvidenceChanged(UUID caseId) {
+        String status = lockedStatus(caseId);
+        if (!"ARRIVAL_CONFIRMED".equals(status) || !policy.mayEnter(caseId, "ARRIVAL_CONFIRMED", "ADMISSION_READY")) return false;
+        Instant now = clock.instant();
+        if (cases.moveStatus(caseId, CaseStatus.ARRIVAL_CONFIRMED, CaseStatus.ADMISSION_READY, micros(now)) != 1) return false;
+        statusLog.record(caseId, "ARRIVAL_CONFIRMED", "ADMISSION_READY", "SYSTEM", "SYSTEM", "Final quote, consent and balance evidenced", now);
+        audit(caseId, "CASE_STATUS_CHANGED", "ARRIVAL_CONFIRMED -> ADMISSION_READY: cleared for admission");
+        notices.send(caseId, "ADMISSION", "cleared-for-admission", "cleared-for-admission:" + caseId);
+        String caseNumber = cases.findCaseNumber(caseId).orElse("");
+        for (String subject : java.util.stream.Stream.concat(assignments.findActiveAssignees(caseId, "COORDINATOR").stream(),
+                assignments.findActiveAssignees(caseId, "OPERATIONS").stream()).distinct().toList())
+            work.notifyStaff(subject, caseId, null, "CLEARED_FOR_ADMISSION", "Patient cleared for admission",
+                    "The balance is evidenced. Confirm the admission with the hospital and record its admission number.",
+                    "cleared-for-admission:" + caseId + ":" + subject, false, WorkCopy.of("CLEARED_FOR_ADMISSION", "caseNumber", caseNumber));
+        work.refreshWaitingOn(caseId, "HOSPITAL", WaitingReason.of("CLEARED_FOR_ADMISSION", "Cleared for admission — the hospital admits the patient"));
+        return true;
+    }
+
+    @EventListener public void on(CaseEvents.FinalQuoteAccepted event) { admissions.onFinalQuoteAccepted(event.caseId()); }
+    @EventListener public void on(CaseEvents.AdmissionEvidenceChanged event) { onAdmissionEvidenceChanged(event.caseId()); }
     @EventListener public void on(CaseEvents.DepositRequired event) { onDepositRequired(event.caseId()); }
     @EventListener public void on(CaseEvents.TransferReported event) { onTransferReported(event.caseId()); }
     @EventListener public void on(CaseEvents.TransferConfirmed event) { onTransferConfirmed(event.caseId()); }

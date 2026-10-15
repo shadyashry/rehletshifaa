@@ -146,7 +146,8 @@ public class StaffWorkService {
     }
 
     /** Work that outlives the case's journey: a governance review of what was done is owed whatever became of the case. */
-    public static final java.util.Set<String> SURVIVES_EXIT = java.util.Set.of("EMERGENCY_OVERRIDE_REVIEW", IncidentService.REVIEW_WORK);
+    public static final java.util.Set<String> SURVIVES_EXIT = java.util.Set.of("EMERGENCY_OVERRIDE_REVIEW", IncidentService.REVIEW_WORK,
+            AdmissionService.EMERGENCY_REVIEW);
 
     /**
      * The case left its journey (cancelled, withdrawn, expired unpaid, closed): nothing on it is owed any more, so every
@@ -371,7 +372,7 @@ public class StaffWorkService {
             case "CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW" -> "CONSULTANT";
             case "ACCEPTED" -> "PAYMENT";
             case "TRAVEL_COORDINATION" -> "TRAVEL_TEAM";
-            case "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS" -> "HOSPITAL";
+            case "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS" -> "HOSPITAL";
             case "CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE", "EXPIRED" -> "NONE";
             default -> "STAFF";
         };

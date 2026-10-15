@@ -487,6 +487,10 @@ All with CSS logical properties, EN/AR parity, WCAG 2.2 AA, one primary action p
 - `CaseTransitionPolicyTest`: new state reachable/terminal properties; blockers per edge.
 - `AdmissionServiceTest`: reserve/letter/variance/voucher money split (worked example: package 100,000 EGP, fee 15%,
   deposit credit 17,250, patient pays at facility = package − credit), balance countersign refusals, admission number.
+  *As built (P1-15 session 1, 2026-10-15):* the money rule follows the design's §6 rule 1 (the deposit covers the platform fee
+  first), so the worked example is deposit 17,250 → fee 15,000 covered, credit to the hospital 2,250, patient pays at the hospital
+  97,750, fee balance 0; with a capped deposit of 10,000 the hospital is paid 100,000 at its cashier and the platform is owed a fee
+  balance of 5,000 (`AdmissionMoneyTest`). The owner confirms this reading (plan, "Owner decisions still open").
 - `ChangeOrderServiceTest`: band rule table, patient decision, emergency path, idempotent replay.
 - `TreatmentMilestoneServiceTest`: countersign rule, complication → incident, SLA item rotation.
 - `DischargeServiceTest`: pack completeness matrix, fit-to-fly window, handover letter render EN/AR.

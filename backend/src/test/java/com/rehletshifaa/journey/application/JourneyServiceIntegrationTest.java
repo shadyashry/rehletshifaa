@@ -414,10 +414,13 @@ class JourneyServiceIntegrationTest {
     @Test void treatmentRequiresProcedureConsentThenSucceeds()throws Exception{
         UUID caseId=arriveWithDoctor("Consent Patient","+254700000088","cn@local.test");
         authenticate("doctor-subject",Role.CONSULTANT);
-        var episode=new TreatmentRequest(facility(),null,Instant.now(),null,"IN_PROGRESS","Angioplasty",null,null,null,false,null);
+        var episode=new TreatmentRequest(facility(),null,Instant.now(),null,"IN_PROGRESS","Angioplasty",null,null,null,false,null,"ADM-1");
         assertThatThrownBy(()->journey.treatment(caseId,episode)).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).hasMessageContaining("consent");
         journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("The treating doctor explained the procedure, risks and alternatives; I consent.","en","v1",null,null,"Provider consent ref #123"));
-        var result=journey.treatment(caseId,new TreatmentRequest(facility(),null,Instant.now(),null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        // P1-15 (D-C): consent alone does not open treatment; the balance must be evidenced first.
+        assertThatThrownBy(()->journey.treatment(caseId,episode)).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).extracting("code").isEqualTo("BALANCE_EVIDENCE_REQUIRED");
+        clearedToAdmit(caseId);
+        var result=journey.treatment(caseId,new TreatmentRequest(facility(),null,Instant.now(),null,"IN_PROGRESS","Angioplasty",null,null,null,false,null,"ADM-1"));
         assertThat(result.status()).isEqualTo("IN_PROGRESS");
     }
 
@@ -425,7 +428,8 @@ class JourneyServiceIntegrationTest {
         UUID caseId=arriveWithDoctor("Emergency Patient","+254700000089","em@local.test");
         authenticate("doctor-subject",Role.CONSULTANT);
         journey.emergencyOverride(caseId,new EmergencyOverrideRequest("Acute STEMI — immediate primary PCI required"));
-        var result=journey.treatment(caseId,new TreatmentRequest(facility(),null,Instant.now(),null,"IN_PROGRESS","Primary PCI",null,null,null,false,null));
+        clearedToAdmit(caseId);
+        var result=journey.treatment(caseId,new TreatmentRequest(facility(),null,Instant.now(),null,"IN_PROGRESS","Primary PCI",null,null,null,false,null,"ADM-1"));
         assertThat(result.status()).isEqualTo("IN_PROGRESS");
         Integer reviewTasks=jdbc.queryForObject("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='EMERGENCY_OVERRIDE_REVIEW'",Integer.class,caseId);
         assertThat(reviewTasks).isEqualTo(1);
@@ -450,8 +454,9 @@ class JourneyServiceIntegrationTest {
         UUID otherCase=cases.create(new CreateCaseRequest("Other","Patient","Kenya","+254700000092","Reports","en",true,null,"dc2@local.test","Africa/Nairobi","cardiology")).caseId();
         authenticate("doctor-subject",Role.CONSULTANT);
         journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("The treating doctor explained the procedure, risks and alternatives; I consent.","en","v1",null,null,"Provider consent ref #124"));
+        clearedToAdmit(caseId);
         Instant start=Instant.now().minusSeconds(3600);
-        journey.treatment(caseId,new TreatmentRequest(facility(),null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        journey.treatment(caseId,new TreatmentRequest(facility(),null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null,"ADM-1"));
         assertThat(caseStatus(caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
 
         var followUp=new FollowUpRequest(null,null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest for a week");
@@ -478,7 +483,8 @@ class JourneyServiceIntegrationTest {
         journey.releaseFinalQuote(fq.caseId(),fq.versionId());
         authenticate("doctor-subject",Role.CONSULTANT);
         journey.captureProcedureConsent(fq.caseId(),new ProcedureConsentRequest("The treating doctor explained the procedure, risks and alternatives; I consent.","en","v1",null,null,"Provider consent ref #125"));
-        var episode=new TreatmentRequest(facility(),null,Instant.now(),null,"IN_PROGRESS","Consultation",null,null,null,false,null);
+        clearedToAdmit(fq.caseId());
+        var episode=new TreatmentRequest(facility(),null,Instant.now(),null,"IN_PROGRESS","Consultation",null,null,null,false,null,"ADM-1");
         assertThatThrownBy(()->journey.treatment(fq.caseId(),episode)).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
         assertThat(caseStatus(fq.caseId())).isEqualTo("ARRIVAL_CONFIRMED");
 
@@ -527,7 +533,8 @@ class JourneyServiceIntegrationTest {
         coordinate(caseId);
         authenticate("doctor-subject",Role.CONSULTANT);
         journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("Explained; I consent.","en","v1",null,null,"Provider consent ref #201"));
-        journey.treatment(caseId,new TreatmentRequest(facility(),null,Instant.now().minusSeconds(3600),null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        clearedToAdmit(caseId);
+        journey.treatment(caseId,new TreatmentRequest(facility(),null,Instant.now().minusSeconds(3600),null,"IN_PROGRESS","Angioplasty",null,null,null,false,null,"ADM-1"));
         assertThat(caseStatus(caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
         authenticate("coordinator-subject",Role.COORDINATOR);
         journey.transition(caseId,new TransitionRequest("CANCELLED",null,version(caseId),"MEDICAL_CONTRAINDICATION"));
@@ -542,8 +549,9 @@ class JourneyServiceIntegrationTest {
         coordinate(caseId);
         authenticate("doctor-subject",Role.CONSULTANT);
         journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("Explained; I consent.","en","v1",null,null,"Provider consent ref #202"));
+        clearedToAdmit(caseId);
         Instant start=Instant.now().minusSeconds(3600);
-        journey.treatment(caseId,new TreatmentRequest(facility(),null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        journey.treatment(caseId,new TreatmentRequest(facility(),null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null,"ADM-1"));
         assertThatThrownBy(()->exits.closeWithoutFollowUp(caseId,"Too early")).isInstanceOf(com.rehletshifaa.shared.api.ApiException.class).extracting("code").isEqualTo("CASE_STATE_CONFLICT");
         journey.treatment(caseId,discharge(start,document(caseId,"CLEAN")));
         assertThat(caseStatus(caseId)).isEqualTo("DISCHARGED");
@@ -567,8 +575,9 @@ class JourneyServiceIntegrationTest {
         coordinate(caseId);
         authenticate("doctor-subject",Role.CONSULTANT);
         journey.captureProcedureConsent(caseId,new ProcedureConsentRequest("Explained; I consent.","en","v1",null,null,"Provider consent ref #203"));
+        clearedToAdmit(caseId);
         Instant start=Instant.now().minusSeconds(3600);
-        journey.treatment(caseId,new TreatmentRequest(facility(),null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null));
+        journey.treatment(caseId,new TreatmentRequest(facility(),null,start,null,"IN_PROGRESS","Angioplasty",null,null,null,false,null,"ADM-1"));
         var discharged=journey.treatment(caseId,discharge(start,document(caseId,"CLEAN")));
         if("FOLLOW_UP".equals(stage))journey.followUp(caseId,new FollowUpRequest(discharged.id(),null,Instant.now().plusSeconds(7*86400),"VIDEO","ECG","Rest"));
         assertThat(caseStatus(caseId)).isEqualTo(stage);
@@ -601,10 +610,19 @@ class JourneyServiceIntegrationTest {
         jdbc.update("INSERT INTO case_assignments(id,case_id,assignee_subject,assignee_role,assignment_type,status,reason,assigned_by,assigned_at,accepted_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",
             UUID.randomUUID(),caseId,"coordinator-subject","COORDINATOR","PRIMARY","ACTIVE","Owner","system",Instant.now(),Instant.now());
     }
+    /**
+     * P1-15: these tests are about consent, discharge and exits, not money. A Consultant's emergency admission row stands in for
+     * the countersigned cashier receipt the pay-to-admit gate reads (written directly, so no Finance review item is opened);
+     * the gate and the override themselves are covered in AdmissionServiceTest.
+     */
+    private void clearedToAdmit(UUID caseId){
+        jdbc.update("INSERT INTO case_evidence(id,case_id,stage,kind,payload,recorded_by,recorded_role,recorded_at,version) VALUES(?,?,?,?,?,?,?,?,0)",
+            UUID.randomUUID(),caseId,"ARRIVAL_CONFIRMED","EMERGENCY_ADMISSION_OVERRIDE",null,"doctor-subject","CONSULTANT",Instant.now());
+    }
     private long version(UUID caseId){return jdbc.queryForObject("SELECT version FROM medical_cases WHERE id=?",Long.class,caseId);}
 
     private TreatmentRequest discharge(Instant start,UUID documentId){
-        return new TreatmentRequest(facility(),null,start,Instant.now(),"COMPLETED","Angioplasty","Angioplasty",null,null,true,documentId);
+        return new TreatmentRequest(facility(),null,start,Instant.now(),"COMPLETED","Angioplasty","Angioplasty",null,null,true,documentId,null);
     }
 
     private UUID document(UUID caseId,String status){

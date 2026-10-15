@@ -90,6 +90,13 @@ public final class RolePolicy {
             g(PATIENT, INCIDENT_REPORT, OWN_PATIENT), g(PATIENT_REPRESENTATIVE, INCIDENT_REPORT, OWN_PATIENT),
             g(COORDINATOR, INCIDENT_REPORT, CASE_OWNER), g(CONSULTANT, INCIDENT_REPORT, CASE_ASSIGNED),
             g(OPERATIONS, INCIDENT_REPORT, CASE_ASSIGNED), g(FINANCE, INCIDENT_REPORT, CASE_ASSIGNED),
+            // P1-15 (D-B, D-C): Operations manages the admission on its own cases; Finance reads and countersigns the money of any case
+            // whose admission is open (no clinical record, documents or threads), as it records deposits platform-wide; the case team
+            // reads the panel; the patient and their representative confirm the arrival.
+            g(OPERATIONS, ADMISSION_READ, CASE_ASSIGNED), g(OPERATIONS, ADMISSION_MANAGE, CASE_ASSIGNED),
+            g(COORDINATOR, ADMISSION_READ, CASE_ASSIGNED), g(CONSULTANT, ADMISSION_READ, CASE_ASSIGNED),
+            g(FINANCE, ADMISSION_READ, CASE_ASSIGNED), g(FINANCE, ADMISSION_READ, CASE_MONEY_OPEN), g(FINANCE, EVIDENCE_COUNTERSIGN, CASE_MONEY_OPEN),
+            g(PATIENT, ARRIVAL_REPORT, OWN_PATIENT), g(PATIENT_REPRESENTATIVE, ARRIVAL_REPORT, OWN_PATIENT),
             // Other function managers: hierarchy and staffing only; no execution, clinical or decision authority.
             g(OPERATIONS_MANAGER, TEAM_MANAGE, PLATFORM), g(OPERATIONS_MANAGER, STAFFING_REQUEST, PLATFORM),
             g(FINANCE_MANAGER, TEAM_MANAGE, PLATFORM), g(FINANCE_MANAGER, STAFFING_REQUEST, PLATFORM),

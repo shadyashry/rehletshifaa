@@ -4,6 +4,7 @@ import com.rehletshifaa.authority.application.CaseRelationships;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.infrastructure.DepositRepository;
+import com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.ReplyCoverRepository;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
@@ -24,10 +25,12 @@ public class JourneyCaseRelationships implements CaseRelationships {
     private final MedicalCaseRepository cases;
     private final ReplyCoverRepository covers;
     private final DepositRepository deposits;
+    private final FacilityAdmissionRepository admissions;
     private final Clock clock;
 
     public JourneyCaseRelationships(CaseAssignmentRepository assignments, MedicalCaseRepository cases, ReplyCoverRepository covers,
-                                    DepositRepository deposits, Clock clock) {
+                                    DepositRepository deposits, FacilityAdmissionRepository admissions, Clock clock) {
+        this.admissions = admissions;
         this.assignments = assignments;
         this.deposits = deposits;
         this.covers = covers;
@@ -65,6 +68,11 @@ public class JourneyCaseRelationships implements CaseRelationships {
     @Override
     public boolean depositOpen(UUID caseId) {
         return deposits.isOpenOn(caseId);
+    }
+
+    @Override
+    public boolean moneyOpen(UUID caseId) {
+        return deposits.isOpenOn(caseId) || admissions.isOpenOn(caseId);
     }
 
     @Override
