@@ -42,7 +42,7 @@ type StepText = { title: string; body: string; next?: string; meanwhile?: string
 /** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. Paying it is the payment step's own panel. */
 const MONEY_STEPS = new Set(["PAY_DEPOSIT", "WAIT_PAYMENT_CHECK"]);
 
-export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, guardianStep, paymentStep, messagesPanel, concerns, newCaseHref = null, onWithdraw }: {
+export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, guardianStep, paymentStep, messagesPanel, concerns, documentUpload, newCaseHref = null, onWithdraw }: {
   locale: Locale; caseSummary: CaseSummary; actions: CaseActions; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
   proposal?: ProposalSummaryData | null; deposit?: DepositSummaryData | null; documents: CaseDocument[]; unreadMessages: number;
   /** Every case the account can open, this one included; the switcher shows from two. */
@@ -52,6 +52,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
   guardianStep?: ReactNode;
   /** P1-13: "Raise a concern" and the patient's own concerns; one quiet line on the page. */
   concerns?: ReactNode;
+  /** Adds a file to the case from the Documents tab; absent where the portal cannot upload. */
+  documentUpload?: ReactNode;
   /** The deposit payment step (DEP-3), rendered when the backend says the patient owes it. */
   paymentStep?: ReactNode; messagesPanel: ReactNode;
   /** Where the account holder sends a new case of their own; null when it is not theirs to send from here. */
@@ -78,6 +80,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
   // The patient's own way out, offered by the backend until travel is confirmed; a confirmation, then the one call.
   const canWithdraw = !!onWithdraw && actions.availableActions.includes("WITHDRAW");
   const [withdrawing, setWithdrawing] = useState(false);
+  // A REJECTED row is an upload that never arrived (or did not match what was announced): there is no file to show.
+  const shared = useMemo(() => documents.filter(doc => doc.status !== "REJECTED"), [documents]);
   const dateFormat = useMemo(() => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }), [locale]);
   const date = (iso: string) => dateFormat.format(new Date(iso));
   const proposalTotal = proposal ? proposal.items.filter(i => !i.optional).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0) : null;
@@ -132,15 +136,21 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
         <section aria-labelledby="documents-title" className="card mt-5 p-5 sm:p-6">
           <h2 id="documents-title" className="text-[1.0625rem] font-bold text-brand-900">{t.documents.title}</h2>
           <p className="mt-1 text-[0.9375rem] text-ink-600">{t.documents.hint}</p>
-          {documents.length === 0 ? <p className="mt-4 text-[0.9375rem] text-ink-500">{t.documents.empty}</p>
+          {documentUpload}
+          {shared.length === 0 ? <p className="mt-4 text-[0.9375rem] text-ink-500">{t.documents.empty}</p>
             : <ul className="mt-4 divide-y divide-line">
-                {documents.map(doc => (
-                  <li key={doc.documentId} className="flex items-center gap-3 py-3">
-                    <FileText size={17} aria-hidden className="flex-none text-brand-600"/>
-                    <span className="min-w-0 flex-1 truncate font-semibold text-ink-800" dir="auto">{doc.fileName}</span>
-                    <span className="text-[0.8125rem] text-ink-500">{date(doc.createdAt)}</span>
-                  </li>
-                ))}
+                {shared.map(doc => {
+                  // A file still being checked, or one the scanner condemned (it was deleted), says so; a clean one says nothing.
+                  const state = doc.status === "CLEAN" ? null : doc.status === "SCAN_FAILED" ? t.documents.status.failed : t.documents.status.checking;
+                  return (
+                    <li key={doc.documentId} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
+                      <FileText size={17} aria-hidden className="flex-none text-brand-600"/>
+                      <span className={`min-w-0 flex-1 truncate font-semibold ${doc.status === "SCAN_FAILED" ? "text-ink-500" : "text-ink-800"}`} dir="auto">{doc.fileName}</span>
+                      {state && <span className={`text-[0.8125rem] font-semibold ${doc.status === "SCAN_FAILED" ? "text-alert-800" : "text-ink-600"}`}>{state}</span>}
+                      <span className="text-[0.8125rem] text-ink-500">{date(doc.createdAt)}</span>
+                    </li>
+                  );
+                })}
               </ul>}
         </section>
       )}

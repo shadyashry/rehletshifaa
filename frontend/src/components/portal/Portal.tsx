@@ -190,6 +190,8 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}
     finally{if(!managedBusy)setBusyCount(n=>n-1);}
   }
+  /** The open case's documents again (a patient upload); dropped if another case was opened meanwhile. */
+  async function reloadDocuments(caseId:string){const request=opening.current;try{const docs=await api<CaseDocument[]>(`/cases/${caseId}/documents`);if(request===opening.current)setDocuments(docs);}catch{if(request===opening.current)setDocumentError(true);}}
   /** Open a case by id (from My Work or a notification), even before the queue has loaded it. */
   async function openCaseById(caseId:string){
     const known=cases.find(item=>item.id===caseId);if(known){await openCase(known);return;}
@@ -344,7 +346,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     {workspace
         // Keyed by case: opening another case straight from a notification or My Work must not carry this case's
         // drafts, tab or open dialogs into it (or let them be submitted against the wrong patient's case).
-        ? !caseRole||!CaseViewFor ? (meFailed?null:<p role="status" className="text-sm text-ink-500">{t.loading}</p>) : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={caseRole} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} facilities={facilities} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} loadIntakeHistory={loadIntakeHistory} load={api} send={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null} canReopen={holds(me,"CASE_REOPEN")}/></div>
+        ? !caseRole||!CaseViewFor ? (meFailed?null:<p role="status" className="text-sm text-ink-500">{t.loading}</p>) : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={caseRole} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} facilities={facilities} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} loadIntakeHistory={loadIntakeHistory} load={api} send={api} reloadDocuments={reloadDocuments} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null} canReopen={holds(me,"CASE_REOPEN")}/></div>
         : isPatientRole ? (queueLoading||(!landed&&patientView)||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)

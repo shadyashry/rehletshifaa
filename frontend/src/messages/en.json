@@ -1084,18 +1084,7 @@
         "upload": {
           "none": "No document on this case has passed the virus check yet. Upload it here.",
           "another": "Not in the list? Upload it here.",
-          "rules": "A PDF or a photo (JPG or PNG), up to 15 MB. We check every file for viruses before it can be used.",
-          "choose": "Choose a file",
-          "sending": "Uploading {name}…",
-          "checking": "Checking {name} for viruses…",
-          "ready": "{name} passed the check and is selected.",
-          "wrongType": "Choose a PDF, JPG or PNG file.",
-          "tooLarge": "This file is over 15 MB. Choose a smaller file, or a photo of the document.",
-          "rejected": "{name} did not pass the virus check and was removed. Choose another file.",
-          "unavailable": "The virus check is not available right now. Your file is kept; check it again in a few minutes.",
-          "retry": "Check again",
-          "full": "This case holds as many files as it can. Message your coordinator.",
-          "failed": "The file could not be uploaded. Try again, or message your coordinator."
+          "ready": "{name} passed the check and is selected."
         },
         "consentLegend": "Your statement",
         "confirm": "Confirm",
@@ -1872,8 +1861,26 @@
       },
       "documents": {
         "title": "Documents you shared",
-        "hint": "The documents attached to this case. To add one, use the secure link your coordinator sends you.",
-        "empty": "You have not shared any documents yet."
+        "hint": "The documents attached to this case. Every file is checked for viruses before anyone can open it.",
+        "empty": "You have not shared any documents yet.",
+        "status": {
+          "checking": "Being checked",
+          "failed": "Did not pass the virus check"
+        }
+      },
+      "upload": {
+        "rules": "A PDF or a photo (JPG or PNG), up to 15 MB. We check every file for viruses before it can be used.",
+        "choose": "Choose a file",
+        "sending": "Uploading {name}…",
+        "checking": "Checking {name} for viruses…",
+        "wrongType": "Choose a PDF, JPG or PNG file.",
+        "tooLarge": "This file is over 15 MB. Choose a smaller file, or a photo of the document.",
+        "rejected": "{name} did not pass the virus check and was removed. Choose another file.",
+        "unavailable": "The virus check is not available right now. Your file is kept; check it again in a few minutes.",
+        "retry": "Check again",
+        "full": "This case holds as many files as it can. Message your coordinator.",
+        "failed": "The file could not be uploaded. Try again, or message your coordinator.",
+        "added": "{name} passed the check and is now in your documents."
       }
     },
     "nav": {
