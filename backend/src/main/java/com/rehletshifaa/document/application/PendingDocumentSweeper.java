@@ -30,7 +30,7 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  * (CLEAN or condemned), bytes absent mean the upload never arrived (REJECTED, which frees the quota), no verdict waits
  * for the next run. One transaction per document; a failure on one is logged and the rest go on. Every decision is audited
  * ({@code DOCUMENT_RECHECKED}, the outcome as reason), and a file that became usable is announced
- * ({@link DocumentEvents.UploadCleared}) so the case's coordinator hears of it.
+ * ({@link DocumentEvents.UploadCleared}) so the patient side and the case's coordinator hear of it.
  *
  * <p>Leased ({@link LeasedJob}): one instance sweeps per tick. A sweep and a patient's "Check again" meeting on one row are
  * settled by the row version, and the loser's transaction rolls back.
@@ -74,7 +74,7 @@ public class PendingDocumentSweeper {
                 if (rechecked.outcome() == Recheck.SKIPPED) continue;
                 auditTrail.event("DOCUMENT_RECHECKED").actor("SYSTEM", "DOCUMENT_SWEEPER").caseId(rechecked.caseId())
                         .entity("MedicalDocument", id).action("RECHECK").reason(rechecked.outcome().name()).record();
-                if (rechecked.outcome() == Recheck.CLEAN) events.publishEvent(new DocumentEvents.UploadCleared(rechecked.caseId(), id));
+                if (rechecked.outcome() == Recheck.CLEAN) events.publishEvent(new DocumentEvents.UploadCleared(rechecked.caseId(), id, rechecked.uploadedBy()));
             }
             catch (RuntimeException e) { log.warn("Stale upload {} not rechecked: {}", id, e.getClass().getSimpleName()); }
         }

@@ -178,7 +178,8 @@ class NotificationOutboxProcessorTest {
                 {"final-quote-ready", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"onboarding-activation", "{\"token\":\"t1\",\"lang\":\"%s\"}"},
                 {"account-link-continue", "{\"token\":\"t1\",\"lang\":\"%s\"}"}, {"deposit-settled-patient", "{\"lang\":\"%s\"}"},
                 {"out-of-hours", "{\"lang\":\"%s\"}"}, {"intake-followup", "{\"lang\":\"%s\"}"},
-                {"coordinator-intro", "{\"name\":\"Layla\",\"lang\":\"%s\"}"}, {"case-access-code", "{\"code\":\"123456\",\"lang\":\"%s\"}"}};
+                {"coordinator-intro", "{\"name\":\"Layla\",\"lang\":\"%s\"}"}, {"case-access-code", "{\"code\":\"123456\",\"lang\":\"%s\"}"},
+                {"document-cleared", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"}};
         for (String[] t : templates) {
             var ar = render(t[0], t[1].formatted("ar"));
             assertThat(arabic(ar.subject()) && arabic(ar.body())).as(t[0] + " in Arabic").isTrue();
@@ -186,6 +187,13 @@ class NotificationOutboxProcessorTest {
             var en = render(t[0], t[1].formatted("en"));
             assertThat(arabic(en.subject()) || arabic(en.body())).as(t[0] + " in English").isFalse();
         }
+    }
+
+    /** A file cleared in the sweep: the patient is sent to their own case page (sign-in), never told the file's name. */
+    @Test void aClearedUploadLinksToTheCasePageWithoutNamingTheFile() {
+        var en = render("document-cleared", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"en\"}");
+        assertThat(en.body()).contains("passed the check").endsWith("http://localhost:3000/en/portal?case=0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00");
+        assertThat(en.linkPath()).isEqualTo("en/portal?case=0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00");
     }
 
     /** QA W-8: the patient acknowledged a preliminary estimate; nothing was accepted. */

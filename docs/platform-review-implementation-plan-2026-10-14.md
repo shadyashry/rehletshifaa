@@ -962,8 +962,21 @@ phases.
     centre, so they see it in My Care; **guardian step**: files of the case still PENDING or QUARANTINED are listed under "Still being checked",
     not choosable. Tests: `upload.test` (2), `CaseDocumentUpload.test` +1 (progress), `GuardianStep.test` +1, `PendingDocumentSweeperTest`
     asserts the audit rows and the notices; frontend 75 files, 541 tests; backend `mvn -o -q test` (JVM in UTC) 886 tests, 0 failures, 3 skips.
-  - Open gaps: a patient-facing notice when a deferred upload clears (needs a patient channel: a WhatsApp template or a patient notification
-    centre); the uploader is not recorded on `medical_documents`, so the notice goes to the coordinator, not to whoever uploaded.
+  - Last gaps closed, same branch (2026-10-15): **uploader recorded**: Flyway **V98** (`V98__document_uploaded_by.sql`) adds
+    `medical_documents.uploaded_by`: the account's subject for a My Care upload, else the channel (`INTAKE`, `SECURE_LINK`, `WHATSAPP`); the
+    next free version is V99. **Patient notice**: when the sweep clears an upload, `UploadNotices` also queues `document-cleared` through the
+    outbox (WhatsApp, else email, in the patient's language, at the case's on-file contact, which for a child's case is the sender's; links
+    to the case page, sign-in required, no file name); not for a draft's INTAKE upload (no case page yet). New WhatsApp template
+    `rs_document_cleared` (bound in `application.yml`, wording in `docs/whatsapp-message-templates.md`) **must be created and approved in
+    WhatsApp Manager**; until it exists Meta refuses those sends (retried, then dead-lettered); email works. **Playwright**: `my-care-safety.spec.ts` gains the
+    guardian upload (presign, bytes, confirm, consent, evidence, en 1440) and the Documents tab upload (ar 390, no side scroll); the fixture
+    serves presign, upload and confirm; the age spec now retries its first click until the form has hydrated (it failed on the dev server
+    when run after other tests). Tests: `NotificationOutboxProcessorTest` +1 and the template in the language check,
+    `PendingDocumentSweeperTest` (outbox row for the patient, none for an INTAKE upload, `uploaded_by`), `GuardiansAndAgeBandTest`
+    (`uploaded_by` = the guardian); backend `mvn -o -q test` (JVM in UTC) 887 tests, 0 failures, 3 skips; `PostgresJpaMappingTest` green
+    on PostgreSQL 17 with V98; frontend 75 files, 541 tests; Playwright `my-care-safety.spec.ts` 7 passed (dev server).
+  - Open: owner tasks only: create and approve `rs_document_cleared` in WhatsApp Manager, native review of the new Arabic, the live walk
+    below. A representative who uploads is reached at the case's contact, not their own (no separate contact is stored for them).
   - Next exact action: owner fast-forwards `feat/review-p0` to `claude/guardian-upload` and rebuilds backend and frontend; live walk: a minor's case with no
     document, the guardian uploads the guardianship paper from My Care, sees it checked, attaches it, the coordinator verifies; a patient
     uploads from the Documents tab; with ClamAV stopped, an upload shows the outage and is finished by the sweeper within ~5 minutes of

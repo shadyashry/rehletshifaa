@@ -36,8 +36,8 @@ public class PatientDocumentService {
     }
 
     public PresignResponse presign(UUID caseId, PresignRequest request) {
-        requirePatientOnCase(caseId);
-        return documents.presignAdditional(caseId, request);
+        Actor actor = requirePatientOnCase(caseId);
+        return documents.presignAdditional(caseId, request, actor.subject());
     }
 
     public ConfirmResponse confirm(UUID caseId, ConfirmRequest request) {

@@ -17,6 +17,8 @@ public class MedicalDocument {
     @Enumerated(EnumType.STRING) @Column(nullable=false, length=20) private DocumentStatus status;
     @Column(name="created_at", nullable=false) private Instant createdAt;
     @Column(name="confirmed_at") private Instant confirmedAt;
+    /** The account (subject) that uploaded it from My Care, or the channel (INTAKE, SECURE_LINK, WHATSAPP); null before V98. */
+    @Column(name="uploaded_by", length=255) private String uploadedBy;
     @Version @Column(nullable=false) private long version;
     protected MedicalDocument() {}
     public MedicalDocument(UUID id, MedicalCase medicalCase, String objectKey, String originalFileName, String safeFileName, String contentType, long sizeBytes, Instant now) { this.id=id; this.medicalCase=medicalCase; this.objectKey=objectKey; this.originalFileName=originalFileName; this.safeFileName=safeFileName; this.contentType=contentType; this.sizeBytes=sizeBytes; this.status=DocumentStatus.PENDING; this.createdAt=now; }
@@ -26,5 +28,7 @@ public class MedicalDocument {
     /** The scanner gave no verdict: back to unconfirmed, still unusable, and confirmable again once it recovers. */
     public void scanDeferred() { if (status != DocumentStatus.QUARANTINED) throw new IllegalStateException("Document is not quarantined"); status=DocumentStatus.PENDING; confirmedAt=null; }
     public void reject() { status=DocumentStatus.REJECTED; }
+    public MedicalDocument uploadedBy(String uploader) { this.uploadedBy=uploader; return this; }
+    public String getUploadedBy(){return uploadedBy;}
     public UUID getId(){return id;} public MedicalCase getMedicalCase(){return medicalCase;} public String getObjectKey(){return objectKey;} public String getOriginalFileName(){return originalFileName;} public String getSafeFileName(){return safeFileName;} public String getContentType(){return contentType;} public long getSizeBytes(){return sizeBytes;} public Instant getCreatedAt(){return createdAt;} public Instant getConfirmedAt(){return confirmedAt;} public DocumentStatus getStatus(){return status;}
 }

@@ -48,7 +48,10 @@ Rules (`GuardianService`, `CustomerReadinessService`, `OnboardingService`):
   `DocumentService.recheckStale` on each in its own transaction: bytes stored → the confirm's own checks and scan (CLEAN, or
   SCAN_FAILED/REJECTED and deleted); no bytes → REJECTED (never arrived; frees the case's file and storage quota); no verdict or
   storage down → left for the next run. Each decision is audited `DOCUMENT_RECHECKED`; a file cleared this way publishes
-  `DocumentEvents.UploadCleared`, and `UploadNotices` notifies the case's coordinators (`DOCUMENT_CLEARED`). Storage lost between
+  `DocumentEvents.UploadCleared`, and `UploadNotices` notifies the case's coordinators (`DOCUMENT_CLEARED`, in-app) and the patient
+  side (`document-cleared`, WhatsApp else email at the case's on-file contact, link to the case page; not for a draft's INTAKE
+  upload). `medical_documents.uploaded_by` (V98) records the uploading account's subject or the channel (INTAKE, SECURE_LINK,
+  WHATSAPP). Storage lost between
   quarantine and read now returns the upload to PENDING in the confirm path too, instead of leaving it stuck in quarantine. Query `MedicalDocumentRepository.findStaleUploads` (JPQL, index
   `idx_documents_status_created`).
 - Consent: `GUARDIAN_AUTHORIZATION` is its own consent type (replaces `REPRESENTATIVE_AUTHORIZATION` for a GUARDIAN subject), recorded

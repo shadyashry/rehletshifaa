@@ -36,6 +36,41 @@ test("in Arabic on a phone, the guardian step reads right-to-left without side s
   await shot(page, "guardian-evidence-ar-390");
 });
 
+const pdf = (name: string) => ({ name, mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7 synthetic") });
+
+test("a guardian with no document on the case uploads one, sees it checked and attaches it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const { writes } = await setupPatient(page, "deposit-arranging", { guardian: "GUARDIAN_EVIDENCE_MISSING", documents: [] });
+  await page.goto("/en/portal");
+  const step = page.getByRole("region", { name: "We need the document that shows you are the guardian" });
+  await expect(step.getByText(/No document on this case has passed the virus check yet/)).toBeVisible();
+  await step.getByLabel("Choose a file").setInputFiles(pdf("guardianship.pdf"));
+  await expect(step.getByText("guardianship.pdf passed the check and is selected.")).toBeVisible();
+  await expect(step.getByRole("radio", { name: /guardianship\.pdf/ })).toBeChecked();
+  await step.getByRole("checkbox", { name: /I confirm I am the patient's parent or legal guardian/ }).check();
+  await shot(page, "guardian-upload-en-1440");
+  await step.getByRole("button", { name: "Use this document" }).click();
+  const caseWrites = () => writes.filter(w => w.path.startsWith("/patient/cases/case-1/") || w.path.startsWith("/local-uploads/"));
+  await expect.poll(() => caseWrites().map(w => w.path)).toEqual(["/patient/cases/case-1/documents/presign", "/local-uploads/u1",
+    "/patient/cases/case-1/documents/confirm", "/patient/cases/case-1/onboarding/consents", "/patient/cases/case-1/onboarding/guardian-evidence"]);
+  expect(caseWrites()[0].body).toEqual({ originalFileName: "guardianship.pdf", contentType: "application/pdf", sizeBytes: 18 });
+  expect(caseWrites()[1].body).toEqual({ bytes: 18 });
+  expect(caseWrites()[4].body).toEqual({ documentId: "u1" });
+});
+
+test("in Arabic on a phone, a patient adds a document from the Documents tab and it is listed", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setupPatient(page, "deposit-paid", { documents: [{ documentId: "d2", fileName: "scan.pdf", status: "PENDING", createdAt: "2026-09-02T09:00:00Z" }] });
+  await page.goto("/ar/portal");
+  await page.getByRole("button", { name: "المستندات" }).click();
+  await expect(page.getByText("قيد الفحص")).toBeVisible();
+  await page.getByLabel("اختر ملفًا").setInputFiles(pdf("lab-results.pdf"));
+  await expect(page.getByText("اجتاز lab-results.pdf الفحص وأصبح ضمن مستنداتك.")).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "lab-results.pdf" })).toBeVisible();
+  await noSideScroll(page);
+  await shot(page, "documents-upload-ar-390");
+});
+
 test("Raise a concern is one quiet line that opens a short form, and the concern then shows its status", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const { writes } = await setupPatient(page, "deposit-paid");
@@ -69,8 +104,11 @@ test("Send my case asks the patient's age once, and it cannot be skipped", async
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/ar/send-my-case");
   await expect(page.getByRole("group", { name: /عمرك/ })).toBeVisible();
-  await page.getByRole("button", { name: "التالي" }).click();
-  await expect(page.getByText("اختر الفئة العمرية.")).toBeVisible();
+  // A click before the form has hydrated does nothing (seen on the dev server): repeat it until the form answers.
+  await expect(async () => {
+    await page.getByRole("button", { name: "التالي" }).click();
+    await expect(page.getByText("اختر الفئة العمرية.")).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await noSideScroll(page);
   await shot(page, "send-my-case-age-ar-390");
   await page.goto("/en/send-my-case");

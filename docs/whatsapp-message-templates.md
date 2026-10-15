@@ -34,6 +34,7 @@ created under the same template name.
 | `rs_deposit_payment_reminder` | `deposit-payment-reminder` | Pay deposit / دفع الوديعة → portal (as above) |
 | `rs_deposit_transfer_rejected` | `deposit-transfer-rejected` | Check my payment / مراجعة دفعتي → portal (as above) |
 | `rs_deposit_balance_due` | `deposit-balance-due` | Pay the balance / دفع المتبقي → portal (as above) |
+| `rs_document_cleared` | `document-cleared` | See my documents / عرض مستنداتي → portal (as above). **New, to be created and approved in WhatsApp Manager**; until it exists Meta refuses the send and the outbox retries it into a dead letter (email to patients without WhatsApp still works) |
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
 | `rs_followup_window_closed` | `intake-followup` | none |
 | `rs_coordinator_intro` | `coordinator-intro` | none (1 body variable: the coordinator's name) |
@@ -87,6 +88,10 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 **`rs_deposit_balance_due`** (DEP-3: part of the deposit received)
 - en: We received part of your coordination deposit. The remaining amount is on your case page: pay it by bank transfer and enter the new transaction reference there using the button below.
 - ar: استلمنا جزءًا من وديعة التنسيق. المبلغ المتبقي موضّح في صفحة حالتك: ادفعه بتحويل بنكي وأدخل الرقم المرجعي الجديد للعملية هناك عبر الزر أدناه.
+
+**`rs_document_cleared`** (a file uploaded while the virus check was down passed it later, in the sweep; no file name in the message)
+- en: A file you sent us could not be checked for viruses at the time. It has now passed the check and is on your case. See it on your case page using the button below.
+- ar: تعذّر فحص ملف أرسلته إلينا من الفيروسات في حينه. وقد اجتاز الفحص الآن وأصبح ضمن حالتك. اطّلع عليه في صفحة حالتك عبر الزر أدناه.
 
 **`rs_followup_window_closed`** (S3: sent once after WhatsApp's 24-hour window has closed)
 - en: Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation.

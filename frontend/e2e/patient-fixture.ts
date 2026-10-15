@@ -30,9 +30,12 @@ export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: strin
   /** P1-13: the case's current step is this guardian blocker (the patient is a minor; the account acts as their guardian). */
   guardian?: "MINOR_REQUIRES_GUARDIAN" | "GUARDIAN_AUTH_MISSING" | "GUARDIAN_EVIDENCE_MISSING";
   /** P1-13: concerns the patient already raised on the case. */
-  concerns?: { id: string; type: string; status: string; raisedAt: string; resolvedAt?: string | null }[] };
+  concerns?: { id: string; type: string; status: string; raisedAt: string; resolvedAt?: string | null }[];
+  /** The case's documents (default: one scanned echo report). Uploads from My Care (presign, put, confirm) add to it, clean. */
+  documents?: { documentId: string; fileName: string; status: string; createdAt: string }[] };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote, guardian, concerns = [] }: PatientOptions = {}) {
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote, guardian, concerns = [],
+  documents = [{ documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", createdAt: "2026-09-01T09:00:00Z" }] }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
       profile: { sub: "patient-1", name: "Maya Example", email: "maya@example.test", roles: ["PATIENT"] }, expires_at: Math.floor(Date.now() / 1000) + 3600 }));
@@ -74,6 +77,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     actions: { journeyStage: "CLOSED", waitingOn: null, blockers: [], currentAction: { code: "NONE", kind: "NONE" }, availableActions: ["MESSAGE_COORDINATOR"], viewer: "SELF" } };
   const caseList = multipleCases ? [relative, { ...caseSummary, viewer: "SELF" }, closed] : [caseSummary];
   const writes: { path: string; body: unknown }[] = [];
+  let uploading: { documentId: string; fileName: string } | null = null;
   // Counted from the browser side so a request storm shows up even when every call is answered: a linked patient's
   // session registration refreshes /me once; repeating it is the reload loop this suite must catch.
   const calls = { session: 0, me: 0, roleless: 0 };
@@ -88,7 +92,8 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     const request = route.request(), api = new URL(request.url()).pathname.replace("/api/v1", "");
     const reply = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204 });
-    if (request.method() !== "GET") writes.push({ path: api, body: request.postDataJSON() });
+    // An upload's bytes are not JSON: recorded by size only.
+    if (request.method() !== "GET") writes.push({ path: api, body: api.startsWith("/local-uploads/") ? { bytes: request.postDataBuffer()?.length ?? 0 } : request.postDataJSON() });
     if (api === "/account/preferences") return reply({ displayName: null, locale: "en" });
     if (api === "/patient/account/session") return reply({ linked: true, currentCaseId: scenario === "no-case" ? null : multipleCases ? "case-2" : "case-1", accountStatus: "ACTIVE", pendingLinkRequests: 0 });
     if (api === "/patient/account/profile") return reply({ givenName: "Maya", familyName: "Example", displayName: "Maya Example", preferredName: null, dateOfBirth: "1990-04-02", country: "Kenya", nationality: "KE", preferredLanguage: "en", email: "maya@example.test", emailVerified: true, whatsappNumber: "+254700000081", phoneVerified: true, accountStatus: "ACTIVE" });
@@ -110,7 +115,12 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (api === "/patient/cases/case-1/proposals/v1/decision") return reply({ ...proposal, status: "ACCEPTED" });
     // The Arabic assisted path: asking once opens the coordinator's work; the page then says it was asked.
     if (api === "/patient/cases/case-1/proposals/v1/assistance") { workspace.proposal.assistance = { requestedAt: "2026-10-08T09:00:00Z" }; return reply(workspace.proposal.assistance); }
-    if (api.endsWith("/documents")) return reply([{ documentId: "d1", fileName: "Echo_Report.pdf", contentType: "application/pdf", sizeBytes: 1024, status: "CLEAN", createdAt: "2026-09-01T09:00:00Z" }]);
+    // My Care upload: presign names a synthetic local upload URL, the bytes go there, confirm "scans" them clean.
+    if (api === "/patient/cases/case-1/documents/presign") { const file = request.postDataJSON(); uploading = { documentId: `u${documents.length + 1}`, fileName: file.originalFileName };
+      return reply({ documentId: uploading.documentId, uploadUrl: `${new URL(request.url()).origin}/api/v1/local-uploads/${uploading.documentId}`, requiredHeaders: { "Content-Type": file.contentType }, expiresInSeconds: 300 }, 201); }
+    if (api.startsWith("/local-uploads/")) return route.fulfill({ status: 200, body: "" });
+    if (api === "/patient/cases/case-1/documents/confirm" && uploading) { documents.unshift({ ...uploading, status: "CLEAN", createdAt: stamp }); return reply({ documentId: uploading.documentId, status: "CLEAN" }); }
+    if (api.endsWith("/documents")) return reply(documents);
     return reply({ message: `unstubbed ${api}` }, 404);
   });
   await routeMe(page, meFor("patient-1", roles));

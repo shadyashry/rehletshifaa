@@ -49,6 +49,8 @@ class PendingDocumentSweeperTest {
         Instant old = Instant.now().minus(Duration.ofDays(3650)); // older than anything else in the shared test database
         jdbc.update("UPDATE medical_documents SET created_at=? WHERE id IN (?,?,?)", old, arrived, neverArrived, stuck);
         jdbc.update("UPDATE medical_documents SET status='QUARANTINED', confirmed_at=? WHERE id=?", old, stuck);
+        assertThat(jdbc.queryForObject("SELECT uploaded_by FROM medical_documents WHERE id=?", String.class, arrived)).isEqualTo("SECURE_LINK");
+        jdbc.update("UPDATE medical_documents SET uploaded_by='INTAKE' WHERE id=?", stuck); // a draft's form upload: no case page to send anyone to
         em.clear();
         assertThat(count(caseId)).isEqualTo(4);
 
@@ -65,6 +67,8 @@ class PendingDocumentSweeperTest {
                 .containsExactly("CLEAN", "CLEAN", "NEVER_ARRIVED");
         assertThat(jdbc.queryForList("SELECT idempotency_key FROM staff_notifications WHERE recipient_subject=? AND case_id=? AND event_type='DOCUMENT_CLEARED'", String.class, COORDINATOR, caseId))
                 .as("one notice per file that became usable").containsExactlyInAnyOrder("document-cleared:" + arrived + ":" + COORDINATOR, "document-cleared:" + stuck + ":" + COORDINATOR);
+        assertThat(jdbc.queryForList("SELECT idempotency_key FROM notification_outbox WHERE template_key='document-cleared'", String.class))
+                .as("the patient side hears of its own upload, not of an intake-form one").contains("document-cleared:" + arrived).doesNotContain("document-cleared:" + stuck);
     }
 
     private UUID presign(UUID caseId, String name, long size, byte[] body) {

@@ -204,6 +204,7 @@ class GuardiansAndAgeBandTest {
         // The real document: uploaded, scanned clean, attached as the guardian's evidence for the coordinator to check.
         UUID evidence = upload(caseId, request, pdf);
         assertThat(patientDocuments.confirm(caseId, new ConfirmRequest(evidence)).status()).isEqualTo("CLEAN");
+        assertThat(jdbc.queryForObject("SELECT uploaded_by FROM medical_documents WHERE id=?", String.class, evidence)).as("the uploading account").isEqualTo(PARENT);
         assertThat(guardians.attachEvidence(caseId, evidence).state()).isEqualTo("EVIDENCE_UNVERIFIED"); em.flush();
         assertThat(codes(caseId)).contains("GUARDIAN_EVIDENCE_UNVERIFIED").doesNotContain("GUARDIAN_EVIDENCE_MISSING");
         assertThat(count("SELECT count(*) FROM audit_events WHERE event_type='PATIENT_DOCUMENT_UPLOADED' AND case_id=? AND actor_subject=?", caseId, PARENT)).isEqualTo(1);
