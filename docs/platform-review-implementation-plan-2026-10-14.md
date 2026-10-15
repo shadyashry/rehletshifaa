@@ -793,7 +793,7 @@ phases.
     (`aria-describedby` the note) and re-enabled by a timer when the time passes, request changes and decline never held; Finance checking the rate as
     "you do not need to do anything" with accept disabled. Both 409 codes (`COOLING_PERIOD`, `FX_REAPPROVAL_REQUIRED`) are explained in place on the
     **secure-link** path (`ProposalSign.decide`; any other 409 stays "newer version") and on the **signed-in** path: `Portal.api` now carries the
-    backend `code` on its error, `mutate` keeps the four proposal codes out of the page banner and exposes them as `FeedbackContext.errorCode` +
+    backend `code` on its error, `mutate` keeps the four proposal codes out of the page banner, only on the two requests whose form or note explains them (the patient's decision, the coordinator's final-quote creation; a decision recorded on the patient's behalf still shows the banner), and exposes them as `FeedbackContext.errorCode` +
     `errorPath`, and `PatientProposal`/`PatientProposalDecision` answer with the same notes (never "your decision was not sent"). **Finance UI:**
     `portal/FxReapproval.tsx` on Finance's case page when the version's `fxReapprovalStatus` is PENDING: the frozen total and rate, "Keep the frozen rate"
     and "Re-release at today's rate", each behind a `ConfirmDialog`, POSTing to the two Finance endpoints; the coordinator's proposal card says Finance is
@@ -808,7 +808,7 @@ phases.
     notes and the refusal contract) and `portal/FinalQuotePricing.test.tsx` (8: both Finance confirmations call exactly their endpoint, cancelling sends
     nothing, Arabic, the coordinator form sends no `validUntil` when empty and the chosen date otherwise, both field errors). `PageHeaders.test.tsx` updated
     (the margin body now carries the two fields) plus one new test (prefilled, confirmed, sent). Verification: `pnpm typecheck` clean; eslint clean on every
-    touched file; `vitest run` 68 files / 500 tests green; Playwright (production build) on a11y, home-quality, home-visual, pre8c-commercial-copy,
+    touched file; `vitest run` 69 files / 504 tests green; Playwright (production build) on a11y, home-quality, home-visual, pre8c-commercial-copy,
     proposal-responsive, arabic-proposal-decision, proposal-otp, my-care: 98 of 106 pass; the 8 failures are 6 in `my-care.spec.ts` that look for a "Deposit arrangements" heading which My Care never rendered at b4ab584 (stale since the deposit step moved, pre-existing and unrelated) and the 2 Arabic-decision specs my home/price panel broke by being the first `ol li` on the page, fixed by scoping the locator to the "What happens next" section (then 10/10). Checked in the browser pane with a throwaway harness (not committed): the
     estimate in en and ar (RTL: step numbers at the start, amounts at the end, fee row), the cooling note with its time and the disabled accept, the
     Arabic rate-check note, and the Arabic home section.

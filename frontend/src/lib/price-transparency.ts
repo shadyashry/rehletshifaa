@@ -13,6 +13,15 @@ export const QUOTE_VALIDITY_TOO_LONG = "QUOTE_VALIDITY_TOO_LONG";
 /** Codes a form answers next to its own field (or in the proposal's own notice): the page banner stays quiet for them. */
 export const FIELD_HANDLED_CODES: readonly string[] = [COOLING_PERIOD, FX_REAPPROVAL_REQUIRED, SCOPE_CHANGE_REASON_REQUIRED, QUOTE_VALIDITY_TOO_LONG];
 
+/**
+ * Whether the request that was refused is one whose own form or proposal note answers the code: the patient's decision on a
+ * proposal and the coordinator's final-quote creation. Anywhere else (a decision recorded on a patient's behalf, say) nothing
+ * on screen explains it, so the page banner must.
+ */
+export const refusalExplainedInPlace = (code: string, path: string) =>
+  FIELD_HANDLED_CODES.includes(code)
+  && (/^\/patient\/cases\/[^/]+\/proposals\/[^/]+\/decision$/.test(path) || /^\/coordinator\/cases\/[^/]+\/final-quotes$/.test(path));
+
 /** The longest a timer can wait; a longer wait re-arms itself. */
 const MAX_TIMEOUT = 2 ** 31 - 1;
 

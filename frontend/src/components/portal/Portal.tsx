@@ -30,7 +30,7 @@ import type { ReplyCover } from "@/components/portal/ReplyCoverPanel";
 import type { ConversationDetail } from "@/components/portal/ConversationsView";
 import { type CaseView, type StaffCaseResponse, type CatalogService, type DirectoryFacility, type FxRate, type CaseDocument, type VerifiedDoctor, type DoctorProfile, type StaffProfile, type CareCategory, type StaffMember, type Task, type Workspace, type MutationResult, refreshAfterRejectedAction, normalizeCases, STAFF_ROLES, terminalStatuses, roleLabel } from "@/components/portal/portal-model";
 import { copy, FeedbackContext } from "@/components/portal/portal-ui";
-import { FIELD_HANDLED_CODES } from "@/lib/price-transparency";
+import { refusalExplainedInPlace } from "@/lib/price-transparency";
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
 // Role-specific panels, loaded on demand: a coordinator never downloads My Care, a patient never the clinical review.
@@ -248,7 +248,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);
       if(e instanceof Error&&"passkeyPending" in e){setPasskeyNeeded({pending:(e as Error&{passkeyPending:PendingChange|null}).passkeyPending});return undefined;}await refreshAfterRejectedAction(path,workspace,refresh,openCase);
       const code=e instanceof Error&&"code" in e?String((e as Error&{code?:string}).code??""):"";
-      if(code&&FIELD_HANDLED_CODES.includes(code))setRefusal({code,path});else setError(message);return undefined;}
+      if(code&&refusalExplainedInPlace(code,path))setRefusal({code,path});else setError(message);return undefined;}
     finally{mutationPending.current=false;setBusyCount(n=>n-1);}
   }
   // Staff views (My work, My cases, Team queue) in one place: the header navigation, the inline phone navigation and
