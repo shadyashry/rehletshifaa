@@ -106,7 +106,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (request.method() === "GET" && path.endsWith("/api/v1/me")) calls.me++;
     if (path.includes("/api/v1/undefined/")) calls.roleless++;
   });
-  if (finalQuote) Object.assign(workspace.proposal, { documentType: "FINAL_TREATMENT_QUOTE", scopeChangeReason: finalQuote.scopeChangeReason ?? null, acceptableFrom: finalQuote.acceptableFrom ?? null, fxReapprovalStatus: finalQuote.fxReapprovalStatus ?? null });
+  if (finalQuote && workspace.proposal) Object.assign(workspace.proposal, { documentType: "FINAL_TREATMENT_QUOTE", scopeChangeReason: finalQuote.scopeChangeReason ?? null, acceptableFrom: finalQuote.acceptableFrom ?? null, fxReapprovalStatus: finalQuote.fxReapprovalStatus ?? null });
   await page.route("**/api/v1/**", async route => {
     const request = route.request(), api = new URL(request.url()).pathname.replace("/api/v1", "");
     const reply = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });

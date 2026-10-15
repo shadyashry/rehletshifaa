@@ -20,7 +20,7 @@ import { composeProposalComment } from "./ProposalDecisionDialog";
 import { getDictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 
-const proposalCopy = (locale: Locale) => { const d = getDictionary(locale); return { ...d.secureLink.proposal, assisted: d.portalProposal.assisted, services: d.portalWork.plural.services, stampEstimateReady: d.portalWork.myCare.stamp.estimateReady }; };
+const proposalCopy = (locale: Locale) => { const d = getDictionary(locale); return { ...d.secureLink.proposal, assisted: d.portalProposal.assisted, services: d.portalWork.plural.services, stampEstimateReady: d.portalWork.myCare.stamp.estimateReady, price: d.portalProposal.price }; };
 
 const summary = { caseNumber: "RS-2026-000030", channel: "WHATSAPP", destinationHint: "•••• 7898", whatsappHint: "•••• 7898", emailHint: null };
 

@@ -46,7 +46,8 @@ async function openDocument(doc: Record<string, unknown>, locale: "en" | "ar" = 
   });
   vi.stubGlobal("fetch", fetchMock);
   sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "g", expiresAt: "2099-01-01T00:00:00Z" }));
-  render(<ProposalSign locale={locale} token="tok-1" />);
+  const d = getDictionary(locale);
+  render(<ProposalSign locale={locale} token="tok-1" copy={{ ...d.secureLink.proposal, assisted: d.portalProposal.assisted, services: d.portalWork.plural.services, stampEstimateReady: d.portalWork.myCare.stamp.estimateReady, price: d.portalProposal.price }} />);
   await screen.findByRole("heading", { level: 1 });
   return fetchMock;
 }
