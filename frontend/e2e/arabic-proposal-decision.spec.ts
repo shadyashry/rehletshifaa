@@ -48,7 +48,7 @@ for (const width of [390, 1440]) {
     // "What happens next" starts with the conversation, not an acknowledgement the page does not offer.
     await expect(page.locator("section[aria-labelledby='next-heading'] ol li").first()).toContainText("يراجع منسّق حالتك الشروط معك بالعربية ويسجّل قرارك.");
     await expect(page.getByText("تُقرّ بهذا التقدير للمتابعة.")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "عرض المقترح بالإنجليزية" })).toHaveAttribute("href", `/en/proposal/${TOKEN}`);
+    await expect(page.getByRole("link", { name: "المراجعة والقرار بالإنجليزية" })).toHaveAttribute("href", `/en/proposal/${TOKEN}`);
     await page.getByRole("button", { name: /منسّقي مراجعة الشروط معي/ }).first().click();
     await expect(page.getByRole("status").filter({ hasText: "ستصلك رسالة من منسّقك" })).toBeVisible();
     expect(asked).toEqual([{ grant: "grant-1" }]);
@@ -67,7 +67,7 @@ test("My Care in Arabic: the drawer offers the coordinator, and Decline asks aga
   await page.setViewportSize({ width: 390, height: 844 });
   const { writes } = await setupPatient(page, "proposal-ready");
   await page.goto("/ar/portal");
-  await page.getByRole("button", { name: "مراجعة العرض" }).click();
+  await page.getByRole("button", { name: "مراجعة تقدير التكلفة" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("checkbox")).toHaveCount(0);
   await dialog.getByRole("button", { name: /Sara Ahmed.*مراجعة الشروط معي/ }).click();

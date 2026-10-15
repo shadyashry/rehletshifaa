@@ -6,6 +6,10 @@ import { ArrowRight, Check, FileText, MessageCircle, MessageSquareText, Plus, Us
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { EmergencyGuidance } from "@/components/EmergencyGuidance";
+import { CaseJourney } from "@/components/CaseJourney";
+import { CaseStamp } from "@/components/brand/CaseStamp";
+import { DossierPage } from "@/components/brand/DossierPage";
+import { careViewHref, isPlainClick } from "@/components/portal/care-view";
 import { careAreaLabel, fillTemplate, plural } from "@/lib/portal-labels";
 import { ConfirmDialog, UnreadCount } from "@/components/portal/portal-ui";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
@@ -14,7 +18,14 @@ import { formatMoney } from "@/lib/money";
 import type { CaseActions } from "@/components/portal/CurrentAction";
 import { isGuardianStep } from "@/lib/guardian";
 /** The backend's one answer to "may the patient see a proposal, and which one" — rendered, never re-derived from the stage. */
-export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null };
+export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null; releasedAt?: string | null;
+  /** PRELIMINARY_ESTIMATE or FINAL_TREATMENT_QUOTE: which noun the step uses (one noun per document). */
+  documentType?: string | null };
+/**
+ * D-1: when the three stamped moments happened, from the case's status history (patient-safe; staff get none). Each is
+ * an ISO instant or null; a page prints a stamp only from one of these, never from today.
+ */
+export type CaseMilestones = { receivedAt?: string | null; consultantReviewAt?: string | null; estimateReadyAt?: string | null };
 
 /**
  * The patient's open file, case-centric: which case this is (and the others one tap away), what is happening now and
@@ -42,8 +53,8 @@ type StepText = { title: string; body: string; next?: string; meanwhile?: string
 /** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. Paying it is the payment step's own panel. */
 const MONEY_STEPS = new Set(["PAY_DEPOSIT", "WAIT_PAYMENT_CHECK"]);
 
-export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, guardianStep, paymentStep, messagesPanel, concerns, documentUpload, newCaseHref = null, onWithdraw }: {
-  locale: Locale; caseSummary: CaseSummary; actions: CaseActions; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
+export function MyCare({ locale, caseSummary, actions, milestones, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, guardianStep, paymentStep, messagesPanel, concerns, documentUpload, newCaseHref = null, onWithdraw }: {
+  locale: Locale; caseSummary: CaseSummary; actions: CaseActions; milestones?: CaseMilestones | null; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
   proposal?: ProposalSummaryData | null; deposit?: DepositSummaryData | null; documents: CaseDocument[]; unreadMessages: number;
   /** Every case the account can open, this one included; the switcher shows from two. */
   cases: CaseSummary[]; view: CareView; onView: (view: CareView) => void;
@@ -68,8 +79,11 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
   // P1-13: a guardian blocker is its own step in words (the backend still says COMPLETE_PROFILE; the blocker names which part).
   const guardianCode = code === "COMPLETE_PROFILE" && isGuardianStep(actions.currentAction.blockerCode) ? actions.currentAction.blockerCode : null;
   const guardianCopy = work.safety.guardian;
-  const step = guardianCode
+  // A final quote is reviewed as a quote, never called an estimate, and carries no estimate stamp.
+  const finalQuote = patientProposal?.documentType === "FINAL_TREATMENT_QUOTE";
+  const step: StepText = guardianCode
     ? (guardianCode === "GUARDIAN_EVIDENCE_MISSING" ? { title: guardianCopy.evidenceTitle, body: guardianCopy.evidenceBody } : { title: guardianCopy.stepTitle, body: guardianCopy.stepBody })
+    : code === "REVIEW_PROPOSAL" && finalQuote ? t.steps.REVIEW_FINAL_QUOTE
     : stepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status, exit: actions.currentAction.exit ?? null });
   const body = code === "PROVIDE_INFORMATION" ? patientAction?.message?.trim() || step.body : step.body;
   // A case closed or cancelled says nothing about how far it got, so its journey shows no step as reached or current.
@@ -91,6 +105,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
   const focus = actions.currentAction.kind === "FOCUS";
   const expectedDays = actions.currentAction.expectedWorkingDays ?? null;
   const showSwitcher = cases.length > 1;
+  const stamp = code === "REVIEW_PROPOSAL" && finalQuote ? null : stampFor(code, { ...milestones, estimateReadyAt: milestones?.estimateReadyAt ?? patientProposal?.releasedAt }, t.stamp);
 
   // Arriving from the case switcher: the card that was pressed is gone, so the new case's heading takes focus.
   useEffect(() => { if (takeArrivalFocus(c.id)) document.getElementById("case-heading")?.focus(); }, [c.id]);
@@ -100,11 +115,11 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
       {/* Small screens: the same three destinations the header carries on wider ones. */}
       <nav aria-label={t.nav.label} className="mb-5 flex gap-1 border-b border-line-strong md:hidden">
         {(["care", "documents", "messages"] as const).map(id => (
-          <button key={id} type="button" aria-current={view === id ? "page" : undefined}
-                  className={`-mb-px min-h-11 border-b-2 px-3 py-2.5 text-[0.9375rem] font-bold transition ${view === id ? "border-brand-600 text-brand-800" : "border-transparent text-ink-500 hover:text-ink-800"}`}
-                  onClick={() => onView(id)}>
+          <a key={id} href={careViewHref(c.id, id)} aria-current={view === id ? "page" : undefined}
+             className={`-mb-px inline-flex min-h-11 items-center border-b-2 px-3 py-2.5 text-[0.9375rem] font-bold transition ${view === id ? "border-brand-600 text-brand-800" : "border-transparent text-ink-500 hover:text-ink-800"}`}
+             onClick={event => { if (!isPlainClick(event)) return; event.preventDefault(); onView(id); }}>
             {t.nav[id]}{id === "messages" && unreadMessages > 0 && <UnreadCount count={unreadMessages}/>}
-          </button>
+          </a>
         ))}
       </nav>
 
@@ -130,7 +145,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
       </header>
 
       {/* A-02: whatever stage the case is at, an emergency is local care now, never a message to the team. */}
-      {view === "care" && <EmergencyGuidance className="mt-5" title={t.emergency.title} body={t.emergency.body}/>}
+      {view === "care" && <EmergencyGuidance variant="quiet" className="mt-5" title={t.emergency.title} body={t.emergency.body} more={t.emergency.more}/>}
 
       {view === "documents" && (
         <section aria-labelledby="documents-title" className="card mt-5 p-5 sm:p-6">
@@ -159,8 +174,10 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
 
       {view === "care" && (
         <div className="mt-5 flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,8fr)_minmax(0,4fr)] lg:items-start lg:gap-6">
-          {/* CURRENT STEP — the focal card: the file's petrol tab edge, one primary action or a clear "nothing needed". */}
-          <section aria-labelledby="current-step-title" className="card file-tab p-5 sm:p-7 lg:col-start-1 lg:row-start-1">
+          {/* CURRENT STEP — the page of the file that matters now: the petrol tab edge, one primary action or a clear "nothing
+              needed", and the stamp when this step is one of the three moments and the backend recorded its date. */}
+          <DossierPage edge="tab" aria-labelledby="current-step-title" className="my-care-step lg:col-start-1 lg:row-start-1"
+                       stamp={stamp ? <CaseStamp label={stamp.label} date={stamp.date} locale={locale}/> : null}>
             <p className="eyebrow">{t.step.eyebrow}</p>
             <h2 id="current-step-title" className="statement mt-2.5 text-brand-900">{step.title}</h2>
             <p className="mt-3 max-w-[65ch] text-ink-600" dir="auto">{body}</p>
@@ -193,12 +210,12 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
             )}
 
             {/* The money this step is about, inside the step: one place for the amount, on the facts panel. */}
-            {depositInStep && deposit && !(code === "PAY_DEPOSIT" && paymentStep) && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 rounded-md bg-mist p-4 sm:p-5"/>}
+            {depositInStep && deposit && !(code === "PAY_DEPOSIT" && paymentStep) && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 border-t border-line pt-4"/>}
             {code === "PAY_DEPOSIT" && focus && paymentStep}
 
             {/* Exactly one primary action, and only when the backend says the patient owes something. */}
             {focus && code === "REVIEW_PROPOSAL" && (
-              <button type="button" className="btn-primary mt-6" onClick={onOpenProposal}>{t.step.reviewProposal}</button>
+              <button type="button" className="btn-primary mt-6" onClick={onOpenProposal}>{finalQuote ? t.step.reviewQuote : t.step.reviewProposal}</button>
             )}
             {focus && code === "PROVIDE_INFORMATION" && (
               <button type="button" className="btn-primary mt-6" onClick={() => onView("messages")}>{t.step.replyInMessages}</button>
@@ -223,7 +240,7 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
                 <p className="text-ink-600">{step.meanwhile}</p>
               </div>
             )}
-          </section>
+          </DossierPage>
 
           {/* COORDINATOR — the relationship that is the product: near the top, a person, one way to reach them. */}
           <section aria-labelledby="coordinator-title" className="card p-5 sm:p-6 lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-start">
@@ -257,23 +274,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
           </section>
 
           {/* JOURNEY — orientation only; nothing here is a control. The markers fill as the case moves. */}
-          <section aria-labelledby="journey-title" className="card care-journey p-5 sm:p-6 lg:col-start-1 lg:row-start-2">
-            <h2 id="journey-title" className="eyebrow">{t.journey.title}</h2>
-            <ol className="mt-5 grid md:grid-cols-7">
-              {t.journey.phases.map((label, index) => {
-                const state = index < phase ? "reached" : index === phase ? "current" : "upcoming";
-                return (
-                  <li key={label} className="journey-step" aria-current={state === "current" ? "step" : undefined}>
-                    {index < t.journey.phases.length - 1 && <span aria-hidden className="journey-link" data-reached={index < phase || undefined}/>}
-                    <span aria-hidden className="journey-marker relative z-10 flex-none" data-state={state}>{index + 1}</span>
-                    <span className={`text-[0.875rem] leading-5 ${state === "current" ? "font-semibold text-brand-900" : "text-ink-600"}`}>
-                      {label}{state === "reached" && <span className="sr-only"> ({t.journey.done})</span>}{state === "current" && <span className="sr-only"> ({t.journey.current})</span>}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
+          <CaseJourney id="journey-title" title={t.journey.title} steps={t.journey.phases} current={phase}
+                       completedLabel={t.journey.done} currentLabel={t.journey.current} className="card p-5 sm:p-6 lg:col-start-1 lg:row-start-2"/>
 
           {/* ESTIMATE — the document's summary and, once settled, one way to open it. */}
           {showProposal && proposal && patientProposal && (
@@ -284,7 +286,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
               </div>
               {proposalTotal != null && <p className="statement mt-3 text-brand-900 tabular-nums"><bdi dir="ltr">{formatMoney(proposalTotal, proposal.currency, locale)}</bdi></p>}
               {proposal.versionNumber > 1 && <p className="mt-1 text-[0.875rem] text-ink-500">{t.estimate.updated}</p>}
-              {proposal.documentType === "PRELIMINARY_ESTIMATE" && <p className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-ink-600">{t.estimate.basis}</p>}
+              {/* While the deposit is being paid, the payment step already says this; it is said once. */}
+              {proposal.documentType === "PRELIMINARY_ESTIMATE" && code !== "PAY_DEPOSIT" && <p className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-ink-600">{t.estimate.basis}</p>}
               {showDeposit && !depositInStep && deposit && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 border-t border-line pt-4"/>}
               {/* One control for one outcome: reviewing is already the current step's action, so only the settled document gets a link here. */}
               {patientProposal.action === "VIEW_PROPOSAL" && (
@@ -373,6 +376,19 @@ function proposalTone(state: string): StatusTone {
 }
 function depositTone(status: string): StatusTone {
   return status === "PAID" || status === "WAIVED" ? "success" : status === "REFUNDED" || status === "CANCELLED" ? "neutral" : "info";
+}
+
+/**
+ * D-1: the stamp for the three moments the file records — case received (while it waits for the coordinator), specialist
+ * reviewing, estimate ready — keyed by the backend's action code and printed only with the date the backend recorded.
+ * No date, no stamp; every other step carries none.
+ */
+function stampFor(code: string, milestones: CaseMilestones | null | undefined, labels: LocalizedWorkCopy["myCare"]["stamp"]): { label: string; date: string } | null {
+  const moment = code === "WAIT_COORDINATOR_REVIEW" ? { label: labels.received, date: milestones?.receivedAt }
+    : code === "WAIT_CONSULTANT_REVIEW" ? { label: labels.inReview, date: milestones?.consultantReviewAt }
+    : code === "REVIEW_PROPOSAL" ? { label: labels.estimateReady, date: milestones?.estimateReadyAt }
+    : null;
+  return moment?.date ? { label: moment.label, date: moment.date } : null;
 }
 
 /**

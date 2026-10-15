@@ -12,6 +12,7 @@ import { apiUrl, apiFetchAs } from "@/lib/api";
 import { ADDITIONAL_CARE_AREAS, additionalCareAreas } from "@/lib/additional-care-areas";
 import { useAuth } from "@/components/AuthProvider";
 import { CaseStamp } from "@/components/brand/CaseStamp";
+import { DossierPage } from "@/components/brand/DossierPage";
 import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 
 type CaseFor = "MYSELF" | "SOMEONE_ELSE";
@@ -61,6 +62,8 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState(1);
   const [caseNumber, setCaseNumber] = useState<string>();
+  // When the case was received: the moment the submission was accepted, printed on the confirmation's stamp.
+  const [receivedAt, setReceivedAt] = useState<string | null>(null);
   const [statusToken, setStatusToken] = useState<string>();
   const [turnstileToken, setTurnstileToken] = useState<string>();
   const [session, setSession] = useState<Session | null>(null);
@@ -219,7 +222,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       const submitted = await uploadAndSubmit(created);
       window.localStorage.setItem("rehletshifaa:last-status-path", `/${locale}/status/${submitted.statusToken}`);
       draftCase.current = null; uploaded.current.clear(); unconfirmed.current.clear();
-      setCaseNumber(submitted.caseNumber); setStatusToken(submitted.statusToken); track("case_submitted");
+      setCaseNumber(submitted.caseNumber); setReceivedAt(new Date().toISOString()); setStatusToken(submitted.statusToken); track("case_submitted");
     } catch (failure) {
       // Each stage fails for a different reason and needs a different next step from the patient;
       // one "something went wrong" left them retrying a submit that a bad file was blocking.
@@ -255,7 +258,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       }
       const submitted = await uploadAndSubmit(created);
       draftCase.current = null; uploaded.current.clear(); unconfirmed.current.clear();
-      setCaseNumber(submitted.caseNumber); track("case_submitted");
+      setCaseNumber(submitted.caseNumber); setReceivedAt(new Date().toISOString()); track("case_submitted");
     } catch (failure) { setErrors({ server: d.form.errors[failure instanceof SubmitFailure ? failure.stage : "server"] }); }
     finally { setBusy(false); }
   }
@@ -266,13 +269,10 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   if (caseNumber) {
     const statusHref = statusToken ? `/${locale}/status/${statusToken}` : undefined;
-    const received = new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short" }).format(new Date());
     const s = d.form.success;
-    // The first page of the patient's file: the case number as its heading, stamped on the day it was received.
-    return <section className="dossier-page dossier-page-static relative card p-7 md:p-10" aria-live="polite">
-      <CaseStamp label={s.stampReceived} date={received} className="absolute end-6 top-6 md:end-9 md:top-9" />
-      <p className="text-[0.8125rem] font-semibold uppercase leading-5 tracking-[0.1em] text-ink-500 rtl:text-[0.875rem] rtl:normal-case rtl:tracking-normal">{d.form.caseNumber}</p>
-      <p className="mt-1 text-3xl font-bold tracking-wide text-brand-900" dir="ltr"><span className="inline-block">{caseNumber}</span></p>
+    // The first page of the patient's file: the case number as its heading, stamped at the moment it was received.
+    return <DossierPage className="[--page-pad:1.75rem] md:[--page-pad:2.5rem]" aria-live="polite" kicker={d.form.caseNumber} reference={caseNumber}
+                        stamp={<CaseStamp label={s.stampReceived} date={receivedAt} locale={locale} />}>
       <h2 className="mt-6 text-2xl font-bold text-brand-900">{d.form.successTitle}</h2>
       <p className="lead mt-3">{isPatient && session?.linked ? t.successReturning : s.withTeam}</p>
       <p className="mt-2 text-[0.9375rem] leading-6 text-ink-600">{s.hours}</p>
@@ -281,7 +281,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
         {isPatient && session?.linked ? <a className="btn-primary" href={`/${locale}/portal`}>{t.goToPortal}</a> : statusHref && <a className="btn-primary" href={statusHref}>{s.track}</a>}
         <a className="link-cta" target="_blank" rel="noreferrer" onClick={() => track("whatsapp_clicked")} href={whatsappEntry(locale, caseNumber)}>{d.form.continue}</a>
       </div>
-    </section>;
+    </DossierPage>;
   }
 
   // ---- Returning, signed-in patient: saved details reused, only the new case is entered ----

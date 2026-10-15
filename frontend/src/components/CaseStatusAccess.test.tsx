@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, configure, fireEvent, render, screen } from "@testing-library/react";
 
 import { CaseStatusAccess } from "./CaseStatusAccess";
 import en from "@/messages/en.json";
@@ -7,7 +7,10 @@ import ar from "@/messages/ar.json";
 
 // The page navigates to the proposal with the App Router; vitest has no router context, so it is a spy.
 const push = vi.fn();
+const statusCopy = (d: typeof en) => ({ ...d.secureLink.status, workingDays: d.portalWork.plural.workingDays, stamp: d.portalWork.myCare.stamp, caseNumber: d.form.caseNumber });
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+// Each case walks the code step first; under a full parallel run the default 1s wait for the next page can run out.
+configure({ asyncUtilTimeout: 3000 });
 
 /**
  * The patient's no-login action page: verify a one-time code, see only what was actually requested,
@@ -47,7 +50,7 @@ async function reachAction(overrides: Record<string, () => Promise<Response>> = 
     "tok-1": () => json(summary),
   });
   vi.stubGlobal("fetch", fetchMock);
-  render(<CaseStatusAccess locale="en" token="tok-1"/>);
+  render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
   fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
   const code = await screen.findByLabelText(/verification code/i);
   fireEvent.change(code, { target: { value: "123456" } });
@@ -65,18 +68,18 @@ describe("CaseStatusAccess", () => {
   // A-02 (P0-3): the emergency instruction is on the page before and after verification, in the patient's language.
   it("tells the patient to seek local care in an emergency, in English and Arabic", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json(summary) }));
-    const { unmount } = render(<CaseStatusAccess locale="en" token="tok-1" emergency={en.common.emergencyNotice}/>);
+    const { unmount } = render(<CaseStatusAccess locale="en" token="tok-1" emergency={en.common.emergencyNotice} copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
     await screen.findByRole("button", { name: /send verification code/i });
     const note = screen.getByRole("note", { name: en.common.emergencyNotice.title });
     expect(note.textContent).toContain(en.common.emergencyNotice.body);
     unmount();
-    render(<CaseStatusAccess locale="ar" token="tok-1" emergency={ar.common.emergencyNotice}/>);
+    render(<CaseStatusAccess locale="ar" token="tok-1" emergency={ar.common.emergencyNotice} copy={statusCopy(ar)} journeyCopy={ar.secureLink.journey}/>);
     expect(await screen.findByRole("note", { name: ar.common.emergencyNotice.title })).toBeTruthy();
   });
 
   it("never shows case data before the one-time code is verified", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json(summary) }));
-    render(<CaseStatusAccess locale="en" token="tok-1"/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
     expect(await screen.findByRole("button", { name: /send verification code/i })).toBeTruthy();
     expect(screen.queryByText(/current medication/i)).toBeNull();
     // No sign-in or registration step exists on this page.
@@ -88,7 +91,8 @@ describe("CaseStatusAccess", () => {
     expect(screen.getByLabelText(/current medication/i)).toBeTruthy();
     expect(screen.getByLabelText(/preferred treatment dates/i)).toBeTruthy();
     expect(screen.getByText(/please confirm your current medication/i)).toBeTruthy();
-    expect(screen.getByText(/\(optional\)/i)).toBeTruthy();
+    // The optional item, and the free note beside requested items, say so.
+    expect(screen.getAllByText(/\(optional\)/i)).toHaveLength(2);
   });
 
   it("blocks submission until the required item is answered", async () => {
@@ -121,10 +125,131 @@ describe("CaseStatusAccess", () => {
     expect((screen.getByLabelText(/current medication/i) as HTMLTextAreaElement).value).toBe("x");
   });
 
-  it("reports an invalid or expired link without revealing anything", async () => {
+  it("reports an invalid or expired link without revealing anything, and says how to get a new one", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json({ code: "CASE_LINK_INVALID" }, false, 404) }));
-    render(<CaseStatusAccess locale="en" token="tok-1"/>);
-    expect(await screen.findByText(/invalid or has expired/i)).toBeTruthy();
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
+    expect(await screen.findByRole("heading", { name: /invalid or has expired/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: en.secureLink.status.invalidAction }).getAttribute("href")).toBe("/en/track-case");
+  });
+
+  // ---- slice B: the sealed page, and failures in the patient's words ----
+
+  it("seals the page: case number, where the code goes, that we never ask for it, one action", async () => {
+    vi.stubGlobal("fetch", stub({ "tok-1": () => json(summary) }));
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
+    const heading = await screen.findByRole("heading", { level: 1, name: en.secureLink.status.title });
+    expect(screen.getByText("RS-10281")).toBeTruthy();
+    expect(screen.getByText("***0031")).toBeTruthy();
+    expect(screen.getByText(en.secureLink.status.neverAsk)).toBeTruthy();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    // Arriving on the page leaves focus where the browser puts it; only the patient's own steps move it.
+    expect(document.activeElement).not.toBe(heading);
+  });
+
+  it("names the channel the code goes to", async () => {
+    vi.stubGlobal("fetch", stub({ "tok-1": () => json({ ...summary, channel: "WHATSAPP" }) }));
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
+    expect(await screen.findByText(new RegExp(en.secureLink.status.sendToWhatsApp))).toBeTruthy();
+  });
+
+  it("keeps a code typed in Arabic-Indic digits, and says when digits are missing", async () => {
+    const fetchMock = stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ grant: "grant-1" }),
+      "/view": () => json(status),
+      "tok-1": () => json(summary),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<CaseStatusAccess locale="ar" token="tok-1" copy={statusCopy(ar)} journeyCopy={ar.secureLink.journey}/>);
+    fireEvent.click(await screen.findByRole("button", { name: ar.secureLink.status.send }));
+    const field = await screen.findByLabelText(ar.secureLink.status.code) as HTMLInputElement;
+    fireEvent.change(field, { target: { value: "١٢٣" } });
+    expect(field.value).toBe("123");
+    fireEvent.click(screen.getByRole("button", { name: ar.secureLink.status.verify }));
+    expect(await screen.findByText(ar.secureLink.status.codeIncomplete)).toBeTruthy();
+    fireEvent.change(field, { target: { value: "١٢٣٤٥٦" } });
+    fireEvent.click(screen.getByRole("button", { name: ar.secureLink.status.verify }));
+    await vi.waitFor(() => expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/verify"))).toBe(true));
+    const verify = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/verify"))!;
+    expect(JSON.parse((verify[1] as RequestInit).body as string)).toEqual({ code: "123456" });
+  });
+
+  it("says beside the file when its upload fails, and keeps the rest of the form", async () => {
+    const docAction = { ...action, items: [{ id: "d1", kind: "DOCUMENT", code: "SCAN", label: "Latest scan", required: true, completed: false, response: null }] };
+    const fetchMock = await reachAction({
+      "/view": () => json({ ...status, action: docAction }),
+      "/documents/presign": () => json({ documentId: "doc-1", uploadUrl: "https://files.example.test/put", requiredHeaders: {} }),
+      "files.example.test/put": () => json({}, false, 500),
+    });
+    fireEvent.change(screen.getByLabelText(/latest scan/i), { target: { files: [new File(["x"], "scan.pdf", { type: "application/pdf" })] } });
+    fireEvent.click(screen.getByRole("button", { name: /send information/i }));
+    expect(await screen.findByText(en.secureLink.status.uploadFailed)).toBeTruthy();
+    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith("/respond"))).toBe(false);
+    expect(screen.getByText("scan.pdf")).toBeTruthy();
+  });
+
+  it("says a wrong code in its own words, beside the field, never the backend's message", async () => {
+    vi.stubGlobal("fetch", stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ code: "VERIFICATION_INVALID", message: "The verification code is invalid or has expired" }, false, 400),
+      "tok-1": () => json(summary),
+    }));
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    const field = await screen.findByLabelText(/verification code/i);
+    fireEvent.change(field, { target: { value: "000000" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+    expect(await screen.findByText(en.secureLink.status.codeInvalid)).toBeTruthy();
+    expect(screen.queryByText("The verification code is invalid or has expired")).toBeNull();
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("says when too many codes were asked for", async () => {
+    vi.stubGlobal("fetch", stub({
+      "/request-access": () => json({ code: "TOO_MANY_REQUESTS", message: "Too many verification requests. Please try again later." }, false, 429),
+      "tok-1": () => json(summary),
+    }));
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    expect(await screen.findByText(en.secureLink.status.tooManyCodes)).toBeTruthy();
+  });
+
+  it("moves focus to the first field in error, and to the note when nothing was written", async () => {
+    await reachAction();
+    fireEvent.click(screen.getByRole("button", { name: /send information/i }));
+    await screen.findByText(/please provide this information/i);
+    const first = screen.getByLabelText(/current medication/i);
+    await vi.waitFor(() => expect(document.activeElement).toBe(first));
+    expect(first.getAttribute("aria-invalid")).toBe("true");
+    expect(first.getAttribute("aria-describedby")).toBeTruthy();
+  });
+
+  it("checks a chosen file's type before sending it", async () => {
+    const docAction = { ...action, items: [{ id: "d1", kind: "DOCUMENT", code: "SCAN", label: "Latest scan", required: true, completed: false, response: null }] };
+    await reachAction({ "/view": () => json({ ...status, action: docAction }) });
+    const input = screen.getByLabelText(/latest scan/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["x"], "notes.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })] } });
+    expect(await screen.findByText(en.secureLink.status.fileType)).toBeTruthy();
+  });
+
+  it("shows an empty-response refusal beside the note, in the page's words", async () => {
+    await reachAction({
+      "/view": () => json({ ...status, action: { ...action, items: [] } }),
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send information/i }));
+    expect(await screen.findByText(en.secureLink.status.noteMissing)).toBeTruthy();
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe("status-note"));
+  });
+
+  it("thanks the patient on a page of the same file, with the case number and the heading focused", async () => {
+    await reachAction();
+    fireEvent.change(screen.getByLabelText(/current medication/i), { target: { value: "Aspirin 75mg" } });
+    fireEvent.click(screen.getByRole("button", { name: /send information/i }));
+    // The submit round-trip can take a while under a full parallel run.
+    const heading = await screen.findByRole("heading", { level: 1, name: en.secureLink.status.doneTitle }, { timeout: 10_000 });
+    expect(screen.getByText("RS-10281")).toBeTruthy();
+    await vi.waitFor(() => expect(document.activeElement).toBe(heading));
+    expect(screen.queryByText("✓")).toBeNull();
   });
 });
 
@@ -142,7 +267,7 @@ describe("CaseStatusAccess journey", () => {
       "/view": () => json(view),
       "tok-1": () => json(summary),
     }));
-    render(<CaseStatusAccess locale="en" token="tok-1"/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
     fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
     fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
@@ -156,9 +281,51 @@ describe("CaseStatusAccess journey", () => {
 
     const tracker = screen.getByRole("list");
     const labels = [...tracker.querySelectorAll("li")].map(li => (li.textContent ?? "").trim());
-    expect(labels).toEqual(["Case received", "Coordinator review", "Consultant review", "Your proposal", "Coordination deposit", "Treatment", "Follow-up"]);
+    // One numbered journey; each step says its state in words for screen readers, and the current one is marked.
+    expect(labels).toEqual(["1Case received (completed)", "2Coordinator review (completed)", "3Consultant review (current)", "4Your proposal", "5Coordination deposit", "6Treatment", "7Follow-up"]);
+    expect(tracker.querySelector("[aria-current=step]")?.textContent).toContain("Consultant review");
     // The internal case status is never sent to this page, so it can never be rendered.
     expect(screen.queryByText(/CONSULTANT_REVIEW/)).toBeNull();
+    // The status line repeated the heading; it is gone.
+    expect(screen.queryByText(/current update/i)).toBeNull();
+    expect(screen.queryByText(/under consultant review/i)).toBeNull();
+  });
+
+  // ---- D-1: the stamp, only on the three moments and only with the backend's date ----
+
+  it("stamps the Consultant's phase In review with the date the backend recorded", async () => {
+    await reachStatus({ ...consultantStatus, milestones: { receivedAt: "2026-03-01T08:00:00Z", consultantReviewAt: "2026-03-04T08:00:00Z", estimateReadyAt: null } });
+    await screen.findByRole("heading", { name: /a consultant is reviewing your case/i });
+    expect(screen.getByText("In review, Mar 4", { exact: false })).toBeTruthy();
+    expect(screen.queryByText(/^Received/)).toBeNull();
+  });
+
+  it("stamps a received case Received, and prints no stamp without a date (never today)", async () => {
+    await reachStatus({ ...consultantStatus, phase: "coordinator", milestones: { receivedAt: "2026-03-01T08:00:00Z" } });
+    await screen.findByRole("heading", { name: /your coordinator is reviewing your case/i });
+    expect(screen.getByText("Received, Mar 1", { exact: false })).toBeTruthy();
+    cleanup(); vi.unstubAllGlobals();
+    await reachStatus({ ...consultantStatus, milestones: null });
+    await screen.findByRole("heading", { name: /a consultant is reviewing your case/i });
+    expect(document.querySelector(".case-stamp")).toBeNull();
+  });
+
+  it("stamps a ready estimate from its release date when the milestone is absent; no stamp on a request for information", async () => {
+    await reachStatus({ ...consultantStatus, phase: "proposal", proposal: { state: "READY", action: "REVIEW_PROPOSAL", versionNumber: 1, validUntil: null, decidedAt: null, documentType: "PRELIMINARY_ESTIMATE", releasedAt: "2026-03-09T10:00:00Z" } });
+    await screen.findByRole("heading", { name: /your estimate is ready to review/i });
+    expect(screen.getByText("Estimate ready, Mar 9", { exact: false })).toBeTruthy();
+    cleanup(); vi.unstubAllGlobals();
+    await reachStatus({ ...consultantStatus, phase: "coordinator", actionRequired: true, action, milestones: { receivedAt: "2026-03-01T08:00:00Z" } });
+    await screen.findByRole("heading", { name: /we need something from you/i });
+    expect(document.querySelector(".case-stamp")).toBeNull();
+  });
+
+  it("names a ready final quote as a quote, without the estimate stamp", async () => {
+    await reachStatus({ ...consultantStatus, phase: "proposal", milestones: { estimateReadyAt: "2026-03-09T10:00:00Z" },
+      proposal: { state: "READY", action: "REVIEW_PROPOSAL", versionNumber: 1, validUntil: null, decidedAt: null, documentType: "FINAL_TREATMENT_QUOTE", releasedAt: "2026-04-01T10:00:00Z" } });
+    await screen.findByRole("heading", { name: en.secureLink.status.quoteReadyTitle });
+    expect(screen.getByRole("button", { name: en.secureLink.status.quoteReview })).toBeTruthy();
+    expect(document.querySelector(".case-stamp")).toBeNull();
   });
 
   it("says how long the team usually takes over the phase and what to do meanwhile (P1-6)", async () => {
@@ -182,7 +349,7 @@ describe("CaseStatusAccess journey", () => {
     await reachStatus({ ...consultantStatus, phase: "proposal", proposal: { state: "PREPARING", action: null, versionNumber: null, validUntil: null, decidedAt: null } });
     expect(await screen.findByRole("heading", { name: /we are preparing your proposal/i })).toBeTruthy();
     expect(screen.getAllByText(/your proposal is being prepared/i)).toHaveLength(1); // said once
-    expect(screen.queryByRole("button", { name: /review proposal/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /review (proposal|estimate)/i })).toBeNull();
     expect(screen.queryByRole("link", { name: /proposal/i })).toBeNull();
   });
 
@@ -203,17 +370,17 @@ describe("CaseStatusAccess journey", () => {
       "tok-1": () => json(summary),
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<CaseStatusAccess locale="en" token="tok-1"/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
     fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
     fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
 
-    expect(await screen.findByRole("heading", { name: /your proposal is ready to review/i })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /your estimate is ready to review/i })).toBeTruthy();
     expect(screen.queryByText(/no action is required/i)).toBeNull(); // a decision is waiting
     // An updated document is said so in words; the technical version number is not patient-facing (UX-8).
     expect(screen.getByText(/Updated version/)).toBeTruthy();
     expect(screen.queryByText(/version 2/i)).toBeNull();
-    const buttons = screen.getAllByRole("button", { name: /review proposal/i });
+    const buttons = screen.getAllByRole("button", { name: /review estimate/i });
     expect(buttons).toHaveLength(1); // one action for one business outcome
     fireEvent.click(buttons[0]);
     await vi.waitFor(() => expect(push).toHaveBeenCalledWith("/en/proposal/share-9"));
@@ -224,9 +391,56 @@ describe("CaseStatusAccess journey", () => {
     expect(push.mock.calls[0][0]).not.toContain("pgrant-9");
   });
 
+  it("tells a patient who asked for changes what is happening, once, with no contradicting story", async () => {
+    await reachStatus({ ...consultantStatus, phase: "proposal", proposal: { state: "REVISION_REQUESTED", action: null, versionNumber: 1, validUntil: null, decidedAt: "2026-09-10T10:00:00Z" } });
+    expect(await screen.findByRole("heading", { level: 1, name: en.secureLink.status.revisionTitle })).toBeTruthy();
+    expect(screen.getAllByText(en.secureLink.status.proposalRevision)).toHaveLength(1);
+    expect(screen.queryByText(/being prepared, or are ready/i)).toBeNull();
+  });
+
+  it("keeps a decidable estimate reachable while the coordinator asks for something, without a second filled action", async () => {
+    await reachStatus({ ...consultantStatus, phase: "proposal", actionRequired: true, action,
+      proposal: { state: "READY", action: "REVIEW_PROPOSAL", versionNumber: 1, validUntil: null, decidedAt: null, documentType: "PRELIMINARY_ESTIMATE" } });
+    await screen.findByRole("heading", { level: 1, name: /we need something from you/i });
+    const review = screen.getByRole("button", { name: en.secureLink.status.proposalReview });
+    expect(review.className).toContain("btn-secondary");
+    expect(document.querySelectorAll(".btn-primary")).toHaveLength(1);
+  });
+
+  it("says when the estimate can no longer be opened, in the page's words", async () => {
+    const ready = { ...consultantStatus, phase: "proposal", proposal: { state: "READY", action: "REVIEW_PROPOSAL", versionNumber: 1, validUntil: null, decidedAt: null } };
+    vi.stubGlobal("fetch", stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ grant: "grant-1" }),
+      "/view": () => json(ready),
+      "/proposal-access": () => json({ code: "PROPOSAL_NOT_AVAILABLE", message: "No proposal is available for review right now" }, false, 409),
+      "tok-1": () => json(summary),
+    }));
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+    fireEvent.click(await screen.findByRole("button", { name: en.secureLink.status.proposalReview }));
+    expect(await screen.findByText(en.secureLink.status.proposalUnavailable)).toBeTruthy();
+    expect(screen.queryByText(/No proposal is available/)).toBeNull();
+  });
+
   it("tells the patient when an acknowledged proposal is read-only rather than faking a button", async () => {
     await reachStatus({ ...consultantStatus, phase: "deposit", proposal: { state: "ACCEPTED", action: "VIEW_PROPOSAL", versionNumber: 1, validUntil: null, decidedAt: "2026-09-10T10:00:00Z" } });
     expect(await screen.findByText(/you acknowledged your estimate/i)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /review proposal/i })).toBeNull();
+    // The deposit page names the next step; the note no longer says the coordinator is arranging it.
+    expect(screen.queryByText(/arranging the next steps/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /review (proposal|estimate)/i })).toBeNull();
+  });
+
+  // DEP-3: the deposit is the patient's to pay in My Care, and this link cannot tell whether it was paid.
+  it("in the deposit phase says where and how to pay, and never that nothing is needed", async () => {
+    await reachStatus({ ...consultantStatus, phase: "deposit", expectedWorkingDays: 1 });
+    expect(await screen.findByRole("heading", { name: "Your coordination deposit" })).toBeTruthy();
+    expect(screen.getByText(/sign in to My Care to pay it by bank transfer or through an agent/i)).toBeTruthy();
+    expect(screen.queryByText(/no action is required/i)).toBeNull();
+    expect(screen.queryByText(/coordinator will share the payment details/i)).toBeNull();
+    expect(screen.queryByText(/usually takes/i)).toBeNull();
+    expect(screen.getByRole("link", { name: "Sign in to pay" }).getAttribute("href")).toBe("/en/portal?signin=1");
   });
 });

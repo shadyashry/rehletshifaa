@@ -10,10 +10,17 @@ beforeAll(() => {
   };
 });
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+
+// Each case walks the code step first; under a full parallel run the default 1s wait for the next page can run out.
+configure({ asyncUtilTimeout: 3000 });
 
 import { ProposalSign } from "./ProposalSign";
 import { composeProposalComment } from "./ProposalDecisionDialog";
+import { getDictionary } from "@/lib/dictionary";
+import type { Locale } from "@/lib/i18n";
+
+const proposalCopy = (locale: Locale) => { const d = getDictionary(locale); return { ...d.secureLink.proposal, assisted: d.portalProposal.assisted, services: d.portalWork.plural.services, stampEstimateReady: d.portalWork.myCare.stamp.estimateReady }; };
 
 const summary = { caseNumber: "RS-2026-000030", channel: "WHATSAPP", destinationHint: "•••• 7898", whatsappHint: "•••• 7898", emailHint: null };
 
@@ -51,7 +58,7 @@ function mockApi({ decisionStatus = 200 }: { decisionStatus?: number } = {}) {
 
 /** Walk the OTP gate so the tests can assert against the proposal itself. */
 async function openProposal() {
-  render(<ProposalSign locale="en" token="tok-1" />);
+  render(<ProposalSign locale="en" token="tok-1" copy={proposalCopy("en")} />);
   fireEvent.click(await screen.findByRole("button", { name: "Send code" }));
   const code = await screen.findByLabelText("Enter the 6-digit code");
   fireEvent.change(code, { target: { value: "123456" } });
@@ -200,7 +207,7 @@ describe("ProposalSign", () => {
 
   it("opens straight to the proposal with the grant handed over from Check Case Status, once", async () => {
     sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "handed-grant", expiresAt: "2099-01-01T00:00:00Z" }));
-    render(<ProposalSign locale="en" token="tok-1" />);
+    render(<ProposalSign locale="en" token="tok-1" copy={proposalCopy("en")} />);
     await screen.findByRole("heading", { name: "Your preliminary care estimate" });
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     const paths = fetchMock.mock.calls.map(call => String(call[0]));
@@ -212,7 +219,7 @@ describe("ProposalSign", () => {
 
   it("in Arabic, isolates each amount, counts services in Arabic plural forms and uses one long date style", async () => {
     sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "handed-grant", expiresAt: "2099-01-01T00:00:00Z" }));
-    render(<ProposalSign locale="ar" token="tok-1" />);
+    render(<ProposalSign locale="ar" token="tok-1" copy={proposalCopy("ar")} />);
     const amounts = await screen.findAllByText(/8,200/);
     // "$US 8,200" came from an un-isolated figure in a right-to-left line.
     expect(amounts.every((el) => el.closest("bdi[dir='ltr']") !== null)).toBe(true);
@@ -228,7 +235,7 @@ describe("ProposalSign", () => {
       return { ok: true, status: 200, json: async () => summary } as Response;
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<ProposalSign locale="en" token="tok-1" />);
+    render(<ProposalSign locale="en" token="tok-1" copy={proposalCopy("en")} />);
     expect(await screen.findByRole("button", { name: "Send code" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Your preliminary care estimate" })).toBeNull();
   });
@@ -243,7 +250,7 @@ async function openDocument(doc: Record<string, unknown>, locale: "en" | "ar" = 
   });
   vi.stubGlobal("fetch", fetchMock);
   sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "g", expiresAt: "2099-01-01T00:00:00Z" }));
-  render(<ProposalSign locale={locale} token="tok-1" />);
+  render(<ProposalSign locale={locale} token="tok-1" copy={proposalCopy(locale)} />);
   await screen.findByRole("heading", { level: 1 });
   return fetchMock;
 }
@@ -347,5 +354,119 @@ describe("composeProposalComment", () => {
     expect(composeProposalComment("COST", "  too high  ")).toBe("The estimated cost - too high");
     expect(composeProposalComment("COST", "")).toBe("The estimated cost");
     expect(composeProposalComment("", "just this")).toBe("just this");
+  });
+});
+
+
+describe("ProposalSign — the estimate as a document (slice C)", () => {
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); sessionStorage.clear(); });
+  const en = getDictionary("en").secureLink.proposal;
+
+  function stubSealed(over: Record<string, () => Response> = {}, s: Record<string, unknown> = summary) {
+    const fetchMock = vi.fn(async (url: string) => {
+      const path = String(url);
+      const hit = Object.keys(over).find(suffix => path.endsWith(suffix));
+      if (hit) return over[hit]();
+      if (path.endsWith("/view")) return { ok: true, status: 200, json: async () => proposal } as Response;
+      if (path.endsWith("/verify")) return { ok: true, status: 200, json: async () => ({ grant: "grant-1" }) } as Response;
+      return { ok: true, status: 200, json: async () => s } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProposalSign locale="en" token="tok-1" copy={proposalCopy("en")} />);
+    return fetchMock;
+  }
+
+  it("seals the document: the case, where the code goes, that no one asks for it, and the other channel only before sending", async () => {
+    stubSealed({}, { ...summary, emailHint: "m***@example.test" });
+    expect(await screen.findByRole("heading", { level: 1, name: en.verifyTitle })).toBeTruthy();
+    expect(screen.getByText("RS-2026-000030")).toBeTruthy();
+    expect(screen.getByText(en.neverAsk)).toBeTruthy();
+    expect(screen.queryByText(/RehletShifaa ·/)).toBeNull();
+    expect(screen.getByRole("button", { name: en.emailInstead })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: en.sendCode }));
+    await screen.findByLabelText(en.codeLabel);
+    expect(screen.queryByRole("button", { name: en.emailInstead })).toBeNull();
+  });
+
+  it("says a wrong code in its own words, never the backend's", async () => {
+    stubSealed({ "/verify": () => ({ ok: false, status: 400, json: async () => ({ code: "VERIFICATION_INVALID", message: "The verification code is invalid or has expired" }) } as Response) });
+    fireEvent.click(await screen.findByRole("button", { name: en.sendCode }));
+    fireEvent.change(await screen.findByLabelText(en.codeLabel), { target: { value: "000000" } });
+    fireEvent.click(screen.getByRole("button", { name: en.verify }));
+    expect(await screen.findByText(en.codeInvalid)).toBeTruthy();
+    expect(screen.queryByText(/The verification code is invalid/)).toBeNull();
+  });
+
+  it("confirms a resent code", async () => {
+    stubSealed();
+    fireEvent.click(await screen.findByRole("button", { name: en.sendCode }));
+    await screen.findByLabelText(en.codeLabel);
+    fireEvent.click(screen.getByRole("button", { name: en.resend }));
+    expect(await screen.findByText(en.codeResent)).toBeTruthy();
+  });
+
+  it("stamps an estimate Estimate ready with its release date, and prints no stamp without one", async () => {
+    await openDocument({ ...proposal, releasedAt: "2026-03-09T10:00:00Z" });
+    expect(screen.getByText("Estimate ready, Mar 9", { exact: false })).toBeTruthy();
+    expect(screen.getByText(en.prelimBadge)).toBeTruthy();
+    cleanup(); sessionStorage.clear();
+    await openDocument({ ...proposal, releasedAt: null });
+    expect(document.querySelector(".case-stamp")).toBeNull();
+  });
+
+  it("gives a final quote its own nouns and no estimate stamp", async () => {
+    await openDocument({ ...finalQuote, releasedAt: "2026-04-01T10:00:00Z", includedServices: "", excludedServices: "" });
+    expect(document.querySelector(".case-stamp")).toBeNull();
+    expect(screen.getByText(en.includedQuoteLabel)).toBeTruthy();
+    fireEvent.click(screen.getByText(en.moreOptions));
+    expect(screen.getByRole("button", { name: en.declineQuote })).toBeTruthy();
+  });
+
+  it("thanks the patient on a page of the same file, says where the profile link went, and focuses its heading", async () => {
+    mockApi();
+    await openProposal();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getAllByRole("button", { name: en.acknowledge })[0]);
+    const heading = await screen.findByRole("heading", { level: 1, name: en.ackDoneTitle });
+    expect(screen.getByText(new RegExp(en.ackDoneWhatsApp))).toBeTruthy();
+    expect(screen.getByText("RS-2026-000030")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  it("ends an expired estimate's code step on the no-longer-works page, with the reason", async () => {
+    stubSealed({ "/request-access": () => ({ ok: false, status: 410, json: async () => ({ code: "PROPOSAL_EXPIRED", message: "This proposal has expired" }) } as Response) });
+    fireEvent.click(await screen.findByRole("button", { name: en.sendCode }));
+    expect(await screen.findByRole("heading", { level: 1, name: en.invalidTitle })).toBeTruthy();
+    expect(screen.getByText(en.blockedExpired)).toBeTruthy();
+    expect(screen.queryByText("This proposal has expired")).toBeNull();
+  });
+
+  it("says a document that lapsed during the decision where focus lands, without the estimate stamp", async () => {
+    mockApi({ decisionStatus: 410 });
+    await openProposal();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getAllByRole("button", { name: en.acknowledge })[0]);
+    const notice = await screen.findByText(/This estimate has expired/);
+    await waitFor(() => expect(document.activeElement).toBe(notice.closest("[role=status]")));
+    expect(document.querySelector(".case-stamp")).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("moves focus to the acknowledgement when the primary action is pressed without it", async () => {
+    mockApi();
+    await openProposal();
+    fireEvent.click(screen.getAllByRole("button", { name: en.acknowledge })[0]);
+    const box = screen.getByRole("checkbox");
+    expect(document.activeElement).toBe(box);
+    expect(box.getAttribute("aria-describedby")).toContain("ack-error");
+  });
+
+  it("says a lapsed session in its own words when a decision is refused", async () => {
+    mockApi({ decisionStatus: 401 });
+    await openProposal();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getAllByRole("button", { name: en.acknowledge })[0]);
+    expect(await screen.findByText(en.error)).toBeTruthy();
+    expect(screen.queryByText("nope")).toBeNull();
   });
 });

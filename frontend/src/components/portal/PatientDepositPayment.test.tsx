@@ -27,9 +27,9 @@ describe("PatientDepositPayment", () => {
     expect(screen.getByText(/may change after your doctor examines you in person/)).toBeTruthy();
     const online = screen.getByRole("radio", { name: /Online payment/ }) as HTMLInputElement;
     expect(online.disabled).toBe(true);
-    expect(screen.getByText("Coming soon — not available yet.")).toBeTruthy();
+    expect(screen.getByText("Coming soon")).toBeTruthy();
     expect((screen.getByRole("radio", { name: /Bank transfer/ }) as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText("EG000000000000000000000000000")).toBeTruthy();
+    expect(screen.getByText("EG00 0000 0000 0000 0000 0000 0000 0")).toBeTruthy();
     expect(screen.getByText("RS-2026-000081")).toBeTruthy();
     expect(screen.getByText(/Write this on your transfer/)).toBeTruthy();
   });
@@ -43,11 +43,13 @@ describe("PatientDepositPayment", () => {
     const submit = screen.getByRole("button", { name: "Send transfer reference" });
     // Mandatory: sending nothing explains the fix inline and puts the focus on the field; nothing is sent.
     fireEvent.click(submit);
-    expect(screen.getByText(/letters and numbers, 4 to 64 characters/)).toBeTruthy();
+    expect(screen.getByText("Enter the reference number your bank gave you.")).toBeTruthy();
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(document.activeElement).toBe(field);
     fireEvent.change(field, { target: { value: "<x>" } });
     fireEvent.click(submit);
+    // A malformed one says the format.
+    expect(screen.getByText(/letters and numbers, 4 to 64 characters/)).toBeTruthy();
     expect(mutate).not.toHaveBeenCalled();
 
     fireEvent.change(field, { target: { value: "  FT 2026 1013  " } });
@@ -97,7 +99,67 @@ describe("PatientDepositPayment", () => {
     expect(screen.getByRole("radio", { name: /الدفع الإلكتروني/ })).toBeTruthy();
     expect(screen.getByRole("textbox", { name: /الرقم المرجعي للعملية/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: "إرسال الرقم المرجعي" })).toBeTruthy();
-    const iban = screen.getByText("EG000000000000000000000000000");
+    const iban = screen.getByText("EG00 0000 0000 0000 0000 0000 0000 0");
     expect(iban.closest("[dir='ltr']")).toBe(iban);
+  });
+});
+
+describe("PatientDepositPayment — the payment slip (slice E)", () => {
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  it("is two numbered parts: pay, then enter the bank's reference, with the field after the details", () => {
+    renderPayment();
+    const pay = screen.getByRole("heading", { name: /Transfer to this account/ });
+    const proof = screen.getByRole("heading", { name: /Enter your bank's reference/ });
+    expect(pay.textContent).toContain("1");
+    expect(proof.textContent).toContain("2");
+    const field = screen.getByRole("textbox", { name: /Transaction reference number/ });
+    expect(proof.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pay.compareDocumentPosition(proof) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  const stubClipboard = (clipboard: unknown) => Object.defineProperty(navigator, "clipboard", { value: clipboard, configurable: true });
+
+  it("copies the account number, IBAN, SWIFT and payment reference, and says it did", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    stubClipboard({ writeText });
+    renderPayment();
+    for (const name of ["Copy Account number", "Copy IBAN", "Copy SWIFT / BIC", "Copy Payment reference"]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+    expect(screen.queryByRole("button", { name: "Copy Account name" })).toBeNull();
+    // The IBAN is shown in groups of four; the raw value is what gets copied.
+    expect(screen.getByText("EG00 0000 0000 0000 0000 0000 0000 0")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Copy IBAN" }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("EG000000000000000000000000000"));
+    expect(await screen.findByText("IBAN copied.")).toBeTruthy();
+    // The control's name keeps its visible word.
+    expect(screen.getByRole("button", { name: "Copied IBAN" })).toBeTruthy();
+  });
+
+  it("copies through the selection where the browser denies the Clipboard API (in-app browsers)", async () => {
+    stubClipboard({ writeText: vi.fn(() => Promise.reject(new Error("denied"))) });
+    const execCommand = vi.fn(() => true);
+    Object.defineProperty(document, "execCommand", { value: execCommand, configurable: true });
+    renderPayment();
+    fireEvent.click(screen.getByRole("button", { name: "Copy IBAN" }));
+    expect(await screen.findByText("IBAN copied.")).toBeTruthy();
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    Object.defineProperty(document, "execCommand", { value: () => false, configurable: true });
+  });
+
+  it("tells the patient to select the value where the browser cannot copy", async () => {
+    stubClipboard(undefined);
+    renderPayment();
+    fireEvent.click(screen.getByRole("button", { name: "Copy SWIFT / BIC" }));
+    expect((await screen.findAllByText("Could not copy SWIFT / BIC. Select it and copy it yourself.")).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the online option as one line that cannot be chosen, and the rejection as a note, not a tinted panel", () => {
+    renderPayment({ transfer: { id: "t1", reference: "FT1", status: "REJECTED", submittedAt: "2026-10-01T00:00:00Z", reason: "No transfer with this reference" } });
+    expect((screen.getByRole("radio", { name: /Online payment/ }) as HTMLInputElement).disabled).toBe(true);
+    const alert = screen.getByRole("alert");
+    expect(alert.className).not.toMatch(/bg-/);
+    expect(alert.textContent).toContain("FT1");
   });
 });

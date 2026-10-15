@@ -6,7 +6,7 @@ import { STEP_UP_USERS, requestStepUp, submitKeycloakSignIn } from "./live-auth"
 /**
  * UAT defect-correction walkthrough over the real stack (Cloudflare -> gateway -> backend, real Keycloak,
  * Mailpit as the mail sink): a new case -> routed to a coordinator -> consultant assignment -> clinical
- * recommendation in USD -> proposal preparation -> release -> Check Case Status -> "Review proposal"
+ * recommendation in USD -> proposal preparation -> release -> Check Case Status -> "Review estimate"
  * (no second code) -> acknowledgement -> the coordinator's next work. At every transition the
  * notification that left the building is checked in Mailpit: recipient, subject wording, case reference,
  * and that nothing was sent twice or to the wrong person. Screens touched by the pass are captured.
@@ -240,7 +240,7 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   await statusPage.getByLabel("Verification code").fill(statusCode);
   await statusPage.getByRole("button", { name: "Verify and continue" }).click();
   await expect(statusPage.getByRole("heading", { name: "We are preparing your proposal" })).toBeVisible();
-  await expect(statusPage.getByRole("button", { name: "Review proposal" })).toHaveCount(0);
+  await expect(statusPage.getByRole("button", { name: "Review estimate" })).toHaveCount(0);
   await statusPage.screenshot({ path: shots("check-status-preparing-1440"), fullPage: true });
 
   // --- 5. Release: the patient is told; Check Case Status now offers the one action ------------------
@@ -259,16 +259,16 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   const statusCode2 = await expectMail(request, SIMULATOR_INBOX, code2At, /verification code/i, new RegExp(`Destination: ${whatsapp.replace("+", "\\+")}`)).then(m => m.Text.match(/code is (\d{6})/)![1]);
   await statusPage.getByLabel("Verification code").fill(statusCode2);
   await statusPage.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(statusPage.getByRole("heading", { name: "Your proposal is ready to review" })).toBeVisible();
+  await expect(statusPage.getByRole("heading", { name: "Your estimate is ready to review" })).toBeVisible();
   await expect(statusPage.getByText("No action is required from you right now.")).toHaveCount(0);
-  const review1 = statusPage.getByRole("button", { name: "Review proposal" });
+  const review1 = statusPage.getByRole("button", { name: "Review estimate" });
   await expect(review1).toHaveCount(1);
   await statusPage.screenshot({ path: shots("check-status-ready-1440"), fullPage: true });
   await statusPage.setViewportSize({ width: 390, height: 844 });
   await statusPage.screenshot({ path: shots("check-status-ready-390"), fullPage: true });
   await statusPage.setViewportSize({ width: 1440, height: 1000 });
 
-  // "Review proposal" opens the released version directly — no second code — priced in USD throughout.
+  // "Review estimate" opens the released version directly — no second code — priced in USD throughout.
   const proposalOpenedAt = Date.now() - 5000;
   await review1.click();
   await statusPage.waitForURL(/\/en\/proposal\/[0-9a-f]{64}$/, { timeout: 30000 });

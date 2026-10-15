@@ -10,7 +10,7 @@ for (const locale of ["en", "ar"] as const) {
   for (const width of [390, 1440]) {
     test(`My Care names the patient and keeps one focal surface (${locale} ${width})`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
-      await setupPatient(page, "deposit-arranging");
+      await setupPatient(page, "deposit-checking");
       await page.goto(`/${locale}/portal`);
       await expect(page.locator("#case-heading")).toContainText("Maya Example");
       // One white card per subject on paper; only the current step carries the file's petrol tab edge.
@@ -26,7 +26,7 @@ test("the proposal drawer fills the phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await setupPatient(page, "proposal-ready");
   await page.goto("/en/portal");
-  await page.getByRole("button", { name: "Review proposal" }).click();
+  await page.getByRole("button", { name: "Review estimate" }).click();
   const box = await page.getByRole("dialog").boundingBox();
   expect(box && box.width).toBeGreaterThanOrEqual(388);
   expect(box && box.height).toBeGreaterThanOrEqual(840);

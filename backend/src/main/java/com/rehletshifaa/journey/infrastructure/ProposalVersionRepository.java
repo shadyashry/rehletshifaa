@@ -82,7 +82,7 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
         Instant getValidUntil(); String getRecommendedTreatment(); String getRisksAndLimitations(); String getAssumptions();
         String getScopeChangeReason(); String getPaymentTerms(); String getRefundTerms(); String getDisclaimers(); String getIncludedServices();
         String getExcludedServices(); BigDecimal getPatientTotalMinEgp(); BigDecimal getPatientTotalExpectedEgp();
-        BigDecimal getPatientTotalMaxEgp(); BigDecimal getFxRate(); LocalDate getFxRateDate(); String getConsultantName();
+        BigDecimal getPatientTotalMaxEgp(); BigDecimal getFxRate(); LocalDate getFxRateDate(); String getConsultantName(); Instant getReleasedAt();
     }
 
     @Query("""
@@ -92,7 +92,7 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
                 v.scopeChangeReason as scopeChangeReason, v.paymentTerms as paymentTerms, v.refundTerms as refundTerms,
                 v.disclaimers as disclaimers, v.includedServices as includedServices, v.excludedServices as excludedServices,
                 v.patientTotalMinEgp as patientTotalMinEgp, v.patientTotalExpectedEgp as patientTotalExpectedEgp,
-                v.patientTotalMaxEgp as patientTotalMaxEgp, v.fxRate as fxRate, v.fxRateDate as fxRateDate, pp.displayName as consultantName
+                v.patientTotalMaxEgp as patientTotalMaxEgp, v.fxRate as fxRate, v.fxRateDate as fxRateDate, pp.displayName as consultantName, v.releasedAt as releasedAt
             from ProposalVersion v join Proposal pr on pr.id = v.proposalId join MedicalCase c on c.id = pr.caseId
                 left join PatientProfile pt on pt.id = c.patientId
                 left join ClinicalReviewVersion cr on cr.id = v.clinicalReviewId left join PractitionerProfile pp on pp.id = cr.practitionerId

@@ -45,7 +45,7 @@ describe("MyCare", () => {
     expect(within(step).getByRole("heading", { level: 3, name: "Coordination deposit" })).toBeTruthy();
     // "Message (2 unread messages)", not "Message2".
     expect(screen.getByRole("button", { name: "Message (2 unread messages)" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Messages (2 unread messages)" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Messages (2 unread messages)" })).toBeTruthy();
   });
 
   it("isolates the figure, not the line, in Arabic, and labels care areas from the shared list", () => {
@@ -79,7 +79,7 @@ describe("MyCare", () => {
     expect(screen.getByRole("status").textContent).toContain("No action is required from you right now.");
     expect(screen.getByText(/Once your payment is confirmed/)).toBeTruthy();
     // The patient acknowledged an estimate; nothing says a proposal was accepted.
-    expect(screen.getByText(/matching your transfer with the reference you sent/)).toBeTruthy();
+    expect(screen.getByText(/matching your payment with the number you sent/)).toBeTruthy();
     expect(screen.queryByText(/has been accepted/)).toBeNull();
     // No fake workflow CTA of any kind.
     expect(screen.queryByRole("button", { name: /continue|pay|check status|refresh/i })).toBeNull();
@@ -149,14 +149,22 @@ describe("MyCare", () => {
     expect(screen.getByRole("heading", { name: "We are arranging your treatment" })).toBeTruthy();
   });
 
+  it("a final quote is reviewed as a quote, with no estimate stamp", () => {
+    renderCare({ actions: focus("REVIEW_PROPOSAL"), patientProposal: { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v3", versionNumber: 1, validUntil: "2026-12-31T00:00:00Z", releasedAt: "2026-04-01T10:00:00Z", documentType: "FINAL_TREATMENT_QUOTE" },
+      proposal: { ...proposal, status: "RELEASED", documentType: "FINAL_TREATMENT_QUOTE" }, deposit: null });
+    expect(screen.getByRole("heading", { name: "Your final quote is ready to review" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Review final quote" })).toBeTruthy();
+    expect(document.querySelector(".case-stamp")).toBeNull();
+  });
+
   it("a released proposal is the one primary action, and the summary does not repeat it", () => {
     const { onOpenProposal } = renderCare({ actions: focus("REVIEW_PROPOSAL"), patientProposal: { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v2", versionNumber: 2, validUntil: "2026-12-31T00:00:00Z" },
       proposal: { ...proposal, status: "RELEASED", versionNumber: 2 }, deposit: null });
-    expect(screen.getByRole("heading", { name: "Your proposal is ready to review" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Your estimate is ready to review" })).toBeTruthy();
     expect(screen.queryByText(/No action is required/)).toBeNull();
-    const buttons = screen.getAllByRole("button", { name: /proposal/i });
+    const buttons = screen.getAllByRole("button", { name: /proposal|estimate/i });
     expect(buttons).toHaveLength(1);
-    expect(buttons[0].textContent).toBe("Review proposal");
+    expect(buttons[0].textContent).toBe("Review estimate");
     fireEvent.click(buttons[0]);
     expect(onOpenProposal).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/Ready to review/)).toBeTruthy();
@@ -239,12 +247,12 @@ describe("MyCare", () => {
     const { onView } = renderCare({ view: "documents", documents: [{ documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", createdAt: "2026-09-08T09:00:00Z" }] });
     expect(screen.getByText("Echo_Report.pdf")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "We're checking your payment" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "My Care" }));
+    fireEvent.click(screen.getByRole("link", { name: "My Care" }));
     expect(onView).toHaveBeenCalledWith("care");
     cleanup();
     renderCare({ view: "messages", unreadMessages: 2 });
     expect(screen.getByText("messages panel")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Messages/ }).textContent).toContain("2");
+    expect(screen.getByRole("link", { name: /Messages/ }).textContent).toContain("2");
   });
 
   it("reads right-to-left with Arabic copy for the same state", () => {
@@ -362,5 +370,38 @@ describe("MyCare", () => {
     expect(coordinator.textContent).toContain("SA");
     expect(coordinator.textContent).toContain("Your Consultant");
     expect(coordinator.textContent).toContain("AA"); // the title is skipped
+  });
+  // D-1: the three moments are stamped only from the dates the backend recorded; never on another step, never without a date.
+  it("stamps the three moments with the backend's dates, and nothing else", () => {
+    const thisYear = new Date().getFullYear();
+    const milestones = { receivedAt: `${thisYear}-09-01T09:00:00Z`, consultantReviewAt: `${thisYear}-09-04T09:00:00Z`, estimateReadyAt: `${thisYear}-09-12T09:00:00Z` };
+    const stampOf = () => document.querySelector(".case-stamp")?.textContent ?? null;
+    renderCare({ actions: wait("WAIT_COORDINATOR_REVIEW"), caseSummary: { ...base, status: "RECEIVED" }, deposit: null, milestones });
+    expect(stampOf()).toContain("Received, Sep 1");
+    cleanup();
+    renderCare({ actions: wait("WAIT_CONSULTANT_REVIEW"), deposit: null, milestones });
+    expect(stampOf()).toContain("In review, Sep 4");
+    cleanup();
+    renderCare({ actions: focus("REVIEW_PROPOSAL"), patientProposal: { state: "READY", action: "REVIEW_PROPOSAL" }, deposit: null, milestones });
+    expect(stampOf()).toContain("Estimate ready, Sep 12");
+    cleanup();
+    // A waiting step that is not one of the three carries none, even with every date known.
+    renderCare({ milestones });
+    expect(stampOf()).toBeNull();
+    cleanup();
+    // No recorded date, no stamp — never today.
+    renderCare({ actions: wait("WAIT_CONSULTANT_REVIEW"), deposit: null, milestones: { receivedAt: milestones.receivedAt, consultantReviewAt: null } });
+    expect(stampOf()).toBeNull();
+  });
+
+  it("makes My Care, Documents and Messages links to the view on this case; a plain click stays in the page", () => {
+    const { onView } = renderCare();
+    const nav = screen.getByRole("navigation", { name: "My Care" });
+    expect(within(nav).getAllByRole("link").map(link => link.getAttribute("href"))).toEqual(["?case=c1", "?case=c1&view=documents", "?case=c1&view=messages"]);
+    fireEvent.click(within(nav).getByRole("link", { name: "Documents" }));
+    expect(onView).toHaveBeenCalledWith("documents");
+    // A modified click is the browser's (new tab): the page does not change view.
+    fireEvent.click(within(nav).getByRole("link", { name: "Messages" }), { ctrlKey: true });
+    expect(onView).toHaveBeenCalledTimes(1);
   });
 });

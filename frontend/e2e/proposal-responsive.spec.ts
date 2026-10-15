@@ -96,7 +96,7 @@ test("proposal renders right-to-left in Arabic without overflow", async ({ page 
 
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByRole("heading", { name: "تقديرك المبدئي للرعاية" })).toBeVisible();
-  await expect(page.getByText("راجعها Dr. Yasmine Farouk Abdelaziz")).toBeVisible();
+  await expect(page.getByText("بمراجعة Dr. Yasmine Farouk Abdelaziz")).toBeVisible();
 
   // Prices must stay on the line-end side under RTL, not collide with the service name.
   const row = page.locator("li", { hasText: "Dual chamber pacemaker implant" }).first();

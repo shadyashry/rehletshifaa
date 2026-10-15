@@ -40,7 +40,7 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
    // "Send a new case" is the account holder's own: offered once the account has a case of its own (sending for someone else is not built yet).
    const sendsOwnCase=allCases.length>1?allCases.some(other=>(other.id===c.id?actions.viewer:other.viewer)!=="REPRESENTATIVE"):actions.viewer!=="REPRESENTATIVE";
    return <div>
-    <MyCare locale={locale} caseSummary={c} actions={actions} patientAction={value.patientAction} patientProposal={value.patientProposal} proposal={value.proposal??null} deposit={value.deposit??null}
+    <MyCare locale={locale} caseSummary={c} actions={actions} milestones={value.milestones} patientAction={value.patientAction} patientProposal={value.patientProposal} proposal={value.proposal??null} deposit={value.deposit??null}
      documents={documents} unreadMessages={unread} cases={allCases} newCaseHref={sendsOwnCase?localeHref(locale,"send-my-case"):null} view={careView} onView={view=>onCareView?.(view)}
      onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)} onWithdraw={()=>mutate(`/patient/cases/${c.id}/withdraw`,{})}
      guardianStep={actions.currentAction.code==="COMPLETE_PROFILE"&&isGuardianStep(actions.currentAction.blockerCode)?<GuardianStep key={`${c.id}:${actions.currentAction.blockerCode}`} locale={locale} caseId={c.id} blockerCode={actions.currentAction.blockerCode??""} documents={documents} busy={busy} mutate={mutate} load={load} send={send}/>:undefined}

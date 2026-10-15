@@ -65,6 +65,10 @@ class UatDefectCorrectionsTest {
         assertThat(view.proposal().state()).isEqualTo("NONE");
         assertThat(view.proposal().action()).isNull();
         assertThat(view.proposal().versionId()).isNull();
+        // D-1: the stamp dates are real events only — received, nothing yet from a Consultant or an estimate.
+        assertThat(view.milestones().receivedAt()).isNotNull();
+        assertThat(view.milestones().consultantReviewAt()).isNull();
+        assertThat(view.milestones().estimateReadyAt()).isNull();
         // The action itself is refused by the backend, not merely hidden by the page.
         assertThatThrownBy(() -> publicCases.proposalAccess(token, grant)).isInstanceOf(ApiException.class).hasMessageContaining("No proposal is available");
 
@@ -77,6 +81,8 @@ class UatDefectCorrectionsTest {
         assertThat(preparing.proposal().state()).isEqualTo("PREPARING");
         assertThat(preparing.proposal().action()).isNull();
         assertThat(preparing.proposal().versionId()).isNull();
+        assertThat(preparing.milestones().consultantReviewAt()).isAfterOrEqualTo(preparing.milestones().receivedAt());
+        assertThat(preparing.milestones().estimateReadyAt()).isNull();
         assertThat(draft.status()).isEqualTo("CLINICALLY_APPROVED");
         assertThatThrownBy(() -> publicCases.proposalAccess(token, grant)).isInstanceOf(ApiException.class);
     }
@@ -92,6 +98,8 @@ class UatDefectCorrectionsTest {
         assertThat(view.proposal().action()).isEqualTo("REVIEW_PROPOSAL");
         assertThat(view.proposal().versionId()).isEqualTo(versionId);
         assertThat(view.proposal().currency()).isEqualTo("USD");
+        assertThat(view.milestones().estimateReadyAt()).isNotNull().isEqualTo(view.proposal().releasedAt())
+                .isAfterOrEqualTo(view.milestones().consultantReviewAt());
 
         ProposalAccessHandoff handoffCredentials = publicCases.proposalAccess(token, grant);
         em.flush();
@@ -101,6 +109,7 @@ class UatDefectCorrectionsTest {
         assertThat(proposal.versionNumber()).isEqualTo(view.proposal().versionNumber());
         assertThat(proposal.currency()).isEqualTo("USD");
         assertThat(proposal.decided()).isFalse();
+        assertThat(proposal.releasedAt()).isEqualTo(view.proposal().releasedAt());
         // The link the patient was originally sent is untouched: nothing was revoked to make room.
         assertThat(count("SELECT count(*) FROM proposal_share_tokens WHERE proposal_version_id=? AND revoked_at IS NULL", versionId)).isEqualTo(2);
         assertThat(count("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_STATUS_PROPOSAL_OPENED'", caseId)).isEqualTo(1);

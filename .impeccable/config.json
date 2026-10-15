@@ -1,0 +1,134 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "markazi text",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:14.678Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "readex pro",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:14.755Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "cascadia mono",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:14.853Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "ibm plex sans",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:14.958Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "ibm plex sans arabic",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:15.074Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "figtree",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:15.190Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "noto kufi arabic",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:15.286Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "noto sans arabic",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:15.384Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "alexandria",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:15.490Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "cairo",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:15.583Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "plus jakarta sans",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:15.671Z",
+        "reason": "Theme Studio v2 is the area-0 visual-world exploration: it renders candidate worlds whose faces are proposed, not yet in DESIGN.md (owner opened the theme 2026-10-15)"
+      },
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:15.775Z",
+        "reason": "DESIGN.md 'tab of a file' 2px top edge on the dossier page, incumbent worlds A-D rendered as built"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:37:15.896Z",
+        "reason": "false positive: padding is declared with clamp() and 44px min-height rows, which the static detector does not evaluate"
+      },
+      {
+        "rule": "overused-font",
+        "value": "plus jakarta sans",
+        "files": [
+          "docs/ux-redesign/theme-studio-v2.html"
+        ],
+        "createdAt": "2026-10-14T23:41:33.219Z",
+        "reason": "world A is the incumbent rendered as built (DESIGN.md body face); the page proposes replacing it"
+      }
+    ]
+  }
+}

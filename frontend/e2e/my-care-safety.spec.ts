@@ -12,7 +12,7 @@ const shot = (page: Page, name: string) => page.screenshot({ path: `test-results
 
 test("a guardian confirms they act for the patient: consent in its own words, then basis and document", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const { writes } = await setupPatient(page, "deposit-arranging", { guardian: "GUARDIAN_AUTH_MISSING" });
+  const { writes } = await setupPatient(page, "deposit-checking", { guardian: "GUARDIAN_AUTH_MISSING" });
   await page.goto("/en/portal");
   const step = page.getByRole("region", { name: "Confirm you act for the patient" });
   await expect(step).toBeVisible();
@@ -28,7 +28,7 @@ test("a guardian confirms they act for the patient: consent in its own words, th
 
 test("in Arabic on a phone, the guardian step reads right-to-left without side scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await setupPatient(page, "deposit-arranging", { guardian: "GUARDIAN_EVIDENCE_MISSING" });
+  await setupPatient(page, "deposit-checking", { guardian: "GUARDIAN_EVIDENCE_MISSING" });
   await page.goto("/ar/portal");
   await expect(page.getByRole("heading", { name: "نحتاج إلى المستند الذي يثبت أنك الوصي" })).toBeVisible();
   await expect(page.getByRole("button", { name: "استخدام هذا المستند" })).toBeVisible();
@@ -40,7 +40,7 @@ const pdf = (name: string) => ({ name, mimeType: "application/pdf", buffer: Buff
 
 test("a guardian with no document on the case uploads one, sees it checked and attaches it", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const { writes } = await setupPatient(page, "deposit-arranging", { guardian: "GUARDIAN_EVIDENCE_MISSING", documents: [] });
+  const { writes } = await setupPatient(page, "deposit-checking", { guardian: "GUARDIAN_EVIDENCE_MISSING", documents: [] });
   await page.goto("/en/portal");
   const step = page.getByRole("region", { name: "We need the document that shows you are the guardian" });
   await expect(step.getByText(/No document on this case has passed the virus check yet/)).toBeVisible();

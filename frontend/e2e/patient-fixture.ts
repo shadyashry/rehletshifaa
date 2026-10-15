@@ -13,11 +13,19 @@ const summary = { id: "case-1", caseNumber: "RS-2026-000081", status: "ACCEPTED"
   createdAt: "2026-09-01T09:00:00Z", updatedAt: stamp, version: 6, coordinatorName: "Sara Ahmed", doctorName: "Dr Ahmed Alashry", waitingOn: "STAFF", travelPackageRequested: false };
 const proposal = { proposalId: "p1", versionId: "v1", versionNumber: 1, status: "ACCEPTED", language: "en", currency: "USD", validUntil: "2026-12-31T00:00:00Z", documentType: "PRELIMINARY_ESTIMATE",
   items: [{ id: "i1", category: "MEDICAL", description: "Dual chamber pacemaker implant", quantity: 1, unitPrice: 4850, optional: false }], coordinatorNotes: null };
-const deposit = { id: "dep-1", status: "REQUESTED", currency: "USD", totalEgp: 25000, totalDisplay: 500, paidDisplay: 0, balanceDisplay: 500, components: [], events: [], transfer: { id: "tr-1", status: "SUBMITTED", reference: "TRX-2026-0042" } };
-// DEP-3: the patient has sent the bank transfer reference; Finance is matching it, so the step is "we're checking your payment" (no action for the patient).
+const deposit = { id: "dep-1", status: "REQUESTED", currency: "USD", totalEgp: 25000, totalDisplay: 500, paidDisplay: 0, balanceDisplay: 500, components: [], events: [] };
+/** `deposit-checking`: the patient entered the bank's transfer reference (DEP-3) and Finance is matching it. */
+const transfer = { id: "tr-1", method: "BANK_TRANSFER", reference: "FT26091200481", status: "SUBMITTED", submittedAt: "2026-09-12T08:30:00Z" };
+/** `pay-deposit`: the deposit is the patient's step (PAY_DEPOSIT) with the platform account (dummy details); `pay-deposit-rejected`: part was received and the last reference was not confirmed. */
+const bankTransfer = { accountName: "RehletShifaa Test Account", bankName: "Test Bank (dummy details)", accountNumber: "0000000000000", iban: "EG000000000000000000000000000", swift: "TESTEGCXXXX", paymentReference: "RS-2026-000081" };
+const rejected = { id: "tr-2", method: "BANK_TRANSFER", reference: "FT0000", status: "REJECTED", submittedAt: "2026-09-12T08:30:00Z", reason: "No transfer with this reference reached the account." };
 
 /** `proposal-recorded`: the coordinator recorded the patient's acknowledgement after an Arabic call (assisted path). */
-export type Scenario = "deposit-arranging" | "deposit-paid" | "proposal-ready" | "proposal-recorded" | "no-case";
+/** `case-received` / `consultant-review`: the case waits for the coordinator / is with a Consultant (stamped moments, D-1). */
+export type Scenario = "deposit-checking" | "deposit-paid" | "proposal-ready" | "proposal-recorded" | "case-received" | "consultant-review" | "no-case" | "pay-deposit" | "pay-deposit-rejected";
+
+/** D-1: when the three stamped moments happened, as the backend sends them on the patient workspace. */
+const received = "2026-09-01T09:00:00Z", consultantReview = "2026-09-04T09:00:00Z";
 
 /** `viewer` is the backend's per-case relation; `roles` the account's. They differ for someone who is a patient and also acts for a relative. */
 /** `identity`: the case's current step is identity verification, and this is the latest submission (none when null). */
@@ -42,10 +50,18 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
   }, { authority: OIDC_AUTHORITY });
   const ready = scenario === "proposal-ready";
   const paid = scenario === "deposit-paid";
-  const caseSummary = ready ? { ...summary, status: "PATIENT_DECISION", waitingOn: "PATIENT" } : paid ? { ...summary, status: "TRAVEL_COORDINATION" } : summary;
-  const states = ready
+  const paying = scenario === "pay-deposit" || scenario === "pay-deposit-rejected";
+  // Before an estimate exists: no proposal, no deposit, and only the milestones reached so far.
+  const early = scenario === "case-received" ? "RECEIVED" : scenario === "consultant-review" ? "CONSULTANT_REVIEW" : null;
+  const caseSummary = early ? { ...summary, status: early, doctorName: early === "RECEIVED" ? null : summary.doctorName }
+    : ready ? { ...summary, status: "PATIENT_DECISION", waitingOn: "PATIENT" } : paid ? { ...summary, status: "TRAVEL_COORDINATION" } : summary;
+  const milestones = { receivedAt: received, consultantReviewAt: early === "RECEIVED" ? null : consultantReview, estimateReadyAt: early ? null : stamp };
+  const states = early
+    ? { journeyStage: early, waitingOn: "STAFF", blockers: [], currentAction: { code: early === "RECEIVED" ? "WAIT_COORDINATOR_REVIEW" : "WAIT_CONSULTANT_REVIEW", kind: "WAIT", expectedWorkingDays: 2 }, availableActions: ["MESSAGE_COORDINATOR"] }
+    : ready
     ? { journeyStage: "PATIENT_DECISION", waitingOn: "PATIENT", blockers: [], currentAction: { code: "REVIEW_PROPOSAL", kind: "FOCUS" }, availableActions: ["MESSAGE_COORDINATOR"] }
     : paid ? { journeyStage: "TRAVEL_COORDINATION", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_COORDINATION", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] }
+    : paying ? { journeyStage: "ACCEPTED", waitingOn: "PATIENT", blockers: [], currentAction: { code: "PAY_DEPOSIT", kind: "FOCUS" }, availableActions: ["MESSAGE_COORDINATOR"] }
     : { journeyStage: "ACCEPTED", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_PAYMENT_CHECK", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] };
   const actions = { ...states, viewer, ...(identity !== undefined ? { currentAction: { code: "VERIFY_IDENTITY", kind: "FOCUS", blocker: "IDENTITY_NOT_VERIFIED" } } : {}),
     ...(guardian ? { waitingOn: "PATIENT", currentAction: { code: "COMPLETE_PROFILE", kind: "FOCUS", blockerCode: guardian },
@@ -54,12 +70,15 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     caseSummary, timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: "2026-09-01T09:00:00Z" }, { type: "STATUS", label: caseSummary.status, status: caseSummary.status, occurredAt: stamp }],
     tasks: [], messages: [{ id: "m1", threadType: "PATIENT_COORDINATOR", senderRole: "COORDINATOR", senderName: "Sara Ahmed", direction: "INBOUND", body: "Welcome — I will send the deposit details shortly.", createdAt: stamp, internalOnly: false, read: false }],
     assignments: [], clinicalReviews: [], gates: null, delivery: null,
-    proposal: { ...proposal, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
+    proposal: early ? null : { ...proposal, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
       ? { requestedAt: "2026-09-10T09:00:00Z", decisionSource: "RECORDED_ON_BEHALF", recordedByName: "Sara Ahmed", channel: "WHATSAPP_CALL", confirmedBy: "PATIENT", conversationAt: "2026-09-11T09:00:00Z", decidedAt: "2026-09-11T09:05:00Z" }
       : null as null | Record<string, string> },
-    deposit: ready ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0, transfer: null } : deposit,
-    actions,
-    patientProposal: ready ? { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: null }
+    deposit: ready || early ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0 }
+      : scenario === "pay-deposit" ? { ...deposit, bankTransfer, transfer: null }
+      : scenario === "pay-deposit-rejected" ? { ...deposit, status: "PARTIALLY_PAID", paidDisplay: 200, balanceDisplay: 300, bankTransfer, transfer: rejected }
+      : { ...deposit, transfer },
+    actions, milestones,
+    patientProposal: early ? null : ready ? { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: null }
       : { state: "ACCEPTED", action: "VIEW_PROPOSAL", versionId: "v1", versionNumber: 1, currency: "USD", validUntil: "2026-12-31T00:00:00Z", releasedAt: stamp, decidedAt: stamp },
   };
   // A relative's case waiting on the account (information requested) and a closed case of the account's own.
@@ -114,7 +133,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (api === "/patient/cases/case-1/proposals/v1/decision" && finalQuote?.decisionRefusal) return reply({ code: finalQuote.decisionRefusal.code, message: "Server wording in English (must not reach the patient)" }, finalQuote.decisionRefusal.status);
     if (api === "/patient/cases/case-1/proposals/v1/decision") return reply({ ...proposal, status: "ACCEPTED" });
     // The Arabic assisted path: asking once opens the coordinator's work; the page then says it was asked.
-    if (api === "/patient/cases/case-1/proposals/v1/assistance") { workspace.proposal.assistance = { requestedAt: "2026-10-08T09:00:00Z" }; return reply(workspace.proposal.assistance); }
+    if (api === "/patient/cases/case-1/proposals/v1/assistance") { const assistance = { requestedAt: "2026-10-08T09:00:00Z" }; if (workspace.proposal) workspace.proposal.assistance = assistance; return reply(assistance); }
     // My Care upload: presign names a synthetic local upload URL, the bytes go there, confirm "scans" them clean.
     if (api === "/patient/cases/case-1/documents/presign") { const file = request.postDataJSON(); uploading = { documentId: `u${documents.length + 1}`, fileName: file.originalFileName };
       return reply({ documentId: uploading.documentId, uploadUrl: `${new URL(request.url()).origin}/api/v1/local-uploads/${uploading.documentId}`, requiredHeaders: { "Content-Type": file.contentType }, expiresInSeconds: 300 }, 201); }

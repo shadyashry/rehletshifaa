@@ -10,8 +10,8 @@ import { setupPatient } from "./patient-fixture";
  */
 const noOverflow = async (page: Page) => expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1), "no horizontal overflow").toBe(false);
 
-test("lands on the current case with the deposit payment being checked: one step, no fake action, authoritative money", async ({ page }) => {
-  await setupPatient(page, "deposit-arranging");
+test("lands on the current case with the deposit being checked: one step, no fake action, authoritative money", async ({ page }) => {
+  await setupPatient(page, "deposit-checking");
   await page.goto("/en/portal");
   // Straight into the care journey — no dashboard, no list, no welcome card.
   await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
@@ -27,15 +27,18 @@ test("lands on the current case with the deposit payment being checked: one step
   const depositBlock = page.getByRole("region", { name: "Coordination deposit", exact: true });
   await expect(depositBlock).toContainText("$500");
   await expect(depositBlock).toContainText("Being checked");
+  await expect(depositBlock).toContainText("FT26091200481");
   await expect(depositBlock.getByRole("button")).toHaveCount(0);
   await expect(page.getByText(/EGP|E£/)).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Preliminary care estimate" })).toContainText("$4,850");
   await expect(page.getByRole("region", { name: "Your coordinator" })).toContainText("Sara Ahmed");
   // Header navigation is exactly three destinations.
   const nav = page.getByRole("navigation", { name: "My Care" }).first();
-  await expect(nav.getByRole("button")).toHaveText(["My Care", "Documents", /^Messages1/]);
+  await expect(nav.getByRole("link")).toHaveText(["My Care", "Documents", /^Messages1/]);
+  // Real links to the view on this case: they open in a new tab or copy.
+  await expect(nav.getByRole("link", { name: "Documents" })).toHaveAttribute("href", "?case=case-1&view=documents");
   // The badge is for the eye; the name says it in words ("Messages1" before Batch 2).
-  await expect(nav.getByRole("button", { name: "Messages (1 unread message)", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Messages (1 unread message)", exact: true })).toBeVisible();
   await page.screenshot({ path: "e2e/screenshots/my-care-deposit-1440.png", fullPage: true });
   for (const width of [1280, 1024, 768]) {
     await page.setViewportSize({ width, height: 900 });
@@ -45,7 +48,7 @@ test("lands on the current case with the deposit payment being checked: one step
 });
 
 test("a linked patient registers the session once and the page settles instead of reloading", async ({ page }) => {
-  const { calls } = await setupPatient(page, "deposit-arranging");
+  const { calls } = await setupPatient(page, "deposit-checking");
   await page.goto("/en/portal");
   await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
   await page.waitForTimeout(1500);
@@ -61,7 +64,7 @@ test("a linked patient registers the session once and the page settles instead o
 
 test("on a phone the current step comes before everything else, and nothing overflows", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await setupPatient(page, "deposit-arranging");
+  await setupPatient(page, "deposit-checking");
   await page.goto("/en/portal");
   await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
   await noOverflow(page);
@@ -80,7 +83,7 @@ test("on a phone the current step comes before everything else, and nothing over
 });
 
 test("the deposit is stated once, inside the step it is about, and the coral reading hairline stays off the app page", async ({ page }) => {
-  await setupPatient(page, "deposit-arranging");
+  await setupPatient(page, "deposit-checking");
   await page.goto("/en/portal");
   const step = page.getByRole("region", { name: "We're checking your payment" });
   await expect(step.getByRole("region", { name: "Coordination deposit", exact: true })).toContainText("$500");
@@ -91,7 +94,7 @@ test("the deposit is stated once, inside the step it is about, and the coral rea
 });
 
 test("several cases: the one waiting on the patient opens first, grouped by person, and switching moves to the other file", async ({ page }) => {
-  await setupPatient(page, "deposit-arranging", { multipleCases: true, roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
+  await setupPatient(page, "deposit-checking", { multipleCases: true, roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
   await page.goto("/en/portal");
   const switcher = page.getByRole("region", { name: "Your cases" });
   await expect(switcher).toBeVisible();
@@ -121,7 +124,7 @@ test("several cases: the one waiting on the patient opens first, grouped by pers
 
 test("several cases in Arabic: the switcher row scrolls on a phone without the page overflowing", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await setupPatient(page, "deposit-arranging", { multipleCases: true, roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
+  await setupPatient(page, "deposit-checking", { multipleCases: true, roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
   await page.goto("/ar/portal");
   const switcher = page.getByRole("region", { name: "حالاتك" });
   await expect(switcher.getByRole("link", { name: /RS-2026-000094/ })).toHaveAttribute("aria-current", "page");
@@ -136,7 +139,7 @@ for (const locale of ["en", "ar"] as const) {
   for (const width of [375, 390, 768, 1024, 1440]) {
     test(`one case, deposit being arranged, holds at ${width}px (${locale})`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
-      await setupPatient(page, "deposit-arranging");
+      await setupPatient(page, "deposit-checking");
       await page.goto(`/${locale}/portal`);
       await expect(page.locator("#current-step-title")).toBeVisible();
       await noOverflow(page);
@@ -152,16 +155,16 @@ test("deposit confirmed: success state, no stale arrangement step", async ({ pag
   const depositBlock = page.getByRole("region", { name: "Coordination deposit", exact: true });
   await expect(depositBlock).toContainText("Deposit received");
   await expect(depositBlock).toContainText("$500");
-  await expect(page.getByText(/Arranging|Deposit arrangements|Pay deposit/)).toHaveCount(0);
+  await expect(page.getByText(/Being checked|checking your payment|Pay your coordination deposit/)).toHaveCount(0);
   await page.screenshot({ path: "e2e/screenshots/my-care-deposit-paid-1440.png", fullPage: true });
 });
 
 test("a proposal waiting for a decision is the one primary action and opens in place", async ({ page }) => {
   const { writes } = await setupPatient(page, "proposal-ready");
   await page.goto("/en/portal");
-  await expect(page.getByRole("heading", { name: "Your proposal is ready to review" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your estimate is ready to review" })).toBeVisible();
   await expect(page.getByText("No action is required from you right now.")).toHaveCount(0);
-  const review = page.getByRole("button", { name: "Review proposal" });
+  const review = page.getByRole("button", { name: "Review estimate" });
   await expect(review).toHaveCount(1);
   await expect(page.getByRole("button", { name: /^view proposal/i })).toHaveCount(0); // not twice
   await review.click();
@@ -174,12 +177,12 @@ test("a proposal waiting for a decision is the one primary action and opens in p
 });
 
 test("Documents and Messages are one click away; Profile & Security lives in the account menu, apart from the case", async ({ page }) => {
-  await setupPatient(page, "deposit-arranging");
+  await setupPatient(page, "deposit-checking");
   await page.goto("/en/portal");
-  await page.getByRole("navigation", { name: "My Care" }).first().getByRole("button", { name: "Documents" }).click();
+  await page.getByRole("navigation", { name: "My Care" }).first().getByRole("link", { name: "Documents" }).click();
   await expect(page.getByText("Echo_Report.pdf")).toBeVisible();
   await expect(page).toHaveURL(/view=documents/);
-  await page.getByRole("navigation", { name: "My Care" }).first().getByRole("button", { name: /Messages/ }).click();
+  await page.getByRole("navigation", { name: "My Care" }).first().getByRole("link", { name: /Messages/ }).click();
   await expect(page.getByText("Welcome — I will send the deposit details shortly.")).toBeVisible();
   await page.getByLabel("Account: Maya Example", { exact: true }).click();
   await page.getByRole("button", { name: "Profile & Security", exact: true }).click();
@@ -195,7 +198,7 @@ test("Documents and Messages are one click away; Profile & Security lives in the
 
 test("Arabic is right-to-left with the same single-action discipline", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await setupPatient(page, "deposit-arranging");
+  await setupPatient(page, "deposit-checking");
   await page.goto("/ar/portal");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByRole("heading", { level: 1, name: "رعايتي" })).toBeVisible();
@@ -210,7 +213,7 @@ test("Arabic is right-to-left with the same single-action discipline", async ({ 
 
 test("whose care it is follows the case, not the account's roles", async ({ page }) => {
   // A patient with their own record who also acts for a relative, looking at the relative's case.
-  await setupPatient(page, "deposit-arranging", { viewer: "REPRESENTATIVE", roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
+  await setupPatient(page, "deposit-checking", { viewer: "REPRESENTATIVE", roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
   await page.goto("/en/portal");
   await expect(page.getByText(/Care for ⁨?Maya Example/)).toBeVisible();
   await page.goto("/ar/portal");
@@ -218,7 +221,7 @@ test("whose care it is follows the case, not the account's roles", async ({ page
 });
 
 test("a representative account looking at its own case sees the bare name", async ({ page }) => {
-  await setupPatient(page, "deposit-arranging", { viewer: "SELF", roles: ["PATIENT_REPRESENTATIVE"] });
+  await setupPatient(page, "deposit-checking", { viewer: "SELF", roles: ["PATIENT_REPRESENTATIVE"] });
   await page.goto("/en/portal");
   await expect(page.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
   await expect(page.getByText(/Care for/)).toHaveCount(0);
@@ -248,4 +251,43 @@ test("identity verification shows a rejection with its reason and the form to re
   await expect(page.getByText(/Not verified. Please resubmit./)).toContainText("The photo page was unreadable");
   await expect(page.getByRole("alert").filter({ hasText: "Not verified" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Submit for verification" })).toBeVisible();
+});
+
+// D-1: the current step is stamped on the three moments only, with the date the backend recorded for each.
+for (const [scenario, title, words] of [
+  ["case-received", "We have your case", "Received, Sep 1"],
+  ["consultant-review", "A Consultant is reviewing your case", "In review, Sep 4"],
+  ["proposal-ready", "Your estimate is ready to review", "Estimate ready, Sep 12"],
+] as const) {
+  test(`the ${scenario} step carries its stamp with the recorded date`, async ({ page }) => {
+    await setupPatient(page, scenario);
+    await page.goto("/en/portal");
+    const step = page.getByRole("region", { name: title });
+    await expect(step.locator(".case-stamp")).toHaveText(new RegExp(words.split(", ")[0]));
+    await expect(step.locator(".case-stamp .sr-only")).toHaveText(words);
+    await noOverflow(page);
+  });
+}
+
+test("a step that is not one of the three moments carries no stamp", async ({ page }) => {
+  await setupPatient(page, "deposit-checking");
+  await page.goto("/en/portal");
+  await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
+  await expect(page.locator(".case-stamp")).toHaveCount(0);
+});
+
+test("Back returns to the previous case and view instead of leaving My Care", async ({ page }) => {
+  await setupPatient(page, "deposit-checking", { multipleCases: true, roles: ["PATIENT", "PATIENT_REPRESENTATIVE"] });
+  await page.goto("/en/portal");
+  await expect(page).toHaveURL(/case=case-2/);
+  await page.getByRole("region", { name: "Your cases" }).getByRole("link", { name: /RS-2026-000081/ }).click();
+  await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
+  await page.getByRole("navigation", { name: "My Care" }).first().getByRole("link", { name: "Documents" }).click();
+  await expect(page).toHaveURL(/case=case-1&view=documents/);
+  await page.goBack();
+  await expect(page).toHaveURL(/case=case-1$/);
+  await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/case=case-2/);
+  await expect(page.locator("#case-heading")).toContainText(/Omar Example/);
 });

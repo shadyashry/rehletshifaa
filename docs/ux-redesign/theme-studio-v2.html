@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RehletShifaa Theme Studio v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400..700&family=Readex+Pro:wght@300..700&family=Alexandria:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&family=Cairo:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Kufi+Arabic:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;500;600&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+  /* ---------- Studio chrome: one quiet wall. Each world is a board with its own fixed colours. ---------- */
+  :root {
+    --bg: #f4f5f2; --fg: #182230; --muted: #55617a; --line: #dfe2e6; --card: #ffffff; --accent: #182230; --seal: #4b3fa5;
+    --font-ui: "Readex Pro", "Segoe UI", system-ui, sans-serif; --font-doc: "Markazi Text", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: light; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 16px; line-height: 1.6; padding-inline: 16px; padding-block: 0 64px; }
+  .wrap { max-width: 1160px; margin-inline: auto; }
+  header.top { padding-block: 40px 20px; border-bottom: 1px solid var(--line); }
+  header.top h1 { font-family: var(--font-doc); font-weight: 600; font-size: clamp(2rem, 1.4rem + 2.4vw, 3.1rem); line-height: 1.08; margin: 0 0 10px; text-wrap: balance; }
+  header.top p { margin: 0 0 8px; max-width: 72ch; color: var(--muted); }
+  nav.jump { display: flex; flex-wrap: wrap; gap: 6px 18px; padding-block: 14px; font-size: 0.9375rem; }
+  nav.jump a { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
+  nav.jump a:hover, nav.jump a:focus-visible { text-decoration-color: currentColor; outline: none; }
+  a:focus-visible, .btn:focus-visible { outline: 3px solid var(--seal); outline-offset: 2px; }
+  ::selection { background: #ecebf7; color: #182230; }
+  h2 { font-family: var(--font-doc); font-weight: 600; font-size: clamp(1.6rem, 1.2rem + 1.4vw, 2.3rem); line-height: 1.12; margin: 0 0 6px; }
+  h3 { font-family: var(--font-ui); font-weight: 600; font-size: 1.125rem; margin: 26px 0 8px; }
+  section.world, section.plain { margin-block: 44px; }
+  .world-head { display: grid; gap: 6px; margin: 0 0 14px; }
+  .world-head .tag { font-size: 0.875rem; color: var(--muted); margin: 0; }
+  .world-head .thesis { color: var(--muted); max-width: 80ch; margin: 0; }
+  p.read, li { max-width: 80ch; }
+  .note-list { padding-inline-start: 20px; margin: 8px 0 0; }
+  .note-list li { margin-block: 6px; }
+  table.cmp { width: 100%; border-collapse: collapse; font-size: 0.9375rem; margin-top: 10px; }
+  table.cmp th, table.cmp td { text-align: start; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.cmp th { font-weight: 600; color: var(--muted); font-size: 0.875rem; }
+  code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.875em; background: #ebedf0; padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+  .tablewrap { overflow-x: auto; }
+  .assess { display: grid; gap: 14px; margin-top: 16px; }
+  @media (min-width: 760px) { .assess { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .assess div { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+  .assess h4 { margin: 0 0 6px; font-size: 0.875rem; font-weight: 600; color: var(--muted); }
+  .assess p, .assess li { margin: 0; font-size: 0.9375rem; }
+  .assess ul { margin: 0; padding-inline-start: 18px; }
+  .verdict { margin-top: 48px; padding: 28px clamp(18px, 3vw, 36px); background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+  .verdict p, .verdict li { max-width: 80ch; }
+  .verdict ol { padding-inline-start: 20px; }
+  .measure { font-variant-numeric: tabular-nums; }
+  .ok { color: #1b5f3d; font-weight: 600; } .bad { color: #8c2b28; font-weight: 600; } .mark-only { color: #55617a; }
+
+  /* ---------- Shared comp (worlds A–D): the v1 board, with the plugin's tells removed. ---------- */
+  .board { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--wbg); color: var(--wink); container-type: inline-size; }
+  .comp { padding: clamp(18px, 3vw, 36px); display: grid; gap: 28px; }
+  @container (min-width: 720px) { .comp { grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); align-items: center; } }
+  .comp.ar { direction: rtl; }
+  .comp h3 { font-family: var(--wdisplay); font-size: clamp(1.6rem, 1.2rem + 2.2vw, 2.7rem); line-height: 1.08; margin: 0 0 12px; letter-spacing: -0.02em; text-wrap: balance; color: var(--whead); }
+  .comp.ar h3 { font-family: var(--wdisplay-ar); letter-spacing: 0; line-height: 1.3; }
+  .comp p.lead { margin: 0 0 18px; max-width: 48ch; font-family: var(--wbody); color: var(--wbodycol); font-size: 1rem; }
+  .comp.ar p.lead { font-family: var(--wbody-ar); line-height: 1.85; }
+  .ctas { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; font-family: var(--wbody); }
+  .comp.ar .ctas { font-family: var(--wbody-ar); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; min-height: 46px; border-radius: 8px; padding: 10px 20px; font-weight: 600; font-size: 0.9375rem; border: 1px solid transparent; cursor: pointer; text-decoration: none; transition: background-color .18s ease-out, color .18s ease-out, border-color .18s ease-out; }
+  .textlink, .lh a.name, .staff a, nav.jump a { transition: color .18s ease-out, text-decoration-color .18s ease-out; }
+  @media (prefers-reduced-motion: reduce) { .btn, .textlink, .lh a.name, .staff a, nav.jump a { transition: none; } }
+  .btn.primary { background: var(--wbtn); color: var(--wbtnfg); }
+  .btn.secondary { background: transparent; color: var(--whead); border-color: var(--wline); }
+  .textlink { color: var(--whead); font-weight: 600; text-decoration: underline; text-underline-offset: 4px; min-height: 44px; display: inline-flex; align-items: center; }
+  .note { margin: 16px 0 0; font-size: 0.875rem; color: var(--wmuted); font-family: var(--wbody); max-width: 46ch; }
+  .comp.ar .note { font-family: var(--wbody-ar); }
+  .stack { position: relative; padding-top: 22px; padding-inline-end: 10px; }
+  .page { position: relative; border: 1px solid var(--wline); border-radius: 6px; background: var(--wpage); color: var(--wpageink); padding: 14px 16px 16px; box-shadow: 0 14px 28px -22px rgba(0,0,0,0.5); font-family: var(--wbody); }
+  .comp.ar .page { font-family: var(--wbody-ar); }
+  .page[data-depth="3"] { margin-inline-start: 11%; transform: rotate(2.5deg); background: var(--wpage2); }
+  .page[data-depth="2"] { margin-top: -40px; margin-inline-start: 5%; margin-inline-end: 6%; transform: rotate(-1.5deg); background: var(--wpage2); }
+  .page[data-depth="1"] { margin-top: -38px; margin-inline-end: 12%; border-top: 2px solid var(--wmark); }
+  .page[data-depth="1"] .k, .page[data-depth="1"] .t { padding-inline-end: 88px; }
+  .comp.ar .page[data-depth="3"] { transform: rotate(-2.5deg); }
+  .comp.ar .page[data-depth="2"] { transform: rotate(1.5deg); }
+  .page .k { font-size: 0.8125rem; color: var(--wpagemuted); margin: 0; }
+  .page .t { font-family: var(--wdisplay); font-size: 1.05rem; font-weight: 600; margin: 4px 0 0; color: var(--wpagehead); }
+  .comp.ar .page .t { font-family: var(--wdisplay-ar); }
+  .page .b { font-size: 0.875rem; color: var(--wpageink); margin: 4px 0 0; }
+  .stamp { position: absolute; inset-inline-end: 14px; top: 12px; display: inline-flex; flex-direction: column; align-items: center; border: 2px solid var(--wstamp); color: var(--wstamptext); border-radius: 4px; padding: 3px 9px; transform: rotate(-8deg); font-size: 0.75rem; font-weight: 700; line-height: 1.3; background: color-mix(in srgb, var(--wpage) 85%, transparent); box-shadow: inset 0 0 0 2px var(--wpage), inset 0 0 0 3px var(--wstamp); }
+  .comp.ar .stamp { transform: rotate(8deg); font-size: 0.8rem; }
+  .stamp small { border-top: 1px solid currentColor; margin-top: 2px; padding-top: 2px; font-weight: 600; font-size: 0.7rem; }
+  .example { position: absolute; inset-inline-end: 0; top: 0; font-size: 0.75rem; border: 1px solid var(--wline); border-radius: 999px; padding: 1px 9px; color: var(--wmuted); background: var(--wbg); }
+  .strip { border-top: 1px solid var(--wline); padding: 18px clamp(18px, 3vw, 36px); display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; font-family: var(--wbody); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 4px; padding: 3px 10px; font-size: 0.8125rem; font-weight: 600; background: var(--wchip); color: var(--wchipfg); }
+  .field { display: inline-flex; align-items: center; height: 44px; min-width: 200px; border: 1px solid var(--wline); border-radius: 8px; padding-inline: 12px; background: var(--wpage); color: var(--wpagemuted); font-size: 0.9375rem; }
+  .body-sample { font-size: 0.9375rem; color: var(--wbodycol); max-width: 36ch; margin: 0; }
+  .tokens { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 0 clamp(18px, 3vw, 36px) 22px; }
+  .sw { border: 1px solid var(--wline); border-radius: 6px; overflow: hidden; background: var(--wpage); color: var(--wpageink); font-size: 0.8125rem; }
+  .sw i { display: block; height: 44px; }
+  .sw b { display: block; padding: 6px 10px 0; font-weight: 600; }
+  .sw span { display: block; padding: 0 10px 8px; color: var(--wpagemuted); font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: no-preference) {
+    .page[data-depth] { animation: place .5s cubic-bezier(.2,.7,.2,1) backwards; }
+    .page[data-depth="3"] { animation-delay: .05s } .page[data-depth="2"] { animation-delay: .18s } .page[data-depth="1"] { animation-delay: .32s }
+    @keyframes place { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+  }
+  .w-a { --wbg: #f7f4ee; --wink: #14262b; --whead: #13292e; --wbodycol: #33474c; --wmuted: #5d6e72; --wline: #cfc8ba; --wmark: #e07a5f; --wbtn: #0e5f66; --wbtnfg: #ffffff; --wpage: #ffffff; --wpage2: #f7f4ee; --wpageink: #33474c; --wpagehead: #13292e; --wpagemuted: #5d6e72; --wstamp: #e07a5f; --wstamptext: #8c2b28; --wchip: #eef4f3; --wchipfg: #0c4247; --wdisplay: "Alexandria", "Plus Jakarta Sans", sans-serif; --wdisplay-ar: "Alexandria", "Cairo", sans-serif; --wbody: "Plus Jakarta Sans", sans-serif; --wbody-ar: "Cairo", sans-serif; }
+  .w-b { --wbg: #0b1d21; --wink: #f4efe4; --whead: #f4efe4; --wbodycol: #c9d2d0; --wmuted: #a8b4b2; --wline: #2a3f44; --wmark: #5fb3ac; --wbtn: #5fb3ac; --wbtnfg: #0b1d21; --wpage: #fffdf8; --wpage2: #efe9dc; --wpageink: #33474c; --wpagehead: #0b1d21; --wpagemuted: #5d6e72; --wstamp: #e07a5f; --wstamptext: #8c2b28; --wchip: #163136; --wchipfg: #c9d2d0; --wdisplay: "Alexandria", sans-serif; --wdisplay-ar: "Alexandria", "Cairo", sans-serif; --wbody: "Plus Jakarta Sans", sans-serif; --wbody-ar: "Cairo", sans-serif; }
+  .w-b .btn.secondary { color: #f4efe4; border-color: #3a545a; } .w-b .textlink { color: #f4efe4; } .w-b .example { background: #0b1d21; }
+  .w-c { --wbg: #f3efe6; --wink: #1d2d50; --whead: #1d2d50; --wbodycol: #2a3550; --wmuted: #5b6478; --wline: #d6cfbf; --wmark: #b4552d; --wbtn: #1d2d50; --wbtnfg: #ffffff; --wpage: #fffdf8; --wpage2: #ebe6da; --wpageink: #2a3550; --wpagehead: #1d2d50; --wpagemuted: #5b6478; --wstamp: #b4552d; --wstamptext: #8a3d1c; --wchip: #e4e9f1; --wchipfg: #1d2d50; --wdisplay: "Readex Pro", "IBM Plex Sans", sans-serif; --wdisplay-ar: "Readex Pro", "IBM Plex Sans Arabic", sans-serif; --wbody: "IBM Plex Sans", sans-serif; --wbody-ar: "IBM Plex Sans Arabic", sans-serif; }
+  .w-d { --wbg: #fbfbf8; --wink: #101614; --whead: #101614; --wbodycol: #2b3330; --wmuted: #5f6b67; --wline: #d9ddd9; --wmark: #2bb39a; --wbtn: #101614; --wbtnfg: #fbfbf8; --wpage: #ffffff; --wpage2: #f1f3f1; --wpageink: #2b3330; --wpagehead: #101614; --wpagemuted: #5f6b67; --wstamp: #2bb39a; --wstamptext: #0f6b5a; --wchip: #d9f3ec; --wchipfg: #101614; --wdisplay: "Figtree", sans-serif; --wdisplay-ar: "Noto Kufi Arabic", sans-serif; --wbody: "Figtree", sans-serif; --wbody-ar: "Noto Sans Arabic", sans-serif; }
+  .w-d .comp h3 { font-weight: 700; letter-spacing: -0.03em; } .w-d .comp.ar h3 { font-weight: 700; }
+
+  /* ---------- World E: Letterhead & Seal. Bond white, blue-black ink, one seal violet, Naskh display, Readex body. ---------- */
+  .w-e { --wbg: #ffffff; --wbg2: #f1f2ee; --wink: #182230; --whead: #182230; --wbodycol: #2a3646; --wmuted: #55617a; --wquiet: #a6adbb; --wline: #dfe2e6; --wline2: #c5cad2; --wedge: #76819a; --wmark: #4b3fa5; --wsealink: #3b3187; --wsealwell: #ecebf7; --wbtn: #182230; --wbtnfg: #ffffff; --wbtnhover: #2a3646; --wpage: #ffffff; --wpage2: #f1f2ee; --wpageink: #2a3646; --wpagehead: #182230; --wpagemuted: #55617a; --wstamp: #4b3fa5; --wstamptext: #3b3187; --wchip: #f1f2ee; --wchipfg: #182230; --wdisplay: "Markazi Text", Georgia, serif; --wdisplay-ar: "Markazi Text", "Noto Naskh Arabic", serif; --wbody: "Readex Pro", "Segoe UI", sans-serif; --wbody-ar: "Readex Pro", "Noto Sans Arabic", sans-serif; }
+  .w-e .btn { border-radius: 4px; }
+  .w-e .btn.primary:hover { background: var(--wbtnhover); }
+  .w-e .btn.secondary { border: 1.5px solid var(--wink); color: var(--wink); background: #fff; }
+  .w-e .btn.secondary:hover { background: var(--wbg2); }
+  .w-e .page { border-radius: 3px; }
+  .w-e .page[data-depth="1"] { border-top: 1px solid var(--wline2); box-shadow: 0 1px 0 var(--wline2) inset, 0 3px 0 var(--wpage) inset, 0 4px 0 var(--wline2) inset, 0 14px 28px -22px rgba(24,34,48,0.5); padding-top: 20px; }
+  .w-e .comp h3 { font-family: var(--wdisplay); font-weight: 600; letter-spacing: 0; font-size: clamp(2rem, 1.4rem + 2.6vw, 3.25rem); line-height: 1.08; }
+  .w-e .comp.ar h3 { font-weight: 700; font-size: clamp(1.9rem, 1.4rem + 2.2vw, 3rem); line-height: 1.3; }
+  .w-e .comp.ar p.lead, .w-e .comp.ar .page { font-size: 1.0625rem; line-height: 1.8; }
+  .w-e .comp.ar .page .b { font-size: 0.9375rem; }
+  .w-e .chip { border: 1px solid var(--wline2); background: #fff; border-radius: 3px; font-weight: 500; }
+  .w-e .field { border-color: var(--wedge); border-radius: 4px; }
+  .w-e ::selection { background: var(--wsealwell); }
+  /* Letterhead: English at the left, the mark in the centre, Arabic at the right, in both locales. */
+  .lh { direction: ltr; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 18px clamp(18px, 3vw, 36px) 12px; font-family: var(--wdisplay); }
+  .lh .name { font-size: clamp(1.25rem, 1rem + 1.2vw, 1.75rem); font-weight: 600; line-height: 1.1; color: var(--wink); text-decoration: none; }
+  .lh .name.ar { justify-self: end; font-weight: 700; font-size: clamp(1.35rem, 1.05rem + 1.3vw, 1.9rem); }
+  .lh a.name { color: var(--wmuted); font-weight: 500; text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; text-decoration-color: var(--wline2); }
+  .lh a.name:hover { color: var(--wink); text-decoration-color: currentColor; }
+  .lh .mark { width: 40px; height: 40px; color: var(--wink); --mk-you: var(--wmark); }
+  .rule2 { height: 5px; margin-inline: clamp(18px, 3vw, 36px); border-top: 1px solid var(--wink); border-bottom: 1px solid var(--wink); }
+  .ref { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 18px; padding: 10px clamp(18px, 3vw, 36px) 0; font-size: 0.875rem; color: var(--wmuted); font-family: var(--wbody); font-variant-numeric: tabular-nums; }
+  .ref.ar { direction: rtl; font-family: var(--wbody-ar); }
+  .w-e .comp { padding-top: 22px; }
+  /* My Care current-step card */
+  .mc { margin: 0 clamp(18px, 3vw, 36px) clamp(18px, 3vw, 36px); border: 1px solid var(--wline2); border-radius: 4px; background: #fff; font-family: var(--wbody); color: var(--wbodycol); max-width: 560px; }
+  .mc.ar { direction: rtl; font-family: var(--wbody-ar); }
+  .mc .mc-ref { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid var(--wline); font-size: 0.8125rem; color: var(--wmuted); font-variant-numeric: tabular-nums; }
+  .mc .mc-body { padding: 16px 18px 6px; }
+  .mc .lbl { margin: 0 0 2px; font-size: 0.875rem; font-weight: 500; color: var(--wmuted); }
+  .mc h4 { margin: 0 0 8px; font-family: var(--wdisplay); font-weight: 600; font-size: 1.75rem; line-height: 1.15; color: var(--whead); text-wrap: balance; }
+  .mc.ar h4 { font-weight: 700; font-size: 1.7rem; line-height: 1.35; }
+  .mc p { margin: 0 0 14px; font-size: 0.9375rem; line-height: 1.65; max-width: 48ch; }
+  .mc.ar p { font-size: 1rem; line-height: 1.8; }
+  .steps { list-style: none; margin: 0; padding: 0 18px; border-top: 1px solid var(--wline); }
+  .steps li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px solid var(--wline); font-size: 0.9375rem; color: var(--wmuted); }
+  .steps li:last-child { border-bottom: 0; }
+  .steps li.now { color: var(--whead); font-weight: 600; }
+  .steps .dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--wquiet); justify-self: center; }
+  .steps li.done .dot { border-color: var(--wmuted); background: var(--wmuted); }
+  .steps li.now .dot { border-color: var(--wmark); background: var(--wmark); box-shadow: 0 0 0 3px var(--wsealwell); }
+  .steps .when { font-size: 0.8125rem; font-weight: 400; color: var(--wmuted); font-variant-numeric: tabular-nums; }
+  .steps svg { width: 14px; height: 14px; justify-self: center; }
+  .mc .mc-act { padding: 14px 18px 18px; border-top: 1px solid var(--wline); }
+  .mc .mc-stamp { position: relative; float: inline-end; margin-inline-start: 12px; }
+  .mc .stamp { position: static; display: inline-flex; }
+  /* Staff case page header */
+  .staff { margin: 0 clamp(18px, 3vw, 36px) clamp(18px, 3vw, 36px); border: 1px solid var(--wline2); border-radius: 4px; background: #fff; font-family: var(--wbody); color: var(--wbodycol); }
+  .staff.ar { direction: rtl; font-family: var(--wbody-ar); }
+  .staff .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 16px; border-bottom: 1px solid var(--wline); font-size: 0.8125rem; color: var(--wmuted); }
+  .staff .bar .mark { width: 20px; height: 20px; color: var(--wink); --mk-you: var(--wmark); }
+  .staff .bar nav { margin-inline-start: auto; display: flex; gap: 14px; }
+  .staff .bar nav a { color: var(--wmuted); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
+  .staff .bar nav a[aria-current] { color: var(--wink); font-weight: 600; }
+  .staff .title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding: 14px 16px 4px; }
+  .staff .title h4 { margin: 0; font-family: var(--wbody); font-weight: 600; font-size: 1.375rem; color: var(--whead); font-variant-numeric: tabular-nums; }
+  .staff .title .status { font-size: 0.9375rem; color: var(--wink); }
+  .staff .title .status::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--wmark); margin-inline-end: 7px; vertical-align: 1px; }
+  .staff .title .owner { font-size: 0.9375rem; color: var(--wmuted); }
+  .staff dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 18px; margin: 0; padding: 10px 16px 14px; border-bottom: 1px solid var(--wline); }
+  .staff dt { font-size: 0.8125rem; color: var(--wmuted); margin: 0; }
+  .staff dd { margin: 0; font-size: 0.9375rem; color: var(--wink); }
+  .staff .next { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 12px 16px; background: var(--wbg2); border-bottom: 1px solid var(--wline); }
+  .staff .next p { margin: 0; flex: 1 1 320px; font-size: 0.9375rem; }
+  .staff .next p b { color: var(--wink); }
+  .staff .next .btn { min-height: 40px; padding: 6px 14px; font-size: 0.875rem; }
+  .staff .tabs { display: flex; flex-wrap: wrap; gap: 0 4px; padding: 0 10px; }
+  .staff .tabs a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; color: var(--wmuted); text-decoration: none; font-size: 0.9375rem; border-bottom: 2px solid transparent; }
+  .staff .tabs a[aria-current] { color: var(--wink); font-weight: 600; border-bottom-color: var(--wink); }
+  /* Lockups */
+  .lockups { display: grid; gap: 16px; padding: 0 clamp(18px, 3vw, 36px) clamp(18px, 3vw, 36px); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .lk { border: 1px solid var(--wline); border-radius: 4px; padding: 22px 18px; display: grid; gap: 14px; align-content: center; justify-items: center; background: #fff; min-height: 150px; }
+  .lk.dark { background: var(--wink); color: #fff; border-color: var(--wink); }
+  .lk.bond { background: var(--wbg2); }
+  .lk .cap { font-size: 0.8125rem; color: var(--wmuted); text-align: center; margin: 0; }
+  .lk.dark .cap { color: #c5cad2; }
+  .lock { display: inline-flex; align-items: center; gap: 10px; font-family: var(--wdisplay); font-weight: 600; font-size: 1.9rem; line-height: 1; color: var(--wink); }
+  .lock .mark { width: 40px; height: 40px; --mk-you: var(--wmark); }
+  .lock.ar { direction: rtl; font-weight: 700; font-size: 2.1rem; }
+  .lock.bi { gap: 16px; font-size: 1.5rem; }
+  .lock.bi .ar { font-weight: 700; font-size: 1.7rem; }
+  .lk.dark .lock { color: #fff; } .lk.dark .lock .mark { --mk-you: #b9b2ea; }
+  .lk.mono .lock .mark { --mk-you: currentColor; }
+  .fav { display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap; justify-content: center; }
+  .fav figure { margin: 0; display: grid; justify-items: center; gap: 6px; font-size: 0.75rem; color: var(--wmuted); }
+  .fav .tile { background: #fff; border: 1px solid var(--wline); border-radius: 4px; display: grid; place-items: center; }
+  .fav svg { color: var(--wink); --mk-you: var(--wmark); display: block; }
+  /* Phone frames: the same comp inside a 390px container; container queries do the rest. */
+  .phones { display: flex; flex-wrap: wrap; gap: 24px; padding: 0 clamp(18px, 3vw, 36px) clamp(18px, 3vw, 36px); align-items: flex-start; }
+  .phone { width: 390px; max-width: 100%; border: 1px solid var(--wline2); border-radius: 22px; padding: 10px; background: var(--wbg2); }
+  .phone .screen { background: #fff; border-radius: 14px; overflow: hidden; container-type: inline-size; border: 1px solid var(--wline); }
+  .phone .comp { padding: 16px 16px 22px; gap: 22px; }
+  .phone .lh { padding: 14px 16px 10px; }
+  .phone .lh .mark { width: 30px; height: 30px; }
+  .phone .lh .name { font-size: 1.1rem; } .phone .lh .name.ar { font-size: 1.25rem; }
+  .phone .rule2, .phone .ref { margin-inline: 16px; padding-inline: 0; }
+  .phone .comp h3 { font-size: 2.1rem; } .phone .comp.ar h3 { font-size: 2rem; }
+  .phone .mc { margin: 14px; max-width: none; }
+  .phone .btn { width: 100%; justify-content: center; }
+  .phone .ctas { gap: 6px 22px; }
+  .subhead { padding: 0 clamp(18px, 3vw, 36px); margin: 22px 0 10px; font-size: 0.875rem; font-weight: 600; color: var(--wmuted); font-family: var(--wbody); }
+  .roll { font-size: 0.9375rem; }
+  .roll dt { font-weight: 600; margin-top: 10px; } .roll dd { margin: 2px 0 0; max-width: 80ch; }
+  .typeline { display: grid; gap: 4px; padding: 0 clamp(18px, 3vw, 36px) 20px; font-family: var(--wbody); }
+  .typeline .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; border-bottom: 1px solid var(--wline); padding: 8px 0; }
+  .typeline .row span.meta { font-size: 0.8125rem; color: var(--wmuted); min-width: 220px; font-variant-numeric: tabular-nums; }
+  .typeline .row [lang="ar"] { direction: rtl; font-family: var(--wbody-ar); }
+  .typeline .row .d { font-family: var(--wdisplay); } .typeline .row .d[lang="ar"] { font-family: var(--wdisplay-ar); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mk" viewBox="0 0 64 64">
+    <path d="M9 20C12 44 52 44 55 20" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round"/>
+    <circle cx="20" cy="23" r="4.6" fill="currentColor"/>
+    <circle cx="44" cy="23" r="4.6" fill="currentColor"/>
+    <circle cx="32" cy="26.5" r="4.6" style="fill: var(--mk-you, currentColor)"/>
+  </symbol>
+  <symbol id="chk" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Theme Studio v2: five visual worlds for an international health-travel platform</h1>
+    <p>The first Theme Studio (<code>theme-studio.html</code>) is re-read here with the frontend-design plugin, Impeccable's new-work method and the ui-ux-pro-max checklist, then regenerated: the four worlds are rendered again with the generated-design tells removed, a fifth world is added and built out as the full comp (home hero, My Care current step, a coordinator case page header, logo lockups, English and Arabic, phone and desktop), and a token proposal closes the page. Nothing here invents claims; the case number and the patient are marked as examples.</p>
+    <p>Every text pair on this page was measured against WCAG AA (4.5:1 for text, 3:1 for component edges and marks); the numbers are printed beside the colours and collected in the appendix.</p>
+    <nav class="jump" aria-label="Jump to a section">
+      <a href="#reading">What the plugins changed</a>
+      <a href="#a">A Petrol &amp; Paper</a>
+      <a href="#b">B Petrol Night</a>
+      <a href="#c">C Nile Ink &amp; Limestone</a>
+      <a href="#d">D Kufi &amp; Chalk</a>
+      <a href="#e">E Letterhead &amp; Seal (new)</a>
+      <a href="#verdict">Recommendation</a>
+      <a href="#tokens">Token proposal</a>
+      <a href="#measure">Measurements</a>
+    </nav>
+  </header>
+
+  <!-- ============================ Reading ============================ -->
+  <section class="plain" id="reading">
+    <h2>What the plugins changed in the reading</h2>
+    <p class="read">The frontend-design plugin keeps a list of the traits generated pages cluster around. Read against it, the first studio has four of them in the comp every world shares, and the incumbent world carries a fifth:</p>
+    <ul class="note-list">
+      <li><b>Eyebrow above the heading, opened by a coral rule.</b> The "signature" of Petrol &amp; Paper is the most common template chrome there is; Impeccable's craft floor lists the kicker as a ban, not a default. v2 removes it from every world; the letterhead in world E carries the context instead.</li>
+      <li><b>Middle-dot meta strings</b> ("Credentials reviewed · current") and <b>an arrow appended to the button</b> ("Send my case →"). Both removed.</li>
+      <li><b>Tracked uppercase labels</b> on the page keys ("PRELIMINARY ESTIMATE") and the stamp. Removed; labels are sentence case in both scripts, which is also the only setting Arabic can share.</li>
+      <li><b>Warm cream ground with a terracotta accent</b> is trait number one on the list: Petrol &amp; Paper's paper (<code>#f7f4ee</code>) with logo coral (<code>#e07a5f</code>) sits inside it, and the coral itself fails 3:1 (2.69) so it cannot even draw a focus ring or a journey marker ring under WCAG 1.4.11. World D's mint has the same defect (2.53). A mark colour that fails non-text contrast is decoration only; it cannot be the ring of a reached step.</li>
+      <li><b>Near-black with one bright accent</b> is trait two: B (petrol night with aqua) and D (ink buttons with mint) are its two renditions.</li>
+      <li><b>A real defect:</b> the first studio ships without <code>&lt;!doctype&gt;</code>, <code>&lt;meta charset&gt;</code> or a viewport meta. Served over HTTP, or opened as a file in a browser that defaults to Windows-1252, every Arabic block renders as mojibake. v2 declares all three.</li>
+      <li><b>Arabic as the second comp.</b> All four worlds set the Latin hero first and mirror it; Arabic is a smaller step of the Latin scale (Cairo set smaller than Jakarta). Owner rule 3 asks for the opposite, and world E is built from the Arabic page outward.</li>
+    </ul>
+    <p class="read">ui-ux-pro-max was consulted as the checklist owner, never as the look. Its design-system match for "medical travel coordination" returned Neumorphism, a cyan palette and a testimonials carousel: the category default, and it conflicts with PRODUCT.md (no testimonials, no soft-shadow panels). Its pre-delivery checklist (44px targets, visible focus, reduced motion, 4.5:1, no emoji as icons, 375/768/1024/1440) is applied to the comp below. Its Google Fonts index confirmed the Arabic faces considered (Noto Naskh Arabic, Readex Pro, Almarai, Markazi Text).</p>
+  </section>
+
+  <!-- ============================ A ============================ -->
+  <section class="world" id="a">
+    <div class="world-head">
+      <p class="tag">A, the incumbent, re-rendered without the tells</p>
+      <h2>Petrol &amp; Paper</h2>
+      <p class="thesis">An evidence-first clinical dossier: deep petrol ink on warm paper, the logo's coral used only as a stamp. Calm, documentary, readable in sunlight. The baseline every other world is measured against.</p>
+    </div>
+    <div class="board w-a">
+      <div class="comp">
+        <div>
+          <h3>Understand your treatment options before you travel</h3>
+          <p class="lead">Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.</p>
+          <div class="ctas"><a class="btn primary" href="#a">Send my case</a><a class="textlink" href="#a">See how it works</a></div>
+          <p class="note">You see the full picture first. The decision stays yours.</p>
+        </div>
+        <div class="stack">
+          <span class="example">Example</span>
+          <div class="page" data-depth="3"><p class="k">Preliminary estimate</p><p class="t">A price range in your currency</p></div>
+          <div class="page" data-depth="2"><p class="k">Reviewed by</p><p class="t">A Consultant in the right specialty</p></div>
+          <div class="page" data-depth="1"><span class="stamp">Received<small>15 Oct</small></span><p class="k">Case received</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">Your file is with the coordination team. Replies Saturday to Thursday, 10:00 to 20:00 Cairo time.</p></div>
+        </div>
+      </div>
+      <div class="comp ar" lang="ar">
+        <div>
+          <h3>افهم خيارات علاجك قبل أن تسافر</h3>
+          <p class="lead">أرسل المعلومات الطبية المتوفرة لديك. نُعِدّ ملفك لمراجعة استشاري في التخصص المناسب، ثم نوضّح لك التوصية والتكلفة المتوقعة والخطوة التالية.</p>
+          <div class="ctas"><a class="btn primary" href="#a">أرسل حالتي</a><a class="textlink" href="#a">كيف يعمل الأمر</a></div>
+        </div>
+        <div class="stack">
+          <span class="example">نموذج</span>
+          <div class="page" data-depth="3"><p class="k">تقدير مبدئي</p><p class="t">نطاق سعري بعملتك</p></div>
+          <div class="page" data-depth="2"><p class="k">راجعها</p><p class="t">استشاري في التخصص المناسب</p></div>
+          <div class="page" data-depth="1"><span class="stamp">تم الاستلام<small>15 أكتوبر</small></span><p class="k">تم استلام الحالة</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">ملفك مع فريق التنسيق. نرد من السبت إلى الخميس، 10:00 إلى 20:00 بتوقيت القاهرة.</p></div>
+        </div>
+      </div>
+      <div class="strip">
+        <span class="btn primary">Send my case</span><span class="btn secondary">Track case</span><span class="chip">Credentials reviewed and current</span><span class="field">Search your country</span>
+        <p class="body-sample">Recommendations and cost estimates are preliminary and can change after an in-person assessment.</p>
+      </div>
+      <div class="tokens">
+        <div class="sw"><i style="background:#0e5f66"></i><b>petrol-600, action</b><span class="measure">#0e5f66, white on it 7.38</span></div>
+        <div class="sw"><i style="background:#14262b"></i><b>ink-900, text</b><span class="measure">#14262b, on paper 14.26</span></div>
+        <div class="sw"><i style="background:#f7f4ee; border-bottom:1px solid #cfc8ba"></i><b>paper, canvas</b><span>#f7f4ee</span></div>
+        <div class="sw"><i style="background:#e07a5f"></i><b>logo coral, mark</b><span class="measure">#e07a5f, on paper 2.69 (fails 3:1)</span></div>
+        <div class="sw"><i style="background:#8c2b28"></i><b>stamp ink</b><span class="measure">#8c2b28, on white 8.43</span></div>
+        <div class="sw"><i style="background:#5d6e72"></i><b>ink-400, muted</b><span class="measure">#5d6e72, on paper 4.86</span></div>
+      </div>
+    </div>
+    <div class="assess">
+      <div><h4>What it says</h4><p>"A careful file, kept by careful people." Documentary and warm. Egypt is in the paper, not in symbols.</p></div>
+      <div><h4>Where it wins</h4><ul><li>Built, tested, AA on 20 pages; the dossier hero and stamp already ship here.</li><li>The best Arabic legibility outdoors of the four original worlds.</li></ul></div>
+      <div><h4>Where it fails the brief now</h4><ul><li>Cream plus coral is the first trait on the plugin's list; teal is the category's colour. Interchangeable at a glance.</li><li>Its signature (coral-ruled eyebrow) is the banned kicker; without it the world has no signature left but the stamp.</li><li>Coral fails 3:1, so rings and markers in it do not meet 1.4.11.</li><li>Arabic is a smaller step of the Latin scale: a translation posture.</li></ul></div>
+      <div><h4>Cost to adopt</h4><p><b>None</b> as is. "A-prime" (A with the tells removed, white bond instead of cream) is one short session and is the fallback if cost must stay at zero.</p></div>
+    </div>
+  </section>
+
+  <!-- ============================ B ============================ -->
+  <section class="world" id="b">
+    <div class="world-head">
+      <p class="tag">B, an evolution of A: same tokens, dark opening</p>
+      <h2>Petrol Night</h2>
+      <p class="thesis">The desk goes dark and the file glows. Marketing openings on the deepest petrol in the palette, ivory case-file pages, the light app behind untouched.</p>
+    </div>
+    <div class="board w-b">
+      <div class="comp">
+        <div>
+          <h3>Understand your treatment options before you travel</h3>
+          <p class="lead">Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.</p>
+          <div class="ctas"><a class="btn primary" href="#b">Send my case</a><a class="textlink" href="#b">See how it works</a></div>
+          <p class="note">You see the full picture first. The decision stays yours.</p>
+        </div>
+        <div class="stack">
+          <span class="example">Example</span>
+          <div class="page" data-depth="3"><p class="k">Preliminary estimate</p><p class="t">A price range in your currency</p></div>
+          <div class="page" data-depth="2"><p class="k">Reviewed by</p><p class="t">A Consultant in the right specialty</p></div>
+          <div class="page" data-depth="1"><span class="stamp">Received<small>15 Oct</small></span><p class="k">Case received</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">Your file is with the coordination team. Replies Saturday to Thursday, 10:00 to 20:00 Cairo time.</p></div>
+        </div>
+      </div>
+      <div class="comp ar" lang="ar">
+        <div>
+          <h3>افهم خيارات علاجك قبل أن تسافر</h3>
+          <p class="lead">أرسل المعلومات الطبية المتوفرة لديك. نُعِدّ ملفك لمراجعة استشاري في التخصص المناسب، ثم نوضّح لك التوصية والتكلفة المتوقعة والخطوة التالية.</p>
+          <div class="ctas"><a class="btn primary" href="#b">أرسل حالتي</a><a class="textlink" href="#b">كيف يعمل الأمر</a></div>
+        </div>
+        <div class="stack">
+          <span class="example">نموذج</span>
+          <div class="page" data-depth="3"><p class="k">تقدير مبدئي</p><p class="t">نطاق سعري بعملتك</p></div>
+          <div class="page" data-depth="2"><p class="k">راجعها</p><p class="t">استشاري في التخصص المناسب</p></div>
+          <div class="page" data-depth="1"><span class="stamp">تم الاستلام<small>15 أكتوبر</small></span><p class="k">تم استلام الحالة</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">ملفك مع فريق التنسيق. نرد من السبت إلى الخميس، 10:00 إلى 20:00 بتوقيت القاهرة.</p></div>
+        </div>
+      </div>
+      <div class="tokens">
+        <div class="sw"><i style="background:#0b1d21"></i><b>petrol-950, desk</b><span class="measure">#0b1d21, ivory on it 15.11</span></div>
+        <div class="sw"><i style="background:#5fb3ac"></i><b>aqua, action on dark</b><span class="measure">#5fb3ac, 7.04 on the desk; ink on it 7.04</span></div>
+        <div class="sw"><i style="background:#c9d2d0"></i><b>body on desk</b><span class="measure">#c9d2d0, 11.23</span></div>
+        <div class="sw"><i style="background:#e07a5f"></i><b>logo coral, stamp frame</b><span class="measure">#e07a5f, 5.9 on the desk</span></div>
+      </div>
+    </div>
+    <div class="assess">
+      <div><h4>What it says</h4><p>"A premium international service." Night flight, hotel lobby, private clinic.</p></div>
+      <div><h4>Where it wins</h4><ul><li>The most striking first screen of the original four; zero new tokens.</li></ul></div>
+      <div><h4>Where it fails the brief now</h4><ul><li>It is a composition on A, so it inherits every tell above and adds trait two (near-black with one bright accent).</li><li>Dark openings lose on a phone in direct sun, which is where the first visit happens.</li><li>It fixes nothing about the Arabic posture or the mark; the premium register is the opposite of the calm, evidence-first voice.</li></ul></div>
+      <div><h4>Cost to adopt</h4><p><b>Low</b>, but it buys a cosmetic distinction and keeps the structural problems.</p></div>
+    </div>
+  </section>
+
+  <!-- ============================ C ============================ -->
+  <section class="world" id="c">
+    <div class="world-head">
+      <p class="tag">C, a new palette: the official file</p>
+      <h2>Nile Ink &amp; Limestone</h2>
+      <p class="thesis">Passport ink, warm limestone, a copper stamp; Readex Pro gives Arabic and Latin one geometric voice.</p>
+    </div>
+    <div class="board w-c">
+      <div class="comp">
+        <div>
+          <h3>Understand your treatment options before you travel</h3>
+          <p class="lead">Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.</p>
+          <div class="ctas"><a class="btn primary" href="#c">Send my case</a><a class="textlink" href="#c">See how it works</a></div>
+        </div>
+        <div class="stack">
+          <span class="example">Example</span>
+          <div class="page" data-depth="3"><p class="k">Preliminary estimate</p><p class="t">A price range in your currency</p></div>
+          <div class="page" data-depth="2"><p class="k">Reviewed by</p><p class="t">A Consultant in the right specialty</p></div>
+          <div class="page" data-depth="1"><span class="stamp">Received<small>15 Oct</small></span><p class="k">Case received</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">Your file is with the coordination team. Replies Saturday to Thursday, 10:00 to 20:00 Cairo time.</p></div>
+        </div>
+      </div>
+      <div class="comp ar" lang="ar">
+        <div>
+          <h3>افهم خيارات علاجك قبل أن تسافر</h3>
+          <p class="lead">أرسل المعلومات الطبية المتوفرة لديك. نُعِدّ ملفك لمراجعة استشاري في التخصص المناسب، ثم نوضّح لك التوصية والتكلفة المتوقعة والخطوة التالية.</p>
+          <div class="ctas"><a class="btn primary" href="#c">أرسل حالتي</a><a class="textlink" href="#c">كيف يعمل الأمر</a></div>
+        </div>
+        <div class="stack">
+          <span class="example">نموذج</span>
+          <div class="page" data-depth="3"><p class="k">تقدير مبدئي</p><p class="t">نطاق سعري بعملتك</p></div>
+          <div class="page" data-depth="2"><p class="k">راجعها</p><p class="t">استشاري في التخصص المناسب</p></div>
+          <div class="page" data-depth="1"><span class="stamp">تم الاستلام<small>15 أكتوبر</small></span><p class="k">تم استلام الحالة</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">ملفك مع فريق التنسيق. نرد من السبت إلى الخميس، 10:00 إلى 20:00 بتوقيت القاهرة.</p></div>
+        </div>
+      </div>
+      <div class="tokens">
+        <div class="sw"><i style="background:#1d2d50"></i><b>nile ink, action and headings</b><span class="measure">#1d2d50, on limestone 11.86</span></div>
+        <div class="sw"><i style="background:#f3efe6; border-bottom:1px solid #d6cfbf"></i><b>limestone, canvas</b><span>#f3efe6</span></div>
+        <div class="sw"><i style="background:#b4552d"></i><b>copper, stamp frame</b><span class="measure">#b4552d, 4.28 on limestone (mark; passes 3:1)</span></div>
+        <div class="sw"><i style="background:#8a3d1c"></i><b>copper ink, stamp text</b><span class="measure">#8a3d1c, on ivory 7.47</span></div>
+        <div class="sw"><i style="background:#5b6478"></i><b>slate, muted</b><span class="measure">#5b6478, 5.17</span></div>
+      </div>
+    </div>
+    <div class="assess">
+      <div><h4>What it says</h4><p>"An institution, not an app." The register of ministries and treatment-abroad committees.</p></div>
+      <div><h4>Where it wins</h4><ul><li>The strongest "official and accountable" signal of the original four; this is Impeccable's grounded pick (the referral file families already hold) rendered in colour.</li><li>Readex Pro is the right Arabic-first body face. World E keeps it.</li><li>Its only listed cost, the mark recolour, is moot now that the mark is open.</li></ul></div>
+      <div><h4>Where it fails the brief now</h4><ul><li>Cream limestone plus copper is the same warm-cream-and-warm-accent trait as A, with navy: passport and bank at once.</li><li>Honest risk: familiarity. It is where most runs in this category land once they leave teal.</li></ul></div>
+      <div><h4>Cost to adopt</h4><p><b>High</b>: full token re-point, fonts, Keycloak, screenshot baselines.</p></div>
+    </div>
+  </section>
+
+  <!-- ============================ D ============================ -->
+  <section class="world" id="d">
+    <div class="world-head">
+      <p class="tag">D, a new palette: precision</p>
+      <h2>Kufi &amp; Chalk</h2>
+      <p class="thesis">Near-black ink on chalk white, one mint mark, a Kufi headline voice: the modern Gulf register.</p>
+    </div>
+    <div class="board w-d">
+      <div class="comp">
+        <div>
+          <h3>Understand your treatment options before you travel</h3>
+          <p class="lead">Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.</p>
+          <div class="ctas"><a class="btn primary" href="#d">Send my case</a><a class="textlink" href="#d">See how it works</a></div>
+        </div>
+        <div class="stack">
+          <span class="example">Example</span>
+          <div class="page" data-depth="3"><p class="k">Preliminary estimate</p><p class="t">A price range in your currency</p></div>
+          <div class="page" data-depth="2"><p class="k">Reviewed by</p><p class="t">A Consultant in the right specialty</p></div>
+          <div class="page" data-depth="1"><span class="stamp">Received<small>15 Oct</small></span><p class="k">Case received</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">Your file is with the coordination team. Replies Saturday to Thursday, 10:00 to 20:00 Cairo time.</p></div>
+        </div>
+      </div>
+      <div class="comp ar" lang="ar">
+        <div>
+          <h3>افهم خيارات علاجك قبل أن تسافر</h3>
+          <p class="lead">أرسل المعلومات الطبية المتوفرة لديك. نُعِدّ ملفك لمراجعة استشاري في التخصص المناسب، ثم نوضّح لك التوصية والتكلفة المتوقعة والخطوة التالية.</p>
+          <div class="ctas"><a class="btn primary" href="#d">أرسل حالتي</a><a class="textlink" href="#d">كيف يعمل الأمر</a></div>
+        </div>
+        <div class="stack">
+          <span class="example">نموذج</span>
+          <div class="page" data-depth="3"><p class="k">تقدير مبدئي</p><p class="t">نطاق سعري بعملتك</p></div>
+          <div class="page" data-depth="2"><p class="k">راجعها</p><p class="t">استشاري في التخصص المناسب</p></div>
+          <div class="page" data-depth="1"><span class="stamp">تم الاستلام<small>15 أكتوبر</small></span><p class="k">تم استلام الحالة</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">ملفك مع فريق التنسيق. نرد من السبت إلى الخميس، 10:00 إلى 20:00 بتوقيت القاهرة.</p></div>
+        </div>
+      </div>
+      <div class="tokens">
+        <div class="sw"><i style="background:#101614"></i><b>ink, action and headings</b><span class="measure">#101614, on chalk 17.66</span></div>
+        <div class="sw"><i style="background:#2bb39a"></i><b>mint, stamp frame</b><span class="measure">#2bb39a, 2.53 on chalk (fails 3:1)</span></div>
+        <div class="sw"><i style="background:#0f6b5a"></i><b>deep mint, stamp text</b><span class="measure">#0f6b5a, 6.42</span></div>
+        <div class="sw"><i style="background:#5f6b67"></i><b>graphite, muted</b><span class="measure">#5f6b67, 5.35</span></div>
+      </div>
+    </div>
+    <div class="assess">
+      <div><h4>What it says</h4><p>"Exact, modern, nothing to hide." The newest Gulf health brands.</p></div>
+      <div><h4>Where it wins</h4><ul><li>Highest contrast; the cleanest staff screens.</li></ul></div>
+      <div><h4>Where it fails the brief now</h4><ul><li>Kufi is a display voice only, so Arabic runs in two faces (Kufi headlines, Noto Sans body) while Latin runs in one: the Arabic site becomes the less coherent one.</li><li>Ink buttons with a mint accent on white is trait two in daylight; the mint fails 3:1 as a mark.</li><li>Coldest for a frightened family; nothing in it says Egypt or care.</li></ul></div>
+      <div><h4>Cost to adopt</h4><p><b>Medium.</b></p></div>
+    </div>
+  </section>
+
+  <!-- ============================ E ============================ -->
+  <section class="world" id="e">
+    <div class="world-head">
+      <p class="tag">E, new in v2, built out as the comp: the bilingual clinic letterhead</p>
+      <h2>Letterhead &amp; Seal</h2>
+      <p class="thesis">Every family in Benghazi, Khartoum, Baghdad or Sanaa who has sought care in Egypt already holds the artefact this world is built from: an Egyptian doctor's letterhead, Arabic on the right, English on the left, the practice mark in the centre, a double rule, the report beneath, and a violet seal where something was done. Bond white instead of cream, one blue-black ink for text and actions, one seal colour reserved for the stamp and the focus ring, a Naskh display face whose Latin was drawn to match the Arabic, and Readex Pro for everything you read on a phone. The product is a case file; the letterhead is how a case file says who stands behind it.</p>
+    </div>
+
+    <h3>How this world was chosen</h3>
+    <dl class="roll">
+      <dt>Impeccable new-work, step 1 (what is already true)</dt>
+      <dd>An established world with a DESIGN.md, reopened by the owner. Pinned: the dossier and the stamp, no fabrication, AA, Arabic first, no gradients, no gold, accents only as marks. The mark is open.</dd>
+      <dt>Step 2 (what would change the work)</dt>
+      <dd>The owner was not at the keyboard; the brief answers the mode questions. Persuade on the home: a family member on a phone must believe that one accountable person holds the file and a Consultant reviews it before any money moves; the proof is the file itself. Operate on My Care and the staff page: the current step and the next action, nothing else.</dd>
+      <dt>Step 3 (seven grounded candidates from the audience's world, by resonance)</dt>
+      <dd>1 the stamped treatment-abroad referral file; 2 the ruled Arabic manuscript page with its marginal gloss (recommendation in the block, coordinator's note in the margin); 3 the bilingual clinic letterhead; 4 the lab report with reference ranges; 5 Cairo airport wayfinding and the boarding stub; 6 mashrabiya light on limestone; 7 the WhatsApp thread (a tool the audience operates, spent as the one allowed). The category's own page (teal telehealth with a doctor photo) and its opposite (dark concierge) were kept out of the list as the rut.</dd>
+      <dt>The roll</dt>
+      <dd><code>impeccable concept-seed --scope direction --mode persuade</code>, seed <code>7766245a</code>, assigned candidate 3. Challengers dealt: city-pop airbrush sleeve (declined: gradients and chrome are banned by the owner), linocut broadside (declined; it donates <b>one ink, total commitment</b>: text, rules and buttons share a single ink), algorave code floor and phosphor terminal (declined; the terminal donates <b>states print themselves as words, never as chrome</b>: the staff header types "Consultant review in progress" instead of a coloured pill), brick build instructions (competitive on product clarity; it donates <b>only the next piece is bright, the finished ones are ghosted</b>, applied to the journey steps), Miura-fold sheet (declined; its one-module grid is already the letterhead's rule). Impeccable's own pick would have been candidate 1, the stamped referral file, which world C already renders; its honest risk is familiarity. The decision board the method serves was replaced by this page because the session ran unattended; the owner's gate is below.</dd>
+    </dl>
+
+    <div class="board w-e">
+      <p class="subhead">Home hero, English, desktop</p>
+      <header class="lh"><span class="name en" lang="en">RehletShifaa</span><svg class="mark" aria-hidden="true"><use href="#mk"/></svg><a class="name ar" lang="ar" dir="rtl" href="#e" hreflang="ar">رحلة شفاء</a></header>
+      <div class="rule2"></div>
+      <p class="ref"><span>Ref. <bdi dir="ltr">RS-2026-000421</bdi> (example)</span><span>Cairo, 15 October 2026</span></p>
+      <div class="comp">
+        <div>
+          <h3>Understand your treatment options before you travel</h3>
+          <p class="lead">Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.</p>
+          <div class="ctas"><a class="btn primary" href="#e">Send my case</a><a class="textlink" href="#e">See how it works</a></div>
+          <p class="note">You see the full picture first. The decision stays yours.</p>
+        </div>
+        <div class="stack">
+          <span class="example">Example</span>
+          <div class="page" data-depth="3"><p class="k">Preliminary estimate</p><p class="t">A price range in your currency</p></div>
+          <div class="page" data-depth="2"><p class="k">Reviewed by</p><p class="t">A Consultant in the right specialty</p></div>
+          <div class="page" data-depth="1"><span class="stamp">Received<small>15 Oct</small></span><p class="k">Case received</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">Your file is with the coordination team. Replies Saturday to Thursday, 10:00 to 20:00 Cairo time.</p></div>
+        </div>
+      </div>
+
+      <p class="subhead">Home hero, Arabic, desktop. The letterhead keeps Arabic on the right and English on the left in both locales; the inactive name is the language switch.</p>
+      <header class="lh"><a class="name en" lang="en" href="#e" hreflang="en">RehletShifaa</a><svg class="mark" aria-hidden="true"><use href="#mk"/></svg><span class="name ar" lang="ar" dir="rtl">رحلة شفاء</span></header>
+      <div class="rule2"></div>
+      <p class="ref ar" lang="ar"><span>المرجع (نموذج): <bdi dir="ltr">RS-2026-000421</bdi></span><span>القاهرة، ١٥ أكتوبر ٢٠٢٦</span></p>
+      <div class="comp ar" lang="ar">
+        <div>
+          <h3>افهم خيارات علاجك قبل أن تسافر</h3>
+          <p class="lead">أرسل المعلومات الطبية المتوفرة لديك. نُعِدّ ملفك لمراجعة استشاري في التخصص المناسب، ثم نوضّح لك التوصية والتكلفة المتوقعة والخطوة التالية.</p>
+          <div class="ctas"><a class="btn primary" href="#e">أرسل حالتي</a><a class="textlink" href="#e">كيف يعمل الأمر</a></div>
+          <p class="note">ترى الصورة كاملة أولًا، والقرار يبقى لك.</p>
+        </div>
+        <div class="stack">
+          <span class="example">نموذج</span>
+          <div class="page" data-depth="3"><p class="k">تقدير مبدئي</p><p class="t">نطاق سعري بعملتك</p></div>
+          <div class="page" data-depth="2"><p class="k">راجعها</p><p class="t">استشاري في التخصص المناسب</p></div>
+          <div class="page" data-depth="1"><span class="stamp">تم الاستلام<small>١٥ أكتوبر</small></span><p class="k">تم استلام الحالة</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">ملفك مع فريق التنسيق. نرد من السبت إلى الخميس، ١٠:٠٠ إلى ٢٠:٠٠ بتوقيت القاهرة.</p></div>
+        </div>
+      </div>
+
+      <p class="subhead">Phone, 390px: Arabic first, then English</p>
+      <div class="phones">
+        <div class="phone"><div class="screen">
+          <header class="lh"><a class="name en" lang="en" href="#e" hreflang="en">RehletShifaa</a><svg class="mark" aria-hidden="true"><use href="#mk"/></svg><span class="name ar" lang="ar" dir="rtl">رحلة شفاء</span></header>
+          <div class="rule2"></div>
+          <p class="ref ar" lang="ar"><span>المرجع (نموذج): <bdi dir="ltr">RS-2026-000421</bdi></span></p>
+          <div class="comp ar" lang="ar">
+            <div>
+              <h3>افهم خيارات علاجك قبل أن تسافر</h3>
+              <p class="lead">أرسل المعلومات الطبية المتوفرة لديك. نُعِدّ ملفك لمراجعة استشاري في التخصص المناسب، ثم نوضّح لك التوصية والتكلفة المتوقعة والخطوة التالية.</p>
+              <div class="ctas"><a class="btn primary" href="#e">أرسل حالتي</a><a class="textlink" href="#e">كيف يعمل الأمر</a></div>
+            </div>
+            <div class="stack">
+              <span class="example">نموذج</span>
+              <div class="page" data-depth="3"><p class="k">تقدير مبدئي</p><p class="t">نطاق سعري بعملتك</p></div>
+              <div class="page" data-depth="2"><p class="k">راجعها</p><p class="t">استشاري في التخصص المناسب</p></div>
+              <div class="page" data-depth="1"><span class="stamp">تم الاستلام<small>١٥ أكتوبر</small></span><p class="k">تم استلام الحالة</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">ملفك مع فريق التنسيق. نرد من السبت إلى الخميس، ١٠:٠٠ إلى ٢٠:٠٠ بتوقيت القاهرة.</p></div>
+            </div>
+          </div>
+        </div></div>
+        <div class="phone"><div class="screen">
+          <header class="lh"><span class="name en" lang="en">RehletShifaa</span><svg class="mark" aria-hidden="true"><use href="#mk"/></svg><a class="name ar" lang="ar" dir="rtl" href="#e" hreflang="ar">رحلة شفاء</a></header>
+          <div class="rule2"></div>
+          <p class="ref"><span>Ref. <bdi dir="ltr">RS-2026-000421</bdi> (example)</span></p>
+          <div class="comp">
+            <div>
+              <h3>Understand your treatment options before you travel</h3>
+              <p class="lead">Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.</p>
+              <div class="ctas"><a class="btn primary" href="#e">Send my case</a><a class="textlink" href="#e">See how it works</a></div>
+            </div>
+            <div class="stack">
+              <span class="example">Example</span>
+              <div class="page" data-depth="3"><p class="k">Preliminary estimate</p><p class="t">A price range in your currency</p></div>
+              <div class="page" data-depth="2"><p class="k">Reviewed by</p><p class="t">A Consultant in the right specialty</p></div>
+              <div class="page" data-depth="1"><span class="stamp">Received<small>15 Oct</small></span><p class="k">Case received</p><p class="t" dir="ltr">RS-2026-000421</p><p class="b">Your file is with the coordination team. Replies Saturday to Thursday, 10:00 to 20:00 Cairo time.</p></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
+      <p class="subhead">My Care, the current-step card. Finished steps are ghosted, the current one carries the seal; nothing else on the card is coloured.</p>
+      <div class="phones">
+        <div class="mc">
+          <div class="mc-ref"><span>Ref. <bdi dir="ltr">RS-2026-000421</bdi> (example)</span><span>Care for yourself</span></div>
+          <div class="mc-body">
+            <p class="lbl">Your current step</p>
+            <h4>A Consultant is reviewing your file</h4>
+            <p>Nothing is needed from you now. We will message you on WhatsApp when the preliminary estimate is ready, and your coordinator stays with your case from here to follow-up.</p>
+          </div>
+          <ol class="steps">
+            <li class="done"><svg aria-hidden="true"><use href="#chk"/></svg><span>Case received</span><span class="when">15 October</span></li>
+            <li class="now" aria-current="step"><span class="dot"></span><span>Consultant review</span><span class="when">now</span></li>
+            <li><span class="dot"></span><span>Preliminary estimate</span><span class="when"></span></li>
+            <li><span class="dot"></span><span>Your decision</span><span class="when"></span></li>
+          </ol>
+          <div class="mc-act"><a class="btn secondary" href="#e">Message your coordinator on WhatsApp</a></div>
+        </div>
+        <div class="phone"><div class="screen">
+          <div class="mc ar" lang="ar">
+            <div class="mc-ref"><span>المرجع (نموذج): <bdi dir="ltr">RS-2026-000421</bdi></span><span>رعاية لنفسك</span></div>
+            <div class="mc-body">
+              <p class="lbl">خطوتك الحالية</p>
+              <h4>استشاري يراجع ملفك الآن</h4>
+              <p>لا نحتاج شيئًا منك الآن. سنراسلك على واتساب عندما يصبح التقدير المبدئي جاهزًا، ويبقى منسّقك مع حالتك من هنا حتى المتابعة.</p>
+            </div>
+            <ol class="steps">
+              <li class="done"><svg aria-hidden="true"><use href="#chk"/></svg><span>تم استلام الحالة</span><span class="when">١٥ أكتوبر</span></li>
+              <li class="now" aria-current="step"><span class="dot"></span><span>مراجعة الاستشاري</span><span class="when">الآن</span></li>
+              <li><span class="dot"></span><span>التقدير المبدئي</span><span class="when"></span></li>
+              <li><span class="dot"></span><span>قرارك</span><span class="when"></span></li>
+            </ol>
+            <div class="mc-act"><a class="btn secondary" href="#e">راسل منسّقك على واتساب</a></div>
+          </div>
+        </div></div>
+      </div>
+
+      <p class="subhead">Coordinator case page header, English then Arabic, desktop. States are typed words; the one dot of seal marks the live state.</p>
+      <div class="staff">
+        <div class="bar"><svg class="mark" aria-hidden="true"><use href="#mk"/></svg><span>RehletShifaa portal</span><nav aria-label="Portal"><a href="#e">My work</a><a href="#e">Queue</a><a href="#e" aria-current="page">Cases</a><a href="#e">Conversations</a></nav></div>
+        <div class="title"><h4><bdi dir="ltr">RS-2026-000421</bdi> <span style="font-weight:400;color:var(--wmuted);font-size:0.9375rem">(example)</span></h4><span class="status">Consultant review in progress</span><span class="owner">Owner: you</span></div>
+        <dl>
+          <div><dt>Patient (example)</dt><dd>Fatima A., 54, Libya</dd></div>
+          <div><dt>Language and channel</dt><dd>Arabic, WhatsApp</dd></div>
+          <div><dt>Care area</dt><dd>Heart</dd></div>
+          <div><dt>Received</dt><dd>15 October 2026</dd></div>
+          <div><dt>Consultant</dt><dd>Assigned, reviewing since 14 October</dd></div>
+        </dl>
+        <div class="next"><p><b>Next:</b> when the Consultant's review arrives, prepare the preliminary estimate. Nothing is waited on from the patient.</p><a class="btn primary" href="#e">Open conversation</a><a class="btn secondary" href="#e">More actions</a></div>
+        <nav class="tabs" aria-label="Case sections"><a href="#e" aria-current="page">Overview</a><a href="#e">Documents (4)</a><a href="#e">Messages (2 unread)</a><a href="#e">Journey</a><a href="#e">Finance</a></nav>
+      </div>
+      <div class="staff ar" lang="ar">
+        <div class="bar"><svg class="mark" aria-hidden="true"><use href="#mk"/></svg><span>بوابة رحلة شفاء</span><nav aria-label="البوابة"><a href="#e">مهامي</a><a href="#e">قائمة الانتظار</a><a href="#e" aria-current="page">الحالات</a><a href="#e">المحادثات</a></nav></div>
+        <div class="title"><h4><bdi dir="ltr">RS-2026-000421</bdi> <span style="font-weight:400;color:var(--wmuted);font-size:0.9375rem">(نموذج)</span></h4><span class="status">مراجعة الاستشاري جارية</span><span class="owner">المسؤول: أنت</span></div>
+        <dl>
+          <div><dt>المريضة (نموذج)</dt><dd>فاطمة أ.، ٥٤ عامًا، ليبيا</dd></div>
+          <div><dt>اللغة والقناة</dt><dd>العربية، واتساب</dd></div>
+          <div><dt>مجال الرعاية</dt><dd>القلب</dd></div>
+          <div><dt>الاستلام</dt><dd>١٥ أكتوبر ٢٠٢٦</dd></div>
+          <div><dt>الاستشاري</dt><dd>مُسنَد، يراجع منذ ١٤ أكتوبر</dd></div>
+        </dl>
+        <div class="next"><p><b>التالي:</b> عند وصول مراجعة الاستشاري، جهّز التقدير المبدئي. لا ننتظر شيئًا من المريضة.</p><a class="btn primary" href="#e">افتح المحادثة</a><a class="btn secondary" href="#e">مزيد من الإجراءات</a></div>
+        <nav class="tabs" aria-label="أقسام الحالة"><a href="#e" aria-current="page">نظرة عامة</a><a href="#e">المستندات (٤)</a><a href="#e">الرسائل (٢ غير مقروءة)</a><a href="#e">الرحلة</a><a href="#e">المالية</a></nav>
+      </div>
+
+      <p class="subhead">The proposed mark and lockups. The mark is a cupped hand holding three dots: you, your coordinator, your Consultant, the three people who ever see the file. The centre dot takes the seal colour; in one ink it is still the same mark.</p>
+      <div class="lockups">
+        <div class="lk"><span class="lock" lang="en"><svg class="mark" aria-hidden="true"><use href="#mk"/></svg>RehletShifaa</span><p class="cap">English lockup, Markazi Text 600</p></div>
+        <div class="lk"><span class="lock ar" lang="ar" dir="rtl"><svg class="mark" aria-hidden="true"><use href="#mk"/></svg>رحلة شفاء</span><p class="cap">Arabic lockup, Markazi Text 700</p></div>
+        <div class="lk"><span class="lock bi" dir="ltr"><span lang="en">RehletShifaa</span><svg class="mark" aria-hidden="true"><use href="#mk"/></svg><span class="ar" lang="ar" dir="rtl">رحلة شفاء</span></span><p class="cap">Letterhead lockup: the header of every page, the Keycloak login and the WhatsApp profile</p></div>
+        <div class="lk dark"><span class="lock" lang="en"><svg class="mark" aria-hidden="true"><use href="#mk"/></svg>RehletShifaa</span><p class="cap">Reversed on ink (closing panel, email footer)</p></div>
+        <div class="lk mono bond"><span class="lock" lang="en"><svg class="mark" aria-hidden="true"><use href="#mk"/></svg>RehletShifaa</span><p class="cap">One ink, for print and the document header</p></div>
+        <div class="lk"><div class="fav">
+          <figure><div class="tile" style="width:28px;height:28px"><svg width="16" height="16" aria-hidden="true"><use href="#mk"/></svg></div><figcaption>16 px</figcaption></figure>
+          <figure><div class="tile" style="width:36px;height:36px"><svg width="24" height="24" aria-hidden="true"><use href="#mk"/></svg></div><figcaption>24 px</figcaption></figure>
+          <figure><div class="tile" style="width:44px;height:44px"><svg width="32" height="32" aria-hidden="true"><use href="#mk"/></svg></div><figcaption>32 px</figcaption></figure>
+          <figure><div class="tile" style="width:60px;height:60px"><svg width="48" height="48" aria-hidden="true"><use href="#mk"/></svg></div><figcaption>48 px</figcaption></figure>
+          <figure><div class="tile" style="width:76px;height:76px;background:var(--wink)"><svg width="64" height="64" aria-hidden="true" style="color:#fff;--mk-you:#b9b2ea"><use href="#mk"/></svg></div><figcaption>64 px, app icon</figcaption></figure>
+        </div><p class="cap">Favicon test: one path and three circles survive 16 px; the ICO ships 16, 32 and 48 from the same SVG</p></div>
+      </div>
+
+      <p class="subhead">Type scale, Arabic first: each role is set for Arabic, then for Latin, never mirrored</p>
+      <div class="typeline">
+        <div class="row"><span class="meta">Display, Markazi Text 700, 44 to 48px, 1.25</span><span class="d" lang="ar" style="font-size:2.5rem;font-weight:700;line-height:1.25;color:var(--wink)">افهم خيارات علاجك</span></div>
+        <div class="row"><span class="meta">Display, Markazi Text 600, 48 to 52px, 1.08, tracking 0</span><span class="d" lang="en" style="font-size:2.6rem;font-weight:600;line-height:1.08;color:var(--wink)">Understand your options</span></div>
+        <div class="row"><span class="meta">Headline, Markazi Text 700 / 600, 30 / 32px</span><span class="d" lang="ar" style="font-size:1.875rem;font-weight:700;color:var(--wink)">خطوتك الحالية</span><span class="d" lang="en" style="font-size:2rem;font-weight:600;color:var(--wink)">Your current step</span></div>
+        <div class="row"><span class="meta">Title, Readex Pro 600, 18 / 20px</span><span lang="ar" style="font-size:1.125rem;font-weight:600;color:var(--wink)">تقدير مبدئي</span><span lang="en" style="font-size:1.25rem;font-weight:600;color:var(--wink)">Preliminary estimate</span></div>
+        <div class="row"><span class="meta">Body, Readex Pro 400, Arabic 17px / 1.8, Latin 16px / 1.65</span><span lang="ar" style="font-size:1.0625rem;line-height:1.8;color:var(--wbodycol)">نرد من السبت إلى الخميس، ١٠:٠٠ إلى ٢٠:٠٠ بتوقيت القاهرة.</span><span lang="en" style="font-size:1rem;color:var(--wbodycol)">Replies Saturday to Thursday, 10:00 to 20:00 Cairo time.</span></div>
+        <div class="row"><span class="meta">Label, Readex Pro 500, 14px, sentence case, no tracking, both scripts</span><span lang="ar" style="font-size:0.875rem;font-weight:500;color:var(--wmuted)">تم استلام الحالة</span><span lang="en" style="font-size:0.875rem;font-weight:500;color:var(--wmuted)">Case received</span></div>
+        <div class="row"><span class="meta">Numerals: locale digits for dates, times and money (ar-EG), Latin digits for identifiers, tabular</span><span lang="ar" style="font-variant-numeric:tabular-nums;color:var(--wbodycol)">٤٬٢٠٠ إلى ٥٬١٠٠ دولار</span><span lang="en" style="font-variant-numeric:tabular-nums;color:var(--wbodycol)"><bdi dir="ltr">RS-2026-000421</bdi></span></div>
+      </div>
+
+      <div class="strip">
+        <span class="btn primary">Send my case</span><span class="btn secondary">Track case</span><span class="chip">Credentials reviewed and current</span><span class="field">Search your country</span>
+        <p class="body-sample">Recommendations and cost estimates are preliminary and can change after an in-person assessment.</p>
+      </div>
+      <div class="tokens">
+        <div class="sw"><i style="background:#182230"></i><b>ink-900, text and action</b><span class="measure">#182230, on bond 16.03, on bond-2 14.25</span></div>
+        <div class="sw"><i style="background:#2a3646"></i><b>ink-600, body and hover</b><span class="measure">#2a3646, on bond 12.25, on bond-2 10.89</span></div>
+        <div class="sw"><i style="background:#55617a"></i><b>ink-400, muted</b><span class="measure">#55617a, on bond 6.22, on bond-2 5.53</span></div>
+        <div class="sw"><i style="background:#76819a"></i><b>ink-350, field edge</b><span class="measure">#76819a, 3.91 / 3.47 (1.4.11)</span></div>
+        <div class="sw"><i style="background:#ffffff; border-bottom:1px solid #c5cad2"></i><b>bond, canvas</b><span>#ffffff</span></div>
+        <div class="sw"><i style="background:#f1f2ee; border-bottom:1px solid #c5cad2"></i><b>bond-2, second surface</b><span>#f1f2ee</span></div>
+        <div class="sw"><i style="background:#4b3fa5"></i><b>seal, stamp frame, focus ring, the you-dot</b><span class="measure">#4b3fa5, on bond 8.22, on bond-2 7.31</span></div>
+        <div class="sw"><i style="background:#3b3187"></i><b>seal ink, stamp words</b><span class="measure">#3b3187, on bond 10.63</span></div>
+        <div class="sw"><i style="background:#ecebf7"></i><b>seal well, selection and halo</b><span class="measure">#ecebf7, ink on it 13.58</span></div>
+        <div class="sw"><i style="background:#dfe2e6"></i><b>hairline</b><span>#dfe2e6, decorative</span></div>
+        <div class="sw"><i style="background:#c5cad2"></i><b>strong hairline, the double rule's grey</b><span>#c5cad2, decorative</span></div>
+      </div>
+    </div>
+    <div class="assess">
+      <div><h4>What it says</h4><p>"The doctor's own letterhead, with your name on it." Official without being a ministry; Egyptian without a symbol; bilingual by construction, because the letterhead always was.</p></div>
+      <div><h4>Where it wins</h4><ul><li>Arabic is structurally first: the Naskh face leads, the Latin was drawn to follow it, and the letterhead keeps Arabic on the right in every locale.</li><li>The bilingual header doubles as the language switch, so the one chrome element every page needs becomes the signature.</li><li>Two colours and white; every pair measured; the seal passes 3:1 as a mark and 4.5:1 as text, so rings, focus and stamp all meet AA.</li><li>White bond, blue-black ink and a violet seal sit outside every trait on the plugin's list, and outside the category's teal.</li></ul></div>
+      <div><h4>Honest risks</h4><ul><li>A serif-flavoured Naskh display on the web is a stronger voice than a geometric sans; in body sizes it must never be used (Readex Pro does that work).</li><li>Violet reads "stamp" to this audience; to a European eye it may read "finance". It is never a surface, so the risk stays small.</li><li>Rename the ramp: "petrol" tokens would carry ink values. The proposal below keeps the names where code depends on them and adds the new ones.</li></ul></div>
+      <div><h4>Cost to adopt</h4><p><b>Medium-high</b>, in three sessions: tokens, fonts and type scale with DESIGN.md; mark, lockups, favicon, Keycloak and WhatsApp; screenshot baselines, a11y, Playwright, Control Center convergence. Pre-production with no data to keep (owner, 2026-09-26) is the cheapest moment there will ever be.</p></div>
+    </div>
+  </section>
+
+  <!-- ============================ Verdict ============================ -->
+  <section class="verdict" id="verdict">
+    <h2>Recommendation</h2>
+    <p><b>Adopt E, Letterhead &amp; Seal, with the new mark.</b> It is the only world of the five that answers all three things the owner reopened at once: it is distinctive for the right reason (the audience's own artefact, not a palette trick), it designs Arabic as the first voice in the type itself, and it gives the mark a meaning the product can explain in one sentence. It also clears the plugin's list without exception, which neither A nor B can do while they keep cream, coral and the eyebrow.</p>
+    <p>For this audience: a family deciding on treatment abroad trusts paper with a letterhead and a seal more than it trusts an app, and it reads Naskh faster than Kufi or a geometric sans. For this business: the product's claim is "a Consultant reviews your file before you commit"; a letterhead is what makes a review a document, and the seal is what makes a step real. For the staff: one ink, typed states and a ruled header make a denser working screen than any coloured-pill system, and it is the same world as the patient's page.</p>
+    <div class="tablewrap">
+      <table class="cmp">
+        <thead><tr><th>World</th><th>Distinctive, and why</th><th>Trust for a worried family</th><th>Arabic as the first voice</th><th>Clears the plugin's list</th><th>Mark</th><th>Cost</th></tr></thead>
+        <tbody>
+          <tr><td>A Petrol &amp; Paper</td><td>Medium: category teal, cream and coral</td><td>High</td><td>No: a step down from Latin</td><td>No (traits 1 and the kicker)</td><td>Current raster</td><td>None</td></tr>
+          <tr><td>A-prime (A, tells removed, white bond)</td><td>Medium</td><td>High</td><td>No</td><td>Yes, barely</td><td>Current, as SVG</td><td>Very low</td></tr>
+          <tr><td>B Petrol Night</td><td>High at first glance, cosmetic</td><td>Medium: premium register</td><td>No</td><td>No (traits 1 and 2)</td><td>Current</td><td>Low</td></tr>
+          <tr><td>C Nile Ink &amp; Limestone</td><td>High, familiar once past teal</td><td>Highest</td><td>Partly: Readex Pro</td><td>Partly (cream and warm accent)</td><td>Needs a new mark</td><td>High</td></tr>
+          <tr><td>D Kufi &amp; Chalk</td><td>Medium-high</td><td>Medium: cold</td><td>Partly: two Arabic faces</td><td>No (trait 2, mint fails 3:1)</td><td>Fits</td><td>Medium</td></tr>
+          <tr><td><b>E Letterhead &amp; Seal</b></td><td><b>High: the audience's own artefact; bilingual header as the switch</b></td><td><b>High</b></td><td><b>Yes: Naskh leads, Latin follows, locale numerals</b></td><td><b>Yes</b></td><td><b>New mark proposed</b></td><td>Medium-high</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>What the owner decides at this gate</h3>
+    <ol>
+      <li><b>The world:</b> E as recommended, or A-prime as the zero-cost fallback (A with the kicker, dots, arrow and cream removed), or one of B, C, D.</li>
+      <li><b>The mark:</b> the cupped hand with three dots as proposed, or the current hand-and-heart redrawn as a one-ink SVG inside world E (it works; it is less ownable).</li>
+      <li><b>The wordmark face:</b> Markazi Text in both scripts as shown, or Readex Pro (the UI face) if the Naskh voice feels too bookish beside the mark.</li>
+      <li><b>Numerals:</b> Eastern Arabic digits for dates, times and money on <code>/ar</code> (identifiers stay Latin), which reverses the pass-3 decision to keep Western digits until the native review.</li>
+    </ol>
+    <p>Nothing in the code changes before the answer. After it, the token session begins with the proposal below.</p>
+  </section>
+
+  <!-- ============================ Tokens ============================ -->
+  <section class="plain" id="tokens">
+    <h2>Token proposal for world E</h2>
+    <p class="read">Proposal only; no token, component or asset is changed in this commit. The token source stays the <code>@theme</code> block in <code>frontend/src/app/globals.css</code>, re-pointed by a theme file under <code>data-brand-theme</code>. The cleanest cut is a new <code>theme-letterhead.css</code> that re-points the same names <code>theme-petrol.css</code> re-points today, selected by <code>data-brand-theme="letterhead"</code>, with <code>theme-petrol.css</code> deleted once the switch lands (pre-production: no shadow or compatibility layer, per the owner's cutover rule). Where a name says "brand" or "coral" it keeps its name and takes the new value, because components read the name; the renames are listed as a follow-up.</p>
+
+    <h3>1. <code>globals.css</code> <code>@theme</code>: colour ramps</h3>
+    <div class="tablewrap"><table class="cmp">
+      <thead><tr><th>Token</th><th>Today (Petrol &amp; Paper)</th><th>Proposed (Letterhead &amp; Seal)</th><th>Role, measured</th></tr></thead>
+      <tbody>
+        <tr><td><code>--color-brand-50</code></td><td class="measure">#eef4f3</td><td class="measure">#eef0f3</td><td>Hover wash</td></tr>
+        <tr><td><code>--color-brand-100</code></td><td class="measure">#d9e8e6</td><td class="measure">#e3e6ec</td><td>Selection, inert well; muted-on-ink panel 12.82</td></tr>
+        <tr><td><code>--color-brand-200</code></td><td class="measure">#b6d3cf</td><td class="measure">#c5cad2</td><td>Strong hairline, the double rule's grey (decorative)</td></tr>
+        <tr><td><code>--color-brand-300</code></td><td class="measure">#8cbab4</td><td class="measure">#a6adbb</td><td>Quiet marks, future journey steps (not text)</td></tr>
+        <tr><td><code>--color-brand-400</code></td><td class="measure">#5fb3ac</td><td class="measure">#76819a</td><td>Field edge and journey connector; 3.91 on bond, 3.47 on bond-2</td></tr>
+        <tr><td><code>--color-brand-500</code></td><td class="measure">#1d6b6b</td><td class="measure">#55617a</td><td>Muted text; 6.22 / 5.53</td></tr>
+        <tr><td><code>--color-brand-600</code></td><td class="measure">#0e5f66</td><td class="measure">#182230</td><td>The action colour; white on it 16.03</td></tr>
+        <tr><td><code>--color-brand-700</code></td><td class="measure">#0e4f55</td><td class="measure">#2a3646</td><td>Hover and pressed; white on it 12.25</td></tr>
+        <tr><td><code>--color-brand-800</code></td><td class="measure">#0c4247</td><td class="measure">#1f2b3a</td><td>Reached journey marker, badge text</td></tr>
+        <tr><td><code>--color-brand-900</code></td><td class="measure">#13292e</td><td class="measure">#182230</td><td>Headings and the wordmark; 16.03 on bond</td></tr>
+        <tr><td><code>--color-brand-950</code></td><td class="measure">#0b1d21</td><td class="measure">#0f1620</td><td>Closing panel and reversed lockup ground</td></tr>
+        <tr><td><code>--color-ink-900 / 800 / 700</code></td><td class="measure">#14262b / #1b2f34 / #24383d</td><td class="measure">#182230 / #1f2b3a / #222d3c</td><td>Deep text; 16.03 and above</td></tr>
+        <tr><td><code>--color-ink-600</code></td><td class="measure">#33474c</td><td class="measure">#2a3646</td><td>Body text; 12.25 on bond, 10.89 on bond-2</td></tr>
+        <tr><td><code>--color-ink-500</code></td><td class="measure">#41555a</td><td class="measure">#3f4b5e</td><td>Supporting text, disabled button label</td></tr>
+        <tr><td><code>--color-ink-400</code></td><td class="measure">#5d6e72</td><td class="measure">#55617a</td><td>Muted text, the floor; 6.22 / 5.53</td></tr>
+        <tr><td><code>--color-ink-350</code></td><td class="measure">#7a898c</td><td class="measure">#76819a</td><td>Field edge; 3.91 / 3.47 (1.4.11)</td></tr>
+        <tr><td><code>--color-ink-300</code></td><td class="measure">#a3afb1</td><td class="measure">#a6adbb</td><td>Resting arrows, not text</td></tr>
+        <tr><td><code>--color-line / --color-line-strong</code></td><td class="measure">#e3ded4 / #cfc8ba</td><td class="measure">#dfe2e6 / #c5cad2</td><td>Hairlines, decorative</td></tr>
+        <tr><td><code>--color-border-subtle / --color-border-card / --color-border-clinical</code></td><td class="measure">(petrol aliases)</td><td class="measure">#e6e9ed / #d9dde3 / #c5cad2</td><td>Card and panel edges</td></tr>
+        <tr><td><code>--color-mist / --color-mist-deep</code></td><td class="measure">#f7f4ee / #efeae0 (paper)</td><td class="measure">#f1f2ee / #e7e9e4</td><td>Bond-2 and the tracks well</td></tr>
+        <tr><td><code>--color-surface-default / -pearl / -clinical / -elevated</code></td><td class="measure">white / paper / white / white</td><td class="measure">#ffffff / #f1f2ee / #ffffff / #ffffff</td><td>Two surfaces: bond and bond-2</td></tr>
+        <tr><td><code>--color-surface-sage / -ivory / -warm / -hospitality</code></td><td class="measure">(paper tints)</td><td class="measure">#f1f2ee (all four collapse to bond-2)</td><td>Washes are banned; the names stay until the components that read them are converged</td></tr>
+        <tr><td><code>--color-sand-50 / 100 / 200 / 300 / 700</code></td><td class="measure">(sand ramp)</td><td class="measure">#f1f2ee / #e7e9e4 / #dfe2e6 / #c5cad2 / #55617a</td><td>Neutral aliases</td></tr>
+        <tr><td><code>--color-wash-aqua / -sky / -peach / -lavender</code></td><td class="measure">(tints)</td><td class="measure">#e8f4f0 / #e9f0f5 / #f4efe8 / #f2ecf5</td><td>Inert; reused as the care-area wells</td></tr>
+        <tr><td><code>--color-text-heading / -body / -muted</code></td><td class="measure">petrol-900 / ink-600 / ink-400</td><td class="measure">#182230 / #2a3646 / #55617a</td><td>16.03 / 12.25 / 6.22 on bond</td></tr>
+        <tr><td><code>--color-coral</code></td><td class="measure">#e07a5f (fails 3:1)</td><td class="measure">#4b3fa5 (seal)</td><td>Stamp frame, journey rings, reading hairline, the you-dot; 8.22 on bond, 7.31 on bond-2, 6.97 on its well. Rename to <code>--color-seal</code> in the follow-up</td></tr>
+        <tr><td><code>--color-accent-50 / 100 / 200</code></td><td class="measure">(warm accent tints)</td><td class="measure">#f4f3fb / #ecebf7 / #d6d3ef</td><td>Seal wells; ink on #ecebf7 13.58</td></tr>
+        <tr><td><code>--color-accent-500 / 600 / 700 / 800</code></td><td class="measure">(warm accent)</td><td class="measure">#6a5fc0 / #4b3fa5 / #3b3187 / #2d2567</td><td>Seal ramp; 600 and 700 are the stamp frame and stamp words (10.63)</td></tr>
+        <tr><td><code>--color-accent-clinical / -warm / -sand</code></td><td class="measure">(petrol / coral / sand)</td><td class="measure">#182230 / #4b3fa5 / #c5cad2</td><td>Aliases kept for readers</td></tr>
+        <tr><td><code>--color-alert-50 / 200 / 600 / 700 / 800</code></td><td class="measure">#fdf5f4 / #f0d4d1 / #b3352f / #8c2b28 / #74201e</td><td class="measure">unchanged</td><td>Errors keep the stamp-ink red; 8.43 on bond</td></tr>
+        <tr><td><code>--color-status-info-fg / -surface / -border</code></td><td class="measure">(petrol info)</td><td class="measure">#3b3187 / #ecebf7 / #c9c4ea</td><td>Info takes the seal; 9.01 on its surface</td></tr>
+        <tr><td><code>--color-status-success-* / -warning-* / -danger-* / -neutral-*</code></td><td class="measure">(D2 values)</td><td class="measure">unchanged, neutral re-pointed to ink-400 on bond-2</td><td>6.69 / 5.45 / 7.58 on their surfaces</td></tr>
+        <tr><td><code>--color-system-heart-well / -ring / -line</code> and <code>--sys-heart-deep</code></td><td class="measure">#e2f5ec / … / #3b9166, #1b5f3d</td><td class="measure">#f6ebed / #a8606c / #a8606c, #6b2f3a</td><td>Deep on well 8.61</td></tr>
+        <tr><td><code>--color-system-neuro-*</code>, <code>--sys-neuro-deep</code></td><td class="measure">#e2f6f3 … #186256</td><td class="measure">#e9f0f5 / #6a8aa6 / #6a8aa6, #2f4f6b</td><td>7.44</td></tr>
+        <tr><td><code>--color-system-movement-*</code>, <code>--sys-movement-deep</code></td><td class="measure">#e1f4f7 … #175c63</td><td class="measure">#e8f4f0 / #6aa693 / #6aa693, #2f6b5a</td><td>5.53</td></tr>
+        <tr><td><code>--color-system-digestive-*</code>, <code>--sys-digestive-deep</code></td><td class="measure">#e2f0f6 … #184c62</td><td class="measure">#f4efe8 / #a6896a / #a6896a, #6b4f2f</td><td>6.59</td></tr>
+        <tr><td><code>--color-system-surgery-*</code>, <code>--sys-surgery-deep</code></td><td class="measure">#e3ebf5 … #1c3b5e</td><td class="measure">#ebeef5 / #7384a6 / #7384a6, #3a4a6b</td><td>7.62</td></tr>
+        <tr><td><code>--color-system-women-*</code>, <code>--sys-women-deep</code></td><td class="measure">#e4e8f4 … #202e5b</td><td class="measure">#f2ecf5 / #9a74a6 / #9a74a6, #5f3a6b</td><td>7.85. The icon still carries identity; the hues are desaturated so none competes with the seal</td></tr>
+        <tr><td><code>--font-sans</code></td><td>Plus Jakarta Sans stack</td><td>Readex Pro, Segoe UI, system-ui, sans-serif</td><td>One family for both scripts</td></tr>
+        <tr><td><code>--font-display</code> (new)</td><td>(Alexandria via <code>--font-brand-*</code>)</td><td>Markazi Text, Noto Naskh Arabic, Georgia, serif</td><td>Display, headline, statement, wordmark</td></tr>
+        <tr><td><code>--radius-card</code></td><td>0.5rem</td><td>0.25rem</td><td>Documents are squarer; 4px on cards, buttons, fields, dialogs; full circles only for markers and avatars</td></tr>
+        <tr><td><code>--shadow-card</code>, <code>--breakpoint-nav</code></td><td>(rest shadow, 1100px)</td><td>unchanged</td><td>The header content shrinks (the letterhead replaces the pill track), so re-test 1100px</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>2. <code>theme-petrol.css</code> becomes <code>theme-letterhead.css</code></h3>
+    <p class="read">Every re-point the petrol file makes today is made again with the values above: <code>--color-brand-*</code>, <code>--color-accent-*</code>, <code>--color-ink-*</code>, <code>--color-line*</code>, <code>--color-mist*</code>, <code>--color-surface-*</code>, <code>--color-sand-700</code>, <code>--color-wash-*</code>, <code>--color-text-*</code>, <code>--color-coral</code>, <code>--color-border-*</code>, <code>--color-system-*</code>, <code>--sys-*-deep</code>, <code>--paper</code> (#ffffff), <code>--paper-deep</code> (#f1f2ee), <code>--radius-card</code>, <code>--shadow-card</code>, <code>--shadow-raised</code> (unchanged), <code>--button-radius</code> and <code>--button-radius-compact</code> (4px), <code>--field-radius</code> and <code>--dialog-radius</code> (4px), <code>--button-primary-shadow-hover</code> (none), <code>--button-secondary-bg-hover</code> (#f1f2ee), <code>--button-secondary-border-hover</code> and <code>--button-secondary-fg-hover</code> (#182230). The petrol-only rules in that file (the hero's rise, the eyebrow's coral rule, the pill track) are dropped; the eyebrow is removed as a pattern.</p>
+
+    <h3>3. Component tokens in <code>globals.css</code> <code>:root</code></h3>
+    <div class="tablewrap"><table class="cmp">
+      <thead><tr><th>Token group</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td><code>--button-primary-bg / -bg-hover / -fg / -border</code></td><td>#182230 / #2a3646 / #ffffff / transparent. White on both 16.03 and 12.25</td></tr>
+        <tr><td><code>--button-secondary-bg / -fg / -border</code> and hover</td><td>#ffffff / #182230 / #182230 at 1.5px; hover bg #f1f2ee</td></tr>
+        <tr><td><code>--button-outline-*</code>, <code>--button-inverse-*</code></td><td>Outline border #182230; inverse stays white with #182230 text on the ink panel</td></tr>
+        <tr><td><code>--button-disabled-bg / -fg / -border / -opacity</code></td><td>#e7e9e4 / #3f4b5e / #c5cad2 / 1 (ink-500 on the well 8.9)</td></tr>
+        <tr><td><code>--button-height*</code>, <code>--button-padding*</code>, <code>--button-font-size*</code></td><td>Unchanged (48 / 44 / 46px; 44px minimum everywhere)</td></tr>
+        <tr><td><code>--badge-bg / -fg / -border</code>, <code>--badge-{tone}-*</code></td><td>Default #f1f2ee / #182230 / #c5cad2; info tone takes the seal set; the others unchanged. Badges keep the tone icon</td></tr>
+        <tr><td><code>--field-bg / -fg / -border / -border-hover / -border-focus / -focus-halo / -border-error / -error-fg / -placeholder / -label-fg-focus / -disabled-bg</code></td><td>#ffffff / #182230 / #76819a / #55617a / #182230 / #ecebf7 (3px) / #8c2b28 / #74201e / #55617a / #182230 / #f1f2ee</td></tr>
+        <tr><td><code>--focus-ring</code></td><td>3px solid #4b3fa5, offset 2px, on every control (8.22 on bond; 7.04 on the ink button)</td></tr>
+        <tr><td><code>--card-bg / -bg-inset / -border / -fg / -radius / -shadow / -shadow-raised / -tab-edge</code></td><td>#ffffff / #f1f2ee / #d9dde3 / #2a3646 / 4px / rest / raised / the tab edge becomes the 1px ink top rule of a letterhead page</td></tr>
+        <tr><td><code>--dialog-bg / -fg / -border / -backdrop / -radius / -shadow</code></td><td>#ffffff / #2a3646 / #c5cad2 / rgba(24,34,48,0.45) / 4px / raised</td></tr>
+        <tr><td><code>--table-header-bg / -header-fg / -border / -row-fg / -row-fg-strong / -row-meta-fg / -row-bg-hover / -row-selected-edge</code></td><td>#ffffff / #55617a / #dfe2e6 / #2a3646 / #182230 / #55617a / #f1f2ee / #4b3fa5. Headers are sentence case, never tracked</td></tr>
+        <tr><td><code>--logo-ink / --logo-accent / --logo-dot</code> and <code>.logo-i</code>, <code>.logo-wordmark*</code></td><td>Retired with <code>Logo.tsx</code>'s hex fallbacks (#29454d, #247c86, #e98d78, #a9ddd6, #f3b3a3); the SVG mark reads <code>currentColor</code> and <code>--mk-you</code> (#4b3fa5; #b9b2ea reversed)</td></tr>
+        <tr><td><code>CaseStamp.tsx</code></td><td>Frame <code>var(--color-seal)</code> #4b3fa5, words <code>--color-accent-700</code> #3b3187 (10.63 on bond), inner second rule, tilt unchanged</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>4. Fonts (<code>frontend/src/lib/fonts.ts</code>, <code>frontend/src/assets/fonts/</code>)</h3>
+    <ul class="note-list">
+      <li><code>latinSans</code> and <code>arabicSans</code> collapse into one <code>localFont</code>, Readex Pro variable (160 to 700), Latin and Arabic subsets, as <code>--font-latin</code> and <code>--font-arabic</code> so existing stacks keep resolving; <code>jakarta-latin-*.woff2</code> and <code>cairo-arabic-*.woff2</code> and their licence files are removed.</li>
+      <li><code>brandLatin</code> and <code>brandArabic</code> become Markazi Text variable (400 to 700) subsets as <code>--font-brand-latin</code> and <code>--font-brand-arabic</code>, now used for display, headline, statement and the wordmark; <code>alexandria-*.woff2</code> removed.</li>
+      <li>Type roles in DESIGN.md: Arabic sizes are set first (display 44 to 48 / 1.25; headline 30 / 1.3; body 17 / 1.8; label 14), Latin follows (48 to 52 / 1.08; 32 / 1.15; 16 / 1.65; 14). No uppercase, no tracking in either script. Numerals: <code>ar-EG</code> digits for dates, times and money through <code>intlLocale()</code>, Latin digits for identifiers in <code>&lt;bdi dir="ltr"&gt;</code>; tabular figures in tables.</li>
+      <li>Licences: Readex Pro and Markazi Text are both SIL OFL 1.1.</li>
+    </ul>
+
+    <h3>5. Keycloak theme (<code>infrastructure/keycloak/themes/rehletshifaa</code>)</h3>
+    <ul class="note-list">
+      <li><code>login/resources/css/rehletshifaa.css</code>: <code>--rs-cream</code> #f7f3ec to #ffffff, <code>--rs-surface</code> #ffffff, <code>--rs-aqua</code> #e6f2f0 to #f1f2ee, <code>--rs-teal</code> #0f8a7e to #182230, <code>--rs-teal-strong</code> #0b6f66 to #2a3646, <code>--rs-teal-soft</code> #14a599 to #4b3fa5 (focus and links), <code>--rs-ink</code> #23343a to #182230, <code>--rs-ink-soft</code> #4a5b62 to #55617a, <code>--rs-border</code> #d9d0c2 to #c5cad2, <code>--rs-danger</code> #b23a48 to #8c2b28, <code>--rs-radius</code> 14px to 4px, <code>--rs-shadow</code> loses its teal tint; the remaining literal hexes (#e6f2f0, #cfe4e0, #bfe0da, #efe8dc, #fbeced, #f0c4c9) map to bond-2, hairlines and the alert tints. The font stack ("Segoe UI", Cairo…) becomes Readex Pro served from <code>login/resources/fonts/</code>, Markazi Text for the page title.</li>
+      <li><code>login/resources/img/brand-lockup.svg</code>, <code>brand-lockup.png</code> and <code>logo.png</code>: replaced by the letterhead lockup (SVG; the CSS background on line 64 reads the PNG, so ship a PNG export too, 2x).</li>
+      <li><code>email/</code> carries no image; its templates inherit the wordmark text only. The messages files are unchanged.</li>
+    </ul>
+
+    <h3>6. Brand assets and the WhatsApp profile</h3>
+    <ul class="note-list">
+      <li><code>frontend/src/app/icon.png</code> (the Next.js favicon): replaced by <code>icon.svg</code> plus a 32px PNG and an ICO (16, 32, 48) generated from the mark; <code>apple-icon.png</code> at 180px on the ink ground, as in the 64px tile above.</li>
+      <li><code>frontend/public/brand/icon.png</code>, <code>mark-body.svg</code> and <code>rehletshifaa-logo-concept-v2.png</code>: retired; <code>public/brand/mark.svg</code>, <code>lockup-en.svg</code>, <code>lockup-ar.svg</code>, <code>lockup-letterhead.svg</code> replace them, and <code>Logo.tsx</code> renders the inline SVG instead of a filtered PNG.</li>
+      <li>WhatsApp Business profile picture (set in Meta Business Manager, not in the repository): the mark on bond at 640×640 PNG, ink on white with the seal dot; the cover and message templates in <code>docs/whatsapp-message-templates.md</code> need no change. The journey film posters (<code>public/media/rehletshifaa-journey-*-poster.jpg</code>) carry the old mark and are re-rendered in the assets session.</li>
+      <li>Social and OpenGraph: no image exists today; the letterhead lockup on bond at 1200×630 becomes the default when one is added.</li>
+    </ul>
+
+    <h3>7. Follow-ups named, not done here</h3>
+    <ul class="note-list">
+      <li>Rename <code>--color-coral</code> to <code>--color-seal</code> and the <code>brand</code> ramp to <code>ink</code> once every reader uses component tokens; DESIGN.md is rewritten from the built world at the end of the token session, not before.</li>
+      <li>The Control Center still reads base values; converging it is UX area 6 and becomes simpler with one ink.</li>
+      <li>Native Arabic review stays the launch gate; the Arabic copy on this page is the existing copy plus four new strings (the note, the step card, the staff header), pending that review.</li>
+    </ul>
+  </section>
+
+  <!-- ============================ Measurements ============================ -->
+  <section class="plain" id="measure">
+    <h2>Measurements</h2>
+    <p class="read">WCAG 2.x relative-luminance contrast, computed from the hex values with the standard formula; text pairs need 4.5:1, component edges and marks 3:1.</p>
+    <div class="tablewrap"><table class="cmp measure">
+      <thead><tr><th>Pair</th><th>Ratio</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>E ink-900 #182230 on bond #ffffff</td><td>16.03</td><td class="ok">AA</td></tr>
+        <tr><td>E ink-900 on bond-2 #f1f2ee</td><td>14.25</td><td class="ok">AA</td></tr>
+        <tr><td>E ink-600 #2a3646 on bond / bond-2</td><td>12.25 / 10.89</td><td class="ok">AA</td></tr>
+        <tr><td>E ink-400 #55617a on bond / bond-2 / seal well</td><td>6.22 / 5.53 / 5.27</td><td class="ok">AA</td></tr>
+        <tr><td>E white on ink-900 (button) / on ink-600 (hover)</td><td>16.03 / 12.25</td><td class="ok">AA</td></tr>
+        <tr><td>E seal #4b3fa5 on bond / bond-2 / seal well</td><td>8.22 / 7.31 / 6.97</td><td class="ok">AA (text and mark)</td></tr>
+        <tr><td>E seal ink #3b3187 on bond / bond-2 / info surface</td><td>10.63 / 9.46 / 9.01</td><td class="ok">AA</td></tr>
+        <tr><td>E white on seal #4b3fa5 / on seal ink #3b3187</td><td>8.22 / 10.63</td><td class="ok">AA</td></tr>
+        <tr><td>E field edge #76819a on bond / bond-2</td><td>3.91 / 3.47</td><td class="ok">1.4.11</td></tr>
+        <tr><td>E hairlines #dfe2e6, #c5cad2; quiet #a6adbb on bond</td><td>1.3, 1.65, 2.25</td><td class="mark-only">decorative only, never a control's only edge</td></tr>
+        <tr><td>E muted-on-ink panel #e3e6ec on #182230; quiet #a6adbb on ink</td><td>12.82 / 7.11</td><td class="ok">AA</td></tr>
+        <tr><td>E success #1b5f3d, warning #8c5a0a, danger #8c2b28 on bond</td><td>7.63 / 5.86 / 8.43</td><td class="ok">AA</td></tr>
+        <tr><td>E success / warning / danger on their surfaces</td><td>6.69 / 5.45 / 7.58</td><td class="ok">AA</td></tr>
+        <tr><td>E care areas, deep on well: heart, neuro, movement, digestive, surgery, women</td><td>8.61 / 7.44 / 5.53 / 6.59 / 7.62 / 7.85</td><td class="ok">AA</td></tr>
+        <tr><td>A petrol-600 with white; ink-900 on paper; ink-400 on paper; stamp ink on white</td><td>7.38 / 14.26 / 4.86 / 8.43</td><td class="ok">AA</td></tr>
+        <tr><td>A logo coral #e07a5f on paper</td><td>2.69</td><td class="bad">fails 3:1 as a mark</td></tr>
+        <tr><td>B ivory, body, muted, aqua on the desk; ink on aqua</td><td>15.11 / 11.23 / 8.12 / 7.04 / 7.04</td><td class="ok">AA</td></tr>
+        <tr><td>C ink and slate on limestone; copper ink on ivory; copper mark</td><td>11.86 / 5.17 / 7.47 / 4.28</td><td class="ok">AA; mark passes 3:1</td></tr>
+        <tr><td>D ink and graphite on chalk; deep mint on white</td><td>17.66 / 5.35 / 6.42</td><td class="ok">AA</td></tr>
+        <tr><td>D mint #2bb39a on chalk</td><td>2.53</td><td class="bad">fails 3:1 as a mark</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+</div>
+</body>
+</html>

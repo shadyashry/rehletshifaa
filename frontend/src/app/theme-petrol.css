@@ -411,7 +411,7 @@
   border: 1px solid var(--color-line-strong);
   border-radius: 0.5rem;
   background: var(--color-surface-default);
-  padding: 1rem 1.125rem 1.125rem;
+  padding: var(--page-pad, 1rem 1.125rem 1.125rem);
   box-shadow: 0 14px 28px -24px rgba(19, 41, 46, 0.55);
   transform: rotate(var(--page-tilt, 0deg));
 }
@@ -423,17 +423,37 @@
 .dossier-page[data-depth="3"] > p,
 .dossier-page[data-depth="2"] > p { padding-inline-end: 1rem; }
 /* The confirmation page is the same page, resting flat, with no stack above it. */
-.dossier-page-static { --page-tilt: 0deg; padding-inline-end: 7rem; }
+/* A flat page has no transform, so nothing inside it (dialogs, sticky bars) gets a new containing block. */
+.dossier-page-static { transform: none; }
+/* My Care's current step: the portal's card padding on the page of the file. */
+.my-care-step { --page-pad: 1.25rem; }
+@media (min-width: 640px) { .my-care-step { --page-pad: 1.75rem; } }
+/* A stamped page keeps the end-top corner clear for the stamp (DossierPage); an unstamped one uses the full width.
+   The reserve is the stamp's inset plus its widest measured box, tilt included ("Estimate ready" wrapped, about
+   7rem), so no line of the page runs under it at any width from 640px. */
+.dossier-page-static { --stamp-inset: 1.5rem; }
+.dossier-page-static[data-stamped] { padding-inline-end: calc(var(--stamp-inset) + 7.25rem); }
+.dossier-page-stamp { position: absolute; inset-inline-end: var(--stamp-inset); inset-block-start: var(--stamp-inset); }
+/* A block below the stamp (journey, form) takes the page's full width back: the reserve only has to clear the corner. */
+.dossier-page-static[data-stamped] .dossier-page-full { margin-inline-end: calc(var(--page-pad, 1.125rem) - var(--stamp-inset) - 7.25rem); }
+/* The page that matters now carries the file's petrol tab on its top edge. */
+.dossier-page-static[data-edge="tab"] { border-block-start: 2px solid var(--color-brand-600); }
+@media (min-width: 768px) {
+  .dossier-page-static { --stamp-inset: 2.25rem; }
+}
 @media (max-width: 639px) {
   .dossier-page[data-depth="1"] { padding-inline-end: 1.125rem; padding-block-start: 3.25rem; }
-  .dossier-page-static { padding-inline-end: 1.75rem; padding-block-start: 4rem; }
+  /* Phones: the stamp sits above the text; its tilted box is about 4.5rem tall on one line ("Estimate ready"). */
+  .dossier-page-static[data-stamped] { padding-inline-end: 1.75rem; padding-block-start: calc(var(--stamp-inset) + 4.75rem); }
+  .my-care-step.dossier-page-static[data-stamped] { padding-inline-end: var(--page-pad); }
+  .dossier-page-static[data-stamped] .dossier-page-full { margin-inline-end: calc(var(--page-pad, 1.125rem) - 1.75rem); }
 }
 .case-stamp {
   transform: rotate(var(--stamp-tilt, -8deg));
   background: color-mix(in srgb, var(--color-surface-default) 82%, transparent);
   letter-spacing: 0.02em;
 }
-[dir="rtl"] .case-stamp { --stamp-tilt: 8deg; }
+[dir="rtl"] .case-stamp { --stamp-tilt: 8deg; letter-spacing: 0; }
 /* The intake card: a petrol top edge, like the tab of a clinical file. */
 :root[data-brand-theme="petrol"] .home-hero-card {
   border-top: 2px solid var(--color-brand-600);
@@ -725,6 +745,10 @@
   :root[data-brand-theme="petrol"] .dossier-page[data-depth="1"] { animation-delay: 0.42s; }
   :root[data-brand-theme="petrol"] .dossier-stamp {
     animation: petrol-stamp-press 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.95s backwards;
+  }
+  /* A real event's stamp on the page that matters now presses in once, quickly, as the page arrives. */
+  :root[data-brand-theme="petrol"] .dossier-page-static[data-edge="tab"] .case-stamp {
+    animation: petrol-stamp-press 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
   :root[data-brand-theme="petrol"] .home-hero-rail li {
     animation: petrol-fade 0.6s ease both;

@@ -494,3 +494,118 @@ Review: `docs/ux-redesign/patient-site-review-2026-10-14.md` (24/32). Plan slot:
 | Done (order only: privacy before travel); care-area row and rail fold still open | Home order and length: privacy before travel; care areas as one quiet row; five-icon rail folded into the hero card. | Review 2026-10-14 | `app/[locale]/page.tsx` | distill, layout |
 | Done (trust pass A') | Hero entrance animation leaves the lead and card invisible until it runs; shorten delays and use `backwards` fill. | Review 2026-10-14 | `theme-petrol.css` 666–687 | animate |
 | P3 | Header: demote the Coordinator link to the language-switch weight; footer disclaimer shortened; emergency card out of the trust palette. | Review 2026-10-14 | `Header.tsx`, `Footer.tsx`, `TrustSection.tsx` | polish |
+
+## UX area 1 — patient portal as the file (critique 2026-10-15)
+
+Critique 23/40; plan `plans/patient-portal-file.md` (at the owner gate). In-area findings are the plan's slices T, A–F. Outside the area:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| P1 | Patient workspace returns the full staff `timeline` (actor names, roles, free-text reasons) and open `assignments` (staff identity subjects); the patient UI renders neither. Strip both for patient actors (or a patient-safe milestone projection, plan D-1). | area 1 critique (source read) | backend `CaseWorkspaceQueryService.workspace` | backend |
+| Blocked (legal L-6) | `commercial-terms.ts` 41, 68, 81: "your coordinator sends you the payment instructions" contradicts DEP-3 (patient pays the platform account in My Care). Wording for legal. | area 1 critique | `lib/commercial-terms.ts` | legal |
+| Blocked (legal / native) | Arabic `ackShortFinal` ("I understand accepting this offer is a financial agreement") differs in meaning from the English acceptance statement. | area 1 critique | `ProposalSign.tsx` copy | legal, native review |
+| P2 | The portal proposal drawer (`PatientProposal.tsx`) and the proposal link (`ProposalSign.tsx`) are two implementations of one document; converge after area 1. | area 1 plan | both | /impeccable shape |
+
+## Area 1 — slice T, deferred review findings (2026-10-15)
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| LOW | `CONSENT_TEXT` (both languages) and `CaseStatusAccess`'s own `copy` object are still inline in the client bundle; move with slices D and B. | React review | `ProfileActivation.tsx`, `CaseStatusAccess.tsx` | **done**: consents in `secureLink.activation.consents` since A (the deposit consent stays legal wording beside `commercial-terms`); the status link's copy since B |
+| LOW | The status link's "Your proposal" note after acknowledgement still says the coordinator is "arranging the next steps" next to "pay your deposit"; align in slice B. | screenshot review | `CaseStatusAccess.tsx` `proposalAccepted` | **done in B**: "It stays available to you in My Care." |
+| LOW | The activation step counter's label is built by joining words ("Step n of m"); one template key with `Intl` numerals. | RTL/i18n | `ProfileActivation.tsx` `Steps` | **done in D**: one `stepCounter` template key |
+| LOW | The journey tracker gives screen readers no "completed" text (now has `aria-current`); `PATIENT_PHASES` could be a key tuple. Both go with `CaseJourney`. | web guidelines, React review | `PatientJourneyTracker.tsx` | slice A |
+| LOW | `resolveAction` still separates `NONE` from `CONTINUE_IN_PORTAL` (both now land on the ready page); the local `Deposit` type keeps `amountPaid`. | React review | `ProfileActivation.tsx` | slice D |
+| LOW | Arabic: shadda in «منسّقك» is inconsistent across the moved strings; «وديعة التنسيق» vs "Your coordination deposit". | RTL/i18n | `messages/ar.json` `secureLink` | native review |
+| LOW | Staff fixture `portal-fixture.ts` (assisted path) and the env-gated `my-care-live.spec.ts` still use the retired `WAIT_DEPOSIT_ARRANGEMENT` / "Deposit arrangements"; the live spec needs a run against the tunnel stack to update. | slice T | `e2e/portal-fixture.ts`, `e2e/my-care-live.spec.ts` | area 2 / live run |
+
+## Area 1 — slices A/F, deferred review findings (2026-10-15)
+
+Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + detector (0). HIGHs and the cheap MEDIUMs were fixed in the same pass. Open:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| MEDIUM | D-1 backend (`milestones`, `PublicProposalView.releasedAt`) is on `feat/review-p0` @ `668e24c`, not on this branch: live, My Care stamps only "Estimate ready" (from `patientProposal.releasedAt`) until it is merged. Live check after the merge. | React, Pro Max | backend `CaseWorkspaceQueryService`, `PublicCaseAccessService` | merge + live run (the proposal link's "Estimate ready" stamp reads `releasedAt` since C) |
+| MEDIUM | Two Arabic names for the same journey: status link «استلمنا حالتك» / «مسار حالتك», My Care «استلام الحالة» / «مسار رعايتك»; the state word is "completed" on the link and "done" in My Care. One source of phase words for `CaseJourney`. | RTL/i18n, Pro Max | `messages/*.json` `secureLink.journey`, `portalWork.myCare.journey` | **done in B**: «استلام الحالة», «مسار رعايتك» / "Your care journey", "completed" in both; `lib/patient-journey.test.ts` holds My Care's words to the status link's |
+| MEDIUM | Verify stays disabled until six digits, so Enter does nothing; enable it and say what is missing inline. | web guidelines | `OneTimeCodeStep.tsx` | **done in B/C/D**: all three links pass `copy.incomplete` |
+| MEDIUM | Resend / channel switch gives no visible or announced confirmation ("New code sent to …"); needs copy en + ar. | web guidelines, Pro Max | `OneTimeCodeStep.tsx` | **done in C/D** for all three links (`OneTimeCodeStep` `round` + `notice`) |
+| MEDIUM | The proposal link keeps the channel switch after a code is sent (and resends silently); activation hides it. One rule. | Pro Max | `ProposalSign.tsx` | **done in C**: the switch is offered only before a code is sent, as activation does |
+| MEDIUM | A wrapped stamp label ("Estimate ready" on two lines from 640px) still overhangs the 7rem reserve by about 3rem; checked at 390 and 1440 only. Check 640–1023 with long headings, or move the stamp into a header row beside the heading. | Pro Max | `brand/DossierPage.tsx`, `theme-petrol.css` | **done in B**: label max 5.25rem, reserve = `--stamp-inset` + 7.25rem (measured), `.dossier-page-full` gives the width back below the stamp; checked 640–1023 on the status link and My Care |
+| LOW | The confirmation stamp prints the browser's moment of acceptance: `SubmitCaseResponse` has no `submittedAt`. Add it (backend) and print the server's time. | Pro Max, React | `CaseForm.tsx`, backend `CaseDtos.SubmitCaseResponse` | backend |
+| LOW | The stamp's press replays when My Care's view changes or the case switches (the page remounts). | web guidelines | `theme-petrol.css` | /impeccable polish |
+| LOW | `careViewHref` reads `window.location` during render (client-only today); pass the role from Portal. | web guidelines, React | `portal/care-view.ts` | /impeccable optimize |
+| LOW | `.dossier-page` is unlayered, so padding utilities passed to `DossierPage` do nothing (CaseForm's `p-7 md:p-10`); use `--page-pad` or move the dossier rules into `@layer components`. | React | `theme-petrol.css`, `CaseForm.tsx` | **done in B** (`[--page-pad:…]` on CaseForm and the status link) |
+| LOW | `CaseStamp` formats without a fixed `timeZone`; once a stamp renders on the server (slice B) server and browser can disagree on the day. | web guidelines | `brand/CaseStamp.tsx` | open: B renders no stamp on the server (the status link is client-only, first paint is the loading page); fix when one does |
+| LOW | The code step's words differ per link (verify / field label / resend). Unify. | Pro Max | `secureLink.*` | slices B–D (clarify) |
+| LOW | The code field is 24px (above the 20px ladder top) and its tracking pushes the centred digits off centre. | Pro Max | `OneTimeCodeStep.tsx` | /impeccable polish |
+| LOW | Arabic isolation: `DossierPage`'s reference `<p dir="ltr">` aligns left on /ar (wrap the number in `<bdi>` instead); case numbers not isolated in `CaseStatusAccess`/`ProfileActivation`; ProposalSign's "RehletShifaa · RS-…" eyebrow and its uppercase tracked labels without an RTL reset. | RTL/i18n | `DossierPage.tsx`, `CaseStatusAccess.tsx`, `ProfileActivation.tsx`, `ProposalSign.tsx` | **done in B/C/D** (status link, proposal link, activation: case numbers, phone, email, names isolated) |
+| LOW | Screenshot runs show the Next.js dev indicator; disable it for capture runs. | Pro Max | `next.config` (dev only) | tooling |
+
+## Area 1 — slice B, deferred review findings (2026-10-15)
+
+Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + detector (0). Fixed in the same pass: 3 HIGH (a code typed in Arabic-Indic digits was wiped; a revised / declined / expired estimate fell back to the "being prepared, or ready" story; Arabic «تقديرك» read as "your regard", now «تقدير التكلفة») and the MEDIUMs listed in STATUS. Open:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| MEDIUM | On a phone, the information-request form starts below the seven-step journey (~950px down at 375). The order follows plan §5 B (journey, then form); moving the form above the journey when the patient owes the step, or a "Go to your response" link, is an owner call. | web guidelines, Pro Max | `CaseStatusAccess.tsx` | owner decision |
+| MEDIUM | One noun per document is not finished: the status link says "estimate" (and "final quote" when `documentType` says so) while My Care still says "Your proposal is ready to review" / "Review proposal", and the journey step is "Your proposal" in both doors; "accept" (`proposalReadyNext`) vs "acknowledged". | RTL/i18n, web guidelines, Pro Max | `messages/*.json` `portalWork.myCare`, `secureLink.journey.phases.proposal` | **done in C**: "estimate" / «تقدير التكلفة» and "final quote" / «عرض السعر النهائي» on the proposal link, the status link and My Care's review step (by `documentType`); "proposal" kept only where a string covers both (journey step, preparing / revised) |
+| MEDIUM | Resend gives no visible or announced confirmation ("New code sent"); carried over from A/F. | web guidelines | `OneTimeCodeStep.tsx` | **done in C/D** (status, proposal and activation links) |
+| MEDIUM | `dueAt` and `validUntil` are formatted in the device's time zone; a date-only value at 00:00Z shows the previous day west of UTC. Decide with the backend whether these are dates or instants, then format accordingly (and the stamp's fixed zone with it). | web guidelines | `CaseStatusAccess.tsx` `date`, `brand/CaseStamp.tsx` | backend + /impeccable harden |
+| LOW | "Next", "Meanwhile" are styled paragraphs, not headings (same as My Care's current step); screen-reader heading navigation skips them. | web guidelines | `CaseStatusAccess.tsx`, `portal/MyCare.tsx` | /impeccable polish (both doors together) |
+| LOW | `sessionEnded` and `proposalUnavailable` say "reload / refresh" without a control to do it. | web guidelines | `secureLink.status` | clarify |
+| LOW | The done page has no onward step (no My Care or Track case link); nothing true to offer yet beyond "your coordinator will continue". | Pro Max | `CaseStatusAccess.tsx` | owner decision |
+| LOW | Off-ladder sizes kept from slice A: the code field 24px, the dossier reference 30px; the global `.error-text` is 13.76px (the status link now sets 14px on its own errors). | Pro Max | `OneTimeCodeStep.tsx`, `DossierPage.tsx`, `globals.css` | /impeccable typeset |
+| LOW | `CaseJourney` joins its screen-reader phrase with a Latin ", " on /ar (CaseStamp already uses «، »). | RTL/i18n | `CaseJourney.tsx` | /impeccable polish |
+| LOW | Upload attribution has unit tests for a failed PUT; the confirm 422 (`fileRejected`) and presign 401 (`sessionEnded`) branches are untested. | React | `CaseStatusAccess.test.tsx` | tests |
+| LOW | Too-many-attempts on a code is the same backend answer as a wrong code (`VERIFICATION_INVALID`), so the page cannot say "too many tries, send a new code"; needs a distinct backend code. | Pro Max (§7) | backend `PublicCaseAccessService.verify` | backend |
+
+## Area 1 — slice C, deferred review findings (2026-10-15)
+
+Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + detector (0). Fixed in the same pass: 5 HIGH (focus lost when the fixed bar or the decision block unmounted; an empty stamp corner reserved without a release date; the stamp covering the kicker on phones; the Arabic final-quote noun) and the MEDIUMs listed in STATUS. Open:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| LOW | The fixed decision bar repeats "Request changes" beside the primary action (unchanged decision rules, so kept); the no-repeated-CTAs rule would show the price and the primary only. | web guidelines | `ProposalSign.tsx` | owner decision |
+| LOW | Channel switch only before sending (one rule for the three links): a patient whose WhatsApp code never arrives must reload to choose email; say so in help copy, or allow the switch after a resend fails. | React | `ProposalSign.tsx`, `secureLink.proposal` | owner decision |
+| LOW | The checked acknowledgement card keeps the DESIGN.md choice-card fill (petrol-50); Pro Max read it as a tinted panel. Kept per DESIGN.md. | Pro Max | `ProposalSign.tsx` | owner call |
+| MEDIUM | `validUntil` (an instant) and the assisted request date are formatted in the device's time zone; with the status link's `dueAt`, decide one zone (Cairo?) or show date-only values in UTC. | web guidelines, RTL/i18n | `ProposalSign.tsx` `longDate`, `CaseStatusAccess.tsx` | backend + /impeccable harden |
+| LOW | On phones the summary aside is shown first with `order-first` but comes after the document in the DOM, so screen readers hear the price last. | web guidelines | `ProposalSign.tsx` | /impeccable polish |
+| LOW | Category rows and the Included / Not included labels are paragraphs under an h2; make them h3. | web guidelines | `ProposalSign.tsx` | /impeccable polish |
+| LOW | The decision buttons are `disabled` while submitting, so focus drops to the page; use `aria-disabled` with a guard. | web guidelines | `ProposalSign.tsx` | /impeccable polish |
+| LOW | `.dossier-page` keeps its own soft shadow while the cards beside it use the token shadow (approved in slice A). | Pro Max | `theme-petrol.css` | /impeccable polish |
+| LOW | The acknowledgement done page says "We've sent you a secure link…", but the backend does not resend when a live profile link exists or the preferred language is unknown; the decision response could say whether a link went out. | React | backend `JourneyService.decideProposalPublic`, `ProposalSign.tsx` | backend |
+| Blocked (legal / native) | Arabic on the proposal link for the legal/native list: `ackShortFinal` (meaning differs), `payNowNote` (shorter, "final balance"), `nextPrelim[2]` (deposit "deducted from your final balance" vs the new done line "we start once received"), the new `blockedExpired*` price/exchange-rate sentence, and the new final-quote nouns in `finalBadge` / `finalTitle`; «منسقك» vs «منسّق حالتك». | RTL/i18n | `messages/ar.json` `secureLink.proposal`, `secureLink.status` | legal, native review |
+| LOW | The phone stamp reserve grew to inset + 4.75rem (the one-line "Estimate ready" stamp covered a long kicker); slice B/F phone screenshots predate it. | web guidelines, Pro Max | `theme-petrol.css` | info |
+
+## Area 1 — slice D, deferred review findings (2026-10-15)
+
+Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + detector (0). Fixed in the same pass: 4 HIGH (the country combobox's label wrapped its open list and the active option was never announced; an error with no field on screen — an empty phone without a number on file, a backend `profile.*` field — made submit look dead; an agreement without words could be accepted unseen) and the MEDIUMs listed in STATUS. Open:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| MEDIUM | An agreement the page has no words for now blocks activation with a clear line (it can no longer be ticked unseen), but nobody is told: the plan's "the coordinator is told" needs a backend signal (or the backend never sends a consent type the frontend cannot word). | Pro Max, RTL/i18n | backend `PatientActivationService`, `ProfileActivation.tsx` | backend |
+| LOW | Country names stay English on /ar (decided until B1) and the flag emoji shows as letters ("LY") on Windows; the flag also sits inside the combobox value, so screen readers read it. | web guidelines, RTL/i18n, Pro Max | `ProfileActivation.tsx` `CountrySelect`, `lib/countries` | B1 |
+| LOW | The resend label differs per link: activation "Send a new code" / «إرسال رمز جديد», status and proposal "Resend code" / «إعادة إرسال الرمز». One label for the three. | RTL/i18n | `secureLink.*.resend` | clarify |
+| LOW | Arabic register on the activation form mixes the new direct imperatives («أدخل…») with older «يرجى…» keys (`error`, `tooMany`, `invalid`); `errSelect` was moved to «اختر أحد الخيارات.». | RTL/i18n | `messages/ar.json` `secureLink.activation` | native review |
+| LOW | Combobox: Escape does not restore the previous query text, and Enter on "No matching country" gives no feedback. | web guidelines | `ProfileActivation.tsx` `CountrySelect` | /impeccable polish |
+| LOW | `resolveAction` still separates `NONE` from `CONTINUE_IN_PORTAL` (both land on the ready page); the local `Deposit` type keeps `amountPaid`; the pre-existing `window.location.assign` lint warning in `openPortal`. | React | `ProfileActivation.tsx` | /impeccable optimize |
+| Blocked (legal) | On /ar the deposit terms render in English under the pending notice and `DEPOSIT_CONSENT.ar` sits under them, until the legal review delivers the Arabic. | RTL/i18n | `CoordinationDepositTerms`, `ProfileActivation.tsx` | legal |
+
+## Area 1 — slice E, deferred review findings (2026-10-15)
+
+Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + detector (0; the side-stripe finding from the critique is gone). Fixed in the same pass: 4 HIGH (slip rows wrapped unevenly and the IBAN broke mid-number on phones; the page grew because the "where to find it" help was always open; the payment reference broke at its hyphen in the agent sentence; a set-state-in-effect lint error from the clipboard check, which also shifted the form after hydration) and the MEDIUMs listed in STATUS. Open:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| Blocked (business) | D-5: an "This is the only account we use" assurance line on the slip is still not added; it needs the business's yes. | plan D-5 | `PatientDepositPayment.tsx`, `portalWork.myCare.payment` | business |
+| LOW | On a phone the whole My Care page is still about 3,600px while the deposit is due, because the coordinator, journey and estimate cards follow the step (the field itself now sits right after the bank rows). Folding the journey on phones while a payment is due is an owner call. | Pro Max | `portal/MyCare.tsx` | owner decision |
+| LOW | The rejected-transfer notice keeps `role="alert"` though it is present on load (not always announced); a heading or one focus move would suit a standing notice better. | web guidelines | `PatientDepositPayment.tsx` | /impeccable polish |
+| LOW | Choice cards (activation, payment) use Tailwind `bg-white` rather than the surface token, and have no pressed state on touch. | Pro Max, web guidelines | `ProfileActivation.tsx`, `PatientDepositPayment.tsx` | /impeccable polish |
+| LOW | §7 "checking" for an agent payment is covered by copy ("Keep your transfer or agent receipt") but not captured; My Care's `deposit-checking` fixture is a bank transfer. | Pro Max | `e2e/patient-fixture.ts` | tests |
+| LOW | Slice F's My Care screenshots predate the quiet emergency notice (D-4) applied to My Care in E. | slice E | `screenshots/area-1/after/f-*` | info |
+
+## Area 1 — gate (2026-10-15)
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| MEDIUM | The In review and Estimate ready stamps were not seen live at the gate (the owner stopped the walk at Received); they are covered by the specs against the live build and the backend D-1 tests. RS-2026-000006 (synthetic, `INTAKE_REVIEW`) can carry the live check once a coordinator sends it to a Consultant and an estimate is released. | area 1 gate | dev data | live run |
+| LOW | The dev frontend container was built from the area worktree (`-p rehletshifaa`); a later canonical rebuild from the main checkout serves whatever that checkout has (today `feat/review-p0`, which does not yet contain area 1). | area 1 gate | docker compose | owner: merge area 1 into `feat/review-p0` |
