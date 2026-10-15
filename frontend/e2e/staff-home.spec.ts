@@ -16,7 +16,7 @@ for (const locale of ["en", "ar"] as const) {
       const ar = locale === "ar";
       // Nothing is assigned to this coordinator, so the home opens on the cases they own.
       await expect(staffView(page, ar ? /حالاتي/ : /My cases/)).toHaveAttribute("aria-current", "page");
-      await expect(page.getByRole("heading", { level: 2, name: ar ? "حالاتي" : "My cases" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: ar ? "حالاتي" : "My cases" })).toBeVisible();
       // One navigation on screen: the header copy from md, the inline copy below it.
       const nav = page.getByRole("navigation", { name: ar ? "أقسام العمل" : "Your work" });
       await expect(nav).toHaveCount(1);
@@ -41,7 +41,7 @@ test("an explicit view choice wins over the landing rule and the role switch liv
   await setupPortal(page, "COORDINATOR_LEAD");
   await page.goto("/en/portal");
   await staffView(page, /Team queue/).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Team queue" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Team queue" })).toBeVisible();
   await page.reload();
   await expect(staffView(page, /Team queue/)).toHaveAttribute("aria-current", "page");
   // No row of filled role buttons above the page.

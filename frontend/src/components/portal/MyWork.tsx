@@ -28,25 +28,24 @@ export type WorkItem = {
  *
  * <p>The list is one tab stop (UX 2-2): ↑/↓, Home/End and `j`/`k` move between rows, Enter opens the row's case.
  */
-export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting = 0, onTeamQueue }: {
+export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting = 0, onTeamQueue, labelledBy }: {
   locale: Locale; role?: string; items: WorkItem[]; busy: boolean; onOpen: (caseId: string) => void;
   /** The viewer, so their own case reads "You" as it does in the queue. */
   subject?: string;
   /** New cases nobody owns yet (coordinators), offered as the next place to look when nothing is assigned. */
   teamWaiting?: number; onTeamQueue?: () => void;
+  /** The page's heading that names this view (UX 2-4: the view's name is the page's place, said once). */
+  labelledBy?: string;
 }) {
   const work = useWorkCopy();
   const t = work.myWork;
   const roving = useRovingList(items.map(item => item.id));
 
   return (
-    <section aria-labelledby="my-work-title" aria-busy={busy} className="mb-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 id="my-work-title" className="title">{t.title}</h2>
-          {/* Finance's queue also holds its team's pool (deposits to record), not only work assigned to them (QA W-44). */}
-          <p className="mt-1 text-sm text-ink-500">{role === "finance" ? t.hintTeam : t.hint}</p>
-        </div>
+    <section aria-labelledby={labelledBy} aria-busy={busy} className="mb-8">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        {/* Finance's queue also holds its team's pool (deposits to record), not only work assigned to them (QA W-44). */}
+        <p className="text-sm text-ink-500">{role === "finance" ? t.hintTeam : t.hint}</p>
         <p role="status" className="text-sm text-ink-500">{busy ? t.loading : items.length ? plural(work.locale, items.length, work.plural.workItems) : ""}</p>
       </div>
 
@@ -77,7 +76,7 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
                     {item.patientName && <bdi className="truncate text-[0.8125rem] font-semibold text-ink-700">{item.patientName}</bdi>}
                   </div>
                   {/* The backend titles work in English; Arabic shows the work type in Arabic, English keeps the specific title. */}
-                  <h3 id={titleId} dir="auto" className="mt-2 font-bold leading-6 text-ink-900">{text.title}</h3>
+                  <h2 id={titleId} dir="auto" className="mt-2 font-bold leading-6 text-ink-900">{text.title}</h2>
                   {/* Enough case identity to act without opening it first. */}
                   <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-ink-600">
                     {item.careCategory && <span>{t.care}: <strong className="font-semibold text-ink-800">{careAreaLabel(item.careCategory, work.careAreas)}</strong></span>}

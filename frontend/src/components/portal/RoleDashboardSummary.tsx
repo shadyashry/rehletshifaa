@@ -35,10 +35,10 @@ export function RoleDashboardSummary({ role, cases, tasks, loading = false, sele
   const work = useWorkCopy();
   const t = work.summary;
   const hintId = useId();
-  const overdue = Math.max(
-    tasks.filter(task => task.overdue && task.status !== "COMPLETED").length,
-    cases.filter(item => matchesKpi(item, "overdue", role)).length,
-  );
+  // My work is this person's own (`/work/mine`): only overdue work of theirs is said in the alert ink. A teammate's overdue
+  // case is still counted, in the line's ink, but it is not this person's alarm (UX 2-4).
+  const mineOverdue = tasks.filter(task => task.overdue && task.status !== "COMPLETED").length;
+  const overdue = Math.max(mineOverdue, cases.filter(item => matchesKpi(item, "overdue", role)).length);
   const needsAction = cases.filter(item => matchesKpi(item, "action", role)).length;
   // New assignments are work items awaiting accept/decline, and a pending assignment is deliberately not a case in the
   // list yet, so they are counted from My work for every assigned role (Consultant, Finance, Operations) — QA #18.
@@ -51,15 +51,14 @@ export function RoleDashboardSummary({ role, cases, tasks, loading = false, sele
   const items: { id: KpiFilter; text: string; alert?: boolean }[] = [];
   if (shown("action", needsAction)) items.push({ id: "action", text: plural(work.locale, needsAction, work.plural.needAction) });
   if (shown("unowned", unowned)) items.push({ id: "unowned", text: plural(work.locale, unowned, role === "coordinator" ? work.plural.unownedCases : work.plural.newAssignments) });
-  if (shown("overdue", overdue)) items.push({ id: "overdue", text: plural(work.locale, overdue, work.plural.overdueCases), alert: overdue > 0 });
+  if (shown("overdue", overdue)) items.push({ id: "overdue", text: plural(work.locale, overdue, work.plural.overdueCases), alert: mineOverdue > 0 });
 
   // The counts arrive after the list and change as work moves; the live line says them once, politely, in words. It is
   // always rendered (empty while loading) so the first real counts are announced too.
   const spoken = loading ? "" : items.length === 0 ? t.nothing : items.map(item => item.text).join(work.locale === "ar" ? "، " : ", ");
 
   return (
-    <section aria-labelledby="dashboard-summary-title" className="mb-6 min-h-11">
-      <h2 id="dashboard-summary-title" className="sr-only">{t.title}</h2>
+    <section aria-label={t.title} className="mb-6 min-h-11">
       <p role="status" className="sr-only">{spoken}</p>
       {loading ? null : items.length === 0 ? (
         <p aria-hidden className="flex min-h-11 items-center text-[0.9375rem] text-ink-600">{t.nothing}</p>
@@ -74,7 +73,7 @@ export function RoleDashboardSummary({ role, cases, tasks, loading = false, sele
                   <button type="button" aria-pressed={pressed} aria-describedby={hintId}
                           onClick={() => onSelect?.(pressed ? "" : item.id)}
                           className={`min-h-11 rounded-md font-semibold underline decoration-2 underline-offset-[6px] transition ${
-                            item.alert ? "text-alert-700" : "text-brand-800"} ${pressed ? "decoration-current" : "decoration-line-strong hover:decoration-current"}`}>
+                            item.alert ? "text-alert-700" : "text-ink-800"} ${pressed ? "decoration-current" : "decoration-line-strong hover:decoration-current"}`}>
                     {item.text}
                   </button>
                 </li>

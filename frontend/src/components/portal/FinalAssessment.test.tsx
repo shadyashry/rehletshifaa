@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { CaseWorkspaceProvider, FinalAssessment } from "./StaffCaseView";
+import { renderWithWork } from "./test-copy";
 import type { DirectoryFacility } from "./portal-model";
 
 const facilities: DirectoryFacility[] = [{ id: "f1", name: "Nile Heart Hospital", city: "Cairo", kind: "HOSPITAL", accreditationStatus: "CURRENT",
   packages: [{ id: "pkg-1", procedureCode: "CABG", name: "Bypass package", careCategory: "cardiology", minEgp: 150000, maxEgp: 200000 }] }];
 
 function setup(mutate = vi.fn().mockResolvedValue({ id: "r1" })) {
-  render(<CaseWorkspaceProvider value={{ locale: "en", t: {} as never, role: "doctor", c: { id: "c1", status: "ARRIVAL_CONFIRMED", version: 1 } as never,
+  renderWithWork(<CaseWorkspaceProvider value={{ locale: "en", t: {} as never, role: "doctor", c: { id: "c1", status: "ARRIVAL_CONFIRMED", version: 1 } as never,
       busy: false, mutate, fxRates: [], catalog: [], facilities, mySubject: "doctor-subject" }}><FinalAssessment/></CaseWorkspaceProvider>);
   return mutate;
 }

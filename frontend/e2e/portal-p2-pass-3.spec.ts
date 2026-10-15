@@ -86,7 +86,7 @@ test("picking a view from inside a case moves focus to that view's visible headi
   await page.goto("/en/portal?view=mine");
   await openFirstCase(page);
   await staffView(page, /Team queue/).click();
-  const heading = page.getByRole("heading", { level: 2, name: "Team queue" });
+  const heading = page.getByRole("heading", { level: 1, name: "Team queue" });
   await expect(heading).toBeVisible();
   await expect(heading).toBeFocused();
 });
@@ -105,15 +105,14 @@ test("leaving a case opened from elsewhere (its URL) by Back hands the focus to 
   await page.goto("/en/portal?view=mine&case=owned");
   await page.locator("#case-heading").waitFor();
   await page.getByRole("button", { name: /^Back to / }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "My cases" })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 1, name: "My cases" })).toBeFocused();
 });
 
 test("Back returns to the landing view even though its URL named no view", async ({ page }) => {
   await setupPortal(page, "COORDINATOR_LEAD");
   await page.goto("/en/portal");
-  // Landing picks the first view with work once the queue has loaded. The view's own heading comes first (the
-  // coordinator home also carries the Out of office panel below it).
-  await expect(page.locator("#staff-view h2.title").first()).toBeVisible();
+  // Landing picks the first view with work once the queue has loaded. The page's heading names the view (UX 2-4).
+  await expect(page.locator("#portal-title")).toBeVisible();
   await page.waitForLoadState("networkidle");
   const landed = await page.getByRole("navigation", { name: "Your work" }).locator('[aria-current="page"]').textContent();
   const other = landed?.includes("Team queue") ? /My work/ : /Team queue/;

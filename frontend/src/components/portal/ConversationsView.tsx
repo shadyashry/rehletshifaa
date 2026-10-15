@@ -20,7 +20,8 @@ const isolate=(text:string)=>`⁨${text}⁩`;
 const textAction="inline-flex min-h-11 items-center text-[0.8125rem] font-bold text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline";
 
 /** Intake conversations: the list on one side, the selected thread with its one-voice composer on the other. */
-export function ConversationsView({locale,lead,staff,busy,mutate,fetchJson}:{locale:Locale;lead:boolean;staff:StaffMember[];busy:boolean;mutate:Mutate;fetchJson:Fetch}){
+/** `labelledBy`: the page's heading that names this view (UX 2-4: the view's name is the page's place, said once). */
+export function ConversationsView({locale,lead,staff,busy,mutate,fetchJson,labelledBy}:{locale:Locale;lead:boolean;staff:StaffMember[];busy:boolean;mutate:Mutate;fetchJson:Fetch;labelledBy?:string}){
   const work=useWorkCopy();const t=work.conversations;const notes=work.caseMessages.attachments;const ar=locale==="ar";
   const {clearNotice}=use(FeedbackContext);
   const base=useId();
@@ -81,10 +82,9 @@ export function ConversationsView({locale,lead,staff,busy,mutate,fetchJson}:{loc
   // Only the conversation asked for is shown: never one that answered late for an earlier pick.
   const thread=detail&&detail.summary.id===selected?detail:null;
   const caseFormLink=`${typeof window==="undefined"?"":window.location.origin}/${thread?.summary.language==="ar"?"ar":"en"}/send-my-case`;
-  const tabId=(id:Scope)=>`${base}-tab-${id}`,panelId=`${base}-panel`,titleId=`${base}-title`,windowHint=`${base}-window`;
-  return <section className="card mt-6 p-5" aria-labelledby={titleId}>
-    <h2 id={titleId} className="title">{t.title}</h2>
-    <p className="mt-2 text-sm text-ink-500">{t.intro}</p>
+  const tabId=(id:Scope)=>`${base}-tab-${id}`,panelId=`${base}-panel`,windowHint=`${base}-window`;
+  return <section className="card p-5" aria-labelledby={labelledBy} aria-label={labelledBy?undefined:t.title}>
+    <p className="max-w-[65ch] text-sm text-ink-500">{t.intro}</p>
     {/* One tab style across the staff side: the case page's underline tabs. Selection follows the arrow keys. */}
     <div role="tablist" aria-label={t.title} className="mt-4 flex flex-wrap gap-x-1 border-b border-line-strong">{scopes.map((id,index)=><button key={id} type="button" role="tab" id={tabId(id)} aria-controls={panelId} aria-selected={scope===id} tabIndex={scope===id?0:-1}
       className={`-mb-px inline-flex min-h-11 items-center border-b-2 px-3 py-2 text-[0.875rem] font-bold transition-colors ${scope===id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
@@ -112,7 +112,7 @@ export function ConversationsView({locale,lead,staff,busy,mutate,fetchJson}:{loc
       </ul></div>
       <div className="min-w-0">
         {!thread?<p className="text-sm text-ink-500">{t.pick}</p>:<>
-          <h3 ref={heading} id="conversation-thread-title" tabIndex={-1} className="rounded-sm text-base font-semibold text-ink-900 outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"><bdi>{thread.summary.name||t.unknown}</bdi> <span className="font-normal text-ink-500" dir="ltr">{thread.summary.phoneHint}</span></h3>
+          <h2 ref={heading} id="conversation-thread-title" tabIndex={-1} className="rounded-sm text-base font-semibold text-ink-900 outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"><bdi>{thread.summary.name||t.unknown}</bdi> <span className="font-normal text-ink-500" dir="ltr">{thread.summary.phoneHint}</span></h2>
           <p className="mt-1 text-[0.8125rem] text-ink-500">{thread.summary.ownerName?<>{t.owner}: <bdi>{thread.summary.ownerName}</bdi></>:t.unowned}</p>
           {thread.coverName&&<p role="note" className="mt-3 border-y border-line py-2.5 text-[0.875rem] leading-6 text-ink-700">{fillTemplate(t.covered,{name:isolate(thread.coverName)})}</p>}
           <div className="mt-4 space-y-3">{thread.messages.map(m=>{const note=m.attachmentStatus!=="CLEAN"?attachmentNote(m.attachmentStatus,notes):null;

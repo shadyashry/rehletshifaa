@@ -3,7 +3,7 @@
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { createContext, use, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft, ArrowRight, Check, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, Gauge, MessageSquare, MoreHorizontal, Plus, X } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageEstimate } from "@/components/portal/FacilityPackagePicker";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
@@ -30,7 +30,7 @@ import { scrollIntoView } from "@/lib/scroll";
 import { countryName } from "@/lib/countries";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
 import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
-import { useStaffShortcut } from "@/components/portal/StaffShortcuts";
+import { useShortcutsEnabled, useStaffShortcut } from "@/components/portal/StaffShortcuts";
 import { copy, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, LockedSection } from "@/components/portal/portal-ui";
 
 const ClinicalReviewPanel=dynamic(()=>import("@/components/portal/ClinicalReview").then(m=>m.ClinicalReviewPanel));
@@ -75,7 +75,7 @@ type CaseOverlay="journey"|"messages"|"reply"|"more"|"transfer"|"requestInfo"|"p
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
 export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref,workItems=[],backLabel,openCaseById}:CaseViewProps){
- const work=useWorkCopy();const cover=work.caseCover;
+ const work=useWorkCopy();const cover=work.caseCover;const cv=work.caseView;
  const c=value.caseSummary;
  const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject]);
  const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
@@ -84,7 +84,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
  const doctorAssignment=value.assignments.find(a=>a.assigneeRole==="DOCTOR"&&!REFERRAL_ASSIGNMENTS.includes(a.assignmentType)&&(a.status==="PENDING"||a.status==="ACTIVE"));
  // Never fall back to an identity subject: the backend resolves the name, and an honest generic label
   // is better than a UUID when it cannot.
-  const assignedDoctorName=doctorAssignment?(doctorAssignment.assigneeName??doctors.find(d=>d.subject===doctorAssignment.assigneeSubject)?.displayName??(locale==="ar"?"الاستشاري المعيَّن":"the assigned consultant")):"";
+  const assignedDoctorName=doctorAssignment?(doctorAssignment.assigneeName??doctors.find(d=>d.subject===doctorAssignment.assigneeSubject)?.displayName??cv.assignedConsultant):"";
   const isDoctor=role==="doctor";
   const assignmentRole=role.toUpperCase();
   const myPending=["doctor","operations","finance"].includes(role)?value.assignments.find(a=>a.assigneeRole===assignmentRole&&a.status==="PENDING"&&(!mySubject||a.assigneeSubject===mySubject)):undefined;
@@ -97,8 +97,8 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   const available=actions.availableActions;
  // Evidence panels are reused so the consultant reads them before deciding, while the coordinator keeps
  // them below the action panels. Rendered once (the guards below are mutually exclusive by role).
- const intakePanel=value.intakeSummary?.trim()?<Panel title={locale==="ar"?"ملخص الحالة عند الاستقبال":"Intake summary"}><p className="whitespace-pre-wrap break-words text-ink-700">{value.intakeSummary}</p></Panel>:null;
- const documentsPanel=documents.length>0?<Panel title={t.documents}>{documents.map(doc=><div key={doc.documentId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3"><div><strong className="break-all">{doc.fileName}</strong><p className="text-sm text-ink-500">{formatBytes(doc.sizeBytes,locale)} · {new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(doc.createdAt))}</p></div>{doc.status==="CLEAN"?<div className="flex gap-2"><button type="button" className="btn-secondary" onClick={()=>viewDoc(doc.documentId)}>{locale==="ar"?"عرض":"View"}<span className="sr-only"> {doc.fileName}</span></button><button type="button" className="btn-secondary" onClick={()=>downloadDoc(doc.documentId)}>{t.download}<span className="sr-only"> {doc.fileName}</span></button></div>:<span className="rounded-full bg-mist px-3 py-1 text-sm font-bold text-ink-600">{(doc.status==="PENDING"||doc.status==="UPLOADED")?t.docScanning:t.docUnavailable}</span>}</div>)}</Panel>:null;
+ const intakePanel=value.intakeSummary?.trim()?<Panel title={cv.intakeSummary}><p className="whitespace-pre-wrap break-words text-ink-700">{value.intakeSummary}</p></Panel>:null;
+ const documentsPanel=documents.length>0?<Panel title={t.documents}><ul className="divide-y divide-line border-y border-line">{documents.map(doc=><li key={doc.documentId} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><strong className="break-all">{doc.fileName}</strong><p className="text-sm text-ink-500">{formatBytes(doc.sizeBytes,locale)} · {new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(doc.createdAt))}</p></div>{doc.status==="CLEAN"?<div className="flex gap-2"><button type="button" className="btn-secondary" onClick={()=>viewDoc(doc.documentId)}>{cv.view}<span className="sr-only"> {doc.fileName}</span></button><button type="button" className="btn-secondary" onClick={()=>downloadDoc(doc.documentId)}>{t.download}<span className="sr-only"> {doc.fileName}</span></button></div>:<span className="text-sm font-semibold text-ink-600">{(doc.status==="PENDING"||doc.status==="UPLOADED")?t.docScanning:t.docUnavailable}</span>}</li>)}</ul></Panel>:null;
   // Only a real consultant assignment earns a second identity row. Falling back to the coordinator
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
@@ -107,16 +107,16 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
  // P0-5: the destination and the treatment episodes read back with their facility named, for every staff role on the case.
  const when=(v?:string|null)=>v?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
  const episodes=value.treatmentEpisodes??[];
- const logistics=value.travelPlan||episodes.length>0?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{locale==="ar"?"الوجهة والعلاج":"Destination & treatment"}</h3>
-  {value.travelPlan&&<dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-2 lg:grid-cols-4">
-   <div><dt className="text-ink-500">{locale==="ar"?"المنشأة":"Facility"}</dt><dd className="font-semibold text-ink-900">{value.travelPlan.facilityName??(locale==="ar"?"لم تُحدَّد بعد":"Not chosen yet")}</dd></div>
-   <div><dt className="text-ink-500">{locale==="ar"?"حالة السفر":"Travel status"}</dt><dd className="font-semibold text-ink-900">{pair(TRAVEL_STATUS,value.travelPlan.status,locale)}</dd></div>
-   <div><dt className="text-ink-500">{locale==="ar"?"الوصول المخطط":"Planned arrival"}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.plannedArrival)}</dd></div>
-   <div><dt className="text-ink-500">{locale==="ar"?"الوصول المؤكد":"Confirmed arrival"}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.confirmedArrival)}</dd></div>
+ const logistics=value.travelPlan||episodes.length>0?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
+  {value.travelPlan&&<dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
+   <div><dt className="text-ink-500">{cv.logistics.facility}</dt><dd className="font-semibold text-ink-900">{value.travelPlan.facilityName??cv.logistics.notChosen}</dd></div>
+   <div><dt className="text-ink-500">{cv.logistics.travelStatus}</dt><dd className="font-semibold text-ink-900">{label(cv.logistics.travel,value.travelPlan.status)}</dd></div>
+   <div><dt className="text-ink-500">{cv.logistics.plannedArrival}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.plannedArrival)}</dd></div>
+   <div><dt className="text-ink-500">{cv.logistics.confirmedArrival}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.confirmedArrival)}</dd></div>
   </dl>}
-  {episodes.length>0&&<ul className="mt-3 space-y-1.5 text-[0.85rem]" aria-label={locale==="ar"?"مراحل العلاج":"Treatment episodes"}>{episodes.map(ep=><li key={ep.id} className="flex flex-wrap items-baseline justify-between gap-3 border-t border-line pt-1.5"><span className="font-semibold text-ink-900">{ep.facilityName??(locale==="ar"?"منشأة غير مسماة":"Unnamed facility")}</span><span className="text-ink-600">{pair(EPISODE_STATUS,ep.status,locale)} · {when(ep.startAt)}{ep.endAt?` – ${when(ep.endAt)}`:""}</span></li>)}</ul>}
+  {episodes.length>0&&<ul className="mt-3 space-y-1.5 text-[0.875rem]" aria-label={cv.logistics.episodes}>{episodes.map(ep=><li key={ep.id} className="flex flex-wrap items-baseline justify-between gap-3 border-t border-line pt-1.5"><span className="font-semibold text-ink-900">{ep.facilityName??cv.logistics.unnamedFacility}</span><span className="text-ink-600">{label(cv.logistics.episode,ep.status)} · {when(ep.startAt)}{ep.endAt?` – ${when(ep.endAt)}`:""}</span></li>)}</ul>}
  </section>:null;
- const recommendationBlock=approved&&(approved.recommendedTreatment||approved.risksAndLimitations)?<div className="rounded-lg border border-line p-4"><p className="mb-2 label-micro text-brand-700">{locale==="ar"?"التوصية السريرية للاستشاري":"Consultant's clinical recommendation"}</p>{approved.recommendedTreatment&&<div className="mb-3"><p className="text-sm font-bold text-ink-800">{t.reviewTreatment}</p><p className="mt-0.5 whitespace-pre-wrap text-ink-700">{approved.recommendedTreatment}</p></div>}{approved.risksAndLimitations&&<div><p className="text-sm font-bold text-ink-800">{t.reviewRisks}</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-600">{approved.risksAndLimitations}</p></div>}</div>:null;
+ const recommendationBlock=approved&&(approved.recommendedTreatment||approved.risksAndLimitations)?<div className="border-b border-line pb-4"><p className="mb-2 label-micro text-brand-700">{cv.recommendation}</p>{approved.recommendedTreatment&&<div className="mb-3"><p className="text-sm font-bold text-ink-800">{t.reviewTreatment}</p><p className="mt-0.5 whitespace-pre-wrap text-ink-700">{approved.recommendedTreatment}</p></div>}{approved.risksAndLimitations&&<div><p className="text-sm font-bold text-ink-800">{t.reviewRisks}</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-600">{approved.risksAndLimitations}</p></div>}</div>:null;
  // The proposal is the coordinator's work while it is being prepared or released (or, at arrival, finalised);
  // once decided it becomes reference history.
  // An assignment step has its own inline form; every other focus step lives in the proposal panel.
@@ -125,8 +125,8 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
  const financeApproval=role==="finance"&&current.code==="APPROVE_COMMERCIAL_TERMS"&&available.includes("APPROVE_COMMERCIAL_TERMS")&&!!value.proposal&&!!value.commercial;
  const formAction=isCoordinator&&owned&&current.kind==="FOCUS"&&["ASSIGN_CONSULTANT","CONFIRM_REFERRAL","ASSIGN_OPERATIONS","ASSIGN_FINANCE"].includes(formCode)||(formCode==="RECORD_PROPOSAL_DECISION"&&isCoordinator&&owned&&!!value.proposal&&available.includes("RECORD_PROPOSAL_DECISION"));
  const proposalIsWork=isCoordinator&&owned&&(["PREPARE_PROPOSAL","RELEASE_PROPOSAL","WAIT_INTERNAL_APPROVAL","ASSIGN_FINANCE"].includes(current.code)||["PREPARE_PROPOSAL","PROPOSAL_REVISION"].includes(current.workType??"")||(!!approved&&!value.proposal)||c.status==="ARRIVAL_CONFIRMED");
- const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm estimate={approved} onSend={sendProposal}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions reviewId={approved?.id} proposal={value.proposal} gates={value.gates}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}{showActions&&<LockedSection locked={dim}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} locale={locale} mutate={mutate} approvalInCard={financeApproval}/></LockedSection>}</Panel>;
- const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={t.reviews}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="rounded-lg border border-line p-4"><strong>v{r.versionNumber} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 rounded-lg bg-brand-50 p-3"><p className="mb-2 label-micro text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-[0.8125rem] text-ink-600">{locale==="ar"?"عملة العرض":"Proposal currency"}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span>{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{locale==="ar"?"الأساس":"Base"} <bdi dir="ltr">{money(e.estimatedCost,e.currency,locale)}</bdi></span>}</span></li>)}</ul></div>}</div>):<Empty/>}{isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&<FinalAssessment/>}</Panel>:null;
+ const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm estimate={approved} onSend={sendProposal}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions reviewId={approved?.id} proposal={value.proposal} gates={value.gates}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}{showActions&&dim&&<p className="mt-4 text-[0.875rem] text-ink-600">{cv.handoffLocked}</p>}{showActions&&<LockedSection locked={dim}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} mutate={mutate} approvalInCard={financeApproval}/></LockedSection>}</Panel>;
+ const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={t.reviews}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="border-b border-line pb-4 last:border-0 last:pb-0"><strong>v{r.versionNumber} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 border-t border-line pt-3"><p className="mb-2 label-micro text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-[0.8125rem] text-ink-600">{cv.proposalCurrency}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span>{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{cv.base} <bdi dir="ltr">{money(e.estimatedCost,e.currency,locale)}</bdi></span>}</span></li>)}</ul></div>}</div>):<Empty/>}{isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&<FinalAssessment/>}</Panel>:null;
  // The consultant's clinical review is the page's primary work, not an appendix to the review history.
  const reviewDraft=isDoctor&&c.status==="CONSULTANT_REVIEW"?(value.clinicalReviews.find(r=>r.status==="DRAFT")??null):null;
  // A second-opinion consultant reads the case and gives an opinion; the clinical decision stays with the primary consultant.
@@ -154,18 +154,16 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   // When the step is the patient's reply (the backend's action, never the stage) and this viewer is the one who answers the
   // patient, the reply is one quiet step from the strip: the drawer opens on the patient's thread with the composer focused.
   const replyFromStrip=isCoordinator&&current.workType==="REVIEW_PATIENT_RESPONSE"&&!!value.patientReply?.canReply
-    ?[{label:work.caseMessages.replyToPatient,onClick:()=>setOverlay("reply")}]:[];
-  const caseTabs=[{id:"overview" as const,label:locale==="ar"?"نظرة عامة":"Overview",count:0},{id:"clinical" as const,label:locale==="ar"?"الملف السريري":"Clinical",count:0},{id:"documents" as const,label:locale==="ar"?"المستندات":"Documents",count:documents.length},{id:"activity" as const,label:locale==="ar"?"السجل":"Activity",count:0}].filter(item=>!value.paymentOnly||item.id==="overview"); // the payment view has no record behind the other tabs
+    ?[{label:work.caseMessages.replyToPatient,onClick:()=>setOverlay("reply"),opensDialog:true}]:[];
+  const caseTabs=[{id:"overview" as const,label:cv.tabs.overview,count:0},{id:"clinical" as const,label:cv.tabs.clinical,count:0},{id:"documents" as const,label:cv.tabs.documents,count:documents.length},{id:"activity" as const,label:cv.tabs.activity,count:0}].filter(item=>!value.paymentOnly||item.id==="overview"); // the payment view has no record behind the other tabs
   // Utilities live in one place each: the secure-link row owns "resend", the header owns messages, and the
   // "More" drawer owns everything else the backend listed for this state.
   const moreAvailable=available.filter(code=>!code.startsWith("RESEND_")&&!(code==="RECORD_PROPOSAL_DECISION"&&formCode==="RECORD_PROPOSAL_DECISION"));
   const showMore=isCoordinator&&owned&&!value.preview&&(moreAvailable.length>0||canRebalance);
 
-  const banners=<>
-   {dim&&<div className="card border border-brand-400 bg-brand-50 p-4"><p className="font-bold text-brand-800">{fillTemplate(t.handoff,{name:`\u2068${assignedDoctorName}\u2069`})}</p></div>}
-
-   {value.preview&&<p className="text-sm text-ink-500">{locale==="ar"?"هذه معاينة للاستقبال. تتاح المستندات والرسائل بعد تولّي مسؤولية الحالة.":"This intake preview supports your ownership decision. Documents and messages become available after you take responsibility for the case."}</p>}
-  </>;
+  // The Consultant handoff is said once: the cover names the Consultant and the strip says the case waits on them (UX 2-4: the
+  // dim banner that repeated both is gone); why the proposal's actions are locked is said beside them, where the lock is.
+  const banners=value.preview?<p className="text-sm text-ink-500">{cv.previewNote}</p>:null;
 
   // The cover's strip (UX area 2): who the case waits on, said once on the page, and — for the coordinator — what the
   // patient's own page says now (the backend's patient step; never inferred here). No field, no line.
@@ -183,12 +181,12 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   const coverRef=useRef<HTMLElement>(null);
   const line=useCoverGone(coverRef);
 
-  // Who is on the case: the owner first, then the clinical and operational people actually assigned.
-  const team=[
-   {label:t.coordinatorLabel,name:coordinatorLabel(c,mySubject,work.queue),pending:false,until:null as string|null},
-   // P1-6: a pending Consultant offer stands until its deadline (working hours); the coordinator sees when it will come back.
-   ...value.assignments.filter(a=>a.assigneeRole!=="COORDINATOR").map(a=>({label:a.assigneeRole==="DOCTOR"?(locale==="ar"?"الاستشاري":"Consultant"):a.assigneeRole==="OPERATIONS"?(locale==="ar"?"العمليات":"Operations"):a.assigneeRole==="FINANCE"?(locale==="ar"?"المالية":"Finance"):a.assigneeRole,name:a.assigneeName??(locale==="ar"?"عضو الفريق":"Team member"),pending:a.status==="PENDING",until:a.status==="PENDING"?a.offerExpiresAt??null:null})),
-  ];
+  // Who else is on the case: the people the cover does not already name (UX 2-4). The coordinator and, during the Consultant's
+  // review, the Consultant are on the cover — with a pending offer's deadline there too — so the rail adds Operations, Finance
+  // and any other Consultant (a second opinion, a referral).
+  const offerTime=(iso:string)=>new Intl.DateTimeFormat(intlLocale(locale),{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(iso));
+  const consultantFact=consultantOnCase?(doctorAssignment?.status==="PENDING"&&doctorAssignment.offerExpiresAt?fillTemplate(cv.pendingUntil,{name:`\u2068${consultantOnCase}\u2069`,date:offerTime(doctorAssignment.offerExpiresAt)}):consultantOnCase):null;
+  const team=value.assignments.filter(a=>a.assigneeRole!=="COORDINATOR"&&!(consultantOnCase&&a===doctorAssignment)).map(a=>({id:a.id,label:label(cv.team.roles,a.assigneeRole),name:a.assigneeName??cv.team.member,pending:a.status==="PENDING",until:a.status==="PENDING"?a.offerExpiresAt??null:null}));
 
   return <CaseWorkspaceProvider value={workspace}><div>
   <nav className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2" aria-label={t.caseWorkspaceLabel}>
@@ -205,13 +203,13 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
       <bdi dir="ltr" className="font-bold text-brand-700">{c.caseNumber}</bdi>
       {[c.careCategory?careAreaLabel(c.careCategory,work.careAreas):null,countryName(c.country,locale),c.preferredLanguage==="ar"?cover.languages.ar:cover.languages.en].filter(Boolean).map(fact=><span key={fact}><span className="sr-only">{cover.separator}</span>{fact}</span>)}
      </p>
-     <h2 id="case-heading" tabIndex={-1} className="mt-1 text-[1.125rem] font-bold leading-7 text-brand-900 outline-none">{c.patientName?<bdi>{c.patientName}</bdi>:cover.untitled}</h2>
+     <h2 id="case-heading" tabIndex={-1} className="mt-1 scroll-mt-28 rounded-sm text-[1.125rem] font-bold leading-7 text-brand-900 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600">{c.patientName?<bdi>{c.patientName}</bdi>:cover.untitled}</h2>
      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.8125rem]">
       <Status value={c.status} locale={locale}/>
       {/* P0-3: the coordinator's urgency, for staff only; routine says nothing. */}
       {c.urgency&&c.urgency!=="ROUTINE"&&<span className={`inline-flex items-center gap-1 font-semibold ${c.urgency==="URGENT"?"text-alert-700":"text-ink-800"}`}><Gauge size={13} aria-hidden/><span className="font-normal text-ink-500">{work.urgency.label}:</span>{work.urgency.levels[c.urgency as Urgency]?.label??c.urgency}</span>}
       <HeaderFact label={t.coordinatorLabel} value={coordinatorLabel(c,mySubject,work.queue)}/>
-      {consultantOnCase&&<HeaderFact label={cover.consultant} value={consultantOnCase}/>}
+      {consultantFact&&<HeaderFact label={cover.consultant} value={consultantFact}/>}
      </div>
     </div>
     <div className="flex flex-none flex-wrap items-center gap-2">
@@ -246,7 +244,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
     <div className="min-w-0">
      {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex flex-wrap gap-1 border-b border-line-strong">
       {caseTabs.map(item=><button key={item.id} type="button" role="tab" id={`case-tab-${item.id}`} aria-controls="case-tab-panel" aria-selected={tab===item.id}
-        className={`-mb-px min-h-11 border-b-2 px-3 py-2 text-[0.85rem] font-bold transition ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
+        className={`-mb-px min-h-11 border-b-2 px-3 py-2 text-[0.875rem] font-bold transition-colors ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
         onKeyDown={event=>{const target=tabKeyTarget(event.key,caseTabs.findIndex(x=>x.id===tab),caseTabs.length,locale==="ar");if(target<0)return;event.preventDefault();const next=caseTabs[target];setTab(next.id);requestAnimationFrame(()=>document.getElementById(`case-tab-${next.id}`)?.focus());}}
         tabIndex={tab===item.id?0:-1}
         onClick={()=>setTab(item.id)}>{item.label}{item.count?<span className="ms-1.5 text-[0.8125rem] font-semibold text-ink-400">{item.count}</span>:null}</button>)}
@@ -258,18 +256,18 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
        {/* Before accepting, a consultant needs the case in front of them — summary and documents, not
            a decision taken blind. Acceptance itself stays in the single Current action panel above. */}
        {myPending&&isDoctor&&<section className="card p-4" aria-labelledby="assignment-preview">
-        <h3 id="assignment-preview" className="label-micro text-ink-500">{locale==="ar"?"ملف التعيين":"Assignment brief"}</h3>
-        <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-2 lg:grid-cols-4">
+        <h3 id="assignment-preview" className="label-micro text-ink-500">{cv.assignment.title}</h3>
+        <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
          <div><dt className="label-micro text-ink-500">{t.patientLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.patientName||"—"}</dd></div>
          {c.careCategory&&<div><dt className="label-micro text-ink-500">{t.careArea}</dt><dd className="mt-0.5 font-semibold text-ink-800">{careAreaLabel(c.careCategory,work.careAreas)}</dd></div>}
          <div><dt className="label-micro text-ink-500">{t.coordinatorLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.coordinatorName??"—"}</dd></div>
          <div><dt className="label-micro text-ink-500">{t.countryLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{countryName(c.country,locale)}</dd></div>
         </dl>
-        {value.intakeSummary?.trim()&&<div className="mt-4 rounded-lg border border-line bg-mist p-3"><p className="whitespace-pre-wrap break-words text-[0.9rem] leading-6 text-ink-700">{value.intakeSummary}</p></div>}
+        {value.intakeSummary?.trim()&&<p className="mt-4 whitespace-pre-wrap break-words border-t border-line pt-3 text-[0.9375rem] leading-6 text-ink-700">{value.intakeSummary}</p>}
         <div className="mt-4">
          <p className="label-micro text-ink-500">{t.documents} {documents.length>0&&<span className="text-ink-400">({documents.length})</span>}</p>
-         {documents.length===0?<p className="mt-1.5 text-[0.88rem] text-ink-500">{locale==="ar"?"لم تُرفع مستندات.":"No documents were uploaded."}</p>
-          :<ul className="mt-1.5">{documents.map(doc=><li key={doc.documentId} className="flex flex-wrap items-center gap-3 border-b border-line py-2 last:border-0"><span className="min-w-0 flex-1 truncate font-semibold text-ink-800">{doc.fileName}</span>{doc.status==="CLEAN"?<span className="flex gap-2"><button type="button" className="link-cta text-[0.85rem]" onClick={()=>viewDoc(doc.documentId)}>{locale==="ar"?"عرض":"View"}<span className="sr-only"> {doc.fileName}</span></button><button type="button" className="link-cta text-[0.85rem]" onClick={()=>downloadDoc(doc.documentId)}>{t.download}<span className="sr-only"> {doc.fileName}</span></button></span>:<span className="text-[0.8rem] text-ink-500">{doc.status==="PENDING"?t.docScanning:t.docUnavailable}</span>}</li>)}</ul>}
+         {documents.length===0?<p className="mt-1.5 text-[0.875rem] text-ink-500">{cv.assignment.noDocuments}</p>
+          :<ul className="mt-1.5">{documents.map(doc=><li key={doc.documentId} className="flex flex-wrap items-center gap-3 border-b border-line py-2 last:border-0"><span className="min-w-0 flex-1 truncate font-semibold text-ink-800">{doc.fileName}</span>{doc.status==="CLEAN"?<span className="flex gap-2"><button type="button" className="link-cta text-[0.875rem]" onClick={()=>viewDoc(doc.documentId)}>{cv.view}<span className="sr-only"> {doc.fileName}</span></button><button type="button" className="link-cta text-[0.875rem]" onClick={()=>downloadDoc(doc.documentId)}>{t.download}<span className="sr-only"> {doc.fileName}</span></button></span>:<span className="text-[0.8125rem] text-ink-500">{doc.status==="PENDING"?t.docScanning:t.docUnavailable}</span>}</li>)}</ul>}
         </div>
        </section>}
        {banners}
@@ -285,16 +283,16 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
 
       {/* Kept mounted for the same reason: the clinical review and final assessment drafts. */}
       <div hidden={tab!=="clinical"} className="space-y-4">
-       {doctorReviewComplete&&<div className="card flex items-center gap-3 border border-brand-500 bg-brand-50 p-4"><span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-brand-600 font-bold text-white">✓</span><p className="font-bold text-brand-800">{c.status==="CLINICAL_RECOMMENDATION_READY"?t.doctorAccepted:c.status==="INFORMATION_REQUIRED"?t.doctorInfoSent:c.status==="CLINICALLY_NOT_SUITABLE"?t.doctorNotSuitable:t.doctorReturned}</p></div>}
+       {doctorReviewComplete&&<div className="flex items-start gap-2 border-y border-line py-3"><Check size={18} aria-hidden className="mt-0.5 flex-none text-brand-600"/><p className="font-semibold text-brand-800">{c.status==="CLINICAL_RECOMMENDATION_READY"?t.doctorAccepted:c.status==="INFORMATION_REQUIRED"?t.doctorInfoSent:c.status==="CLINICALLY_NOT_SUITABLE"?t.doctorNotSuitable:t.doctorReturned}</p></div>}
        {clinicalReviewPanel}
        {isDoctor&&<ConsultantReferrals key={c.id} locale={locale} caseId={c.id} careCategory={c.careCategory} categories={categories} canRefer={c.status==="CONSULTANT_REVIEW"&&!myPending&&!secondOpinionOnly} busy={busy} load={load} mutate={mutate}/>}
        {intakePanel}
        {/* While the consultant is composing, the review history would only repeat their own draft back at them. */}
        {!clinicalReviewPanel&&clinicalPanel}
-       {!intakePanel&&!clinicalPanel&&!clinicalReviewPanel&&!doctorReviewComplete&&<p className="text-sm text-ink-500">{locale==="ar"?"لا توجد معلومات سريرية بعد.":"No clinical information yet."}</p>}
+       {!intakePanel&&!clinicalPanel&&!clinicalReviewPanel&&!doctorReviewComplete&&<p className="text-sm text-ink-500">{cv.noClinical}</p>}
       </div>
 
-      {tab==="documents"&&(documentsPanel??<p className="text-sm text-ink-500">{locale==="ar"?"لم يتم رفع مستندات بعد.":"No documents uploaded yet."}</p>)}
+      {tab==="documents"&&(documentsPanel??<p className="text-sm text-ink-500">{cv.noDocuments}</p>)}
 
       {tab==="activity"&&<><CaseActivity tasks={value.tasks} timeline={value.timeline} onViewJourney={()=>setOverlay("journey")}/>{isCoordinator&&loadAssignmentHistory&&<div className="mt-5"><AssignmentHistory key={c.id} locale={locale} caseId={c.id} load={loadAssignmentHistory}/></div>}</>}
      </div>
@@ -303,20 +301,20 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
     {/* Sticks below the site header (--case-header-bottom), and below the case line once that shows (--case-line-bottom). */}
     <aside className="min-w-0 space-y-4 lg:sticky lg:top-[calc(var(--case-line-bottom,var(--case-header-bottom,4rem))+1rem)]">
      <JourneyPulse stage={c.status} onViewJourney={()=>setOverlay("journey")}/>
-     {!value.preview&&<section aria-labelledby="case-team-title" className="card p-4">
-      <h2 id="case-team-title" className="label-micro text-ink-500">{locale==="ar"?"فريق الحالة":"Case team"}</h2>
-      <dl className="mt-2 space-y-1.5 text-[0.82rem]">{team.map((member,i)=><div key={`${member.label}-${i}`} className="flex items-baseline justify-between gap-3"><dt className="text-ink-500">{member.label}</dt><dd className="text-end font-semibold text-ink-800">{member.name}{member.pending&&<span className="ms-1 text-[0.8125rem] font-semibold text-status-warning-fg">{locale==="ar"?"· بانتظار القبول":"· pending"}</span>}{member.until&&<span className="block text-[0.8125rem] font-normal text-ink-500">{locale==="ar"?"العرض قائم حتى ":"Offer until "}<time dateTime={member.until}>{new Intl.DateTimeFormat(intlLocale(locale),{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(member.until))}</time></span>}</dd></div>)}</dl>
+     {!value.preview&&team.length>0&&<section aria-labelledby="case-team-title" className="card p-4">
+      <h2 id="case-team-title" className="label-micro text-ink-500">{cv.team.title}</h2>
+      <dl className="mt-2 space-y-1.5 text-[0.875rem]">{team.map(member=><div key={member.id} className="flex items-baseline justify-between gap-3"><dt className="text-ink-500">{member.label}</dt><dd className="text-end font-semibold text-ink-800"><bdi>{member.name}</bdi>{member.pending&&<span className="ms-1 text-[0.8125rem] font-semibold text-status-warning-fg">· {cv.team.pending}</span>}{member.until&&<span className="block text-[0.8125rem] font-normal text-ink-500"><time dateTime={member.until}>{fillTemplate(cv.team.offerUntil,{date:offerTime(member.until)})}</time></span>}</dd></div>)}</dl>
      </section>}
     </aside>
    </div>
    {/* Explains why the workspace is read-only. The Take ownership button lives once, in the current-
        action panel above; repeating it here put the same claim on screen twice under one label. */}
-   {isCoordinator&&!owned&&<p className="card mt-5 border border-brand-400 p-4 text-ink-600">{c.coordinatorSubject?t.ownedByOther:t.ownershipHint}</p>}
+   {isCoordinator&&!owned&&<p className="mt-5 border-y border-line py-3 text-[0.9375rem] text-ink-600">{c.coordinatorSubject?t.ownedByOther:t.ownershipHint}</p>}
   </div>
 
   {overlay==="journey"&&<FullJourneyDialog locale={locale} timeline={value.timeline} caseNumber={c.caseNumber} onClose={()=>closeOverlay("journey")}/>}
   {(overlay==="messages"||overlay==="reply")&&<CaseDrawer locale={locale} title={work.caseMessages.title} onClose={()=>closeOverlay(overlay)}><MessageThreads key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={showActions} patientReply={value.patientReply} busy={busy} mutate={mutate} replyTo={overlay==="reply"?"PATIENT_COORDINATOR":undefined}/>{isCoordinator&&loadIntakeHistory&&<IntakeHistory locale={locale} caseId={c.id} load={loadIntakeHistory}/>}</CaseDrawer>}
-  {overlay==="more"&&<CaseDrawer locale={locale} title={locale==="ar"?"إجراءات إضافية":"More actions"} onClose={()=>closeOverlay("more")}>
+  {overlay==="more"&&<CaseDrawer locale={locale} title={cv.moreTitle} onClose={()=>closeOverlay("more")}>
    <MoreActions locale={locale} caseId={c.id} available={moreAvailable} travelPackage={!!c.travelPackageRequested} version={c.version} busy={busy} mutate={mutate}
     onRequestInformation={()=>setOverlay("requestInfo")} onRecordResponse={()=>setOverlay("recordResponse")}
     onRecordDecision={value.proposal?()=>setOverlay("recordDecision"):undefined}
@@ -332,7 +330,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   {overlay==="proposal"&&<CaseDrawer locale={locale} title={t.proposal} onClose={()=>closeOverlay("proposal")}>
    <div className="space-y-4">{recommendationBlock}{value.proposal&&<ProposalCard proposal={value.proposal}/>}{value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={false}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}</div>
   </CaseDrawer>}
-  {overlay==="transfer"&&<CaseDrawer locale={locale} title={locale==="ar"?"نقل ملكية الحالة":"Transfer case ownership"} onClose={()=>closeOverlay("transfer")}><TransferOwnership locale={locale} caseId={c.id} caseNumber={c.caseNumber} currentOwner={c.coordinatorSubject} currentOwnerName={c.coordinatorName} mySubject={mySubject} staff={staff??[]} busy={busy} mutate={mutate} onClose={()=>closeOverlay("transfer")}/></CaseDrawer>}
+  {overlay==="transfer"&&<CaseDrawer locale={locale} title={cv.transferTitle} onClose={()=>closeOverlay("transfer")}><TransferOwnership locale={locale} caseId={c.id} caseNumber={c.caseNumber} currentOwner={c.coordinatorSubject} currentOwnerName={c.coordinatorName} mySubject={mySubject} staff={staff??[]} busy={busy} mutate={mutate} onClose={()=>closeOverlay("transfer")}/></CaseDrawer>}
   {overlay==="requestInfo"&&<RequestInformationDialog locale={locale} caseIds={[c.id]} busy={busy} mutate={mutate} onClose={()=>closeOverlay("requestInfo")}/>}
   {overlay==="decline"&&myPending&&<DeclineAssignmentDialog locale={locale} caseNumber={c.caseNumber} busy={busy} onClose={()=>closeOverlay("decline")}
    onConfirm={reason=>void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:false,reason})}/>}
@@ -390,7 +388,9 @@ function AlsoOpen({items}:{items:WorkItem[]}){
 /** A quiet link to the next item in My work's order: never a second filled action. The case it opens is named for everyone. */
 function NextInMyWork({item,onOpen}:{item:WorkItem;onOpen:()=>void}){
  const work=useWorkCopy();const sep=work.caseCover.separator;
- return <button type="button" className="link-cta text-[0.875rem]" onClick={onOpen}>
+ // `n` opens it from anywhere on the case while one-key shortcuts are on (UX 2-2); the button says so to assistive technology.
+ const shortcuts=useShortcutsEnabled();
+ return <button type="button" className="link-cta text-[0.875rem]" aria-keyshortcuts={shortcuts?"n":undefined} onClick={onOpen}>
   {work.caseCover.nextInMyWork}
   <span className="inline-flex min-w-0 items-baseline max-sm:sr-only"><span className="sr-only">{sep}</span><span aria-hidden className="text-ink-300">·&nbsp;</span><bdi dir="ltr" className="font-semibold">{item.caseNumber}</bdi>
    {item.patientName&&<><span className="sr-only">{sep}</span><span aria-hidden className="text-ink-300">&nbsp;·&nbsp;</span><bdi className="max-w-[16ch] truncate font-semibold">{item.patientName}</bdi></>}</span>
@@ -463,36 +463,35 @@ function useCoverGone(cover:RefObject<HTMLElement|null>){
  * in one line, with the full breakdown, delivery and deposit one click away. The secure link the patient
  * currently holds is shown compactly with its one utility — resend — only while resending is valid.
  */
-function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?:Proposal;deposit?:DepositView|null;delivery?:DeliveryStatus|null;available:string[];onView:()=>void}){const work=useWorkCopy();const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
+function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?:Proposal;deposit?:DepositView|null;delivery?:DeliveryStatus|null;available:string[];onView:()=>void}){const work=useWorkCopy();const cv=work.caseView;const s=cv.summary;const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
  // A resend revokes the link the patient holds, so it is confirmed first.
  const [resendPath,setResendPath]=useState<string|null>(null);
- const ar=locale==="ar";
  const total=proposal?proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0):null;
  const services=proposal?.items.length??0;
- const depositLabel=deposit?({REQUESTED:ar?"مطلوبة":"Requested",PARTIALLY_PAID:ar?"مدفوعة جزئيًا":"Partially paid",PAID:ar?"مدفوعة":"Paid",CANCELLED:ar?"ملغاة":"Cancelled",REFUNDED:ar?"مستردة":"Refunded",WAIVED:ar?"معفاة":"Waived"} as Record<string,string>)[deposit.status]??deposit.status:null;
+ const depositLabel=deposit?label(cv.depositStatus,deposit.status):null;
  const fmt=(n:number,currency:string)=>money(n,currency,locale);
  const resendProposal=available.includes("RESEND_PROPOSAL_LINK")&&proposal;
  const resendProfile=available.includes("RESEND_ONBOARDING_LINK");
- const linkLabel=resendProfile?(ar?"رابط تفعيل الملف":"Profile link"):(ar?"رابط العرض":"Proposal link");
- const deliveryLabel=delivery?({QUEUED:ar?"في قائمة الإرسال":"Queued",DELIVERED:ar?"تم التسليم":"Delivered",RETRY:ar?"إعادة المحاولة":"Retrying",FAILED:ar?"فشل الإرسال":"Failed"} as Record<string,string>)[delivery.status]??delivery.status:null;
+ const deliveryLabel=delivery?label(cv.deliveryStatus,delivery.status):null;
+ const channel=delivery?.channel==="WHATSAPP"?cv.channels.WHATSAPP:cv.channels.EMAIL;
  return <section className="card p-4 sm:p-5" aria-labelledby="proposal-summary-title">
   <div className="flex flex-wrap items-start justify-between gap-3">
    <div className="min-w-0">
-    <h3 id="proposal-summary-title" className="label-micro text-ink-500">{ar?"آخر عرض":"Latest proposal"}</h3>
+    <h3 id="proposal-summary-title" className="label-micro text-ink-500">{s.title}</h3>
     {proposal?<>
-     <p className="mt-1 text-[1rem] font-bold text-brand-900">{proposal.documentType==="FINAL_TREATMENT_QUOTE"?(ar?"عرض العلاج النهائي":"Final treatment quote"):(ar?"تقدير مبدئي":"Preliminary estimate")} · {fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</p>
-     <p className="mt-0.5 text-[0.85rem] text-ink-600">{total!=null&&<strong className="text-ink-900"><bdi dir="ltr">{fmt(total,proposal.currency)}</bdi></strong>}{services>0&&<> · {plural(work.locale,services,work.plural.services)}</>}{proposal.validUntil&&<> · {ar?"صالح حتى":"Valid until"} {new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(proposal.validUntil))}</>}</p>
-    </>:<p className="mt-1 text-[0.9rem] text-ink-600">{ar?"لا يوجد عرض بعد.":"No proposal yet."}</p>}
+     <p className="mt-1 text-[1rem] font-bold text-brand-900">{proposal.documentType==="FINAL_TREATMENT_QUOTE"?s.final:s.preliminary} · {fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</p>
+     <p className="mt-0.5 text-[0.875rem] text-ink-600">{total!=null&&<strong className="text-ink-900"><bdi dir="ltr">{fmt(total,proposal.currency)}</bdi></strong>}{services>0&&<> · {plural(work.locale,services,work.plural.services)}</>}{proposal.validUntil&&<> · {fillTemplate(cv.validUntil,{date:new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(proposal.validUntil))})}</>}</p>
+    </>:<p className="mt-1 text-[0.875rem] text-ink-600">{s.none}</p>}
    </div>
-   <button type="button" className="btn-secondary !px-3 !text-[0.82rem]" onClick={onView}>{ar?"عرض التفاصيل":"View proposal"}</button>
+   <button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={onView}>{s.view}</button>
   </div>
-  <dl className="mt-3 grid gap-x-6 gap-y-2 border-t border-line pt-3 text-[0.85rem] sm:grid-cols-2">
-   {deposit&&<div className="flex flex-wrap items-baseline justify-between gap-x-3"><dt className="text-ink-500">{ar?"وديعة التنسيق":"Coordination deposit"}</dt><dd className="font-semibold text-ink-800">{depositLabel}{deposit.totalDisplay!=null&&<> · <bdi dir="ltr">{fmt(deposit.totalDisplay,deposit.currency||"EGP")}</bdi></>}{deposit.paidDisplay?<span className="text-ink-500"> · {ar?"المدفوع":"paid"} <bdi dir="ltr">{fmt(deposit.paidDisplay,deposit.currency||"EGP")}</bdi></span>:null}</dd></div>}
-   {(delivery||resendProfile)&&<div className="flex flex-wrap items-baseline justify-between gap-x-3"><dt className="text-ink-500">{ar?"الرابط الآمن":"Secure link"}</dt><dd className="flex flex-wrap items-center gap-x-2 font-semibold text-ink-800">
-    {delivery&&!resendProfile&&<span>{deliveryLabel} · {delivery.channel==="WHATSAPP"?(ar?"واتساب":"WhatsApp"):(ar?"البريد":"Email")} · <span dir="ltr">{delivery.destinationMasked}</span></span>}
-    {resendProfile&&<span>{linkLabel}{delivery?<> · {delivery.channel==="WHATSAPP"?(ar?"واتساب":"WhatsApp"):(ar?"البريد":"Email")} · <span dir="ltr">{delivery.destinationMasked}</span></>:null}</span>}
-    {resendProposal&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>setResendPath(`/coordinator/cases/${caseId}/proposals/${proposal.versionId}/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
-    {resendProfile&&<button type="button" className="link-cta text-[0.82rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>setResendPath(`/coordinator/cases/${caseId}/onboarding-link/resend`)}>{ar?"إعادة الإرسال":"Resend link"}</button>}
+  <dl className="mt-3 grid gap-x-6 gap-y-2 border-t border-line pt-3 text-[0.875rem] sm:grid-cols-2">
+   {deposit&&<div className="flex flex-wrap items-baseline justify-between gap-x-3"><dt className="text-ink-500">{s.deposit}</dt><dd className="font-semibold text-ink-800">{depositLabel}{deposit.totalDisplay!=null&&<> · <bdi dir="ltr">{fmt(deposit.totalDisplay,deposit.currency||"EGP")}</bdi></>}{deposit.paidDisplay?<span className="text-ink-500"> · {s.paid} <bdi dir="ltr">{fmt(deposit.paidDisplay,deposit.currency||"EGP")}</bdi></span>:null}</dd></div>}
+   {(delivery||resendProfile)&&<div className="flex flex-wrap items-baseline justify-between gap-x-3"><dt className="text-ink-500">{s.secureLink}</dt><dd className="flex flex-wrap items-center gap-x-2 font-semibold text-ink-800">
+    {delivery&&!resendProfile&&<span>{deliveryLabel} · {channel} · <bdi dir="ltr">{delivery.destinationMasked}</bdi></span>}
+    {resendProfile&&<span>{s.profileLink}{delivery?<> · {channel} · <bdi dir="ltr">{delivery.destinationMasked}</bdi></>:null}</span>}
+    {resendProposal&&<button type="button" className="link-cta text-[0.875rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>setResendPath(`/coordinator/cases/${caseId}/proposals/${proposal.versionId}/resend`)}>{s.resend}</button>}
+    {resendProfile&&<button type="button" className="link-cta text-[0.875rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>setResendPath(`/coordinator/cases/${caseId}/onboarding-link/resend`)}>{s.resend}</button>}
    </dd></div>}
   </dl>
   {resendPath&&<ConfirmDialog title={work.confirm.resendTitle} body={delivery?fillTemplate(work.confirm.resendBodyTo,{destination:`\u2068${delivery.destinationMasked}\u2069`}):work.confirm.resendBody} confirm={work.confirm.resend} cancel={work.confirm.cancel}
@@ -507,30 +506,29 @@ function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?
  * action sits above. It renders only real data: a fact with nothing behind it is left out, not filled in.
  */
 function CoordinatorBrief({documents,preview,intakeSummary,onClinical,onDocuments}:{documents:CaseDocument[];preview:boolean;intakeSummary?:string;onClinical:()=>void;onDocuments:()=>void}){
- const {locale,t,c}=useCaseWorkspace();
- const ar=locale==="ar";
+ const {locale,t,c}=useCaseWorkspace();const b=useWorkCopy().caseView.brief;
  const when=(iso:string)=>new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(iso));
  const facts:{label:string;value:string}[]=[
-  {label:ar?"تاريخ الاستلام":"Received",value:when(c.createdAt)},
+  {label:b.received,value:when(c.createdAt)},
   // Care area, country, language, coordinator, Consultant, stage and "waiting on" are on the case cover above, said once.
   // An unclassified care area is the one gap the cover cannot show (it leaves the area out), so the brief names it.
-  ...(c.careCategory?[]:[{label:t.careArea,value:ar?"لم يُحدَّد بعد":"Not classified yet"}]),
-  {label:t.documents,value:documents.length===0?(ar?"لا توجد":"None"):String(documents.length)},
-  ...(c.travelPackageRequested?[{label:ar?"باقة السفر":"Travel package",value:ar?"مطلوبة":"Requested"}]:[]),
+  ...(c.careCategory?[]:[{label:t.careArea,value:b.notClassified}]),
+  {label:t.documents,value:documents.length===0?b.none:new Intl.NumberFormat(intlLocale(locale)).format(documents.length)},
+  ...(c.travelPackageRequested?[{label:b.travelPackage,value:b.requested}]:[]),
   {label:t.updatedLabel,value:when(c.updatedAt)},
  ];
  const summary=intakeSummary?.trim();
  return <section className="card p-4" aria-labelledby="case-brief-title">
-  <h3 id="case-brief-title" className="label-micro text-ink-500">{preview?(ar?"ملخص الاستقبال":"Intake brief"):(ar?"ملخص الحالة":"Case brief")}</h3>
-  <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-2 lg:grid-cols-3">
+  <h3 id="case-brief-title" className="label-micro text-ink-500">{preview?b.intake:b.case}</h3>
+  <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-3">
    {facts.map(fact=><div key={fact.label} className="min-w-0"><dt className="label-micro text-ink-500">{fact.label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-800">{fact.value}</dd></div>)}
   </dl>
   <div className="mt-4 border-t border-line pt-3">
-   <p className="label-micro text-ink-500">{ar?"ملخص الحالة عند الاستقبال":"Intake summary"}</p>
-   {summary?<p className="mt-1 line-clamp-4 whitespace-pre-wrap break-words text-[0.88rem] leading-6 text-ink-700">{summary}</p>:<p className="mt-1 text-[0.85rem] text-ink-500">{ar?"لم يكتب المريض وصفًا للحالة.":"The patient did not describe their condition."}</p>}
+   <p className="label-micro text-ink-500">{b.intakeSummary}</p>
+   {summary?<p className="mt-1 line-clamp-4 whitespace-pre-wrap break-words text-[0.875rem] leading-6 text-ink-700">{summary}</p>:<p className="mt-1 text-[0.875rem] text-ink-500">{b.noDescription}</p>}
    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-    {summary&&<button type="button" className="link-cta text-[0.85rem]" onClick={onClinical}>{ar?"الملف السريري الكامل":"Full clinical file"}</button>}
-    {documents.length>0&&<button type="button" className="link-cta text-[0.85rem]" onClick={onDocuments}>{ar?`المستندات (${documents.length})`:`Documents (${documents.length})`}</button>}
+    {summary&&<button type="button" className="link-cta text-[0.875rem]" onClick={onClinical}>{b.fullClinical}</button>}
+    {documents.length>0&&<button type="button" className="link-cta text-[0.875rem]" onClick={onDocuments}>{fillTemplate(b.documents,{count:new Intl.NumberFormat(intlLocale(locale)).format(documents.length)})}</button>}
    </div>
   </div>
  </section>;
@@ -538,8 +536,7 @@ function CoordinatorBrief({documents,preview,intakeSummary,onClinical,onDocument
 
 /** History, not current work: every task and the recorded stage changes, out of the operational view. */
 function CaseActivity({tasks,timeline,onViewJourney}:{tasks:Task[];timeline:{status:string;occurredAt:string}[];onViewJourney:()=>void}){
- const {locale}=useCaseWorkspace();const work=useWorkCopy();
- const ar=locale==="ar";
+ const {locale}=useCaseWorkspace();const work=useWorkCopy();const a=work.caseView.activity;
  const open=tasks.filter(task=>["OPEN","IN_PROGRESS"].includes(task.status));
  const done=tasks.filter(task=>!["OPEN","IN_PROGRESS"].includes(task.status));
  const row=(task:Task)=><li key={task.id} className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line py-2.5 last:border-0">
@@ -548,20 +545,20 @@ function CaseActivity({tasks,timeline,onViewJourney}:{tasks:Task[];timeline:{sta
  </li>;
  return <div className="space-y-5">
   <section className="card p-4">
-   <h3 className="label-micro text-ink-500">{ar?"المهام":"Work items"}</h3>
-   {tasks.length===0?<p className="mt-2 text-sm text-ink-500">{ar?"لا توجد مهام على هذه الحالة.":"No work items on this case."}</p>
+   <h3 className="label-micro text-ink-500">{a.workItems}</h3>
+   {tasks.length===0?<p className="mt-2 text-sm text-ink-500">{a.none}</p>
     :<ul className="mt-2">{open.map(row)}{done.map(row)}</ul>}
   </section>
   <section className="card p-4">
-   <h3 className="label-micro text-ink-500">{ar?"مراحل الحالة":"Case history"}</h3>
-   <p className="mt-2 text-sm text-ink-600">{ar?`${timeline.length} تغييرات مسجلة.`:`${timeline.length} recorded stage changes.`}</p>
-   <button type="button" className="link-cta mt-3 text-[0.88rem]" onClick={onViewJourney}>{ar?"عرض الرحلة كاملة":"View full journey"}</button>
+   <h3 className="label-micro text-ink-500">{a.history}</h3>
+   <p className="mt-2 text-sm text-ink-600">{plural(locale,timeline.length,work.plural.stageChanges)}</p>
+   <button type="button" className="link-cta mt-3 text-[0.875rem]" aria-haspopup="dialog" onClick={onViewJourney}>{a.viewJourney}</button>
   </section>
  </div>;
 }
 
 function ProposalSendForm({estimate,onSend}:{estimate:Review;onSend:(caseId:string,body:unknown)=>void}){
- const {locale,t,c:{id:caseId,preferredLanguage:language},busy}=useCaseWorkspace();
+ const {locale,t,c:{id:caseId,preferredLanguage:language},busy}=useCaseWorkspace();const cv=useWorkCopy().caseView;
  const reviewId=estimate.id;
  const estimates=estimate?.costEstimates??[];const[notes,setNotes]=useState("");
  // The consultant fixes the proposal currency when submitting the recommendation. The lines below are the
@@ -575,27 +572,26 @@ function ProposalSendForm({estimate,onSend}:{estimate:Review;onSend:(caseId:stri
  const foreign=proposalCurrency!==baseCurrency;
  const quoted=foreign&&estimates.length>0&&estimates.every(item=>item.quotedCost!=null&&item.quotedCurrency===proposalCurrency);
  const rateUnavailable=foreign&&estimates.length>0&&!quoted;
- const labels=locale==="ar"?{source:"اعتمدها الاستشاري",locked:"الخدمات والتكاليف الطبية أدخلها الاستشاري واعتمدها. لا يستطيع المنسق تعديلها.",missing:"لا يمكن إنشاء العرض حتى يضيف الاستشاري خدمة واحدة على الأقل وتكلفتها ضمن المراجعة المعتمدة.",coordination:"ملاحظة تنسيقية اختيارية",coordinationHint:"أضف فقط معلومات غير سريرية يحتاجها المريض، مثل نقطة التواصل أو خطوات التنسيق. لا تضف علاجًا أو تكلفة طبية هنا.",currency:"عملة عرض المريض",rateNote:"حدّدها الاستشاري عند تسجيل التقدير؛ يرى المريض العرض بهذه العملة."}:{source:"Consultant approved",locked:"Medical services and costs were entered and approved by the consultant. Coordinators cannot edit them.",missing:"A proposal cannot be created until the consultant adds at least one service and cost to the approved review.",coordination:"Optional coordination note",coordinationHint:"Add only non-clinical information the patient needs, such as the contact point or coordination steps. Do not add treatment or medical pricing here.",currency:"Patient's quote currency",rateNote:"Set by the consultant when recording the estimate; the patient sees the quote in this currency."};
+ const labels=cv.send;
  const items=estimates.map((item,index)=>({category:"MEDICAL",description:item.serviceDescription,quantity:1,unitPrice:item.estimatedCost,optional:false,sortOrder:index,quotedPrice:item.quotedCost??null}));
  const total=items.reduce((a,i)=>a+i.unitPrice,0);
  const quotedTotal=quoted?items.reduce((a,i)=>a+(i.quotedPrice??0),0):null;
- const rateNote=quoted&&estimate?.quoteRate?(locale==="ar"?`سعر الصرف اليوم: 1 جنيه = ${estimate.quoteRate} ${proposalCurrency}${estimate.quoteRateDate?` (${estimate.quoteRateDate})`:""}. يُثبَّت السعر النهائي عند إرسال العرض.`:`Today's rate: 1 EGP = ${estimate.quoteRate} ${proposalCurrency}${estimate.quoteRateDate?` (${estimate.quoteRateDate})`:""}. The rate is frozen when the proposal is released.`):null;
+ const rateNote=quoted&&estimate?.quoteRate?fillTemplate(estimate.quoteRateDate?labels.rateTodayDated:labels.rateToday,{rate:new Intl.NumberFormat(intlLocale(locale),{maximumFractionDigits:6}).format(estimate.quoteRate),currency:proposalCurrency,date:estimate.quoteRateDate?new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(estimate.quoteRateDate)):""}):null;
  const send=()=>{if(!items.length)return;onSend(caseId,{clinicalReviewId:reviewId,language,includedServices:items.map(i=>i.description).join("; "),paymentTerms:PROPOSAL_PAYMENT_TERMS_RECORD,coordinatorNotes:notes.trim()||undefined,validUntil:validUntilInDays(14),items});};
  return <div className="mt-4 space-y-5">
-  <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-bold text-ink-700">{labels.currency}<span className="rounded-full bg-brand-50 px-3 py-1 text-brand-800">{CURRENCY_LABELS[proposalCurrency]?.[locale]??proposalCurrency}</span></span><span className="text-[0.8125rem] text-ink-500">{labels.rateNote}</span></div>
-  {/* Inside the proposal panel: a hairline list, not a second boxed surface (no nested cards). */}<div><div className="flex flex-wrap items-baseline justify-between gap-2"><h4 className="font-bold text-brand-900">{t.servicesFromConsultant}</h4><span className="inline-flex items-center gap-1 text-[0.8125rem] font-semibold text-brand-700"><Check size={14} strokeWidth={2.5} aria-hidden/>{labels.source}</span></div><p className="mt-1 text-sm text-ink-600">{labels.locked}</p>{items.length?<ul className="mt-3 divide-y divide-line border-y border-line">{items.map(item=><li key={item.sortOrder} className="flex items-baseline justify-between gap-4 py-3"><span className="font-semibold">{item.description}</span><span className="text-end"><strong className="block whitespace-nowrap"><bdi dir="ltr">{quoted&&item.quotedPrice!=null?money(item.quotedPrice,proposalCurrency,locale):money(item.unitPrice,baseCurrency,locale)}</bdi></strong>{quoted&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{locale==="ar"?"الأساس":"Base"} <bdi dir="ltr">{money(item.unitPrice,baseCurrency,locale)}</bdi></span>}</span></li>)}<li className="flex items-baseline justify-between gap-4 border-t-2 border-line-strong py-3"><span className="font-bold">{locale==="ar"?"الإجمالي":"Total"}</span><span className="text-end"><strong className="block whitespace-nowrap"><bdi dir="ltr">{quotedTotal!=null?money(quotedTotal,proposalCurrency,locale):money(total,baseCurrency,locale)}</bdi></strong>{quotedTotal!=null&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{locale==="ar"?"الأساس":"Base"} <bdi dir="ltr">{money(total,baseCurrency,locale)}</bdi></span>}</span></li></ul>:<p className="mt-3 rounded-lg bg-alert-50 p-4 text-sm font-semibold text-alert-800">{labels.missing}</p>}{rateNote&&<p className="mt-2 text-[0.8125rem] text-ink-500">{rateNote}</p>}{rateUnavailable&&<p role="alert" className="mt-3 rounded-lg bg-alert-50 px-4 py-3 text-sm font-semibold text-alert-800">{locale==="ar"?`لا يتوفر سعر صرف لعملة ${proposalCurrency} حاليًا، لذلك لا يمكن عرض المبالغ بها ولا إنشاء العرض حتى يتوفر السعر.`:`No exchange rate is available for ${proposalCurrency} right now, so the amounts cannot be quoted in it and the proposal cannot be created until a rate is available.`}</p>}</div>
+  <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex items-baseline gap-2 text-sm font-bold text-ink-700">{labels.currency}<span className="text-[0.9375rem] text-ink-900">{CURRENCY_LABELS[proposalCurrency]?.[locale]??proposalCurrency}</span></span><span className="text-[0.8125rem] text-ink-500">{labels.rateNote}</span></div>
+  {/* Inside the proposal panel: a hairline list, not a second boxed surface (no nested cards). */}<div><div className="flex flex-wrap items-baseline justify-between gap-2"><h4 className="font-bold text-brand-900">{t.servicesFromConsultant}</h4><span className="inline-flex items-center gap-1 text-[0.8125rem] font-semibold text-brand-700"><Check size={14} strokeWidth={2.5} aria-hidden/>{labels.source}</span></div><p className="mt-1 text-sm text-ink-600">{labels.locked}</p>{items.length?<ul className="mt-3 divide-y divide-line border-y border-line">{items.map(item=><li key={item.sortOrder} className="flex items-baseline justify-between gap-4 py-3"><span className="font-semibold">{item.description}</span><span className="text-end"><strong className="block whitespace-nowrap"><bdi dir="ltr">{quoted&&item.quotedPrice!=null?money(item.quotedPrice,proposalCurrency,locale):money(item.unitPrice,baseCurrency,locale)}</bdi></strong>{quoted&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{cv.base} <bdi dir="ltr">{money(item.unitPrice,baseCurrency,locale)}</bdi></span>}</span></li>)}<li className="flex items-baseline justify-between gap-4 border-t-2 border-line-strong py-3"><span className="font-bold">{labels.total}</span><span className="text-end"><strong className="block whitespace-nowrap"><bdi dir="ltr">{quotedTotal!=null?money(quotedTotal,proposalCurrency,locale):money(total,baseCurrency,locale)}</bdi></strong>{quotedTotal!=null&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{cv.base} <bdi dir="ltr">{money(total,baseCurrency,locale)}</bdi></span>}</span></li></ul>:<p className="mt-3 flex items-start gap-2 border-y border-alert-200 py-3 text-sm font-semibold text-alert-800"><CircleAlert size={16} aria-hidden className="mt-0.5 flex-none"/>{labels.missing}</p>}{rateNote&&<p className="mt-2 text-[0.8125rem] text-ink-500">{rateNote}</p>}{rateUnavailable&&<p role="alert" className="mt-3 flex items-start gap-2 border-y border-alert-200 py-3 text-sm font-semibold text-alert-800"><CircleAlert size={16} aria-hidden className="mt-0.5 flex-none"/>{fillTemplate(labels.noRate,{currency:proposalCurrency})}</p>}</div>
   <div><label className="block"><span className="title text-base">{labels.coordination}</span><span className="mt-1 block text-sm text-ink-500">{labels.coordinationHint}</span><textarea className="field mt-2 min-h-24" maxLength={20000} value={notes} onChange={e=>setNotes(e.target.value)}/></label></div>
   <button type="button" disabled={busy||!items.length||rateUnavailable} className="btn-primary w-full justify-center py-3 text-base sm:w-auto" onClick={send}>{t.createProposal}</button>
  </div>;
 }
 
 export function FinalAssessment(){
- const {locale,c:{id:caseId},busy,mutate,catalog,fxRates,facilities}=useCaseWorkspace();
+ const {locale,c:{id:caseId},busy,mutate,catalog,fxRates,facilities}=useCaseWorkspace();const g=useWorkCopy().caseView.finalAssessment;
  const[treatment,setTreatment]=useState("");const[risks,setRisks]=useState("");const[currency,setCurrency]=useState("EGP");const[costs,setCosts]=useState([{description:"",amount:""}]);const[selected,setSelected]=useState<Set<string>>(new Set());const[packagePicks,setPackagePicks]=useState<Map<string,number>>(new Map());
- const g=locale==="ar"?{title:"الفحص السريري النهائي",intro:"سجّل تقييمك بعد فحص المريض. سيبني المنسق العرض النهائي من الخدمات المؤكدة.",treatment:"العلاج النهائي الموصى به",risks:"المخاطر والقيود",services:"خدماتك المعتمدة",manual:"خدمة غير مدرجة (تتطلب موافقة مالية)",currency:"عملة العرض",add:"إضافة خدمة",save:"حفظ التقييم النهائي",service:"الخدمة",amount:"المبلغ"}:{title:"Final in-person assessment",intro:"Record your assessment after examining the patient. The coordinator builds the final quote from the confirmed services.",treatment:"Final recommended treatment",risks:"Risks & limitations",services:"Your approved services",manual:"Service not on your list (needs finance approval)",currency:"Display currency",add:"Add a service",save:"Save final assessment",service:"Service",amount:"Amount"};
  const currencyOptions=["EGP",...fxRates.filter(f=>f.currency!=="EGP").map(f=>f.currency)];const rate=currency==="EGP"?1:(fxRates.find(f=>f.currency===currency)?.rate??1);
  // P0-5: Finance-approved facility packages are approved lines here too; the expected figure must sit inside the range.
- const pk=locale==="ar"?{title:"باقات المنشآت (معتمدة ماليًا)",hint:"باقات المستشفى وغرفة العمليات والعناية المركزة والمستلزمات التي اعتمدها الفريق المالي. حدّد الرقم المتوقع داخل النطاق؛ يُطلق البند دون موافقة مالية.",expected:"المتوقع (ج.م)",outOfRange:"الرقم خارج النطاق المعتمد"}:{title:"Facility packages (Finance-approved)",hint:"Hospital, theatre, ICU and implant packages Finance has approved. Set the expected figure inside the range; the line releases without Finance.",expected:"Expected (EGP)",outOfRange:"Outside the approved range"};
+ const pk=g.packages;
  const packages=facilityPackages(facilities);const {lines:packageLines,inRange:packagesInRange}=facilityPackageLines(packages,packagePicks);
  const togglePackage=(id:string,min:number)=>setPackagePicks(m=>{const n=new Map(m);if(n.has(id))n.delete(id);else n.set(id,min);return n;});const setPackageAmount=(id:string,amount:number)=>setPackagePicks(m=>new Map(m).set(id,amount));
  const toggle=(id:string)=>setSelected(s=>{const n=new Set(s);if(n.has(id))n.delete(id);else n.add(id);return n;});
@@ -606,12 +602,12 @@ export function FinalAssessment(){
   <div><h4 className="title text-base">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.intro}</p></div>
   <label className="block text-sm font-bold">{g.treatment}<textarea className="field mt-1" value={treatment} onChange={e=>setTreatment(e.target.value)}/></label>
   <label className="block text-sm font-bold">{g.risks}<textarea className="field mt-1" value={risks} onChange={e=>setRisks(e.target.value)}/></label>
-  <div className="rounded-lg border border-brand-200 bg-brand-50 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold text-brand-800">{g.services}</span><select aria-label={g.currency} className="field !mt-0 w-auto py-1" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></div>
-   {catalog.length>0&&<div className="mt-2 space-y-1.5">{catalog.map(s=>{const on=selected.has(s.id);return <button type="button" key={s.id} onClick={()=>toggle(s.id)} aria-pressed={on} className={`flex w-full items-center justify-between gap-3 rounded-lg border p-2.5 text-start transition ${on?"border-brand-500 bg-white":"border-line bg-white/60"}`}><span className="flex items-center gap-2.5"><span className={`flex h-5 w-5 flex-none items-center justify-center rounded border text-[0.8125rem] ${on?"border-brand-500 bg-brand-500 text-white":"border-line"}`} aria-hidden>{on?"✓":""}</span><span className="text-sm font-semibold text-ink-800">{s.serviceName}</span></span><span className="text-sm font-bold"><bdi dir="ltr">{money(s.priceEgp*rate,currency,locale)}</bdi></span></button>;})}</div>}
+  <div className="border-y border-line py-4"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold text-brand-800">{g.services}</span><select aria-label={g.currency} className="field !mt-0 w-auto py-1" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></div>
+   {catalog.length>0&&<div className="mt-2 space-y-1.5">{catalog.map(s=>{const on=selected.has(s.id);return <button type="button" key={s.id} onClick={()=>toggle(s.id)} aria-pressed={on} className={`flex w-full items-center justify-between gap-3 rounded-lg border p-2.5 text-start transition ${on?"border-brand-600 bg-white":"border-ink-350 bg-white"}`}><span className="flex items-center gap-2.5"><span className={`flex h-5 w-5 flex-none items-center justify-center rounded border ${on?"border-brand-600 bg-brand-600 text-white":"border-ink-350"}`} aria-hidden>{on?<Check size={14} strokeWidth={2.5}/>:null}</span><span className="text-sm font-semibold text-ink-800">{s.serviceName}</span></span><span className="text-sm font-bold"><bdi dir="ltr">{money(s.priceEgp*rate,currency,locale)}</bdi></span></button>;})}</div>}
    <FacilityPackagePicker locale={locale} packages={packages} picks={packagePicks} onToggle={togglePackage} onAmount={setPackageAmount} labels={pk}/>
    <p className="mt-3 text-sm font-bold text-ink-700">{g.manual}</p>
-   <div className="mt-1 space-y-2">{costs.map((row,i)=><div key={i} className="flex gap-2"><input aria-label={g.service} className="field flex-1" value={row.description} onChange={e=>updateCost(i,"description",e.target.value)} placeholder={g.service}/><input aria-label={g.amount} className="field w-32" type="number" min="0" step="0.01" value={row.amount} onChange={e=>updateCost(i,"amount",e.target.value)} placeholder={`${g.amount} (${currency})`}/>{costs.length>1&&<button type="button" className="btn-secondary" onClick={()=>setCosts(rows=>rows.filter((_,idx)=>idx!==i))} aria-label={locale==="ar"?"إزالة الخدمة":"Remove service"}>×</button>}</div>)}</div>
-   <button type="button" className="btn-secondary mt-2" onClick={()=>setCosts(rows=>[...rows,{description:"",amount:""}])}>+ {g.add}</button>
+   <div className="mt-1 space-y-2">{costs.map((row,i)=><div key={i} className="flex gap-2"><input aria-label={g.service} className="field flex-1" value={row.description} onChange={e=>updateCost(i,"description",e.target.value)} placeholder={g.service}/><input aria-label={g.amount} className="field w-32" type="number" min="0" step="0.01" value={row.amount} onChange={e=>updateCost(i,"amount",e.target.value)} placeholder={fillTemplate(g.amountIn,{currency})}/>{costs.length>1&&<button type="button" className="btn-secondary" onClick={()=>setCosts(rows=>rows.filter((_,idx)=>idx!==i))} aria-label={g.remove}><X size={16} aria-hidden/></button>}</div>)}</div>
+   <button type="button" className="btn-secondary mt-2" onClick={()=>setCosts(rows=>[...rows,{description:"",amount:""}])}><Plus size={16} aria-hidden/>{g.add}</button>
   </div>
   <button className="btn-primary w-full sm:w-auto" disabled={busy||!packagesInRange} onClick={save}>{g.save}</button>
  </div>;
@@ -620,12 +616,12 @@ export function FinalAssessment(){
 function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;proposal?:Proposal;gates?:ProposalGates|null}){
  const {locale,c:{id:caseId},busy,mutate,fxRates}=useCaseWorkspace();
  const[currency,setCurrency]=useState("EGP");const[scope,setScope]=useState("");
- const g=locale==="ar"?{title:"العرض النهائي",createIntro:"أنشئ العرض النهائي من التقييم النهائي المعتمد. لا يتغيّر وضع الحالة.",currency:"عملة عرض المريض",scope:"سبب تغيّر النطاق مقارنةً بالتقدير المبدئي",create:"إنشاء العرض النهائي",release:"إرسال العرض النهائي للمريض",releaseHint:"يُرسل رابطًا آمنًا. تبقى الحالة عند «تأكيد الوصول».",needReview:"يجب أن يسجّل الطبيب تقييمًا نهائيًا معتمدًا أولًا.",financeWait:"بانتظار الموافقة المالية على الخدمات المُدخلة يدويًا."}:{title:"Final treatment quote",createIntro:"Create the final quote from the approved final assessment. The case status does not change.",currency:"Patient's quote currency",scope:"Why the scope changed vs the preliminary estimate",create:"Create final quote",release:"Send final quote to patient",releaseHint:"Sends a secure link. The case stays at arrival confirmed.",needReview:"The doctor must record an approved final assessment first.",financeWait:"Waiting for finance approval of the manually-priced services."};
+ const g=useWorkCopy().caseView.finalQuote;
  const currencyOptions=["EGP",...fxRates.filter(f=>f.currency!=="EGP").map(f=>f.currency)];
  const isFinalDraft=proposal?.documentType==="FINAL_TREATMENT_QUOTE"&&["CLINICALLY_APPROVED","FINANCE_APPROVED"].includes(proposal.status);
- if(isFinalDraft&&proposal)return <div className="mt-4 rounded-lg border border-brand-200 p-4"><h4 className="font-bold text-brand-800">{g.title}</h4>{gates?.financeRequired&&!gates.financeCompleted?<p className="mt-2 text-sm text-alert-700">{g.financeWait}</p>:null}<button className="btn-primary mt-3" disabled={busy||!gates?.readyForRelease} onClick={()=>void mutate(`/coordinator/cases/${caseId}/final-quotes/${proposal.versionId}/release`)}>{g.release}</button><p className="mt-2 text-[0.8125rem] text-ink-500">{g.releaseHint}</p></div>;
+ if(isFinalDraft&&proposal)return <div className="mt-4 border-t border-line pt-4"><h4 className="font-bold text-brand-800">{g.title}</h4>{gates?.financeRequired&&!gates.financeCompleted?<p className="mt-2 text-sm text-alert-700">{g.financeWait}</p>:null}<button className="btn-primary mt-3" disabled={busy||!gates?.readyForRelease} onClick={()=>void mutate(`/coordinator/cases/${caseId}/final-quotes/${proposal.versionId}/release`)}>{g.release}</button><p className="mt-2 text-[0.8125rem] text-ink-500">{g.releaseHint}</p></div>;
  if(proposal?.documentType==="FINAL_TREATMENT_QUOTE")return null;
- return <div className="mt-4 rounded-lg border border-brand-200 p-4"><h4 className="font-bold text-brand-800">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.createIntro}</p>{!reviewId?<p className="mt-2 text-sm text-ink-500">{g.needReview}</p>:<><label className="mt-3 block text-sm font-bold">{g.currency}<select className="field mt-1 w-auto" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></label><label className="mt-3 block text-sm font-bold">{g.scope}<textarea className="field mt-1" rows={2} value={scope} onChange={e=>setScope(e.target.value)}/></label><button className="btn-primary mt-3" disabled={busy} onClick={()=>{const validUntil=validUntilInDays(14);void mutate(`/coordinator/cases/${caseId}/final-quotes`,{clinicalReviewId:reviewId,currency,scopeChangeReason:scope||undefined,validUntil});}}>{g.create}</button></>}</div>;
+ return <div className="mt-4 border-t border-line pt-4"><h4 className="font-bold text-brand-800">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.createIntro}</p>{!reviewId?<p className="mt-2 text-sm text-ink-500">{g.needReview}</p>:<><label className="mt-3 block text-sm font-bold">{g.currency}<select className="field mt-1 w-auto" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></label><label className="mt-3 block text-sm font-bold">{g.scope}<textarea className="field mt-1" rows={2} value={scope} onChange={e=>setScope(e.target.value)}/></label><button className="btn-primary mt-3" disabled={busy} onClick={()=>{const validUntil=validUntilInDays(14);void mutate(`/coordinator/cases/${caseId}/final-quotes`,{clinicalReviewId:reviewId,currency,scopeChangeReason:scope||undefined,validUntil});}}>{g.create}</button></>}</div>;
 }
 
 /**
@@ -654,20 +650,18 @@ function TransferPanel({locale,deposit,caseId,isFinance,busy,mutate,tx,amountLab
 
 function DepositCard({deposit}:{deposit:DepositView}){
  const {locale,role,c:{id:caseId},busy,mutate}=useCaseWorkspace();
- const workCopy=useWorkCopy();const confirmCopy=workCopy.confirm;const tx=workCopy.depositTransfer;
+ const workCopy=useWorkCopy();const confirmCopy=workCopy.confirm;const tx=workCopy.depositTransfer;const g=workCopy.caseView.deposit;
  // A refund is money leaving: the amount is read back before it is recorded.
  const [refund,setRefund]=useState<{form:HTMLFormElement;amountEgp:number;reason:string}|null>(null);
  const isFinance=role==="finance";
- const g=locale==="ar"?{title:"وديعة التنسيق والدفعات",total:"الإجمالي",paid:"المدفوع",balance:"المتبقي",record:"تسجيل دفعة",refund:"تسجيل استرداد",amount:"المبلغ (ج.م)",method:"الطريقة",reference:"مرجع المزوّد",reason:"سبب الاسترداد",note:"تسجيل دون اتصال فقط — يسجّل الدفعات المستلمة فعليًا؛ لا تُدخل بيانات بطاقة.",credited:"تُخصم من الرصيد النهائي",REQUESTED:"مطلوبة",PARTIALLY_PAID:"مدفوعة جزئيًا",PAID:"مدفوعة",CANCELLED:"ملغاة",REFUNDED:"مستردة"}:{title:"Coordination deposit & payments",total:"Total",paid:"Paid",balance:"Balance",record:"Record a payment",refund:"Record a refund",amount:"Amount (EGP)",method:"Method",reference:"Provider reference",reason:"Refund reason",note:"Offline record-only — records payments actually received; no card data is entered.",credited:"credited to final",REQUESTED:"Requested",PARTIALLY_PAID:"Partially paid",PAID:"Paid",CANCELLED:"Cancelled",REFUNDED:"Refunded"};
  const amount=(n?:number)=>n==null?"—":money(n,deposit.currency||"EGP",locale);
  // QA W-26: Finance records in EGP, so each figure in the patient's currency carries its EGP amount.
  const foreign=(deposit.currency||"EGP")!=="EGP";
  const inEgp=(n?:number)=>foreign&&n!=null?<span className="block text-[0.8125rem] font-normal text-ink-500"><bdi dir="ltr">{money(n,"EGP",locale)}</bdi></span>:null;
  const open=deposit.status==="REQUESTED"||deposit.status==="PARTIALLY_PAID";
- const label=(g as Record<string,string>)[deposit.status]??deposit.status;
- const cls=deposit.status==="PAID"?"bg-brand-50 text-brand-700":(deposit.status==="REFUNDED"||deposit.status==="CANCELLED")?"bg-mist text-ink-600":"bg-alert-50 text-alert-700";
- return <div className="mt-4 rounded-lg border border-line p-4">
-  <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-bold text-ink-800">{g.title}</h4><span className={`rounded px-2 py-0.5 text-[0.8125rem] font-bold ${cls}`}>{label}</span></div>
+ const tone=deposit.status==="PAID"?"success":(deposit.status==="REFUNDED"||deposit.status==="CANCELLED"||deposit.status==="WAIVED")?"neutral":"warning";
+ return <div className="mt-4 border-t border-line pt-4">
+  <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-bold text-ink-800">{g.title}</h4><StatusBadge tone={tone}>{label(workCopy.caseView.depositStatus,deposit.status)}</StatusBadge></div>
   <div className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><span className="text-ink-500">{g.total}</span><br/><strong><bdi dir="ltr">{amount(deposit.totalDisplay)}</bdi>{inEgp(deposit.totalEgp)}</strong></div><div><span className="text-ink-500">{g.paid}</span><br/><strong><bdi dir="ltr">{amount(deposit.paidDisplay)}</bdi>{inEgp(deposit.paidEgp)}</strong></div><div><span className="text-ink-500">{g.balance}</span><br/><strong><bdi dir="ltr">{amount(deposit.balanceDisplay)}</bdi>{inEgp(deposit.balanceEgp)}</strong></div></div>
   {deposit.components.length>0&&<ul className="mt-3 space-y-1 text-sm">{deposit.components.map((cp,i)=><li key={i} className="flex justify-between gap-3"><span>{cp.purpose} <span className="text-[0.8125rem] text-ink-400">({cp.beneficiary}{cp.creditedToFinal?` · ${g.credited}`:""})</span></span><strong className="whitespace-nowrap"><bdi dir="ltr">{amount(cp.amountDisplay)}</bdi></strong></li>)}</ul>}
   {open&&<TransferPanel locale={locale} deposit={deposit} caseId={caseId} isFinance={isFinance} busy={busy} mutate={mutate} tx={tx} amountLabel={g.amount}/>}
@@ -686,12 +680,10 @@ function DepositCard({deposit}:{deposit:DepositView}){
 
 function DeliveryCard({delivery,versionId,canResend=true}:{delivery:DeliveryStatus;versionId:string;canResend?:boolean}){
  const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
- const confirmCopy=useWorkCopy().confirm;const [resending,setResending]=useState(false);
- const g=locale==="ar"?{title:"حالة إرسال الرابط الآمن",channel:"القناة",to:"إلى",attempts:"المحاولات",resend:"إعادة إرسال الرابط",QUEUED:"في قائمة الإرسال",DELIVERED:"تم التسليم",RETRY:"إعادة المحاولة",FAILED:"فشل الإرسال",resendHint:"يُلغي الرابط ورمز التحقق السابقين ويُرسل رابطًا آمنًا جديدًا. لا يُنشئ عرضًا جديدًا ولا يغيّر حالة الطلب."}:{title:"Secure link delivery",channel:"Channel",to:"To",attempts:"Attempts",resend:"Resend link",QUEUED:"Queued",DELIVERED:"Delivered",RETRY:"Retrying",FAILED:"Failed",resendHint:"Revokes the previous link and code and sends a fresh secure link to the patient's verified contact. It does not create a new proposal or change the case."};
- const label=(g as Record<string,string>)[delivery.status]??delivery.status;
- const cls=delivery.status==="DELIVERED"?"bg-brand-50 text-brand-700":delivery.status==="FAILED"?"bg-alert-50 text-alert-700":"bg-mist text-ink-600";
- return <div className="mt-4 rounded-lg border border-line p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-bold text-ink-800">{g.title}</p><span className={`rounded px-2 py-0.5 text-[0.8125rem] font-bold ${cls}`}>{label}</span></div>
-  <p className="mt-2 text-sm text-ink-600">{g.channel}: <strong>{delivery.channel}</strong> · {g.to} <span dir="ltr">{delivery.destinationMasked}</span>{delivery.attempts>0?` · ${g.attempts}: ${delivery.attempts}`:""}</p>
+ const workCopy=useWorkCopy();const confirmCopy=workCopy.confirm;const cv=workCopy.caseView;const g=cv.delivery;const [resending,setResending]=useState(false);
+ const tone=delivery.status==="DELIVERED"?"success":delivery.status==="FAILED"?"danger":"neutral";
+ return <div className="mt-4 border-t border-line pt-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-bold text-ink-800">{g.title}</p><StatusBadge tone={tone}>{label(cv.deliveryStatus,delivery.status)}</StatusBadge></div>
+  <p className="mt-2 text-sm text-ink-600">{g.channel}: <strong>{delivery.channel==="WHATSAPP"?cv.channels.WHATSAPP:cv.channels.EMAIL}</strong> · {g.to} <bdi dir="ltr">{delivery.destinationMasked}</bdi>{delivery.attempts>0?` · ${g.attempts}: ${new Intl.NumberFormat(intlLocale(locale)).format(delivery.attempts)}`:""}</p>
   {canResend&&<button type="button" className="btn-secondary mt-3" disabled={busy} aria-haspopup="dialog" onClick={()=>setResending(true)}>{g.resend}</button>}
   {canResend&&<p className="mt-2 text-[0.8125rem] text-ink-500">{g.resendHint}</p>}
   {resending&&<ConfirmDialog title={confirmCopy.resendTitle} body={fillTemplate(confirmCopy.resendBodyTo,{destination:`\u2068${delivery.destinationMasked}\u2069`})} confirm={confirmCopy.resend} cancel={confirmCopy.cancel}
@@ -699,20 +691,18 @@ function DeliveryCard({delivery,versionId,canResend=true}:{delivery:DeliveryStat
 }
 
 /** Also rendered on its own (`AuthoritativeActions.test.tsx`), so it keeps explicit props rather than reading the case workspace. */
-export function RoleActions({role,t,c,proposal,gates,availableActions,locale,mutate,approvalInCard=false}:{role:RoleKey;t:typeof copy.en;c:CaseView;proposal?:Proposal;gates?:ProposalGates|null;availableActions:string[];locale:Locale;mutate:Mutate;/** The action card already carries Finance's approval (QA #20): no second button. */approvalInCard?:boolean}){
+export function RoleActions({role,t,c,proposal,gates,availableActions,mutate,approvalInCard=false}:{role:RoleKey;t:typeof copy.en;c:CaseView;proposal?:Proposal;gates?:ProposalGates|null;availableActions:string[];mutate:Mutate;/** The action card already carries Finance's approval (QA #20): no second button. */approvalInCard?:boolean}){
  const[operationsPlan,setOperationsPlan]=useState(proposal?.operationalPlan??"");
- const gl=locale==="ar"?{checklist:"متطلبات الإرسال",operations:"العمليات (باقة السفر)",finance:"الموافقة المالية",notReq:"غير مطلوب",waiting:"بانتظار",done:"مكتمل",releaseHint:"يُفعَّل الإرسال بعد اكتمال جميع المتطلبات."}:{checklist:"Release requirements",operations:"Operations (travel package)",finance:"Finance approval",notReq:"Not required",waiting:"Waiting",done:"Complete",releaseHint:"Release unlocks once every required step is complete."};
- const badge=(required:boolean,done:boolean)=>{const s=!required?gl.notReq:done?gl.done:gl.waiting;const cls=!required?"bg-mist text-ink-500":done?"bg-brand-50 text-brand-700":"bg-alert-50 text-alert-700";return <span className={`rounded px-2 py-0.5 text-[0.8125rem] font-bold ${cls}`}>{s}</span>;};
- const checklist=gates&&["coordinator","operations","finance"].includes(role)?<div className="mt-4 rounded-lg border border-line p-3"><p className="mb-2 text-sm font-bold text-ink-800">{gl.checklist}</p><div className="space-y-1.5 text-sm"><div className="flex items-center justify-between gap-2"><span>{gl.operations}</span>{badge(gates.operationsRequired,gates.operationsCompleted)}</div><div className="flex items-center justify-between gap-2"><span>{gl.finance}</span>{badge(gates.financeRequired,gates.financeCompleted)}</div></div>{gates.financeRequired&&gates.financeReasons.length>0&&<p className="mt-2 text-[0.8125rem] text-ink-500">{gates.financeReasons.join(" ")}</p>}</div>:null;
+ const gl=useWorkCopy().caseView.release;
+ const badge=(required:boolean,done:boolean)=><StatusBadge tone={!required?"neutral":done?"success":"warning"}>{!required?gl.notRequired:done?gl.done:gl.waiting}</StatusBadge>;
+ const checklist=gates&&["coordinator","operations","finance"].includes(role)?<div className="mt-4 border-t border-line pt-3"><p className="mb-2 text-sm font-bold text-ink-800">{gl.checklist}</p><div className="space-y-1.5 text-sm"><div className="flex items-center justify-between gap-2"><span>{gl.operations}</span>{badge(gates.operationsRequired,gates.operationsCompleted)}</div><div className="flex items-center justify-between gap-2"><span>{gl.finance}</span>{badge(gates.financeRequired,gates.financeCompleted)}</div></div>{gates.financeRequired&&gates.financeReasons.length>0&&<p className="mt-2 text-[0.8125rem] text-ink-500">{gates.financeReasons.join(" ")}</p>}</div>:null;
  if(role==="operations")return <>{checklist}{(availableActions.includes("PREPARE_TRAVEL_PACKAGE")||availableActions.includes("UPDATE_TRAVEL_PLAN"))&&proposal?.status==="CLINICALLY_APPROVED"?<div className="mt-4 space-y-3"><textarea className="field min-h-28" aria-label={t.operationsComplete} maxLength={30000} required value={operationsPlan} onChange={event=>setOperationsPlan(event.target.value)}/><button className="btn-primary" disabled={!operationsPlan.trim()} onClick={()=>void mutate(`/operations/cases/${c.id}/proposals/${proposal.versionId}/complete`,{plan:operationsPlan.trim()})}>{t.operationsComplete}</button></div>:null}</>;
  if(role==="finance")return <>{checklist}{availableActions.includes("APPROVE_COMMERCIAL_TERMS")&&proposal&&!approvalInCard?<button className="btn-primary mt-4" onClick={()=>void mutate(`/finance/cases/${c.id}/proposals/${proposal.versionId}/approve`)}>{t.financeApprove}</button>:null}</>;
- if(role==="coordinator")return <>{checklist}{gates?.readyForRelease&&proposal?<div className="mt-4"><button className="btn-primary" onClick={()=>void mutate(`/coordinator/cases/${c.id}/proposals/${proposal.versionId}/release`)}>{t.release}</button><p className="mt-2 text-[0.8125rem] text-ink-500">{gl.releaseHint}</p></div>:(gates&&!gates.readyForRelease?<p className="mt-3 text-[0.8125rem] text-ink-500">{gl.releaseHint}</p>:null)}</>;
+ if(role==="coordinator")return <>{checklist}{gates?.readyForRelease&&proposal?<div className="mt-4"><button className="btn-primary" onClick={()=>void mutate(`/coordinator/cases/${c.id}/proposals/${proposal.versionId}/release`)}>{t.release}</button><p className="mt-2 text-[0.8125rem] text-ink-500">{gl.hint}</p></div>:(gates&&!gates.readyForRelease?<p className="mt-3 text-[0.8125rem] text-ink-500">{gl.hint}</p>:null)}</>;
  return null;
 }
 
-function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const {locale,t}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-lg bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong><bdi dir="ltr">{money(total,proposal.currency,locale)}</bdi></strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?(locale==="ar"?" (اختياري)":" (optional)"):""}</span><strong className="whitespace-nowrap"><bdi dir="ltr">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</bdi></strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{locale==="ar"?"صالح حتى":"Valid until"} {new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))}</p>}</div>}
+function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const cv=work.caseView;const {locale,t}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="border-y border-line py-4"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong><bdi dir="ltr">{money(total,proposal.currency,locale)}</bdi></strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${new Intl.NumberFormat(intlLocale(locale)).format(item.quantity)}`:""}{item.optional?` ${cv.optional}`:""}</span><strong className="whitespace-nowrap"><bdi dir="ltr">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</bdi></strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 border-t border-line pt-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{fillTemplate(cv.validUntil,{date:new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))})}</p>}</div>}
 
-// P0-5: business labels for the travel plan and treatment episode states shown on the case page.
-const TRAVEL_STATUS:Record<string,[string,string]>={PLANNING:["Planning","قيد التخطيط"],CONFIRMED:["Confirmed booking","حجز مؤكد"],ARRIVED:["Arrived","تم الوصول"]};
-const EPISODE_STATUS:Record<string,[string,string]>={PLANNED:["Planned","مخطط"],IN_PROGRESS:["In progress","قيد التنفيذ"],COMPLETED:["Completed","مكتمل"]};
-const pair=(map:Record<string,[string,string]>,key:string,locale:Locale)=>map[key]?.[locale==="ar"?1:0]??key;
+/** A business label from the messages files (`portalWork.caseView`), with the code itself as the fallback for a new one. */
+const label=(table:Record<string,string>,key:string)=>Object.hasOwn(table,key)?table[key]:key;

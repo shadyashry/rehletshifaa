@@ -87,7 +87,7 @@ for (const locale of ["en", "ar"] as const) {
     await page.keyboard.press("g");
     await page.keyboard.press("c");
     await expect(page).toHaveURL(/view=mine/);
-    await expect(page.locator("#staff-view h2.title")).toBeFocused();
+    await expect(page.locator("#portal-title")).toBeFocused();
     await expect(list(page).locator('[data-roving-primary][tabindex="0"]')).toHaveCount(1);
     // In the queue the row's other controls join the tab order only while the list has the focus.
     await expect(list(page).locator('button:not([data-roving-primary])[tabindex="0"]')).toHaveCount(0);

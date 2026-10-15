@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CaseWorkflowActions } from "./CaseWorkflowActions";
 import { refreshAfterRejectedAction } from "./portal-model";
 import { RoleActions } from "./StaffCaseView";
+import { renderWithWork } from "./test-copy";
 
 const t = { operationsComplete: "Complete operational plan", financeApprove: "Approve commercial terms" } as never;
 const c = { id: "case-1", caseNumber: "RS-1", status: "PROPOSAL_PREPARATION", patientName: "Patient", country: "AE", preferredLanguage: "en", createdAt: "2026-01-01", updatedAt: "2026-01-01", version: 1 };
@@ -14,22 +15,22 @@ describe("server-authoritative proposal actions", () => {
   afterEach(cleanup);
 
   it("does not reconstruct Finance authority from gate booleans", () => {
-    render(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={{ ...gates, operationsRequired: false }} availableActions={[]} locale="en" mutate={vi.fn()}/>);
+    renderWithWork(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={{ ...gates, operationsRequired: false }} availableActions={[]} mutate={vi.fn()}/>);
     expect(screen.queryByRole("button", { name: /approve commercial terms/i })).toBeNull();
     cleanup();
-    render(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={{ ...gates, financeRequired: false }} availableActions={["APPROVE_COMMERCIAL_TERMS"]} locale="en" mutate={vi.fn()}/>);
+    renderWithWork(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={{ ...gates, financeRequired: false }} availableActions={["APPROVE_COMMERCIAL_TERMS"]} mutate={vi.fn()}/>);
     expect(screen.getByRole("button", { name: /approve commercial terms/i })).toBeTruthy();
     // QA #20: when the action card carries the approval, there is no second button here.
     cleanup();
-    render(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={gates} availableActions={["APPROVE_COMMERCIAL_TERMS"]} locale="en" mutate={vi.fn()} approvalInCard/>);
+    renderWithWork(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={gates} availableActions={["APPROVE_COMMERCIAL_TERMS"]} mutate={vi.fn()} approvalInCard/>);
     expect(screen.queryByRole("button", { name: /approve commercial terms/i })).toBeNull();
   });
 
   it("does not reconstruct Operations authority from proposal status or gates", () => {
-    render(<RoleActions role="operations" t={t} c={c} proposal={proposal} gates={gates} availableActions={[]} locale="en" mutate={vi.fn()}/>);
+    renderWithWork(<RoleActions role="operations" t={t} c={c} proposal={proposal} gates={gates} availableActions={[]} mutate={vi.fn()}/>);
     expect(screen.queryByRole("button", { name: /complete operational plan/i })).toBeNull();
     cleanup();
-    render(<RoleActions role="operations" t={t} c={c} proposal={proposal} gates={{ ...gates, operationsRequired: false }} availableActions={["UPDATE_TRAVEL_PLAN"]} locale="en" mutate={vi.fn()}/>);
+    renderWithWork(<RoleActions role="operations" t={t} c={c} proposal={proposal} gates={{ ...gates, operationsRequired: false }} availableActions={["UPDATE_TRAVEL_PLAN"]} mutate={vi.fn()}/>);
     expect(screen.getByRole("button", { name: /complete operational plan/i })).toBeTruthy();
   });
 

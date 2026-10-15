@@ -32,7 +32,8 @@ export type CaseActions = { journeyStage: string; waitingOn?: string | null; wai
    */
   patientStep?: CurrentActionView | null };
 export type ResponseContext = { message?: string | null; documentName?: string | null; receivedAt?: string | null };
-export type SecondaryAction = { label: string; onClick: () => void };
+/** `opensDialog`: the action opens a dialog (the strip's reply opens the messages drawer), said to assistive technology. */
+export type SecondaryAction = { label: string; onClick: () => void; opensDialog?: boolean };
 
 /**
  * The single strongest element on a case page: the one thing to do next ("Your step"), labelled by its business
@@ -69,7 +70,10 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
   const deadline = primary.kind === "accept" && respondBy ? respondBy : null;
   const hasWork = showResponse || primary.kind !== "none" || secondary.length > 0 || !!form;
 
-  // Phones read the step, then the facts, then the work; wide screens keep the facts in a column beside both.
+  // Phones read the step, then the facts, then the work; wide screens keep the facts in a column beside both. When the work
+  // is a reply to read (the patient's response), the facts come after it on phones (UX 2-4): the reply is what the step is about.
+  const factsAfterWork = showResponse;
+  const factsColumn = facts ? <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">{facts}</div> : null;
   return (
     <section id="current-action" aria-labelledby="current-action-title"
              className={`grid gap-x-8 gap-y-4 ${facts ? "lg:grid-cols-[minmax(0,1fr)_17rem]" : ""}`}>
@@ -99,7 +103,7 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
         {copy.body && <p dir="auto" className="mt-1 max-w-[65ch] text-[0.9375rem] leading-6 text-ink-600">{copy.body}</p>}
       </div>
 
-      {facts && <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">{facts}</div>}
+      {!factsAfterWork && factsColumn}
 
       {hasWork && <div className="min-w-0 lg:col-start-1 lg:row-start-2">
         {/* What the coordinator has to look at, inline — reviewing should not require navigating away. A hairline, not a tinted box. */}
@@ -143,12 +147,13 @@ export function CurrentActionPanel({ locale, role, action, response, busy, secon
               <button type="button" className="btn-secondary" disabled={busy} onClick={onDeclineAssignment}>{t.decline}</button>
             )}
             {(primary.kind === "accept" ? [] : secondary).slice(0, 2).map(item => (
-              <button key={item.label} type="button" className="btn-secondary" disabled={busy} onClick={item.onClick}>{item.label}</button>
+              <button key={item.label} type="button" className="btn-secondary" disabled={busy} aria-haspopup={item.opensDialog ? "dialog" : undefined} onClick={item.onClick}>{item.label}</button>
             ))}
           </div>
         )}
         {form}
       </div>}
+      {factsAfterWork && factsColumn}
     </section>
   );
 }

@@ -34,14 +34,12 @@ type StaffNavProps = {
 export function StaffViewLinks({ locale, label, items, current, clinic, onSelect, hrefFor, variant }: StaffNavProps & { locale: Locale; variant: "header" | "inline" }) {
   const count = (value?: number) => value ? <span className="ms-1.5 text-[0.8125rem] font-semibold tabular-nums text-ink-500"><span className="sr-only">, </span><bdi>{new Intl.NumberFormat(intlLocale(locale)).format(value)}</bdi></span> : null;
   const header = variant === "header";
-  const base = header
-    ? "inline-flex min-h-11 items-center rounded-lg px-3 text-[0.9rem] font-semibold transition"
-    : "-mb-px inline-flex min-h-11 items-center border-b-2 px-3 text-[0.9rem] font-semibold transition";
-  const tone = (on: boolean) => header
-    ? on ? "bg-brand-50 text-brand-800" : "text-ink-600 hover:bg-mist hover:text-brand-800"
-    : on ? "border-brand-600 text-brand-800" : "border-transparent text-ink-600 hover:text-brand-800";
+  // One tab style on the staff side (UX 2-4): the place you are in is underlined in petrol, as the case page's tabs and
+  // Conversations' scopes are. The header copy has no rule of its own (the bar's edge is enough); the inline copy sits on one.
+  const base = "-mb-px inline-flex min-h-11 items-center border-b-2 px-3 text-[0.9375rem] font-semibold transition-colors";
+  const tone = (on: boolean) => on ? "border-brand-600 text-brand-800" : "border-transparent text-ink-600 hover:text-brand-800";
   return (
-    <nav aria-label={label} className={header ? "hidden items-center gap-1 md:flex" : "mb-5 border-b border-line-strong md:hidden"}>
+    <nav aria-label={label} className={header ? "hidden items-center md:flex" : "mb-5 border-b border-line-strong md:hidden"}>
       <ul className={`flex flex-wrap items-center ${header ? "gap-1" : "gap-x-1"}`}>
         {items.map(item => (
           <li key={item.id}>
