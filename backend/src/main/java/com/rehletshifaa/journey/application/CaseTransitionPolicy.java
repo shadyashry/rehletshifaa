@@ -29,6 +29,7 @@ import java.util.*;
  *       reminder cycle ends unpaid, and ACCEPTED through FOLLOW_UP cancel with a typed reason — a coordinator's
  *       action, or the patient's own withdrawal while travel is not yet confirmed ({@link CaseExitService}).
  *       DISCHARGED closes directly when the Consultant records that no follow-up is needed.</li>
+ *   <li>CLOSED reopens into FOLLOW_UP (P1-13, A-06) with a typed reason, through {@link CaseReopenService}.</li>
  * </ul>
  */
 @Component
@@ -53,9 +54,15 @@ public class CaseTransitionPolicy {
         Map.entry("ARRIVAL_CONFIRMED", Set.of("TREATMENT_IN_PROGRESS", "CANCELLED")),
         Map.entry("TREATMENT_IN_PROGRESS", Set.of("DISCHARGED", "CANCELLED")),
         Map.entry("DISCHARGED", Set.of("FOLLOW_UP", "CLOSED", "CANCELLED")),
-        Map.entry("FOLLOW_UP", Set.of("CLOSED", "CANCELLED")));
-    /** Stages a case never leaves (EXPIRED is not one: it re-enters proposal preparation as a recovery path). */
-    public static final Set<String> TERMINAL = Set.of("CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE");
+        Map.entry("FOLLOW_UP", Set.of("CLOSED", "CANCELLED")),
+        // P1-13 (A-06): a complication or a concern after closing brings the case back, with the same Consultant, through
+        // CaseReopenService only (the coordinator's generic transition refuses FOLLOW_UP).
+        Map.entry("CLOSED", Set.of("FOLLOW_UP")));
+    /**
+     * Stages a case never leaves (EXPIRED is not one: it re-enters proposal preparation as a recovery path; CLOSED is not one
+     * either since P1-13: it reopens into FOLLOW_UP).
+     */
+    public static final Set<String> TERMINAL = Set.of("CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE");
     /** Stages where a cancellation is an exit from a committed journey and therefore needs a typed reason. */
     public static final Set<String> TYPED_CANCELLATION_STAGES = Set.of("ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED",
             "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP");

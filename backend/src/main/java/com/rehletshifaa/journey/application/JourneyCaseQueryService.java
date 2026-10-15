@@ -97,7 +97,7 @@ public class JourneyCaseQueryService {
     private static CaseView forPatient(CaseView view, String viewer) {
         return new CaseView(view.id(), view.caseNumber(), view.status(), view.patientName(), view.country(), view.preferredLanguage(),
                 view.careCategory(), view.createdAt(), view.updatedAt(), view.version(), null, null, view.coordinatorName(), view.doctorName(),
-                view.travelPackageRequested(), view.waitingOn(), view.waitingReason(), viewer, null); // urgency is a staff judgement
+                view.travelPackageRequested(), view.waitingOn(), view.waitingReason(), viewer, null, null); // urgency and age band are staff judgements
     }
 
     /**
@@ -222,7 +222,7 @@ public class JourneyCaseQueryService {
                     row.getPreferredLanguage(), row.getCareCategory(), row.getCreatedAt(), row.getUpdatedAt(), row.getVersion(), coordinator,
                     activeDoctors.get(row.getId()), names.staff(coordinator), names.consultant(namedDoctors.get(row.getId())),
                     Boolean.TRUE.equals(row.getTravelPackageRequested()), row.getWaitingOn(), row.getWaitingReason(), null,
-                    row.getUrgency() == null ? "ROUTINE" : row.getUrgency().name());
+                    row.getUrgency() == null ? "ROUTINE" : row.getUrgency().name(), row.getAgeBand() == null ? null : row.getAgeBand().name());
         }).toList();
     }
 }

@@ -38,6 +38,9 @@ class CaseTransitionPolicyTest {
         assertThat(CaseTransitionPolicy.exitsFrom("CONSULTANT_REVIEW")).doesNotContain("CANCELLED");
         assertThat(CaseTransitionPolicy.exitsFrom("CONSULTANT_ASSIGNMENT_PENDING")).doesNotContain("CANCELLED");
         assertThat(CaseTransitionPolicy.exitsFrom("EXPIRED")).containsExactly("PROPOSAL_PREPARATION");
+        // P1-13 (A-06): a closed case reopens into FOLLOW_UP and nowhere else; it is no longer a final stage.
+        assertThat(CaseTransitionPolicy.exitsFrom("CLOSED")).containsExactly("FOLLOW_UP");
+        assertThat(TERMINAL).doesNotContain("CLOSED").contains("CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE");
     }
 
     /** The patient's own withdrawal: after acceptance, until travel is confirmed; then it is the coordinator's. */

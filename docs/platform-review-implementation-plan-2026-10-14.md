@@ -846,6 +846,46 @@ phases.
   `incidents` (COMPLAINT / DISPUTE / ADVERSE_EVENT / DEATH, severity, owner, resolution) visible to Compliance;
   complaint intake from My Care routed to the Care Coordination Manager; `REOPEN` from `CLOSED` into `FOLLOW_UP`.
 - Sessions: 2. Model: Opus 5.5 fast, medium (guardian consent reviewed by Fable).
+- **Status (2026-10-15, session 1 of 2 = backend, Sonnet 5.5 stood in for Opus 5.5; committed on `claude/p1-13-guardians-23a6cb`, cut from
+  `claude/p1-10-s2-ui-bf8b61` at 67b56ce, so the owner fast-forwards `feat/review-p0` to this commit):** the model, the rules, the endpoints and
+  the tests are delivered; no screen. The model, its rules and the hooks for P1-16 and P1-18 are written down in
+  `docs/incidents-guardians-reopen-model.md`. Flyway **V97** (`V97__guardians_incidents_reopen.sql`) is now used: the next free version is V98 (the
+  `V95…V100` file names in the P1-15…P1-19 entries below are already stale, take the next free number when each is built). The dev stack needs a
+  backend rebuild (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`) for V97; the frontend only gained message keys.
+  - Delivered: **(1) Age band.** `medical_cases.age_band` (`UNDER_12`, `AGE_12_17`, `AGE_18_64`, `AGE_65_PLUS`, NULL = not stated), optional `ageBand` on the
+    public intake, the signed-in next case and the case sent for someone else; a coordinator records or corrects it (`PUT /api/v1/coordinator/cases/{id}/age-band`,
+    audited); `CaseView.ageBand` on staff views. **(2) Guardian delegation.** `patient_representatives.delegation_type` (`REPRESENTATIVE` | `GUARDIAN`), `legal_basis`
+    (`PARENT`, `LEGAL_GUARDIAN`, `COURT_ORDER`), an evidence document (a clean document of the case) that a coordinator verifies or refuses
+    (`GuardianService`). A minor's onboarding starts as GUARDIAN and PATIENT/REPRESENTATIVE/PAYER are refused for a minor; the account that sends a case for a
+    child becomes a guardian when it is the PARENT or the GUARDIAN; readiness gains `MINOR_REQUIRES_GUARDIAN`, `GUARDIAN_AUTH_MISSING`,
+    `GUARDIAN_EVIDENCE_MISSING` (patient-owed) and `GUARDIAN_EVIDENCE_UNVERIFIED` (coordinator-owed, deferred at submit, gating at treatment coordination).
+    The guardian's consent is its own type `GUARDIAN_AUTHORIZATION` (policy version `guardian-v0-placeholder`; the wording is a **placeholder**, one key per
+    language `guardianConsent.text` in `en.json` and `ar.json`, same words in `PatientActivationService.consentText`; counsel and a native reader replace it).
+    **(3) Incidents.** `case_incidents` (COMPLAINT / DISPUTE / ADVERSE_EVENT / DEATH, severity, status, owner, typed resolution, encrypted summary and note),
+    `IncidentService`: raised by the patient, the case team or another phase (`raiseFromSystem`); owner = a Care Coordination Manager, never the case's
+    coordinator nor the reporter, least loaded and one per case; one `INCIDENT_REVIEW` item (2 working days, survives the case's exit); a critical
+    incident tells the other managers, a clinical one the Consultant; Compliance and managers read (`INCIDENT_READ`), only the owner works it
+    (`INCIDENT_MANAGE`); new permissions `INCIDENT_REPORT/MANAGE/READ`, `CASE_REOPEN`. **(4) Complaint intake from My Care:** `POST|GET
+    /api/v1/patient/cases/{id}/concerns` (the patient sees type, status and dates only). **(5) Reopen:** `CLOSED -> FOLLOW_UP` through `CaseReopenService` only
+    (`CLOSED` is no longer terminal in `CaseTransitionPolicy`), typed reason, `case_reopenings` row, the same Consultant gets a `FOLLOW_UP_REVIEW` item,
+    the coordinator is told; by a manager or the case's own Consultant. Staff copy for the new work and notifications (`INCIDENT_REVIEW`,
+    `INCIDENT_CRITICAL`, `INCIDENT_CLINICAL`, `CASE_REOPENED`, `FOLLOW_UP_REVIEW`) is in both message files (Arabic is a draft).
+  - Tests and numbers: new `IncidentsAndReopenTest` (14) and `GuardiansAndAgeBandTest` (8); `CaseTransitionPolicyTest` updated (CLOSED reopens, no longer
+    final). Verification: backend `mvn -o -q test` (JVM in UTC) 875 tests, 0 failures, 3 skips (853 before, 22 new),
+    `ArchitectureRulesTest` and `RolePolicyTest` green (no JDBC or native query added; journey imports no coordination); `PostgresJpaMappingTest` green on a
+    disposable PostgreSQL 17 (V97 applied, Hibernate validated, every new repository query executed). The two English/Arabic message files keep key parity; no
+    frontend code changed, so no frontend suite was run (it needs `pnpm install --offline --frozen-lockfile` in the worktree first).
+  - Open gaps (session 2 and later): **no screens yet**: the age-band question on the intake forms (it becomes required on the wire then), the guardian
+    steps and evidence upload in onboarding, the guardian consent checkbox wired to `guardianConsent.text`, "Raise a concern" on My Care, the manager's incident
+    list and detail, the Compliance view in the Control Center, the coordinator's age-band control and evidence decision, "Reopen case" for managers and
+    Consultants, a patient-visible wording of a reopened case. Decisions not taken: Consultant matching on the `AGE_GROUP` capability, deriving the band from a date of birth
+    at activation, a guardian's authority at 18, a patient notice when a concern is resolved (needs a WhatsApp template), an SLA clock on patient concerns
+    visible to the patient, who may reopen a case cancelled for an unanswered information request. Counsel reviews the guardian consent wording; a native reader
+    the Arabic. The incident summary is free text kept encrypted; its retention and its data-protection class
+    (P1-7, and the PDPL review of P1-18) are not decided.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the backend of the dev stack (V97); then P1-13 session 2 (UI and copy,
+    Sonnet 5.5 or Opus 5.5, in its own session): load the vercel and Impeccable skills, one quiet "Raise a concern" action on My Care (not another CTA beside the
+    existing ones), the guardian steps in onboarding, and the manager/Compliance incident views, through the UX plan areas that own those screens.
 
 ### P1-14  Consultant public profiles — data and endpoint  (D-03, §16.2 item 5)
 - Backend only: a public read of the published profile ("Credentials reviewed · current" derived from the credential
@@ -953,7 +993,7 @@ Delivered on `feat/review-p0` (pushed at `e68dbc5`, local beyond that; dev stack
 P0-5, P1-6, and P1-8 sessions 1 and 2 (meters, internal metrics port, alert rules; `5919bf1`; scheduler lease V95, Prometheus
 registry, Prometheus + Grafana, rules file, dashboard on `claude/p1-8-lease-5e9409`) and its verification (`df40908`). P1-10 session 1
 (fee line, no-surprise cap, cooling period, validity, FX band; V96, `b4ab584`) and session 2 (patient and Finance UI, copy; `claude/p1-10-s2-ui-bf8b61`)
-are done. Everything below is still to do.
+are done. P1-13 session 1 (backend: age band, guardians, incidents, reopen; V97; `claude/p1-13-guardians-23a6cb`) is done; its session 2 is the UI. Everything below is still to do.
 
 **Why the order changed.** The owner's two priorities are (1) a complete, auditable journey after the deposit —
 today nothing collects, proves or reconciles money after the 15%, and the Consultant's hospital deal is invisible —
@@ -969,7 +1009,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
 | 2 | ~~P1-10 Commercial truth + fee restructuring~~ (D-A) | **done**: sessions 1 and 2 (2026-10-15) | Fable 5.1 high, then Sonnet 5.5 | Owner fast-forwards `feat/review-p0` to the session-2 commit, rebuilds the frontend and walks the flow; counsel on the guarantee wording and the fee's VAT rate; native Arabic review |
 | — | UI/UX (all areas) | own plan | see `docs/ux-redesign/PLAN.md` | Runs in parallel in its own worktree; Finance and Operations areas wait for P1-15 / P1-17 |
-| 3 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
+| 3 | P1-13 Minors, guardians, incidents, reopen | session 1 (backend) **done** 2026-10-15; session 2 (UI, copy) to do | Opus 5.5; guardian consent reviewed by Fable | Owner fast-forwards `feat/review-p0` and rebuilds the backend (V97); P1-16 and P1-18 can start on the backend models now |
 | 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |
 | 6 | **P1-16 Treatment evidence: milestones, change orders** | 2 | Fable 5.1 high; forms by Opus | D-E band; P1-13 |
 | 7 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths by Fable | Owner: payer terms, partner commission |

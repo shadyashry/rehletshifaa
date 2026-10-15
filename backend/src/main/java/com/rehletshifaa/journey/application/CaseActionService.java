@@ -138,7 +138,8 @@ public class CaseActionService {
     private static final Set<String> CONSULTANT_STAGES = Set.of("CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW", "CLINICAL_RECOMMENDATION_READY");
     private static final Set<String> PROPOSAL_STAGES = Set.of("PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL", "REVISION_REQUESTED", "PATIENT_DECISION", "EXPIRED");
     /** Readiness steps only the signed-in patient can finish, in the order they should be asked for. */
-    private static final List<String> PATIENT_STEPS = List.of("PROFILE_NOT_ACTIVATED", "CONTACT_NOT_VERIFIED", "REPRESENTATIVE_AUTH_MISSING", "CONSENTS_INCOMPLETE", "IDENTITY_NOT_VERIFIED");
+    private static final List<String> PATIENT_STEPS = List.of("PROFILE_NOT_ACTIVATED", "CONTACT_NOT_VERIFIED", "REPRESENTATIVE_AUTH_MISSING", "MINOR_REQUIRES_GUARDIAN",
+            "GUARDIAN_AUTH_MISSING", "GUARDIAN_EVIDENCE_MISSING", "CONSENTS_INCOMPLETE", "IDENTITY_NOT_VERIFIED");
 
     /**
      * What the patient sees as "the current step": one authoritative answer, resolved here and rendered by
@@ -382,6 +383,8 @@ public class CaseActionService {
                 // Onboarding starts when the patient acknowledges the estimate; a case without it needs staff to start it.
                 case "ONBOARDING_NOT_STARTED" -> out.add(new BlockerView(b.code(), "Onboarding not started", "لم يبدأ التسجيل", "STAFF", true));
                 case "CONTACT_NOT_VERIFIED" -> out.add(new BlockerView(b.code(), "Contact channel verification", "تأكيد وسيلة التواصل", "PATIENT", true));
+                // P1-13: the guardian provided evidence; the coordinator owes the check, and the case waits on it.
+                case "GUARDIAN_EVIDENCE_UNVERIFIED" -> out.add(new BlockerView(b.code(), "Guardian evidence check", "التحقق من مستند الوصي", "STAFF", true));
                 case "IDENTITY_NOT_VERIFIED" -> out.add(queries.identityUnderReview(caseId)
                         ? new BlockerView(b.code(), "Identity review", "مراجعة الهوية", "STAFF", false)
                         : new BlockerView(b.code(), "Identity verification", "التحقق من الهوية", "PATIENT", false));

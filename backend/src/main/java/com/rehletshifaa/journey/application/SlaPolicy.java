@@ -38,18 +38,23 @@ public class SlaPolicy {
      *   <li>the Consultant's clinical review ({@code CLINICAL_REVIEW}): 2;</li>
      *   <li>the coordinator's intake review ({@code ASSIGN_CONSULTANT}, {@code REVIEW_PATIENT_RESPONSE}): 1;</li>
      *   <li>the coordinator's proposal ({@code PREPARE_PROPOSAL}): 2 (session 2, so the patient's "preparing your
-     *       proposal" has a window too).</li>
+     *       proposal" has a window too);</li>
+     *   <li>a Care Coordination Manager's review of an incident ({@code INCIDENT_REVIEW}, P1-13): 2.</li>
      * </ul>
      */
-    static final Map<String, Integer> QUEUE_WORKING_DAYS = Map.of(
-            "DEPOSIT_RECORD", 1,
-            "PATIENT_IDENTITY_REVIEW", 2,
-            "PREPARE_TRAVEL_PACKAGE", 2,
-            "UPDATE_TRAVEL_PLAN", 2,
-            "CLINICAL_REVIEW", 2,
-            "ASSIGN_CONSULTANT", 1,
-            "REVIEW_PATIENT_RESPONSE", 1,
-            "PREPARE_PROPOSAL", 2);
+    static final Map<String, Integer> QUEUE_WORKING_DAYS = Map.ofEntries(
+            Map.entry("DEPOSIT_RECORD", 1),
+            Map.entry("PATIENT_IDENTITY_REVIEW", 2),
+            Map.entry("PREPARE_TRAVEL_PACKAGE", 2),
+            Map.entry("UPDATE_TRAVEL_PLAN", 2),
+            Map.entry("CLINICAL_REVIEW", 2),
+            Map.entry("ASSIGN_CONSULTANT", 1),
+            Map.entry("REVIEW_PATIENT_RESPONSE", 1),
+            Map.entry("PREPARE_PROPOSAL", 2),
+            // P1-13: a manager takes up an incident (complaint, dispute, adverse event, death) within two working days.
+            Map.entry("INCIDENT_REVIEW", 2),
+            // P1-13: the Consultant of a reopened case reviews it within two working days.
+            Map.entry("FOLLOW_UP_REVIEW", 2));
 
     /**
      * P1-6 session 2 (D-02): the queue each waiting state waits on, so "usually within N working days" is read from the

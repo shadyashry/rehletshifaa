@@ -1,6 +1,8 @@
 package com.rehletshifaa.journey.application;
 
+import com.rehletshifaa.casemanagement.domain.AgeBand;
 import com.rehletshifaa.casemanagement.domain.MedicalCase;
+import com.rehletshifaa.directory.domain.PatientRepresentative;
 import com.rehletshifaa.casemanagement.infrastructure.ConsentRecordRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.directory.domain.PatientProfile;
@@ -37,15 +39,19 @@ public class CustomerReadinessService {
     // Onboarding-stage consents that live in the existing consent_records table (never a new table).
     static final List<String> BASE_CONSENTS = List.of("PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "DEPOSIT_CANCELLATION_TERMS");
     static final String REP_CONSENT = "REPRESENTATIVE_AUTHORIZATION";
+    /** P1-13 (A-05): a guardian gives their own consent text; it replaces the representative authorisation for a GUARDIAN subject. */
+    static final String GUARDIAN_CONSENT = "GUARDIAN_AUTHORIZATION";
     // Gates that legitimately remain open when the patient submits onboarding: activation IS the submission,
     // and the deposit plus any operational identity step deliberately come after the profile is active.
-    private static final Set<String> SUBMIT_DEFERRED = Set.of("ONBOARDING_INCOMPLETE", "DEPOSIT_UNPAID", "ACCOUNT_NOT_ACTIVATED", "IDENTITY_NOT_VERIFIED");
+    // A coordinator verifies a guardian's evidence after the guardian provides it, so that wait never holds up the submission.
+    private static final Set<String> SUBMIT_DEFERRED = Set.of("ONBOARDING_INCOMPLETE", "DEPOSIT_UNPAID", "ACCOUNT_NOT_ACTIVATED", "IDENTITY_NOT_VERIFIED", "GUARDIAN_EVIDENCE_UNVERIFIED");
 
     public CustomerReadinessService(Clock clock, DepositQueryService deposits, MedicalCaseRepository cases, PatientProfileRepository patients, PatientOnboardingRepository onboardings, PatientIdentityVerificationRepository verifications, ConsentRecordRepository consents, PatientRepresentativeRepository representatives) { this.representatives = representatives; this.consents = consents; this.verifications = verifications; this.onboardings = onboardings; this.patients = patients; this.cases = cases; this.clock = clock; this.deposits = deposits; }
 
     public List<String> requiredConsentTypes(String subjectType) {
         List<String> required = new ArrayList<>(BASE_CONSENTS);
-        if (subjectType != null && !"PATIENT".equals(subjectType)) required.add(REP_CONSENT);
+        if ("GUARDIAN".equals(subjectType)) required.add(GUARDIAN_CONSENT);
+        else if (subjectType != null && !"PATIENT".equals(subjectType)) required.add(REP_CONSENT);
         return required;
     }
 
@@ -73,7 +79,10 @@ public class CustomerReadinessService {
 
         List<String> required = requiredConsentTypes(subjectType);
         boolean consentsDone = required.stream().allMatch(t -> consentPresent(p.patientId(), caseId, t));
-        boolean repValid = repAuthValid(p.patientId(), subjectType);
+        boolean guardianSubject = "GUARDIAN".equals(subjectType);
+        GuardianState guardian = guardianSubject ? guardianState(p.patientId()) : null;
+        boolean repValid = guardianSubject ? guardian == GuardianState.VERIFIED : repAuthValid(p.patientId(), subjectType);
+        boolean minorWithoutGuardian = AgeBand.isMinor(medicalCase.getAgeBand()) && !guardianSubject;
 
         DepositQueryService.Standing deposit = deposits.standing(caseId);
         boolean depositWaived = deposit.waived();
@@ -87,7 +96,13 @@ public class CustomerReadinessService {
         if (!accountActivated) blocking.add(new BlockingItem("ACCOUNT_NOT_ACTIVATED", "Activate your profile", "فعّل ملفك"));
         if (!contactVerified) blocking.add(new BlockingItem("CONTACT_NOT_VERIFIED", "Verify a contact channel", "تأكيد وسيلة تواصل"));
         if (identityRequired && !identityVerified) blocking.add(new BlockingItem("IDENTITY_NOT_VERIFIED", "Complete identity verification", "أكمل التحقق من الهوية"));
-        if (!repValid) blocking.add(new BlockingItem("REPRESENTATIVE_AUTH_MISSING", "Representative authorization required", "مطلوب تفويض ممثّل ساري"));
+        if (minorWithoutGuardian) blocking.add(new BlockingItem("MINOR_REQUIRES_GUARDIAN", "A parent or legal guardian must act for this patient", "يجب أن يتصرف أحد الوالدين أو الوصي القانوني نيابة عن المريض"));
+        else if (guardianSubject && !repValid) blocking.add(switch (guardian) {
+            case NONE -> new BlockingItem("GUARDIAN_AUTH_MISSING", "Guardian details required", "مطلوب إدخال بيانات الوصي");
+            case EVIDENCE_MISSING -> new BlockingItem("GUARDIAN_EVIDENCE_MISSING", "Guardian evidence required", "مطلوب مستند يثبت صفة الوصي");
+            default -> new BlockingItem("GUARDIAN_EVIDENCE_UNVERIFIED", "Guardian evidence is being checked", "جارٍ التحقق من مستند الوصي");
+        });
+        else if (!repValid) blocking.add(new BlockingItem("REPRESENTATIVE_AUTH_MISSING", "Representative authorization required", "مطلوب تفويض ممثّل ساري"));
         if (!consentsDone) blocking.add(new BlockingItem("CONSENTS_INCOMPLETE", "Complete required consents", "أكمل الموافقات المطلوبة"));
         if (depositRequired && !depositSatisfied) blocking.add(new BlockingItem("DEPOSIT_UNPAID", "Pay or waive the coordination deposit", "سداد وديعة التنسيق أو إعفاؤها"));
         if (ob == null) blocking.add(new BlockingItem("ONBOARDING_NOT_STARTED", "Ask your coordinator to start onboarding from your acknowledged estimate", "اطلب من المنسق بدء التسجيل من التقدير الذي وافقت عليه"));
@@ -121,6 +136,16 @@ public class CustomerReadinessService {
     private boolean consentPresent(UUID patientId, UUID caseId, String type) {
         return consents.isGiven(patientId, type, caseId);
     }
+    /** How far a guardian's authority has come: no delegation, one without evidence, evidence not yet verified, verified. */
+    enum GuardianState { NONE, EVIDENCE_MISSING, EVIDENCE_UNVERIFIED, VERIFIED }
+
+    private GuardianState guardianState(UUID patientId) {
+        var guardians = representatives.findActiveGuardians(patientId, micros(clock.instant()));
+        if (guardians.stream().anyMatch(PatientRepresentative::evidenceVerified)) return GuardianState.VERIFIED;
+        if (guardians.stream().anyMatch(g -> g.getEvidenceDocumentId() != null)) return GuardianState.EVIDENCE_UNVERIFIED;
+        return guardians.isEmpty() ? GuardianState.NONE : GuardianState.EVIDENCE_MISSING;
+    }
+
     private boolean repAuthValid(UUID patientId, String subjectType) {
         // The patient acting for themselves, or a payer (who never receives clinical access), needs no
         // delegation. A guardian/representative needs an active, non-expired authorization row.

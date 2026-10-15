@@ -80,7 +80,7 @@ public final class JourneyDtos {
      * {@code waitingOn} answers "who must act next", which is deliberately not the same as the stage. {@code viewer} is set
      * only on the patient's own case list: SELF for their own case, REPRESENTATIVE for a relative's (null for staff).
      */
-    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason,String viewer,String urgency) {}
+    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason,String viewer,String urgency,String ageBand) {}
     /**
      * Operational signals for a case card. All derived read-only from open work items — the case itself
      * carries no priority or attention status, so nothing here is persisted for the UI's benefit.
@@ -290,7 +290,11 @@ public final class JourneyDtos {
     // Intake details become the initial account profile. Corrections require a separately verified,
     // audited workflow rather than silently rewriting identity or contact data.
     public record PatientProfileSummary(String fullName,String country,String whatsappNumber,String email,boolean phoneVerified,boolean emailVerified) {}
-    public record OnboardingSubjectRequest(@NotBlank @Pattern(regexp="PATIENT|GUARDIAN|REPRESENTATIVE|PAYER")String subjectType,@Size(max=80)String relationship,@Size(max=500)String permissionScope,Instant expiresAt,@NotNull Long expectedVersion) {}
+    public record OnboardingSubjectRequest(@NotBlank @Pattern(regexp="PATIENT|GUARDIAN|REPRESENTATIVE|PAYER")String subjectType,@Size(max=80)String relationship,@Size(max=500)String permissionScope,Instant expiresAt,@NotNull Long expectedVersion,
+        /** P1-13: a GUARDIAN names the legal basis of their authority and, optionally, the evidence document already uploaded to the case. */
+        @Pattern(regexp="PARENT|LEGAL_GUARDIAN|COURT_ORDER")String legalBasis,UUID evidenceDocumentId) {
+        public OnboardingSubjectRequest(String subjectType,String relationship,String permissionScope,Instant expiresAt,Long expectedVersion){this(subjectType,relationship,permissionScope,expiresAt,expectedVersion,null,null);}
+    }
     public record OnboardingConsentRequest(@NotBlank @Size(max=60)String consentType,@NotBlank @Size(max=20000)String exactText,@Size(max=40)String policyVersion,@Pattern(regexp="en|ar")String language,@Size(max=500)String purpose,@Size(max=500)String scope) {}
     public record OnboardingSubmitRequest(@NotNull Long expectedVersion) {}
     // Patient-facing identity verification view — never exposes encrypted legal name/DOB or document content.

@@ -24,6 +24,9 @@ public enum Permission {
     PATIENT_SELF_SERVICE(false), PATIENT_DECIDE(true), ACCOUNT_BINDING(false),
     /** DEP-3: the patient (or representative) enters the bank's transfer reference for their deposit; evidence, not a decision, so no step-up. */
     DEPOSIT_TRANSFER_REPORT(false),
+    // P1-13 (A-06): incidents are raised by the case team or the patient, owned and resolved by a Care Coordination Manager,
+    // read by managers and Compliance; a CLOSED case is reopened by a manager or the case's Consultant.
+    INCIDENT_REPORT(false), INCIDENT_MANAGE(false), INCIDENT_READ(false), CASE_REOPEN(false),
     // consultants, credentials, identity
     CONSULTANT_ONBOARD(true), CREDENTIAL_READ(false), CREDENTIAL_DECIDE(true), PATIENT_IDENTITY_REVIEW(true), PATIENT_IDENTITY_READ(false),
     CLINIC_MANAGE(false), CLINIC_APPROVE(true), CAPABILITY_DECIDE(true),

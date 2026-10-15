@@ -38,12 +38,13 @@ public class OnboardingService {
     private final MedicalCaseRepository cases;
     private final OnboardingQueryService queries;
     private final Authority authority; private final Clock clock; private final CustomerReadinessService readiness; private final org.springframework.context.ApplicationEventPublisher events;
+    private final GuardianService guardians;
     private static final Duration ONBOARDING_TTL = Duration.ofDays(45);
     /** The consents an onboarding records and shows; any other consent type is refused here. */
     static final Set<String> ONBOARDING_CONSENTS = Set.of(
-            "PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "MEDICAL_INFORMATION_SHARING", "TELECONSULTATION", "DEPOSIT_CANCELLATION_TERMS", "REPRESENTATIVE_AUTHORIZATION");
+            "PRIVACY_DATA_PROCESSING", "CROSS_BORDER_CARE", "MEDICAL_INFORMATION_SHARING", "TELECONSULTATION", "DEPOSIT_CANCELLATION_TERMS", "REPRESENTATIVE_AUTHORIZATION", "GUARDIAN_AUTHORIZATION");
 
-    public OnboardingService(Authority authority, Clock clock, CustomerReadinessService readiness, org.springframework.context.ApplicationEventPublisher events, AuditTrail auditTrail, PatientRepresentativeRepository representatives, ConsentRecordRepository consents, PatientOnboardingRepository onboardings, MedicalCaseRepository cases, OnboardingQueryService queries) { this.onboardings = onboardings; this.consents = consents; this.representatives = representatives; this.auditTrail = auditTrail;
+    public OnboardingService(Authority authority, Clock clock, CustomerReadinessService readiness, org.springframework.context.ApplicationEventPublisher events, AuditTrail auditTrail, PatientRepresentativeRepository representatives, ConsentRecordRepository consents, PatientOnboardingRepository onboardings, MedicalCaseRepository cases, OnboardingQueryService queries, GuardianService guardians) { this.guardians = guardians; this.onboardings = onboardings; this.consents = consents; this.representatives = representatives; this.auditTrail = auditTrail;
         this.cases = cases; this.queries = queries;
         this.authority = authority; this.clock = clock; this.readiness = readiness; this.events = events;
     }
@@ -57,7 +58,12 @@ public class OnboardingService {
         UUID patientId = cases.findPatientId(caseId).orElse(null);
         if (patientId == null) return;
         Instant now = clock.instant(); UUID id = UUID.randomUUID();
-        if (!onboardings.existsFor(patientId, caseId, versionId)) onboardings.saveAndFlush(new PatientOnboarding(id, patientId, caseId, versionId, now.plus(ONBOARDING_TTL), now));
+        // A minor's onboarding is a guardian's from the start (P1-13): nobody has to remember to choose it.
+        if (!onboardings.existsFor(patientId, caseId, versionId)) {
+            var onboarding = new PatientOnboarding(id, patientId, caseId, versionId, now.plus(ONBOARDING_TTL), now);
+            if (guardians.isMinor(caseId)) onboarding.startingAs("GUARDIAN");
+            onboardings.saveAndFlush(onboarding);
+        }
         audit(caseId, "PATIENT_ONBOARDING_CREATED", id, null, "SYSTEM", "PATIENT");
     }
 
@@ -83,6 +89,9 @@ public class OnboardingService {
         var ob = queries.current(caseId);
         if (ob.getVersion() != request.expectedVersion()) throw new ApiException(409, "ONBOARDING_VERSION_CONFLICT", "Your onboarding was updated in another session");
         Instant now = clock.instant();
+        // A minor cannot consent alone: only a guardian may onboard them (P1-13, A-05).
+        if (!"GUARDIAN".equals(request.subjectType()) && guardians.isMinor(caseId))
+            throw new ApiException(409, "MINOR_REQUIRES_GUARDIAN", "A parent or legal guardian must act for this patient");
         int changed = onboardings.chooseSubjectType(ob.getId(), request.expectedVersion(), request.subjectType(), micros(now));
         if (changed != 1) throw new ApiException(409, "ONBOARDING_VERSION_CONFLICT", "Your onboarding was updated in another session");
         // A guardian/representative needs a scoped, time-bound delegation. A payer is NOT given a
@@ -91,6 +100,12 @@ public class OnboardingService {
             String scope = request.permissionScope() == null || request.permissionScope().isBlank() ? "COORDINATION" : request.permissionScope().trim();
             Instant expires = request.expiresAt();
             String relationship = request.relationship() == null ? request.subjectType() : request.relationship();
+            if ("GUARDIAN".equals(request.subjectType())) {
+                guardians.declare(caseId, patientId, actor, new GuardianService.OnboardingGuardian(relationship, request.legalBasis(), scope, expires, request.evidenceDocumentId()), now);
+                audit(caseId, "PATIENT_ONBOARDING_SUBJECT_SET", ob.getId(), request.subjectType(), actor.subject(), actor.label());
+                events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));
+                return buildView(caseId);
+            }
             int updated = representatives.regrant(patientId, actor.subject(), relationship, scope, micros(now), micros(expires));
             if (updated == 0)
                 representatives.saveAndFlush(new PatientRepresentative(patientId, actor.subject(), relationship, scope, now, expires, now));

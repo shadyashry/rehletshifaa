@@ -89,6 +89,10 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
     @Query("select c.careCategory as careCategory, c.preferredLanguage as preferredLanguage, c.status as status, c.urgency as urgency from MedicalCase c where c.id = :id")
     Optional<RoutingFacts> findRoutingFacts(@Param("id") UUID id);
 
+    /** The patient's age band (P1-13); empty while it was never stated. */
+    @Query("select c.ageBand from MedicalCase c where c.id = :id")
+    Optional<com.rehletshifaa.casemanagement.domain.AgeBand> findAgeBand(@Param("id") UUID id);
+
     /** The coordinator's current urgency judgement of the case (an input to work priority). */
     @Query("select c.urgency from MedicalCase c where c.id = :id")
     Optional<CaseUrgency> findUrgency(@Param("id") UUID id);
@@ -205,6 +209,7 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
         UUID getId(); String getCaseNumber(); CaseStatus getStatus(); String getCountry();
         String getPreferredLanguage(); String getCareCategory(); Instant getCreatedAt(); Instant getUpdatedAt(); Long getVersion();
         Boolean getTravelPackageRequested(); String getWaitingOn(); String getWaitingReason(); CaseUrgency getUrgency();
+        com.rehletshifaa.casemanagement.domain.AgeBand getAgeBand();
     }
 
     String CASE_ROW = """
@@ -212,7 +217,7 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
                 p.givenName as givenName, p.familyName as familyName, c.country as country,
                 c.preferredLanguage as preferredLanguage, c.careCategory as careCategory, c.createdAt as createdAt,
                 c.updatedAt as updatedAt, c.version as version, c.travelPackageRequested as travelPackageRequested,
-                c.waitingOn as waitingOn, c.waitingReason as waitingReason, c.urgency as urgency
+                c.waitingOn as waitingOn, c.waitingReason as waitingReason, c.urgency as urgency, c.ageBand as ageBand
             from MedicalCase c join PatientProfile p on p.id = c.patientId
             """;
 

@@ -1040,6 +1040,9 @@
     },
     "decisionFailed": "Your decision was not sent. Check your connection and try again; nothing has changed yet."
   },
+  "guardianConsent": {
+    "text": "I confirm I am the patient's parent or legal guardian, that the document I provided is genuine, and that I consent on the patient's behalf to coordinating their care. (Placeholder text pending legal review.)"
+  },
   "portalWork": {
     "empty": {
       "thread": "No messages in this conversation yet.",
@@ -1794,7 +1797,9 @@
       "INFORMATION_REQUEST": "Follow up the information request",
       "DOCUMENT_REVIEW": "Review the documents",
       "FX_REAPPROVAL": "Check the exchange rate on a final quote",
-      "FINAL_QUOTE_EXPIRED": "Final quote expired: contact the patient"
+      "FINAL_QUOTE_EXPIRED": "Final quote expired: contact the patient",
+      "INCIDENT_REVIEW": "Review an incident",
+      "FOLLOW_UP_REVIEW": "Review the reopened case"
     },
     "proposalVersion": "v{number}",
     "waitingReason": {
@@ -1979,6 +1984,26 @@
         "CASE_MARKED_URGENT": {
           "title": "Case {caseNumber} was marked urgent",
           "context": "Its coordinator judged it time-critical. Make room for its work today."
+        },
+        "INCIDENT_REVIEW": {
+          "title": "Review an incident on case {caseNumber}",
+          "context": "Open the incident, take it up and resolve it with a note."
+        },
+        "INCIDENT_CRITICAL": {
+          "title": "A critical incident was raised on case {caseNumber}",
+          "context": "Another manager owns it. Open the incident list to see who."
+        },
+        "INCIDENT_CLINICAL": {
+          "title": "A clinical incident was recorded on case {caseNumber}",
+          "context": "Open the case to see its follow-up."
+        },
+        "CASE_REOPENED": {
+          "title": "Case {caseNumber} was reopened",
+          "context": "Its Consultant has been asked to review it."
+        },
+        "FOLLOW_UP_REVIEW": {
+          "title": "Review the reopened case {caseNumber}",
+          "context": "The case was reopened. Review it and plan the follow-up."
         },
         "ASSIGN_CONSULTANT": {
           "title": "Prepare the case for a Consultant",

@@ -11,7 +11,6 @@ import com.rehletshifaa.casemanagement.infrastructure.CaseSubmissionContactRepos
 import com.rehletshifaa.casemanagement.infrastructure.ConsentRecordRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.directory.domain.PatientProfile;
-import com.rehletshifaa.directory.domain.PatientRepresentative;
 import com.rehletshifaa.directory.infrastructure.PatientProfileRepository;
 import com.rehletshifaa.directory.infrastructure.PatientProfileRepository.Account;
 import com.rehletshifaa.directory.infrastructure.PatientRepresentativeRepository;
@@ -88,8 +87,9 @@ public class PatientAccountService {
     private final com.rehletshifaa.casemanagement.application.CaseService caseService;
     private final Authority authority;
     private final Clock clock;
+    private final GuardianService guardians;
 
-    public PatientAccountService(PatientIdentityPort identity, IntakeLifecycleService intake, com.rehletshifaa.casemanagement.application.CaseService caseService, Authority authority, Clock clock, AuditTrail auditTrail, NotificationOutbox notificationOutbox, PatientProfileRepository patients, PatientRepresentativeRepository representatives, CaseSubmissionContactRepository contacts, PatientOnboardingRepository onboardings, PatientAccountLinkRequestRepository linkRequests, MedicalCaseRepository cases, CaseAccessLinkRepository accessLinks, ConsentRecordRepository consentRecords, PatientIdentityVerificationRepository identityVerifications, ApplicationEventPublisher events) { this.events = events; this.identityVerifications = identityVerifications; this.consentRecords = consentRecords; this.accessLinks = accessLinks; this.cases = cases; this.linkRequests = linkRequests; this.onboardings = onboardings; this.contacts = contacts; this.representatives = representatives; this.patients = patients; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
+    public PatientAccountService(PatientIdentityPort identity, IntakeLifecycleService intake, com.rehletshifaa.casemanagement.application.CaseService caseService, Authority authority, Clock clock, AuditTrail auditTrail, NotificationOutbox notificationOutbox, PatientProfileRepository patients, PatientRepresentativeRepository representatives, CaseSubmissionContactRepository contacts, PatientOnboardingRepository onboardings, PatientAccountLinkRequestRepository linkRequests, MedicalCaseRepository cases, CaseAccessLinkRepository accessLinks, ConsentRecordRepository consentRecords, PatientIdentityVerificationRepository identityVerifications, ApplicationEventPublisher events, GuardianService guardians) { this.guardians = guardians; this.events = events; this.identityVerifications = identityVerifications; this.consentRecords = consentRecords; this.accessLinks = accessLinks; this.cases = cases; this.linkRequests = linkRequests; this.onboardings = onboardings; this.contacts = contacts; this.representatives = representatives; this.patients = patients; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;
         this.identity = identity; this.intake = intake; this.caseService = caseService; this.authority = authority; this.clock = clock;
     }
 
@@ -267,13 +267,13 @@ public class PatientAccountService {
         var intakeRequest = new com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest("SOMEONE_ELSE", person.givenName(), person.familyName(), person.singleLegalName(),
                 new com.rehletshifaa.casemanagement.api.CaseDtos.RepresentativeContact(PatientNames.display(me.getGivenName(), me.getFamilyName()), relationship),
                 person.country(), me.getPhone(), request.conditionDescription(), "ar".equals(me.getLanguage()) ? "ar" : "en", true, null,
-                me.getEmail(), null, request.careArea(), request.travelPackageRequested());
+                me.getEmail(), null, request.careArea(), request.travelPackageRequested(), request.ageBand());
         var created = caseService.create(intakeRequest, subject);
         UUID patientId = cases.findById(created.caseId()).orElseThrow().getPatientId();
         // The grant is safe only on a person this request just created: never on an existing record.
         if (cases.countByPatientId(patientId) != 1 || representatives.existsByPatientId(patientId))
             throw new IllegalStateException("A case for someone else must create a new patient " + patientId);
-        representatives.saveAndFlush(new PatientRepresentative(patientId, subject, relationship, "VIEW,MESSAGE,COORDINATE", now, null, now));
+        guardians.grantAtIntake(created.caseId(), patientId, subject, relationship, now);
         audit(created.caseId(), "CASE_STARTED_FOR_SOMEONE_ELSE", patientId, "Signed-in account sent a case for someone in their care (" + relationship + ") and acts for them");
         return created;
     }
@@ -360,8 +360,7 @@ public class PatientAccountService {
      */
     private void linkAsRepresentative(LinkRequest r, String subject, String relationship, Instant now) {
         String rel = trimToNull(relationship) == null ? "OTHER" : relationship.trim().toUpperCase(Locale.ROOT);
-        if (!representatives.existsByPatientIdAndRepresentativeSubjectAndRevokedAtIsNull(r.getPatientId(), subject))
-            representatives.saveAndFlush(new PatientRepresentative(r.getPatientId(), subject, rel, "VIEW,MESSAGE,COORDINATE", now, null, now));
+        guardians.grantAtIntake(r.getCaseId(), r.getPatientId(), subject, rel, now);
         // The representative's email is not the patient's account email.
         changeProfile(r.getPatientId(), p -> p.withdrawEmail(r.getEmail(), false, now));
         // If the intake said "myself", it was in fact a representative: correct the submission record and the

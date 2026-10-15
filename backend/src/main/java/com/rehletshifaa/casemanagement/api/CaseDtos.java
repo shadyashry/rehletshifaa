@@ -29,11 +29,14 @@ public final class CaseDtos {
         @Email @Size(max=254) String email,
         @Size(max=80) String timeZone,
         @Size(max=80) String careArea,
-        Boolean travelPackageRequested
+        Boolean travelPackageRequested,
+        /** P1-13 (A-05): the patient's age band; optional on the wire until the form sends it (null = not stated, recorded in intake review). */
+        @Pattern(regexp="UNDER_12|AGE_12_17|AGE_18_64|AGE_65_PLUS") String ageBand
     ) {
-        public CreateCaseRequest(String givenName,String familyName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken){this("MYSELF",givenName,familyName,null,null,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,null,null,null,null);}
-        public CreateCaseRequest(String givenName,String familyName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken,String email,String timeZone){this("MYSELF",givenName,familyName,null,null,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,email,timeZone,null,null);}
-        public CreateCaseRequest(String givenName,String familyName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken,String email,String timeZone,String careArea){this("MYSELF",givenName,familyName,null,null,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,email,timeZone,careArea,null);}
+        public CreateCaseRequest(String caseFor,String givenName,String familyName,Boolean singleLegalName,RepresentativeContact representative,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken,String email,String timeZone,String careArea,Boolean travelPackageRequested){this(caseFor,givenName,familyName,singleLegalName,representative,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,email,timeZone,careArea,travelPackageRequested,null);}
+        public CreateCaseRequest(String givenName,String familyName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken){this("MYSELF",givenName,familyName,null,null,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,null,null,null,null,null);}
+        public CreateCaseRequest(String givenName,String familyName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken,String email,String timeZone){this("MYSELF",givenName,familyName,null,null,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,email,timeZone,null,null,null);}
+        public CreateCaseRequest(String givenName,String familyName,String country,String whatsappNumber,String conditionDescription,String preferredLanguage,Boolean consent,String turnstileToken,String email,String timeZone,String careArea){this("MYSELF",givenName,familyName,null,null,country,whatsappNumber,conditionDescription,preferredLanguage,consent,turnstileToken,email,timeZone,careArea,null,null);}
         public boolean forSomeoneElse(){return "SOMEONE_ELSE".equals(caseFor);}
     }
 
@@ -54,9 +57,12 @@ public final class CaseDtos {
         Boolean travelPackageRequested,
         @AssertTrue Boolean consent,
         @Pattern(regexp="MYSELF|SOMEONE_ELSE") String caseFor,
-        @Valid SomeoneElse someoneElse
+        @Valid SomeoneElse someoneElse,
+        /** P1-13 (A-05): the age band of whoever the case is for; optional (null = not stated). */
+        @Pattern(regexp="UNDER_12|AGE_12_17|AGE_18_64|AGE_65_PLUS") String ageBand
     ) {
-        public NewCaseForPatientRequest(String conditionDescription,String careArea,Boolean travelPackageRequested,Boolean consent){this(conditionDescription,careArea,travelPackageRequested,consent,null,null);}
+        public NewCaseForPatientRequest(String conditionDescription,String careArea,Boolean travelPackageRequested,Boolean consent,String caseFor,SomeoneElse someoneElse){this(conditionDescription,careArea,travelPackageRequested,consent,caseFor,someoneElse,null);}
+        public NewCaseForPatientRequest(String conditionDescription,String careArea,Boolean travelPackageRequested,Boolean consent){this(conditionDescription,careArea,travelPackageRequested,consent,null,null,null);}
         public boolean forSomeoneElse(){return "SOMEONE_ELSE".equals(caseFor);}
     }
 
