@@ -12,6 +12,19 @@ public interface MedicalDocumentRepository extends JpaRepository<MedicalDocument
     @org.springframework.data.jpa.repository.Query("select coalesce(sum(d.sizeBytes),0) from MedicalDocument d where d.medicalCase.id=:caseId and d.status <> :status")
     long totalBytesForCase(UUID caseId, com.rehletshifaa.document.domain.DocumentStatus status);
 
+    /**
+     * Uploads nobody finished: PENDING since before the cutoff (presigned and never confirmed, or the scanner had no verdict),
+     * or QUARANTINED since before it (a scan that never completed). Oldest first, for the sweeper.
+     */
+    @org.springframework.data.jpa.repository.Query("""
+            select d.id from MedicalDocument d
+            where (d.status = :pending and d.createdAt < :cutoff) or (d.status = :quarantined and d.confirmedAt < :cutoff)
+            order by d.createdAt""")
+    java.util.List<UUID> findStaleUploads(
+            @org.springframework.data.repository.query.Param("pending") com.rehletshifaa.document.domain.DocumentStatus pending,
+            @org.springframework.data.repository.query.Param("quarantined") com.rehletshifaa.document.domain.DocumentStatus quarantined,
+            @org.springframework.data.repository.query.Param("cutoff") java.time.Instant cutoff, org.springframework.data.domain.Limit limit);
+
     interface CaseDocumentCount { UUID getCaseId(); Long getDocuments(); }
 
     /** Documents per case, excluding one status; cases without any are absent. */

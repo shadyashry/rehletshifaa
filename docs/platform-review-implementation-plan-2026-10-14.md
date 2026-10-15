@@ -942,10 +942,25 @@ phases.
     880 tests, 0 failures, 3 skips (876 before, 4 new), `ArchitectureRulesTest` green. Frontend: `pnpm typecheck` clean, eslint clean on touched files, `vitest run` 73 files, 533 tests (5 new in `GuardianStep.test`: upload →
     check → selected, focused and attached; scanner outage and "Check again" with one presign; wrong type and condemned file; upload under an existing list;
     Arabic label). Not run: Playwright (`my-care-safety.spec.ts` still covers the step without an upload) and a live walk with ClamAV.
-  - Open gaps: the Documents tab of My Care has no upload of its own (the endpoint is ready for it); no byte-level progress (the PUT is one fetch); a file
-    left PENDING by a scanner outage and never re-checked stays PENDING (as on the secure link).
+  - Follow-up, same branch (2026-10-15), closing the two gaps above. **(a) Documents tab upload** (`13859e8`): the control becomes
+    `CaseDocumentUpload`, used by the guardian step and by My Care's Documents tab (`documentUpload` slot of `MyCare`; a clean upload calls
+    `reloadDocuments`, new in `CaseViewProps`/`Portal`); the list says "Being checked" / "Did not pass the virus check" and hides REJECTED rows;
+    the tab's hint no longer points to the coordinator's link; generic upload copy moved to `portalWork.myCare.upload` (en, ar draft).
+    Tests: `CaseDocumentUpload.test` (3), `MyCare.test` +1; frontend gate 74 files, 537 tests. **(b) Unfinished-upload sweeper** (this commit):
+    `PendingDocumentSweeper.sweep` (`@LeasedJob`, every 5 min, 50 per run) gives each upload PENDING since before presign expiry + 10 min, or
+    QUARANTINED that long, `DocumentService.recheckStale`: bytes stored → scanned like a confirm; no bytes → REJECTED, which frees the case's
+    quota (abandoned presigns counted against it before); no verdict or storage down → next run. The confirm path no longer leaves an upload
+    stuck in QUARANTINED when storage fails between quarantine and read. JPQL `findStaleUploads` on the existing `(status, created_at)` index; no
+    migration. The outage message now says the file is checked automatically. Tests: `DocumentServiceTest` +5, new `PendingDocumentSweeperTest`
+    (arrived, never arrived, stuck in quarantine, in flight untouched, quota), `SchedulerLeaseTest` lists the job; `PostgresJpaMappingTest` green on a
+    disposable PostgreSQL 17; backend `mvn -o -q test` (JVM in UTC) 886 tests, 0 failures, 3 skips (880 before, 6 new).
+  - Open gaps: no byte-level progress bar (the PUT is one fetch; files are at most 15 MB); the sweeper writes no audit row (the status change
+    is the record) and tells nobody when a deferred upload becomes clean; the guardian step does not list the guardian's own uploads that are
+    still being checked (they appear once clean).
   - Next exact action: owner fast-forwards `feat/review-p0` to `claude/guardian-upload` and rebuilds backend and frontend; live walk: a minor's case with no
-    document, the guardian uploads the guardianship paper from My Care, sees it checked, attaches it, the coordinator verifies.
+    document, the guardian uploads the guardianship paper from My Care, sees it checked, attaches it, the coordinator verifies; a patient
+    uploads from the Documents tab; with ClamAV stopped, an upload shows the outage and is finished by the sweeper within ~5 minutes of
+    ClamAV returning (once the upload is 15 minutes old).
 
 ### P1-14  Consultant public profiles — data and endpoint  (D-03, §16.2 item 5)
 - Backend only: a public read of the published profile ("Credentials reviewed · current" derived from the credential

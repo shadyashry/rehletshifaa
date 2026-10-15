@@ -39,14 +39,44 @@ public class DocumentService {
     private ConfirmResponse confirmForCase(UUID caseId,ConfirmRequest request){var document=documents.findByIdAndMedicalCaseId(request.documentId(), caseId).orElseThrow(() -> new ApiException(404,"DOCUMENT_NOT_FOUND","Document was not found"));
         if (document.getStatus()==DocumentStatus.CLEAN) return new ConfirmResponse(document.getId(),document.getStatus().name()); // a retry after a lost response
         if (document.getStatus()!=DocumentStatus.PENDING) throw new ApiException(409,"DOCUMENT_NOT_PENDING","Document cannot be confirmed in its current state");
+        inspectStored(document); return new ConfirmResponse(document.getId(),document.getStatus().name());
+    }
+
+    /** What {@link #recheckStale} did with one upload nobody finished confirming. */
+    public enum Recheck { CLEAN, CONDEMNED, NEVER_ARRIVED, STILL_UNAVAILABLE, SKIPPED }
+
+    /**
+     * The sweeper's second look at an upload left unconfirmed (PENDING: never confirmed, or the scanner had no verdict) or
+     * stuck mid-scan (QUARANTINED: the process or the storage stopped after quarantine). Bytes in storage get the confirm's
+     * own checks and scan; no bytes after the presign has expired means the upload never arrived, so the row is rejected and
+     * stops counting against the case's limits. No verdict, or storage down, leaves it for the next run. A row someone
+     * confirmed meanwhile is skipped; a concurrent confirm loses on the row version, never both.
+     */
+    @Transactional(noRollbackFor=ApiException.class) public Recheck recheckStale(UUID documentId){
+        var document=documents.findById(documentId).orElse(null);
+        if(document==null)return Recheck.SKIPPED;
+        if(document.getStatus()==DocumentStatus.QUARANTINED)document.scanDeferred();
+        if(document.getStatus()!=DocumentStatus.PENDING)return Recheck.SKIPPED;
+        try{inspectStored(document);return Recheck.CLEAN;}
+        catch(ApiException e){return switch(e.code()){
+            case "UPLOAD_NOT_FOUND"->{document.reject();documents.save(document);yield Recheck.NEVER_ARRIVED;}
+            case "DOCUMENT_SCAN_UNAVAILABLE","STORAGE_UNAVAILABLE"->Recheck.STILL_UNAVAILABLE;
+            default->Recheck.CONDEMNED;};}
+    }
+
+    /** Checks the stored bytes against the presign and scans them; leaves the document CLEAN or throws why it is not. */
+    private void inspectStored(MedicalDocument document){
         StoragePort.StoredObject stored=storage.verify(document.getObjectKey());
         if (stored.sizeBytes()!=document.getSizeBytes() || !document.getContentType().equalsIgnoreCase(stored.contentType())) { document.reject(); documents.save(document); storage.delete(document.getObjectKey()); throw new ApiException(422,"DOCUMENT_METADATA_MISMATCH","Uploaded document metadata does not match the request"); }
         document.quarantine(clock.instant()); documents.saveAndFlush(document);
-        var result=inspector.inspect(storage.read(document.getObjectKey(),maxBytes),document.getContentType());
+        byte[] content;
+        // Storage gone between quarantine and read: no verdict either, so back to unconfirmed rather than stuck in quarantine.
+        try{content=storage.read(document.getObjectKey(),maxBytes);}catch(ApiException e){if("STORAGE_UNAVAILABLE".equals(e.code())){document.scanDeferred();documents.save(document);}throw e;}
+        var result=inspector.inspect(content,document.getContentType());
         // No verdict is not a verdict: keep the upload, keep it unusable, and let the same confirm be retried.
         if(result.retryable()){document.scanDeferred();documents.save(document);throw new ApiException(503,"DOCUMENT_SCAN_UNAVAILABLE","Document security inspection is temporarily unavailable; retry shortly");}
         if(!result.clean()){document.scanFailed();documents.save(document);storage.delete(document.getObjectKey());throw new ApiException(422,"DOCUMENT_INSPECTION_FAILED","Uploaded document did not pass security inspection");}
-        storage.markClean(document.getObjectKey());document.markClean();documents.save(document);return new ConfirmResponse(document.getId(),document.getStatus().name());
+        storage.markClean(document.getObjectKey());document.markClean();documents.save(document);
     }
     /** A file that arrived on a patient channel (WhatsApp): the case document it became, or why there is none. */
     public record ChannelFile(UUID documentId, String status) {}

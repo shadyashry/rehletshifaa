@@ -42,6 +42,14 @@ Rules (`GuardianService`, `CustomerReadinessService`, `OnboardingService`):
   submitted and the type, size, per-case limits and scan (ClamAV in production) are those of every channel. A clean confirm is audited
   `PATIENT_DOCUMENT_UPLOADED`. Not transactional itself, so a scanner outage (503, upload kept PENDING, the same confirm retried) or a
   malware verdict (422, SCAN_FAILED, object deleted) stays recorded.
+- Unfinished uploads (every channel): `PendingDocumentSweeper.sweep` (`@LeasedJob`, every 5 min,
+  `app.storage.pending-sweep-milliseconds`) takes up to 50 documents PENDING since before the presign expiry plus 10 min
+  (`pending-sweep-grace-seconds`), or QUARANTINED that long (a scan that never finished), and runs
+  `DocumentService.recheckStale` on each in its own transaction: bytes stored → the confirm's own checks and scan (CLEAN, or
+  SCAN_FAILED/REJECTED and deleted); no bytes → REJECTED (never arrived; frees the case's file and storage quota); no verdict or
+  storage down → left for the next run. Storage lost between quarantine and read now returns the upload to PENDING in the confirm
+  path too, instead of leaving it stuck in quarantine. Query `MedicalDocumentRepository.findStaleUploads` (JPQL, index
+  `idx_documents_status_created`).
 - Consent: `GUARDIAN_AUTHORIZATION` is its own consent type (replaces `REPRESENTATIVE_AUTHORIZATION` for a GUARDIAN subject), recorded
   in `consent_records` with policy version `guardian-v0-placeholder`. **The wording is a placeholder** (backend
   `PatientActivationService.consentText`, frontend `guardianConsent.text` in `en.json` and `ar.json`, same words). Counsel and a
@@ -103,9 +111,11 @@ Not touched (P1-18): the 30-day window, the closure statement and review request
 | Manager, Compliance | Control Center › Reviews & Safety › Incidents | `IncidentsPage` |
 | Manager, Consultant | Closed case: "Reopen case" | `ReopenCase` |
 
-In `GuardianStep` the guardian chooses a clean document of the case or uploads one (`EvidenceUpload`, through the portal `api` passed
-as `send`): "Uploading…", then "Checking … for viruses…" while confirm runs the scan; a clean file is listed first, selected and
+In `GuardianStep` the guardian chooses a clean document of the case or uploads one (`CaseDocumentUpload`, through the portal `api`
+passed as `send`): "Uploading…", then "Checking … for viruses…" while confirm runs the scan; a clean file is listed first, selected and
 focused, and attached with the step's own button. A scanner outage offers "Check again" (same upload, no second presign); a condemned
 or wrong-type file says so. The upload is offered under the list too, since the case's documents are usually medical files. The
-generic Documents tab of My Care still has no upload.
+same `CaseDocumentUpload` sits on My Care's Documents tab (the `documentUpload` slot; a clean upload reloads the case's documents
+through `reloadDocuments`); that list marks files still being checked or condemned and hides REJECTED rows (uploads that never
+arrived).
 

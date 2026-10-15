@@ -1876,7 +1876,7 @@
         "wrongType": "Choose a PDF, JPG or PNG file.",
         "tooLarge": "This file is over 15 MB. Choose a smaller file, or a photo of the document.",
         "rejected": "{name} did not pass the virus check and was removed. Choose another file.",
-        "unavailable": "The virus check is not available right now. Your file is kept; check it again in a few minutes.",
+        "unavailable": "The virus check is not available right now. Your file is kept and is checked automatically once the check is back, or you can check it again yourself.",
         "retry": "Check again",
         "full": "This case holds as many files as it can. Message your coordinator.",
         "failed": "The file could not be uploaded. Try again, or message your coordinator.",
