@@ -4,7 +4,7 @@ import { API } from "./env";
 
 /**
  * Check Case Status renders the backend's proposal answer and nothing more: no proposal control while the
- * proposal is being prepared, one "Review proposal" action for a released version — which opens the
+ * proposal is being prepared, one "Review estimate" action for a released version — which opens the
  * proposal page straight away, with the grant handed over through session storage rather than the URL.
  */
 const BASE = `${API}/public/cases/status-token`;
@@ -50,9 +50,9 @@ test("a released proposal is opened securely from the verified status session", 
   });
   await reachStatus(page, { caseNumber: "RS-2026-000081", statusEn: "Waiting for your decision", statusAr: "بانتظار قرارك", phase: "proposal", actionRequired: false, action: null,
     proposal: { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v-2", versionNumber: 2, validUntil: "2099-01-01T00:00:00Z", decidedAt: null } });
-  await expect(page.getByRole("heading", { name: "Your proposal is ready to review" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your estimate is ready to review" })).toBeVisible();
   await expect(page.getByText("No action is required from you right now.")).toHaveCount(0);
-  const review = page.getByRole("button", { name: "Review proposal" });
+  const review = page.getByRole("button", { name: "Review estimate" });
   await expect(review).toHaveCount(1);
   await review.click();
   await page.waitForURL(/\/en\/proposal\/share-token$/);

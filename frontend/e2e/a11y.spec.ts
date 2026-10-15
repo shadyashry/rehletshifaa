@@ -6,6 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { setupPatient } from "./patient-fixture";
 import { setupPortal } from "./portal-fixture";
+import { INFORMATION_REQUESTED, openStatusView, setupStatusLink, STATUS_TOKEN } from "./status-fixture";
 
 /**
  * WCAG 2.2 AA ratchet for the public site and the portal, in English and Arabic.
@@ -45,6 +46,8 @@ const PUBLIC: Target[] = [
   { name: "how-it-works", path: "/how-it-works" },
   { name: "send-my-case", path: "/send-my-case" },
   { name: "track-case", path: "/track-case" },
+  // The secure status link after the code (plan section 10): the current page, the journey and the response form.
+  { name: "status-link", path: `/status/${STATUS_TOKEN}`, prepare: page => setupStatusLink(page, INFORMATION_REQUESTED), ready: openStatusView },
   { name: "cardiology", path: "/cardiology" },
 ];
 const PORTAL: Target[] = [

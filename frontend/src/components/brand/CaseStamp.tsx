@@ -16,7 +16,7 @@ export function CaseStamp({ label, date, locale, className = "" }: { label: stri
   if (!printed) return null;
   return (
     <span className={`case-stamp inline-flex flex-col items-center rounded-[0.375rem] border-2 border-[var(--color-coral,var(--color-alert-600))] px-2.5 py-1 text-alert-700 ${className}`}>
-      <span aria-hidden className="text-center sm:max-w-[6.5rem] text-[0.75rem] font-bold uppercase leading-4 tracking-[0.14em] [text-wrap:balance] rtl:text-[0.8125rem] rtl:normal-case rtl:tracking-normal">{label}</span>
+      <span aria-hidden className="text-center sm:max-w-[5.25rem] text-[0.75rem] font-bold uppercase leading-4 tracking-[0.14em] [text-wrap:balance] rtl:text-[0.8125rem] rtl:leading-5 rtl:normal-case rtl:tracking-normal">{label}</span>
       <span aria-hidden className="mt-0.5 border-t border-current pt-0.5 text-[0.75rem] font-semibold leading-4 tabular-nums" dir="auto">{printed}</span>
       <span className="sr-only">{label}{locale === "ar" ? "، " : ", "}{printed}</span>
     </span>

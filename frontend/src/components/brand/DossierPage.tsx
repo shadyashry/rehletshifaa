@@ -24,7 +24,8 @@ export function DossierPage({ kicker, reference, stamp, edge = "plain", classNam
     <section {...rest} data-edge={edge === "tab" ? "tab" : undefined} data-stamped={stamp ? "" : undefined}
              className={`dossier-page dossier-page-static relative card ${edge === "tab" ? "file-tab " : ""}${className}`}>
       {kicker ? <p className="text-[0.8125rem] font-semibold uppercase leading-5 tracking-[0.1em] text-ink-500 rtl:text-[0.875rem] rtl:normal-case rtl:tracking-normal">{kicker}</p> : null}
-      {reference ? <p className="mt-1 text-3xl font-bold tracking-wide text-brand-900" dir="ltr"><span className="inline-block">{reference}</span></p> : null}
+      {/* Isolated left-to-right inside the paragraph, so the number stays whole and still starts at the page's start edge in Arabic. */}
+      {reference ? <p className="mt-1 text-3xl font-bold tracking-wide text-brand-900"><bdi dir="ltr" className="inline-block">{reference}</bdi></p> : null}
       {children}
       {/* Drawn in the end-top corner; read after the page's own text. */}
       {stamp ? <div className="dossier-page-stamp">{stamp}</div> : null}

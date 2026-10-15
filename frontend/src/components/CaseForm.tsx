@@ -268,7 +268,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     const statusHref = statusToken ? `/${locale}/status/${statusToken}` : undefined;
     const s = d.form.success;
     // The first page of the patient's file: the case number as its heading, stamped at the moment it was received.
-    return <DossierPage className="p-7 md:p-10" aria-live="polite" kicker={d.form.caseNumber} reference={caseNumber}
+    return <DossierPage className="[--page-pad:1.75rem] md:[--page-pad:2.5rem]" aria-live="polite" kicker={d.form.caseNumber} reference={caseNumber}
                         stamp={<CaseStamp label={s.stampReceived} date={receivedAt} locale={locale} />}>
       <h2 className="mt-6 text-2xl font-bold text-brand-900">{d.form.successTitle}</h2>
       <p className="lead mt-3">{isPatient && session?.linked ? t.successReturning : s.withTeam}</p>
